@@ -1,0 +1,32 @@
+---
+# Formatting for Modal. CI checks with clang-format 22.1.8; use the same version locally.
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++20
+ColumnLimit: 100
+IndentWidth: 4
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+NamespaceIndentation: None
+FixNamespaceComments: true
+InsertNewlineAtEOF: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<modal/'
+    Priority: 2
+  - Regex: '^<(catch2|libremidi|SDL3)/'
+    Priority: 3
+  - Regex: '^<'
+    Priority: 4
+...

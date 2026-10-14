@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: pip install --user clang-format==22.1.8
+      - name: Check formatting
+        run: git ls-files -z '*.cpp' '*.hpp' | xargs -0 --no-run-if-empty clang-format --dry-run --Werror
+
+  build:
+    name: ${{ matrix.preset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, preset: linux-gcc, configs: "debug release" }
+          - { os: ubuntu-24.04, preset: linux-clang, configs: "debug release" }
+          - { os: ubuntu-24.04, preset: linux-clang-asan, configs: "" }
+          - { os: windows-2022, preset: windows-msvc, configs: "debug release" }
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read vcpkg baseline
+        id: baseline
+        run: echo "commit=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ steps.baseline.outputs.commit }}
+          path: vcpkg
+
+      - name: Install Linux packages
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Bootstrap vcpkg
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          if [ "$RUNNER_OS" = Windows ]; then ./vcpkg/bootstrap-vcpkg.bat -disableMetrics; else ./vcpkg/bootstrap-vcpkg.sh -disableMetrics; fi
+
+      - uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-${{ matrix.preset }}-${{ steps.baseline.outputs.commit }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ matrix.preset }}-${{ steps.baseline.outputs.commit }}-
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build and test
+        run: |
+          if [ -z "${{ matrix.configs }}" ]; then
+            cmake --build --preset ${{ matrix.preset }}
+            ctest --preset ${{ matrix.preset }}
+          else
+            for c in ${{ matrix.configs }}; do
+              cmake --build --preset ${{ matrix.preset }}-$c
+              ctest --preset ${{ matrix.preset }}-$c
+            done
+          fi
