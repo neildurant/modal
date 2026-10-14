@@ -47,6 +47,9 @@ A song is a list of tracks, each holding a time-ordered list of events, with all
 - Song files record their PPQN; loading a file at a different resolution rescales it, exactly as SMF import does.
 - Display of bar:beat:tick derives its tick-field width from PPQN.
 - Unit tests run at more than one resolution (e.g. 960 and 6720) to catch hidden assumptions.
+- The constant (`kPpqn`) is the resolution of new songs and the target of import. Every conversion takes the PPQN from the song rather than the constant, so the same code runs at any resolution in tests (decided in milestone 1).
+
+**Tempo.** Tempo is stored as integer microseconds per quarter note, which round-trips SMF exactly, and shown as BPM. Tick-to-time conversion uses 128-bit intermediates so long songs can't overflow.
 
 **Per-track meters (polymeter)**
 
@@ -243,12 +246,13 @@ Recorded events are timestamped by the engine at arrival, never by the UI, so re
 
 - **Chasing.** When playback starts mid-song, each track first sends its latest program change, CC values, pitch bend and channel pressure from before the start point, then note-ons for notes already sounding, for their remaining duration. Note chasing can be turned off per track, for drums and other sounds where a late attack sounds wrong.
 - **Tempo.** The tempo map is evaluated at the start position, so playback begins at the right tempo. Tempo is internal timing, not something sent as MIDI.
+- **Overlapping notes.** When notes of the same pitch on the same channel overlap, each new note retriggers (note-off, then note-on), and the final note-off is sent at the latest end of the overlapping notes, so a long note keeps sounding past a short one inside it. The editor never creates overlapping notes; overlaps in imported files are kept as they are, since the data is shown honestly.
 - **Stop.** Note-offs are sent for every note currently sounding. All Notes Off and a sustain reset on each channel are optional, off by default. A panic key sends All Notes Off and resets controllers on every port and channel.
 - **Tracks and channels.** As in SPG, each track has exactly one output port and one MIDI channel. Notes recorded on any input channel are rechannelised to the armed track's channel. Multi-channel tracks in imported MIDI files are split into one track per channel.
 - **Recording.** Recording replaces existing material in the recorded range by default; overdub (merge) is a setting.
 - **MIDI clock.** A keyboard-driven transport and sync settings screen chooses which ports send MIDI clock, Start/Stop/Continue and Song Position Pointer. These settings are stored in the song, with port names resolved through each machine's port aliases.
 
-* **Panic.** `Ctrl-.` (a full stop, literally) sends All Notes Off and resets controllers on every port and channel, in every mode.
+* **Panic.** `Ctrl-.` (a full stop, literally) sends All Notes Off and resets controllers on every port and channel, in every mode. The interim command-line tools use `!` while playing and a `--panic` option instead, since terminals can't reliably detect `Ctrl-.`.
 * **Recording input.** Armed tracks listen to all MIDI inputs by default; each track can optionally be set to one input.
 * **MIDI thru.** On by default, so you hear the armed track's sound while playing; can be switched off globally or per track.
 
@@ -300,6 +304,10 @@ The engine is a separate library running its own high-priority thread; the UI is
 
 The editor publishes a new immutable song snapshot after each edit; the scheduler picks it up between events. Recorded notes and the play position flow back through a queue.
 
+- **Snapshot handoff.** Songs share unchanged tracks through `shared_ptr<const Track>`. Snapshots reach the engine through a lock-free single-producer, single-consumer queue, not `std::atomic<shared_ptr>` (which takes a lock on common standard libraries). Retired snapshots are handed back and freed off the engine thread, so the engine never runs a destructor or frees memory.
+- **Playback plan.** Each snapshot is compiled off the engine thread into a flat, time-sorted plan with destination, channel, transpose, velocity offset and mute/solo already applied. Notes keep their durations in the plan; the engine generates note-offs from its own table of sounding notes, which also serves stop, panic, overlapping notes and plan swaps during playback.
+- **Engine wake-ups.** The engine sleeps until its next event, or at most 1 ms, so transport commands are seen within 1 ms.
+
 - **Engine library (`core`):** song model, scheduler, recorder, SMF and native file I/O. No UI dependencies; usable from a command-line player and from tests.
 - **Platform layer:** a small `MidiBackend` interface over libremidi, plus thread-priority and timer helpers per OS.
 - **Grid UI:** a cell-grid abstraction (characters, colours, attributes) plus optional pixel regions for the piano roll and velocity lanes. Rendered with SDL3 now; a terminal backend stays possible later.
@@ -323,14 +331,15 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 | MIDI API | ALSA sequencer (via libremidi) | WinMM now; Windows MIDI Services where available (via libremidi) |
 | Virtual ports | Native: the app creates its own named ports | Not in WinMM: needs loopMIDI or Windows MIDI Services loopback |
 | Port sharing | Multi-client | Often single-client under WinMM |
-| Engine thread priority | `SCHED_FIFO` via rtkit or realtime limits | MMCSS "Pro Audio" task |
+| Engine thread priority | `SCHED_FIFO` via realtime limits (`audio` group or `limits.conf`); no rtkit for now; warns if unavailable | MMCSS "Pro Audio" task |
 | Sleeping until next event | `clock_nanosleep` on `CLOCK_MONOTONIC` | High-resolution waitable timer |
 | Compiler | GCC / Clang | MSVC |
 
 **Build and tooling**
 
-- C++20, CMake, dependencies via vcpkg (or Conan): SDL3, SDL\_ttf or FreeType, libremidi, a test framework such as Catch2 or doctest.
+- C++20, CMake, dependencies via vcpkg in manifest mode with a pinned baseline: SDL3, SDL\_ttf or FreeType, libremidi, Catch2 v3 for tests.
 - CI builds and unit tests on both platforms from the first commit.
+- **Testing on Linux, in three tiers.** Unit tests run in WSL (Ubuntu 24.04) and in CI with GCC and Clang. An ALSA integration test in CI loads `snd-seq-dummy` and sends notes between virtual ports through libremidi, checking function but not timing. Timing is measured only on a native Linux install with real MIDI hardware and a loopback cable.
 - A bundled monospace font so the grid looks identical everywhere.
 - A loopback timing test tool: send a steady stream out, receive it back through a cable, report latency and jitter statistics.
 
@@ -364,10 +373,11 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestones 1–2: engine and recording**
 
-- [ ] Scheduler look-ahead. Proposal: the engine sends each event itself at its exact time, preparing only a small window (around 10 ms) ahead; any edit, mute or tempo change during playback discards and rebuilds that window. If milestone 1's loopback measurements show too much jitter on a platform, that backend switches to OS-timestamped delivery (around 50 ms ahead, recalled on stop or edit). The MIDI interface is designed to allow either.
+- [x] Scheduler look-ahead. The engine sends each event itself at its exact time, preparing only a small window (around 10 ms) ahead; any edit, mute or tempo change during playback discards and rebuilds that window. If milestone 1's loopback measurements show too much jitter on a platform (p99 send lateness or loopback jitter above about 1 ms), that backend switches to OS-timestamped delivery (around 50 ms ahead, recalled on stop or edit). The MIDI interface is designed to allow either.
 - [x] Panic key: `Ctrl-.`.
 - [x] Record input: all MIDI inputs by default, optional per-track input. MIDI thru on by default, changeable.
-- [ ] Build tooling details (vcpkg or Conan; Catch2 or doctest): Claude Code proposes, Neil approves.
+- [x] Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
+- [x] An imported SMF's time signatures apply to all tracks; a change that falls mid-bar starts a remainder bar. (Moved up from milestones 3–4, since import needs it.)
 
 **Milestones 3–4: grid and first editing view**
 
@@ -378,7 +388,6 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 * [ ] Remainder bars: always the exact leftover (e.g. 1/4, 5/16), or let the user choose to extend the previous bar instead?
 * [ ] How the arrangement ruler and per-track bar lines are drawn when meters differ, at different zoom levels.
-* [ ] Whether the time-signature map in an imported SMF applies to all tracks (likely) or just the reference track.
 
 - [x] Delete can leave silence (`d`) or close the gap (`D`); put can merge (`p`) or insert (`P`).
 - [x] Cut-at-edges key is `|` (rarely used, so its reach doesn't matter; rebindable like everything else).
