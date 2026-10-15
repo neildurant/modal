@@ -339,7 +339,7 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 
 - C++20, CMake, dependencies via vcpkg in manifest mode with a pinned baseline: SDL3, SDL\_ttf or FreeType, libremidi, Catch2 v3 for tests.
 - CI builds and unit tests on both platforms from the first commit.
-- **Testing on Linux, in three tiers.** Unit tests run in WSL (Ubuntu 24.04) and in CI with GCC and Clang. An ALSA integration test in CI loads `snd-seq-dummy` and sends notes between virtual ports through libremidi, checking function but not timing. Timing is measured only on a native Linux install with real MIDI hardware and a loopback cable.
+- **Testing on Linux, in three tiers.** Unit tests run in WSL (Ubuntu 24.04) and in CI with GCC and Clang. ALSA integration tests (ports through `snd-seq-dummy`, notes between virtual ports through libremidi) run on a native Linux install, since neither WSL nor the GitHub-hosted runners have an ALSA sequencer: the runners' Azure kernel ships no sound modules (checked October 2026). A self-hosted runner on that machine could bring them into CI later. Timing is measured only on a native Linux install with real MIDI hardware and a loopback cable.
 - A bundled monospace font so the grid looks identical everywhere.
 - A loopback timing test tool: send a steady stream out, receive it back through a cable, report latency and jitter statistics.
 

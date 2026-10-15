@@ -24,8 +24,9 @@ bool hasPort(const auto& ports, std::string_view fragment)
 } // namespace
 
 // Port lists depend on the machine. Without help from the environment, this only checks
-// that listing doesn't fail. CI on Linux loads snd-seq-dummy, which provides "Midi Through"
-// ports, and sets MODAL_TEST_ALSA_SEQ=1 so the ports themselves are checked.
+// that listing doesn't fail. On a Linux machine with snd-seq-dummy loaded (it provides
+// "Midi Through" ports), set MODAL_TEST_ALSA_SEQ=1 to check the ports themselves. CI
+// runners have no ALSA sequencer, so this runs only on a real Linux install.
 TEST_CASE("listing MIDI ports")
 {
     const auto ports = modal::platform::listMidiPorts();
