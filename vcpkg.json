@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "builtin-baseline": "357b1a6f8343064ca982a20771e420fcecfe7efc",
   "dependencies": [
-    "catch2"
+    "catch2",
+    "libremidi"
   ]
 }

@@ -16,6 +16,8 @@ set(MODAL_SANITIZE "" CACHE STRING "Sanitizers to enable, e.g. address,undefined
 include(cmake/ModalWarnings.cmake)
 
 add_subdirectory(src/core)
+add_subdirectory(src/platform)
+add_subdirectory(apps)
 
 if(MODAL_BUILD_TESTS)
     enable_testing()

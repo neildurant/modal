@@ -3,8 +3,15 @@ include(Catch)
 
 add_executable(modal_tests
     core/version_test.cpp
+    platform/midi_ports_test.cpp
 )
 
-target_link_libraries(modal_tests PRIVATE modal::core modal::warnings Catch2::Catch2WithMain)
+target_link_libraries(modal_tests PRIVATE
+    modal::core modal::platform modal::warnings Catch2::Catch2WithMain)
+
+# Tests read environment variables with std::getenv, which MSVC deprecates.
+if(MSVC)
+    target_compile_definitions(modal_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 
 catch_discover_tests(modal_tests)

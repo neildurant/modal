@@ -55,7 +55,20 @@ jobs:
 
       - name: Install Linux packages
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+        # autotools: vcpkg builds ALSA from source. libremidi loads the system libasound at run time.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool libasound2t64
+
+      # snd-seq-dummy provides "Midi Through" ports, so tests can use a real ALSA sequencer.
+      - name: Load ALSA sequencer
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y "linux-modules-extra-$(uname -r)"
+          sudo modprobe snd-seq-dummy
+          sudo chmod a+rw /dev/snd/seq
+          echo "MODAL_TEST_ALSA_SEQ=1" >> "$GITHUB_ENV"
 
       - name: Bootstrap vcpkg
         run: |
@@ -82,3 +95,9 @@ jobs:
               ctest --preset ${{ matrix.preset }}-$c
             done
           fi
+
+      - name: List MIDI ports
+        if: matrix.configs != ''
+        run: |
+          exe=$(find build -name 'modal-ports' -o -name 'modal-ports.exe' | grep -i release | head -1)
+          "$exe" || true

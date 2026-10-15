@@ -49,7 +49,7 @@ tests/          unit tests
 
 ## Building and testing
 
-Requires `VCPKG_ROOT` pointing at a vcpkg clone (Windows: `C:\Users\neild\vcpkg`; WSL Ubuntu 24.04: `/opt/vcpkg`). On Linux, also Ninja and the ALSA headers (`libasound2-dev`).
+Requires `VCPKG_ROOT` pointing at a vcpkg clone (Windows: `C:\Users\neild\vcpkg`; WSL Ubuntu 24.04: `/opt/vcpkg`). On Linux, also Ninja, autotools (`autoconf autoconf-archive automake libtool`, which vcpkg needs to build ALSA) and the ALSA runtime (`libasound2t64`), which libremidi loads at run time. MIDI on Linux needs `/dev/snd/seq`, which WSL lacks.
 
 Configure presets: `linux-gcc`, `linux-clang`, `linux-clang-asan` (ASan + UBSan, Debug only), `windows-msvc`. Build and test presets append `-debug` or `-release` (except `linux-clang-asan`). Build trees go in `build/<preset>`.
 
