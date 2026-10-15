@@ -64,11 +64,23 @@ jobs:
       - name: Load ALSA sequencer
         if: runner.os == 'Linux'
         continue-on-error: true
+        # Diagnostic for now: the Azure kernel lacks snd-seq-dummy, so report which sound
+        # modules exist and whether plain snd-seq (enough for virtual ports) loads.
         run: |
-          sudo apt-get install -y "linux-modules-extra-$(uname -r)"
-          sudo modprobe snd-seq-dummy
-          sudo chmod a+rw /dev/snd/seq
-          echo "MODAL_TEST_ALSA_SEQ=1" >> "$GITHUB_ENV"
+          sudo apt-get install -y "linux-modules-extra-$(uname -r)" || true
+          echo "Sound modules for $(uname -r):"
+          find "/lib/modules/$(uname -r)" -name 'snd*' -printf '  %f\n' | sort || true
+          if sudo modprobe snd-seq-dummy; then
+            echo "snd-seq-dummy loaded"
+            sudo chmod a+rw /dev/snd/seq
+            echo "MODAL_TEST_ALSA_SEQ=1" >> "$GITHUB_ENV"
+          elif sudo modprobe snd-seq; then
+            echo "snd-seq loaded, without snd-seq-dummy"
+            sudo chmod a+rw /dev/snd/seq
+          else
+            echo "No ALSA sequencer available"
+          fi
+          ls -l /dev/snd || true
 
       - name: Bootstrap vcpkg
         run: |
