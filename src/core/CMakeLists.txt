@@ -1,4 +1,5 @@
 add_library(modal_core STATIC
+    note_fraction.cpp
     version.cpp
 )
 add_library(modal::core ALIAS modal_core)
