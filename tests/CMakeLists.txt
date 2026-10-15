@@ -3,6 +3,7 @@ include(Catch)
 
 add_executable(modal_tests
     core/note_fraction_test.cpp
+    core/tempo_map_test.cpp
     core/version_test.cpp
     platform/midi_ports_test.cpp
 )

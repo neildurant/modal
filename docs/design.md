@@ -49,7 +49,7 @@ A song is a list of tracks, each holding a time-ordered list of events, with all
 - Unit tests run at more than one resolution (e.g. 960 and 6720) to catch hidden assumptions.
 - The constant (`kPpqn`) is the resolution of new songs and the target of import. Every conversion takes the PPQN from the song rather than the constant, so the same code runs at any resolution in tests (decided in milestone 1).
 
-**Tempo.** Tempo is stored as integer microseconds per quarter note, which round-trips SMF exactly, and shown as BPM. Tick-to-time conversion uses 128-bit intermediates so long songs can't overflow.
+**Tempo.** Tempo is stored as integer microseconds per quarter note, which round-trips SMF exactly, and shown as BPM. The accepted range is 1 to 1000 BPM; SMF tempos outside it are clamped on import. Tempo changes are steps (no ramps). Tick-to-time conversion splits each calculation into whole quarter notes plus remaining ticks, so no intermediate value overflows for centuries of song time, without 128-bit arithmetic. A tick's time is the first whole nanosecond not before it, and a time's tick is the last tick at or before it, so converting a tick to time and back always gives the same tick.
 
 **Per-track meters (polymeter)**
 
