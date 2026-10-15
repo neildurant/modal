@@ -377,6 +377,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Panic key: `Ctrl-.`.
 - [x] Record input: all MIDI inputs by default, optional per-track input. MIDI thru on by default, changeable.
 - [x] Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
+- [ ] Windows MIDI Services. vcpkg's libremidi port is built without its Windows MIDI Services backend, so Windows uses WinMM for now. Using Windows MIDI Services (loopback ports, multi-client access) would need a local overlay port that enables it.
 - [x] An imported SMF's time signatures apply to all tracks; a change that falls mid-bar starts a remainder bar. (Moved up from milestones 3–4, since import needs it.)
 
 **Milestones 3–4: grid and first editing view**
