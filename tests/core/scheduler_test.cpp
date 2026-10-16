@@ -1,3 +1,4 @@
+#include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
 #include <modal/core/playback_plan.hpp>
@@ -7,12 +8,12 @@
 
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <vector>
 
 using namespace modal::core;
 using namespace std::chrono_literals;
+using namespace modal::test;
 using std::chrono::nanoseconds;
 
 namespace
@@ -20,71 +21,6 @@ namespace
 
 // An arbitrary time on the engine's clock to start playing at, so times relative to it show.
 constexpr nanoseconds kNow = 1000s;
-
-struct Sent
-{
-    DestinationId destination;
-    std::vector<std::uint8_t> bytes;
-    nanoseconds due;
-
-    friend bool operator==(const Sent&, const Sent&) = default;
-};
-
-class RecordingSink : public MessageSink
-{
-public:
-    void send(DestinationId destination, std::span<const std::uint8_t> bytes,
-              nanoseconds due) noexcept override
-    {
-        sent.push_back({destination, {bytes.begin(), bytes.end()}, due});
-    }
-
-    // The messages sent, without destinations or times.
-    std::vector<std::vector<std::uint8_t>> messages() const
-    {
-        std::vector<std::vector<std::uint8_t>> result;
-        for (const auto& s : sent)
-        {
-            result.push_back(s.bytes);
-        }
-        return result;
-    }
-
-    std::vector<Sent> sent;
-};
-
-// Routes each track to the destination numbered by its port name, or to 1 if it has none.
-std::optional<DestinationId> byPortName(const Track& track)
-{
-    if (track.port.empty())
-    {
-        return DestinationId{1};
-    }
-    return DestinationId{static_cast<std::uint32_t>(std::stoul(track.port))};
-}
-
-// A song at 120 BPM, so a quarter note is 500 ms at any resolution.
-Song songAt(Ppqn ppqn)
-{
-    Song song{ppqn};
-    song.tempo().set(0, Tempo{500'000});
-    return song;
-}
-
-TrackId addTrack(Song& song, int channel, const std::function<void(Track&)>& edit = {})
-{
-    const auto id = song.addTrack();
-    song.updateTrack(id,
-                     [&](Track& track)
-                     {
-                         track.channel = channel;
-                         if (edit)
-                         {
-                             edit(track);
-                         }
-                     });
-    return id;
-}
 
 // Calls sendDue() at each wake time up to the end, as the engine would.
 void runUntil(Scheduler& scheduler, nanoseconds end)

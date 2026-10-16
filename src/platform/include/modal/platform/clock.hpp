@@ -1,5 +1,7 @@
 #pragma once
 
+#include <modal/core/engine.hpp>
+
 #include <chrono>
 
 namespace modal::platform
@@ -28,6 +30,17 @@ public:
 
 private:
     [[maybe_unused]] void* timer_ = nullptr; // Windows only
+};
+
+// The engine's clock, for the engine thread only.
+class SystemClock final : public core::EngineClock
+{
+public:
+    std::chrono::nanoseconds now() noexcept override { return platform::now(); }
+    void sleepUntil(std::chrono::nanoseconds time) noexcept override { sleeper_.sleepUntil(time); }
+
+private:
+    Sleeper sleeper_;
 };
 
 } // namespace modal::platform

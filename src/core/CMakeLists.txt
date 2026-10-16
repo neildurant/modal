@@ -1,4 +1,5 @@
 add_library(modal_core STATIC
+    engine.cpp
     event.cpp
     meter_map.cpp
     note_fraction.cpp
