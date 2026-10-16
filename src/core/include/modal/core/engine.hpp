@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/core/input_queue.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/scheduler.hpp>
 #include <modal/core/snapshot_exchange.hpp>
@@ -14,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace modal::core
@@ -63,6 +65,11 @@ struct EngineStatus
     TimingStats lateness;
     TimingStats wakeLateness; // from the due time to the start of the send call
     TimingStats sendTime;     // in the send call
+
+    // MIDI input: messages the engine has taken in, and those dropped because it didn't
+    // keep up (or a SysEx too long ever to fit).
+    std::size_t inputReceived = 0;
+    std::size_t inputDropped = 0;
 };
 
 namespace detail
@@ -134,7 +141,15 @@ public:
 
     bool quitRequested() const noexcept { return quit_; }
 
+    // Input side: from the thread receiving from an input, which must be the only one
+    // calling this for that input. Queues a message for the engine and wakes it. Returns
+    // false if the message was dropped because the engine hasn't kept up. Messages the engine
+    // doesn't use (see InputQueue::push) are left out.
+    bool receive(InputId input, std::span<const std::uint8_t> message,
+                 std::chrono::nanoseconds time) noexcept;
+
     static constexpr std::chrono::nanoseconds kMaxSleep = std::chrono::milliseconds{1};
+    static constexpr std::size_t kMaxInputs = 16;
 
 private:
     using Snapshot = detail::EngineSnapshot;
@@ -158,6 +173,7 @@ private:
 
     bool publish(Snapshot snapshot);
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
+    void takeInput() noexcept;
     void publishStatus(std::chrono::nanoseconds now) noexcept;
 
     // Control side.
@@ -167,6 +183,8 @@ private:
     // Shared.
     SnapshotExchange<Snapshot, 8> snapshots_;
     SpscQueue<Command, 64> commands_;
+    std::unique_ptr<std::array<InputQueue, kMaxInputs>> inputs_; // too big for the stack
+    std::atomic<std::size_t> inputDropped_{0};                   // written by input threads
 
     // Engine side.
     MessageSink& sink_;
@@ -182,6 +200,7 @@ private:
     static constexpr Tick kNoPosition = -1;
     std::atomic<Tick> position_{kNoPosition};
     std::atomic<std::size_t> droppedNotes_{0};
+    std::atomic<std::size_t> inputReceived_{0};
     SharedTimingStats lateness_;
     SharedTimingStats wakeLateness_;
     SharedTimingStats sendTime_;

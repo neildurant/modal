@@ -5,6 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <thread>
@@ -32,7 +33,7 @@ public:
     void wake() noexcept override { ++wakes; }
 
     nanoseconds time = kStart;
-    int wakes = 0;
+    std::atomic<int> wakes{0}; // from input threads too
 };
 
 // One note per quarter, starting on the beat, a quarter note long: pitches 60, 62, 64, 65.
@@ -266,4 +267,77 @@ TEST_CASE("the engine runs on its own thread until told to quit")
     REQUIRE(engine.quit());
     thread.join();
     CHECK(sink.sent.size() == 8);
+}
+
+TEST_CASE("input wakes the engine, which takes it in on its next pass")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::vector<std::uint8_t> note{0x90, 60, 100};
+    const std::vector<std::uint8_t> sysEx(3 * InputChunk::kMaxBytes, 0x01);
+    std::vector<std::uint8_t> wholeSysEx = sysEx;
+    wholeSysEx.front() = 0xF0;
+    wholeSysEx.back() = 0xF7;
+
+    CHECK(engine.receive(InputId{0}, note, kStart));
+    CHECK(engine.receive(InputId{3}, wholeSysEx, kStart));
+    CHECK(engine.receive(InputId{0}, std::vector<std::uint8_t>{0xF8}, kStart)); // ignored
+    CHECK(clock.wakes == 2);
+    CHECK(engine.status().inputReceived == 0);
+
+    engine.step();
+    const auto status = engine.status();
+    CHECK(status.inputReceived == 2); // the SysEx counts once
+    CHECK(status.inputDropped == 0);
+}
+
+TEST_CASE("input the engine hasn't kept up with is dropped, for that input only")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::vector<std::uint8_t> note{0x90, 60, 100};
+    for (std::size_t i = 0; i < InputQueue::kCapacity; ++i)
+    {
+        REQUIRE(engine.receive(InputId{0}, note, kStart));
+    }
+    CHECK_FALSE(engine.receive(InputId{0}, note, kStart));
+    CHECK(engine.receive(InputId{Engine::kMaxInputs - 1}, note, kStart));
+    CHECK(engine.status().inputDropped == 1);
+
+    engine.step();
+    CHECK(engine.status().inputReceived == InputQueue::kCapacity + 1);
+    CHECK(engine.receive(InputId{0}, note, kStart)); // room again
+}
+
+// Input from a thread of its own, while the engine runs on another.
+TEST_CASE("the engine takes in input from another thread while it runs")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    std::thread thread{[&] { engine.run(); }};
+
+    constexpr std::size_t kMessages = 20'000;
+    std::thread input{[&]
+                      {
+                          const std::vector<std::uint8_t> note{0x90, 60, 100};
+                          for (std::size_t i = 0; i < kMessages; ++i)
+                          {
+                              while (!engine.receive(InputId{1}, note, kStart))
+                              {
+                                  std::this_thread::yield();
+                              }
+                          }
+                      }};
+    input.join();
+    const auto deadline = std::chrono::steady_clock::now() + 10s;
+    while (engine.status().inputReceived < kMessages && std::chrono::steady_clock::now() < deadline)
+    {
+        std::this_thread::yield();
+    }
+    REQUIRE(engine.quit());
+    thread.join();
+    CHECK(engine.status().inputReceived == kMessages);
 }

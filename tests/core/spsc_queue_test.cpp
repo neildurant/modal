@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <thread>
@@ -29,9 +30,11 @@ TEST_CASE("an SPSC queue holds exactly its capacity")
     for (int i = 0; i < 4; ++i)
     {
         CHECK_FALSE(queue.full());
+        CHECK(queue.space() == static_cast<std::size_t>(4 - i));
         CHECK(queue.tryPush(i));
     }
     CHECK(queue.full());
+    CHECK(queue.space() == 0);
     CHECK_FALSE(queue.tryPush(99));
     CHECK(queue.tryPop() == 0);
     CHECK(queue.tryPush(4));

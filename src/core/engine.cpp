@@ -15,7 +15,8 @@ using std::chrono::nanoseconds;
 } // namespace
 
 Engine::Engine(MessageSink& sink, EngineClock& clock, StopOptions options)
-    : sink_(sink)
+    : inputs_(std::make_unique<std::array<InputQueue, kMaxInputs>>())
+    , sink_(sink)
     , clock_(clock)
     , scheduler_(measuring_, options)
 {
@@ -79,7 +80,27 @@ EngineStatus Engine::status() const
     status.lateness = lateness_.read();
     status.wakeLateness = wakeLateness_.read();
     status.sendTime = sendTime_.read();
+    status.inputReceived = inputReceived_.load(std::memory_order_relaxed);
+    status.inputDropped = inputDropped_.load(std::memory_order_relaxed);
     return status;
+}
+
+bool Engine::receive(InputId input, std::span<const std::uint8_t> message,
+                     nanoseconds time) noexcept
+{
+    assert(input.value < kMaxInputs);
+    switch ((*inputs_)[input.value].push(message, time))
+    {
+    case InputQueue::Result::Pushed:
+        clock_.wake();
+        return true;
+    case InputQueue::Result::Ignored:
+        return true;
+    case InputQueue::Result::Dropped:
+        inputDropped_.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    return true;
 }
 
 bool Engine::publish(Snapshot snapshot)
@@ -129,6 +150,8 @@ EngineWake Engine::step() noexcept
         }
     }
 
+    takeInput();
+
     const auto sendTime = clock_.now();
     scheduler_.sendDue(sendTime);
     publishStatus(sendTime);
@@ -166,6 +189,27 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         return true;
     }
     return true;
+}
+
+// Nothing uses input yet but the count.
+void Engine::takeInput() noexcept
+{
+    std::size_t received = 0;
+    for (auto& queue : *inputs_)
+    {
+        while (const auto chunk = queue.pop())
+        {
+            if (!chunk->more)
+            {
+                ++received;
+            }
+        }
+    }
+    if (received > 0)
+    {
+        inputReceived_.store(inputReceived_.load(std::memory_order_relaxed) + received,
+                             std::memory_order_relaxed);
+    }
 }
 
 void Engine::publishStatus(nanoseconds now) noexcept

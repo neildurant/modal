@@ -53,10 +53,14 @@ public:
     }
 
     // Producer only: whether a push would fail now.
-    bool full() const noexcept
+    bool full() const noexcept { return space() == 0; }
+
+    // Producer only: how many pushes would succeed now. The consumer can only make more
+    // room, so they'll all still succeed when made.
+    std::size_t space() const noexcept
     {
-        return tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_acquire) ==
-               Capacity;
+        return Capacity -
+               (tail_.load(std::memory_order_relaxed) - head_.load(std::memory_order_acquire));
     }
 
     // Consumer only.
