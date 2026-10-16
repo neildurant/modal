@@ -37,11 +37,20 @@ public:
     }
 
     // Consumer only; real-time safe. Moves to the latest published snapshot, retiring the
-    // ones it replaces. Takes no more snapshots than it can retire, so if the producer stops
-    // reclaiming, the consumer keeps its current snapshot rather than freeing one.
-    // Returns whether the current snapshot changed.
+    // ones it replaces. The snapshot that was current stays alive until the next update, so
+    // the consumer can finish with it after switching. Takes no more snapshots than it can
+    // retire, so if the producer stops reclaiming, the consumer keeps its current snapshot
+    // rather than freeing one. Returns whether the current snapshot changed.
     bool update() noexcept
     {
+        if (previous_)
+        {
+            if (!retired_.tryPush(std::move(previous_)))
+            {
+                return false;
+            }
+        }
+
         bool changed = false;
         while (!retired_.full())
         {
@@ -50,7 +59,11 @@ public:
             {
                 break;
             }
-            if (current_)
+            if (!changed)
+            {
+                previous_ = std::move(current_);
+            }
+            else
             {
                 retired_.tryPush(std::move(current_));
             }
@@ -66,7 +79,8 @@ public:
 private:
     SpscQueue<std::shared_ptr<const T>, Capacity> incoming_;
     SpscQueue<std::shared_ptr<const T>, Capacity> retired_;
-    std::shared_ptr<const T> current_; // owned by the consumer
+    std::shared_ptr<const T> current_;  // owned by the consumer
+    std::shared_ptr<const T> previous_; // likewise, until the next update
 };
 
 } // namespace modal::core

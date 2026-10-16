@@ -96,14 +96,32 @@ TEST_CASE("replaced snapshots are freed by the producer, never the consumer")
     CHECK(update());           // current 2, retired {1}
     exchange.publish(make(3)); // frees 1
     exchange.publish(make(4));
-    CHECK(update()); // current 4, retired {2, 3}
+    CHECK(update()); // current 4, previous 2, retired {3}
     CHECK(exchange.current()->version == 4);
     CHECK(gLive == 3);
-    CHECK_FALSE(update());
+    CHECK_FALSE(update()); // retires 2
 
     exchange.reclaim();
     CHECK(gLive == 1);
     CHECK(gFreedOnConsumer == 0);
+}
+
+TEST_CASE("the snapshot replaced stays alive until the next update")
+{
+    SnapshotExchange<Snapshot, 4> exchange;
+    exchange.publish(make(1));
+    exchange.update();
+    const Snapshot* first = exchange.current();
+
+    exchange.publish(make(2));
+    CHECK(exchange.update());
+    exchange.reclaim();
+    CHECK(first->version == 1); // still alive for the consumer to finish with
+    CHECK(gLive == 2);
+
+    CHECK_FALSE(exchange.update());
+    exchange.reclaim();
+    CHECK(gLive == 1);
 }
 
 TEST_CASE("snapshots cross threads without the consumer freeing any")
@@ -151,6 +169,7 @@ TEST_CASE("snapshots cross threads without the consumer freeing any")
 
         producer.join();
         consumer.join();
+        exchange.update(); // retires the snapshot the last one replaced
         exchange.reclaim();
         CHECK(monotonic);
         CHECK(exchange.current()->version == kCount);
