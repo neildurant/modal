@@ -25,7 +25,10 @@ class FakeClock : public EngineClock
 {
 public:
     nanoseconds now() noexcept override { return time; }
-    void sleepUntil(nanoseconds until, bool) noexcept override { time = std::max(time, until); }
+    void sleepUntil(nanoseconds until, std::optional<nanoseconds>) noexcept override
+    {
+        time = std::max(time, until);
+    }
 
     nanoseconds time = kStart;
 };
@@ -53,7 +56,7 @@ void runUntil(Engine& engine, FakeClock& clock, nanoseconds end)
 {
     while (clock.time <= end)
     {
-        clock.sleepUntil(engine.step().time, false);
+        clock.sleepUntil(engine.step().time, std::nullopt);
     }
 }
 
@@ -72,7 +75,7 @@ TEST_CASE("the engine plays a plan from a start tick, and reports its progress")
     CHECK_FALSE(engine.status().playing); // until the engine thread gets to it
 
     // The first note goes at once; the next event is 500 ms on.
-    CHECK(engine.step() == EngineWake{kStart + 1ms, false});
+    CHECK(engine.step() == EngineWake{kStart + 1ms, kStart + 500ms});
     CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x90, 62, 100}});
     auto status = engine.status();
     CHECK(status.playing);
@@ -100,13 +103,13 @@ TEST_CASE("the engine wakes for its next event, or within 1 ms to look for comma
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    CHECK(engine.step() == EngineWake{kStart + 1ms, false}); // stopped
+    CHECK(engine.step() == EngineWake{kStart + 1ms, std::nullopt}); // stopped
 
     engine.setPlan(fourNotes(ppqn));
     engine.play(0);
     engine.step();
     clock.time = kStart + 499'500us;
-    CHECK(engine.step() == EngineWake{kStart + 500ms, true});
+    CHECK(engine.step() == EngineWake{kStart + 500ms, kStart + 500ms});
 }
 
 TEST_CASE("commands are carried out in the order given")

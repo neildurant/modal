@@ -3,6 +3,7 @@
 #include <modal/core/engine.hpp>
 
 #include <chrono>
+#include <optional>
 
 namespace modal::platform
 {
@@ -37,7 +38,8 @@ private:
 void spinUntil(std::chrono::nanoseconds time) noexcept;
 
 // The engine's clock, for the engine thread only. Sleeping is accurate to around a
-// millisecond, so for events it sleeps until a margin before the time and spins the rest.
+// millisecond, so for events it sleeps until a margin before the time and spins the rest,
+// even when that runs past a routine wake-up.
 class SystemClock final : public core::EngineClock
 {
 public:
@@ -50,12 +52,14 @@ public:
 
     std::chrono::nanoseconds now() noexcept override { return platform::now(); }
 
-    void sleepUntil(std::chrono::nanoseconds time, bool forEvent) noexcept override
+    void sleepUntil(std::chrono::nanoseconds time,
+                    std::optional<std::chrono::nanoseconds> nextEvent) noexcept override
     {
-        if (forEvent && spinMargin_ > std::chrono::nanoseconds{0})
+        if (nextEvent && spinMargin_ > std::chrono::nanoseconds{0} &&
+            *nextEvent - spinMargin_ <= time)
         {
-            sleeper_.sleepUntil(time - spinMargin_);
-            spinUntil(time);
+            sleeper_.sleepUntil(*nextEvent - spinMargin_);
+            spinUntil(*nextEvent);
         }
         else
         {

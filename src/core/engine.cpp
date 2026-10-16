@@ -100,7 +100,7 @@ void Engine::run() noexcept
         const auto wake = step();
         if (!quit_)
         {
-            clock_.sleepUntil(wake.time, wake.forEvent);
+            clock_.sleepUntil(wake.time, wake.nextEvent);
         }
     }
 }
@@ -133,12 +133,8 @@ EngineWake Engine::step() noexcept
     scheduler_.sendDue(sendTime);
     publishStatus(sendTime);
 
-    const auto routine = sendTime + kMaxSleep;
-    if (const auto next = scheduler_.nextWakeTime(); next && *next <= routine)
-    {
-        return {*next, true};
-    }
-    return {routine, false};
+    const auto next = scheduler_.nextWakeTime();
+    return {std::min(sendTime + kMaxSleep, next.value_or(nanoseconds::max())), next};
 }
 
 bool Engine::carryOut(const Command& command, nanoseconds now) noexcept

@@ -1,3 +1,5 @@
+#include <modal/core/engine.hpp>
+#include <modal/core/playback_plan.hpp>
 #include <modal/core/timing_stats.hpp>
 #include <modal/platform/clock.hpp>
 #include <modal/platform/thread_priority.hpp>
@@ -6,7 +8,11 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <iostream>
+#include <memory>
+#include <span>
+#include <thread>
 
 using namespace modal::platform;
 using namespace std::chrono_literals;
@@ -53,8 +59,13 @@ TEST_CASE("the system clock never wakes early, for events or not")
         for (int i = 0; i < 5; ++i)
         {
             const auto until = clock.now() + 2ms;
-            clock.sleepUntil(until, forEvent);
+            const auto event = forEvent ? std::optional{until + 500us} : std::nullopt;
+            clock.sleepUntil(until, event);
             CHECK(clock.now() >= until);
+            if (event && margin > 0ns) // spinning carries on to the event
+            {
+                CHECK(clock.now() >= *event);
+            }
         }
     }
 }
@@ -71,7 +82,7 @@ TEST_CASE("how late the system clock wakes", "[.timing]")
         for (int i = 0; i < 1000; ++i)
         {
             const auto until = clock.now() + 3700us; // not a whole number of timer ticks
-            clock.sleepUntil(until, true);
+            clock.sleepUntil(until, until);
             lateness.record(clock.now() - until);
         }
         const auto ms = [](auto time)
@@ -80,5 +91,68 @@ TEST_CASE("how late the system clock wakes", "[.timing]")
                   << ms(lateness.within(0.5).value_or(20ms)) << " ms, 99% within "
                   << ms(lateness.within(0.99).value_or(20ms)) << " ms, max " << ms(lateness.max)
                   << " ms (priority " << (priority.raised() ? "raised" : "normal") << ")\n";
+    }
+}
+
+namespace
+{
+
+class NullSink : public modal::core::MessageSink
+{
+public:
+    void send(modal::core::DestinationId, std::span<const std::uint8_t>,
+              std::chrono::nanoseconds) noexcept override
+    {
+    }
+};
+
+} // namespace
+
+// The engine's own timing with the system clock, as modal-loopback's default stream (a note
+// every 10 ms, lasting 5 ms) but without MIDI. Not run by default; run it with
+// modal_tests "[.timing]"
+TEST_CASE("how late the engine sends a steady stream", "[.timing]")
+{
+    using namespace modal::core;
+    for (const auto margin : {std::chrono::nanoseconds{0}, SystemClock::kDefaultSpinMargin})
+    {
+        PlaybackPlan plan{TempoMap{kPpqn}};
+        plan.tracks.push_back({TrackId{1}, DestinationId{0}, 0, false, 0ns});
+        for (int i = 0; i < 500; ++i)
+        {
+            PlannedEvent event{};
+            event.time = 50ms + 10ms * i;
+            event.tick = i;
+            event.track = TrackId{1};
+            event.message = {{0x90, static_cast<std::uint8_t>(i % 128), 100}, 3};
+            event.endTick = i;
+            event.noteOffTime = event.time + 5ms;
+            plan.events.push_back(event);
+        }
+
+        NullSink sink;
+        SystemClock clock{margin};
+        Engine engine{sink, clock};
+        std::thread thread{[&]
+                           {
+                               const modal::platform::RealtimePriority priority;
+                               engine.run();
+                           }};
+        engine.setPlan(std::make_shared<const PlaybackPlan>(std::move(plan)));
+        engine.play(0);
+        while (!engine.status().finished)
+        {
+            std::this_thread::sleep_for(10ms);
+        }
+        engine.quit();
+        thread.join();
+
+        const auto waking = engine.status().wakeLateness;
+        const auto ms = [](auto time)
+        { return std::chrono::duration<double, std::milli>(time).count(); };
+        std::cout << "engine, spin margin " << ms(margin) << " ms: waking 50% within "
+                  << ms(waking.within(0.5).value_or(20ms)) << " ms, 99% within "
+                  << ms(waking.within(0.99).value_or(20ms)) << " ms, max " << ms(waking.max)
+                  << " ms\n";
     }
 }
