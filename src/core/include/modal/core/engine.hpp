@@ -33,6 +33,11 @@ public:
     // nextEvent instead.
     virtual void sleepUntil(std::chrono::nanoseconds time,
                             std::optional<std::chrono::nanoseconds> nextEvent) noexcept = 0;
+
+    // Ends the current sleep early, or if the engine isn't sleeping, the next one, so a wake
+    // between the engine looking for work and going to sleep isn't lost. Safe to call from
+    // any thread.
+    virtual void wake() noexcept = 0;
 };
 
 // When the engine next needs to wake: for the next event, or within 1 ms to look for

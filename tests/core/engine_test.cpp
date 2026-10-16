@@ -29,8 +29,10 @@ public:
     {
         time = std::max(time, until);
     }
+    void wake() noexcept override { ++wakes; }
 
     nanoseconds time = kStart;
+    int wakes = 0;
 };
 
 // One note per quarter, starting on the beat, a quarter note long: pitches 60, 62, 64, 65.

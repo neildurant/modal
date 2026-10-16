@@ -70,6 +70,51 @@ TEST_CASE("the system clock never wakes early, for events or not")
     }
 }
 
+// How soon a woken sleep returns depends on the machine, so the limit is generous: it only
+// shows the wake ended the sleep rather than the sleep running its course.
+TEST_CASE("a wake from another thread ends a sleep or spin early")
+{
+    const bool spin = GENERATE(false, true);
+    Sleeper sleeper;
+    const auto start = now();
+    std::thread waker{[&]
+                      {
+                          std::this_thread::sleep_for(20ms);
+                          sleeper.wake();
+                      }};
+    const bool reached = spin ? sleeper.spinUntil(start + 5s) : sleeper.sleepUntil(start + 5s);
+    waker.join();
+    CHECK_FALSE(reached);
+    CHECK(now() - start < 2s);
+}
+
+TEST_CASE("a wake before a sleep ends that sleep at once, and only that one")
+{
+    Sleeper sleeper;
+    sleeper.wake();
+    const auto start = now();
+    CHECK_FALSE(sleeper.sleepUntil(start + 5s));
+    CHECK(now() - start < 2s);
+
+    const auto until = now() + 2ms;
+    CHECK(sleeper.sleepUntil(until));
+    CHECK(now() >= until);
+}
+
+TEST_CASE("the system clock passes wakes on to its sleep")
+{
+    SystemClock clock;
+    const auto start = clock.now();
+    std::thread waker{[&]
+                      {
+                          std::this_thread::sleep_for(20ms);
+                          clock.wake();
+                      }};
+    clock.sleepUntil(start + 5s, start + 5s);
+    waker.join();
+    CHECK(clock.now() - start < 2s);
+}
+
 // Not run by default, since it measures the machine rather than checking the code. Run it
 // with: modal_tests "[.timing]"
 TEST_CASE("how late the system clock wakes", "[.timing]")
