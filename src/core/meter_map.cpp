@@ -2,11 +2,36 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
 #include <iterator>
 #include <utility>
 
 namespace modal::core
 {
+
+std::optional<BarBeatTick> parseBarBeat(std::string_view text)
+{
+    const auto number = [](std::string_view part) -> std::optional<std::int64_t>
+    {
+        std::int64_t value = 0;
+        const auto* end = part.data() + part.size();
+        const auto [ptr, error] = std::from_chars(part.data(), end, value);
+        if (part.empty() || error != std::errc{} || ptr != end || value < 1)
+        {
+            return std::nullopt;
+        }
+        return value;
+    };
+
+    const auto colon = text.find(':');
+    const auto bar = number(text.substr(0, colon));
+    const auto beat = colon == std::string_view::npos ? 1 : number(text.substr(colon + 1));
+    if (!bar || !beat)
+    {
+        return std::nullopt;
+    }
+    return BarBeatTick{*bar, *beat, 0};
+}
 
 MeterMap::MeterMap(Ppqn ppqn, TimeSignature initial)
     : ppqn_(ppqn)

@@ -9,10 +9,10 @@ add_library(modal_platform STATIC
 add_library(modal::platform ALIAS modal_platform)
 
 if(WIN32)
-    target_sources(modal_platform PRIVATE clock_win32.cpp thread_priority_win32.cpp)
+    target_sources(modal_platform PRIVATE clock_win32.cpp console_win32.cpp thread_priority_win32.cpp)
     target_link_libraries(modal_platform PRIVATE avrt)
 else()
-    target_sources(modal_platform PRIVATE clock_linux.cpp thread_priority_linux.cpp)
+    target_sources(modal_platform PRIVATE clock_linux.cpp console_linux.cpp thread_priority_linux.cpp)
 endif()
 
 target_include_directories(modal_platform PUBLIC include)

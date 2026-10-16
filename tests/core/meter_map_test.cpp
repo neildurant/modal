@@ -9,6 +9,7 @@
 using modal::core::BarBeatTick;
 using modal::core::MeterChange;
 using modal::core::MeterMap;
+using modal::core::parseBarBeat;
 using modal::core::Tick;
 using modal::core::TimeSignature;
 
@@ -235,4 +236,15 @@ TEST_CASE("positions outside their bar are rejected")
     CHECK_FALSE(map.toTick({1, 1, -1}));
     CHECK_FALSE(map.toTick({1, 1, ppqn.quarter()}));
     CHECK(map.toTick({1, 3, ppqn.quarter() - 1}));
+}
+
+TEST_CASE("positions are read as a bar, or a bar and beat")
+{
+    CHECK(parseBarBeat("1") == BarBeatTick{1, 1, 0});
+    CHECK(parseBarBeat("17:3") == BarBeatTick{17, 3, 0});
+    for (const auto* bad : {"", "0", "17:", ":3", "17:0", "-2", "1.5", "17:3:1", "x", " 4"})
+    {
+        CAPTURE(bad);
+        CHECK_FALSE(parseBarBeat(bad));
+    }
 }

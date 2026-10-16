@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace modal::core
@@ -54,6 +55,9 @@ struct BarBeatTick
 
     friend constexpr bool operator==(const BarBeatTick&, const BarBeatTick&) = default;
 };
+
+// Reads a position written as a bar ("17") or a bar and beat ("17:3"), counting from 1.
+std::optional<BarBeatTick> parseBarBeat(std::string_view text);
 
 // One track's bars: a time signature at each change, starting with one at tick 0. Bars are a
 // view of the shared timeline, so changing the meter never moves events in time.
