@@ -39,6 +39,17 @@
       }
     },
     {
+      "name": "linux-clang-tsan",
+      "displayName": "Linux Clang, ThreadSanitizer",
+      "inherits": "linux-base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MODAL_SANITIZE": "thread"
+      }
+    },
+    {
       "name": "windows-msvc",
       "displayName": "Windows MSVC",
       "inherits": "base",
@@ -53,6 +64,7 @@
     { "name": "linux-clang-debug", "configurePreset": "linux-clang", "configuration": "Debug" },
     { "name": "linux-clang-release", "configurePreset": "linux-clang", "configuration": "Release" },
     { "name": "linux-clang-asan", "configurePreset": "linux-clang-asan" },
+    { "name": "linux-clang-tsan", "configurePreset": "linux-clang-tsan" },
     { "name": "windows-msvc-debug", "configurePreset": "windows-msvc", "configuration": "Debug" },
     { "name": "windows-msvc-release", "configurePreset": "windows-msvc", "configuration": "Release" }
   ],
@@ -68,6 +80,7 @@
     { "name": "linux-clang-debug", "inherits": "test-base", "configurePreset": "linux-clang", "configuration": "Debug" },
     { "name": "linux-clang-release", "inherits": "test-base", "configurePreset": "linux-clang", "configuration": "Release" },
     { "name": "linux-clang-asan", "inherits": "test-base", "configurePreset": "linux-clang-asan" },
+    { "name": "linux-clang-tsan", "inherits": "test-base", "configurePreset": "linux-clang-tsan" },
     { "name": "windows-msvc-debug", "inherits": "test-base", "configurePreset": "windows-msvc", "configuration": "Debug" },
     { "name": "windows-msvc-release", "inherits": "test-base", "configurePreset": "windows-msvc", "configuration": "Release" }
   ]

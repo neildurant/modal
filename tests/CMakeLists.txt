@@ -1,4 +1,5 @@
 find_package(Catch2 3 CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 include(Catch)
 
 add_executable(modal_tests
@@ -6,7 +7,9 @@ add_executable(modal_tests
     core/meter_map_test.cpp
     core/note_fraction_test.cpp
     core/smf_test.cpp
+    core/snapshot_exchange_test.cpp
     core/song_test.cpp
+    core/spsc_queue_test.cpp
     core/tempo_map_test.cpp
     core/track_test.cpp
     core/version_test.cpp
@@ -14,7 +17,7 @@ add_executable(modal_tests
 )
 
 target_link_libraries(modal_tests PRIVATE
-    modal::core modal::platform modal::warnings Catch2::Catch2WithMain)
+    modal::core modal::platform modal::warnings Catch2::Catch2WithMain Threads::Threads)
 
 # Tests read environment variables with std::getenv, which MSVC deprecates.
 if(MSVC)

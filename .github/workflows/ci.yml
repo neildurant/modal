@@ -33,6 +33,7 @@ jobs:
           - { os: ubuntu-24.04, preset: linux-gcc, configs: "debug release" }
           - { os: ubuntu-24.04, preset: linux-clang, configs: "debug release" }
           - { os: ubuntu-24.04, preset: linux-clang-asan, configs: "" }
+          - { os: ubuntu-24.04, preset: linux-clang-tsan, configs: "" }
           - { os: windows-2022, preset: windows-msvc, configs: "debug release" }
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -59,6 +60,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool libasound2t64
+
+      # ThreadSanitizer can't map its shadow memory with the kernel's default ASLR entropy.
+      - name: Reduce ASLR entropy for ThreadSanitizer
+        if: matrix.preset == 'linux-clang-tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Bootstrap vcpkg
         run: |
