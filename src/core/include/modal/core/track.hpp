@@ -1,0 +1,89 @@
+#pragma once
+
+#include <modal/core/event.hpp>
+#include <modal/core/meter_map.hpp>
+#include <modal/core/tick.hpp>
+
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string>
+#include <vector>
+
+namespace modal::core
+{
+
+// A track's events in send order: by tick, and at the same tick, non-note events (in the
+// order added) before notes (in the order added).
+class EventList
+{
+public:
+    std::span<const Event> all() const { return events_; }
+    std::size_t size() const { return events_.size(); }
+    bool empty() const { return events_.empty(); }
+    const Event& operator[](std::size_t index) const { return events_[index]; }
+
+    // Events starting in [from, to).
+    std::span<const Event> startingIn(Tick from, Tick to) const;
+
+    // Inserts after the events already at its tick that it sorts with: after other non-note
+    // events but before notes, or after everything for a note. Returns its index.
+    std::size_t insert(Event event);
+
+    void erase(std::size_t index);
+
+    friend bool operator==(const EventList&, const EventList&) = default;
+
+private:
+    std::vector<Event> events_;
+};
+
+// Identifies a track for its whole life, across edits and song snapshots.
+struct TrackId
+{
+    std::uint64_t value;
+
+    friend constexpr auto operator<=>(TrackId, TrackId) = default;
+};
+
+class Track
+{
+public:
+    static constexpr int kMinChannel = 1;
+    static constexpr int kMaxChannel = 16;
+    static constexpr int kMaxTranspose = 127; // semitones either way
+    static constexpr int kMaxVelocityOffset = 127;
+    static constexpr std::chrono::milliseconds kMaxTimeOffset{1000};
+
+    Track(TrackId id, Ppqn ppqn);
+
+    TrackId id() const { return id_; }
+
+    std::string name;
+    std::string port; // output port name, resolved through the machine's port aliases
+    int channel = kMinChannel;
+    MeterMap meter;
+    bool mute = false;
+    bool solo = false;
+    bool arm = false;
+    bool chaseNotes = true; // off for drums and other sounds where a late attack sounds wrong
+
+    // Applied at playback only; the stored events never change.
+    int transpose = 0;
+    int velocityOffset = 0;
+    std::chrono::milliseconds timeOffset{0}; // negative sends early
+
+    EventList events;
+
+    // Whether channel and the playback settings are in range.
+    bool hasValidSettings() const;
+
+    friend bool operator==(const Track&, const Track&) = default;
+
+private:
+    TrackId id_;
+};
+
+} // namespace modal::core

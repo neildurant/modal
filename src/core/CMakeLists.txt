@@ -1,7 +1,10 @@
 add_library(modal_core STATIC
+    event.cpp
     meter_map.cpp
     note_fraction.cpp
+    song.cpp
     tempo_map.cpp
+    track.cpp
     version.cpp
 )
 add_library(modal::core ALIAS modal_core)

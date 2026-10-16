@@ -93,6 +93,11 @@ public:
     // Where a bar (counting from 1) starts.
     Tick barStart(std::int64_t bar) const;
 
+    friend bool operator==(const MeterMap& a, const MeterMap& b)
+    {
+        return a.ppqn_ == b.ppqn_ && a.changes_ == b.changes_;
+    }
+
 private:
     struct Segment
     {
