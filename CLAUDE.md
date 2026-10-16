@@ -64,3 +64,5 @@ ctest --preset windows-msvc-debug
 ```
 
 Check formatting: `git ls-files -z '*.cpp' '*.hpp' | xargs -0 clang-format --dry-run --Werror`.
+
+The command-line tools (`modal-ports`, `modal-play`, `modal-loopback`), the hidden `[.timing]` tests and the `MODAL_TEST_ALSA_SEQ` flag for ALSA tests are described in `docs/tools.md`.
