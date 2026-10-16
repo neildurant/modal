@@ -2,6 +2,7 @@ find_package(Catch2 3 CONFIG REQUIRED)
 include(Catch)
 
 add_executable(modal_tests
+    core/meter_map_test.cpp
     core/note_fraction_test.cpp
     core/tempo_map_test.cpp
     core/version_test.cpp

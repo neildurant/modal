@@ -1,4 +1,5 @@
 add_library(modal_core STATIC
+    meter_map.cpp
     note_fraction.cpp
     tempo_map.cpp
     version.cpp

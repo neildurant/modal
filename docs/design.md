@@ -61,6 +61,7 @@ As in SPG, each track has its own sequence of bars and time signatures, so track
 - **Motions follow each track's bars.** `}` moves to the next bar of the current track. Operators that span several tracks, such as a Visual block in the arrangement, select a time range, which may start or end mid-bar on some tracks.
 - **Copy and paste by time.** Pasting from a 3/4 track into a 4/4 track keeps the material's timing, not its bar positions.
 - **Apply meter to a range.** In the arrangement, select a range and set a time signature (`:meter 3/4`, or from the leader menu). Bars are rebuilt from the range start; if the range doesn't divide evenly, the last bar becomes a shorter remainder bar, e.g. 10 beats in 3/4 gives three 3/4 bars and one 1/4 bar.
+- **Beats and remainder bars (decided in milestone 1).** The beat is the denominator note, so 6/8 counts six eighth-note beats. A meter set mid-bar ends that bar with a remainder bar of the exact leftover, using a finer denominator when the leftover isn't whole beats (half a beat into a 4/4 bar gives a 1/8 bar); a leftover no time signature can express, such as a single tick, moves the change on to the next beat. A change inside the first bar after another change replaces that bar's meter rather than adding a bar. Removing a change keeps later changes at their positions in time, adding remainder bars where needed, and repeating the meter already in effect adds nothing.
 - **Unify meters.** `:meter unify` copies the reference track's meter map to the selected tracks (or all tracks), removing polymeter where it isn't wanted.
 - **Arrangement drawing.** Columns represent time, not bars (decided: SPG's bar-aligned view made polymeter confusing). Each track draws its own bar lines, so tracks in different meters show bar lines at different places, and the ruler shows the reference track's bars.
 
@@ -387,7 +388,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [ ] Undo granularity: is a recording pass or a macro run one undo step?
 - [ ] Cursor mapping when switching between arrangement, piano roll and event list.
 
-* [ ] Remainder bars: always the exact leftover (e.g. 1/4, 5/16), or let the user choose to extend the previous bar instead?
+* [x] Remainder bars are always the exact leftover (e.g. 1/4, 5/16). To get something else, the user selects the bars and applies a meter again, e.g. a 3/4 bar plus a 1/4 remainder re-barred as one 4/4 bar.
 * [ ] How the arrangement ruler and per-track bar lines are drawn when meters differ, at different zoom levels.
 
 - [x] Delete can leave silence (`d`) or close the gap (`D`); put can merge (`p`) or insert (`P`).
