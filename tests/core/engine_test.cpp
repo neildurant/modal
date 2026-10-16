@@ -198,38 +198,46 @@ TEST_CASE("panic and quit end the notes sounding")
     }
 }
 
-TEST_CASE("lateness is measured from each message's due time")
+// A sink whose every send takes 200 us.
+class SlowSink : public MessageSink
+{
+public:
+    explicit SlowSink(FakeClock& clock)
+        : clock_(clock)
+    {
+    }
+
+    void send(DestinationId, std::span<const std::uint8_t>, nanoseconds) noexcept override
+    {
+        clock_.time += 200us;
+    }
+
+private:
+    FakeClock& clock_;
+};
+
+TEST_CASE("lateness is measured from each message's due time, in two parts")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    RecordingSink sink;
     FakeClock clock;
+    SlowSink sink{clock};
     Engine engine{sink, clock};
     engine.setPlan(fourNotes(ppqn));
     engine.play(0);
-    engine.step(); // on time
+    engine.step(); // woken on time; sent by 0.2 ms
 
-    clock.time = kStart + 503ms; // note-off and note-on 3 ms late
+    // Woken 3 ms late for a note-off and a note-on; the note-on waits for the note-off.
+    clock.time = kStart + 503ms;
     engine.step();
-    const auto lateness = engine.status().lateness;
-    CHECK(lateness.count == 3);
-    CHECK(lateness.max == 3ms);
-    CHECK(lateness.buckets[0] == 1);
-    CHECK(lateness.buckets[5] == 2); // 2-5 ms
-    CHECK(lateness.within(0.3) == 100us);
-    CHECK(lateness.within(0.99) == 5ms);
-}
-
-TEST_CASE("the lateness limit that a fraction of messages were within")
-{
-    LatenessStats stats;
-    CHECK(stats.within(0.99) == std::nullopt);
-
-    stats.count = 100;
-    stats.buckets = {90, 5, 4, 0, 0, 0, 0, 1};
-    CHECK(stats.within(0.5) == 100us);
-    CHECK(stats.within(0.95) == 250us);
-    CHECK(stats.within(0.99) == 500us);
-    CHECK(stats.within(1.0) == std::nullopt); // one message was over 10 ms late
+    const auto status = engine.status();
+    CHECK(status.lateness.count == 3);
+    CHECK(status.lateness.max == 3400us);
+    CHECK(status.lateness.within(0.3) == 250us);
+    CHECK(status.lateness.within(0.99) == 3450us);
+    CHECK(status.wakeLateness.max == 3200us);
+    CHECK(status.wakeLateness.within(0.3) == 50us);
+    CHECK(status.sendTime.max == 200us);
+    CHECK(status.sendTime.within(1.0) == 250us);
 }
 
 // The engine on a thread of its own, with a clock that never really sleeps.

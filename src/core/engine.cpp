@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <utility>
 
 namespace modal::core
@@ -13,33 +12,7 @@ namespace
 
 using std::chrono::nanoseconds;
 
-// Single writer, so a plain load and store does instead of a read-modify-write.
-template <typename T>
-void add(std::atomic<T>& counter, T amount)
-{
-    counter.store(counter.load(std::memory_order_relaxed) + amount, std::memory_order_relaxed);
-}
-
 } // namespace
-
-std::optional<nanoseconds> LatenessStats::within(double fraction) const
-{
-    if (count == 0)
-    {
-        return std::nullopt;
-    }
-    const auto needed = static_cast<std::size_t>(std::ceil(fraction * static_cast<double>(count)));
-    std::size_t sofar = 0;
-    for (std::size_t i = 0; i < kLimits.size(); ++i)
-    {
-        sofar += buckets[i];
-        if (sofar >= needed)
-        {
-            return kLimits[i];
-        }
-    }
-    return std::nullopt;
-}
 
 Engine::Engine(MessageSink& sink, EngineClock& clock, StopOptions options)
     : sink_(sink)
@@ -103,12 +76,9 @@ EngineStatus Engine::status() const
         status.position = position;
     }
     status.droppedNotes = droppedNotes_.load(std::memory_order_relaxed);
-    status.lateness.count = sent_.load(std::memory_order_relaxed);
-    status.lateness.max = nanoseconds{maxLateness_.load(std::memory_order_relaxed)};
-    for (std::size_t i = 0; i < buckets_.size(); ++i)
-    {
-        status.lateness.buckets[i] = buckets_[i].load(std::memory_order_relaxed);
-    }
+    status.lateness = lateness_.read();
+    status.wakeLateness = wakeLateness_.read();
+    status.sendTime = sendTime_.read();
     return status;
 }
 
@@ -213,18 +183,12 @@ void Engine::publishStatus(nanoseconds now) noexcept
 void Engine::MeasuringSink::send(DestinationId destination, std::span<const std::uint8_t> bytes,
                                  nanoseconds due) noexcept
 {
+    const auto start = engine_.clock_.now();
     engine_.sink_.send(destination, bytes, due);
-    const auto lateness = std::max(engine_.clock_.now() - due, nanoseconds{0});
-
-    const auto& limits = LatenessStats::kLimits;
-    const auto bucket =
-        static_cast<std::size_t>(std::ranges::upper_bound(limits, lateness) - limits.begin());
-    add(engine_.buckets_[bucket], std::size_t{1});
-    add(engine_.sent_, std::size_t{1});
-    if (lateness.count() > engine_.maxLateness_.load(std::memory_order_relaxed))
-    {
-        engine_.maxLateness_.store(lateness.count(), std::memory_order_relaxed);
-    }
+    const auto end = engine_.clock_.now();
+    engine_.lateness_.record(end - due);
+    engine_.wakeLateness_.record(start - due);
+    engine_.sendTime_.record(end - start);
 }
 
 } // namespace modal::core

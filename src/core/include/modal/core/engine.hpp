@@ -5,6 +5,7 @@
 #include <modal/core/snapshot_exchange.hpp>
 #include <modal/core/spsc_queue.hpp>
 #include <modal/core/tick.hpp>
+#include <modal/core/timing_stats.hpp>
 
 #include <array>
 #include <atomic>
@@ -30,34 +31,19 @@ public:
     virtual void sleepUntil(std::chrono::nanoseconds time) noexcept = 0;
 };
 
-// How late messages were sent: from each message's due time to just after it was handed to
-// the MIDI layer.
-struct LatenessStats
-{
-    // Upper limits of the histogram's buckets; a last bucket holds anything later.
-    static constexpr std::array<std::chrono::nanoseconds, 7> kLimits{
-        std::chrono::microseconds{100}, std::chrono::microseconds{250},
-        std::chrono::microseconds{500}, std::chrono::milliseconds{1},
-        std::chrono::milliseconds{2},   std::chrono::milliseconds{5},
-        std::chrono::milliseconds{10},
-    };
-
-    std::size_t count = 0;
-    std::chrono::nanoseconds max{0};
-    std::array<std::size_t, kLimits.size() + 1> buckets{}; // buckets[i]: below kLimits[i]
-
-    // The limit that at least a fraction of the messages (e.g. 0.99) were sent within, or
-    // none if that's beyond the last limit or nothing has been sent.
-    std::optional<std::chrono::nanoseconds> within(double fraction) const;
-};
-
 struct EngineStatus
 {
     bool playing = false;
     bool finished = false;        // every event sent and every note ended
     std::optional<Tick> position; // while playing
     std::size_t droppedNotes = 0; // see Scheduler::droppedNotes
-    LatenessStats lateness;
+
+    // How late messages were sent: from each one's due time to just after it was handed to
+    // the MIDI layer. That is the sum of how late the engine got to it (waking, and any
+    // messages sent before it in the same wake-up) and how long the send call took.
+    TimingStats lateness;
+    TimingStats wakeLateness; // from the due time to the start of the send call
+    TimingStats sendTime;     // in the send call
 };
 
 namespace detail
@@ -177,9 +163,9 @@ private:
     static constexpr Tick kNoPosition = -1;
     std::atomic<Tick> position_{kNoPosition};
     std::atomic<std::size_t> droppedNotes_{0};
-    std::atomic<std::size_t> sent_{0};
-    std::atomic<std::int64_t> maxLateness_{0};
-    std::array<std::atomic<std::size_t>, LatenessStats::kLimits.size() + 1> buckets_{};
+    SharedTimingStats lateness_;
+    SharedTimingStats wakeLateness_;
+    SharedTimingStats sendTime_;
 };
 
 } // namespace modal::core

@@ -14,6 +14,7 @@ add_executable(modal_tests
     core/song_test.cpp
     core/spsc_queue_test.cpp
     core/tempo_map_test.cpp
+    core/timing_stats_test.cpp
     core/track_test.cpp
     core/version_test.cpp
     platform/clock_test.cpp

@@ -205,18 +205,23 @@ void printSong(const core::Song& song, const std::string& file)
     }
 }
 
+void printTiming(std::string_view label, const core::TimingStats& stats)
+{
+    const auto p99 = stats.within(0.99);
+    std::cout << "  " << std::left << std::setw(14) << label << std::right << "99% within "
+              << std::setw(8) << (p99 ? milliseconds(*p99) : std::string{"> 20 ms"}) << "   max "
+              << milliseconds(stats.max) << '\n';
+}
+
 void printSummary(const core::EngineStatus& status, std::size_t failedSends)
 {
-    const auto& lateness = status.lateness;
-    std::cout << "Sent " << lateness.count << " messages.";
-    if (lateness.count > 0)
+    std::cout << "Sent " << status.lateness.count << " messages.\n";
+    if (status.lateness.count > 0)
     {
-        const auto p99 = lateness.within(0.99);
-        std::cout << " Send lateness: 99% within "
-                  << (p99 ? milliseconds(*p99) : std::string{"more than 10 ms"}) << ", max "
-                  << milliseconds(lateness.max) << '.';
+        printTiming("Lateness", status.lateness);
+        printTiming("  waking", status.wakeLateness);
+        printTiming("  sending", status.sendTime);
     }
-    std::cout << '\n';
     if (status.droppedNotes > 0)
     {
         std::cout << status.droppedNotes
