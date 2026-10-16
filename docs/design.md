@@ -314,7 +314,7 @@ The editor publishes a new immutable song snapshot after each edit; the schedule
 
 - **Snapshot handoff.** Songs share unchanged tracks through `shared_ptr<const Track>`. Snapshots reach the engine through a lock-free single-producer, single-consumer queue, not `std::atomic<shared_ptr>` (which takes a lock on common standard libraries). Retired snapshots are handed back and freed off the engine thread, so the engine never runs a destructor or frees memory.
 - **Playback plan.** Each snapshot is compiled off the engine thread into a flat, time-sorted plan with destination, channel, transpose, velocity offset and mute/solo already applied. Notes keep their durations in the plan; the engine generates note-offs from its own table of sounding notes, which also serves stop, panic, overlapping notes and plan swaps during playback.
-- **Engine wake-ups.** The engine sleeps until its next event, or at most 1 ms, so transport commands are seen within 1 ms.
+- **Engine wake-ups.** The engine sleeps until its next event, or at most 1 ms, so transport commands are seen within 1 ms (within the spin margin just before an event; see Clock).
 - **Scheduler.** The scheduler plays a plan without doing any timing itself: the engine passes it the time on each wake-up, so tests drive it with made-up times. At equal times, note-offs go before other events, so touching notes of the same pitch retrigger cleanly. Its table of sounding notes holds 4,096 notes, allocated up front; if it is ever full, a new note-on isn't sent (and is counted), rather than risk a stuck note. Panic reaches up to 64 destinations: every one any plan has used.
 - **Plan swaps during playback.** Everything due under the old plan is sent first; playback then carries on from the same tick in the new plan, so a tempo change keeps the bar and beat. Events not yet sent come from the new plan. Sounding notes end at their original tick, at the new tempo and time offset, even if the edit changed or removed the note; notes on tracks no longer in the plan (muted, removed or unrouted) end at once.
 - **Stop options.** All Notes Off and sustain reset on stop are scheduler settings, set by `modal-play` flags, until settings exist (milestone 8). Each is sent once per destination and channel the plan's tracks use.
@@ -322,7 +322,7 @@ The editor publishes a new immutable song snapshot after each edit; the schedule
 - **Send lateness.** Measured from each message's due time to just after it was handed to the MIDI layer: the engine's wake-up accuracy plus the driver call. This is the figure behind the ~1 ms rule for switching to OS-timestamped delivery; the time a message leaves the cable is what the loopback test measures. It is also reported in its two parts, wake lateness (from the due time to the start of the send call) and send time (in the call), so a slow timer and a slow driver can be told apart. Each is a count, the maximum and a histogram in 50 µs steps up to 20 ms.
 
 - **Engine library (`core`):** song model, scheduler, recorder, SMF and native file I/O. No UI dependencies; usable from a command-line player and from tests.
-- **Platform layer:** a small `MidiBackend` interface over libremidi, plus thread-priority and timer helpers per OS.
+- **Platform layer:** MIDI outputs behind the scheduler's small message-sink interface, timestamped MIDI input and port lookup by name, all over libremidi; plus thread-priority, clock and console-key helpers per OS.
 - **Grid UI:** a cell-grid abstraction (characters, colours, attributes) plus optional pixel regions for the piano roll and velocity lanes. Rendered with SDL3 now; a terminal backend stays possible later.
 - **Editor:** the grammar parser, operators, motions, views and undo history, operating on the song model.
 
@@ -349,6 +349,16 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 | Compiler | GCC / Clang | MSVC |
 
 - **Clock.** The engine's clock is the steady clock (`CLOCK_MONOTONIC` on Linux, the performance counter on Windows). MIDI input is timestamped on the same clock when it arrives, so recorded and loopback times compare directly with send times. The sleep never wakes early. Before an event, the engine sleeps until a margin before it (1.5 ms by default) and busy-waits the rest, since the first Windows loopback run (October 2026, Babyface, WinMM) showed sleeping alone woke 99% of the time within 0.95 ms, at worst 1.7 ms late. The engine always tells the clock when the next event is due, so the spin starts a margin before it even when that falls inside a routine 1 ms wake-up; a command arriving during a spin waits for it, so commands are seen within the margin rather than 1 ms. With the spin, the engine's own waking on that machine (measured without MIDI) went from 99% within 0.85 ms to 99% within 0.05 ms. The margin is a `--spin` option on the command-line tools, for measuring.
+- **Measured timing, Windows.** Loopback runs by Neil, October 2026, on one PC with a Babyface interface through WinMM and a MIDI cable, using `modal-loopback`'s default stream (2,000 notes, one every 10 ms):
+
+  |  | No spin | Spin (1.5 ms) |
+  | --- | --- | --- |
+  | Latency, due to back: median / p99 / max | 1.46 / 1.95 / 2.38 ms | 1.10 / 1.36 / 1.79 ms |
+  | Jitter: p99 − median / standard deviation | 0.49 / 0.21 ms | 0.26 / 0.07 ms |
+  | Send lateness: p99 / max | 0.90 / 1.29 ms | 0.35 / 0.54 ms |
+  | of which waking: p99 / max | 0.80 / 1.19 ms | within 0.05 / 0.04 ms |
+
+  All messages came back, in order. With the spin, what remains is the driver call (up to about 0.5 ms) and the interface and cable (about 1 ms, mostly the 0.96 ms a 3-byte message takes on the wire). Both are well under the 1 ms threshold for OS-timestamped delivery, so Windows stays engine-timed. Linux is still to be measured, on a native install.
 - **Opening ports by name.** A port name given by the user picks out the port with exactly that name, or else the one port with that name ignoring case, or else the one port whose name contains it ignoring case. If several match equally well, or none, the error lists the candidates or all the ports. Ports are opened before playback starts; devices appearing and disappearing during a session come later.
 - **SysEx on Windows blocks.** libremidi's WinMM backend waits until a SysEx message has been fully sent, about 0.3 ms per byte at MIDI's speed, and may allocate to copy it. Accepted for milestone 1, since SysEx usually comes at the start of a song. The fix (a SysEx thread per port, keeping later messages to that port behind it, or Windows MIDI Services) stays inside the MIDI backend, behind the scheduler's message sink.
 - **Engine thread priority.** `SCHED_FIFO` at priority 70 on Linux; the MMCSS "Pro Audio" task at high priority on Windows. If it can't be raised, the engine runs anyway and says why.
@@ -391,7 +401,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestones 1–2: engine and recording**
 
-- [x] Scheduler look-ahead. The engine sends each event itself at its exact time. Since the playback plan already holds every event's send time, there is no window to prepare: the engine sends whatever is due when it wakes, and any edit, mute or tempo change during playback applies to every event not yet sent. If milestone 1's loopback measurements show too much jitter on a platform (p99 send lateness or loopback jitter above about 1 ms), that backend switches to OS-timestamped delivery (around 50 ms ahead, recalled on stop or edit). The MIDI interface is designed to allow either.
+- [x] Scheduler look-ahead. The engine sends each event itself at its exact time. Since the playback plan already holds every event's send time, there is no window to prepare: the engine sends whatever is due when it wakes, and any edit, mute or tempo change during playback applies to every event not yet sent. If milestone 1's loopback measurements show too much jitter on a platform (p99 send lateness or loopback jitter above about 1 ms), that backend switches to OS-timestamped delivery (around 50 ms ahead, recalled on stop or edit). The MIDI interface is designed to allow either. Windows measured well under the threshold (see Measured timing, Windows); Linux is still to be measured.
 - [x] Panic key: `Ctrl-.`.
 - [x] Record input: all MIDI inputs by default, optional per-track input. MIDI thru on by default, changeable.
 - [x] Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
