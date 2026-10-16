@@ -32,15 +32,40 @@ private:
     [[maybe_unused]] void* timer_ = nullptr; // Windows only
 };
 
-// The engine's clock, for the engine thread only.
+// Busy-waits until a time on the engine's clock, using the CPU throughout but waking within
+// microseconds of it.
+void spinUntil(std::chrono::nanoseconds time) noexcept;
+
+// The engine's clock, for the engine thread only. Sleeping is accurate to around a
+// millisecond, so for events it sleeps until a margin before the time and spins the rest.
 class SystemClock final : public core::EngineClock
 {
 public:
+    static constexpr std::chrono::nanoseconds kDefaultSpinMargin = std::chrono::microseconds{1500};
+
+    explicit SystemClock(std::chrono::nanoseconds spinMargin = kDefaultSpinMargin)
+        : spinMargin_(spinMargin)
+    {
+    }
+
     std::chrono::nanoseconds now() noexcept override { return platform::now(); }
-    void sleepUntil(std::chrono::nanoseconds time) noexcept override { sleeper_.sleepUntil(time); }
+
+    void sleepUntil(std::chrono::nanoseconds time, bool forEvent) noexcept override
+    {
+        if (forEvent && spinMargin_ > std::chrono::nanoseconds{0})
+        {
+            sleeper_.sleepUntil(time - spinMargin_);
+            spinUntil(time);
+        }
+        else
+        {
+            sleeper_.sleepUntil(time);
+        }
+    }
 
 private:
     Sleeper sleeper_;
+    std::chrono::nanoseconds spinMargin_;
 };
 
 } // namespace modal::platform

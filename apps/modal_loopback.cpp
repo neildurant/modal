@@ -57,6 +57,8 @@ Options:
   --interval MS    time between note-ons, in milliseconds (default 10); each
                    note lasts half of it
   --chord N        notes sent at once, 1 to 16 (default 1)
+  --spin MS        how long before each event the engine stops sleeping and
+                   busy-waits, for precise timing; 0 turns it off (default 1.5)
   --help           show this help
 
 Port names can be the full name, or any part that matches only one port,
@@ -71,6 +73,7 @@ struct Options
     int count = 2000;
     double intervalMs = 10.0;
     int chord = 1;
+    nanoseconds spin = platform::SystemClock::kDefaultSpinMargin;
     bool help = false;
 };
 
@@ -141,6 +144,26 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv)
                 return "--interval needs a time from 1 to 1000 ms";
             }
             options.intervalMs = *interval;
+        }
+        else if (arg == "--spin")
+        {
+            const auto text = value();
+            double ms = -1;
+            if (text)
+            {
+                const auto* end = text->data() + text->size();
+                const auto [ptr, error] = std::from_chars(text->data(), end, ms);
+                if (error != std::errc{} || ptr != end)
+                {
+                    ms = -1;
+                }
+            }
+            if (ms < 0 || ms > 10)
+            {
+                return "--spin needs a time from 0 to 10 ms";
+            }
+            options.spin = std::chrono::duration_cast<nanoseconds>(
+                std::chrono::duration<double, std::milli>(ms));
         }
         else if (arg == "--chord")
         {
@@ -438,10 +461,11 @@ int run(const Options& options)
     std::cout << "Out: " << out.portName << "\nIn:  " << in.portName << "\n\n"
               << "Sending " << options.count << (options.chord > 1 ? " chords of " : " notes")
               << (options.chord > 1 ? std::to_string(options.chord) + " notes" : "")
-              << ", one every " << options.intervalMs << " ms...\n";
+              << ", one every " << options.intervalMs << " ms, spin margin "
+              << milliseconds(options.spin) << "...\n";
 
     RecordingSink sink{outputs, expected};
-    platform::SystemClock clock;
+    platform::SystemClock clock{options.spin};
     core::Engine engine{sink, clock};
     std::promise<std::string> priority;
     auto priorityError = priority.get_future();

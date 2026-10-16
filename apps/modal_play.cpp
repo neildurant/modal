@@ -11,6 +11,7 @@
 #include <modal/platform/thread_priority.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <csignal>
 #include <filesystem>
@@ -44,6 +45,8 @@ Options:
   --start BAR[:BEAT]   where to start playing (default 1)
   --all-notes-off      send All Notes Off on each channel used when stopping
   --reset-sustain      send sustain off on each channel used when stopping
+  --spin MS            how long before each event the engine stops sleeping and
+                       busy-waits, for precise timing; 0 turns it off (default 1.5)
   --panic              send All Notes Off and Reset All Controllers on every
                        channel of the port, then exit
   --help               show this help
@@ -61,6 +64,7 @@ struct Options
     std::string file;
     core::BarBeatTick start{1, 1, 0};
     core::StopOptions stop;
+    nanoseconds spin = platform::SystemClock::kDefaultSpinMargin;
     bool panic = false;
     bool help = false;
 };
@@ -111,6 +115,26 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv)
         else if (arg == "--reset-sustain")
         {
             options.stop.resetSustain = true;
+        }
+        else if (arg == "--spin")
+        {
+            const auto text = value();
+            double ms = -1;
+            if (text)
+            {
+                const auto* end = text->data() + text->size();
+                const auto [ptr, error] = std::from_chars(text->data(), end, ms);
+                if (error != std::errc{} || ptr != end)
+                {
+                    ms = -1;
+                }
+            }
+            if (ms < 0 || ms > 10)
+            {
+                return "--spin needs a time from 0 to 10 ms";
+            }
+            options.spin = std::chrono::duration_cast<nanoseconds>(
+                std::chrono::duration<double, std::milli>(ms));
         }
         else if (arg == "--panic")
         {
@@ -213,9 +237,10 @@ void printTiming(std::string_view label, const core::TimingStats& stats)
               << milliseconds(stats.max) << '\n';
 }
 
-void printSummary(const core::EngineStatus& status, std::size_t failedSends)
+void printSummary(const core::EngineStatus& status, std::size_t failedSends, nanoseconds spin)
 {
-    std::cout << "Sent " << status.lateness.count << " messages.\n";
+    std::cout << "Sent " << status.lateness.count << " messages (spin margin " << milliseconds(spin)
+              << ").\n";
     if (status.lateness.count > 0)
     {
         printTiming("Lateness", status.lateness);
@@ -272,7 +297,7 @@ int play(const Options& options, const core::SmfImportResult& imported,
                   << warning.droppedEvents << " notes transposed outside 0-127\n";
     }
 
-    platform::SystemClock clock;
+    platform::SystemClock clock{options.spin};
     core::Engine engine{outputs, clock, options.stop};
     std::promise<std::string> priority;
     auto priorityError = priority.get_future();
@@ -349,7 +374,7 @@ int play(const Options& options, const core::SmfImportResult& imported,
     }
     thread.join();
     std::cout << "\n\n";
-    printSummary(engine.status(), outputs.failedSends());
+    printSummary(engine.status(), outputs.failedSends(), options.spin);
     return 0;
 }
 

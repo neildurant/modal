@@ -21,4 +21,16 @@ void Sleeper::sleepUntil(std::chrono::nanoseconds time) noexcept
     }
 }
 
+void spinUntil(std::chrono::nanoseconds time) noexcept
+{
+    while (now() < time)
+    {
+#if defined(__x86_64__) || defined(__i386__)
+        __builtin_ia32_pause(); // eases the spin on the core and its sibling
+#elif defined(__aarch64__)
+        asm volatile("yield");
+#endif
+    }
+}
+
 } // namespace modal::platform

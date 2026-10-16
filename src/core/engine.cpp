@@ -100,12 +100,12 @@ void Engine::run() noexcept
         const auto wake = step();
         if (!quit_)
         {
-            clock_.sleepUntil(wake);
+            clock_.sleepUntil(wake.time, wake.forEvent);
         }
     }
 }
 
-nanoseconds Engine::step() noexcept
+EngineWake Engine::step() noexcept
 {
     const auto now = clock_.now();
     if (snapshots_.update())
@@ -133,12 +133,12 @@ nanoseconds Engine::step() noexcept
     scheduler_.sendDue(sendTime);
     publishStatus(sendTime);
 
-    auto wake = sendTime + kMaxSleep;
-    if (const auto next = scheduler_.nextWakeTime())
+    const auto routine = sendTime + kMaxSleep;
+    if (const auto next = scheduler_.nextWakeTime(); next && *next <= routine)
     {
-        wake = std::min(wake, *next);
+        return {*next, true};
     }
-    return wake;
+    return {routine, false};
 }
 
 bool Engine::carryOut(const Command& command, nanoseconds now) noexcept

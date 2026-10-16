@@ -52,4 +52,12 @@ void Sleeper::sleepUntil(std::chrono::nanoseconds time) noexcept
     }
 }
 
+void spinUntil(std::chrono::nanoseconds time) noexcept
+{
+    while (now() < time)
+    {
+        YieldProcessor(); // a pause instruction: eases the spin on the core and its sibling
+    }
+}
+
 } // namespace modal::platform

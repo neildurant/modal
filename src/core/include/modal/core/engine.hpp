@@ -27,8 +27,19 @@ public:
 
     virtual std::chrono::nanoseconds now() noexcept = 0;
 
-    // Sleeps until a time on the clock, never waking early.
-    virtual void sleepUntil(std::chrono::nanoseconds time) noexcept = 0;
+    // Sleeps until a time on the clock, never waking early. forEvent says the time is when a
+    // message is due, rather than a routine wake-up to look for commands, so waking late
+    // matters; a clock can then take extra care, at some cost in CPU time.
+    virtual void sleepUntil(std::chrono::nanoseconds time, bool forEvent) noexcept = 0;
+};
+
+// When the engine next needs to wake, and whether that's for an event.
+struct EngineWake
+{
+    std::chrono::nanoseconds time;
+    bool forEvent;
+
+    friend bool operator==(const EngineWake&, const EngineWake&) = default;
 };
 
 struct EngineStatus
@@ -111,7 +122,7 @@ public:
 
     // One pass of run(): carries out new commands and plans, sends what is due, and returns
     // when to wake for the next pass (at most 1 ms ahead).
-    std::chrono::nanoseconds step() noexcept;
+    EngineWake step() noexcept;
 
     bool quitRequested() const noexcept { return quit_; }
 
