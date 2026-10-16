@@ -3,6 +3,7 @@ add_library(modal_core STATIC
     meter_map.cpp
     note_fraction.cpp
     playback_plan.cpp
+    scheduler.cpp
     smf.cpp
     song.cpp
     tempo_map.cpp

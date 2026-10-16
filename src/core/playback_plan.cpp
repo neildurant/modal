@@ -181,7 +181,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
 
         const auto channel = static_cast<std::uint8_t>(track.channel - 1);
         const nanoseconds offset = track.timeOffset;
-        plan.tracks.push_back({track.id(), *destination, channel, track.chaseNotes});
+        plan.tracks.push_back({track.id(), *destination, channel, track.chaseNotes, offset});
         plan.leadIn = std::max(plan.leadIn, -offset);
 
         std::size_t dropped = 0;

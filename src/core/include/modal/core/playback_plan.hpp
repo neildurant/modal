@@ -77,6 +77,7 @@ struct PlannedTrack
     DestinationId destination;
     std::uint8_t channel; // 0-15
     bool chaseNotes;
+    std::chrono::nanoseconds timeOffset;
 };
 
 // A song compiled for playback, built off the engine thread and handed to it as an immutable
