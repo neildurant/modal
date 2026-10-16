@@ -6,6 +6,7 @@ add_executable(modal_tests
     core/event_test.cpp
     core/meter_map_test.cpp
     core/note_fraction_test.cpp
+    core/playback_plan_test.cpp
     core/smf_test.cpp
     core/snapshot_exchange_test.cpp
     core/song_test.cpp
