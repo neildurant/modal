@@ -297,6 +297,7 @@ track "Bass"  port="Pro-800"  ch=1
 **Other files**
 
 - **SMF import/export:** type 0 and 1, preserving tempo map, markers and track names.
+- **SMF import rules (milestone 1).** Files are rescaled to the song's PPQN, rounding each note's start and end separately so touching notes still touch. Note-ons and note-offs pair first on, first off; notes still sounding at the end of a track end there. Each file track becomes one track per channel it uses, named "Name (ch N)" when split; its SysEx and text go to the first of those, or to a track of their own if it has no channel events. A track with only tempo, meter, markers and a name (a conductor track) doesn't become a track; in a type 0 file, or a type 1 file whose first track is a conductor track, the first track's name is the song title. Tempo, time signatures (applied to every track) and markers are read from any track. Running status is accepted across meta and SysEx events, split SysEx packets are joined, and escapes other than complete SysEx messages are dropped. Not supported: type 2 files and SMPTE-timed files. Ignored: port and channel prefixes, SMPTE offset, key signature, sequencer-specific events. Text is kept as the file's raw bytes. Damaged files are read as far as possible, and every problem worked around is reported as a warning.
 - **Configuration and keymaps:** plain text, in the style of `.vimrc` / `.muttrc`, reloadable without restarting.
 - **Port aliases:** a small per-machine file mapping friendly names to OS port names.
 
