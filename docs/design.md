@@ -358,7 +358,7 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
   | Send lateness: p99 / max | 0.90 / 1.29 ms | 0.35 / 0.54 ms |
   | of which waking: p99 / max | 0.80 / 1.19 ms | within 0.05 / 0.04 ms |
 
-  All messages came back, in order. With the spin, what remains is the driver call (up to about 0.5 ms) and the interface and cable (about 1 ms, mostly the 0.96 ms a 3-byte message takes on the wire). Both are well under the 1 ms threshold for OS-timestamped delivery, so Windows stays engine-timed. Linux is still to be measured, on a native install.
+  All messages came back, in order. With the spin, what remains is the driver call (up to about 0.5 ms) and the interface and cable (about 1 ms, mostly the 0.96 ms a 3-byte message takes on the wire). Both are well under the 1 ms threshold for OS-timestamped delivery, so Windows stays engine-timed. Linux is still to be measured, on a native install; that waits until one is available, and milestone 2 goes ahead meanwhile.
 - **Opening ports by name.** A port name given by the user picks out the port with exactly that name, or else the one port with that name ignoring case, or else the one port whose name contains it ignoring case. If several match equally well, or none, the error lists the candidates or all the ports. Ports are opened before playback starts; devices appearing and disappearing during a session come later.
 - **SysEx on Windows blocks.** libremidi's WinMM backend waits until a SysEx message has been fully sent, about 0.3 ms per byte at MIDI's speed, and may allocate to copy it. Accepted for milestone 1, since SysEx usually comes at the start of a song. The fix (a SysEx thread per port, keeping later messages to that port behind it, or Windows MIDI Services) stays inside the MIDI backend, behind the scheduler's message sink.
 - **Engine thread priority.** `SCHED_FIFO` at priority 70 on Linux; the MMCSS "Pro Audio" task at high priority on Windows. If it can't be raised, the engine runs anyway and says why.
@@ -405,7 +405,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Panic key: `Ctrl-.`.
 - [x] Record input: all MIDI inputs by default, optional per-track input. MIDI thru on by default, changeable.
 - [x] Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
-- [ ] Windows MIDI Services. vcpkg's libremidi port is built without its Windows MIDI Services backend, so Windows uses WinMM for now. Using Windows MIDI Services (loopback ports, multi-client access) would need a local overlay port that enables it.
+- [ ] Windows MIDI Services. vcpkg's libremidi port is built without its Windows MIDI Services backend, so Windows uses WinMM for now. Using Windows MIDI Services (loopback ports, multi-client access) would need a local overlay port that enables it. Shelved for now, since WinMM measures well (October 2026).
 - [x] An imported SMF's time signatures apply to all tracks; a change that falls mid-bar starts a remainder bar. (Moved up from milestones 3–4, since import needs it.)
 
 **Milestones 3–4: grid and first editing view**
