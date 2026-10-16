@@ -345,6 +345,11 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 | Sleeping until next event | `clock_nanosleep` on `CLOCK_MONOTONIC` | High-resolution waitable timer |
 | Compiler | GCC / Clang | MSVC |
 
+- **Clock.** The engine's clock is the steady clock (`CLOCK_MONOTONIC` on Linux, the performance counter on Windows). MIDI input is timestamped on the same clock when it arrives, so recorded and loopback times compare directly with send times. The sleep never wakes early; whether it needs a short spin before each event is left to the loopback measurements.
+- **Opening ports by name.** A port name given by the user picks out the port with exactly that name, or else the one port with that name ignoring case, or else the one port whose name contains it ignoring case. If several match equally well, or none, the error lists the candidates or all the ports. Ports are opened before playback starts; devices appearing and disappearing during a session come later.
+- **SysEx on Windows blocks.** libremidi's WinMM backend waits until a SysEx message has been fully sent, about 0.3 ms per byte at MIDI's speed, and may allocate to copy it. Accepted for milestone 1, since SysEx usually comes at the start of a song. The fix (a SysEx thread per port, keeping later messages to that port behind it, or Windows MIDI Services) stays inside the MIDI backend, behind the scheduler's message sink.
+- **Engine thread priority.** `SCHED_FIFO` at priority 70 on Linux; the MMCSS "Pro Audio" task at high priority on Windows. If it can't be raised, the engine runs anyway and says why.
+
 **Build and tooling**
 
 - C++20, CMake, dependencies via vcpkg in manifest mode with a pinned baseline: SDL3, SDL\_ttf or FreeType, libremidi, Catch2 v3 for tests.

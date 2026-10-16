@@ -15,7 +15,10 @@ add_executable(modal_tests
     core/tempo_map_test.cpp
     core/track_test.cpp
     core/version_test.cpp
+    platform/clock_test.cpp
+    platform/midi_io_test.cpp
     platform/midi_ports_test.cpp
+    platform/thread_priority_test.cpp
 )
 
 target_link_libraries(modal_tests PRIVATE
