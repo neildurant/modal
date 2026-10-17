@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/core/count_in.hpp>
 #include <modal/core/input_queue.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/scheduler.hpp>
@@ -90,6 +91,7 @@ struct EngineSnapshot
     std::uint64_t playRequest = 0;
     Tick start = 0;
     std::shared_ptr<const std::vector<PlannedEvent>> chased;
+    std::shared_ptr<const PlannedCountIn> countIn;
 };
 
 struct EngineCommand
@@ -127,9 +129,9 @@ public:
     // Replaces the plan, in playback too (see Scheduler::setPlan).
     bool setPlan(std::shared_ptr<const PlaybackPlan> plan);
 
-    // Starts playing the current plan from a tick, chasing what's before it. Does nothing
-    // without a plan.
-    bool play(Tick start);
+    // Starts playing the current plan from a tick, chasing what's before it, after the
+    // count-in if there is one (see planRecordStart). Does nothing without a plan.
+    bool play(Tick start, std::optional<PlannedCountIn> countIn = std::nullopt);
 
     // The id of the last play() request, as StampedInput::play gives it.
     std::uint64_t lastPlay() const noexcept { return playRequests_; }

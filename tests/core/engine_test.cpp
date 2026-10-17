@@ -522,3 +522,32 @@ TEST_CASE(
     REQUIRE(received.size() == 1);
     CHECK(received[0].first);
 }
+
+TEST_CASE("the engine plays a count-in, and input during it is stamped before the record point")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const auto plan = fourNotes(ppqn);
+    engine.setPlan(plan);
+    Song song = songAt(ppqn);
+    song.countIn.beats = 2;
+    auto start = planRecordStart(song, ppqn.quarter(), DestinationId{9});
+
+    engine.play(start.playFrom, std::move(start.countIn));
+    engine.step(); // the first click, 1000 ms before the record point
+    engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart + 750ms);
+    runUntil(engine, clock, kStart + 1100ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{9}, {0x99, 77, 80}, kStart},
+                           {{9}, {0x89, 77, 64}, kStart + 62500us},
+                           {{9}, {0x99, 76, 110}, kStart + 500ms}, // beat 1, before beat 2
+                           {{9}, {0x89, 76, 64}, kStart + 562500us},
+                           {{1}, {0x90, 62, 100}, kStart + 1000ms}, // the record point
+                       });
+    const auto received = allReceived(engine);
+    REQUIRE(received.size() == 1);
+    CHECK(received[0].tick < ppqn.quarter());
+    CHECK(received[0].songTime == 250ms); // the record point is at 500 ms into the song
+}

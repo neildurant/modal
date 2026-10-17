@@ -31,7 +31,7 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
     return publish(std::move(next));
 }
 
-bool Engine::play(Tick start)
+bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
 {
     if (!latest_)
     {
@@ -45,6 +45,7 @@ bool Engine::play(Tick start)
     next.playRequest = playRequests_ + 1;
     next.start = start;
     next.chased = std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start));
+    next.countIn = countIn ? std::make_shared<const PlannedCountIn>(std::move(*countIn)) : nullptr;
     if (!publish(std::move(next)))
     {
         return false;
@@ -179,7 +180,7 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         }
         if (snapshot->playRequest == command.playRequest) // otherwise a later Play replaced it
         {
-            scheduler_.play(snapshot->start, *snapshot->chased, now);
+            scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get());
             currentPlay_ = command.playRequest;
         }
         return true;

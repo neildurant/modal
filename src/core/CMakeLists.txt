@@ -5,6 +5,7 @@ add_library(modal_core STATIC
     input_queue.cpp
     meter_map.cpp
     note_fraction.cpp
+    count_in.cpp
     playback_plan.cpp
     recorder.cpp
     scheduler.cpp

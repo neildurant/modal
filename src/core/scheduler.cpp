@@ -73,12 +73,12 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
     }
 
     const auto& metronome = plan.metronome;
-    if (click_)
+    if (click_ && click_->endTick)
     {
         if (metronome && metronome->destination == click_->destination &&
             metronome->channel == click_->channel)
         {
-            click_->end = plan.tempo.toTime(click_->endTick);
+            click_->end = origin_ + plan.tempo.toTime(*click_->endTick);
         }
         else
         {
@@ -98,7 +98,8 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
     next_ = static_cast<std::size_t>(it - plan.events.begin());
 }
 
-void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanoseconds now) noexcept
+void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanoseconds now,
+                     const PlannedCountIn* countIn) noexcept
 {
     if (plan_ == nullptr)
     {
@@ -109,10 +110,19 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
         endAllNotes(now);
         releasePedals(now);
     }
-    const nanoseconds startTime = plan_->tempo.toTime(start) - plan_->leadIn;
+    const nanoseconds lead =
+        std::max(plan_->leadIn, countIn != nullptr ? countIn->length : nanoseconds{0});
+    const nanoseconds startTime = plan_->tempo.toTime(start) - lead;
     playing_ = true;
     startTick_ = start;
     origin_ = now - startTime;
+    countIn_ = countIn;
+    nextCountIn_ = 0;
+    if (countIn != nullptr)
+    {
+        rememberDestination(countIn->destination);
+    }
+    recordPoint_ = origin_ + plan_->tempo.toTime(start);
     next_ = plan_->firstAtOrAfter(startTime);
     chased_ = chased;
     nextClick_.reset();
@@ -133,6 +143,7 @@ void Scheduler::stop(nanoseconds now) noexcept
     playing_ = false;
     chased_ = {};
     nextClick_.reset();
+    countIn_ = nullptr;
 
     if (!options_.allNotesOff && !options_.resetSustain)
     {
@@ -166,6 +177,7 @@ void Scheduler::panic(nanoseconds now) noexcept
     playing_ = false;
     chased_ = {};
     nextClick_.reset();
+    countIn_ = nullptr;
     for (std::size_t d = 0; d < destinationCount_; ++d)
     {
         for (std::uint8_t channel = 0; channel < kChannels; ++channel)
@@ -199,6 +211,7 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             NoteOff,
             ClickOff,
             Click,
+            CountInClick,
             Event,
         };
         Due due = Due::Nothing;
@@ -218,12 +231,16 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         }
         if (click_)
         {
-            consider(Due::ClickOff, click_->end);
+            consider(Due::ClickOff, click_->end - origin_);
         }
         const auto click = clickDue();
         if (click)
         {
             consider(Due::Click, plan_->tempo.toTime(*click));
+        }
+        if (const auto countIn = countInDue())
+        {
+            consider(Due::CountInClick, *countIn);
         }
         if (next_ < events.size())
         {
@@ -242,6 +259,9 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             break;
         case Due::Click:
             sendClick(*click);
+            break;
+        case Due::CountInClick:
+            sendCountInClick();
             break;
         case Due::Event:
         {
@@ -278,7 +298,11 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
     }
     if (click_)
     {
-        earliest(click_->end);
+        earliest(click_->end - origin_);
+    }
+    if (const auto countIn = countInDue())
+    {
+        earliest(*countIn);
     }
     if (const auto click = clickDue())
     {
@@ -293,7 +317,16 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
 
 bool Scheduler::finished() const noexcept
 {
-    return playing_ && songDone() && !clickDue() && !click_;
+    return playing_ && songDone() && !clickDue() && !click_ && !countInDue();
+}
+
+std::optional<nanoseconds> Scheduler::countInDue() const noexcept
+{
+    if (countIn_ == nullptr || nextCountIn_ == countIn_->clicks.size())
+    {
+        return std::nullopt;
+    }
+    return recordPoint_ - countIn_->clicks[nextCountIn_].before - origin_;
 }
 
 bool Scheduler::songDone() const noexcept
@@ -407,8 +440,26 @@ void Scheduler::sendClick(Tick tick) noexcept
     const Tick next = metronome.meter.beatAtOrAfter(tick + 1);
     const Tick endTick = tick + std::min(metronome.length, next - tick);
     click_ = Click{metronome.destination, metronome.channel, pitch, endTick,
-                   plan_->tempo.toTime(endTick)};
+                   origin_ + plan_->tempo.toTime(endTick)};
     nextClick_ = next;
+}
+
+void Scheduler::sendCountInClick() noexcept
+{
+    const auto& countIn = *countIn_;
+    const auto& click = countIn.clicks[nextCountIn_++];
+    const nanoseconds due = recordPoint_ - click.before;
+    if (click_)
+    {
+        endClick(due);
+    }
+    const auto pitch = click.accent ? countIn.accentNote : countIn.beatNote;
+    const auto velocity = click.accent ? countIn.accentVelocity : countIn.beatVelocity;
+    const std::uint8_t on[] = {static_cast<std::uint8_t>(kNoteOn | countIn.channel), pitch,
+                               velocity};
+    sink_.send(countIn.destination, on, due);
+    click_ =
+        Click{countIn.destination, countIn.channel, pitch, std::nullopt, due + countIn.clickLength};
 }
 
 void Scheduler::endClick(nanoseconds due) noexcept
@@ -499,26 +550,27 @@ std::optional<std::size_t> Scheduler::nextNoteOff() const noexcept
 
 void Scheduler::rememberDestinations(const PlaybackPlan& plan) noexcept
 {
-    const auto remember = [&](DestinationId destination)
-    {
-        const auto known = std::span{destinations_}.first(destinationCount_);
-        if (std::ranges::find(known, destination) == known.end() &&
-            destinationCount_ < kMaxDestinations)
-        {
-            destinations_[destinationCount_++] = destination;
-        }
-    };
     for (const auto& track : plan.tracks)
     {
-        remember(track.destination);
+        rememberDestination(track.destination);
     }
     for (const auto& target : plan.thru) // panic reaches what thru has sent to, too
     {
-        remember(target.destination);
+        rememberDestination(target.destination);
     }
     if (plan.metronome)
     {
-        remember(plan.metronome->destination);
+        rememberDestination(plan.metronome->destination);
+    }
+}
+
+void Scheduler::rememberDestination(DestinationId destination) noexcept
+{
+    const auto known = std::span{destinations_}.first(destinationCount_);
+    if (std::ranges::find(known, destination) == known.end() &&
+        destinationCount_ < kMaxDestinations)
+    {
+        destinations_[destinationCount_++] = destination;
     }
 }
 

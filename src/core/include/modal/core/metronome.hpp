@@ -40,4 +40,25 @@ struct MetronomeSettings
     friend bool operator==(const MetronomeSettings&, const MetronomeSettings&) = default;
 };
 
+// What comes before the record point when recording: a count-in of metronome clicks, at the
+// tempo and in the meter there, or a pre-roll of the song itself.
+struct CountInSettings
+{
+    enum class Mode : std::uint8_t
+    {
+        None,
+        CountIn,
+        PreRoll,
+    };
+
+    Mode mode = Mode::CountIn;
+    int bars = 1;        // of the meter at the record point
+    int beats = 0;       // a custom count-in, used instead of bars when above 0
+    int preRollBars = 1; // fewer if the record point is nearer the song's start
+
+    bool isValid() const { return bars >= 0 && beats >= 0 && preRollBars >= 0; }
+
+    friend bool operator==(const CountInSettings&, const CountInSettings&) = default;
+};
+
 } // namespace modal::core

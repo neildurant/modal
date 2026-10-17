@@ -1,6 +1,7 @@
 #include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
+#include <modal/core/count_in.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/scheduler.hpp>
 
@@ -880,4 +881,111 @@ TEST_CASE("after a panic, stop has no pedals to let up")
     sink.sent.clear();
     scheduler.stop(kNow + 2ms); // before the pedal is sent again
     CHECK(sink.sent.empty());
+}
+
+TEST_CASE("a count-in clicks before the record point, with the song silent until then")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](Track& track)
+             {
+                 track.events.insert({2 * q, Note{50, 100, q}}); // in the count-in's time
+                 track.events.insert({4 * q, Note{60, 100, q / 4}});
+             });
+    const auto plan = compilePlan(song, byPortName); // the metronome is off
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, {}, kNow, &*start.countIn);
+    runUntil(scheduler, kNow + 10s);
+    CHECK(sentTo(sink, kClick) == clicks({
+                                      click(76, 110, kNow),
+                                      click(77, 80, kNow + 500ms),
+                                      click(77, 80, kNow + 1000ms),
+                                      click(77, 80, kNow + 1500ms),
+                                  }));
+    CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{
+                                                {{1}, {0x90, 60, 100}, kNow + 2s},
+                                                {{1}, {0x80, 60, 64}, kNow + 2125ms},
+                                            });
+    CHECK(scheduler.finished());
+}
+
+TEST_CASE("after a count-in, the metronome carries on from the record point")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto plan = withMetronome(song);
+    song.countIn.beats = 2;
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, {}, kNow, &*start.countIn);
+    runUntil(scheduler, kNow + 1600ms);
+    CHECK(sink.sent == clicks({
+                           click(77, 80, kNow),
+                           click(77, 80, kNow + 500ms),
+                           click(76, 110, kNow + 1000ms),
+                           click(77, 80, kNow + 1500ms),
+                       }));
+}
+
+TEST_CASE("a lead-in longer than the count-in starts playback earlier")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](Track& track)
+             {
+                 track.timeOffset = -1000ms;
+                 track.events.insert({4 * q, Note{60, 100, q}});
+             });
+    song.countIn.beats = 1;
+    const auto plan = compilePlan(song, byPortName);
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, {}, kNow, &*start.countIn);
+    runUntil(scheduler, kNow + 600ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0x90, 60, 100}, kNow},
+                           {{1}, {0x80, 60, 64}, kNow + 500ms},
+                           {kClick, {0x99, 77, 80}, kNow + 500ms}, // beat 4
+                           {kClick, {0x89, 77, 64}, kNow + 562500us},
+                       });
+}
+
+TEST_CASE("stopping in a count-in ends it, and panic reaches its port")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto plan = compilePlan(song, byPortName);
+    const auto start = planRecordStart(song, ppqn.whole(), kClick);
+    REQUIRE(start.countIn);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, {}, kNow, &*start.countIn);
+    scheduler.sendDue(kNow + 10ms);
+    scheduler.stop(kNow + 10ms);
+    CHECK(sink.sent == click(76, 110, kNow, 10ms));
+    CHECK(scheduler.nextWakeTime() == std::nullopt);
+
+    sink.sent.clear();
+    scheduler.panic(kNow + 20ms);
+    CHECK(std::ranges::count(sink.sent, kClick, &Sent::destination) == 32);
 }

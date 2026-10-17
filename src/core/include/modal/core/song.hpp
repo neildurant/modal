@@ -38,6 +38,7 @@ public:
 
     std::string title;
     MetronomeSettings metronome;
+    CountInSettings countIn;
 
     const TempoMap& tempo() const { return tempo_; }
     TempoMap& tempo() { return tempo_; }

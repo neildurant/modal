@@ -3,6 +3,7 @@ find_package(Threads REQUIRED)
 include(Catch)
 
 add_executable(modal_tests
+    core/count_in_test.cpp
     core/engine_test.cpp
     core/event_test.cpp
     core/input_queue_test.cpp

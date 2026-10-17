@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/core/count_in.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/tick.hpp>
 
@@ -59,10 +60,12 @@ public:
     void setPlan(const PlaybackPlan& plan, std::chrono::nanoseconds now) noexcept;
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
-    // lead-in, the start tick is reached that long after now. If already playing, the notes
-    // sounding end first, and the pedals held down come up. Does nothing without a plan.
-    void play(Tick start, std::span<const PlannedEvent> chased,
-              std::chrono::nanoseconds now) noexcept;
+    // lead-in or a count-in, the start tick is reached after the longer of the two; the
+    // count-in clicks before it, with the song silent. If already playing, the notes sounding
+    // end first, and the pedals held down come up. Does nothing without a plan. The caller
+    // keeps the count-in alive while the scheduler uses it.
+    void play(Tick start, std::span<const PlannedEvent> chased, std::chrono::nanoseconds now,
+              const PlannedCountIn* countIn = nullptr) noexcept;
 
     // Ends the notes sounding, lets up each pedal (sustain, sostenuto or soft) playback left
     // down, on just the channels where it's down, and stops, with the stop options.
@@ -131,17 +134,20 @@ private:
         DestinationId destination;
         std::uint8_t channel;
         std::uint8_t pitch;
-        Tick endTick;
-        std::chrono::nanoseconds end; // plan time of the note-off
+        std::optional<Tick> endTick;  // none for a count-in click, which no tempo change moves
+        std::chrono::nanoseconds end; // the note-off's time, on the caller's clock
     };
 
     // Whether every event has been sent and every note ended, clicks aside.
     bool songDone() const noexcept;
     // When the next click is due, if the metronome is still to click.
     std::optional<Tick> clickDue() const noexcept;
+    // When the next count-in click is due, in plan time, if there's one to come.
+    std::optional<std::chrono::nanoseconds> countInDue() const noexcept;
 
     void send(const PlannedEvent& event) noexcept;
     void sendClick(Tick tick) noexcept;
+    void sendCountInClick() noexcept;
     void endClick(std::chrono::nanoseconds due) noexcept;
     void noteOn(const PlannedEvent& event, std::chrono::nanoseconds due) noexcept;
     void noteOff(std::size_t index, std::chrono::nanoseconds due) noexcept;
@@ -152,6 +158,7 @@ private:
                      std::uint8_t value, std::chrono::nanoseconds due) noexcept;
     std::optional<std::size_t> nextNoteOff() const noexcept;
     void rememberDestinations(const PlaybackPlan& plan) noexcept;
+    void rememberDestination(DestinationId destination) noexcept;
 
     MessageSink& sink_;
     StopOptions options_;
@@ -165,6 +172,10 @@ private:
 
     std::optional<Tick> nextClick_; // while the metronome clicks
     std::optional<Click> click_;
+
+    const PlannedCountIn* countIn_ = nullptr;
+    std::size_t nextCountIn_ = 0;
+    std::chrono::nanoseconds recordPoint_{0}; // where the count-in ends, on the caller's clock
 
     std::vector<SoundingNote> sounding_; // capacity reserved up front, never grown
     std::vector<HeldPedal> pedals_;      // likewise
