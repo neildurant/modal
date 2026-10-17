@@ -404,6 +404,43 @@ Each milestone ends with something runnable and testable on both platforms. Timi
 
 Later: in-process plugin hosting, patterns, MIDI clock in, take lanes, splits, scripting, macOS.
 
+## Ideas (not scheduled)
+
+Distinctive features to consider after version 1. Not committed to any milestone.
+
+**Finding and developing ideas**
+- **Musical search and replace:** `/` searches by interval pattern or rhythm, in any key; `n` jumps between matches; `:s` substitutes across the song.
+- **Linked variations:** copies that stay linked to the original, optionally with a transform (inverted, transposed, half speed); editing the original updates every variation.
+- **Retrospective capture:** MIDI input is always buffered; one key turns the last few minutes of playing into a take.
+
+**Recording**
+- **Half-speed recording:** record at half the tempo (or another fraction) and play back at full speed, for passages too fast to play in; similar uses to step entry.
+- **Loop takes to choose from:** loop over a section, keeping each pass as a take, then audition and pick the best afterwards (building on milestone 7's loop recording and the take lanes listed under Later).
+
+**Rhythm and time**
+- **Polytempo:** a track can run at a ratio of the song tempo (e.g. 3:2) for phasing and tempo canons.
+- **Free-time recording:** record without a click, then tap or mark downbeats to fit a tempo map and bar lines.
+- **Tuplets and generators:** arbitrary and nested tuplets (7:4, 5:3) as grid settings; Euclidean rhythm transform.
+- **Stretch and compress:** a transform that scales a range of bars in time, by a percentage or to a target length in beats or bars.
+
+**Song structure and editing**
+- **Sections as blocks:** working with blocks of music larger than a bar, such as a chorus, as a unit: either operations on the range between start and end markers, or a structural primitive holding a group of bars.
+- **Track loops:** as in SPG, a track can loop (shown by an `L` at its end); a starting point to build on.
+- **Split screen:** several tracks side by side, scrolled together, for editing notes across them in sync.
+
+**Harmony and arranging**
+- **Chord track:** a chord-progression lane used by step entry, transpose-in-key and reharmonisation.
+- **Arranging checks:** optional warnings for out-of-range notes per instrument, out-of-key notes, overlapping same-pitch notes, parallel fifths.
+- **MusicXML export:** to Dorico, keeping keys and per-staff meters.
+
+**Versions and annotation**
+- **Alternatives:** named alternative versions of a section, switchable and auditionable in place.
+- **Text lanes:** lyrics, rehearsal notes and cues at song positions.
+- **To-do markers:** markers flagged as to-dos, gathered in a to-do list to jump between.
+
+**Later**
+- **Live rig mode:** send program changes and setup messages per song section, stepped through with a footswitch.
+
 ## To decide
 
 Settled one milestone at a time, at the start of that milestone's work. Add to this list as new questions come up.
