@@ -6,3 +6,6 @@ target_link_libraries(modal-play PRIVATE modal::core modal::platform modal::warn
 
 add_executable(modal-loopback modal_loopback.cpp)
 target_link_libraries(modal-loopback PRIVATE modal::core modal::platform modal::warnings)
+
+add_executable(modal-record modal_record.cpp)
+target_link_libraries(modal-record PRIVATE modal::core modal::platform modal::warnings)

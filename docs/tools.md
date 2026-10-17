@@ -1,6 +1,6 @@
 # Command-line tools
 
-Milestone 1's tools, for playing songs and measuring timing until the GUI exists. Each takes `--help`. They're built with everything else: on Windows in `build/windows-msvc/apps/Debug` or `Release`, on Linux in `build/linux-gcc/apps/Debug` or `Release` (and likewise for `linux-clang`). Measure timing with a Release build.
+The command-line tools, for playing and recording songs and measuring timing until the GUI exists. Each takes `--help`. They're built with everything else: on Windows in `build/windows-msvc/apps/Debug` or `Release`, on Linux in `build/linux-gcc/apps/Debug` or `Release` (and likewise for `linux-clang`). Measure timing with a Release build.
 
 Port names can be given in full, or as any part that matches only one port, ignoring case. Quote names with spaces: `--port "My Synth Out"`.
 
@@ -25,6 +25,26 @@ modal-play --port NAME --panic
 While playing: space stops, or resumes from where it stopped; `!` panics; `q`, Esc or Ctrl-C stops and exits. It exits by itself at the end of the song.
 
 It prints a summary of the song first, and its send lateness at the end: how long after its due time each message was handed to the MIDI driver, split into waking (the engine's timer) and sending (the driver call).
+
+## modal-record
+
+Records MIDI input to a Standard MIDI File: onto a new track, or with `--overdub` into a track of the file it plays along with.
+
+```
+modal-record --in NAME --out NAME [options] OUT.mid
+```
+
+- `--in` is an input to record from; repeat it to record from several at once.
+- `--out` is the output for playback, MIDI thru and the metronome; `--click` sends the metronome and count-in to another port instead.
+- `--play FILE.mid` plays along with a file, and the take is added to it. `--overdub N` merges the take into track N of that file; otherwise it goes on a new track called "Recorded", on `--channel` (default 1), after the file's tracks. Without `--play`, `--tempo` (default 120) and `--meter` (default 4/4) set the bars.
+- `--start BAR[:BEAT]` is where recording starts (default bar 1). Before it comes a 1-bar count-in, or `--count-in BARS`, `--count-in-beats N`, `--pre-roll BARS` (play the song from that many bars before) or `--no-count-in`.
+- `--no-click` turns the metronome off while recording (a count-in still clicks); `--no-thru` stops the input being sent on to `--out`.
+- `--type0` writes a type 0 file. An existing OUT.mid isn't overwritten without `--force`.
+- `--spin`: as for `modal-play`.
+
+While recording: space stops, saves and exits; Esc or Ctrl-C stops without saving, after asking; `!` panics and exits without saving. Stopping before the record point (during the count-in) saves nothing.
+
+At the end it reports what was recorded, how many input messages arrived (and any dropped, which should be none), the thru delay (from a message's arrival to just after it was sent on) and the send lateness.
 
 ## modal-loopback
 
