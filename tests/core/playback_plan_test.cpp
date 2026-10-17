@@ -456,3 +456,39 @@ TEST_CASE("armed tracks with thru on are thru targets, muted or not")
                            {mutedArmed, DestinationId{1}, 0, 0, 0},
                        });
 }
+
+TEST_CASE("the metronome is planned when its settings say it plays, and it has a port")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [](Track& track) { track.meter.set(0, {3, 4}); });
+    constexpr DestinationId kClick{9};
+    using When = MetronomeSettings::When;
+
+    const PlanOptions playing{.recording = false, .metronomeDestination = kClick};
+    const PlanOptions recording{.recording = true, .metronomeDestination = kClick};
+    const PlanOptions nowhere{.recording = true, .metronomeDestination = std::nullopt};
+
+    CHECK(song.metronome.when == When::Recording);
+    CHECK_FALSE(compilePlan(song, everythingToPort, playing).metronome);
+    CHECK_FALSE(compilePlan(song, everythingToPort, nowhere).metronome);
+    const auto plan = compilePlan(song, everythingToPort, recording);
+    REQUIRE(plan.metronome);
+    CHECK(plan.metronome->destination == kClick);
+    CHECK(plan.metronome->channel == 9);
+    CHECK(plan.metronome->downbeatNote == 76);
+    CHECK(plan.metronome->downbeatVelocity == 110);
+    CHECK(plan.metronome->beatNote == 77);
+    CHECK(plan.metronome->beatVelocity == 80);
+    CHECK(plan.metronome->length == ppqn.quarter() / 8);
+    CHECK(plan.metronome->meter == song.referenceMeter());
+    CHECK(plan.metronome->meter.signatureAt(0) == TimeSignature{3, 4});
+    CHECK(plan.metronome->pastEnd);
+
+    song.metronome.when = When::Always;
+    const auto played = compilePlan(song, everythingToPort, playing);
+    REQUIRE(played.metronome);
+    CHECK_FALSE(played.metronome->pastEnd); // it stops when the song ends
+    song.metronome.when = When::Off;
+    CHECK_FALSE(compilePlan(song, everythingToPort, recording).metronome);
+}

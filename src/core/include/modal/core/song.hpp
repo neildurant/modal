@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modal/core/meter_map.hpp>
+#include <modal/core/metronome.hpp>
 #include <modal/core/tempo_map.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
@@ -36,6 +37,7 @@ public:
     Ppqn ppqn() const { return tempo_.ppqn(); }
 
     std::string title;
+    MetronomeSettings metronome;
 
     const TempoMap& tempo() const { return tempo_; }
     TempoMap& tempo() { return tempo_; }

@@ -11,6 +11,7 @@ namespace
 using std::chrono::nanoseconds;
 
 constexpr std::uint8_t kNoteOff = 0x80;
+constexpr std::uint8_t kNoteOn = 0x90;
 constexpr std::uint8_t kControlChange = 0xB0;
 
 constexpr std::uint8_t kSustain = 64;
@@ -67,6 +68,27 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
         ++i;
     }
 
+    const auto& metronome = plan.metronome;
+    if (click_)
+    {
+        if (metronome && metronome->destination == click_->destination &&
+            metronome->channel == click_->channel)
+        {
+            click_->end = plan.tempo.toTime(click_->endTick);
+        }
+        else
+        {
+            endClick(now);
+        }
+    }
+    nextClick_.reset();
+    if (metronome)
+    {
+        // The clicks at or before the position have been sent.
+        const Tick from = position < nanoseconds{0} ? 0 : plan.tempo.toTick(position) + 1;
+        nextClick_ = metronome->meter.beatAtOrAfter(std::max(from, startTick_));
+    }
+
     // Everything at or before the position has been sent, from one plan or the other.
     const auto it = std::ranges::upper_bound(plan.events, position, {}, &PlannedEvent::time);
     next_ = static_cast<std::size_t>(it - plan.events.begin());
@@ -88,6 +110,11 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     origin_ = now - startTime;
     next_ = plan_->firstAtOrAfter(startTime);
     chased_ = chased;
+    nextClick_.reset();
+    if (plan_->metronome)
+    {
+        nextClick_ = plan_->metronome->meter.beatAtOrAfter(start);
+    }
 }
 
 void Scheduler::stop(nanoseconds now) noexcept
@@ -99,6 +126,7 @@ void Scheduler::stop(nanoseconds now) noexcept
     endAllNotes(now);
     playing_ = false;
     chased_ = {};
+    nextClick_.reset();
 
     if (!options_.allNotesOff && !options_.resetSustain)
     {
@@ -130,6 +158,7 @@ void Scheduler::panic(nanoseconds now) noexcept
     endAllNotes(now);
     playing_ = false;
     chased_ = {};
+    nextClick_.reset();
     for (std::size_t d = 0; d < destinationCount_; ++d)
     {
         for (std::uint8_t channel = 0; channel < kChannels; ++channel)
@@ -156,24 +185,66 @@ void Scheduler::sendDue(nanoseconds now) noexcept
     const auto& events = plan_->events;
     for (;;)
     {
-        const auto off = nextNoteOff();
-        const bool offDue = off && sounding_[*off].end <= position;
-        const bool eventDue = next_ < events.size() && events[next_].time <= position;
-        if (offDue && (!eventDue || sounding_[*off].end <= events[next_].time))
+        // The earliest thing due; at equal times, the first considered.
+        enum class Due : std::uint8_t
         {
-            noteOff(*off, origin_ + sounding_[*off].end);
+            Nothing,
+            NoteOff,
+            ClickOff,
+            Click,
+            Event,
+        };
+        Due due = Due::Nothing;
+        nanoseconds dueTime{0};
+        const auto consider = [&](Due what, nanoseconds time)
+        {
+            if (time <= position && (due == Due::Nothing || time < dueTime))
+            {
+                due = what;
+                dueTime = time;
+            }
+        };
+        const auto off = nextNoteOff();
+        if (off)
+        {
+            consider(Due::NoteOff, sounding_[*off].end);
         }
-        else if (eventDue)
+        if (click_)
+        {
+            consider(Due::ClickOff, click_->end);
+        }
+        const auto click = clickDue();
+        if (click)
+        {
+            consider(Due::Click, plan_->tempo.toTime(*click));
+        }
+        if (next_ < events.size())
+        {
+            consider(Due::Event, events[next_].time);
+        }
+
+        switch (due)
+        {
+        case Due::Nothing:
+            return;
+        case Due::NoteOff:
+            noteOff(*off, origin_ + dueTime);
+            break;
+        case Due::ClickOff:
+            endClick(origin_ + dueTime);
+            break;
+        case Due::Click:
+            sendClick(*click);
+            break;
+        case Due::Event:
         {
             const auto& event = events[next_++];
             if (event.tick >= startTick_)
             {
                 send(event);
             }
-        }
-        else
-        {
             break;
+        }
         }
     }
 }
@@ -193,9 +264,18 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
     {
         next = plan_->events[next_].time;
     }
+    const auto earliest = [&](nanoseconds time) { next = next ? std::min(*next, time) : time; };
     if (const auto off = nextNoteOff())
     {
-        next = next ? std::min(*next, sounding_[*off].end) : sounding_[*off].end;
+        earliest(sounding_[*off].end);
+    }
+    if (click_)
+    {
+        earliest(click_->end);
+    }
+    if (const auto click = clickDue())
+    {
+        earliest(plan_->tempo.toTime(*click));
     }
     if (!next)
     {
@@ -206,7 +286,21 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
 
 bool Scheduler::finished() const noexcept
 {
-    return playing_ && chased_.empty() && next_ == plan_->events.size() && sounding_.empty();
+    return playing_ && songDone() && !clickDue() && !click_;
+}
+
+bool Scheduler::songDone() const noexcept
+{
+    return chased_.empty() && next_ == plan_->events.size() && sounding_.empty();
+}
+
+std::optional<Tick> Scheduler::clickDue() const noexcept
+{
+    if (!nextClick_ || (!plan_->metronome->pastEnd && songDone()))
+    {
+        return std::nullopt;
+    }
+    return nextClick_;
 }
 
 std::optional<Tick> Scheduler::position(nanoseconds now) const noexcept
@@ -251,6 +345,36 @@ void Scheduler::send(const PlannedEvent& event) noexcept
     {
         sink_.send(event.destination, event.message.view(), due);
     }
+}
+
+void Scheduler::sendClick(Tick tick) noexcept
+{
+    const auto& metronome = *plan_->metronome;
+    const nanoseconds due = origin_ + plan_->tempo.toTime(tick);
+    if (click_)
+    {
+        endClick(due);
+    }
+    const bool downbeat = metronome.meter.toBarBeatTick(tick).beat == 1;
+    const auto pitch = downbeat ? metronome.downbeatNote : metronome.beatNote;
+    const auto velocity = downbeat ? metronome.downbeatVelocity : metronome.beatVelocity;
+    const std::uint8_t on[] = {static_cast<std::uint8_t>(kNoteOn | metronome.channel), pitch,
+                               velocity};
+    sink_.send(metronome.destination, on, due);
+
+    const Tick next = metronome.meter.beatAtOrAfter(tick + 1);
+    const Tick endTick = tick + std::min(metronome.length, next - tick);
+    click_ = Click{metronome.destination, metronome.channel, pitch, endTick,
+                   plan_->tempo.toTime(endTick)};
+    nextClick_ = next;
+}
+
+void Scheduler::endClick(nanoseconds due) noexcept
+{
+    const std::uint8_t off[] = {static_cast<std::uint8_t>(kNoteOff | click_->channel),
+                                click_->pitch, 64};
+    sink_.send(click_->destination, off, due);
+    click_.reset();
 }
 
 void Scheduler::noteOn(const PlannedEvent& event, nanoseconds due) noexcept
@@ -307,6 +431,10 @@ void Scheduler::endAllNotes(nanoseconds now) noexcept
     {
         noteOff(sounding_.size() - 1, now);
     }
+    if (click_)
+    {
+        endClick(now);
+    }
 }
 
 void Scheduler::sendControl(DestinationId destination, std::uint8_t channel,
@@ -345,6 +473,10 @@ void Scheduler::rememberDestinations(const PlaybackPlan& plan) noexcept
     for (const auto& target : plan.thru) // panic reaches what thru has sent to, too
     {
         remember(target.destination);
+    }
+    if (plan.metronome)
+    {
+        remember(plan.metronome->destination);
     }
 }
 

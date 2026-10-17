@@ -97,6 +97,9 @@ public:
     // Where a bar (counting from 1) starts.
     Tick barStart(std::int64_t bar) const;
 
+    // The first beat at or after a tick (not before 0), where the metronome clicks.
+    Tick beatAtOrAfter(Tick tick) const;
+
     friend bool operator==(const MeterMap& a, const MeterMap& b)
     {
         return a.ppqn_ == b.ppqn_ && a.changes_ == b.changes_;

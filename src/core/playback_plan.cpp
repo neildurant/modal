@@ -158,9 +158,30 @@ const PlannedTrack* PlaybackPlan::track(TrackId id) const
     return it == tracks.end() ? nullptr : &*it;
 }
 
-PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination)
+PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
+                         const PlanOptions& options)
 {
     PlaybackPlan plan{song.tempo()};
+
+    const auto& metronome = song.metronome;
+    using When = MetronomeSettings::When;
+    const bool clicks =
+        metronome.when == When::Always || (metronome.when == When::Recording && options.recording);
+    if (clicks && options.metronomeDestination && metronome.isValid())
+    {
+        plan.metronome = PlannedMetronome{
+            *options.metronomeDestination,
+            static_cast<std::uint8_t>(metronome.channel - 1),
+            metronome.downbeatNote,
+            metronome.downbeatVelocity,
+            metronome.beatNote,
+            metronome.beatVelocity,
+            std::max(metronome.length.toTicks(song.ppqn()), Tick{1}),
+            song.referenceMeter(),
+            options.recording,
+        };
+    }
+
     const auto tracks = song.tracks();
     const bool anySolo = std::ranges::any_of(tracks, [](const auto& t) { return t->solo; });
 

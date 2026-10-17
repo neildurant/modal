@@ -125,6 +125,16 @@ Tick MeterMap::barStart(std::int64_t bar) const
     return changes_[i].tick + (index - segments_[i].firstBar) * segments_[i].barTicks;
 }
 
+Tick MeterMap::beatAtOrAfter(Tick tick) const
+{
+    tick = std::max(tick, Tick{0});
+    const auto i = changeAt(tick);
+    const Tick beat = segments_[i].beatTicks;
+    const Tick withinBeat = (tick - changes_[i].tick) % segments_[i].barTicks % beat;
+    // A change always starts on a bar line, so the beat found never runs past one.
+    return withinBeat == 0 ? tick : tick + beat - withinBeat;
+}
+
 Tick MeterMap::beatTicks(TimeSignature signature) const
 {
     assert(signature.isValid());

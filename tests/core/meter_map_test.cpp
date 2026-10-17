@@ -248,3 +248,20 @@ TEST_CASE("positions are read as a bar, or a bar and beat")
         CHECK_FALSE(parseBarBeat(bad));
     }
 }
+
+TEST_CASE("the metronome's beats follow the meter, remainder bars included")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick e = q / 2;
+    MeterMap map{ppqn, k4_4};
+    map.set(4 * q + 2 * q, k6_8); // mid-bar, so bar 2 becomes a 2/4 remainder bar
+
+    CHECK(map.beatAtOrAfter(-q) == 0);
+    CHECK(map.beatAtOrAfter(0) == 0);
+    CHECK(map.beatAtOrAfter(1) == q);
+    CHECK(map.beatAtOrAfter(3 * q + 1) == 4 * q);
+    CHECK(map.beatAtOrAfter(5 * q + 1) == 6 * q); // the end of the remainder bar
+    CHECK(map.beatAtOrAfter(6 * q + 1) == 6 * q + e);
+    CHECK(map.beatAtOrAfter(6 * q + e) == 6 * q + e);
+}

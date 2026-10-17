@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/core/meter_map.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tempo_map.hpp>
 #include <modal/core/tick.hpp>
@@ -93,6 +94,21 @@ struct PlannedTrack
     std::chrono::nanoseconds timeOffset;
 };
 
+// The metronome as the scheduler plays it: a click on each beat of the meter, from the
+// playback start on.
+struct PlannedMetronome
+{
+    DestinationId destination;
+    std::uint8_t channel; // 0-15
+    std::uint8_t downbeatNote;
+    std::uint8_t downbeatVelocity;
+    std::uint8_t beatNote;
+    std::uint8_t beatVelocity;
+    Tick length; // cut short where the next beat comes sooner
+    MeterMap meter;
+    bool pastEnd; // carries on past the song's end until stopped, as when recording
+};
+
 // A song compiled for playback, built off the engine thread and handed to it as an immutable
 // snapshot. Only audible tracks with a destination are included.
 struct PlaybackPlan
@@ -116,6 +132,9 @@ struct PlaybackPlan
     // starts this much early, so offset events at the start point still play in time.
     std::chrono::nanoseconds leadIn{0};
 
+    // The metronome, if it is to click during this playback.
+    std::optional<PlannedMetronome> metronome;
+
     // The index of the first event at or after a time.
     std::size_t firstAtOrAfter(std::chrono::nanoseconds time) const;
 
@@ -125,11 +144,19 @@ struct PlaybackPlan
 // Chooses a destination for a track, or none to leave it out.
 using DestinationResolver = std::function<std::optional<DestinationId>(const Track&)>;
 
+struct PlanOptions
+{
+    bool recording = false; // whether this playback records, for the metronome's When
+    std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
+};
+
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside
 // 0-127 are left out and reported in transposeWarnings; velocities are clamped to 1-127
-// after the velocity offset. Also lists the thru targets.
-PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination);
+// after the velocity offset. Also lists the thru targets, and plans the metronome on the
+// reference meter if the song's settings say it plays.
+PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
+                         const PlanOptions& options = {});
 
 // What to send when playback starts at a tick, before the events from that tick on: for each
 // track, the last program change, controller values, pitch bend and channel pressure before

@@ -6,8 +6,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <initializer_list>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -566,4 +569,226 @@ TEST_CASE("without a plan, nothing plays")
     CHECK_FALSE(scheduler.isPlaying());
     scheduler.panic(kNow);
     CHECK(sink.sent.empty());
+}
+
+namespace
+{
+
+constexpr DestinationId kClick{9};
+
+// The song's plan with the metronome on, to destination 9, by default for recording.
+PlaybackPlan withMetronome(Song song, bool recording = true)
+{
+    song.metronome.when = MetronomeSettings::When::Always;
+    return compilePlan(song, byPortName, {.recording = recording, .metronomeDestination = kClick});
+}
+
+// A metronome click (channel 10) and its note-off, by default 1/32 later at 120 BPM.
+std::vector<Sent> click(std::uint8_t pitch, std::uint8_t velocity, nanoseconds at,
+                        nanoseconds length = 62500us)
+{
+    return {{kClick, {0x99, pitch, velocity}, at}, {kClick, {0x89, pitch, 64}, at + length}};
+}
+
+std::vector<Sent> clicks(std::initializer_list<std::vector<Sent>> parts)
+{
+    std::vector<Sent> result;
+    for (const auto& part : parts)
+    {
+        result.insert(result.end(), part.begin(), part.end());
+    }
+    return result;
+}
+
+std::vector<Sent> sentTo(const RecordingSink& sink, DestinationId destination)
+{
+    std::vector<Sent> result;
+    std::ranges::copy_if(sink.sent, std::back_inserter(result),
+                         [&](const Sent& sent) { return sent.destination == destination; });
+    return result;
+}
+
+} // namespace
+
+TEST_CASE("the metronome clicks on each beat, accenting the first of each bar")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto plan = withMetronome(songAt(ppqn));
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    runUntil(scheduler, kNow + 2100ms);
+    CHECK(sink.sent == clicks({
+                           click(76, 110, kNow),
+                           click(77, 80, kNow + 500ms),
+                           click(77, 80, kNow + 1000ms),
+                           click(77, 80, kNow + 1500ms),
+                           click(76, 110, kNow + 2000ms),
+                       }));
+    CHECK_FALSE(scheduler.finished()); // when recording, it carries on past the song's end
+}
+
+TEST_CASE("when not recording, the metronome stops when the song ends")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 2 * q}}); });
+    const auto plan = withMetronome(song, false);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    runUntil(scheduler, kNow + 10s);
+    CHECK(sentTo(sink, kClick) == clicks({
+                                      click(76, 110, kNow),
+                                      click(77, 80, kNow + 500ms),
+                                  })); // none with the note-off at 1000 ms
+    CHECK(scheduler.finished());
+    CHECK(scheduler.nextWakeTime() == std::nullopt);
+}
+
+TEST_CASE("in 6/8 the metronome clicks on every eighth")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [](Track& track) { track.meter.set(0, {6, 8}); });
+    const auto plan = withMetronome(song);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    runUntil(scheduler, kNow + 1600ms);
+    CHECK(sink.sent == clicks({
+                           click(76, 110, kNow),
+                           click(77, 80, kNow + 250ms),
+                           click(77, 80, kNow + 500ms),
+                           click(77, 80, kNow + 750ms),
+                           click(77, 80, kNow + 1000ms),
+                           click(77, 80, kNow + 1250ms),
+                           click(76, 110, kNow + 1500ms),
+                       }));
+}
+
+TEST_CASE("starting mid-beat, the metronome first clicks on the next beat")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto plan = withMetronome(songAt(ppqn));
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(q + q / 2, {}, kNow);
+    runUntil(scheduler, kNow + 1400ms);
+    CHECK(sink.sent == clicks({
+                           click(77, 80, kNow + 250ms),
+                           click(77, 80, kNow + 750ms),
+                           click(76, 110, kNow + 1250ms),
+                       }));
+}
+
+TEST_CASE("a click ends by the next beat when the beat is shorter")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [](Track& track) { track.meter.set(0, {4, 64}); });
+    const auto plan = withMetronome(song);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    runUntil(scheduler, kNow + 62500us);
+    CHECK(sink.sent == clicks({
+                           click(76, 110, kNow, 31250us),
+                           click(77, 80, kNow + 31250us, 31250us),
+                           {{kClick, {0x99, 77, 80}, kNow + 62500us}}, // after the note-off
+                       }));
+}
+
+TEST_CASE("the metronome isn't offset with the tracks")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](Track& track)
+             {
+                 track.timeOffset = -100ms;
+                 track.events.insert({0, Note{60, 100, ppqn.quarter() / 4}});
+             });
+    const auto plan = withMetronome(song);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow); // with a lead-in of 100 ms
+    runUntil(scheduler, kNow + 200ms);
+    CHECK(sentTo(sink, DestinationId{1}).front() == Sent{{1}, {0x90, 60, 100}, kNow});
+    CHECK(sentTo(sink, kClick) == click(76, 110, kNow + 100ms));
+}
+
+TEST_CASE("stopping ends the click sounding, and the metronome")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto plan = withMetronome(songAt(ppqn));
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow + 10ms);
+    scheduler.stop(kNow + 10ms);
+    CHECK(sink.sent == click(76, 110, kNow, 10ms));
+    CHECK(scheduler.nextWakeTime() == std::nullopt);
+}
+
+TEST_CASE("after a tempo change the metronome carries on from the next beat")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto before = withMetronome(song);
+    song.tempo().set(0, Tempo{1'000'000}); // 60 BPM
+    const auto after = withMetronome(song);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(before, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow + 531250us); // the second click is sounding, a 1/64 into its beat
+    scheduler.setPlan(after, kNow + 531250us);
+    runUntil(scheduler, kNow + 2000ms);
+
+    // A 1/64 into the second beat is 31.25 ms at 120 BPM and 62.5 ms at 60, so the click
+    // sounding ends 125 - 62.5 ms later, and the next beat comes 1000 - 62.5 ms later.
+    CHECK(sink.sent == clicks({
+                           click(76, 110, kNow),
+                           click(77, 80, kNow + 500ms, 93750us),
+                           click(77, 80, kNow + 1468750us, 125ms),
+                       }));
+}
+
+TEST_CASE("dropping the metronome mid-play ends its click, and panic reaches its port")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto clicking = withMetronome(song);
+    const auto quiet = compilePlan(song, byPortName);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(clicking, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow + 10ms);
+    scheduler.setPlan(quiet, kNow + 10ms);
+    CHECK(sink.sent == click(76, 110, kNow, 10ms));
+    CHECK(scheduler.nextWakeTime() == std::nullopt);
+
+    sink.sent.clear();
+    scheduler.panic(kNow + 20ms);
+    CHECK(std::ranges::count(sink.sent, kClick, &Sent::destination) == 32);
 }

@@ -35,7 +35,8 @@ struct StopOptions
 };
 
 // Plays a playback plan: sends each event at its time, and the note-offs from its own table
-// of sounding notes. It does no timing itself. The engine calls sendDue() at or after
+// of sounding notes, and clicks the plan's metronome on each beat from the start tick on,
+// until stopped. It does no timing itself. The engine calls sendDue() at or after
 // nextWakeTime(), passing the time on its clock; tests pass made-up times.
 //
 // Everything here runs on the engine thread without allocating or throwing. The caller keeps
@@ -69,7 +70,8 @@ public:
     // all 16 channels of every destination any plan has used.
     void panic(std::chrono::nanoseconds now) noexcept;
 
-    // Sends everything due by now, in time order; at equal times, note-offs go first.
+    // Sends everything due by now, in time order; at equal times, note-offs go first, then
+    // the metronome, then the plan's events.
     void sendDue(std::chrono::nanoseconds now) noexcept;
 
     // When something is next due, or none if stopped or there's nothing left to send.
@@ -77,7 +79,8 @@ public:
 
     bool isPlaying() const noexcept { return playing_; }
 
-    // Whether playback has reached the end: every event sent and every note ended.
+    // Whether playback has reached the end: every event sent and every note ended. Never while
+    // a metronome that carries on past the end (when recording) is clicking.
     bool finished() const noexcept;
 
     // The tick being played at a time, or none if stopped. During a lead-in, this is before
@@ -110,7 +113,24 @@ private:
         std::chrono::nanoseconds end; // plan time of the note-off
     };
 
+    // The metronome note sounding, if any.
+    struct Click
+    {
+        DestinationId destination;
+        std::uint8_t channel;
+        std::uint8_t pitch;
+        Tick endTick;
+        std::chrono::nanoseconds end; // plan time of the note-off
+    };
+
+    // Whether every event has been sent and every note ended, clicks aside.
+    bool songDone() const noexcept;
+    // When the next click is due, if the metronome is still to click.
+    std::optional<Tick> clickDue() const noexcept;
+
     void send(const PlannedEvent& event) noexcept;
+    void sendClick(Tick tick) noexcept;
+    void endClick(std::chrono::nanoseconds due) noexcept;
     void noteOn(const PlannedEvent& event, std::chrono::nanoseconds due) noexcept;
     void noteOff(std::size_t index, std::chrono::nanoseconds due) noexcept;
     void endAllNotes(std::chrono::nanoseconds now) noexcept;
@@ -128,6 +148,9 @@ private:
     std::chrono::nanoseconds origin_{0}; // the time on the caller's clock of plan time 0
     std::size_t next_ = 0;               // the next plan event to send
     std::span<const PlannedEvent> chased_;
+
+    std::optional<Tick> nextClick_; // while the metronome clicks
+    std::optional<Click> click_;
 
     std::vector<SoundingNote> sounding_; // capacity reserved up front, never grown
     std::size_t droppedNotes_ = 0;
