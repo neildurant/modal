@@ -180,21 +180,25 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         }
         if (snapshot->playRequest == command.playRequest) // otherwise a later Play replaced it
         {
+            noteStop(now);
             scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get());
             currentPlay_ = command.playRequest;
         }
         return true;
     }
     case Command::Kind::Stop:
+        noteStop(now);
         scheduler_.stop(now);
         currentPlay_ = 0;
         return true;
     case Command::Kind::Panic:
+        noteStop(now);
         thru_.endAll(now);
         scheduler_.panic(now);
         currentPlay_ = 0;
         return true;
     case Command::Kind::Quit:
+        noteStop(now);
         scheduler_.stop(now);
         currentPlay_ = 0;
         thru_.endAll(now);
@@ -263,6 +267,25 @@ void Engine::takeInput() noexcept
         inputReceived_.store(inputReceived_.load(std::memory_order_relaxed) + received,
                              std::memory_order_relaxed);
     }
+}
+
+void Engine::noteStop(nanoseconds now) noexcept
+{
+    if (currentPlay_ == 0)
+    {
+        return;
+    }
+    stopTick_.store(scheduler_.tickAt(now).value_or(0), std::memory_order_relaxed);
+    stoppedPlay_.store(currentPlay_, std::memory_order_release);
+}
+
+std::optional<Tick> Engine::stoppedAt(std::uint64_t play) const noexcept
+{
+    if (play == 0 || stoppedPlay_.load(std::memory_order_acquire) != play)
+    {
+        return std::nullopt;
+    }
+    return stopTick_.load(std::memory_order_relaxed);
 }
 
 void Engine::publishStatus(nanoseconds now) noexcept

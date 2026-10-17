@@ -551,3 +551,35 @@ TEST_CASE("the engine plays a count-in, and input during it is stamped before th
     CHECK(received[0].tick < ppqn.quarter());
     CHECK(received[0].songTime == 250ms); // the record point is at 500 ms into the song
 }
+
+TEST_CASE("the engine reports where each play stopped")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    engine.setPlan(fourNotes(ppqn));
+
+    engine.play(q);
+    engine.step();
+    const auto first = engine.lastPlay();
+    CHECK(engine.stoppedAt(first) == std::nullopt); // still playing
+    clock.time = kStart + 750ms;
+    engine.stop();
+    engine.step();
+    CHECK(engine.stoppedAt(first) == q + q + q / 2);
+
+    // Stopped in a count-in: before the record point.
+    Song song = songAt(ppqn);
+    auto start = planRecordStart(song, q, DestinationId{9});
+    engine.play(start.playFrom, std::move(start.countIn));
+    engine.step();
+    const auto second = engine.lastPlay();
+    clock.time += 500ms;
+    engine.stop();
+    engine.step();
+    REQUIRE(engine.stoppedAt(second));
+    CHECK(*engine.stoppedAt(second) < q);
+    CHECK(engine.stoppedAt(first) == std::nullopt); // only the last play's is kept
+}

@@ -142,6 +142,11 @@ public:
 
     bool stop();
 
+    // Where a play stopped (by stop, panic, quit or another play), once the engine has done
+    // so: before its start tick if stopped during a count-in or lead-in. For the last play
+    // only; the tick of an earlier one may have been replaced.
+    std::optional<Tick> stoppedAt(std::uint64_t play) const noexcept;
+
     // Stops, sends All Notes Off and Reset All Controllers (see Scheduler::panic), and ends
     // every held thru note and pedal.
     bool panic();
@@ -215,6 +220,7 @@ private:
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
     void takeInput() noexcept;
     void publishStatus(std::chrono::nanoseconds now) noexcept;
+    void noteStop(std::chrono::nanoseconds now) noexcept;
 
     // Control side.
     std::shared_ptr<const Snapshot> latest_;
@@ -252,6 +258,8 @@ private:
     SharedTimingStats sendTime_;
     SharedTimingStats thruDelay_;
     std::atomic<std::size_t> thruDroppedNotes_{0};
+    std::atomic<Tick> stopTick_{0};
+    std::atomic<std::uint64_t> stoppedPlay_{0}; // published after stopTick_
 };
 
 } // namespace modal::core
