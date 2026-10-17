@@ -429,7 +429,7 @@ std::vector<StampedInput> allReceived(Engine& engine)
 
 } // namespace
 
-TEST_CASE("the engine passes input back, with the play and tick it arrived at")
+TEST_CASE("the engine passes input back, with the play, tick and song time it arrived at")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     RecordingSink sink;
@@ -457,6 +457,7 @@ TEST_CASE("the engine passes input back, with the play and tick it arrived at")
     REQUIRE(received.size() == 1);
     CHECK(received[0].play == engine.lastPlay());
     CHECK(received[0].tick == ppqn.quarter() + ppqn.quarter() / 2);
+    CHECK(received[0].songTime == 750ms); // the song is at 120 BPM
 
     engine.stop();
     engine.receive(InputId{2}, note, clock.time);

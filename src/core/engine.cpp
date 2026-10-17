@@ -226,10 +226,11 @@ void Engine::takeInput() noexcept
 
             if (!dropping)
             {
-                StampedInput stamped{InputId{i}, *chunk, first, currentPlay_, 0};
+                StampedInput stamped{InputId{i}, *chunk, first, currentPlay_};
                 if (currentPlay_ != 0)
                 {
                     stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
+                    stamped.songTime = scheduler_.songTimeAt(chunk->time).value_or(nanoseconds{0});
                 }
                 if (!stamped_->tryPush(std::move(stamped)))
                 {

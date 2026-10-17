@@ -88,6 +88,11 @@ public:
     // tempo at tick 0. For stamping MIDI input.
     std::optional<Tick> tickAt(std::chrono::nanoseconds time) const noexcept;
 
+    // How far into the song a time is, before 0 during a lead-in from the start, or none if
+    // stopped. For stamping MIDI input, so a track's time offset can be taken off exactly.
+    std::optional<std::chrono::nanoseconds>
+    songTimeAt(std::chrono::nanoseconds time) const noexcept;
+
     std::size_t soundingNotes() const noexcept { return sounding_.size(); }
 
     // Note-ons not sent because the table of sounding notes was full.

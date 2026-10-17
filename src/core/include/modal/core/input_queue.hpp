@@ -47,6 +47,10 @@ struct StampedInput
 
     std::uint64_t play = 0; // the play it arrived during (see Engine::lastPlay), or 0 if stopped
     Tick tick = 0;          // while playing, where in the song it arrived; before 0 in a lead-in
+
+    // While playing, how far into the song it arrived, on the song's tempo map; before 0 in a
+    // lead-in. The recorder takes a track's time offset off this.
+    std::chrono::nanoseconds songTime{};
 };
 
 // Messages from one input port on their way to the engine, timestamped as they arrived. One

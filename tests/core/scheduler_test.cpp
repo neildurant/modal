@@ -310,8 +310,11 @@ TEST_CASE("ticks for input during a lead-in from the song start are before tick 
     CHECK(scheduler.tickAt(kNow) < 0);
     CHECK(scheduler.tickAt(kNow + 40ms) == 0);
     CHECK(scheduler.tickAt(kNow + 540ms) == ppqn.quarter());
+    CHECK(scheduler.songTimeAt(kNow) == -40ms);
+    CHECK(scheduler.songTimeAt(kNow + 540ms) == 500ms);
     scheduler.stop(kNow + 1s);
     CHECK(scheduler.tickAt(kNow + 1s) == std::nullopt);
+    CHECK(scheduler.songTimeAt(kNow + 1s) == std::nullopt);
 }
 
 TEST_CASE("stop ends the notes sounding, with optional All Notes Off and sustain reset")
