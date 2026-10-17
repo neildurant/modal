@@ -218,6 +218,15 @@ std::optional<Tick> Scheduler::position(nanoseconds now) const noexcept
     return plan_->tempo.toTick(std::max(now - origin_, nanoseconds{0}));
 }
 
+std::optional<Tick> Scheduler::tickAt(nanoseconds time) const noexcept
+{
+    if (!playing_)
+    {
+        return std::nullopt;
+    }
+    return plan_->tempo.toTickExtended(time - origin_);
+}
+
 void Scheduler::send(const PlannedEvent& event) noexcept
 {
     const nanoseconds due = origin_ + event.time;

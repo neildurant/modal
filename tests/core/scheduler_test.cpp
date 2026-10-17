@@ -294,6 +294,26 @@ TEST_CASE("the position during a lead-in from the song start is tick 0")
     CHECK(sink.sent == std::vector<Sent>{{{1}, {0x90, 60, 100}, kNow}});
 }
 
+TEST_CASE("ticks for input during a lead-in from the song start are before tick 0")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](Track& track) { track.timeOffset = -40ms; });
+    const auto plan = compilePlan(song, byPortName);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    CHECK(scheduler.tickAt(kNow) == std::nullopt);
+    scheduler.play(0, {}, kNow);
+    CHECK(scheduler.tickAt(kNow) == plan.tempo.toTickExtended(-40ms));
+    CHECK(scheduler.tickAt(kNow) < 0);
+    CHECK(scheduler.tickAt(kNow + 40ms) == 0);
+    CHECK(scheduler.tickAt(kNow + 540ms) == ppqn.quarter());
+    scheduler.stop(kNow + 1s);
+    CHECK(scheduler.tickAt(kNow + 1s) == std::nullopt);
+}
+
 TEST_CASE("stop ends the notes sounding, with optional All Notes Off and sustain reset")
 {
     const auto ppqn = MODAL_ANY_PPQN();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modal/core/spsc_queue.hpp>
+#include <modal/core/tick.hpp>
 
 #include <array>
 #include <chrono>
@@ -30,6 +31,22 @@ struct InputChunk
     std::array<std::uint8_t, kMaxBytes> bytes{};
     std::uint8_t size = 0;
     bool more = false; // the next chunk carries on the same SysEx
+};
+
+// A piece of input as the engine took it in, on its way back to the control side for
+// recording.
+struct StampedInput
+{
+    InputId input{0};
+    InputChunk chunk;
+
+    // Whether this chunk starts a message; a SysEx's later chunks follow it (see
+    // InputChunk::more). If a SysEx couldn't all be passed back, its chunks so far are
+    // followed by the next message's first chunk instead.
+    bool first = true;
+
+    std::uint64_t play = 0; // the play it arrived during (see Engine::lastPlay), or 0 if stopped
+    Tick tick = 0;          // while playing, where in the song it arrived; before 0 in a lead-in
 };
 
 // Messages from one input port on their way to the engine, timestamped as they arrived. One

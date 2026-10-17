@@ -413,3 +413,111 @@ TEST_CASE("stop leaves held thru notes alone; panic ends them")
     REQUIRE(messages.size() > 2);
     CHECK(messages[1] == std::vector<std::uint8_t>{0x81, 60, 64}); // then All Notes Off etc.
 }
+
+namespace
+{
+
+std::vector<StampedInput> allReceived(Engine& engine)
+{
+    std::vector<StampedInput> result;
+    while (auto stamped = engine.nextReceived())
+    {
+        result.push_back(*stamped);
+    }
+    return result;
+}
+
+} // namespace
+
+TEST_CASE("the engine passes input back, with the play and tick it arrived at")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    engine.setPlan(fourNotes(ppqn));
+    const std::vector<std::uint8_t> note{0x90, 60, 100};
+
+    engine.receive(InputId{2}, note, kStart - 1ms);
+    engine.step();
+    auto received = allReceived(engine);
+    REQUIRE(received.size() == 1);
+    CHECK(received[0].input == InputId{2});
+    CHECK(received[0].chunk.time == kStart - 1ms);
+    CHECK(received[0].first);
+    CHECK(received[0].play == 0); // stopped
+
+    engine.play(ppqn.quarter());
+    engine.step(); // starts playing at kStart
+    CHECK(engine.lastPlay() != 0);
+    engine.receive(InputId{2}, note, kStart + 250ms);
+    clock.time = kStart + 300ms;
+    engine.step();
+    received = allReceived(engine);
+    REQUIRE(received.size() == 1);
+    CHECK(received[0].play == engine.lastPlay());
+    CHECK(received[0].tick == ppqn.quarter() + ppqn.quarter() / 2);
+
+    engine.stop();
+    engine.receive(InputId{2}, note, clock.time);
+    engine.step();
+    received = allReceived(engine);
+    REQUIRE(received.size() == 1);
+    CHECK(received[0].play == 0);
+}
+
+TEST_CASE("a SysEx comes back in chunks, the first marked")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    std::vector<std::uint8_t> sysEx(InputChunk::kMaxBytes * 2 + 1, 0x01);
+    sysEx.front() = 0xF0;
+    sysEx.back() = 0xF7;
+    engine.receive(InputId{0}, sysEx, kStart);
+    engine.step();
+    const auto received = allReceived(engine);
+    REQUIRE(received.size() == 3);
+    CHECK(received[0].first);
+    CHECK_FALSE(received[1].first);
+    CHECK_FALSE(received[2].first);
+    CHECK_FALSE(received[2].chunk.more);
+}
+
+TEST_CASE(
+    "input not collected in time is counted, and a SysEx cut short is followed by a new message")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::vector<std::uint8_t> note{0x90, 60, 100};
+    std::vector<std::uint8_t> sysEx(InputChunk::kMaxBytes * 3, 0x01);
+    sysEx.front() = 0xF0;
+    sysEx.back() = 0xF7;
+
+    // Fill the way back to two short of full, from several passes of the engine.
+    std::size_t queued = 0;
+    while (queued < Engine::kMaxStamped - 2)
+    {
+        for (std::size_t i = 0; i < 512 && queued < Engine::kMaxStamped - 2; ++i, ++queued)
+        {
+            REQUIRE(engine.receive(InputId{0}, note, kStart));
+        }
+        engine.step();
+    }
+    engine.receive(InputId{0}, sysEx, kStart); // only two of its three chunks fit
+    engine.receive(InputId{0}, note, kStart);  // doesn't fit
+    engine.step();
+    CHECK(engine.status().inputUnreported == 2);
+
+    auto received = allReceived(engine);
+    REQUIRE(received.size() == Engine::kMaxStamped);
+    CHECK(received[Engine::kMaxStamped - 2].first);
+    CHECK(received[Engine::kMaxStamped - 1].chunk.more); // cut short
+
+    engine.receive(InputId{0}, note, kStart);
+    engine.step();
+    received = allReceived(engine);
+    REQUIRE(received.size() == 1);
+    CHECK(received[0].first);
+}

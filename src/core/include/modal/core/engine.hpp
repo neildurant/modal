@@ -71,6 +71,7 @@ struct EngineStatus
     // keep up (or a SysEx too long ever to fit).
     std::size_t inputReceived = 0;
     std::size_t inputDropped = 0;
+    std::size_t inputUnreported = 0; // not passed back, because nextReceived() didn't keep up
 
     // MIDI thru: from each message's arrival to just after it was sent on, and note-ons not
     // sent because too many thru notes were held (see Thru::kMaxHeldNotes).
@@ -130,6 +131,13 @@ public:
     // without a plan.
     bool play(Tick start);
 
+    // The id of the last play() request, as StampedInput::play gives it.
+    std::uint64_t lastPlay() const noexcept { return playRequests_; }
+
+    // Input the engine has taken in, stamped with when and where in the song it arrived, in
+    // the order taken in (each input in arrival order). Only one thread may call this.
+    std::optional<StampedInput> nextReceived() noexcept { return stamped_->tryPop(); }
+
     bool stop();
 
     // Stops, sends All Notes Off and Reset All Controllers (see Scheduler::panic), and ends
@@ -163,6 +171,7 @@ public:
 
     static constexpr std::chrono::nanoseconds kMaxSleep = std::chrono::milliseconds{1};
     static constexpr std::size_t kMaxInputs = 16;
+    static constexpr std::size_t kMaxStamped = 4096; // chunks waiting for nextReceived()
 
 private:
     using Snapshot = detail::EngineSnapshot;
@@ -215,6 +224,7 @@ private:
     std::unique_ptr<std::array<InputQueue, kMaxInputs>> inputs_; // too big for the stack
     std::atomic<std::size_t> inputDropped_{0};                   // written by input threads
     std::atomic<bool> thruOn_{true};
+    std::unique_ptr<SpscQueue<StampedInput, kMaxStamped>> stamped_;
 
     // Engine side.
     MessageSink& sink_;
@@ -224,6 +234,7 @@ private:
     ThruSink thruSink_{*this};
     Thru thru_{thruSink_};
     std::optional<Command> pending_; // a Play waiting for its snapshot
+    std::uint64_t currentPlay_ = 0;  // 0 while stopped
     bool quit_ = false;
 
     // Status, written by the engine thread only.
@@ -233,6 +244,7 @@ private:
     std::atomic<Tick> position_{kNoPosition};
     std::atomic<std::size_t> droppedNotes_{0};
     std::atomic<std::size_t> inputReceived_{0};
+    std::atomic<std::size_t> inputUnreported_{0};
     SharedTimingStats lateness_;
     SharedTimingStats wakeLateness_;
     SharedTimingStats sendTime_;

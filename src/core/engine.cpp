@@ -16,6 +16,7 @@ using std::chrono::nanoseconds;
 
 Engine::Engine(MessageSink& sink, EngineClock& clock, StopOptions options)
     : inputs_(std::make_unique<std::array<InputQueue, kMaxInputs>>())
+    , stamped_(std::make_unique<SpscQueue<StampedInput, kMaxStamped>>())
     , sink_(sink)
     , clock_(clock)
     , scheduler_(measuring_, options)
@@ -82,6 +83,7 @@ EngineStatus Engine::status() const
     status.sendTime = sendTime_.read();
     status.inputReceived = inputReceived_.load(std::memory_order_relaxed);
     status.inputDropped = inputDropped_.load(std::memory_order_relaxed);
+    status.inputUnreported = inputUnreported_.load(std::memory_order_relaxed);
     status.thruDelay = thruDelay_.read();
     status.thruDroppedNotes = thruDroppedNotes_.load(std::memory_order_relaxed);
     return status;
@@ -178,18 +180,22 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         if (snapshot->playRequest == command.playRequest) // otherwise a later Play replaced it
         {
             scheduler_.play(snapshot->start, *snapshot->chased, now);
+            currentPlay_ = command.playRequest;
         }
         return true;
     }
     case Command::Kind::Stop:
         scheduler_.stop(now);
+        currentPlay_ = 0;
         return true;
     case Command::Kind::Panic:
         thru_.endAll(now);
         scheduler_.panic(now);
+        currentPlay_ = 0;
         return true;
     case Command::Kind::Quit:
         scheduler_.stop(now);
+        currentPlay_ = 0;
         thru_.endAll(now);
         quit_ = true;
         return true;
@@ -197,30 +203,57 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
     return true;
 }
 
-// Sends channel messages thru. SysEx isn't sent thru (WinMM blocks while sending it), and
-// isn't used yet.
+// Stamps input and passes it back, and sends channel messages thru. SysEx isn't sent thru,
+// since WinMM blocks while sending it.
 void Engine::takeInput() noexcept
 {
     const bool thruOn = thruOn_.load(std::memory_order_relaxed);
     std::size_t received = 0;
+    std::size_t unreported = 0;
     for (std::uint32_t i = 0; i < kMaxInputs; ++i)
     {
-        bool inSysEx = false; // pushes are all or nothing, so a SysEx's chunks are together
+        // Pushes are all or nothing, so a SysEx's chunks come together.
+        bool continuing = false;
+        bool dropping = false; // the rest of a SysEx that couldn't all be passed back
         while (const auto chunk = (*inputs_)[i].pop())
         {
-            const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
-            const bool sysEx = inSysEx || bytes[0] == 0xF0;
-            inSysEx = chunk->more;
+            const bool first = !continuing;
+            continuing = chunk->more;
+            if (first)
+            {
+                dropping = false;
+            }
+
+            if (!dropping)
+            {
+                StampedInput stamped{InputId{i}, *chunk, first, currentPlay_, 0};
+                if (currentPlay_ != 0)
+                {
+                    stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
+                }
+                if (!stamped_->tryPush(std::move(stamped)))
+                {
+                    ++unreported;
+                    dropping = chunk->more;
+                }
+            }
+
             if (chunk->more)
             {
                 continue;
             }
             ++received;
-            if (thruOn && !sysEx)
+            const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
+            if (thruOn && first && bytes[0] != 0xF0)
             {
                 thru_.receive(InputId{i}, bytes, chunk->time);
             }
         }
+    }
+    if (unreported > 0)
+    {
+        inputUnreported_.store(inputUnreported_.load(std::memory_order_relaxed) + unreported,
+                               std::memory_order_relaxed);
     }
     thruDroppedNotes_.store(thru_.droppedNotes(), std::memory_order_relaxed);
     if (received > 0)

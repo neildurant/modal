@@ -69,6 +69,10 @@ public:
     std::chrono::nanoseconds toTime(Tick tick) const;
     Tick toTick(std::chrono::nanoseconds time) const;
 
+    // As toTick(), but a time before 0 gives a tick before 0, at the tempo at tick 0, such as
+    // for MIDI input during a count-in at the start of the song.
+    Tick toTickExtended(std::chrono::nanoseconds time) const;
+
 private:
     // Index of the change in effect at the tick, or at the time.
     std::size_t segmentAt(Tick tick) const;

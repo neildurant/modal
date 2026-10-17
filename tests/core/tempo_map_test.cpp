@@ -71,6 +71,21 @@ TEST_CASE("ticks convert to time at a single tempo")
     CHECK(map.toTick(499ms) < ppqn.quarter());
 }
 
+TEST_CASE("times before 0 convert to ticks before 0, at the first tempo")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    TempoMap map{ppqn, k120Bpm};
+    map.set(ppqn.quarter(), k60Bpm); // makes no difference before 0
+
+    CHECK(map.toTickExtended(0ns) == 0);
+    CHECK(map.toTickExtended(1500ms) == map.toTick(1500ms));
+    CHECK(map.toTickExtended(-1ns) == -1);
+    CHECK(map.toTickExtended(-500ms) == -ppqn.quarter());
+    CHECK(map.toTickExtended(-2s) == -ppqn.whole());
+    CHECK(map.toTickExtended(-499ms) == -ppqn.quarter() + ppqn.quarter() / 500);
+    CHECK(map.toTickExtended(-501ms) == -ppqn.quarter() - ppqn.quarter() / 500 - 1);
+}
+
 TEST_CASE("tempo changes are steps")
 {
     const auto ppqn = MODAL_ANY_PPQN();

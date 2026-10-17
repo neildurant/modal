@@ -120,6 +120,20 @@ Tick TempoMap::toTick(nanoseconds time) const
     return changes_[i].tick + elapsedTicks(time - startTimes_[i], changes_[i].tempo, ppqn_);
 }
 
+Tick TempoMap::toTickExtended(nanoseconds time) const
+{
+    if (time >= nanoseconds{0})
+    {
+        return toTick(time);
+    }
+    // The last tick at or before the time is the next whole tick back from it.
+    const nanoseconds before = -time;
+    const Tick ticks = elapsedTicks(before, changes_[0].tempo, ppqn_);
+    const std::int64_t nanosPerQuarter = changes_[0].tempo.microsPerQuarter * kNanosPerMicro;
+    const bool onTick = before.count() % nanosPerQuarter * ppqn_.value % nanosPerQuarter == 0;
+    return -(ticks + (onTick ? 0 : 1));
+}
+
 std::size_t TempoMap::segmentAt(Tick tick) const
 {
     // The last change at or before the tick; changes_[0] is at tick 0.

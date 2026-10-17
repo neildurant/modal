@@ -84,6 +84,10 @@ public:
     // the start tick, and never before tick 0.
     std::optional<Tick> position(std::chrono::nanoseconds now) const noexcept;
 
+    // As position(), but before tick 0 (during a lead-in) it gives ticks before 0, at the
+    // tempo at tick 0. For stamping MIDI input.
+    std::optional<Tick> tickAt(std::chrono::nanoseconds time) const noexcept;
+
     std::size_t soundingNotes() const noexcept { return sounding_.size(); }
 
     // Note-ons not sent because the table of sounding notes was full.
