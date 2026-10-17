@@ -46,6 +46,7 @@ class Scheduler
 public:
     static constexpr std::size_t kMaxSoundingNotes = 4096; // more note-ons aren't sent
     static constexpr std::size_t kMaxDestinations = 64;    // more aren't reached by panic
+    static constexpr std::size_t kMaxHeldPedals = 256;     // more aren't let up on stop
 
     explicit Scheduler(MessageSink& sink, StopOptions options = {});
 
@@ -59,11 +60,12 @@ public:
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
     // lead-in, the start tick is reached that long after now. If already playing, the notes
-    // sounding end first. Does nothing without a plan.
+    // sounding end first, and the pedals held down come up. Does nothing without a plan.
     void play(Tick start, std::span<const PlannedEvent> chased,
               std::chrono::nanoseconds now) noexcept;
 
-    // Ends the notes sounding and stops, with the stop options.
+    // Ends the notes sounding, lets up each pedal (sustain, sostenuto or soft) playback left
+    // down, on just the channels where it's down, and stops, with the stop options.
     void stop(std::chrono::nanoseconds now) noexcept;
 
     // Ends the notes sounding and stops, then sends All Notes Off and Reset All Controllers on
@@ -113,6 +115,16 @@ private:
         std::chrono::nanoseconds end; // plan time of the note-off
     };
 
+    // A pedal playback has left down.
+    struct HeldPedal
+    {
+        DestinationId destination;
+        std::uint8_t channel;
+        std::uint8_t controller;
+
+        friend bool operator==(const HeldPedal&, const HeldPedal&) = default;
+    };
+
     // The metronome note sounding, if any.
     struct Click
     {
@@ -134,6 +146,8 @@ private:
     void noteOn(const PlannedEvent& event, std::chrono::nanoseconds due) noexcept;
     void noteOff(std::size_t index, std::chrono::nanoseconds due) noexcept;
     void endAllNotes(std::chrono::nanoseconds now) noexcept;
+    void notePedal(const PlannedEvent& event) noexcept;
+    void releasePedals(std::chrono::nanoseconds now) noexcept;
     void sendControl(DestinationId destination, std::uint8_t channel, std::uint8_t controller,
                      std::uint8_t value, std::chrono::nanoseconds due) noexcept;
     std::optional<std::size_t> nextNoteOff() const noexcept;
@@ -153,6 +167,7 @@ private:
     std::optional<Click> click_;
 
     std::vector<SoundingNote> sounding_; // capacity reserved up front, never grown
+    std::vector<HeldPedal> pedals_;      // likewise
     std::size_t droppedNotes_ = 0;
 
     std::array<DestinationId, kMaxDestinations> destinations_{};

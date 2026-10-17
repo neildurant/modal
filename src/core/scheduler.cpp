@@ -15,6 +15,9 @@ constexpr std::uint8_t kNoteOn = 0x90;
 constexpr std::uint8_t kControlChange = 0xB0;
 
 constexpr std::uint8_t kSustain = 64;
+constexpr std::uint8_t kSostenuto = 66;
+constexpr std::uint8_t kSoft = 67;
+constexpr std::uint8_t kPedalDown = 64; // values from this up hold a pedal down
 constexpr std::uint8_t kResetAllControllers = 121;
 constexpr std::uint8_t kAllNotesOff = 123;
 constexpr std::uint8_t kChannels = 16;
@@ -39,6 +42,7 @@ Scheduler::Scheduler(MessageSink& sink, StopOptions options)
     , options_(options)
 {
     sounding_.reserve(kMaxSoundingNotes);
+    pedals_.reserve(kMaxHeldPedals);
 }
 
 void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
@@ -103,6 +107,7 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     if (playing_)
     {
         endAllNotes(now);
+        releasePedals(now);
     }
     const nanoseconds startTime = plan_->tempo.toTime(start) - plan_->leadIn;
     playing_ = true;
@@ -124,6 +129,7 @@ void Scheduler::stop(nanoseconds now) noexcept
         return;
     }
     endAllNotes(now);
+    releasePedals(now);
     playing_ = false;
     chased_ = {};
     nextClick_.reset();
@@ -156,6 +162,7 @@ void Scheduler::stop(nanoseconds now) noexcept
 void Scheduler::panic(nanoseconds now) noexcept
 {
     endAllNotes(now);
+    pedals_.clear(); // Reset All Controllers lets them up
     playing_ = false;
     chased_ = {};
     nextClick_.reset();
@@ -343,8 +350,43 @@ void Scheduler::send(const PlannedEvent& event) noexcept
     }
     else
     {
+        notePedal(event);
         sink_.send(event.destination, event.message.view(), due);
     }
+}
+
+void Scheduler::notePedal(const PlannedEvent& event) noexcept
+{
+    const auto& bytes = event.message.bytes;
+    const std::uint8_t controller = bytes[1];
+    if (event.message.size != 3 || (bytes[0] & 0xF0) != kControlChange ||
+        (controller != kSustain && controller != kSostenuto && controller != kSoft))
+    {
+        return;
+    }
+    const HeldPedal pedal{event.destination, static_cast<std::uint8_t>(bytes[0] & 0x0F),
+                          controller};
+    const auto it = std::ranges::find(pedals_, pedal);
+    if (bytes[2] < kPedalDown)
+    {
+        if (it != pedals_.end())
+        {
+            pedals_.erase(it); // keeps the order they went down in, for pedal-ups
+        }
+    }
+    else if (it == pedals_.end() && pedals_.size() < kMaxHeldPedals)
+    {
+        pedals_.push_back(pedal);
+    }
+}
+
+void Scheduler::releasePedals(nanoseconds now) noexcept
+{
+    for (const auto& pedal : pedals_)
+    {
+        sendControl(pedal.destination, pedal.channel, pedal.controller, 0, now);
+    }
+    pedals_.clear();
 }
 
 void Scheduler::sendClick(Tick tick) noexcept

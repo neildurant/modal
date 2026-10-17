@@ -792,3 +792,92 @@ TEST_CASE("dropping the metronome mid-play ends its click, and panic reaches its
     scheduler.panic(kNow + 20ms);
     CHECK(std::ranges::count(sink.sent, kClick, &Sent::destination) == 32);
 }
+
+TEST_CASE("stop lets up each pedal playback left down, on just its channel")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](Track& track)
+             {
+                 track.events.insert({0, ControlChange{64, 100}}); // a half pedal is down
+                 track.events.insert({0, ControlChange{67, 127}});
+                 track.events.insert({q, ControlChange{67, 0}}); // up again
+             });
+    addTrack(song, 2,
+             [&](Track& track)
+             {
+                 track.port = "2";
+                 track.events.insert({0, ControlChange{66, 127}});
+                 track.events.insert({0, ControlChange{7, 127}}); // not a pedal
+             });
+    addTrack(song, 3, [&](Track& track) { track.events.insert({0, ControlChange{64, 20}}); });
+    const auto plan = compilePlan(song, byPortName);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow + 1s);
+    sink.sent.clear();
+    scheduler.stop(kNow + 1s);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0xB0, 64, 0}, kNow + 1s},
+                           {{2}, {0xB1, 66, 0}, kNow + 1s},
+                       });
+
+    sink.sent.clear();
+    scheduler.play(2 * q, {}, kNow + 2s);
+    scheduler.stop(kNow + 2s);
+    CHECK(sink.sent.empty()); // let up already
+}
+
+TEST_CASE("chased pedals are let up on stop, and restarting lets pedals up first")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](Track& track)
+             {
+                 track.events.insert({0, ControlChange{64, 127}});
+                 track.events.insert({4 * q, ControlChange{64, 0}});
+             });
+    const auto plan = compilePlan(song, byPortName);
+    const auto chased = chase(plan, 2 * q);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(2 * q, chased, kNow);
+    scheduler.sendDue(kNow);
+    CHECK(sink.messages() == std::vector<Bytes>{{0xB0, 64, 127}});
+
+    sink.sent.clear();
+    scheduler.play(5 * q, {}, kNow + 100ms);
+    CHECK(sink.messages() == std::vector<Bytes>{{0xB0, 64, 0}});
+
+    sink.sent.clear();
+    scheduler.stop(kNow + 200ms);
+    CHECK(sink.sent.empty());
+}
+
+TEST_CASE("after a panic, stop has no pedals to let up")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](Track& track) { track.events.insert({0, ControlChange{64, 127}}); });
+    const auto plan = compilePlan(song, byPortName);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow);
+    scheduler.panic(kNow + 1ms);
+    scheduler.play(0, {}, kNow + 2ms);
+    sink.sent.clear();
+    scheduler.stop(kNow + 2ms); // before the pedal is sent again
+    CHECK(sink.sent.empty());
+}
