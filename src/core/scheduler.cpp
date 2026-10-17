@@ -311,14 +311,22 @@ std::optional<std::size_t> Scheduler::nextNoteOff() const noexcept
 
 void Scheduler::rememberDestinations(const PlaybackPlan& plan) noexcept
 {
-    for (const auto& track : plan.tracks)
+    const auto remember = [&](DestinationId destination)
     {
         const auto known = std::span{destinations_}.first(destinationCount_);
-        if (std::ranges::find(known, track.destination) == known.end() &&
+        if (std::ranges::find(known, destination) == known.end() &&
             destinationCount_ < kMaxDestinations)
         {
-            destinations_[destinationCount_++] = track.destination;
+            destinations_[destinationCount_++] = destination;
         }
+    };
+    for (const auto& track : plan.tracks)
+    {
+        remember(track.destination);
+    }
+    for (const auto& target : plan.thru) // panic reaches what thru has sent to, too
+    {
+        remember(target.destination);
     }
 }
 

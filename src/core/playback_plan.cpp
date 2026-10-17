@@ -167,6 +167,16 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     for (const auto& trackPtr : tracks)
     {
         const Track& track = *trackPtr;
+        if (track.arm && track.thru)
+        {
+            if (const auto destination = resolveDestination(track))
+            {
+                plan.thru.push_back({track.id(), *destination,
+                                     static_cast<std::uint8_t>(track.channel - 1), track.transpose,
+                                     track.velocityOffset});
+            }
+        }
+
         const bool audible = anySolo ? track.solo : !track.mute;
         if (!audible)
         {

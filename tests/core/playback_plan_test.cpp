@@ -408,3 +408,51 @@ TEST_CASE("chasing with time offsets uses positions, and starts early by the lea
     CHECK(chased[0].message == bytes(0xB0, 7, 50));
     CHECK(chased[0].time == 500ms - 40ms);
 }
+
+TEST_CASE("armed tracks with thru on are thru targets, muted or not")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto armed = addTrack(song, 3,
+                                [](Track& track)
+                                {
+                                    track.arm = true;
+                                    track.port = "4";
+                                    track.transpose = -12;
+                                    track.velocityOffset = 5;
+                                    track.timeOffset = std::chrono::milliseconds{-20};
+                                });
+    const auto mutedArmed = addTrack(song, 1,
+                                     [](Track& track)
+                                     {
+                                         track.arm = true;
+                                         track.mute = true;
+                                     });
+    addTrack(song, 1); // not armed
+    addTrack(song, 1,
+             [](Track& track)
+             {
+                 track.arm = true;
+                 track.thru = false;
+             });
+    addTrack(song, 1,
+             [](Track& track)
+             {
+                 track.arm = true;
+                 track.port = "Missing";
+             });
+
+    const auto plan = compilePlan(song,
+                                  [](const Track& track) -> std::optional<DestinationId>
+                                  {
+                                      if (track.port == "Missing")
+                                      {
+                                          return std::nullopt;
+                                      }
+                                      return track.port == "4" ? DestinationId{4} : kPort;
+                                  });
+    CHECK(plan.thru == std::vector<ThruTarget>{
+                           {armed, DestinationId{4}, 2, -12, 5},
+                           {mutedArmed, DestinationId{1}, 0, 0, 0},
+                       });
+}

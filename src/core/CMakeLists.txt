@@ -10,6 +10,7 @@ add_library(modal_core STATIC
     smf.cpp
     song.cpp
     tempo_map.cpp
+    thru.cpp
     track.cpp
     version.cpp
 )

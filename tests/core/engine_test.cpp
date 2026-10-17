@@ -341,3 +341,75 @@ TEST_CASE("the engine takes in input from another thread while it runs")
     thread.join();
     CHECK(engine.status().inputReceived == kMessages);
 }
+
+namespace
+{
+
+// A plan with one armed track, on channel 2 of destination 1, and nothing to play.
+std::shared_ptr<const PlaybackPlan> armedPlan(Ppqn ppqn)
+{
+    Song song = songAt(ppqn);
+    addTrack(song, 2, [](Track& track) { track.arm = true; });
+    return std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName));
+}
+
+} // namespace
+
+TEST_CASE("the engine sends input thru to the armed tracks, playing or not")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    engine.setPlan(armedPlan(ppqn));
+    engine.step();
+
+    REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart - 2ms));
+    std::vector<std::uint8_t> sysEx(100, 0x01);
+    sysEx.front() = 0xF0;
+    sysEx.back() = 0xF7;
+    REQUIRE(engine.receive(InputId{0}, sysEx, kStart - 1ms)); // not sent thru
+    engine.step();
+    CHECK(sink.sent == std::vector<Sent>{{DestinationId{1}, {0x91, 60, 100}, kStart - 2ms}});
+
+    const auto status = engine.status();
+    CHECK(status.inputReceived == 2);
+    CHECK(status.thruDelay.count == 1);
+    CHECK(status.thruDelay.max == 2ms);
+    CHECK(status.lateness.count == 0); // playback lateness is kept apart
+}
+
+TEST_CASE("with thru off, the engine takes input in but doesn't send it on")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    engine.setPlan(armedPlan(ppqn));
+    engine.setThru(false);
+    engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart);
+    engine.step();
+    CHECK(sink.sent.empty());
+    CHECK(engine.status().inputReceived == 1);
+}
+
+TEST_CASE("stop leaves held thru notes alone; panic ends them")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    engine.setPlan(armedPlan(ppqn));
+    engine.play(0);
+    engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart);
+    engine.step();
+    engine.stop();
+    engine.step();
+    CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x91, 60, 100}});
+
+    engine.panic();
+    engine.step();
+    const auto messages = sink.messages();
+    REQUIRE(messages.size() > 2);
+    CHECK(messages[1] == std::vector<std::uint8_t>{0x81, 60, 64}); // then All Notes Off etc.
+}

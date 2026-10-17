@@ -5,6 +5,7 @@
 #include <modal/core/scheduler.hpp>
 #include <modal/core/snapshot_exchange.hpp>
 #include <modal/core/spsc_queue.hpp>
+#include <modal/core/thru.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/timing_stats.hpp>
 
@@ -70,6 +71,11 @@ struct EngineStatus
     // keep up (or a SysEx too long ever to fit).
     std::size_t inputReceived = 0;
     std::size_t inputDropped = 0;
+
+    // MIDI thru: from each message's arrival to just after it was sent on, and note-ons not
+    // sent because too many thru notes were held (see Thru::kMaxHeldNotes).
+    TimingStats thruDelay;
+    std::size_t thruDroppedNotes = 0;
 };
 
 namespace detail
@@ -125,7 +131,14 @@ public:
     bool play(Tick start);
 
     bool stop();
+
+    // Stops, sends All Notes Off and Reset All Controllers (see Scheduler::panic), and ends
+    // every held thru note and pedal.
     bool panic();
+
+    // Turns MIDI thru on or off for every track (on to begin with). Notes and pedals already
+    // held still end where they went.
+    void setThru(bool on) { thruOn_.store(on, std::memory_order_relaxed); }
 
     // Ends run() once the commands before it have been carried out.
     bool quit();
@@ -171,6 +184,22 @@ private:
         Engine& engine_;
     };
 
+    // Measures thru delay on the way to the real sink; the due time is the arrival time.
+    class ThruSink final : public MessageSink
+    {
+    public:
+        ThruSink(Engine& engine)
+            : engine_(engine)
+        {
+        }
+
+        void send(DestinationId destination, std::span<const std::uint8_t> bytes,
+                  std::chrono::nanoseconds arrival) noexcept override;
+
+    private:
+        Engine& engine_;
+    };
+
     bool publish(Snapshot snapshot);
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
     void takeInput() noexcept;
@@ -185,12 +214,15 @@ private:
     SpscQueue<Command, 64> commands_;
     std::unique_ptr<std::array<InputQueue, kMaxInputs>> inputs_; // too big for the stack
     std::atomic<std::size_t> inputDropped_{0};                   // written by input threads
+    std::atomic<bool> thruOn_{true};
 
     // Engine side.
     MessageSink& sink_;
     EngineClock& clock_;
     MeasuringSink measuring_{*this};
     Scheduler scheduler_;
+    ThruSink thruSink_{*this};
+    Thru thru_{thruSink_};
     std::optional<Command> pending_; // a Play waiting for its snapshot
     bool quit_ = false;
 
@@ -204,6 +236,8 @@ private:
     SharedTimingStats lateness_;
     SharedTimingStats wakeLateness_;
     SharedTimingStats sendTime_;
+    SharedTimingStats thruDelay_;
+    std::atomic<std::size_t> thruDroppedNotes_{0};
 };
 
 } // namespace modal::core

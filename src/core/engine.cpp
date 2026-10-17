@@ -82,6 +82,8 @@ EngineStatus Engine::status() const
     status.sendTime = sendTime_.read();
     status.inputReceived = inputReceived_.load(std::memory_order_relaxed);
     status.inputDropped = inputDropped_.load(std::memory_order_relaxed);
+    status.thruDelay = thruDelay_.read();
+    status.thruDroppedNotes = thruDroppedNotes_.load(std::memory_order_relaxed);
     return status;
 }
 
@@ -131,7 +133,9 @@ EngineWake Engine::step() noexcept
     const auto now = clock_.now();
     if (snapshots_.update())
     {
-        scheduler_.setPlan(*snapshots_.current()->plan, now);
+        const auto& plan = *snapshots_.current()->plan;
+        scheduler_.setPlan(plan, now);
+        thru_.setTargets(plan.thru);
     }
 
     // Commands are carried out in order; a Play whose snapshot hasn't arrived yet waits, and
@@ -181,30 +185,44 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         scheduler_.stop(now);
         return true;
     case Command::Kind::Panic:
+        thru_.endAll(now);
         scheduler_.panic(now);
         return true;
     case Command::Kind::Quit:
         scheduler_.stop(now);
+        thru_.endAll(now);
         quit_ = true;
         return true;
     }
     return true;
 }
 
-// Nothing uses input yet but the count.
+// Sends channel messages thru. SysEx isn't sent thru (WinMM blocks while sending it), and
+// isn't used yet.
 void Engine::takeInput() noexcept
 {
+    const bool thruOn = thruOn_.load(std::memory_order_relaxed);
     std::size_t received = 0;
-    for (auto& queue : *inputs_)
+    for (std::uint32_t i = 0; i < kMaxInputs; ++i)
     {
-        while (const auto chunk = queue.pop())
+        bool inSysEx = false; // pushes are all or nothing, so a SysEx's chunks are together
+        while (const auto chunk = (*inputs_)[i].pop())
         {
-            if (!chunk->more)
+            const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
+            const bool sysEx = inSysEx || bytes[0] == 0xF0;
+            inSysEx = chunk->more;
+            if (chunk->more)
             {
-                ++received;
+                continue;
+            }
+            ++received;
+            if (thruOn && !sysEx)
+            {
+                thru_.receive(InputId{i}, bytes, chunk->time);
             }
         }
     }
+    thruDroppedNotes_.store(thru_.droppedNotes(), std::memory_order_relaxed);
     if (received > 0)
     {
         inputReceived_.store(inputReceived_.load(std::memory_order_relaxed) + received,
@@ -229,6 +247,13 @@ void Engine::MeasuringSink::send(DestinationId destination, std::span<const std:
     engine_.lateness_.record(end - due);
     engine_.wakeLateness_.record(start - due);
     engine_.sendTime_.record(end - start);
+}
+
+void Engine::ThruSink::send(DestinationId destination, std::span<const std::uint8_t> bytes,
+                            nanoseconds arrival) noexcept
+{
+    engine_.sink_.send(destination, bytes, arrival);
+    engine_.thruDelay_.record(engine_.clock_.now() - arrival);
 }
 
 } // namespace modal::core

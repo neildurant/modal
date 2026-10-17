@@ -71,6 +71,19 @@ struct TransposeWarning
     friend bool operator==(const TransposeWarning&, const TransposeWarning&) = default;
 };
 
+// An armed track that MIDI thru sends to: on its channel, with its transpose and velocity
+// offset, but not its time offset.
+struct ThruTarget
+{
+    TrackId track;
+    DestinationId destination;
+    std::uint8_t channel; // 0-15
+    int transpose;
+    int velocityOffset;
+
+    friend bool operator==(const ThruTarget&, const ThruTarget&) = default;
+};
+
 struct PlannedTrack
 {
     TrackId id;
@@ -95,6 +108,10 @@ struct PlaybackPlan
     std::vector<TrackId> unrouted;    // audible tracks left out for want of a destination
     std::vector<TransposeWarning> transposeWarnings;
 
+    // The armed tracks with thru on and a destination, in song order. Muted and un-soloed
+    // tracks are included, since thru is how a track being recorded is heard.
+    std::vector<ThruTarget> thru;
+
     // How far the earliest track's negative time offset reaches before a tick's time. Playback
     // starts this much early, so offset events at the start point still play in time.
     std::chrono::nanoseconds leadIn{0};
@@ -111,7 +128,7 @@ using DestinationResolver = std::function<std::optional<DestinationId>(const Tra
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside
 // 0-127 are left out and reported in transposeWarnings; velocities are clamped to 1-127
-// after the velocity offset.
+// after the velocity offset. Also lists the thru targets.
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination);
 
 // What to send when playback starts at a tick, before the events from that tick on: for each

@@ -266,6 +266,7 @@ Recorded events are timestamped by the engine at arrival, never by the UI, so re
 * **Panic.** `Ctrl-.` (a full stop, literally) stops playback and sends All Notes Off and resets controllers on every channel of every port playback has used, in every mode. The interim command-line tools use `!` while playing and a `--panic` option instead, since terminals can't reliably detect `Ctrl-.`.
 * **Recording input.** Armed tracks listen to all MIDI inputs by default; each track can optionally be set to one input.
 * **MIDI thru.** On by default, so you hear the armed track's sound while playing; can be switched off globally or per track.
+* **How thru behaves (decided in milestone 2).** Thru works whether or not the song is playing, so sounds can be tried before recording. It goes to every armed track with thru on, including muted and un-soloed ones, since thru is how a track being recorded is heard. Each gets the track's channel, transpose and velocity offset (so you hear what playback will sound like) but not its time offset. The engine remembers where each held thru note and pedal went (up to 1,024 notes and 256 pedals; a note-on beyond that isn't sent), so its note-off or pedal-up goes to the same place even if the track is disarmed or changed meanwhile. Stop leaves held thru notes alone, since their note-offs will follow; panic ends them, and reaches thru's ports too. Thru delay, from arrival to just after the send call, is measured separately from playback lateness.
 
 ## Metronome and count-in
 

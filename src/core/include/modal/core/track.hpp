@@ -68,6 +68,7 @@ public:
     bool mute = false;
     bool solo = false;
     bool arm = false;
+    bool thru = true;       // while armed, send MIDI input on to the track's port and channel
     bool chaseNotes = true; // off for drums and other sounds where a late attack sounds wrong
 
     // Applied at playback only; the stored events never change.
