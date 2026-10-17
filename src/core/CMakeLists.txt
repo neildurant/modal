@@ -10,6 +10,7 @@ add_library(modal_core STATIC
     recorder.cpp
     scheduler.cpp
     smf.cpp
+    smf_export.cpp
     song.cpp
     tempo_map.cpp
     thru.cpp

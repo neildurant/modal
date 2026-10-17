@@ -12,6 +12,7 @@ add_executable(modal_tests
     core/playback_plan_test.cpp
     core/recorder_test.cpp
     core/scheduler_test.cpp
+    core/smf_export_test.cpp
     core/smf_test.cpp
     core/snapshot_exchange_test.cpp
     core/song_test.cpp

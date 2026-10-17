@@ -34,4 +34,36 @@ SmfImportResult importSmf(std::span<const std::uint8_t> bytes);
 
 SmfImportResult importSmfFile(const std::filesystem::path& path);
 
+enum class SmfType : std::uint8_t
+{
+    Type0, // one track
+    Type1, // a conductor track, then one track per Modal track
+};
+
+struct SmfExportResult
+{
+    std::vector<std::uint8_t> bytes;   // the file, empty if it couldn't be written
+    std::string error;                 // why, when there's no file
+    std::vector<std::string> warnings; // problems worked around, e.g. a clamped tempo
+};
+
+// Exports a Standard MIDI File at the song's resolution.
+//
+// - The first track holds the title (as its name), the tempo map, the reference track's
+//   meter and the markers. In a type 1 file each Modal track follows, with its name and a
+//   channel prefix; in a type 0 file, everything is in the one track and track names are
+//   left out.
+// - Events are written as stored, on the track's channel: transpose, velocity and time
+//   offsets and mute and solo aren't applied. Port names aren't written.
+// - At each tick come note-offs, then other events in stored order, then note-ons, then the
+//   note-offs of zero-length notes. Each track ends at its last event or
+//   note end, and the first track at the latest of all.
+// - Tempos slower than an SMF can hold (about 3.58 BPM) are clamped.
+SmfExportResult exportSmf(const Song& song, SmfType type = SmfType::Type1);
+
+// Exports to a file, writing a temporary file beside it first and then renaming it, so a
+// failed write never leaves half a file. The result's bytes are what was written.
+SmfExportResult exportSmfFile(const Song& song, const std::filesystem::path& path,
+                              SmfType type = SmfType::Type1);
+
 } // namespace modal::core
