@@ -130,8 +130,40 @@ CellSize Window::cellSize() const
     return impl_->font->cell();
 }
 
+namespace
+{
+
+// While the user drags a window's edge, Windows runs its own loop and the main loop waits, so
+// SDL sends the expose events of a live resize to event watches instead, on the main thread,
+// to be drawn at once. Otherwise the newly uncovered area stays unpainted until the drag ends.
+struct LiveResize
+{
+    Window* window;
+    const std::function<void(Window&)>* redraw;
+
+    static bool watch(void* userdata, SDL_Event* event)
+    {
+        if (event->type == SDL_EVENT_WINDOW_EXPOSED && event->window.data1 == 1)
+        {
+            const auto* self = static_cast<LiveResize*>(userdata);
+            (*self->redraw)(*self->window);
+        }
+        return true;
+    }
+};
+
+} // namespace
+
 void Window::run(const std::function<void(Window&)>& redraw)
 {
+    LiveResize liveResize{this, &redraw};
+    SDL_AddEventWatch(&LiveResize::watch, &liveResize);
+    struct Unwatch
+    {
+        LiveResize* liveResize;
+        ~Unwatch() { SDL_RemoveEventWatch(&LiveResize::watch, liveResize); }
+    } unwatch{&liveResize};
+
     bool needsFrame = true;
     for (;;)
     {
