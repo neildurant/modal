@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modal/ui/frame.hpp>
+#include <modal/ui/key.hpp>
 #include <modal/ui/style.hpp>
 
 #include <functional>
@@ -70,8 +71,10 @@ public:
 
     // Handles events until the window is closed, calling redraw (which draws a frame) only
     // when the window needs one: when it is shown, resized or uncovered, or moved to a display
-    // with another scale (when the font is sized again for it first).
-    void run(const std::function<void(Window&)>& redraw);
+    // with another scale (when the font is sized again for it first), or when a key press
+    // passed to key says it changed what's shown.
+    void run(const std::function<void(Window&)>& redraw,
+             const std::function<bool(const Key&)>& key = {});
 
     // For offscreen windows, the colour of a pixel in the last frame drawn, in pixels.
     std::optional<Colour> pixel(int x, int y) const;

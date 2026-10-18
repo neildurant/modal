@@ -5,6 +5,7 @@
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 
+#include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdlib>
@@ -12,6 +13,7 @@
 #include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 using namespace modal::ui;
 using namespace modal::ui::sdl;
@@ -240,4 +242,60 @@ TEST_CASE("a window can open at a size in cells")
     const auto& window = *std::get<std::unique_ptr<Window>>(opened);
     CHECK(window.pixelWidth() == 30 * window.cellSize().width);
     CHECK(window.pixelHeight() == 10 * window.cellSize().height);
+}
+
+namespace
+{
+
+void pushKey(SDL_Keycode code, SDL_Keymod mod = SDL_KMOD_NONE)
+{
+    SDL_Event event{};
+    event.key.type = SDL_EVENT_KEY_DOWN;
+    event.key.key = code;
+    event.key.mod = mod;
+    event.key.down = true;
+    REQUIRE(SDL_PushEvent(&event));
+}
+
+void pushText(const char* text)
+{
+    SDL_Event event{};
+    event.text.type = SDL_EVENT_TEXT_INPUT;
+    event.text.text = text;
+    REQUIRE(SDL_PushEvent(&event));
+}
+
+} // namespace
+
+TEST_CASE("key presses reach the key handler as characters typed and named keys")
+{
+    auto window = offscreen(320, 200);
+    // As a keyboard sends them: a press, then the text it types, if any.
+    pushKey(SDLK_4, SDL_KMOD_LSHIFT);
+    pushText("$");
+    pushKey(SDLK_D, SDL_KMOD_LCTRL); // types nothing
+    pushKey(SDLK_J, SDL_KMOD_LALT);
+    pushText("j"); // typed with Alt by some systems, and the same key
+    pushKey(SDLK_E, static_cast<SDL_Keymod>(SDL_KMOD_LCTRL | SDL_KMOD_RALT)); // AltGr
+    pushText("€");
+    pushKey(SDLK_ESCAPE);
+    pushKey(SDLK_DOWN, SDL_KMOD_LSHIFT);
+    pushKey(SDLK_F5);
+    SDL_Event quit{};
+    quit.type = SDL_EVENT_QUIT;
+    REQUIRE(SDL_PushEvent(&quit));
+
+    std::vector<Key> keys;
+    int frames = 0;
+    window->run([&](Window&) { ++frames; },
+                [&](const Key& key)
+                {
+                    keys.push_back(key);
+                    return key.named == NamedKey::Escape;
+                });
+    CHECK(keys == std::vector<Key>{Key::typed(U'$'), Key::typed(U'd', kCtrl),
+                                   Key::typed(U'j', kAlt), Key::typed(U'€'),
+                                   Key::of(NamedKey::Escape), Key::of(NamedKey::Down, kShift),
+                                   Key::of(NamedKey::F5)});
+    CHECK(frames >= 1);
 }

@@ -1,5 +1,6 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
+find_package(SDL3 CONFIG REQUIRED) # to push events at windows
 include(Catch)
 
 add_executable(modal_tests
@@ -34,7 +35,8 @@ add_executable(modal_tests
 )
 
 target_link_libraries(modal_tests PRIVATE
-    modal::core modal::platform modal::ui modal::ui_sdl modal::warnings Catch2::Catch2WithMain Threads::Threads)
+    modal::core modal::platform modal::ui modal::ui_sdl modal::warnings Catch2::Catch2WithMain Threads::Threads
+    SDL3::SDL3)
 
 # Tests read environment variables with std::getenv, which MSVC deprecates.
 if(MSVC)

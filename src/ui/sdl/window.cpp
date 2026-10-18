@@ -281,8 +281,128 @@ struct LiveResize
 
 } // namespace
 
-void Window::run(const std::function<void(Window&)>& redraw)
+namespace
 {
+
+NamedKey namedKey(SDL_Keycode code)
+{
+    switch (code)
+    {
+    case SDLK_ESCAPE:
+        return NamedKey::Escape;
+    case SDLK_TAB:
+        return NamedKey::Tab;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+        return NamedKey::Enter;
+    case SDLK_BACKSPACE:
+        return NamedKey::Backspace;
+    case SDLK_DELETE:
+        return NamedKey::Delete;
+    case SDLK_INSERT:
+        return NamedKey::Insert;
+    case SDLK_UP:
+        return NamedKey::Up;
+    case SDLK_DOWN:
+        return NamedKey::Down;
+    case SDLK_LEFT:
+        return NamedKey::Left;
+    case SDLK_RIGHT:
+        return NamedKey::Right;
+    case SDLK_HOME:
+        return NamedKey::Home;
+    case SDLK_END:
+        return NamedKey::End;
+    case SDLK_PAGEUP:
+        return NamedKey::PageUp;
+    case SDLK_PAGEDOWN:
+        return NamedKey::PageDown;
+    default:
+        break;
+    }
+    if (code >= SDLK_F1 && code <= SDLK_F12)
+    {
+        return static_cast<NamedKey>(static_cast<int>(NamedKey::F1) +
+                                     static_cast<int>(code - SDLK_F1));
+    }
+    return NamedKey::None;
+}
+
+Modifiers modifiers(SDL_Keymod mod)
+{
+    Modifiers result = kNoModifiers;
+    result |= (mod & SDL_KMOD_CTRL) != 0 ? kCtrl : kNoModifiers;
+    result |= (mod & SDL_KMOD_ALT) != 0 ? kAlt : kNoModifiers;
+    result |= (mod & SDL_KMOD_SHIFT) != 0 ? kShift : kNoModifiers;
+    return result;
+}
+
+// Turns SDL's key events into Keys. Named keys come from key presses; characters come from
+// text input, which follows the keyboard's layout, except with Ctrl or Alt, which type no
+// text, when they come from the key pressed. Ctrl and Alt together are taken as AltGr, which
+// types text on many layouts.
+class KeyReader
+{
+public:
+    explicit KeyReader(const std::function<bool(const Key&)>& key)
+        : key_(key)
+    {
+    }
+
+    // Whether the event was a key the handler said changed what's shown.
+    bool read(const SDL_Event& event)
+    {
+        if (!key_)
+        {
+            return false;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN)
+        {
+            skipText_ = false;
+            const auto mods = modifiers(event.key.mod);
+            if (const auto named = namedKey(event.key.key); named != NamedKey::None)
+            {
+                return key_(Key::of(named, mods));
+            }
+            const bool ctrlOrAlt = (mods & (kCtrl | kAlt)) != 0;
+            const bool altGr = (mods & kCtrl) != 0 && (mods & kAlt) != 0;
+            if (ctrlOrAlt && !altGr && event.key.key >= 0x20 && event.key.key < 0x7f)
+            {
+                // Some systems type text for Alt and a key as well; it's the same key.
+                skipText_ = true;
+                return key_(Key::typed(static_cast<char32_t>(event.key.key), mods));
+            }
+            return false;
+        }
+        if (event.type == SDL_EVENT_TEXT_INPUT && event.text.text != nullptr)
+        {
+            if (std::exchange(skipText_, false))
+            {
+                return false;
+            }
+            bool changed = false;
+            for (const char32_t character : decodeUtf8(event.text.text))
+            {
+                changed = key_(Key::typed(character)) || changed;
+            }
+            return changed;
+        }
+        return false;
+    }
+
+private:
+    const std::function<bool(const Key&)>& key_;
+    bool skipText_ = false;
+};
+
+} // namespace
+
+void Window::run(const std::function<void(Window&)>& redraw,
+                 const std::function<bool(const Key&)>& key)
+{
+    KeyReader keys{key};
+    SDL_StartTextInput(impl_->window);
+
     LiveResize liveResize{this, &redraw};
     SDL_AddEventWatch(&LiveResize::watch, &liveResize);
     struct Unwatch
@@ -322,6 +442,7 @@ void Window::run(const std::function<void(Window&)>& redraw)
                 needsFrame = true;
                 break;
             default:
+                needsFrame = keys.read(event) || needsFrame;
                 break;
             }
         } while (SDL_PollEvent(&event)); // all that's waiting, then one frame for them
