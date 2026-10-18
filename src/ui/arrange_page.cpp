@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace modal::ui
 {
@@ -398,10 +399,11 @@ void ArrangePage::addRegions(Frame& frame) const
 
     // The ruler: markers by name, the reference track's meters, and its bars, numbered where
     // there's room for the numbers.
-    // Markers: lines under the text and bars, solid beside their names and faint across the
-    // tracks so as not to distract, leaving the meters and bar numbers clear between; named
-    // up to the next marker, cut short with an ellipsis or left out if there's no room.
+    // Markers: lines under the text and bars, solid through the ruler and faint across the
+    // tracks so as not to distract; named up to the next marker, cut short with an ellipsis
+    // or left out if there's no room.
     const auto markers = song_.markers();
+    std::vector<int> markerLines; // drawn through the ruler once its text is placed
     for (std::size_t i = 0; i < markers.size(); ++i)
     {
         const auto tick = markers[i].tick;
@@ -410,7 +412,7 @@ void ArrangePage::addRegions(Frame& frame) const
             continue;
         }
         const int x = scale.toX(tick);
-        timeline.under.push_back({{x, 0, lineWidth, cell_.height}, Role::Marker, 255});
+        markerLines.push_back(x);
         timeline.under.push_back(
             {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Marker, kFaint});
         const int textX = x + lineWidth + 2;
@@ -446,11 +448,11 @@ void ArrangePage::addRegions(Frame& frame) const
         }
         const int x = scale.toX(tick);
         auto text = signatureText(changes[i].signature);
-        const int room =
-            i + 1 < changes.size() ? scale.toX(changes[i + 1].tick) - x - 4 : timeline.bounds.width;
+        const int room = i + 1 < changes.size() ? scale.toX(changes[i + 1].tick) - x - lineWidth - 4
+                                                : timeline.bounds.width;
         if (static_cast<int>(text.size()) * cell_.width <= room)
         {
-            timeline.text.push_back({x + 2, cell_.height, decodeUtf8(text), kDim});
+            timeline.text.push_back({x + lineWidth + 2, cell_.height, decodeUtf8(text), kDim});
         }
         else
         {
@@ -483,7 +485,28 @@ void ArrangePage::addRegions(Frame& frame) const
         }
         if ((bar - 1) % every == 0)
         {
-            numbers.add(scale.toX(start), std::to_string(bar), {});
+            numbers.add(scale.toX(start) + lineWidth + 2, std::to_string(bar), {});
+        }
+    }
+    // The markers' lines through the ruler, a row at a time, broken only where a label of the
+    // row sits across a line, so the line never runs through text.
+    for (const int x : markerLines)
+    {
+        for (int row = 0; row < kRulerRows; ++row)
+        {
+            const int y = row * cell_.height;
+            const bool covered =
+                std::ranges::any_of(timeline.text,
+                                    [&](const TextRun& run)
+                                    {
+                                        const int right =
+                                            run.x + static_cast<int>(run.text.size()) * cell_.width;
+                                        return run.y == y && run.x < x + lineWidth && right > x;
+                                    });
+            if (!covered)
+            {
+                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, 255});
+            }
         }
     }
     // The end of the song.

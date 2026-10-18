@@ -209,10 +209,13 @@ TEST_CASE("markers are named in the ruler, with faint lines across every track")
     std::vector<int> lines;
     for (const auto& shape : timeline.under)
     {
-        if (shape.role == Role::Marker && shape.rect.y == 0)
+        if (shape.role == Role::Marker && shape.rect.y < tracksTop)
         {
-            lines.push_back(shape.rect.x);
-            CHECK(shape.rect.height == kCell.height); // beside the name only
+            if (shape.rect.y == 0)
+            {
+                lines.push_back(shape.rect.x);
+            }
+            CHECK(shape.rect.height == kCell.height); // a row of the ruler at a time
             CHECK(shape.alpha == 255);
         }
         else if (shape.role == Role::Marker)
@@ -337,6 +340,26 @@ TEST_CASE("the cursor boxes its bar on all four sides")
     const int y = ArrangePage::kRulerRows * kCell.height;
     CHECK(sides ==
           std::vector<Rect>{{0, y, 21, 2}, {0, y + 18, 21, 2}, {0, y, 1, 20}, {20, y, 1, 20}});
+}
+
+TEST_CASE("a marker's line through the ruler breaks only where a label sits across it")
+{
+    auto page = page80x22();
+    type(page, U"-", 2); // eight quarter notes to a column
+    Frame frame;
+    page.addRegions(frame);
+    const auto& timeline = frame[1];
+    // The second chorus, 127 quarter notes in, runs through the "33" of bar 33 at 99.
+    const int x = 158;
+    std::vector<int> rows;
+    for (const auto& shape : timeline.under)
+    {
+        if (shape.role == Role::Marker && shape.rect.x == x && shape.alpha == 255)
+        {
+            rows.push_back(shape.rect.y / kCell.height);
+        }
+    }
+    CHECK(rows == std::vector<int>{0, 1});
 }
 
 TEST_CASE("narrow bars lose their gaps")
