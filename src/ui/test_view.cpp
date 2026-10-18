@@ -45,8 +45,10 @@ struct RoleSample
     bool swatch; // a block of the role's colour before its name
 };
 
-// Every theme role, in three columns: text, backgrounds with their text, and timeline lines.
-constexpr RoleSample kRoles[3][5] = {
+// Every theme role, in four columns: text, backgrounds with their text, timeline lines and
+// markers, and density.
+constexpr int kRoleGroups = 4;
+constexpr RoleSample kRoles[kRoleGroups][5] = {
     {{"text", {Role::Text, Role::Background, kPlain}, false},
      {"dim", {Role::Dim, Role::Background, kPlain}, false},
      {"accent", {Role::Accent, Role::Background, kPlain}, false},
@@ -62,6 +64,11 @@ constexpr RoleSample kRoles[3][5] = {
      {"bar line", {Role::BarLine, Role::Background, kPlain}, true},
      {"note", {Role::Note, Role::Background, kPlain}, true},
      {"marker", {Role::Marker, Role::Background, kPlain}, true}},
+    {{"density 1", {Role::Density1, Role::Background, kPlain}, true},
+     {"density 2", {Role::Density2, Role::Background, kPlain}, true},
+     {"density 3", {Role::Density3, Role::Background, kPlain}, true},
+     {"density 4", {Role::Density4, Role::Background, kPlain}, true},
+     {nullptr, {}, false}},
 };
 
 std::string number(int value)
@@ -304,9 +311,9 @@ Region TestView::samplesRegion() const
 {
     CellGrid grid{layout_.columns, layout_.rows};
     grid.write(1, 0, "Theme roles", kTitle);
-    for (int group = 0; group < 3; ++group)
+    for (int group = 0; group < kRoleGroups; ++group)
     {
-        const int x = 1 + group * 20;
+        const int x = 1 + group * 19;
         for (int i = 0; i < 5; ++i)
         {
             const auto& role = kRoles[group][i];

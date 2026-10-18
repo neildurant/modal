@@ -23,6 +23,10 @@ Theme Theme::dark()
     theme.set(Role::BarLine, {0x56, 0x5f, 0x89});
     theme.set(Role::Note, {0x9e, 0xce, 0x6a});
     theme.set(Role::Marker, {0xff, 0x9e, 0x64});
+    theme.set(Role::Density1, {0x3a, 0x4d, 0x2e});
+    theme.set(Role::Density2, {0x5b, 0x7d, 0x3f});
+    theme.set(Role::Density3, {0x7f, 0xab, 0x55});
+    theme.set(Role::Density4, {0xb4, 0xe0, 0x7c});
     return theme;
 }
 

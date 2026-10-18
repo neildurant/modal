@@ -36,9 +36,13 @@ enum class Role : std::uint8_t
     BarLine,
     Note,
     Marker,
+    Density1, // how busy a stretch of a track is, as in the arrangement, from sparse to dense
+    Density2,
+    Density3,
+    Density4,
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Marker) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Density4) + 1;
 
 // Text attributes, which combine.
 using Attributes = std::uint8_t;
