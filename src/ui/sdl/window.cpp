@@ -407,11 +407,18 @@ public:
                 skipText_ = true;
                 return key_(Key::of(keypad, mods), time(event));
             }
-            if (ctrlOrAlt && !altGr && event.key.key >= 0x20 && event.key.key < 0x7f)
+            // The key's own character in the layout, unshifted, since SDL's key code has Shift
+            // applied: Ctrl-Shift-d is d with Ctrl and Shift, not D.
+            SDL_Keycode own = SDL_GetKeyFromScancode(event.key.scancode, SDL_KMOD_NONE, false);
+            if (own == SDLK_UNKNOWN)
+            {
+                own = event.key.key;
+            }
+            if (ctrlOrAlt && !altGr && own >= 0x20 && own < 0x7f)
             {
                 // Some systems type text for Alt and a key as well; it's the same key.
                 skipText_ = true;
-                return key_(Key::typed(static_cast<char32_t>(event.key.key), mods), time(event));
+                return key_(Key::typed(static_cast<char32_t>(own), mods), time(event));
             }
             return false;
         }

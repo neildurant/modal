@@ -295,11 +295,15 @@ TEST_CASE("a window can open at a size in cells")
 namespace
 {
 
-void pushKey(SDL_Keycode code, SDL_Keymod mod = SDL_KMOD_NONE)
+// A key pressed, as SDL reports it: the key code with Shift applied, and the scancode of the
+// key itself, if given.
+void pushKey(SDL_Keycode code, SDL_Keymod mod = SDL_KMOD_NONE,
+             SDL_Scancode scancode = SDL_SCANCODE_UNKNOWN)
 {
     SDL_Event event{};
     event.key.type = SDL_EVENT_KEY_DOWN;
     event.key.key = code;
+    event.key.scancode = scancode;
     event.key.mod = mod;
     event.key.down = true;
     REQUIRE(SDL_PushEvent(&event));
@@ -329,6 +333,10 @@ TEST_CASE("key presses reach the key handler as characters typed and named keys"
     pushKey(SDLK_ESCAPE);
     pushKey(SDLK_DOWN, SDL_KMOD_LSHIFT);
     pushKey(SDLK_F5);
+    // With Shift as well, SDL's key code is shifted, but the key is still d, or =.
+    const auto ctrlShift = static_cast<SDL_Keymod>(SDL_KMOD_LCTRL | SDL_KMOD_LSHIFT);
+    pushKey(SDLK_D | SDLK_EXTENDED_MASK, ctrlShift, SDL_SCANCODE_D); // a code SDL wouldn't give
+    pushKey(SDLK_PLUS, ctrlShift, SDL_SCANCODE_EQUALS);
     pushKey(SDLK_KP_PLUS, SDL_KMOD_LCTRL); // the keypad's own, with Ctrl
     pushKey(SDLK_KP_PLUS);                 // and its character without
     pushText("+");
@@ -350,8 +358,9 @@ TEST_CASE("key presses reach the key handler as characters typed and named keys"
     CHECK(keys == std::vector<Key>{Key::typed(U'$'), Key::typed(U'd', kCtrl),
                                    Key::typed(U'j', kAlt), Key::typed(U'€'),
                                    Key::of(NamedKey::Escape), Key::of(NamedKey::Down, kShift),
-                                   Key::of(NamedKey::F5), Key::of(NamedKey::KeypadPlus, kCtrl),
-                                   Key::typed(U'+')});
+                                   Key::of(NamedKey::F5), Key::typed(U'd', kCtrl | kShift),
+                                   Key::typed(U'=', kCtrl | kShift),
+                                   Key::of(NamedKey::KeypadPlus, kCtrl), Key::typed(U'+')});
     CHECK(frames >= 1);
 }
 
