@@ -35,6 +35,7 @@ add_executable(modal_tests
     ui/demo_song_test.cpp
     ui/grid_cursor_test.cpp
     ui/key_notation_test.cpp
+    ui/keymap_test.cpp
     ui/layout_test.cpp
     ui/test_view_test.cpp
     ui/window_test.cpp

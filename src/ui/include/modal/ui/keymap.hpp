@@ -1,0 +1,117 @@
+#pragma once
+
+#include <modal/ui/key.hpp>
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace modal::ui
+{
+
+// The modes keys are bound in, as in Vim. Only Normal has bindings so far.
+enum class Mode : std::uint8_t
+{
+    Normal,
+    Visual,
+    Insert,
+    OperatorPending, // after an operator, waiting for its motion
+    CommandLine,
+};
+
+inline constexpr std::size_t kModeCount = static_cast<std::size_t>(Mode::CommandLine) + 1;
+
+// What a sequence of keys does: a command, by name, and a short label for hints.
+struct Binding
+{
+    std::string command;
+    std::string hint;
+
+    friend bool operator==(const Binding&, const Binding&) = default;
+};
+
+// Key sequences bound to commands, in each mode.
+class Keymap
+{
+public:
+    // Binds keys written in notation (see key_notation.hpp), replacing any binding of the
+    // same keys; returns why not if the notation can't be read, or else nothing.
+    std::string bind(Mode mode, std::string_view keys, Binding binding);
+    void bind(Mode mode, std::vector<Key> keys, Binding binding);
+
+    bool unbind(Mode mode, const std::vector<Key>& keys);
+
+    // What some keys typed in a mode match: a binding of exactly those keys, if any, and
+    // whether there are bindings of longer sequences starting with them.
+    struct Match
+    {
+        const Binding* binding = nullptr;
+        bool longer = false;
+    };
+    Match match(Mode mode, std::span<const Key> keys) const;
+
+private:
+    struct KeysLess
+    {
+        bool operator()(const std::vector<Key>& a, const std::vector<Key>& b) const;
+    };
+    using Bindings = std::map<std::vector<Key>, Binding, KeysLess>;
+
+    std::array<Bindings, kModeCount> modes_;
+};
+
+// A command to run, with the count typed before its keys, or 0 if none was.
+struct Action
+{
+    std::string command;
+    int count = 0;
+
+    friend bool operator==(const Action&, const Action&) = default;
+};
+
+// How long to wait, in milliseconds, after keys that are a binding and also start a longer
+// one, before running the shorter: Vim's timeoutlen, until it's a setting.
+inline constexpr std::int64_t kDefaultTimeout = 1000;
+inline constexpr int kMaxCount = 99999;
+
+// Turns keys into commands through a keymap, as Vim does. Digits typed first are a count,
+// except a 0 that would begin one. Keys that only start longer bindings wait for the next
+// key; keys that are a binding and also start a longer one wait up to the timeout, then run.
+// A key that continues no binding runs the keys before it, if they're a binding, and is
+// then taken afresh; otherwise those keys and the count are given up. Escape gives up any
+// count and keys waiting. Times are in milliseconds, from any fixed point.
+class KeyDispatcher
+{
+public:
+    explicit KeyDispatcher(const Keymap& keymap, std::int64_t timeout = kDefaultTimeout);
+
+    // Handles a key typed in a mode, returning the commands to run, in order.
+    std::vector<Action> key(Mode mode, const Key& key, std::int64_t now);
+
+    // Runs keys that were waiting for a longer binding, once their time is up.
+    std::vector<Action> timeout(std::int64_t now);
+
+    // When timeout() should next be called, if anything is waiting for it.
+    std::optional<std::int64_t> deadline() const { return deadline_; }
+
+    // The count and keys typed so far, for the status line, such as "3g"; empty if none.
+    std::string pending() const;
+
+private:
+    void clear();
+
+    const Keymap& keymap_;
+    std::int64_t timeout_;
+    Mode mode_ = Mode::Normal; // the mode the waiting keys were typed in
+    int count_ = 0;
+    std::vector<Key> keys_;
+    std::optional<std::int64_t> deadline_;
+};
+
+} // namespace modal::ui

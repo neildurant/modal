@@ -8,6 +8,7 @@ add_library(modal_ui STATIC
     demo_song.cpp
     frame.cpp
     key_notation.cpp
+    keymap.cpp
     grid_cursor.cpp
     layout.cpp
     style.cpp
