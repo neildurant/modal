@@ -143,7 +143,7 @@ core::Song demoSong(core::Ppqn ppqn)
     }
     for (int i = 0; i < kEmptyTracks; ++i)
     {
-        song.addTrack();
+        song.updateTrack(song.addTrack(), [&](core::Track& track) { track.meter = sections; });
     }
     return song;
 }

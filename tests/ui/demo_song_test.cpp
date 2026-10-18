@@ -57,6 +57,7 @@ TEST_CASE("the demo song has sections in several meters, marked, on most tracks"
     for (std::size_t i = 10; i < 14; ++i)
     {
         CHECK(song.tracks()[i]->events.empty());
+        CHECK(song.tracks()[i]->meter == drums);
     }
 }
 
