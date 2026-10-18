@@ -68,6 +68,21 @@ It reports:
 - **Send lateness**: as for `modal-play`.
 - **Messages lost, out of order and unexpected**: these should all be 0.
 
+### Checking recording: `--record`
+
+With `--record`, the stream is also recorded, as `modal-record` would record it, and each recorded note is compared with the one sent. The stream becomes a song at 120 BPM, with each note at the tick at or before its time in the plain stream. MIDI thru is off, since it would send every note round the cable again. There's no metronome or count-in. Notes are matched by pitch and velocity.
+
+- `--save FILE.mid`: also save the song as a type 1 file, with what was sent on a track "Sent" and what was recorded on a track "Recorded". It won't overwrite a file unless `--force` is given.
+
+As well as the usual report, it gives:
+
+- **Recorded, missing and extra**: how many of the notes sent were recorded. Missing and extra should be 0.
+- **Late**: each recorded note's position less the one sent, in milliseconds and in ticks. This should be close to the latency, since a note is recorded where it arrived.
+- **Longer**: each recorded note's length less the one sent. This should be close to 0, since a note-on and its note-off take the same time to come back.
+- **Off arrival time**: notes recorded at a tick other than the one at which the note-on arrived, worked out from the arrival time and the time the song started. This checks the path from timestamp to tick, and should be 0.
+
+The exit status is 0 only if nothing was lost, missing, extra or recorded off its arrival time.
+
 ## Timing tests without MIDI
 
 Two hidden tests measure the machine's timer and the engine's waking with no MIDI involved. They're for diagnosis, so they aren't run by default:

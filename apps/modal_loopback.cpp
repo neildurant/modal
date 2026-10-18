@@ -3,9 +3,15 @@
 // Plays a steady stream of notes through the engine, as modal-play does, and times each
 // message from when it was due to when it came back. Each note's pitch and velocity identify
 // it, so every message received is matched to the one sent.
+//
+// With --record, the stream is also recorded, as modal-record would record it, and each
+// recorded note is compared with the one sent.
 
 #include <modal/core/engine.hpp>
 #include <modal/core/playback_plan.hpp>
+#include <modal/core/recorder.hpp>
+#include <modal/core/smf.hpp>
+#include <modal/core/song.hpp>
 #include <modal/core/timing_stats.hpp>
 #include <modal/platform/clock.hpp>
 #include <modal/platform/midi_input.hpp>
@@ -19,6 +25,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <future>
 #include <iomanip>
 #include <iostream>
@@ -59,6 +66,10 @@ Options:
   --chord N        notes sent at once, 1 to 16 (default 1)
   --spin MS        how long before each event the engine stops sleeping and
                    busy-waits, for precise timing; 0 turns it off (default 1.5)
+  --record         also record the stream, at 120 BPM, and compare each
+                   recorded note with the one sent
+  --save FILE.mid  with --record, save what was sent and recorded, as two tracks
+  --force          overwrite the --save file if it exists
   --help           show this help
 
 Port names can be the full name, or any part that matches only one port,
@@ -74,6 +85,9 @@ struct Options
     double intervalMs = 10.0;
     int chord = 1;
     nanoseconds spin = platform::SystemClock::kDefaultSpinMargin;
+    bool record = false;
+    std::string save;
+    bool force = false;
     bool help = false;
 };
 
@@ -175,14 +189,44 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv)
             }
             options.chord = *chord;
         }
+        else if (arg == "--record")
+        {
+            options.record = true;
+        }
+        else if (arg == "--save")
+        {
+            const auto file = value();
+            if (!file)
+            {
+                return "--save needs a MIDI file";
+            }
+            options.save = *file;
+        }
+        else if (arg == "--force")
+        {
+            options.force = true;
+        }
         else
         {
             return "unknown option " + std::string{arg};
         }
     }
-    if (!options.help && (options.out.empty() || options.in.empty()))
+    if (options.help)
+    {
+        return options;
+    }
+    if (options.out.empty() || options.in.empty())
     {
         return "both an output and an input port are needed (--port, or --out and --in)";
+    }
+    if (!options.save.empty() && !options.record)
+    {
+        return "--save needs --record";
+    }
+    std::error_code error;
+    if (!options.save.empty() && !options.force && std::filesystem::exists(options.save, error))
+    {
+        return options.save + " exists; use --force to overwrite it";
     }
     return options;
 }
@@ -239,6 +283,15 @@ struct Summary
     nanoseconds deviation{0}; // standard deviation
 };
 
+// The value a fraction of the way through sorted values, by the nearest-rank method.
+template <typename T>
+T percentile(const std::vector<T>& sorted, double fraction)
+{
+    const auto rank =
+        static_cast<std::size_t>(std::ceil(fraction * static_cast<double>(sorted.size())));
+    return sorted[std::clamp<std::size_t>(rank, 1, sorted.size()) - 1];
+}
+
 Summary summarize(std::vector<nanoseconds> values)
 {
     Summary summary;
@@ -247,15 +300,9 @@ Summary summarize(std::vector<nanoseconds> values)
         return summary;
     }
     std::ranges::sort(values);
-    const auto at = [&](double fraction)
-    {
-        const auto rank =
-            static_cast<std::size_t>(std::ceil(fraction * static_cast<double>(values.size())));
-        return values[std::clamp<std::size_t>(rank, 1, values.size()) - 1];
-    };
     summary.min = values.front();
-    summary.median = at(0.5);
-    summary.p99 = at(0.99);
+    summary.median = percentile(values, 0.5);
+    summary.p99 = percentile(values, 0.99);
     summary.max = values.back();
 
     double mean = 0;
@@ -292,6 +339,19 @@ void printSummary(std::string_view label, const Summary& summary)
               << '\n';
 }
 
+void printTicks(std::string_view label, std::vector<core::Tick> values)
+{
+    if (values.empty())
+    {
+        return;
+    }
+    std::ranges::sort(values);
+    std::cout << "  " << std::left << std::setw(22) << label << std::right << "min " << std::setw(5)
+              << values.front() << "     median " << std::setw(5) << percentile(values, 0.5)
+              << "     p99 " << std::setw(5) << percentile(values, 0.99) << "     max "
+              << std::setw(5) << values.back() << '\n';
+}
+
 void printTiming(std::string_view label, const core::TimingStats& stats)
 {
     const auto p99 = stats.within(0.99);
@@ -311,15 +371,30 @@ bool isNoteOff(const Message& message)
                                  ((message.bytes[0] & 0xF0) == 0x90 && message.bytes[2] == 0));
 }
 
+constexpr nanoseconds kLeadIn = 200ms; // time for the engine and port to settle
+
+nanoseconds intervalOf(const Options& options)
+{
+    return std::chrono::duration_cast<nanoseconds>(
+        std::chrono::duration<double, std::milli>(options.intervalMs));
+}
+
 // The stream: note n (counting across chords) has pitch n % 128 and velocity
 // 1 + (n / 128) % 127, which tells apart the first 16,256 notes; its note-off carries the
 // same velocity as its release velocity.
+std::uint8_t pitchOf(int n)
+{
+    return static_cast<std::uint8_t>(n % 128);
+}
+
+std::uint8_t velocityOf(int n)
+{
+    return static_cast<std::uint8_t>(1 + (n / 128) % 127);
+}
+
 core::PlaybackPlan streamPlan(const Options& options, core::DestinationId destination)
 {
-    constexpr nanoseconds kLeadIn = 200ms; // time for the engine and port to settle
-    const auto interval = std::chrono::duration_cast<nanoseconds>(
-        std::chrono::duration<double, std::milli>(options.intervalMs));
-
+    const auto interval = intervalOf(options);
     core::PlaybackPlan plan{core::TempoMap{core::kPpqn}};
     plan.tracks.push_back({core::TrackId{1}, destination, 0, false, 0ns});
     for (int i = 0; i < options.count; ++i)
@@ -327,8 +402,8 @@ core::PlaybackPlan streamPlan(const Options& options, core::DestinationId destin
         for (int c = 0; c < options.chord; ++c)
         {
             const int n = i * options.chord + c;
-            const auto pitch = static_cast<std::uint8_t>(n % 128);
-            const auto velocity = static_cast<std::uint8_t>(1 + (n / 128) % 127);
+            const auto pitch = pitchOf(n);
+            const auto velocity = velocityOf(n);
             core::PlannedEvent event{};
             event.time = kLeadIn + interval * i;
             event.tick = i;
@@ -342,6 +417,51 @@ core::PlaybackPlan streamPlan(const Options& options, core::DestinationId destin
         }
     }
     return plan;
+}
+
+// For --record: the stream as a song at 120 BPM, its notes on a track "Sent" at the ticks at
+// or before their times in the plain stream, and an empty track armed to record onto.
+struct StreamSong
+{
+    core::Song song;
+    core::TrackId sent{0};
+    core::TrackId recorded{0};
+};
+
+StreamSong streamSong(const Options& options)
+{
+    StreamSong stream;
+    auto& song = stream.song;
+    song.tempo().set(0, core::Tempo::fromBpm(120.0));
+    song.metronome.when = core::MetronomeSettings::When::Off;
+    song.countIn.mode = core::CountInSettings::Mode::None;
+
+    const auto interval = intervalOf(options);
+    const auto& tempo = song.tempo();
+    stream.sent = song.addTrack("Sent");
+    song.updateTrack(stream.sent,
+                     [&](core::Track& track)
+                     {
+                         for (int i = 0; i < options.count; ++i)
+                         {
+                             const auto on = tempo.toTick(kLeadIn + interval * i);
+                             const auto off = tempo.toTick(kLeadIn + interval * i + interval / 2);
+                             for (int c = 0; c < options.chord; ++c)
+                             {
+                                 const int n = i * options.chord + c;
+                                 track.events.insert({on, core::Note{pitchOf(n), velocityOf(n),
+                                                                     off - on, velocityOf(n)}});
+                             }
+                         }
+                     });
+    stream.recorded = song.addTrack("Recorded");
+    song.updateTrack(stream.recorded,
+                     [](core::Track& track)
+                     {
+                         track.arm = true;
+                         track.thru = false;
+                     });
+    return stream;
 }
 
 struct Matching
@@ -426,6 +546,82 @@ Matching match(const RecordingSink& sink, const std::vector<Message>& received)
     return result;
 }
 
+// How the recorded notes compare with the ones sent, matched by pitch and velocity.
+struct RecordCheck
+{
+    std::vector<nanoseconds> late;     // recorded position less the one sent
+    std::vector<core::Tick> lateTicks; // the same, in ticks
+    std::vector<nanoseconds> longer;   // recorded length less the one sent
+    std::size_t missing = 0;           // sent and not recorded
+    std::size_t extra = 0;             // recorded and not sent
+    std::size_t offArrival = 0;        // not at the tick of its note-on's arrival time
+};
+
+// origin is when the song started, on the engine's clock.
+RecordCheck checkRecording(const StreamSong& stream, const core::Song& recorded,
+                           const std::vector<Message>& arrivals, nanoseconds origin)
+{
+    using Key = std::pair<std::uint8_t, std::uint8_t>; // pitch, velocity
+    std::map<Key, std::deque<const core::Event*>> sent;
+    for (const auto& event : stream.song.track(stream.sent)->events.all())
+    {
+        const auto& note = std::get<core::Note>(event.data);
+        sent[{note.pitch, note.velocity}].push_back(&event);
+    }
+    std::map<Key, std::deque<nanoseconds>> arrived; // note-on arrival times
+    for (const auto& message : arrivals)
+    {
+        if (isNoteOn(message))
+        {
+            arrived[{message.bytes[1], message.bytes[2]}].push_back(message.time);
+        }
+    }
+
+    const auto& tempo = recorded.tempo();
+    const auto timeOf = [&](core::Tick tick)
+    { return tempo.toTime(std::max(tick, core::Tick{0})); };
+    RecordCheck check;
+    for (const auto& event : recorded.track(stream.recorded)->events.all())
+    {
+        const auto* note = std::get_if<core::Note>(&event.data);
+        if (note == nullptr)
+        {
+            ++check.extra;
+            continue;
+        }
+        const Key key{note->pitch, note->velocity};
+        const auto it = sent.find(key);
+        if (it == sent.end() || it->second.empty())
+        {
+            ++check.extra;
+            continue;
+        }
+        const auto& original = *it->second.front();
+        it->second.pop_front();
+        const auto originalLength = std::get<core::Note>(original.data).duration;
+
+        check.lateTicks.push_back(event.tick - original.tick);
+        check.late.push_back(timeOf(event.tick) - timeOf(original.tick));
+        check.longer.push_back((timeOf(event.tick + note->duration) - timeOf(event.tick)) -
+                               (timeOf(original.tick + originalLength) - timeOf(original.tick)));
+
+        auto& times = arrived[key];
+        if (times.empty() || tempo.toTickExtended(times.front() - origin) != event.tick)
+        {
+            ++check.offArrival;
+        }
+        if (!times.empty())
+        {
+            times.pop_front();
+        }
+    }
+    for (const auto& [key, left] : sent)
+    {
+        check.missing += left.size();
+    }
+    return check;
+}
+
 int run(const Options& options)
 {
     platform::MidiOutputs outputs;
@@ -438,11 +634,20 @@ int run(const Options& options)
 
     const std::size_t expected =
         static_cast<std::size_t>(options.count) * static_cast<std::size_t>(options.chord) * 2;
+    RecordingSink sink{outputs, expected};
+    platform::SystemClock clock{options.spin};
+    core::Engine engine{sink, clock};
+    engine.setThru(false); // thru would send everything round the cable again
+
     std::mutex mutex;
     std::vector<Message> received;
     received.reserve(expected);
     platform::MidiInput input{[&](std::span<const std::uint8_t> bytes, nanoseconds time)
                               {
+                                  if (options.record)
+                                  {
+                                      engine.receive(core::InputId{0}, bytes, time);
+                                  }
                                   Message message;
                                   const auto size = std::min<std::size_t>(bytes.size(), 3);
                                   std::copy_n(bytes.begin(), size, message.bytes.begin());
@@ -459,14 +664,26 @@ int run(const Options& options)
     }
 
     std::cout << "Out: " << out.portName << "\nIn:  " << in.portName << "\n\n"
-              << "Sending " << options.count << (options.chord > 1 ? " chords of " : " notes")
+              << (options.record ? "Recording " : "Sending ") << options.count
+              << (options.chord > 1 ? " chords of " : " notes")
               << (options.chord > 1 ? std::to_string(options.chord) + " notes" : "")
               << ", one every " << options.intervalMs << " ms, spin margin "
               << milliseconds(options.spin) << "...\n";
 
-    RecordingSink sink{outputs, expected};
-    platform::SystemClock clock{options.spin};
-    core::Engine engine{sink, clock};
+    std::optional<StreamSong> stream;
+    std::shared_ptr<const core::PlaybackPlan> plan;
+    if (options.record)
+    {
+        stream = streamSong(options);
+        plan = std::make_shared<const core::PlaybackPlan>(
+            core::compilePlan(stream->song, [&](const core::Track&) { return out.destination; },
+                              {.recording = true, .metronomeDestination = std::nullopt}));
+    }
+    else
+    {
+        plan = std::make_shared<const core::PlaybackPlan>(streamPlan(options, out.destination));
+    }
+
     std::promise<std::string> priority;
     auto priorityError = priority.get_future();
     std::thread thread{[&]
@@ -484,11 +701,28 @@ int run(const Options& options)
         const std::lock_guard lock{mutex};
         received.clear(); // anything that arrived before the stream
     }
-    engine.setPlan(
-        std::make_shared<const core::PlaybackPlan>(streamPlan(options, out.destination)));
+    engine.setPlan(plan);
     engine.play(0);
+    const auto play = engine.lastPlay();
+    std::optional<core::Recorder> recorder;
+    if (stream)
+    {
+        recorder.emplace(stream->song, play, 0, core::RecordMode::Replace);
+    }
+    const auto takeInput = [&]
+    {
+        while (const auto stamped = engine.nextReceived())
+        {
+            if (recorder)
+            {
+                recorder->receive(*stamped);
+            }
+        }
+    };
+
     while (!engine.status().finished)
     {
+        takeInput();
         std::this_thread::sleep_for(10ms);
     }
 
@@ -496,6 +730,7 @@ int run(const Options& options)
     const auto deadline = std::chrono::steady_clock::now() + 1s;
     while (std::chrono::steady_clock::now() < deadline)
     {
+        takeInput();
         {
             const std::lock_guard lock{mutex};
             if (received.size() >= expected)
@@ -505,6 +740,13 @@ int run(const Options& options)
         }
         std::this_thread::sleep_for(10ms);
     }
+    engine.stop();
+    std::optional<core::Tick> stoppedAt;
+    while (!(stoppedAt = engine.stoppedAt(play)))
+    {
+        std::this_thread::sleep_for(1ms);
+    }
+    takeInput();
     while (!engine.quit())
     {
         std::this_thread::sleep_for(1ms);
@@ -543,7 +785,54 @@ int run(const Options& options)
     printTiming("Send lateness", status.lateness);
     printTiming("  waking", status.wakeLateness);
     printTiming("  sending", status.sendTime);
-    return result.lost == 0 ? 0 : 1;
+    if (!stream)
+    {
+        return result.lost == 0 ? 0 : 1;
+    }
+
+    // The recording, against what was sent.
+    const auto recorded = recorder->finish(*stoppedAt);
+    const auto sentNotes = stream->song.track(stream->sent)->events.size();
+    const auto origin = sink.due.front() - plan->events.front().time;
+    const auto check = checkRecording(*stream, recorded, arrivals, origin);
+    std::cout << "\nRecorded " << check.late.size() << " of " << sentNotes << " notes. Missing "
+              << check.missing << ", extra " << check.extra << ".\n";
+    if (status.inputDropped + status.inputUnreported > 0)
+    {
+        std::cout << "Input: " << status.inputDropped << " messages dropped and "
+                  << status.inputUnreported << " not passed back for recording.\n";
+    }
+    if (!check.late.empty())
+    {
+        std::cout << '\n';
+        printSummary("Late (recorded - sent)", summarize(check.late));
+        printTicks("  in ticks", check.lateTicks);
+        printSummary("Longer (recorded - sent)", summarize(check.longer));
+        std::cout << "  " << std::left << std::setw(22) << "Off arrival time" << std::right
+                  << check.offArrival << " recorded at a tick other than the one they arrived at\n";
+    }
+
+    bool saved = true;
+    if (!options.save.empty())
+    {
+        const auto written = core::exportSmfFile(recorded, options.save, core::SmfType::Type1);
+        for (const auto& warning : written.warnings)
+        {
+            std::cout << "Warning: " << warning << '\n';
+        }
+        saved = written.error.empty();
+        if (saved)
+        {
+            std::cout << "\nSaved " << options.save << ".\n";
+        }
+        else
+        {
+            std::cerr << "modal-loopback: " << written.error << '\n';
+        }
+    }
+    const bool clean =
+        result.lost == 0 && check.missing == 0 && check.extra == 0 && check.offArrival == 0;
+    return clean && saved ? 0 : 1;
 }
 
 } // namespace
