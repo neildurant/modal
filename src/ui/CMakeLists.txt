@@ -8,6 +8,7 @@ add_library(modal_ui STATIC
     grid_cursor.cpp
     layout.cpp
     style.cpp
+    test_view.cpp
 )
 add_library(modal::ui ALIAS modal_ui)
 

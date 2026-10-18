@@ -4,6 +4,7 @@
 #include <modal/ui/layout.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
+#include <modal/ui/test_view.hpp>
 
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
@@ -11,6 +12,7 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -225,6 +227,27 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
     window->draw({gridRegion(grid, {0, 0, 640, 260}, cell, Role::Background)}, Theme::dark());
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
     CHECK(window->saveFrame(path != nullptr ? path : "font-sample.bmp"));
+}
+
+// Hidden: writes both pages of the test view to look at, to MODAL_SAMPLE_BMP with "-grid" and
+// "-samples" before its extension, or test-view-grid.bmp and test-view-samples.bmp.
+TEST_CASE("a sample of the test view", "[.sample]")
+{
+    auto window = offscreen(1000, 600);
+    TestView view;
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    for (const char32_t key : std::u32string_view{U"12j3l"})
+    {
+        view.handle(Key::typed(key));
+    }
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "test-view.bmp";
+    base = base.substr(0, base.rfind('.'));
+    window->draw(view.frame(), Theme::dark());
+    CHECK(window->saveFrame(base + "-grid.bmp"));
+    view.handle(Key::of(NamedKey::Tab));
+    window->draw(view.frame(), Theme::dark());
+    CHECK(window->saveFrame(base + "-samples.bmp"));
 }
 
 TEST_CASE("a window can open at a size in cells")

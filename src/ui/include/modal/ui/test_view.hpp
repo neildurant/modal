@@ -1,0 +1,65 @@
+#pragma once
+
+#include <modal/ui/frame.hpp>
+#include <modal/ui/grid_cursor.hpp>
+#include <modal/ui/key.hpp>
+#include <modal/ui/layout.hpp>
+
+#include <cstdint>
+
+namespace modal::ui
+{
+
+// What the program shows until the event list arrives (milestone 4), to try out the grid
+// renderer: a large grid of labelled cells to move the cursor around, with headers that stay
+// put as it scrolls, under a demo of bar lines in two meters on one time scale; and a page
+// of samples of each theme role and the characters the views use.
+class TestView
+{
+public:
+    enum class Page : std::uint8_t
+    {
+        Grid,
+        Samples,
+    };
+
+    static constexpr int kGridRows = 1000;
+    static constexpr int kGridColumns = 1000;
+    static constexpr int kCellColumns = 10;    // characters to a labelled cell
+    static constexpr int kRowLabelColumns = 5; // the row numbers down the left
+    static constexpr int kDemoRows = 6;        // the bar-line demo, above the grid
+    static constexpr int kMaxCount = 99999;
+
+    TestView();
+
+    // Fits the view to the window, scrolling if the cursor would be out of it.
+    void resize(int width, int height, CellSize cell);
+
+    // Handles a key with the test view's own bindings, until there's a keymap: counts, hjkl
+    // and the arrow keys, 0 and $, G, Ctrl-D, Ctrl-U, Ctrl-F and Ctrl-B, Escape, and Tab to
+    // switch pages. Returns whether what's shown changed.
+    bool handle(const Key& key);
+
+    Frame frame() const;
+
+    Page page() const { return page_; }
+    const GridCursor& cursor() const { return cursor_; }
+    int count() const { return count_; } // 0 when none has been typed
+
+private:
+    bool move(const Key& key, int count);
+    Region demoRegion() const;
+    Region cellsRegion() const;
+    Region samplesRegion() const;
+    void addBars(Frame& frame) const;
+
+    Page page_ = Page::Grid;
+    GridCursor cursor_;
+    int count_ = 0;
+    int width_ = 0;
+    int height_ = 0;
+    CellSize cell_{1, 1};
+    WindowLayout layout_;
+};
+
+} // namespace modal::ui
