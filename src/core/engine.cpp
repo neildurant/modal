@@ -141,6 +141,10 @@ EngineWake Engine::step() noexcept
         thru_.setTargets(plan.thru);
     }
 
+    // Input first: it arrived before the commands below take effect, now, so it belongs to
+    // the play it arrived during, even if a stop was given meanwhile.
+    takeInput();
+
     // Commands are carried out in order; a Play whose snapshot hasn't arrived yet waits, and
     // so do the commands after it.
     while (!quit_)
@@ -156,8 +160,6 @@ EngineWake Engine::step() noexcept
             break;
         }
     }
-
-    takeInput();
 
     const auto sendTime = clock_.now();
     scheduler_.sendDue(sendTime);
