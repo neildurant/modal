@@ -85,17 +85,18 @@ inline constexpr int kMaxCount = 99999;
 // key; keys that are a binding and also start a longer one wait up to the timeout, then run.
 // A key that continues no binding runs the keys before it, if they're a binding, and is
 // then taken afresh; otherwise those keys and the count are given up. Escape gives up any
-// count and keys waiting. Times are in milliseconds, from any fixed point.
+// count and keys waiting. Times are in milliseconds, from any fixed point. The keymap is
+// passed with each key, and should be the same while keys are waiting.
 class KeyDispatcher
 {
 public:
-    explicit KeyDispatcher(const Keymap& keymap, std::int64_t timeout = kDefaultTimeout);
+    explicit KeyDispatcher(std::int64_t timeout = kDefaultTimeout);
 
     // Handles a key typed in a mode, returning the commands to run, in order.
-    std::vector<Action> key(Mode mode, const Key& key, std::int64_t now);
+    std::vector<Action> key(const Keymap& keymap, Mode mode, const Key& key, std::int64_t now);
 
     // Runs keys that were waiting for a longer binding, once their time is up.
-    std::vector<Action> timeout(std::int64_t now);
+    std::vector<Action> timeout(const Keymap& keymap, std::int64_t now);
 
     // When timeout() should next be called, if anything is waiting for it.
     std::optional<std::int64_t> deadline() const { return deadline_; }
@@ -106,7 +107,6 @@ public:
 private:
     void clear();
 
-    const Keymap& keymap_;
     std::int64_t timeout_;
     Mode mode_ = Mode::Normal; // the mode the waiting keys were typed in
     int count_ = 0;

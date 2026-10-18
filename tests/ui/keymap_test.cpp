@@ -32,15 +32,15 @@ Keymap testKeymap()
 
 // Types keys written in notation, a millisecond apart from a time, returning the commands
 // they run.
-std::vector<Action> type(KeyDispatcher& dispatcher, std::string_view keys, std::int64_t at = 0,
-                         Mode mode = Mode::Normal)
+std::vector<Action> type(KeyDispatcher& dispatcher, const Keymap& keymap, std::string_view keys,
+                         std::int64_t at = 0, Mode mode = Mode::Normal)
 {
     const auto parsed = parseKeys(keys);
     REQUIRE(std::holds_alternative<std::vector<Key>>(parsed));
     std::vector<Action> actions;
     for (const auto& key : std::get<std::vector<Key>>(parsed))
     {
-        auto more = dispatcher.key(mode, key, at++);
+        auto more = dispatcher.key(keymap, mode, key, at++);
         actions.insert(actions.end(), more.begin(), more.end());
     }
     return actions;
@@ -79,88 +79,88 @@ TEST_CASE("a keymap matches bindings, and says whether longer ones start with th
 TEST_CASE("digits typed first are a count for the binding after them")
 {
     const auto keymap = testKeymap();
-    KeyDispatcher dispatcher{keymap};
-    CHECK(type(dispatcher, "j") == Actions{{"down", 0}});
-    CHECK(type(dispatcher, "12") == Actions{});
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, "j") == Actions{{"down", 0}});
+    CHECK(type(dispatcher, keymap, "12") == Actions{});
     CHECK(dispatcher.pending() == "12");
-    CHECK(type(dispatcher, "j") == Actions{{"down", 12}});
+    CHECK(type(dispatcher, keymap, "j") == Actions{{"down", 12}});
     CHECK(dispatcher.pending().empty());
 
-    CHECK(type(dispatcher, "0") == Actions{{"first", 0}}); // a 0 that would begin a count
-    CHECK(type(dispatcher, "10<C-d>") == Actions{{"half-down", 10}});
-    CHECK(type(dispatcher, "9999999j") == Actions{{"down", kMaxCount}});
+    CHECK(type(dispatcher, keymap, "0") == Actions{{"first", 0}}); // a 0 that would begin a count
+    CHECK(type(dispatcher, keymap, "10<C-d>") == Actions{{"half-down", 10}});
+    CHECK(type(dispatcher, keymap, "9999999j") == Actions{{"down", kMaxCount}});
 }
 
 TEST_CASE("keys that start longer bindings wait for the next key")
 {
     const auto keymap = testKeymap();
-    KeyDispatcher dispatcher{keymap};
-    CHECK(type(dispatcher, "3g") == Actions{});
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, "3g") == Actions{});
     CHECK(dispatcher.pending() == "3g");
     CHECK_FALSE(dispatcher.deadline()); // g alone is nothing, so no hurry
-    CHECK(type(dispatcher, "g") == Actions{{"top", 3}});
+    CHECK(type(dispatcher, keymap, "g") == Actions{{"top", 3}});
     CHECK(dispatcher.pending().empty());
 
-    CHECK(type(dispatcher, "ZQ") == Actions{{"quit", 0}});
+    CHECK(type(dispatcher, keymap, "ZQ") == Actions{{"quit", 0}});
 }
 
 TEST_CASE("keys that are a binding and start a longer one wait only so long")
 {
     const auto keymap = testKeymap();
-    KeyDispatcher dispatcher{keymap, 1000};
-    CHECK(type(dispatcher, "2z", 5000) == Actions{});
+    KeyDispatcher dispatcher{1000};
+    CHECK(type(dispatcher, keymap, "2z", 5000) == Actions{});
     CHECK(dispatcher.deadline() == 5001 + 1000); // from the z
-    CHECK(dispatcher.timeout(5999) == Actions{});
+    CHECK(dispatcher.timeout(keymap, 5999) == Actions{});
     CHECK(dispatcher.pending() == "2z");
-    CHECK(dispatcher.timeout(6001) == Actions{{"centre", 2}});
+    CHECK(dispatcher.timeout(keymap, 6001) == Actions{{"centre", 2}});
     CHECK(dispatcher.pending().empty());
     CHECK_FALSE(dispatcher.deadline());
-    CHECK(dispatcher.timeout(7000) == Actions{}); // nothing waiting
+    CHECK(dispatcher.timeout(keymap, 7000) == Actions{}); // nothing waiting
 
-    CHECK(type(dispatcher, "zz", 8000) == Actions{{"reset", 0}});
+    CHECK(type(dispatcher, keymap, "zz", 8000) == Actions{{"reset", 0}});
     CHECK_FALSE(dispatcher.deadline());
 }
 
 TEST_CASE("a key that continues no binding runs the keys before it if it can, then itself")
 {
     const auto keymap = testKeymap();
-    KeyDispatcher dispatcher{keymap};
+    KeyDispatcher dispatcher;
     // z is a binding: it runs with the count, then j afresh.
-    CHECK(type(dispatcher, "4zj") == Actions{{"centre", 4}, {"down", 0}});
+    CHECK(type(dispatcher, keymap, "4zj") == Actions{{"centre", 4}, {"down", 0}});
     // g isn't: it and the count are given up, then j runs.
-    CHECK(type(dispatcher, "4gj") == Actions{{"down", 0}});
+    CHECK(type(dispatcher, keymap, "4gj") == Actions{{"down", 0}});
     // The key taken afresh can begin a count or another sequence.
-    CHECK(type(dispatcher, "g5") == Actions{});
+    CHECK(type(dispatcher, keymap, "g5") == Actions{});
     CHECK(dispatcher.pending() == "5");
-    CHECK(type(dispatcher, "g") == Actions{});
+    CHECK(type(dispatcher, keymap, "g") == Actions{});
     CHECK(dispatcher.pending() == "5g");
-    CHECK(type(dispatcher, "z") == Actions{});
+    CHECK(type(dispatcher, keymap, "z") == Actions{});
     CHECK(dispatcher.pending() == "z");
-    CHECK(type(dispatcher, "z") == Actions{{"reset", 0}});
+    CHECK(type(dispatcher, keymap, "z") == Actions{{"reset", 0}});
 
     // A key bound to nothing gives up the count.
-    CHECK(type(dispatcher, "7x") == Actions{});
+    CHECK(type(dispatcher, keymap, "7x") == Actions{});
     CHECK(dispatcher.pending().empty());
 }
 
 TEST_CASE("Escape gives up a count and keys waiting, or else runs its binding")
 {
     const auto keymap = testKeymap();
-    KeyDispatcher dispatcher{keymap};
-    CHECK(type(dispatcher, "3g<Esc>") == Actions{});
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, "3g<Esc>") == Actions{});
     CHECK(dispatcher.pending().empty());
-    CHECK(type(dispatcher, "z<Esc>") == Actions{}); // even a binding waiting for more
+    CHECK(type(dispatcher, keymap, "z<Esc>") == Actions{}); // even a binding waiting for more
     CHECK_FALSE(dispatcher.deadline());
-    CHECK(type(dispatcher, "<Esc>") == Actions{{"cancel", 0}});
+    CHECK(type(dispatcher, keymap, "<Esc>") == Actions{{"cancel", 0}});
 }
 
 TEST_CASE("keys are matched in the mode the first of them was typed in")
 {
     auto keymap = testKeymap();
     REQUIRE(keymap.bind(Mode::Visual, "j", {"visual-down", ""}).empty());
-    KeyDispatcher dispatcher{keymap};
-    CHECK(type(dispatcher, "j", 0, Mode::Visual) == Actions{{"visual-down", 0}});
-    CHECK(type(dispatcher, "gg", 0, Mode::Visual) == Actions{});
-    CHECK(type(dispatcher, "g", 0, Mode::Normal) == Actions{});
-    CHECK(type(dispatcher, "g", 0, Mode::Visual) == Actions{{"top", 0}}); // begun in Normal
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, "j", 0, Mode::Visual) == Actions{{"visual-down", 0}});
+    CHECK(type(dispatcher, keymap, "gg", 0, Mode::Visual) == Actions{});
+    CHECK(type(dispatcher, keymap, "g", 0, Mode::Normal) == Actions{});
+    CHECK(type(dispatcher, keymap, "g", 0, Mode::Visual) == Actions{{"top", 0}}); // begun in Normal
 }

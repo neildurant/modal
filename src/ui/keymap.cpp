@@ -63,9 +63,8 @@ Keymap::Match Keymap::match(Mode mode, std::span<const Key> keys) const
     return match;
 }
 
-KeyDispatcher::KeyDispatcher(const Keymap& keymap, std::int64_t timeout)
-    : keymap_(keymap)
-    , timeout_(timeout)
+KeyDispatcher::KeyDispatcher(std::int64_t timeout)
+    : timeout_(timeout)
 {
 }
 
@@ -76,7 +75,8 @@ void KeyDispatcher::clear()
     deadline_.reset();
 }
 
-std::vector<Action> KeyDispatcher::key(Mode mode, const Key& key, std::int64_t now)
+std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Key& key,
+                                       std::int64_t now)
 {
     if (key == Key::of(NamedKey::Escape) && (count_ > 0 || !keys_.empty()))
     {
@@ -97,7 +97,7 @@ std::vector<Action> KeyDispatcher::key(Mode mode, const Key& key, std::int64_t n
         mode_ = mode;
     }
     keys_.push_back(key);
-    const auto match = keymap_.match(mode_, keys_);
+    const auto match = keymap.match(mode_, keys_);
     if (match.longer)
     {
         // Wait for the next key, or only so long if these keys are a binding already.
@@ -120,24 +120,24 @@ std::vector<Action> KeyDispatcher::key(Mode mode, const Key& key, std::int64_t n
         return {};
     }
     std::vector<Action> actions;
-    if (const auto* binding = keymap_.match(mode_, keys_).binding)
+    if (const auto* binding = keymap.match(mode_, keys_).binding)
     {
         actions.push_back({binding->command, count_});
     }
     clear();
-    auto more = this->key(mode, key, now);
+    auto more = this->key(keymap, mode, key, now);
     actions.insert(actions.end(), more.begin(), more.end());
     return actions;
 }
 
-std::vector<Action> KeyDispatcher::timeout(std::int64_t now)
+std::vector<Action> KeyDispatcher::timeout(const Keymap& keymap, std::int64_t now)
 {
     if (!deadline_ || now < *deadline_)
     {
         return {};
     }
     std::vector<Action> actions;
-    if (const auto* binding = keymap_.match(mode_, keys_).binding)
+    if (const auto* binding = keymap.match(mode_, keys_).binding)
     {
         actions.push_back({binding->command, count_});
     }
