@@ -38,6 +38,7 @@ add_executable(modal_tests
     ui/key_notation_test.cpp
     ui/keymap_test.cpp
     ui/layout_test.cpp
+    ui/settings_test.cpp
     ui/test_view_test.cpp
     ui/window_test.cpp
 )
