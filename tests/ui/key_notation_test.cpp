@@ -55,6 +55,9 @@ TEST_CASE("named and modified keys are written in angle brackets, in any case")
     CHECK(keys("<F5><f12>") == std::vector{Key::of(NamedKey::F5), Key::of(NamedKey::F12)});
     CHECK(keys("<PageDown>") == std::vector{Key::of(NamedKey::PageDown)});
     CHECK(keys("<C-A-Del>") == std::vector{Key::of(NamedKey::Delete, kCtrl | kAlt)});
+    CHECK(keys("<C-kPlus><C-kminus><C-k0>") == std::vector{Key::of(NamedKey::KeypadPlus, kCtrl),
+                                                           Key::of(NamedKey::KeypadMinus, kCtrl),
+                                                           Key::of(NamedKey::Keypad0, kCtrl)});
 }
 
 TEST_CASE("with Ctrl or Alt a letter is the same in either case, and Shift is written")
@@ -95,12 +98,14 @@ TEST_CASE("keys are written in notation that reads back the same")
         Key::of(NamedKey::Tab, kShift),
         Key::of(NamedKey::F11),
         Key::of(NamedKey::Delete, kCtrl | kAlt | kShift),
+        Key::of(NamedKey::KeypadMinus, kCtrl),
+        Key::of(NamedKey::Keypad9, kAlt),
     };
     for (const auto& key : all)
     {
         CAPTURE(formatKey(key));
         CHECK(keys(formatKey(key)) == std::vector{key});
     }
-    CHECK(formatKeys(all) ==
-          "jG<lt><Space>é<C-d><C-S-d><A-x><C-Space><C-lt><Esc><S-Tab><F11><C-A-S-Del>");
+    CHECK(formatKeys(all) == "jG<lt><Space>é<C-d><C-S-d><A-x><C-Space><C-lt><Esc><S-Tab><F11><C-A-"
+                             "S-Del><C-kMinus><A-k9>");
 }

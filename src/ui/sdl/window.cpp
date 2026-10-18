@@ -328,6 +328,40 @@ NamedKey namedKey(SDL_Keycode code)
     return NamedKey::None;
 }
 
+// The keypad's keys that have names of their own, for use with Ctrl or Alt.
+NamedKey keypadKey(SDL_Keycode code)
+{
+    switch (code)
+    {
+    case SDLK_KP_PLUS:
+        return NamedKey::KeypadPlus;
+    case SDLK_KP_MINUS:
+        return NamedKey::KeypadMinus;
+    case SDLK_KP_0:
+        return NamedKey::Keypad0;
+    case SDLK_KP_1:
+        return NamedKey::Keypad1;
+    case SDLK_KP_2:
+        return NamedKey::Keypad2;
+    case SDLK_KP_3:
+        return NamedKey::Keypad3;
+    case SDLK_KP_4:
+        return NamedKey::Keypad4;
+    case SDLK_KP_5:
+        return NamedKey::Keypad5;
+    case SDLK_KP_6:
+        return NamedKey::Keypad6;
+    case SDLK_KP_7:
+        return NamedKey::Keypad7;
+    case SDLK_KP_8:
+        return NamedKey::Keypad8;
+    case SDLK_KP_9:
+        return NamedKey::Keypad9;
+    default:
+        return NamedKey::None;
+    }
+}
+
 Modifiers modifiers(SDL_Keymod mod)
 {
     Modifiers result = kNoModifiers;
@@ -366,6 +400,13 @@ public:
             }
             const bool ctrlOrAlt = (mods & (kCtrl | kAlt)) != 0;
             const bool altGr = (mods & kCtrl) != 0 && (mods & kAlt) != 0;
+            // The keypad's keys type their characters, except with Ctrl or Alt.
+            if (const auto keypad = keypadKey(event.key.key);
+                keypad != NamedKey::None && ctrlOrAlt && !altGr)
+            {
+                skipText_ = true;
+                return key_(Key::of(keypad, mods), time(event));
+            }
             if (ctrlOrAlt && !altGr && event.key.key >= 0x20 && event.key.key < 0x7f)
             {
                 // Some systems type text for Alt and a key as well; it's the same key.

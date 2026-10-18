@@ -329,6 +329,9 @@ TEST_CASE("key presses reach the key handler as characters typed and named keys"
     pushKey(SDLK_ESCAPE);
     pushKey(SDLK_DOWN, SDL_KMOD_LSHIFT);
     pushKey(SDLK_F5);
+    pushKey(SDLK_KP_PLUS, SDL_KMOD_LCTRL); // the keypad's own, with Ctrl
+    pushKey(SDLK_KP_PLUS);                 // and its character without
+    pushText("+");
     SDL_Event quit{};
     quit.type = SDL_EVENT_QUIT;
     REQUIRE(SDL_PushEvent(&quit));
@@ -347,7 +350,8 @@ TEST_CASE("key presses reach the key handler as characters typed and named keys"
     CHECK(keys == std::vector<Key>{Key::typed(U'$'), Key::typed(U'd', kCtrl),
                                    Key::typed(U'j', kAlt), Key::typed(U'€'),
                                    Key::of(NamedKey::Escape), Key::of(NamedKey::Down, kShift),
-                                   Key::of(NamedKey::F5)});
+                                   Key::of(NamedKey::F5), Key::of(NamedKey::KeypadPlus, kCtrl),
+                                   Key::typed(U'+')});
     CHECK(frames >= 1);
 }
 

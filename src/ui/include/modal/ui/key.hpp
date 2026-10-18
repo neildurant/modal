@@ -35,6 +35,19 @@ enum class NamedKey : std::uint8_t
     F10,
     F11,
     F12,
+    // The numeric keypad's, with Ctrl or Alt; without, they type their characters.
+    KeypadPlus,
+    KeypadMinus,
+    Keypad0,
+    Keypad1,
+    Keypad2,
+    Keypad3,
+    Keypad4,
+    Keypad5,
+    Keypad6,
+    Keypad7,
+    Keypad8,
+    Keypad9,
 };
 
 // Modifier keys held with a key, which combine.
