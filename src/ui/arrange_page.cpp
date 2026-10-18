@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -18,7 +19,7 @@ namespace
 {
 
 constexpr Style kDim{Role::Dim, Role::Background, kPlain};
-constexpr std::uint8_t kFaint = 96; // the opacity of marker lines across the tracks
+constexpr std::uint8_t kFaint = 96; // the opacity of marker lines
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -399,9 +400,9 @@ void ArrangePage::addRegions(Frame& frame) const
 
     // The ruler: markers by name, the reference track's meters, and its bars, numbered where
     // there's room for the numbers.
-    // Markers: lines under the text and bars, solid through the ruler and faint across the
-    // tracks so as not to distract; named up to the next marker, cut short with an ellipsis
-    // or left out if there's no room.
+    // Markers: faint lines under the text and bars, so as not to distract, through the ruler
+    // and across the tracks; named up to the next marker, cut short with an ellipsis or left
+    // out if there's no room.
     const auto markers = song_.markers();
     std::vector<int> markerLines; // drawn through the ruler once its text is placed
     for (std::size_t i = 0; i < markers.size(); ++i)
@@ -461,8 +462,10 @@ void ArrangePage::addRegions(Frame& frame) const
                 {{x, cell_.height + height, lineWidth, height}, Role::Dim, 255});
         }
     }
-    // Bar numbers on bars 1, 1 + n, 1 + 2n... for n of 1, 2, 4, 8..., as few as fit the
-    // widest number and a space into n of the shortest bar, so none crowd the next.
+    // Bar numbers, counted in sections: bar 1 and the bar of each marker start one. Each
+    // section's first bar is numbered, then every n bars into it, for n of 1, 2, 4, 8..., as
+    // few as fit the widest number and a space into n of the shortest bar. A number shows
+    // only if it fits before the next section's, so the sections' numbers come first.
     core::Tick shortest = reference.barStart(2);
     for (const auto& change : reference.changes())
     {
@@ -475,6 +478,15 @@ void ArrangePage::addRegions(Frame& frame) const
     {
         every *= 2;
     }
+    std::vector<std::int64_t> sections{1};
+    for (const auto& marker : markers)
+    {
+        sections.push_back(reference.toBarBeatTick(marker.tick).bar);
+    }
+    std::ranges::sort(sections);
+    const auto [last, unique] = std::ranges::unique(sections);
+    sections.erase(last, unique);
+
     Labels numbers{timeline, 2 * cell_.height, cell_};
     for (auto bar = reference.toBarBeatTick(leftTick_).bar;; ++bar)
     {
@@ -483,9 +495,20 @@ void ArrangePage::addRegions(Frame& frame) const
         {
             break;
         }
-        if ((bar - 1) % every == 0)
+        const auto next = std::ranges::upper_bound(sections, bar);
+        const auto section = *std::prev(next);
+        if ((bar - section) % every != 0)
         {
-            numbers.add(scale.toX(start) + lineWidth + 2, std::to_string(bar), {});
+            continue;
+        }
+        const auto text = std::to_string(bar);
+        const int x = scale.toX(start) + lineWidth + 2;
+        const bool fits =
+            next == sections.end() ||
+            x + static_cast<int>(text.size()) * cell_.width < scale.toX(reference.barStart(*next));
+        if (fits)
+        {
+            numbers.add(x, text, {});
         }
     }
     // The markers' lines through the ruler, a row at a time, broken only where a label of the
@@ -505,7 +528,7 @@ void ArrangePage::addRegions(Frame& frame) const
                                     });
             if (!covered)
             {
-                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, 255});
+                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, kFaint});
             }
         }
     }

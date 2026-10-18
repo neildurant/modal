@@ -1,3 +1,5 @@
+#include <modal/core/event.hpp>
+#include <modal/core/song.hpp>
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/demo_song.hpp>
 
@@ -199,7 +201,7 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
                                }));
 }
 
-TEST_CASE("markers are named in the ruler, with faint lines across every track")
+TEST_CASE("markers are named in the ruler, with faint lines through it and every track")
 {
     auto page = page80x22();
     Frame frame;
@@ -216,7 +218,7 @@ TEST_CASE("markers are named in the ruler, with faint lines across every track")
                 lines.push_back(shape.rect.x);
             }
             CHECK(shape.rect.height == kCell.height); // a row of the ruler at a time
-            CHECK(shape.alpha == 255);
+            CHECK(shape.alpha < 255);
         }
         else if (shape.role == Role::Marker)
         {
@@ -267,23 +269,21 @@ TEST_CASE("marker names are cut short at the next marker, or left out if there's
     CHECK(rulerText(frame[1], 0) == std::vector<std::u32string>{U"Chor…", U"Chor…", U"Outro"});
 }
 
-TEST_CASE("bars are numbered every so many bars, as many as fit, from bar 1")
+TEST_CASE("bars are numbered from bar 1 and each marker, every so many bars")
 {
     auto page = page80x22();
     Frame frame;
     page.addRegions(frame);
-    // The shortest bar, of 2/4, is ten pixels, and "53 " is thirty: every fourth bar.
-    const auto numbers = rulerText(frame[1], 2);
-    REQUIRE(numbers.size() >= 5);
-    for (std::size_t i = 0; i < numbers.size(); ++i)
-    {
-        CHECK(numbers[i] == modal::ui::decodeUtf8(std::to_string(1 + 4 * i)));
-    }
+    // The shortest bar, of 2/4, is ten pixels, and "53 " is thirty: every fourth bar, from
+    // bar 1, the verse at 9, the chorus at 15 and the bridge at 28. Bar 27 would crowd 28.
+    CHECK(rulerText(frame[1], 2) ==
+          std::vector<std::u32string>{U"1", U"5", U"9", U"13", U"15", U"19", U"23", U"28", U"32"});
 
     type(page, U"-", 2); // a 2/4 bar is now 2.5 pixels: every sixteenth bar
     frame.clear();
     page.addRegions(frame);
-    CHECK(rulerText(frame[1], 2) == std::vector<std::u32string>{U"1", U"17", U"33", U"49"});
+    CHECK(rulerText(frame[1], 2) ==
+          std::vector<std::u32string>{U"1", U"9", U"15", U"28", U"36", U"48"});
 }
 
 TEST_CASE("a meter change too short for its name is shown by a tick, not hiding the next")
@@ -344,22 +344,27 @@ TEST_CASE("the cursor boxes its bar on all four sides")
 
 TEST_CASE("a marker's line through the ruler breaks only where a label sits across it")
 {
-    auto page = page80x22();
-    type(page, U"-", 2); // eight quarter notes to a column
+    // A marker halfway through bar 1, which its meter and number run across.
+    core::Song song;
+    const auto id = song.addTrack("Piano");
+    song.updateTrack(id, [&](core::Track& track)
+                     { track.events.insert({0, core::Note{60, 100, song.ppqn().quarter()}}); });
+    song.setMarker(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
+    ArrangePage page{song};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
     Frame frame;
     page.addRegions(frame);
-    const auto& timeline = frame[1];
-    // The second chorus, 127 quarter notes in, runs through the "33" of bar 33 at 99.
-    const int x = 158;
+
     std::vector<int> rows;
-    for (const auto& shape : timeline.under)
+    for (const auto& shape : frame[1].under)
     {
-        if (shape.role == Role::Marker && shape.rect.x == x && shape.alpha == 255)
+        if (shape.role == Role::Marker && shape.rect.x == 10 &&
+            shape.rect.y < ArrangePage::kRulerRows * kCell.height)
         {
             rows.push_back(shape.rect.y / kCell.height);
         }
     }
-    CHECK(rows == std::vector<int>{0, 1});
+    CHECK(rows == std::vector<int>{0}); // beside its name, but not through "4/4" or "1"
 }
 
 TEST_CASE("narrow bars lose their gaps")
