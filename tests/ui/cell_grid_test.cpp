@@ -1,6 +1,7 @@
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/style.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -30,7 +31,7 @@ TEST_CASE("UTF-8 is decoded, with anything malformed replaced")
 
 TEST_CASE("a theme's reverse swaps a style's colours")
 {
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     const Style plain{Role::Text, Role::Selection, kPlain};
     const Style reversed{Role::Text, Role::Selection, kReverse | kBold};
     CHECK(theme.foreground(plain) == theme[Role::Text]);

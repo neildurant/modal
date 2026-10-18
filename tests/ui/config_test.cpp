@@ -1,8 +1,11 @@
 #include <modal/ui/config.hpp>
+#include <modal/ui/style.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -163,4 +166,85 @@ TEST_CASE("files that source each other stop, and say so")
     reader.runFile(file);
     REQUIRE_FALSE(reader.errors().empty());
     CHECK(reader.errors().front().message == "files source each other more than 16 deep");
+}
+
+TEST_CASE("highlight sets a role's colour, and themes are command files of highlights")
+{
+    Config config;
+    ConfigReader reader{config, kCommands};
+    CHECK(config.theme[Role::Background] == Colour{0x1a, 0x1b, 0x26}); // dark, to begin with
+    CHECK(reader.runCommand("highlight cursor-text #FFEEDD", {}).empty());
+    CHECK(config.theme[Role::CursorText] == Colour{0xff, 0xee, 0xdd});
+    CHECK(reader.runCommand("highlight cursor", {}) == "highlight needs ROLE #RRGGBB");
+    CHECK(reader.runCommand("highlight curser #000000", {}) == "unknown role \"curser\"");
+    CHECK(reader.runCommand("highlight cursor black", {}) ==
+          "a colour is written #rrggbb, not black");
+
+    CHECK(reader.runCommand("set theme=light", {}).empty());
+    CHECK(config.theme[Role::Background] == Colour{0xe1, 0xe2, 0xe7});
+    CHECK(config.theme[Role::CursorText] == Colour{0xe1, 0xe2, 0xe7}); // the override's gone
+}
+
+TEST_CASE("a theme in the config directory comes before a built-in one, from dark")
+{
+    const TempDirectory directory{"modal-theme-test"};
+    directory.write("themes/light", "highlight background #000001\n");
+    directory.write("themes/mine", "highlight text #000002\nhighlight nope #000000\n");
+    Config config;
+    ConfigReader reader{config, kCommands, directory.path()};
+
+    CHECK(reader.runCommand("set theme=light", {}).empty());
+    CHECK(config.theme[Role::Background] == Colour{0, 0, 1});
+    CHECK(config.theme[Role::Text] == builtInTheme("dark")->operator[](Role::Text));
+
+    CHECK(reader.runCommand("set theme=mine", {}).empty());
+    CHECK(config.theme[Role::Text] == Colour{0, 0, 2});
+    CHECK(config.theme[Role::Background] == Colour{0x1a, 0x1b, 0x26});
+    REQUIRE(reader.errors().size() == 1); // from the theme's own file
+    CHECK(reader.errors()[0].line == 2);
+    CHECK(reader.errors()[0].source.ends_with("mine"));
+
+    const auto before = config.theme;
+    const auto error = reader.runCommand("set theme=nowhere", {});
+    CAPTURE(error);
+    CHECK(error.starts_with("no theme \"nowhere\" in "));
+    CHECK(config.settings.text("theme") == "mine"); // as it was
+    CHECK(config.theme == before);
+}
+
+TEST_CASE("the built-in themes give every role a colour of its own reading")
+{
+    for (const auto name : builtInThemeNames())
+    {
+        CAPTURE(name);
+        const auto text = builtInThemeText(name);
+        REQUIRE(text);
+        // Every role is named once, and reading it with ConfigReader agrees.
+        for (std::size_t i = 0; i < kRoleCount; ++i)
+        {
+            const auto role = std::string{roleName(static_cast<Role>(i))};
+            CHECK(text->find("highlight " + role + " ") != std::string_view::npos);
+        }
+        Config config;
+        ConfigReader reader{config, kCommands};
+        reader.runText(*text, name, {});
+        CHECK(reader.errors().empty());
+        CHECK(config.theme == *builtInTheme(name));
+    }
+    CHECK_FALSE(builtInTheme("nope"));
+}
+
+TEST_CASE("roles and colours read back as they're written")
+{
+    for (std::size_t i = 0; i < kRoleCount; ++i)
+    {
+        const auto role = static_cast<Role>(i);
+        CHECK(roleFromName(roleName(role)) == role);
+    }
+    CHECK_FALSE(roleFromName("Cursor"));
+    CHECK(formatColour({0x1a, 0xb0, 0xff}) == "#1ab0ff");
+    CHECK(parseColour("#1AB0ff") == Colour{0x1a, 0xb0, 0xff});
+    CHECK_FALSE(parseColour("1ab0ff"));
+    CHECK_FALSE(parseColour("#1ab0f"));
+    CHECK_FALSE(parseColour("#1ab0fg"));
 }

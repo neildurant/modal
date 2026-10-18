@@ -48,8 +48,8 @@ struct RoleSample
     bool swatch; // a block of the role's colour before its name
 };
 
-// Every theme role, in four columns: text, backgrounds with their text, timeline lines and
-// markers, and density.
+// Every theme role, by the name highlight takes, in four columns: text, backgrounds with
+// their text, timeline lines and markers, and density.
 constexpr int kRoleGroups = 4;
 constexpr RoleSample kRoles[kRoleGroups][5] = {
     {{"text", {Role::Text, Role::Background, kPlain}, false},
@@ -62,15 +62,15 @@ constexpr RoleSample kRoles[kRoleGroups][5] = {
      {"bar", {Role::BarText, Role::Bar, kPlain}, false},
      {"mode", {Role::ModeText, Role::Mode, kBold}, false},
      {nullptr, {}, false}},
-    {{"grid line", {Role::GridLine, Role::Background, kPlain}, true},
-     {"beat line", {Role::BeatLine, Role::Background, kPlain}, true},
-     {"bar line", {Role::BarLine, Role::Background, kPlain}, true},
+    {{"grid-line", {Role::GridLine, Role::Background, kPlain}, true},
+     {"beat-line", {Role::BeatLine, Role::Background, kPlain}, true},
+     {"bar-line", {Role::BarLine, Role::Background, kPlain}, true},
      {"note", {Role::Note, Role::Background, kPlain}, true},
      {"marker", {Role::Marker, Role::Background, kPlain}, true}},
-    {{"density 1", {Role::Density1, Role::Background, kPlain}, true},
-     {"density 2", {Role::Density2, Role::Background, kPlain}, true},
-     {"density 3", {Role::Density3, Role::Background, kPlain}, true},
-     {"density 4", {Role::Density4, Role::Background, kPlain}, true},
+    {{"density-1", {Role::Density1, Role::Background, kPlain}, true},
+     {"density-2", {Role::Density2, Role::Background, kPlain}, true},
+     {"density-3", {Role::Density3, Role::Background, kPlain}, true},
+     {"density-4", {Role::Density4, Role::Background, kPlain}, true},
      {nullptr, {}, false}},
 };
 
@@ -408,6 +408,7 @@ Region TestView::samplesRegion() const
 {
     CellGrid grid{layout_.columns, layout_.rows};
     grid.write(1, 0, "Theme roles", kTitle);
+    grid.write(13, 0, "as highlight names them; cursor, bar and mode have -text roles too", kDim);
     for (int group = 0; group < kRoleGroups; ++group)
     {
         const int x = 1 + group * 19;

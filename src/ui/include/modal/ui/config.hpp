@@ -2,8 +2,11 @@
 
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
+#include <modal/ui/style.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -21,6 +24,7 @@ struct Config
 {
     Settings settings;
     Keymap keymap;
+    Theme theme = *builtInTheme("dark");
 };
 
 // A command that couldn't be run, where it was.
@@ -40,7 +44,10 @@ struct ConfigError
 // lines and lines starting with " (comments) skipped. The commands are those that exist so
 // far (milestone 3):
 //
-//   set NAME=VALUE...             sets settings (see Settings)
+//   set NAME=VALUE...             sets settings (see Settings); set theme=NAME starts again
+//                                 from the dark theme, then runs themes/NAME from the config
+//                                 directory, or else the built-in theme of that name
+//   highlight ROLE #RRGGBB        sets a role's colour (see roleName)
 //   nmap KEYS COMMAND ["HINT"]    binds keys in Normal mode; vmap, imap, omap and cmap bind
 //                                 them in Visual, Insert, operator-pending and command-line
 //                                 mode; keys are in notation (see key_notation.hpp)
@@ -54,8 +61,9 @@ struct ConfigError
 class ConfigReader
 {
 public:
-    // The commands keys can be bound to, by name.
-    ConfigReader(Config& config, std::span<const std::string_view> commands);
+    // The commands keys can be bound to, by name, and the directory themes are found in.
+    ConfigReader(Config& config, std::span<const std::string_view> commands,
+                 std::optional<std::filesystem::path> configDirectory = std::nullopt);
 
     // Runs a file's commands. If it can't be read, that's an error.
     void runFile(const std::filesystem::path& file);
@@ -75,9 +83,11 @@ private:
     std::string map(std::string_view command, const std::vector<std::string>& arguments);
     std::string source(const std::vector<std::string>& arguments,
                        const std::filesystem::path& directory);
+    std::string useTheme(std::string name, const std::string& previous);
 
     Config& config_;
     std::span<const std::string_view> commands_;
+    std::optional<std::filesystem::path> configDirectory_;
     std::vector<ConfigError> errors_;
     int depth_ = 0; // of files sourcing others, which stops at a limit
 };

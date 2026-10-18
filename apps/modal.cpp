@@ -4,6 +4,7 @@
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/test_view.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -28,7 +29,7 @@ int main()
         return 1;
     }
     auto& window = *std::get<std::unique_ptr<ui::sdl::Window>>(opened);
-    const auto theme = ui::Theme::dark();
+    const auto theme = *ui::builtInTheme("dark");
 
     // Until the event list (milestone 4), the test view.
     ui::TestView view;

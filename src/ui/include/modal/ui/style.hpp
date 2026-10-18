@@ -3,6 +3,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace modal::ui
 {
@@ -44,6 +47,15 @@ enum class Role : std::uint8_t
 
 inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Density4) + 1;
 
+// A role's name, as themes and highlight write it: lower case with hyphens, such as
+// cursor-text or density-1; and the role of a name, if there is one.
+std::string_view roleName(Role role);
+std::optional<Role> roleFromName(std::string_view name);
+
+// A colour written as #rrggbb, in either case; and the colour so written, in lower case.
+std::optional<Colour> parseColour(std::string_view text);
+std::string formatColour(Colour colour);
+
 // Text attributes, which combine.
 using Attributes = std::uint8_t;
 inline constexpr Attributes kPlain = 0;
@@ -60,19 +72,18 @@ struct Style
     friend bool operator==(const Style&, const Style&) = default;
 };
 
-// A colour for every role.
+// A colour for every role; black until set. The built-in themes are in themes.hpp.
 class Theme
 {
 public:
-    // The built-in dark theme, until themes can be loaded.
-    static Theme dark();
-
     Colour operator[](Role role) const { return colours_[static_cast<std::size_t>(role)]; }
     void set(Role role, Colour colour) { colours_[static_cast<std::size_t>(role)] = colour; }
 
     // The colours a style's text and background are drawn in, with reverse applied.
     Colour foreground(const Style& style) const;
     Colour background(const Style& style) const;
+
+    friend bool operator==(const Theme&, const Theme&) = default;
 
 private:
     std::array<Colour, kRoleCount> colours_{};

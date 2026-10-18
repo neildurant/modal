@@ -3,31 +3,81 @@
 namespace modal::ui
 {
 
-Theme Theme::dark()
+namespace
 {
-    Theme theme;
-    theme.set(Role::Background, {0x1a, 0x1b, 0x26});
-    theme.set(Role::Text, {0xc0, 0xca, 0xf5});
-    theme.set(Role::Dim, {0x56, 0x5f, 0x89});
-    theme.set(Role::Accent, {0x7a, 0xa2, 0xf7});
-    theme.set(Role::Warning, {0xf7, 0x76, 0x8e});
-    theme.set(Role::Cursor, {0xe0, 0xaf, 0x68});
-    theme.set(Role::CursorText, {0x1a, 0x1b, 0x26});
-    theme.set(Role::Selection, {0x2e, 0x3c, 0x64});
-    theme.set(Role::Bar, {0x24, 0x28, 0x3b});
-    theme.set(Role::BarText, {0xa9, 0xb1, 0xd6});
-    theme.set(Role::Mode, {0x7a, 0xa2, 0xf7});
-    theme.set(Role::ModeText, {0x1a, 0x1b, 0x26});
-    theme.set(Role::GridLine, {0x24, 0x28, 0x3b});
-    theme.set(Role::BeatLine, {0x34, 0x3a, 0x55});
-    theme.set(Role::BarLine, {0x56, 0x5f, 0x89});
-    theme.set(Role::Note, {0x9e, 0xce, 0x6a});
-    theme.set(Role::Marker, {0xff, 0x9e, 0x64});
-    theme.set(Role::Density1, {0x3a, 0x4d, 0x2e});
-    theme.set(Role::Density2, {0x5b, 0x7d, 0x3f});
-    theme.set(Role::Density3, {0x7f, 0xab, 0x55});
-    theme.set(Role::Density4, {0xb4, 0xe0, 0x7c});
-    return theme;
+
+constexpr std::array<std::string_view, kRoleCount> kRoleNames{
+    "background", "text", "dim",      "accent",    "warning",   "cursor",    "cursor-text",
+    "selection",  "bar",  "bar-text", "mode",      "mode-text", "grid-line", "beat-line",
+    "bar-line",   "note", "marker",   "density-1", "density-2", "density-3", "density-4",
+};
+
+std::optional<int> hexDigit(char c)
+{
+    if (c >= '0' && c <= '9')
+    {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+std::string_view roleName(Role role)
+{
+    return kRoleNames[static_cast<std::size_t>(role)];
+}
+
+std::optional<Role> roleFromName(std::string_view name)
+{
+    for (std::size_t i = 0; i < kRoleCount; ++i)
+    {
+        if (kRoleNames[i] == name)
+        {
+            return static_cast<Role>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<Colour> parseColour(std::string_view text)
+{
+    if (text.size() != 7 || text[0] != '#')
+    {
+        return std::nullopt;
+    }
+    std::array<std::uint8_t, 3> parts{};
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        const auto high = hexDigit(text[1 + 2 * i]);
+        const auto low = hexDigit(text[2 + 2 * i]);
+        if (!high || !low)
+        {
+            return std::nullopt;
+        }
+        parts[i] = static_cast<std::uint8_t>(*high * 16 + *low);
+    }
+    return Colour{parts[0], parts[1], parts[2]};
+}
+
+std::string formatColour(Colour colour)
+{
+    constexpr std::string_view kDigits = "0123456789abcdef";
+    std::string text = "#";
+    for (const std::uint8_t part : {colour.r, colour.g, colour.b})
+    {
+        text += kDigits[part >> 4];
+        text += kDigits[part & 0xf];
+    }
+    return text;
 }
 
 Colour Theme::foreground(const Style& style) const

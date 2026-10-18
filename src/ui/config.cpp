@@ -119,9 +119,11 @@ std::string ConfigError::text() const
     return source + ":" + std::to_string(line) + ": " + message;
 }
 
-ConfigReader::ConfigReader(Config& config, std::span<const std::string_view> commands)
+ConfigReader::ConfigReader(Config& config, std::span<const std::string_view> commands,
+                           std::optional<std::filesystem::path> configDirectory)
     : config_(config)
     , commands_(commands)
+    , configDirectory_(std::move(configDirectory))
 {
 }
 
@@ -165,8 +167,8 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
         return {}; // blank, or a comment
     }
     // A map command's keys are taken as they are, since " is a key.
-    const auto name = line.substr(static_cast<std::size_t>(first - line.begin()));
-    const auto commandName = name.substr(0, name.find_first_of(" 	"));
+    const auto rest = line.substr(static_cast<std::size_t>(first - line.begin()));
+    const auto commandName = rest.substr(0, rest.find_first_of(" \t"));
     const bool mapping = commandName.ends_with("map");
     auto split = ui::split(line, mapping ? 2 : 1);
     if (auto* error = std::get_if<std::string>(&split))
@@ -190,11 +192,20 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
             {
                 return "set needs NAME=VALUE, not " + argument;
             }
-            if (auto error = config_.settings.set(std::string_view{argument}.substr(0, equals),
-                                                  std::string_view{argument}.substr(equals + 1));
+            const auto name = std::string_view{argument}.substr(0, equals);
+            const auto previous = name == "theme" ? config_.settings.text("theme") : std::string{};
+            if (auto error =
+                    config_.settings.set(name, std::string_view{argument}.substr(equals + 1));
                 !error.empty())
             {
                 return error;
+            }
+            if (name == "theme")
+            {
+                if (auto error = useTheme(config_.settings.text("theme"), previous); !error.empty())
+                {
+                    return error;
+                }
             }
         }
         return {};
@@ -202,6 +213,10 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
     if (command == "source")
     {
         return source(arguments, directory);
+    }
+    if (command == "highlight")
+    {
+        return highlight(config_.theme, arguments);
     }
     if (command.size() >= 4 && (command.substr(1) == "map" || command.substr(1) == "unmap"))
     {
@@ -267,6 +282,29 @@ std::string ConfigReader::source(const std::vector<std::string>& arguments,
     runText(*text, utf8Text(file), file.parent_path());
     --depth_;
     return {};
+}
+
+std::string ConfigReader::useTheme(std::string name, const std::string& previous)
+{
+    if (configDirectory_)
+    {
+        const auto file = *configDirectory_ / "themes" / utf8Path(name);
+        if (std::filesystem::is_regular_file(file))
+        {
+            config_.theme = *builtInTheme("dark");
+            runFile(file);
+            return {};
+        }
+    }
+    if (const auto theme = builtInTheme(name))
+    {
+        config_.theme = *theme;
+        return {};
+    }
+    config_.settings.set("theme", previous);
+    return "no theme \"" + name + "\"" +
+           (configDirectory_ ? " in " + utf8Text(*configDirectory_ / "themes") : std::string{}) +
+           ", nor built in";
 }
 
 } // namespace modal::ui

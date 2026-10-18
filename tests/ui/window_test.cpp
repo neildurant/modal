@@ -5,6 +5,7 @@
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/test_view.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
@@ -79,7 +80,7 @@ TEST_CASE("an offscreen window draws frames that can be read back")
     CHECK(window->pixelHeight() >= 48);
     CHECK(window->pixel(0, 0) == std::nullopt); // nothing drawn yet
 
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     window->draw({}, theme);
     CHECK(window->pixel(0, 0) == theme[Role::Background]);
     CHECK(window->pixel(window->pixelWidth() - 1, window->pixelHeight() - 1) ==
@@ -111,7 +112,7 @@ TEST_CASE("a font that can't be opened is reported, and the old one kept")
 TEST_CASE("text runs are drawn in their styles' colours, one character to a cell")
 {
     auto window = offscreen(320, 200);
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     const auto cell = window->cellSize();
     Region region = textRegion(*window, {cell.width, cell.height * 2, U"█ █",
                                          Style{Role::Note, Role::Background, kPlain}});
@@ -137,7 +138,7 @@ TEST_CASE("text runs are drawn in their styles' colours, one character to a cell
 TEST_CASE("bold text is heavier, and underlining draws a line across the cells")
 {
     auto window = offscreen(320, 200);
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     const auto cell = window->cellSize();
     Region region = textRegion(*window, {0, 0, U"M", Style{}});
     region.text.push_back({cell.width * 2, 0, U"M", Style{Role::Text, Role::Background, kBold}});
@@ -166,7 +167,7 @@ TEST_CASE("bold text is heavier, and underlining draws a line across the cells")
 TEST_CASE("a region is clipped to its bounds, with shapes under and over its text")
 {
     auto window = offscreen(320, 200);
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     Region region{.bounds = {10, 10, 40, 30},
                   .background = Role::Bar,
                   .text = {},
@@ -183,7 +184,7 @@ TEST_CASE("a region is clipped to its bounds, with shapes under and over its tex
 TEST_CASE("a bottom bar touches the bottom edge, whatever the window's height")
 {
     auto window = offscreen(320, 203);
-    const auto theme = Theme::dark();
+    const auto theme = *builtInTheme("dark");
     const auto cell = window->cellSize();
     const int width = window->pixelWidth();
     const int height = window->pixelHeight();
@@ -226,7 +227,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
     grid.write(1, 8, "bold", Style{Role::Text, Role::Background, kBold});
     grid.write(6, 8, "underline", Style{Role::Text, Role::Background, kUnderline});
     grid.write(16, 8, "reverse", Style{Role::Text, Role::Background, kReverse});
-    window->draw({gridRegion(grid, {0, 0, 640, 260}, cell, Role::Background)}, Theme::dark());
+    window->draw({gridRegion(grid, {0, 0, 640, 260}, cell, Role::Background)},
+                 *builtInTheme("dark"));
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
     CHECK(window->saveFrame(path != nullptr ? path : "font-sample.bmp"));
 }
@@ -246,23 +248,23 @@ TEST_CASE("a sample of the test view", "[.sample]")
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
     std::string base = path != nullptr ? path : "test-view.bmp";
     base = base.substr(0, base.rfind('.'));
-    window->draw(view.frame(), Theme::dark());
+    window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-grid.bmp"));
     view.handle(Key::of(NamedKey::Tab), 0);
     for (const char32_t key : std::u32string_view{U"6j9l"})
     {
         view.handle(Key::typed(key), 0);
     }
-    window->draw(view.frame(), Theme::dark());
+    window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-arrange.bmp"));
     for (int i = 0; i < 3; ++i) // to two whole notes to a column
     {
         view.handle(Key::typed(U'-'), 0);
     }
-    window->draw(view.frame(), Theme::dark());
+    window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-arrange-out.bmp"));
     view.handle(Key::of(NamedKey::Tab), 0);
-    window->draw(view.frame(), Theme::dark());
+    window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-samples.bmp"));
 }
 

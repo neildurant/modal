@@ -1,0 +1,25 @@
+" Modal's dark theme, after Tokyo Night. A theme is a command file of highlight lines, a
+" colour for each role; set theme=NAME runs themes/NAME from the config directory, or a
+" built-in theme, after starting again from this one.
+
+highlight background   #1a1b26
+highlight text         #c0caf5
+highlight dim          #565f89
+highlight accent       #7aa2f7
+highlight warning      #f7768e
+highlight cursor       #e0af68
+highlight cursor-text  #1a1b26
+highlight selection    #2e3c64
+highlight bar          #24283b
+highlight bar-text     #a9b1d6
+highlight mode         #7aa2f7
+highlight mode-text    #1a1b26
+highlight grid-line    #24283b
+highlight beat-line    #343a55
+highlight bar-line     #565f89
+highlight note         #9ece6a
+highlight marker       #ff9e64
+highlight density-1    #3a4d2e
+highlight density-2    #5b7d3f
+highlight density-3    #7fab55
+highlight density-4    #b4e07c
