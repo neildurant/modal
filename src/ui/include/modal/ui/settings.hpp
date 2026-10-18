@@ -50,8 +50,10 @@ public:
     // The setting of a name, or null if there's none.
     const Setting* find(std::string_view name) const;
 
-    // All settings, in the order they're listed in generated config.
-    std::span<const Setting> all() const { return settings_; }
+    // All settings, in the order they're listed in generated config. Not of a temporary,
+    // which would be gone before the span is used.
+    std::span<const Setting> all() const& { return settings_; }
+    std::span<const Setting> all() const&& = delete;
 
     // A setting's value, which must exist and be of the type asked for.
     std::int64_t integer(std::string_view name) const;

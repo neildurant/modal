@@ -327,4 +327,102 @@ void runStartupFiles(ConfigReader& reader,
     }
 }
 
+namespace
+{
+
+// Text as comment lines, wrapped at spaces to fit kCommentWidth characters.
+constexpr std::size_t kCommentWidth = 90;
+
+std::string wrappedComment(std::string_view text)
+{
+    std::string out;
+    std::string line = "\"";
+    while (!text.empty())
+    {
+        const auto end = text.find(' ');
+        const auto word = text.substr(0, end);
+        text = end == std::string_view::npos ? std::string_view{} : text.substr(end + 1);
+        if (line.size() > 1 && line.size() + 1 + word.size() > kCommentWidth)
+        {
+            out += line + "\n";
+            line = "\"";
+        }
+        line += " ";
+        line += word;
+    }
+    return out + line + "\n";
+}
+
+// A built-in file's lines after its opening comment, with commands commented out.
+std::string commentedOut(std::string_view text)
+{
+    std::string out;
+    bool opening = true; // the comment the file starts with, up to a blank line
+    while (!text.empty())
+    {
+        const auto end = text.find('\n');
+        const auto line = text.substr(0, end);
+        text = end == std::string_view::npos ? std::string_view{} : text.substr(end + 1);
+        if (opening)
+        {
+            opening = !line.empty();
+            continue;
+        }
+        if (!line.empty() && !line.starts_with('"'))
+        {
+            out += '"';
+        }
+        out += line;
+        out += '\n';
+    }
+    return out;
+}
+
+} // namespace
+
+std::string defaultConfigText(std::span<const CommandInfo> commands)
+{
+    std::string text =
+        "\" Modal's configuration: every setting, key binding and colour, each commented out\n"
+        "\" at its default. Uncomment and change only what you want, and the rest will follow\n"
+        "\" later versions' defaults. Put it in modalrc in the config directory.\n"
+        "\"\n"
+        "\" A line starting with \" is a comment. Keys are written as in Vim: <C-d>, <Esc>,\n"
+        "\" <S-Tab>, <lt> for <, <Space>.\n\n"
+        "\" Settings\n\n";
+    const Settings defaults;
+    for (const auto& setting : defaults.all())
+    {
+        text += wrappedComment(setting.description);
+        auto value = formatValue(setting.defaultValue);
+        if (value.empty() || value.find(' ') != std::string::npos)
+        {
+            value = "\"" + value + "\"";
+        }
+        text += "\"set " + std::string{setting.name} + "=" + value + "\n\n";
+    }
+
+    text +=
+        "\" Key bindings: nmap KEYS COMMAND \"HINT\" binds keys in Normal mode, and nunmap KEYS\n"
+        "\" unbinds them.\n\n";
+    text += commentedOut(builtInModalrc());
+    text += "\n\" The commands keys can be bound to:\n\"\n";
+    std::size_t width = 0;
+    for (const auto& command : commands)
+    {
+        width = std::max(width, command.name.size());
+    }
+    for (const auto& command : commands)
+    {
+        text += "\"   " + std::string{command.name} +
+                std::string(width - command.name.size() + 2, ' ') +
+                std::string{command.description} + "\n";
+    }
+
+    text += "\n\" Colours: highlight ROLE #rrggbb sets a role's colour, after the theme's. These\n"
+            "\" are the dark theme's.\n\n";
+    text += commentedOut(*builtInThemeText("dark"));
+    return text;
+}
+
 } // namespace modal::ui

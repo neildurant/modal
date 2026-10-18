@@ -8,13 +8,73 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 
-int main()
+namespace
 {
-    using namespace modal;
+
+using namespace modal;
+
+void fail(const std::string& message)
+{
+    std::fprintf(stderr, "modal: %s\n", message.c_str());
+    ui::sdl::showError("Modal", "Modal " + message + "."); // there's no console on Windows
+}
+
+// modal --write-config FILE [--force]: writes every setting, key binding and colour, each
+// commented out at its default, to start a modalrc from. Returns the exit status.
+int writeConfig(const std::filesystem::path& file, bool force)
+{
+    if (!force && std::filesystem::exists(file))
+    {
+        fail("won't overwrite " + file.string() + " without --force");
+        return 1;
+    }
+    std::ofstream out{file, std::ios::binary};
+    out << ui::defaultConfigText(ui::TestView::commands());
+    if (!out.flush())
+    {
+        fail("can't write " + file.string());
+        return 1;
+    }
+    std::printf("Wrote %s\n", file.string().c_str());
+    return 0;
+}
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+    std::optional<std::filesystem::path> configFile;
+    bool force = false;
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string_view argument = argv[i];
+        if (argument == "--write-config" && i + 1 < argc)
+        {
+            configFile = argv[++i];
+        }
+        else if (argument == "--force")
+        {
+            force = true;
+        }
+        else
+        {
+            fail("doesn't know " + std::string{argument} +
+                 "; it takes --write-config FILE, with --force to overwrite FILE");
+            return 2;
+        }
+    }
+    if (configFile)
+    {
+        return writeConfig(*configFile, force);
+    }
 
     // The built-in modalrc, then the user's. Errors go to stderr, where there is one, and
     // the first to the status line.

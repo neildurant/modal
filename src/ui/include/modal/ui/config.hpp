@@ -92,6 +92,11 @@ private:
     int depth_ = 0; // of files sourcing others, which stops at a limit
 };
 
+// A command file of every setting, key binding and colour, each commented out at its
+// default, with what it does, so a user uncomments only what they change and keeps later
+// versions' defaults for the rest; and the commands keys can be bound to, listed.
+std::string defaultConfigText(std::span<const CommandInfo> commands);
+
 // The built-in command file, assets/config/modalrc, which holds the default key bindings.
 std::string_view builtInModalrc();
 

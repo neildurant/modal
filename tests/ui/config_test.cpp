@@ -252,3 +252,63 @@ TEST_CASE("roles and colours read back as they're written")
     CHECK_FALSE(parseColour("#1ab0f"));
     CHECK_FALSE(parseColour("#1ab0fg"));
 }
+
+TEST_CASE("the default config changes nothing, and uncommented gives the defaults")
+{
+    // The commands of the built-in modalrc, whichever the program has.
+    std::vector<CommandInfo> commands;
+    for (const auto name :
+         {"cursor-left", "cursor-down", "cursor-up", "cursor-right", "cursor-first", "cursor-last",
+          "go-first", "go-last", "scroll-half-down", "scroll-half-up", "scroll-page-down",
+          "scroll-page-up", "scroll-centre", "zoom-in", "zoom-out", "zoom-reset", "test-next-page",
+          "cancel"})
+    {
+        commands.push_back({name, "Does something"});
+    }
+    const auto text = defaultConfigText(commands);
+    CHECK(text.find("\"set timeoutlen=500\n") != std::string::npos);
+    CHECK(text.find("\"set font=\"\"\n") != std::string::npos);
+    CHECK(text.find("\"nmap gg") != std::string::npos);
+    CHECK(text.find("\"highlight cursor-text") != std::string::npos);
+    CHECK(text.find("\"   scroll-half-down  Does something\n") != std::string::npos);
+
+    Config defaults;
+    ConfigReader defaultReader{defaults, commands};
+    defaultReader.runText(builtInModalrc(), "built-in modalrc", {});
+    REQUIRE(defaultReader.errors().empty());
+
+    // As written, every line is a comment.
+    Config config;
+    ConfigReader reader{config, commands};
+    reader.runText(text, "written", {});
+    CHECK(reader.errors().empty());
+    CHECK(config.keymap == Keymap{});
+
+    // Uncommented, the commands give the defaults: settings, bindings and colours.
+    std::string uncommented;
+    for (std::size_t start = 0; start < text.size();)
+    {
+        const auto end = text.find('\n', start);
+        auto line = text.substr(start, end - start);
+        start = end + 1;
+        for (const auto* command : {"\"set ", "\"nmap ", "\"highlight "})
+        {
+            if (line.starts_with(command))
+            {
+                line.erase(0, 1);
+            }
+        }
+        uncommented += line + "\n";
+    }
+    Config written;
+    ConfigReader writtenReader{written, commands};
+    writtenReader.runText(uncommented, "uncommented", {});
+    CHECK(writtenReader.errors().empty());
+    CHECK(written.keymap == defaults.keymap);
+    CHECK(written.theme == defaults.theme);
+    for (const auto& setting : defaults.settings.all())
+    {
+        CAPTURE(setting.name);
+        CHECK(written.settings.find(setting.name)->value == setting.value);
+    }
+}

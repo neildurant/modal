@@ -63,6 +63,8 @@ public:
     };
     Match match(Mode mode, std::span<const Key> keys) const;
 
+    friend bool operator==(const Keymap&, const Keymap&) = default;
+
 private:
     struct KeysLess
     {
