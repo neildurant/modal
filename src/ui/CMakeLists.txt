@@ -7,6 +7,7 @@ add_library(modal_ui STATIC
     cell_grid.cpp
     demo_song.cpp
     frame.cpp
+    key_notation.cpp
     grid_cursor.cpp
     layout.cpp
     style.cpp
