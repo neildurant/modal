@@ -1,3 +1,10 @@
+# The sequencer: a GUI program, so no console window on Windows.
+add_executable(modal WIN32 modal.cpp)
+target_link_libraries(modal PRIVATE modal::ui_sdl modal::warnings)
+if(MSVC)
+    target_link_options(modal PRIVATE /ENTRY:mainCRTStartup) # a plain main(), not WinMain
+endif()
+
 add_executable(modal-ports modal_ports.cpp)
 target_link_libraries(modal-ports PRIVATE modal::platform modal::warnings)
 

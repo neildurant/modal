@@ -49,7 +49,7 @@ tests/          unit tests
 
 ## Building and testing
 
-Requires `VCPKG_ROOT` pointing at a vcpkg clone (Windows: `C:\Users\neild\vcpkg`; WSL Ubuntu 24.04: `/opt/vcpkg`). On Linux, also Ninja, autotools (`autoconf autoconf-archive automake libtool`, which vcpkg needs to build ALSA) and the ALSA runtime (`libasound2t64`), which libremidi loads at run time. MIDI on Linux needs `/dev/snd/seq`, which WSL lacks.
+Requires `VCPKG_ROOT` pointing at a vcpkg clone (Windows: `C:\Users\neild\vcpkg`; WSL Ubuntu 24.04: `/opt/vcpkg`). On Linux, also Ninja, autotools (`autoconf autoconf-archive automake libtool`, which vcpkg needs to build ALSA) the ALSA runtime (`libasound2t64`), which libremidi loads at run time, and the X11 and Wayland development packages vcpkg needs to build SDL3 (`pkg-config libx11-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev`). MIDI on Linux needs `/dev/snd/seq`, which WSL lacks.
 
 Configure presets: `linux-gcc`, `linux-clang`, `linux-clang-asan` (ASan + UBSan, Debug only), `linux-clang-tsan` (ThreadSanitizer, Debug only), `windows-msvc`. Build and test presets append `-debug` or `-release` (except the sanitizer presets). Build trees go in `build/<preset>`. ThreadSanitizer needs `sudo sysctl vm.mmap_rnd_bits=28` on recent kernels (including WSL), or it fails to start.
 

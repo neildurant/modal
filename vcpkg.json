@@ -5,6 +5,14 @@
   "builtin-baseline": "357b1a6f8343064ca982a20771e420fcecfe7efc",
   "dependencies": [
     "catch2",
-    "libremidi"
+    "libremidi",
+    {
+      "name": "sdl3",
+      "default-features": false,
+      "features": [
+        { "name": "wayland", "platform": "linux" },
+        { "name": "x11", "platform": "linux" }
+      ]
+    }
   ]
 }

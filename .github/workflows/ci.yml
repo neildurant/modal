@@ -57,9 +57,10 @@ jobs:
       - name: Install Linux packages
         if: runner.os == 'Linux'
         # autotools: vcpkg builds ALSA from source. libremidi loads the system libasound at run time.
+        # X11 and Wayland headers: vcpkg builds SDL3 with both, loading them at run time.
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool libasound2t64
+          sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool libasound2t64             pkg-config libx11-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev
 
       # ThreadSanitizer can't map its shadow memory with the kernel's default ASLR entropy.
       - name: Reduce ASLR entropy for ThreadSanitizer
