@@ -164,3 +164,13 @@ TEST_CASE("keys are matched in the mode the first of them was typed in")
     CHECK(type(dispatcher, keymap, "g", 0, Mode::Normal) == Actions{});
     CHECK(type(dispatcher, keymap, "g", 0, Mode::Visual) == Actions{{"top", 0}}); // begun in Normal
 }
+
+TEST_CASE("digits are a count only in the modes with counts, not in Insert or the command line")
+{
+    Keymap keymap;
+    REQUIRE(keymap.bind(Mode::CommandLine, "1", {"one", ""}).empty());
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, "1", 0, Mode::CommandLine) == Actions{{"one", 0}});
+    CHECK(type(dispatcher, keymap, "2", 0, Mode::Insert) == Actions{});
+    CHECK(dispatcher.pending().empty());
+}

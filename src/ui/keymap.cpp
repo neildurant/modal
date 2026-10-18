@@ -86,7 +86,9 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
     const char32_t c = key.character;
     const bool digit =
         key.named == NamedKey::None && key.modifiers == kNoModifiers && c >= U'0' && c <= U'9';
-    if (keys_.empty() && digit && (c != U'0' || count_ > 0))
+    const bool counts =
+        mode == Mode::Normal || mode == Mode::Visual || mode == Mode::OperatorPending;
+    if (keys_.empty() && counts && digit && (c != U'0' || count_ > 0))
     {
         count_ = std::min(count_ * 10 + static_cast<int>(c - U'0'), kMaxCount);
         return {};

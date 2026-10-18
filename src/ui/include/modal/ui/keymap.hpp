@@ -89,13 +89,13 @@ struct Action
 inline constexpr std::int64_t kDefaultTimeout = 500;
 inline constexpr int kMaxCount = 99999;
 
-// Turns keys into commands through a keymap, as Vim does. Digits typed first are a count,
-// except a 0 that would begin one. Keys that only start longer bindings wait for the next
-// key; keys that are a binding and also start a longer one wait up to the timeout, then run.
-// A key that continues no binding runs the keys before it, if they're a binding, and is
-// then taken afresh; otherwise those keys and the count are given up. Escape gives up any
-// count and keys waiting. Times are in milliseconds, from any fixed point. The keymap is
-// passed with each key, and should be the same while keys are waiting.
+// Turns keys into commands through a keymap, as Vim does. In Normal, Visual and
+// operator-pending mode, digits typed first are a count, except a 0 that would begin one. Keys that
+// only start longer bindings wait for the next key; keys that are a binding and also start a longer
+// one wait up to the timeout, then run. A key that continues no binding runs the keys before it, if
+// they're a binding, and is then taken afresh; otherwise those keys and the count are given up.
+// Escape gives up any count and keys waiting. Times are in milliseconds, from any fixed point. The
+// keymap is passed with each key, and should be the same while keys are waiting.
 class KeyDispatcher
 {
 public:
