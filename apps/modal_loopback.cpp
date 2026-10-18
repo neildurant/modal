@@ -805,9 +805,9 @@ int run(const Options& options)
     if (!check.late.empty())
     {
         std::cout << '\n';
-        printSummary("Late (recorded - sent)", summarize(check.late));
+        printSummary("Recorded late by", summarize(check.late));
         printTicks("  in ticks", check.lateTicks);
-        printSummary("Longer (recorded - sent)", summarize(check.longer));
+        printSummary("Recorded longer by", summarize(check.longer));
         std::cout << "  " << std::left << std::setw(22) << "Off arrival time" << std::right
                   << check.offArrival << " recorded at a tick other than the one they arrived at\n";
     }

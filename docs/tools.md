@@ -77,8 +77,8 @@ With `--record`, the stream is also recorded, as `modal-record` would record it,
 As well as the usual report, it gives:
 
 - **Recorded, missing and extra**: how many of the notes sent were recorded. Missing and extra should be 0.
-- **Late**: each recorded note's position less the one sent, in milliseconds and in ticks. This should be close to the latency, since a note is recorded where it arrived.
-- **Longer**: each recorded note's length less the one sent. This should be close to 0, since a note-on and its note-off take the same time to come back.
+- **Recorded late by**: each recorded note's position less the one sent, in milliseconds and in ticks. This should be close to the latency, since a note is recorded where it arrived.
+- **Recorded longer by**: each recorded note's length less the one sent. This should be close to 0, since a note-on and its note-off take the same time to come back.
 - **Off arrival time**: notes recorded at a tick other than the one at which the note-on arrived, worked out from the arrival time and the time the song started. This checks the path from timestamp to tick, and should be 0.
 
 The exit status is 0 only if nothing was lost, missing, extra or recorded off its arrival time.
