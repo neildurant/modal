@@ -187,7 +187,7 @@ The song has a key and scale setting (key changes over time later), used by the 
 
 The arrangement is the home view; Enter on a track opens it in the piano roll for detailed editing, and the event list shows the exact data. All three share one cursor position and selection, so switching views (or `, v`) never loses your place. A status line and transport bar are always visible.
 
-- **Arrangement (home view).** One row per track, one column per bar, cells shaded by note density, with markers along the top. Used for navigating the song and for whole-section operations: copy verse to bar 33, mute tracks, set loop range.
+- **Arrangement (home view).** One row per track, cells shaded by note density, with markers along the top. Since tracks can have different meters (decided in milestone 3), a column is a fixed length of time at the current zoom (such as one beat of the reference meter), not a bar: the track headers are text cells, but each row's timeline is a pixel region where the track draws its own bar lines at their exact positions, and the cursor is an exact span of time (such as bar 5 of that track) drawn to the pixel. The ruler numbers the reference track's bars. Used for navigating the song and for whole-section operations: copy verse to bar 33, mute tracks, set loop range.
 - **Piano roll (track editing).** Pitch rows against time, drawn on the grid with pixel-precise note starts and lengths inside the cells. The cursor moves note to note (`j`/`k`, Tab) or by grid step. A velocity lane underneath shows bars per note.
 - **Event list (exact data).** One row per event: bar:beat:tick, type, channel, data fields (pitch name, velocity, duration). Every field is a cell you can move to and edit directly, with `Ctrl-A` / `Ctrl-X` incrementing and decrementing as in Vim. Filters show only notes, only CCs, a pitch range, etc.
 - **Status line and transport.** Contents set in configuration (see Customisation).
@@ -231,6 +231,8 @@ The command language stays flat: no variables, conditionals or loops. If program
 
 - **Themes.** Colours are assigned to semantic roles (cursor, selection, playhead, note, muted track, velocity bar, marker, status segments), never hard-coded in views. Light and dark themes ship by default; users add their own.
 - **Key bindings.** Per-mode bindings and leader sequences, rebindable like Vim's `map`. Each binding names a command and a hint label for the leader menu. The defaults aim for stable muscle memory and won't be reshuffled between versions.
+- **Config files (decided in milestone 3).** The user's command file is `~/.config/modal/modalrc` on Linux and `%APPDATA%\Modal\modalrc` on Windows, found through the platform layer. The shipped defaults (a default command file and the light and dark themes) are built into the program, so it runs with no files installed; the user's file runs after them. `set theme=NAME` runs `themes/NAME` from the config directory, or a built-in theme of that name. An error reports the file and line, and the rest of the file still runs. Until the full command line exists (milestone 5), the file and the `:` prompt take only the commands that exist so far: `set`, `highlight`, the `map` family and `source`.
+- **Settings registry and generated config (decided in milestone 3).** Every setting is registered with its name, type, default and a one-line description, which later also drive `:set` completion, hint labels and error messages. `:write-config FILE` (`:write-config!` to overwrite) and `modal --print-config` write every setting, key binding and highlight group, in sections, each with a comment saying what it does, and each commented out at its default, so a user uncomments only what they change and keeps later improvements to the rest. It is never written automatically. Writing the current settings instead, like Vim's `:mkvimrc`, is a later option of the same command.
 - **Status bar.** Built from named segments (mode, position, tempo, time signature, key, loop/punch, record state, MIDI activity, pending keys, message), each with a format string, arranged left and right in configuration, like a Vim or Doom Emacs modeline.
 
 ## Input and recording
@@ -335,7 +337,11 @@ The editor publishes a new immutable song snapshot after each edit; the schedule
 
 - **Engine library (`core`):** song model, scheduler, recorder, SMF and native file I/O. No UI dependencies; usable from a command-line player and from tests.
 - **Platform layer:** MIDI outputs behind the scheduler's small message-sink interface, timestamped MIDI input and port lookup by name, all over libremidi; plus thread-priority, clock and console-key helpers per OS.
-- **Grid UI:** a cell-grid abstraction (characters, colours, attributes) plus optional pixel regions for the piano roll and velocity lanes. Rendered with SDL3 now; a terminal backend stays possible later.
+- **Grid UI:** a cell-grid abstraction (characters, colours, attributes) plus optional pixel regions for the piano roll, velocity lanes and arrangement timelines. Rendered with SDL3 now; a terminal backend stays possible later.
+- **Rendering (decided in milestone 3).** SDL3's 2D renderer, with text through SDL_ttf (FreeType, without HarfBuzz, since a fixed grid needs no shaping). Each glyph is rendered once into a texture atlas and each cell is drawn from it. Pixel regions are rectangles of whole cells, so they fit the layout, inside which a view draws filled rectangles and lines at exact pixel positions, clipped to the region, in the same pass as the text. The window redraws only when something changes, synced to the display: every frame while the playhead moves, otherwise only on input or a resize, so an idle window takes no CPU.
+- **Cell size and high DPI (decided in milestone 3).** The font size is in points, scaled by the display's pixel density. Cells are a whole number of pixels, from the font's advance and line height, so the grid never blurs or drifts. Moving to a display with another scale, or `Ctrl-+` / `Ctrl--`, renders the atlas again.
+- **Keys (decided in milestone 3).** Printable keys are bound by the character they type, so `|`, `"` or `D` work whichever key types them on any layout. Ctrl and Alt combinations and special keys are bound by key code, written in Vim notation (`<C-a>`, `<Esc>`, `<S-Tab>`, `<F5>`). Physical scancodes are kept for the later playable computer keyboard. The main modifier is abstract, so it can be Cmd on a Mac.
+- **UI code layout (decided in milestone 3).** `src/ui` holds the cell grid, layout, key handling, keymaps and the config parser, with no SDL, so all of it is unit-tested directly; `src/ui/sdl` holds the renderer and key translation, smoke-tested through SDL's offscreen video driver in CI; `apps/modal` is the program.
 - **Editor:** the grammar parser, operators, motions, views and undo history, operating on the song model.
 
 **Planning for in-process plugin hosting**
@@ -381,7 +387,7 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 - C++20, CMake, dependencies via vcpkg in manifest mode with a pinned baseline: SDL3, SDL\_ttf or FreeType, libremidi, Catch2 v3 for tests.
 - CI builds and unit tests on both platforms from the first commit.
 - **Testing on Linux, in three tiers.** Unit tests run in WSL (Ubuntu 24.04) and in CI with GCC and Clang. ALSA integration tests (ports through `snd-seq-dummy`, notes between virtual ports through libremidi) run on a native Linux install, since neither WSL nor the GitHub-hosted runners have an ALSA sequencer: the runners' Azure kernel ships no sound modules (checked October 2026). A self-hosted runner on that machine could bring them into CI later. Timing is measured only on a native Linux install with real MIDI hardware and a loopback cable.
-- A bundled monospace font so the grid looks identical everywhere.
+- A bundled monospace font so the grid looks identical everywhere: JetBrains Mono NL (the version without ligatures), under the SIL Open Font License, shipped with its licence (decided in milestone 3). It has box drawing, shades and eighth blocks, arrows, `♯` and `♭`; it lacks `♮` and the note symbols. A `font` setting can choose any other.
 - A loopback timing test tool: send a steady stream out, receive it back through a cable, report latency and jitter statistics.
 - A command-line recorder, `modal-record` (decided in milestone 2): records from an input onto a new track, or merges into an existing one with `--overdub`, optionally playing along with a file, and writes the result as a MIDI file. Its bars come from the play-along file's tempo map and meter, or else from `--tempo` (default 120 BPM) and `--meter` (default 4/4), which can't be combined with a file. Recording is checked through the cable by a `--record` mode of the loopback tool, which reports how far each recorded position is from what was sent. In that mode (decided in milestone 2) the stream is a song at 120 BPM with no metronome or count-in, MIDI thru is off since it would send the stream round the cable again, and the take can be saved with `--save` to look at. It also checks that every note is recorded at the tick its arrival time gives.
 
@@ -400,7 +406,7 @@ Each milestone ends with something runnable and testable on both platforms. Timi
 
 1. **Engine and MIDI layer.** Song model, SMF import, playback through libremidi, command-line player. Loopback timing tool with jitter measurements on Linux and Windows. *Done, October 2026, except the Linux measurements.*
 2. **Recording.** Timestamped input, record to track, metronome, count-in and pre-roll, SMF export. Command-line recorder, verified against the loopback tool. *Done, October 2026, except the Linux measurements.*
-3. **Grid renderer.** SDL3 window, cell grid, font rendering, cursor, scrolling, high-DPI, keyboard input layer, keymap and theme files, resizable grid.
+3. **Grid renderer.** SDL3 window, cell grid, font rendering, cursor, scrolling, high-DPI, keyboard input layer, keymap and theme files, resizable grid. Until the event list arrives in milestone 4, the program shows a test view (decided in milestone 3): a large scrollable grid of labelled cells, sample text in each theme role and a pixel-region demo of bar lines in two meters, with counts on cursor motions and a minimal `:` prompt.
 4. **Event list view and core grammar.** Navigation, motions, delete/yank/put, undo, transport keys, native song format save/load, inspector panel. First version usable for real work.
 5. **Full grammar.** Remaining operators, text objects and MIDI transforms, leader key and hint menu, counts, `.` repeat, registers, macros, command line.
 6. **Piano roll and arrangement views.** Shared cursor and selection, view switching.
@@ -463,13 +469,15 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestones 3–4: grid and first editing view**
 
+- [x] Milestone 3's rendering, font, DPI, key, config and test-view decisions (October 2026): see Views, Customisation, Architecture and Build and tooling.
+
 - [ ] Song file grammar: exact syntax, quoting, comments, how SysEx is written.
 - [ ] Default keymap: the full set of single-key bindings, designed for muscle memory.
 - [ ] Undo granularity: is a recording pass or a macro run one undo step?
 - [ ] Cursor mapping when switching between arrangement, piano roll and event list.
 
 * [x] Remainder bars are always the exact leftover (e.g. 1/4, 5/16). To get something else, the user selects the bars and applies a meter again, e.g. a 3/4 bar plus a 1/4 remainder re-barred as one 4/4 bar.
-* [ ] How the arrangement ruler and per-track bar lines are drawn when meters differ, at different zoom levels.
+* [ ] How the arrangement ruler and per-track bar lines are drawn when meters differ, at different zoom levels. The approach is settled (time-based columns, each track's bar lines in a pixel region; see Views); the zoom levels and ruler details wait for milestone 6.
 
 - [x] Delete can leave silence (`d`) or close the gap (`D`); put can merge (`p`) or insert (`P`).
 - [x] Cut-at-edges key is `|` (rarely used, so its reach doesn't matter; rebindable like everything else).
