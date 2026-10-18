@@ -4,6 +4,7 @@ add_library(modal_ui STATIC
     block_glyphs.cpp
     cell_grid.cpp
     frame.cpp
+    grid_cursor.cpp
     layout.cpp
     style.cpp
 )

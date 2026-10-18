@@ -30,6 +30,7 @@ add_executable(modal_tests
     ui/bar_test.cpp
     ui/block_glyphs_test.cpp
     ui/cell_grid_test.cpp
+    ui/grid_cursor_test.cpp
     ui/layout_test.cpp
     ui/window_test.cpp
 )
