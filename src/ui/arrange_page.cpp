@@ -368,9 +368,12 @@ void ArrangePage::addRegions(Frame& frame) const
             {
                 if (spaced(barEnd - start))
                 {
+                    // On the bar line, where the marker lines are.
                     const int dot = std::max(lineWidth, 2);
                     timeline.under.push_back(
-                        {{x0, y + (cell_.height - dot) / 2, dot, dot}, Role::Dim, 255});
+                        {{scale.toX(start), y + (cell_.height - dot) / 2, dot, dot},
+                         Role::Dim,
+                         255});
                 }
                 continue;
             }
@@ -429,13 +432,31 @@ void ArrangePage::addRegions(Frame& frame) const
         timeline.text.push_back(
             {textX, 0, std::move(name), {Role::Marker, Role::Background, kBold}});
     }
+    // The reference track's meter changes, each named if the name fits before the next
+    // change, or else shown by a tick, so a short change, such as a single bar, never hides
+    // the one after it.
     const auto& reference = song_.referenceMeter();
-    Labels meterLabels{timeline, cell_.height, cell_};
-    for (const auto& change : reference.changes())
+    const auto changes = reference.changes();
+    for (std::size_t i = 0; i < changes.size(); ++i)
     {
-        if (change.tick >= leftTick_ && change.tick < shownEnd)
+        const auto tick = changes[i].tick;
+        if (tick < leftTick_ || tick >= shownEnd)
         {
-            meterLabels.add(scale.toX(change.tick) + 2, signatureText(change.signature), kDim);
+            continue;
+        }
+        const int x = scale.toX(tick);
+        auto text = signatureText(changes[i].signature);
+        const int room =
+            i + 1 < changes.size() ? scale.toX(changes[i + 1].tick) - x - 4 : timeline.bounds.width;
+        if (static_cast<int>(text.size()) * cell_.width <= room)
+        {
+            timeline.text.push_back({x + 2, cell_.height, decodeUtf8(text), kDim});
+        }
+        else
+        {
+            const int height = cell_.height / 3;
+            timeline.under.push_back(
+                {{x, cell_.height + height, lineWidth, height}, Role::Dim, 255});
         }
     }
     // Bar numbers on bars 1, 1 + n, 1 + 2n... for n of 1, 2, 4, 8..., as few as fit the

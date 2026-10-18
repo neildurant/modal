@@ -283,6 +283,43 @@ TEST_CASE("bars are numbered every so many bars, as many as fit, from bar 1")
     CHECK(rulerText(frame[1], 2) == std::vector<std::u32string>{U"1", U"17", U"33", U"49"});
 }
 
+TEST_CASE("a meter change too short for its name is shown by a tick, not hiding the next")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    // The single bar of 2/4 is ten pixels, too narrow for "2/4", so the bridge's 3/4 shows.
+    CHECK(rulerText(frame[1], 1) == std::vector<std::u32string>{U"4/4", U"7/8", U"4/4", U"3/4"});
+    std::vector<int> ticks;
+    for (const auto& shape : frame[1].under)
+    {
+        if (shape.role == Role::Dim && shape.rect.y > kCell.height &&
+            shape.rect.y < 2 * kCell.height)
+        {
+            ticks.push_back(shape.rect.x);
+        }
+    }
+    CHECK(ticks == std::vector<int>{505}); // 101 quarter notes in
+
+    type(page, U"+", 2); // a sixteenth to a column: the 2/4 bar is 80 pixels
+    type(page, U"G", 27);
+    frame.clear();
+    page.addRegions(frame);
+    const auto meters = rulerText(frame[1], 1);
+    CHECK(std::ranges::find(meters, U"2/4") != meters.end());
+}
+
+TEST_CASE("an empty track's dots are on its bar lines")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    const auto dots = rowShapes(frame[1], 10, Role::Dim);
+    REQUIRE(dots.size() >= 2);
+    CHECK(dots[0].rect.x == 0);
+    CHECK(dots[1].rect.x == 20);
+}
+
 TEST_CASE("the cursor boxes its bar on all four sides")
 {
     auto page = page80x22();
