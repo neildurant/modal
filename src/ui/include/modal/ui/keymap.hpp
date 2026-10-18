@@ -77,7 +77,7 @@ struct Action
 
 // How long to wait, in milliseconds, after keys that are a binding and also start a longer
 // one, before running the shorter: Vim's timeoutlen, until it's a setting.
-inline constexpr std::int64_t kDefaultTimeout = 1000;
+inline constexpr std::int64_t kDefaultTimeout = 500;
 inline constexpr int kMaxCount = 99999;
 
 // Turns keys into commands through a keymap, as Vim does. Digits typed first are a count,

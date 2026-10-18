@@ -273,9 +273,9 @@ TEST_CASE("z centres the view once the time for zz has passed, and zz resets the
     view.handle(Key::typed(U'z'), 1000);
     CHECK(view.pending() == "z");
     REQUIRE(view.deadline() == 1000 + kDefaultTimeout);
-    CHECK_FALSE(view.wake(1999));
+    CHECK_FALSE(view.wake(1000 + kDefaultTimeout - 1));
     CHECK(view.cursor().top() == 26);
-    CHECK(view.wake(2000));
+    CHECK(view.wake(1000 + kDefaultTimeout));
     CHECK(view.cursor().top() == 33); // row 40 in the middle of 15
     CHECK(view.pending().empty());
     CHECK_FALSE(view.deadline());
