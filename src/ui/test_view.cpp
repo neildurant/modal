@@ -326,7 +326,7 @@ Region TestView::demoRegion() const
         .length = core::NoteFraction{4, 1}.toTicks(ppqn),
         .x = kRowLabelColumns * cell_.width,
         .width = std::max(main.width - kRowLabelColumns * cell_.width - cell_.width / 2, 0)};
-    const int barLineWidth = std::max(cell_.width / 7, 1);
+    const int barLineWidth = hairline(cell_);
     const int gap = std::max(cell_.height / 8, 1); // between the lanes
     const core::NoteFraction grid16{1, 16};
 
@@ -337,7 +337,7 @@ Region TestView::demoRegion() const
         const core::MeterMap meters{ppqn, signature};
         const int top = row * cell_.height;
         const int laneHeight = 2 * cell_.height - gap;
-        auto lines = meterLines(meters, scale, top, laneHeight, grid16, barLineWidth);
+        auto lines = meterLines(meters, scale, top, laneHeight, grid16, cell_);
         region.under.insert(region.under.end(), lines.begin(), lines.end());
 
         for (std::int64_t bar = 1;; ++bar)
@@ -347,7 +347,7 @@ Region TestView::demoRegion() const
             {
                 break;
             }
-            region.text.push_back({scale.toX(start) + barLineWidth + 2, top,
+            region.text.push_back({scale.toX(start) + 2 * barLineWidth, top,
                                    decodeUtf8(number(static_cast<int>(bar))), kDim});
             // The rhythm, repeated through the bar, each note a sixteenth short of the next.
             core::Tick tick = start;
@@ -356,7 +356,7 @@ Region TestView::demoRegion() const
                  it = std::next(it) == rhythm.end() ? rhythm.begin() : std::next(it))
             {
                 const core::Tick length = it->toTicks(ppqn);
-                const int x = scale.toX(tick) + barLineWidth + 1;
+                const int x = scale.toX(tick) + 2 * barLineWidth;
                 const int right = scale.toX(tick + length - grid16.toTicks(ppqn));
                 region.under.push_back(
                     {{x, top + cell_.height + gap, std::max(right - x, 1), cell_.height - 3 * gap},

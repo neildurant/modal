@@ -15,7 +15,7 @@ int TimeScale::toX(core::Tick tick) const
 }
 
 std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& scale, int top,
-                              int height, core::NoteFraction grid, int barLineWidth)
+                              int height, core::NoteFraction grid, CellSize cell)
 {
     std::vector<Shape> lines;
     if (scale.width <= 0 || scale.length <= 0)
@@ -26,7 +26,7 @@ std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& sca
     const core::Tick gridTicks = std::max<core::Tick>(grid.toTicks(meters.ppqn()), 1);
     // Whether lines a length apart would be far enough apart to draw.
     const auto spaced = [&](core::Tick ticks)
-    { return ticks * scale.width >= kMinLineSpacing * scale.length; };
+    { return ticks * scale.width >= minLineSpacing(cell) * scale.length; };
     const bool drawGrid = spaced(gridTicks);
 
     const auto line = [&](core::Tick tick, Role role, int width)
@@ -47,7 +47,7 @@ std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& sca
 
         if (barStart >= scale.start)
         {
-            line(barStart, Role::BarLine, barLineWidth);
+            line(barStart, Role::BarLine, hairline(cell));
         }
         // The beats and grid steps after the bar line, in order, each drawn once.
         core::Tick nextBeat = barStart + beatTicks;

@@ -308,13 +308,13 @@ void ArrangePage::addRegions(Frame& frame) const
     const int shownTracks = static_cast<int>(std::min<std::size_t>(
         tracks.size() - topTrack_, static_cast<std::size_t>(rows - kRulerRows)));
     const int tracksBottom = tracksTop + shownTracks * cell_.height;
-    const int lineWidth = std::max(cell_.width / 7, 1);
+    const int lineWidth = hairline(cell_); // also the space beside a line
     const core::Tick whole = core::NoteFraction{1, 1}.toTicks(song_.ppqn());
     // Gaps between bars while a column holds no more than a whole note; past that, bars are
     // too narrow for gaps, and the overall shape matters more than single bars.
     const int gap = column <= whole ? lineWidth : 0;
     const auto spaced = [&](core::Tick ticks)
-    { return ticks * cell_.width >= kMinLineSpacing * column; };
+    { return ticks * cell_.width >= minLineSpacing(cell_) * column; };
 
     // The cursor's bar, as a span of time across every track, and boxed on its own track: its
     // sides in the gaps either side of the bar's block, its top and bottom above and below it.
@@ -363,7 +363,7 @@ void ArrangePage::addRegions(Frame& frame) const
                 if (spaced(barEnd - start))
                 {
                     // On the bar line, where the marker lines are.
-                    const int dot = std::max(lineWidth, 2);
+                    const int dot = 2 * lineWidth;
                     timeline.under.push_back(
                         {{scale.toX(start), y + (cell_.height - dot) / 2, dot, dot},
                          Role::Dim,
@@ -408,11 +408,11 @@ void ArrangePage::addRegions(Frame& frame) const
         markerLines.push_back(x);
         timeline.under.push_back(
             {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Marker, kFaint});
-        const int textX = x + lineWidth + 2;
+        const int textX = x + 2 * lineWidth;
         int room = timeline.bounds.width; // characters, to the next marker or past the edge
         if (i + 1 < markers.size())
         {
-            room = (scale.toX(markers[i + 1].tick) - textX - 2) / cell_.width;
+            room = (scale.toX(markers[i + 1].tick) - textX - lineWidth) / cell_.width;
         }
         auto name = decodeUtf8(markers[i].name);
         if (static_cast<int>(name.size()) > room)
@@ -441,11 +441,11 @@ void ArrangePage::addRegions(Frame& frame) const
         }
         const int x = scale.toX(tick);
         auto text = signatureText(changes[i].signature);
-        const int room = i + 1 < changes.size() ? scale.toX(changes[i + 1].tick) - x - lineWidth - 4
+        const int room = i + 1 < changes.size() ? scale.toX(changes[i + 1].tick) - x - 4 * lineWidth
                                                 : timeline.bounds.width;
         if (static_cast<int>(text.size()) * cell_.width <= room)
         {
-            timeline.text.push_back({x + lineWidth + 2, cell_.height, decodeUtf8(text), kDim});
+            timeline.text.push_back({x + 2 * lineWidth, cell_.height, decodeUtf8(text), kDim});
         }
         else
         {
@@ -494,7 +494,7 @@ void ArrangePage::addRegions(Frame& frame) const
             continue;
         }
         const auto text = std::to_string(bar);
-        const int x = scale.toX(start) + lineWidth + 2;
+        const int x = scale.toX(start) + 2 * lineWidth;
         const bool fits =
             next == sections.end() ||
             x + static_cast<int>(text.size()) * cell_.width < scale.toX(reference.barStart(*next));

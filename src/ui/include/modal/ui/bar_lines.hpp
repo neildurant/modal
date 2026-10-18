@@ -24,14 +24,18 @@ struct TimeScale
     int toX(core::Tick tick) const;
 };
 
-// Beat and grid lines closer together than this, in pixels, are left out.
-inline constexpr int kMinLineSpacing = 4;
+// Beat and grid lines closer together than this, in pixels, are left out: four pixels, or
+// more in larger cells.
+inline int minLineSpacing(CellSize cell)
+{
+    return std::max(cell.width * 2 / 5, 4);
+}
 
 // The lines of a meter map across a time scale, as shapes from a top for a height in pixels:
 // a bar line at the start of each bar, a beat line at each beat and a grid line at each grid
-// step, counting from each bar line. Where lines meet, only the most important is drawn. Bar
-// lines are barLineWidth pixels wide, the others one.
+// step, counting from each bar line. Where lines meet, only the most important is drawn.
+// Bar lines are a hairline wide in the cell size given (see hairline), the others a pixel.
 std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& scale, int top,
-                              int height, core::NoteFraction grid, int barLineWidth);
+                              int height, core::NoteFraction grid, CellSize cell);
 
 } // namespace modal::ui

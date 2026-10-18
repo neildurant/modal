@@ -2,6 +2,7 @@
 
 #include <modal/ui/style.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -18,6 +19,13 @@ struct CellSize
 
     friend bool operator==(CellSize, CellSize) = default;
 };
+
+// The width of a thin line, and of the space beside one, in pixels: a seventh of a cell's
+// width, at least a pixel, so drawing keeps its proportions at any font size.
+inline int hairline(CellSize cell)
+{
+    return std::max(cell.width / 7, 1);
+}
 
 // A rectangle in pixels.
 struct Rect
