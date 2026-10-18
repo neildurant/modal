@@ -49,9 +49,13 @@ Arguments are separated by spaces. As in a shell, double quotes keep spaces in a
 
 ### Keys
 
-Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`); `<` is written `<lt>` and space `<Space>`. Other keys go in angle brackets: `<Esc>`, `<Tab>`, `<CR>`, `<BS>`, `<Del>`, `<Insert>`, `<Up>`, `<Down>`, `<Left>`, `<Right>`, `<Home>`, `<End>`, `<PageUp>`, `<PageDown>`, `<F1>` to `<F12>`. Modifiers come first: `C-` for Ctrl, `A-` (or `M-`) for Alt, `S-` for Shift, as in `<C-d>`, `<S-Tab>` and `<C-S-d>`. With Ctrl or Alt, a letter is the same in either case, so Ctrl-Shift-d is written `<C-S-d>`. A sequence of keys is written one after another: `gg`, `<C-w>j`.
+Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`); `<` is written `<lt>` and space `<Space>`. Other keys go in angle brackets: `<Esc>`, `<Tab>`, `<CR>`, `<BS>`, `<Del>`, `<Insert>`, `<Up>`, `<Down>`, `<Left>`, `<Right>`, `<Home>`, `<End>`, `<PageUp>`, `<PageDown>`, `<F1>` to `<F12>`, and the keypad's `<kPlus>`, `<kMinus>` and `<k0>` to `<k9>`, which arrive only with Ctrl or Alt (otherwise the keypad types its characters). Modifiers come first: `C-` for Ctrl, `A-` (or `M-`) for Alt, `S-` for Shift, as in `<C-d>`, `<S-Tab>` and `<C-S-d>`. With Ctrl or Alt, a letter is the same in either case, so Ctrl-Shift-d is written `<C-S-d>`. A sequence of keys is written one after another: `gg`, `<C-w>j`.
 
 When a sequence is bound as well as a longer one starting with it (such as `z` and `zz`), Modal waits up to `timeoutlen` milliseconds for the next key before running the shorter.
+
+## Text size
+
+`Ctrl-+` and `Ctrl--` make the text a point bigger or smaller, on the main keyboard or the keypad, and `Ctrl-0` goes back to the size your config sets. The window keeps its size and shows more or fewer cells. The new size shows in the status line until the next key. To start at another size, set `fontsize`.
 
 ## Settings
 
@@ -72,6 +76,7 @@ The roles are:
 | Role | For |
 |------|-----|
 | `background`, `text`, `dim`, `accent`, `warning` | the window and its text |
+| `message` | a message in the status line, such as the new text size |
 | `cursor`, `cursor-text` | the cursor and the text on it |
 | `selection` | the background of what's selected |
 | `bar`, `bar-text` | the status line and other bars |
