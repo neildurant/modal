@@ -58,7 +58,7 @@ As in SPG, each track has its own sequence of bars and time signatures, so track
 - **Time is shared; bars are not.** All events sit on one timeline in ticks, and tempo is global. Bars are a per-track view of that timeline, so "bar 10" on a 3/4 track is earlier than bar 10 on a 4/4 track.
 - **Reference track.** One track (track 1 by default) is the reference meter. Markers, the loop range, the metronome and the main position display are measured against it. SMF export writes its meter as the file's time signatures, since standard MIDI files have only one.
 - **Positions are always relative to a track.** The cursor's position and the inspector use the bars of the track the cursor is on. Typed positions like `:goto 10` or `10G` use the current track's bars; `:goto ref 10` uses the reference track's.
-- **Motions follow each track's bars.** `}` moves to the next bar of the current track. Operators that span several tracks, such as a Visual block in the arrangement, select a time range, which may start or end mid-bar on some tracks.
+- **Motions follow each track's bars.** `}` moves to the same position in the next bar of the current track. Operators that span several tracks, such as a Visual block in the arrangement, select a time range, which may start or end mid-bar on some tracks.
 - **Copy and paste by time.** Pasting from a 3/4 track into a 4/4 track keeps the material's timing, not its bar positions.
 - **Apply meter to a range.** In the arrangement, select a range and set a time signature (`:meter 3/4`, or from the leader menu). Bars are rebuilt from the range start; if the range doesn't divide evenly, the last bar becomes a shorter remainder bar, e.g. 10 beats in 3/4 gives three 3/4 bars and one 1/4 bar.
 - **Beats and remainder bars (decided in milestone 1).** The beat is the denominator note, so 6/8 counts six eighth-note beats. A meter set mid-bar ends that bar with a remainder bar of the exact leftover, using a finer denominator when the leftover isn't whole beats (half a beat into a 4/4 bar gives a 1/8 bar); a leftover no time signature can express, such as a single tick, moves the change on to the next beat. A change inside the first bar after another change replaces that bar's meter rather than adding a bar. Removing a change keeps later changes at their positions in time, adding remainder bars where needed, and repeating the meter already in effect adds nothing.
@@ -73,7 +73,7 @@ As in SPG, each track has its own sequence of bars and time signatures, so track
 - **Operators act on the time range.** Transforms, copy, delete and quantise work on whatever falls inside it, whole bars or not. Operations that need whole bars, such as applying a meter, use the bars of the cursor's track.
 
 * **Song:** title, PPQN, tempo map, which track is the reference meter, markers, tracks, global settings such as count-in and metronome.
-* **Track:** a stable ID, name, output port, MIDI channel, its own meter (time-signature) map, mute/solo/arm, note chasing on/off, optional transpose, velocity offset and time offset applied at playback, list of events. The ID survives edits, so the engine can follow a track from one song snapshot to the next.
+* **Track:** a stable ID, name, output port, MIDI channel, its own meter (time-signature) map, mute/solo/arm, note chasing on/off, optional transpose, velocity offset and time offset applied at playback, grid and default note length (see Editing grammar), list of events. The ID survives edits, so the engine can follow a track from one song snapshot to the next.
 * **Event:** tick, type, and type-specific fields. A note has pitch, velocity, duration and release velocity. Other types are CC, program change, pitch bend, channel and poly aftertouch, SysEx and meta (text, markers). Events carry no channel; the track's channel applies.
 * **Event order.** A track's events are in tick order, and events at the same tick are sent in the order stored. Import and editing put non-note events (program change, CC, etc.) before notes at the same tick, so a program change at 1:1:0 always takes effect before the first note.
 * **Overlapping notes.** The model allows overlapping notes of the same pitch, since imported files can contain them; the editor never creates them (see Playback and recording behaviour).
@@ -93,18 +93,87 @@ Editing follows Vim's model: `[count] operator [count] motion-or-object`, with `
 - **Visual:** select a range by time, by events, or by rectangle (time × pitch or time × track).
 - **Command:** `:` opens a command line for named commands, e.g. `:quantize 1/16 swing=55`, `:tempo 96`, `:w`.
 
-**Motions**
+**Motions** (decided October 2026)
+
+Motions in time work the same in every view. In the piano roll the cursor is also on a pitch (see Views).
 
 | Key | Moves to |
 | --- | --- |
-| `j` / `k` | Next / previous event (event list) or pitch (piano roll) |
 | `h` / `l` | Previous / next grid step |
-| `w` / `b` | Next / previous beat |
-| `}` / `{` | Next / previous bar |
-| `]m` / `[m` | Next / previous marker |
+| `b` / `w` | Previous / next beat |
+| `{` / `}` | The same position one bar earlier / later (`4}` = four bars later) |
+| `[[` / `]]` | Previous / next bar line |
+| `0` / `$` | Start / last grid step of the current bar |
+| `j` / `k` | Next / previous event (event list); down / up a pitch step (piano roll, below) |
+| `Tab` / `Shift-Tab` | Next / previous note start at any pitch; in the piano roll the cursor's pitch jumps to that note |
+| `(` / `)` | Previous / next chord (a group of notes starting together) |
+| `f` + note / `F` + note | Next / previous note of that pitch on this track, e.g. `fE` |
+| `[m` / `]m` | Previous / next marker |
 | `n` / `N` | Next / previous match of the last search (e.g. same pitch, same CC) |
-| `gg` / `G` | Start / end of song; `12G` = bar 12 |
-| `f` + note | Next note of that pitch on this track |
+| `gg` / `G` | Start / end of the track; `12G` = bar 12 |
+| `ma` / `'a` | Set mark `a` / jump back to it: a time, pitch and track, as in Vim |
+
+- Counts work on every motion: `3w`, `2}`, `4l`. As in Vim, `0` is a motion only when no count has been started.
+- `Tab` lands exactly on a note's real start, even if it is off the grid. Grid motions from an off-grid position first snap to the next grid line, then step normally.
+- Notes starting together are visited low to high by `Tab`; `)` skips the whole chord.
+- **Bar motions remember the intended position.** If `}` moves into a shorter bar (e.g. 3/4 after 4/4) and the position would fall beyond its end, the cursor stops at that bar's last grid step but remembers where it wanted to be. Moving on into a longer bar restores the original position, as Vim does with columns across lines of different lengths.
+- Bar motions use the bars of the current track (see Per-track meters). `{` / `}` mean "the same position, one bar on" in the arrangement too, so they mean the same thing everywhere.
+
+**Moving in pitch (piano roll)**
+
+| Key | Moves |
+| --- | --- |
+| `k` / `j` | Up / down one step: a semitone, or a scale step when scale lock is on |
+| `K` / `J` | Up / down an octave (always) |
+| `Ctrl-k` / `Ctrl-j` | Up / down a semitone, even when scale lock is on |
+| `gk` / `gj` | To the next note above / below that is sounding at the cursor's time (moving through a chord voicing) |
+| `gp` + pitch | Straight to a pitch, e.g. `gp C4 Enter` |
+
+**Scale lock** is a toggle, shown in the status line (key to decide; `, s` proposed). When it is on, `k` / `j` move by scale steps in the song's key and scale (later, following the chord track if one exists). From a pitch outside the key, `k` / `j` move to the nearest scale tone in that direction. Scale lock also applies to moving notes (`Alt-k` / `Alt-j`) and to step entry.
+
+**Moving and editing notes**
+
+The same motions move notes when combined with Alt:
+
+| Key | Effect |
+| --- | --- |
+| `Alt-k` / `Alt-j` | Move the current note (or selection) up / down one step (a semitone or a scale step, per scale lock) |
+| `Alt-K` / `Alt-J` | Move up / down an octave |
+| `Alt-l` / `Alt-h` | Move later / earlier by a grid step |
+| `Alt-}` / `Alt-{` | Move later / earlier by a bar |
+| `=` / `-` | Lengthen / shorten the current note by a grid step |
+| `o` | Create a note at the cursor, with the default note length and the last-used velocity (to decide), without entering Insert mode |
+| `x` | Delete the note under the cursor |
+
+Counts apply: `3Alt-l` moves three grid steps later. Operators (`>ib`, `t}`, etc.) remain for larger ranges.
+
+**Grid**
+
+- Values: straight 1/1 to 1/64; triplets (1/4T, 1/8T, 1/16T, …); dotted values; any tuplet from the command line, e.g. `:grid 1/16 5:4`.
+- Stored **per track** and saved in the song. Shown in the status line, e.g. `grid 1/8T`.
+- The grid drives `h` / `l` movement, and `q` quantise unless a value is given (`:quantize 1/16`).
+
+| Key | Effect |
+| --- | --- |
+| `Ctrl-h` / `Ctrl-l` | Coarser / finer grid, through the straight values |
+| `Ctrl-t` | Toggle triplet (1/8 ↔ 1/8T) |
+| `:grid …` | Set any grid exactly |
+
+**Default note length**
+
+An independent setting for the length of new notes, after Sequencer Plus Gold's default note length.
+
+- **Linked to the grid by default:** the length follows the grid, and the status line shows `len =grid`.
+- Changing the length unlinks it; it then stays fixed whatever the grid does, and the status line shows both, e.g. `grid 1/16 │ len 1/8T`. `:len grid`, or the leader menu, links it again.
+- Stored per track and saved in the song.
+- Used by `o`, step entry (from a MIDI keyboard or the computer keyboard) and inserted rests. Not used by recording: played notes keep their real lengths.
+
+| Key | Effect |
+| --- | --- |
+| `+` / `_` | Longer / shorter default length |
+| `, l` + keys | Set it directly from the leader menu: `4` quarter, `8` eighth, `6` sixteenth, then `t` triplet or `.` dotted (e.g. `, l 8 t` = 1/8T) |
+
+`+` / `_` step through all the common lengths in order of actual duration, including triplets and dotted values: … 1/16 → 1/8T → 1/16. → 1/8 → 1/4T → 1/8. → 1/4 → 1/2T → 1/4. → 1/2 … The list is configurable, e.g. to leave out dotted values.
 
 **Text objects** (used after an operator, `i` = inner, `a` = around)
 
@@ -115,14 +184,14 @@ Editing follows Vim's model: `[count] operator [count] motion-or-object`, with `
 | Key | Operation |
 | --- | --- |
 | `d` / `y` / `p` | Delete / yank / put |
-| `>` / `<` | Transpose up / down a semitone (count = semitones; `+` octave variant) |
+| `>` / `<` | Transpose up / down a semitone (count = semitones) |
 | `q` | Quantise to the current grid |
 | `v` | Set or scale velocity (prompts for value or %) |
 | `t` | Shift in time by the grid step |
 | `~` | Humanise (small random time and velocity changes) |
 | `c` | Change channel or destination track |
 
-Examples: `d2}` deletes two bars, `>ib` transposes this bar up a semitone, `5.` repeats the last change five times.
+Examples: `d2}` deletes from the cursor to the same position two bars later, `>ib` transposes this bar up a semitone, `5.` repeats the last change five times.
 
 **Registers, macros and undo**
 
@@ -144,7 +213,7 @@ Both are needed, so both are operators. Uppercase means "and shift the timeline"
 - `d` deletes and leaves silence; `D` deletes and closes the gap, moving everything after the range earlier on the affected tracks.
 - `p` puts material over what's there (merging); `P` inserts it, moving everything after the insertion point later.
 - Ripple operations on one track move that track only; in an arrangement selection covering several tracks, all of them move together, keeping them in sync.
-- Vim's own `D` (delete to end of line) is given up; `dG` deletes from the cursor to the end of the song.
+- Vim's own `D` (delete to end of line) is given up; `dG` deletes from the cursor to the end of the track.
 
 **Leader key and hint menu**
 
@@ -157,6 +226,8 @@ Less frequent commands live behind a leader key, as in Doom Emacs: press the lea
 | `, x i` / `, x k` | Transform: invert / transpose in key |
 | `, v a` / `, v p` | View: arrangement / piano roll |
 | `, p o` | Ports: choose output for this track |
+| `, l` … | Default note length (see Default note length) |
+| `, s` | Scale lock on/off (proposed; see To decide) |
 
 The most frequent operations stay on single keys for speed and muscle memory; the leader tree holds everything else. Both are defined in the keymap file, and hint labels come from the same definitions.
 
@@ -188,11 +259,20 @@ The song has a key and scale setting (key changes over time later), used by the 
 The arrangement is the home view; Enter on a track opens it in the piano roll for detailed editing, and the event list shows the exact data. All three share one cursor position and selection, so switching views (or `, v`) never loses your place. A status line and transport bar are always visible.
 
 - **Arrangement (home view).** One row per track, cells shaded by note density, with markers along the top. Since tracks can have different meters (decided in milestone 3), a column is a fixed length of time at the current zoom (such as one beat of the reference meter), not a bar: the track headers are text cells, but each row's timeline is a pixel region where the track draws its own bar lines at their exact positions, and the cursor is an exact span of time (such as bar 5 of that track) drawn to the pixel. The ruler numbers the reference track's bars. Used for navigating the song and for whole-section operations: copy verse to bar 33, mute tracks, set loop range.
-- **Piano roll (track editing).** Pitch rows against time, drawn on the grid with pixel-precise note starts and lengths inside the cells. The cursor moves note to note (`j`/`k`, Tab) or by grid step. A velocity lane underneath shows bars per note.
+- **Piano roll (track editing).** Pitch rows against time, drawn on the grid with pixel-precise note starts and lengths inside the cells. A velocity lane underneath shows bars per note. The cursor is a crosshair, a position in time plus a pitch, and doesn't have to sit on a note. When it is at the start of a note or inside one, that note is the **current note**: the inspector shows it and operators act on it. On an empty spot, the inspector shows the position and pitch only. Motions are in Editing grammar.
 - **Event list (exact data).** One row per event: bar:beat:tick, type, channel, data fields (pitch name, velocity, duration). Every field is a cell you can move to and edit directly, with `Ctrl-A` / `Ctrl-X` incrementing and decrementing as in Vim. Filters show only notes, only CCs, a pitch range, etc.
 - **Status line and transport.** Contents set in configuration (see Customisation).
 
-**Resizing.** Text size stays fixed when the window resizes; the grid gains or loses cells. Extra columns show more time at the same zoom, extra rows show more tracks or pitches, and panels such as the velocity lane keep fixed heights while the main area takes the rest. `Ctrl-+` / `Ctrl--` change the font size, and with it the cell size. So that resizing is smooth rather than jumping a cell at a time (decided in milestone 3), regions are laid out in pixels: bars at the top are anchored to the top edge and bars at the bottom to the bottom edge, so they follow the window edge a pixel at a time, and right-aligned status segments follow the right edge. The main area takes everything between, including a partly visible last row and column, clipped, which are revealed gradually as the window grows. The cursor and scrolling count only fully visible rows and columns, so the cursor never sits on a half-hidden one. Within each region, text stays on that region's cell grid.
+**Piano roll pages (decided October 2026).** The piano roll shows a whole number of bars at a time, not a freely scrolling timeline.
+
+- The bars on a page are stretched to fill the window width, whatever their length: a 7/8 bar fills the page as a 4/4 bar does.
+- When the cursor moves past the last bar on screen, the view turns to the next page.
+- `zi` / `zo` change the number of bars per page, stepping through a list: 1, 2, 4, 8, 16 by default, configurable (e.g. `set pagebars=1,2,3,4,6,8,12,16`). A count sets the page size directly: `3zp` is 3 bars per page. When zooming, the new page is the one containing the cursor.
+- **Pages restart at each marker.** With a marker at bar 3, 4-bar pages show bars 3–6, 7–10 and so on, so pages follow the song's sections.
+- Vertically, the view scrolls to keep the cursor's pitch visible; `zz` centres the pitch range on the cursor.
+- Grid lines are drawn at the current grid, with beat and bar lines stronger. If the grid is too fine to show legibly across the page, lines are drawn at the finest level that fits; movement still uses the real grid. Notes are always drawn at their exact positions, so recorded material never looks falsely quantised.
+
+**Resizing.** Text size stays fixed when the window resizes; the grid gains or loses cells. In the arrangement and event list, extra columns show more time at the same zoom (the piano roll instead stretches its page of bars to the width), extra rows show more tracks or pitches, and panels such as the velocity lane keep fixed heights while the main area takes the rest. `Ctrl-+` / `Ctrl--` change the font size, and with it the cell size. So that resizing is smooth rather than jumping a cell at a time (decided in milestone 3), regions are laid out in pixels: bars at the top are anchored to the top edge and bars at the bottom to the bottom edge, so they follow the window edge a pixel at a time, and right-aligned status segments follow the right edge. The main area takes everything between, including a partly visible last row and column, clipped, which are revealed gradually as the window grows. The cursor and scrolling count only fully visible rows and columns, so the cursor never sits on a half-hidden one. Within each region, text stays on that region's cell grid.
 
 Splits (later): two views side by side, e.g. arrangement above event list, as with Vim windows.
 
@@ -216,7 +296,7 @@ Themes, key bindings and the status bar are all defined in a plain-text command 
 
 ```
 " ~/.config/modal/modalrc
-set grid=1/16
+set pagebars=1,2,4,8,16
 set theme=dusk
 nmap q quantize
 nmap Q macro-record
@@ -242,7 +322,7 @@ Recorded events are timestamped by the engine at arrival, never by the UI, so re
 - **Real-time recording:** optional count-in, metronome as MIDI notes to a chosen port, input quantise off by default. Recording goes to the armed track(s); thru to the track's output so you hear the right sound while playing.
 - **Loop recording:** each pass is kept as a separate take; version 1 merges or keeps the last, take lanes come later.
 - **Punch in/out:** set by markers or the current selection.
-- **Step entry from a MIDI keyboard:** play a note or chord; it is entered at the cursor with the current step length, and the cursor advances. Keys on the computer keyboard change step length, insert rests and tie.
+- **Step entry from a MIDI keyboard:** play a note or chord; it is entered at the cursor with the default note length (see Editing grammar), and the cursor advances. Keys on the computer keyboard change the length, insert rests and tie.
 - **Step entry from the computer keyboard:** in Insert mode, letters enter pitches (e.g. `c d e f g a b` plus accidentals and octave keys) and digits set durations.
 - **Playable computer keyboard (later):** a tracker-style key-to-pitch layout using physical scancodes, with proper note-off on key release.
 - **MIDI thru and filtering:** per-input filters for channel, message type and range.
@@ -482,6 +562,13 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Delete can leave silence (`d`) or close the gap (`D`); put can merge (`p`) or insert (`P`).
 - [x] Cut-at-edges key is `|` (rarely used, so its reach doesn't matter; rebindable like everything else).
 
+**Milestone 6: piano roll and arrangement views**
+
+- [ ] Scale-lock toggle key. Proposed `, s`. `\` was considered, but it is the proposed key for repeating an `f` search backwards (since `,` is the leader). Decide which key gets `\`.
+- [ ] Confirm `Ctrl-h` / `Ctrl-l` for grid size on both platforms (no conflicts expected in an SDL3 GUI app).
+- [ ] Velocity used by `o`: the last-used velocity, or a per-track default velocity setting?
+- [ ] On a piano roll page whose bars differ in length (a 7/8 bar beside 4/4 bars), is each bar given the same width, or is time kept to one scale across the page?
+
 **Later milestones**
 
 - [ ] Default parameters for each transform, and how they appear in the hint menu and command line.
@@ -498,7 +585,8 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Patterns are a nice-to-have, not version 1.
 - [x] In-process plugin hosting is wanted eventually.
 - [x] Configuration is a Vim-style command file, sharing the `:` command language.
-- [ ] Vim uses `,` to repeat an `f` search backwards; pick another key for that (e.g. `\`).
+- [ ] Vim uses `,` to repeat an `f` search backwards; pick another key for that (e.g. `\`), together with the scale-lock key (see To decide, milestone 6).
+- [x] Piano roll navigation, grid and default note length (October 2026): a crosshair cursor; `{` / `}` keep the position in the bar, with bar lines on `[[` / `]]`; `gg` / `G` go to the start and end of the track; pitch motions and scale lock; Alt plus a motion moves notes; a per-track grid and default note length; the piano roll shows pages of whole bars. See Editing grammar and Views.
 - [ ] Licence: undecided; note JUCE's AGPL/commercial terms if hosting plugins.
 - [ ] Working title Modal: check clashes before any public release (e.g. Modal Electronics makes synths).
 
