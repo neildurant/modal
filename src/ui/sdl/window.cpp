@@ -209,6 +209,11 @@ std::string Window::setFont(const FontOptions& font)
     return {};
 }
 
+const FontOptions& Window::font() const
+{
+    return impl_->fontOptions;
+}
+
 CellSize Window::cellSize() const
 {
     return impl_->font->cell();

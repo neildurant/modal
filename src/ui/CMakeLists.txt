@@ -16,6 +16,7 @@ add_library(modal_ui STATIC
     style.cpp
     test_view.cpp
     themes.cpp
+    window_commands.cpp
 )
 modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/config/modalrc"

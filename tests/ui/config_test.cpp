@@ -1,6 +1,8 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/style.hpp>
+#include <modal/ui/test_view.hpp>
 #include <modal/ui/themes.hpp>
+#include <modal/ui/window_commands.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -255,22 +257,15 @@ TEST_CASE("roles and colours read back as they're written")
 
 TEST_CASE("the default config changes nothing, and uncommented gives the defaults")
 {
-    // The commands of the built-in modalrc, whichever the program has.
-    std::vector<CommandInfo> commands;
-    for (const auto name :
-         {"cursor-left", "cursor-down", "cursor-up", "cursor-right", "cursor-first", "cursor-last",
-          "go-first", "go-last", "scroll-half-down", "scroll-half-up", "scroll-page-down",
-          "scroll-page-up", "scroll-centre", "zoom-in", "zoom-out", "zoom-reset", "test-next-page",
-          "cancel"})
-    {
-        commands.push_back({name, "Does something"});
-    }
+    // The commands of the built-in modalrc: the test view's and the window's.
+    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
+    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
     const auto text = defaultConfigText(commands);
     CHECK(text.find("\"set timeoutlen=500\n") != std::string::npos);
     CHECK(text.find("\"set font=\"\"\n") != std::string::npos);
     CHECK(text.find("\"nmap gg") != std::string::npos);
     CHECK(text.find("\"highlight cursor-text") != std::string::npos);
-    CHECK(text.find("\"   scroll-half-down  Does something\n") != std::string::npos);
+    CHECK(text.find("\"   scroll-half-down  Scroll down half a page\n") != std::string::npos);
 
     Config defaults;
     ConfigReader defaultReader{defaults, commands};

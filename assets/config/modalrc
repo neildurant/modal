@@ -31,6 +31,17 @@ nmap +          zoom-in           "Zoom in"
 nmap =          zoom-in           "Zoom in"
 nmap -          zoom-out          "Zoom out"
 
+" Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
+" most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
+nmap <C-=>      font-bigger       "Bigger text"
+nmap <C-S-=>    font-bigger       "Bigger text"
+nmap <C-+>      font-bigger       "Bigger text"
+nmap <C-kPlus>  font-bigger       "Bigger text"
+nmap <C-->      font-smaller      "Smaller text"
+nmap <C-kMinus> font-smaller      "Smaller text"
+nmap <C-0>      font-reset        "Text size from the config"
+nmap <C-k0>     font-reset        "Text size from the config"
+
 " The test view, until the event list
 nmap <Tab>      test-next-page    "Next test page"
 nmap <Esc>      cancel            "Cancel"

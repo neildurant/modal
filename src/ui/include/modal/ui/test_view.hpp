@@ -8,6 +8,7 @@
 #include <modal/ui/layout.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -24,6 +25,12 @@ namespace modal::ui
 class TestView
 {
 public:
+    enum class MessageKind : std::uint8_t
+    {
+        Information, // in the message colour
+        Warning,     // in the warning colour
+    };
+
     enum class Page : std::uint8_t
     {
         Grid,
@@ -40,7 +47,8 @@ public:
     // The commands keys can be bound to, until there's an editor with commands of its own.
     static std::span<const CommandInfo> commands();
 
-    // The keymap of the built-in modalrc alone.
+    // The keymap of the built-in modalrc alone, whose bindings run the view's commands and
+    // the window's (see windowCommands), which the view hands to its command handler.
     static Keymap defaultKeymap();
 
     explicit TestView(Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
@@ -58,8 +66,15 @@ public:
     bool wake(std::int64_t now);
 
     // Runs a command with a count (0 for none), returning whether it changed what's shown,
-    // or nothing if there's no such command.
+    // or nothing if there's no such command. Commands the view doesn't have go to the
+    // handler, if there is one, such as the program's own.
     std::optional<bool> run(std::string_view command, int count);
+
+    using CommandHandler = std::function<std::optional<bool>(std::string_view command, int count)>;
+    void setCommandHandler(CommandHandler handler) { handler_ = std::move(handler); }
+
+    // How long to wait for a longer key binding, in milliseconds (timeoutlen).
+    void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
 
     Frame frame() const;
 
@@ -68,8 +83,12 @@ public:
     const ArrangePage& arrange() const { return arrange_; }
     std::string pending() const { return keys_.pending(); } // the count and keys typed so far
 
-    // Shows a message in the status line, as a warning, until the next key.
-    void setMessage(std::string message) { message_ = std::move(message); }
+    // Shows a message in the status line until the next key.
+    void setMessage(std::string message, MessageKind kind)
+    {
+        message_ = std::move(message);
+        messageKind_ = kind;
+    }
     const std::string& message() const { return message_; }
 
 private:
@@ -85,6 +104,8 @@ private:
     Keymap keymap_;
     KeyDispatcher keys_;
     std::string message_;
+    MessageKind messageKind_ = MessageKind::Information;
+    CommandHandler handler_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};

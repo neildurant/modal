@@ -110,6 +110,8 @@ public:
     // When timeout() should next be called, if anything is waiting for it.
     std::optional<std::int64_t> deadline() const { return deadline_; }
 
+    void setTimeout(std::int64_t timeout) { timeout_ = timeout; }
+
     // The count and keys typed so far, for the status line, such as "3g"; empty if none.
     std::string pending() const;
 

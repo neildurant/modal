@@ -7,6 +7,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/test_view.hpp>
+#include <modal/ui/window_commands.hpp>
 
 #include <algorithm>
 #include <array>
@@ -63,7 +64,7 @@ constexpr RoleSample kRoles[kRoleGroups][5] = {
      {"selection", {Role::Text, Role::Selection, kPlain}, false},
      {"bar", {Role::BarText, Role::Bar, kPlain}, false},
      {"mode", {Role::ModeText, Role::Mode, kBold}, false},
-     {nullptr, {}, false}},
+     {"message", {Role::Message, Role::Bar, kPlain}, false}},
     {{"grid-line", {Role::GridLine, Role::Background, kPlain}, true},
      {"beat-line", {Role::BeatLine, Role::Background, kPlain}, true},
      {"bar-line", {Role::BarLine, Role::Background, kPlain}, true},
@@ -94,7 +95,9 @@ std::string rightAligned(const std::string& text, int width)
 Keymap TestView::defaultKeymap()
 {
     Config config;
-    ConfigReader reader{config, commands()};
+    std::vector<CommandInfo> all{commands().begin(), commands().end()};
+    all.insert(all.end(), windowCommands().begin(), windowCommands().end());
+    ConfigReader reader{config, all};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     assert(reader.errors().empty()); // the tests run the built-in modalrc too
     return config.keymap;
@@ -285,7 +288,7 @@ std::optional<bool> TestView::run(std::string_view command, int count)
     {
         return false;
     }
-    return std::nullopt;
+    return handler_ ? handler_(command, count) : std::nullopt;
 }
 
 Frame TestView::frame() const
@@ -474,7 +477,8 @@ void TestView::addBars(Frame& frame) const
     bottom.left = {{" NORMAL ", {Role::ModeText, Role::Mode, kBold}}, {pageName, bar}};
     if (!message_.empty())
     {
-        bottom.left.push_back({"  " + message_, {Role::Warning, Role::Bar, kPlain}});
+        const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
+        bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
     }
     else if (page_ == Page::Grid)
     {

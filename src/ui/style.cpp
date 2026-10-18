@@ -7,9 +7,10 @@ namespace
 {
 
 constexpr std::array<std::string_view, kRoleCount> kRoleNames{
-    "background", "text", "dim",      "accent",    "warning",   "cursor",    "cursor-text",
-    "selection",  "bar",  "bar-text", "mode",      "mode-text", "grid-line", "beat-line",
-    "bar-line",   "note", "marker",   "density-1", "density-2", "density-3", "density-4",
+    "background", "text",        "dim",       "accent",    "warning",  "message",
+    "cursor",     "cursor-text", "selection", "bar",       "bar-text", "mode",
+    "mode-text",  "grid-line",   "beat-line", "bar-line",  "note",     "marker",
+    "density-1",  "density-2",   "density-3", "density-4",
 };
 
 std::optional<int> hexDigit(char c)

@@ -1,6 +1,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/test_view.hpp>
+#include <modal/ui/window_commands.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -295,10 +296,12 @@ TEST_CASE("z centres the view once the time for zz has passed, and zz resets the
     CHECK(view.arrange().zoom() == ArrangePage::kDefaultZoom);
 }
 
-TEST_CASE("the built-in modalrc binds keys only to the test view's commands")
+TEST_CASE("the built-in modalrc binds keys only to the test view's and the window's commands")
 {
     Config config;
-    ConfigReader reader{config, TestView::commands()};
+    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
+    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
+    ConfigReader reader{config, commands};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     CHECK(reader.errors().empty());
 
@@ -315,9 +318,49 @@ TEST_CASE("the built-in modalrc binds keys only to the test view's commands")
 TEST_CASE("a message shows in the status line until the next key")
 {
     auto view = view80x24();
-    view.setMessage("modalrc:3: unknown setting \"fontsiz\"");
+    view.setMessage("modalrc:3: unknown setting \"fontsiz\"", TestView::MessageKind::Warning);
     CHECK(contains(rowText(view.frame()[3], 0), U"modalrc:3: unknown setting"));
     CHECK(view.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
     CHECK(view.message().empty());
     CHECK_FALSE(contains(rowText(view.frame()[3], 0), U"modalrc:3"));
+
+    // A warning is in the warning colour, information in the message colour.
+    const auto messageStyle = [&]
+    {
+        const auto frame = view.frame();
+        for (const auto& run : frame[3].text)
+        {
+            if (run.text.find(U"hello") != std::u32string::npos)
+            {
+                return run.style.foreground;
+            }
+        }
+        return Role::Background;
+    };
+    view.setMessage("hello", TestView::MessageKind::Warning);
+    CHECK(messageStyle() == Role::Warning);
+    view.setMessage("hello", TestView::MessageKind::Information);
+    CHECK(messageStyle() == Role::Message);
+}
+
+TEST_CASE("commands the view doesn't have go to its handler, such as the window's")
+{
+    auto view = view80x24();
+    std::vector<std::pair<std::string, int>> handled;
+    view.setCommandHandler(
+        [&](std::string_view command, int count) -> std::optional<bool>
+        {
+            if (command != "font-bigger")
+            {
+                return std::nullopt;
+            }
+            handled.emplace_back(command, count);
+            return true;
+        });
+    CHECK(view.handle(Key::typed(U'=', kCtrl), 0));
+    view.handle(Key::typed(U'3'), 0);
+    view.handle(Key::of(NamedKey::KeypadPlus, kCtrl), 0);
+    CHECK(handled ==
+          std::vector<std::pair<std::string, int>>{{"font-bigger", 0}, {"font-bigger", 3}});
+    CHECK_FALSE(view.run("no-such-command", 0).has_value());
 }

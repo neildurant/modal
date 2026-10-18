@@ -27,6 +27,7 @@ enum class Role : std::uint8_t
     Dim,     // secondary text, such as labels and hints
     Accent,  // text to draw the eye
     Warning, // problems and errors
+    Message, // a message in the status line, such as the new font size
     Cursor,  // the cursor's background
     CursorText,
     Selection, // the background of what's selected

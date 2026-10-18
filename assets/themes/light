@@ -5,6 +5,7 @@ highlight text         #3760bf
 highlight dim          #8990b3
 highlight accent       #2e7de9
 highlight warning      #f52a65
+highlight message      #8c6c3e
 highlight cursor       #8c6c3e
 highlight cursor-text  #e1e2e7
 highlight selection    #b7c1e3

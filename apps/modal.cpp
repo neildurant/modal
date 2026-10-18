@@ -5,7 +5,10 @@
 #include <modal/ui/key.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/test_view.hpp>
+#include <modal/ui/window_commands.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -15,11 +18,44 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace
 {
 
 using namespace modal;
+
+// The test view's commands and the window's.
+std::vector<ui::CommandInfo> allCommands()
+{
+    std::vector<ui::CommandInfo> commands{ui::TestView::commands().begin(),
+                                          ui::TestView::commands().end()};
+    commands.insert(commands.end(), ui::windowCommands().begin(), ui::windowCommands().end());
+    return commands;
+}
+
+// Applies the settings to the window and the view, as at startup or after a change. A font
+// that can't be opened is replaced by the built-in one, the font setting too so it isn't
+// tried again, and that's the error returned.
+std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::TestView& view)
+{
+    std::string error;
+    const ui::sdl::FontOptions font{.file = settings.text("font"),
+                                    .points = static_cast<float>(settings.number("fontsize"))};
+    if (font != window.font())
+    {
+        error = window.setFont(font);
+        if (!error.empty() && !font.file.empty())
+        {
+            settings.set("font", "");
+            window.setFont({.file = "", .points = font.points});
+        }
+    }
+    const auto minimum = settings.cells("minsize");
+    window.setMinimumCells(minimum.columns, minimum.rows);
+    view.setTimeout(settings.integer("timeoutlen"));
+    return error;
+}
 
 void fail(const std::string& message)
 {
@@ -37,7 +73,7 @@ int writeConfig(const std::filesystem::path& file, bool force)
         return 1;
     }
     std::ofstream out{file, std::ios::binary};
-    out << ui::defaultConfigText(ui::TestView::commands());
+    out << ui::defaultConfigText(allCommands());
     if (!out.flush())
     {
         fail("can't write " + file.string());
@@ -78,8 +114,9 @@ int main(int argc, char* argv[])
 
     // The built-in modalrc, then the user's. Errors go to stderr, where there is one, and
     // the first to the status line.
+    const auto commands = allCommands();
     ui::Config config;
-    ui::ConfigReader reader{config, ui::TestView::commands(), platform::configDirectory()};
+    ui::ConfigReader reader{config, commands, platform::configDirectory()};
     ui::runStartupFiles(reader, platform::configDirectory());
     std::string message;
     for (const auto& error : reader.errors())
@@ -96,38 +133,77 @@ int main(int argc, char* argv[])
             message += " (and " + std::to_string(reader.errors().size() - 1) + " more)";
         }
     }
-    const auto& settings = config.settings;
-    const auto minimum = settings.cells("minsize");
-    const auto points = static_cast<float>(settings.number("fontsize"));
+    auto& settings = config.settings;
+    const double configuredSize = settings.number("fontsize");
 
-    auto opened = ui::sdl::Window::open({.title = "Modal",
-                                         .columns = 120,
-                                         .rows = 36,
-                                         .width = 0,
-                                         .height = 0,
-                                         .offscreen = false,
-                                         .font = {.file = "", .points = points},
-                                         .minimumColumns = minimum.columns,
-                                         .minimumRows = minimum.rows});
+    // Opened in the built-in font, which a user's font then replaces if it can be opened.
+    auto opened =
+        ui::sdl::Window::open({.title = "Modal",
+                               .columns = 120,
+                               .rows = 36,
+                               .width = 0,
+                               .height = 0,
+                               .offscreen = false,
+                               .font = {.file = "", .points = static_cast<float>(configuredSize)},
+                               .minimumColumns = 0,
+                               .minimumRows = 0});
     if (const auto* error = std::get_if<std::string>(&opened))
     {
         ui::sdl::showError("Modal", "Modal " + *error + ".");
         return 1;
     }
     auto& window = *std::get<std::unique_ptr<ui::sdl::Window>>(opened);
-    // A font of the user's choosing, if it can be opened; the built-in one if not.
-    if (const auto& font = settings.text("font"); !font.empty())
-    {
-        if (auto error = window.setFont({.file = font, .points = points}); !error.empty())
-        {
-            std::fprintf(stderr, "%s\n", error.c_str());
-            message = message.empty() ? error : message + "; " + error;
-        }
-    }
 
     // Until the event list (milestone 4), the test view.
-    ui::TestView view{config.keymap, settings.integer("timeoutlen")};
-    view.setMessage(message);
+    ui::TestView view{config.keymap};
+    if (auto error = apply(settings, window, view); !error.empty())
+    {
+        std::fprintf(stderr, "%s\n", error.c_str());
+        message = message.empty() ? error : message + "; " + error;
+    }
+    if (!message.empty())
+    {
+        view.setMessage(message, ui::TestView::MessageKind::Warning);
+    }
+
+    // The window's commands (see windowCommands): the text size, for now.
+    view.setCommandHandler(
+        [&](std::string_view command, int count) -> std::optional<bool>
+        {
+            const auto* setting = settings.find("fontsize");
+            double size = settings.number("fontsize");
+            const int steps = std::max(count, 1);
+            if (command == "font-bigger")
+            {
+                size += steps;
+            }
+            else if (command == "font-smaller")
+            {
+                size -= steps;
+            }
+            else if (command == "font-reset")
+            {
+                size = configuredSize;
+            }
+            else
+            {
+                return std::nullopt;
+            }
+            size = std::clamp(size, setting->minimum, setting->maximum);
+            settings.set("fontsize", ui::formatValue(size));
+            if (auto error = apply(settings, window, view); !error.empty())
+            {
+                view.setMessage(error, ui::TestView::MessageKind::Warning);
+                return true;
+            }
+            const auto cell = window.cellSize();
+            view.setMessage("font " + ui::formatValue(size) + " pt, cells " +
+                                std::to_string(cell.width) + "×" + std::to_string(cell.height) +
+                                " px",
+                            ui::TestView::MessageKind::Information);
+            return true;
+        });
+
     const auto& theme = config.theme;
     window.run({.redraw =
                     [&](ui::sdl::Window& w)

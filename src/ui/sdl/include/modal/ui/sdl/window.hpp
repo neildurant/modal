@@ -82,6 +82,7 @@ public:
     // Changes the font, or says why it couldn't and keeps the one it had. The minimum size
     // follows the new cell size, and the window grows if it is now below it.
     std::string setFont(const FontOptions& font);
+    const FontOptions& font() const;
     CellSize cellSize() const;
 
     // Sets the smallest the window can be made, in cells; 0 for no limit. If the window is
