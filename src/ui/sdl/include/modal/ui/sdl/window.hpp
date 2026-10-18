@@ -4,6 +4,7 @@
 #include <modal/ui/key.hpp>
 #include <modal/ui/style.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -43,6 +44,24 @@ struct WindowOptions
     int minimumRows = 0;
 };
 
+class Window;
+
+// What a window's event loop calls. Times are in milliseconds, on the clock of Window::now().
+struct WindowHandlers
+{
+    // Draws a frame.
+    std::function<void(Window&)> redraw;
+
+    // Handles a key pressed at a time, returning whether it changed what's shown.
+    std::function<bool(const Key&, std::int64_t)> key;
+
+    // When to call wake next, if at all; asked after each batch of events.
+    std::function<std::optional<std::int64_t>()> deadline;
+
+    // Called at or after the deadline, returning whether it changed what's shown.
+    std::function<bool(std::int64_t)> wake;
+};
+
 // A window with a renderer and a monospace font, which draws frames of regions. SDL's video
 // subsystem is initialised while it exists, so there is one at a time.
 class Window
@@ -69,12 +88,15 @@ public:
     // smaller, it grows to fit, as far as the screen allows.
     void setMinimumCells(int columns, int rows);
 
-    // Handles events until the window is closed, calling redraw (which draws a frame) only
-    // when the window needs one: when it is shown, resized or uncovered, or moved to a display
-    // with another scale (when the font is sized again for it first), or when a key press
-    // passed to key says it changed what's shown.
-    void run(const std::function<void(Window&)>& redraw,
-             const std::function<bool(const Key&)>& key = {});
+    // Handles events until the window is closed, sleeping until there's something to do. It
+    // calls redraw only when the window needs a frame: when it is shown, resized or
+    // uncovered, or moved to a display with another scale (when the font is sized again for
+    // it first), or when a key or a wake-up says it changed what's shown. It wakes at the
+    // handlers' deadline even with no events, as for a key binding's timeout.
+    void run(const WindowHandlers& handlers);
+
+    // The time now, in milliseconds since some fixed point, as passed to the handlers.
+    static std::int64_t now();
 
     // For offscreen windows, the colour of a pixel in the last frame drawn, in pixels.
     std::optional<Colour> pixel(int x, int y) const;

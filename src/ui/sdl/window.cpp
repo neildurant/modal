@@ -344,7 +344,7 @@ Modifiers modifiers(SDL_Keymod mod)
 class KeyReader
 {
 public:
-    explicit KeyReader(const std::function<bool(const Key&)>& key)
+    explicit KeyReader(const std::function<bool(const Key&, std::int64_t)>& key)
         : key_(key)
     {
     }
@@ -362,7 +362,7 @@ public:
             const auto mods = modifiers(event.key.mod);
             if (const auto named = namedKey(event.key.key); named != NamedKey::None)
             {
-                return key_(Key::of(named, mods));
+                return key_(Key::of(named, mods), time(event));
             }
             const bool ctrlOrAlt = (mods & (kCtrl | kAlt)) != 0;
             const bool altGr = (mods & kCtrl) != 0 && (mods & kAlt) != 0;
@@ -370,7 +370,7 @@ public:
             {
                 // Some systems type text for Alt and a key as well; it's the same key.
                 skipText_ = true;
-                return key_(Key::typed(static_cast<char32_t>(event.key.key), mods));
+                return key_(Key::typed(static_cast<char32_t>(event.key.key), mods), time(event));
             }
             return false;
         }
@@ -383,7 +383,7 @@ public:
             bool changed = false;
             for (const char32_t character : decodeUtf8(event.text.text))
             {
-                changed = key_(Key::typed(character)) || changed;
+                changed = key_(Key::typed(character), time(event)) || changed;
             }
             return changed;
         }
@@ -391,16 +391,27 @@ public:
     }
 
 private:
-    const std::function<bool(const Key&)>& key_;
+    // When an event happened, in milliseconds on the clock of Window::now().
+    static std::int64_t time(const SDL_Event& event)
+    {
+        return static_cast<std::int64_t>(event.common.timestamp / SDL_NS_PER_MS);
+    }
+
+    const std::function<bool(const Key&, std::int64_t)>& key_;
     bool skipText_ = false;
 };
 
 } // namespace
 
-void Window::run(const std::function<void(Window&)>& redraw,
-                 const std::function<bool(const Key&)>& key)
+std::int64_t Window::now()
 {
-    KeyReader keys{key};
+    return static_cast<std::int64_t>(SDL_GetTicks());
+}
+
+void Window::run(const WindowHandlers& handlers)
+{
+    const auto& redraw = handlers.redraw;
+    KeyReader keys{handlers.key};
     SDL_StartTextInput(impl_->window);
 
     LiveResize liveResize{this, &redraw};
@@ -420,8 +431,24 @@ void Window::run(const std::function<void(Window&)>& redraw,
             needsFrame = false;
         }
 
+        // Wake at the deadline, if there is one; it may already have passed while handling a
+        // stream of events.
+        const auto deadline = handlers.deadline ? handlers.deadline() : std::nullopt;
+        if (deadline && now() >= *deadline)
+        {
+            needsFrame = (handlers.wake && handlers.wake(now())) || needsFrame;
+            continue;
+        }
         SDL_Event event;
-        if (!SDL_WaitEvent(&event))
+        if (deadline)
+        {
+            const auto wait = std::clamp<std::int64_t>(*deadline - now(), 0, 1'000'000);
+            if (!SDL_WaitEventTimeout(&event, static_cast<Sint32>(wait)))
+            {
+                continue; // the deadline, which the next pass handles
+            }
+        }
+        else if (!SDL_WaitEvent(&event))
         {
             return;
         }

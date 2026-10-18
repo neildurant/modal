@@ -9,8 +9,10 @@
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -322,15 +324,42 @@ TEST_CASE("key presses reach the key handler as characters typed and named keys"
 
     std::vector<Key> keys;
     int frames = 0;
-    window->run([&](Window&) { ++frames; },
-                [&](const Key& key)
-                {
-                    keys.push_back(key);
-                    return key.named == NamedKey::Escape;
-                });
+    window->run({.redraw = [&](Window&) { ++frames; },
+                 .key =
+                     [&](const Key& key, std::int64_t)
+                 {
+                     keys.push_back(key);
+                     return key.named == NamedKey::Escape;
+                 },
+                 .deadline = {},
+                 .wake = {}});
     CHECK(keys == std::vector<Key>{Key::typed(U'$'), Key::typed(U'd', kCtrl),
                                    Key::typed(U'j', kAlt), Key::typed(U'€'),
                                    Key::of(NamedKey::Escape), Key::of(NamedKey::Down, kShift),
                                    Key::of(NamedKey::F5)});
     CHECK(frames >= 1);
+}
+
+TEST_CASE("a window wakes at its handlers' deadline with no events, and draws if asked")
+{
+    auto window = offscreen(320, 200);
+    const auto start = Window::now();
+    std::optional<std::int64_t> deadline = start + 30;
+    std::int64_t wokeAt = 0;
+    int frames = 0;
+    window->run({.redraw = [&](Window&) { ++frames; },
+                 .key = {},
+                 .deadline = [&] { return deadline; },
+                 .wake =
+                     [&](std::int64_t now)
+                 {
+                     wokeAt = now;
+                     deadline.reset();
+                     SDL_Event quit{};
+                     quit.type = SDL_EVENT_QUIT;
+                     SDL_PushEvent(&quit);
+                     return true;
+                 }});
+    CHECK(wokeAt >= start + 30);
+    CHECK(frames >= 2); // the first, and the one the wake-up asked for
 }

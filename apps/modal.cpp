@@ -5,6 +5,7 @@
 #include <modal/ui/style.hpp>
 #include <modal/ui/test_view.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <variant>
@@ -31,12 +32,14 @@ int main()
 
     // Until the event list (milestone 4), the test view.
     ui::TestView view;
-    window.run(
-        [&](ui::sdl::Window& w)
-        {
-            view.resize(w.pixelWidth(), w.pixelHeight(), w.cellSize());
-            w.draw(view.frame(), theme);
-        },
-        [&](const ui::Key& key) { return view.handle(key); });
+    window.run({.redraw =
+                    [&](ui::sdl::Window& w)
+                {
+                    view.resize(w.pixelWidth(), w.pixelHeight(), w.cellSize());
+                    w.draw(view.frame(), theme);
+                },
+                .key = [&](const ui::Key& key, std::int64_t) { return view.handle(key); },
+                .deadline = {},
+                .wake = {}});
     return 0;
 }
