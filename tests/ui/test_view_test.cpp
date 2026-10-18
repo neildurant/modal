@@ -1,4 +1,4 @@
-#include <modal/ui/default_keymap.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/test_view.hpp>
 
@@ -295,15 +295,13 @@ TEST_CASE("z centres the view once the time for zz has passed, and zz resets the
     CHECK(view.arrange().zoom() == ArrangePage::kDefaultZoom);
 }
 
-TEST_CASE("every default key binding runs one of the test view's commands")
+TEST_CASE("the built-in modalrc binds keys only to the test view's commands")
 {
-    for (const auto& binding : defaultBindings())
-    {
-        CAPTURE(binding.keys, binding.command);
-        CHECK(std::ranges::any_of(TestView::commands(), [&](const auto& command)
-                                  { return command.name == binding.command; }));
-        CHECK_FALSE(binding.hint.empty());
-    }
+    Config config;
+    ConfigReader reader{config, TestView::commands()};
+    reader.runText(builtInModalrc(), "built-in modalrc", {});
+    CHECK(reader.errors().empty());
+
     // And every command is one the test view runs.
     TestView view;
     for (const auto& command : TestView::commands())
@@ -312,4 +310,14 @@ TEST_CASE("every default key binding runs one of the test view's commands")
         CHECK(view.run(command.name, 0).has_value());
     }
     CHECK_FALSE(view.run("no-such-command", 0).has_value());
+}
+
+TEST_CASE("a message shows in the status line until the next key")
+{
+    auto view = view80x24();
+    view.setMessage("modalrc:3: unknown setting \"fontsiz\"");
+    CHECK(contains(rowText(view.frame()[3], 0), U"modalrc:3: unknown setting"));
+    CHECK(view.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
+    CHECK(view.message().empty());
+    CHECK_FALSE(contains(rowText(view.frame()[3], 0), U"modalrc:3"));
 }

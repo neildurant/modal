@@ -1,7 +1,6 @@
 #pragma once
 
 #include <modal/ui/arrange_page.hpp>
-#include <modal/ui/default_keymap.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
@@ -38,16 +37,13 @@ public:
     static constexpr int kRowLabelColumns = 5; // the row numbers down the left
     static constexpr int kDemoRows = 6;        // the bar-line demo, above the grid
 
-    struct CommandInfo
-    {
-        std::string_view name;
-        std::string_view description;
-    };
-
     // The commands keys can be bound to, until there's an editor with commands of its own.
     static std::span<const CommandInfo> commands();
 
-    explicit TestView(Keymap keymap = defaultKeymap());
+    // The keymap of the built-in modalrc alone.
+    static Keymap defaultKeymap();
+
+    explicit TestView(Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
 
     // Fits the view to the window, scrolling if the cursor would be out of it.
     void resize(int width, int height, CellSize cell);
@@ -72,6 +68,10 @@ public:
     const ArrangePage& arrange() const { return arrange_; }
     std::string pending() const { return keys_.pending(); } // the count and keys typed so far
 
+    // Shows a message in the status line, as a warning, until the next key.
+    void setMessage(std::string message) { message_ = std::move(message); }
+    const std::string& message() const { return message_; }
+
 private:
     bool runAll(const std::vector<Action>& actions);
     Region demoRegion() const;
@@ -84,6 +84,7 @@ private:
     ArrangePage arrange_;
     Keymap keymap_;
     KeyDispatcher keys_;
+    std::string message_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};

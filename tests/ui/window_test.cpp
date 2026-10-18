@@ -234,7 +234,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
 }
 
 // Hidden: writes the pages of the test view to look at, to MODAL_SAMPLE_BMP with "-grid",
-// "-arrange", "-arrange-out" (zoomed out) and "-samples" before its extension, or to
+// "-arrange", "-arrange-out" (zoomed out), "-samples", and "-samples-light" and
+// "-arrange-light" in the light theme, before its extension, or to
 // test-view-grid.bmp and so on.
 TEST_CASE("a sample of the test view", "[.sample]")
 {
@@ -266,6 +267,12 @@ TEST_CASE("a sample of the test view", "[.sample]")
     view.handle(Key::of(NamedKey::Tab), 0);
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-samples.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-samples-light.bmp"));
+    view.handle(Key::of(NamedKey::Tab), 0);
+    view.handle(Key::of(NamedKey::Tab), 0);
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-arrange-light.bmp"));
 }
 
 TEST_CASE("a window can open at a size in cells")

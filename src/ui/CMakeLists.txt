@@ -6,7 +6,6 @@ add_library(modal_ui STATIC
     block_glyphs.cpp
     cell_grid.cpp
     config.cpp
-    default_keymap.cpp
     demo_song.cpp
     frame.cpp
     key_notation.cpp
@@ -18,6 +17,9 @@ add_library(modal_ui STATIC
     test_view.cpp
     themes.cpp
 )
+modal_embed_file(TARGET modal_ui
+    FILE "${PROJECT_SOURCE_DIR}/assets/config/modalrc"
+    FUNCTION modal::ui::builtInModalrcBytes)
 modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/themes/dark"
     FUNCTION modal::ui::builtInDarkTheme)

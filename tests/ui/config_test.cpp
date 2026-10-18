@@ -17,7 +17,11 @@ using namespace modal::ui;
 namespace
 {
 
-constexpr std::array<std::string_view, 3> kCommands{"cursor-down", "go-first", "cancel"};
+constexpr std::array<CommandInfo, 3> kCommands{{
+    {"cursor-down", "Down"},
+    {"go-first", "First"},
+    {"cancel", "Cancel"},
+}};
 
 // A directory of its own for a test's files, removed afterwards.
 class TempDirectory

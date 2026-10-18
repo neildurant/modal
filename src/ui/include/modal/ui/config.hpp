@@ -62,7 +62,7 @@ class ConfigReader
 {
 public:
     // The commands keys can be bound to, by name, and the directory themes are found in.
-    ConfigReader(Config& config, std::span<const std::string_view> commands,
+    ConfigReader(Config& config, std::span<const CommandInfo> commands,
                  std::optional<std::filesystem::path> configDirectory = std::nullopt);
 
     // Runs a file's commands. If it can't be read, that's an error.
@@ -86,10 +86,18 @@ private:
     std::string useTheme(std::string name, const std::string& previous);
 
     Config& config_;
-    std::span<const std::string_view> commands_;
+    std::span<const CommandInfo> commands_;
     std::optional<std::filesystem::path> configDirectory_;
     std::vector<ConfigError> errors_;
     int depth_ = 0; // of files sourcing others, which stops at a limit
 };
+
+// The built-in command file, assets/config/modalrc, which holds the default key bindings.
+std::string_view builtInModalrc();
+
+// Runs the command files a session starts with: the built-in modalrc, then modalrc in the
+// config directory, if there's one.
+void runStartupFiles(ConfigReader& reader,
+                     const std::optional<std::filesystem::path>& configDirectory);
 
 } // namespace modal::ui

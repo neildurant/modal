@@ -12,6 +12,9 @@
 namespace modal::ui
 {
 
+// Built in from assets/config by modal_embed_file.
+std::span<const unsigned char> builtInModalrcBytes();
+
 namespace
 {
 
@@ -119,7 +122,7 @@ std::string ConfigError::text() const
     return source + ":" + std::to_string(line) + ": " + message;
 }
 
-ConfigReader::ConfigReader(Config& config, std::span<const std::string_view> commands,
+ConfigReader::ConfigReader(Config& config, std::span<const CommandInfo> commands,
                            std::optional<std::filesystem::path> configDirectory)
     : config_(config)
     , commands_(commands)
@@ -252,7 +255,7 @@ std::string ConfigReader::map(std::string_view command, const std::vector<std::s
         return config_.keymap.unbind(it->mode, sequence) ? std::string{}
                                                          : "no binding of " + arguments[0];
     }
-    if (std::ranges::find(commands_, arguments[1]) == commands_.end())
+    if (std::ranges::find(commands_, arguments[1], &CommandInfo::name) == commands_.end())
     {
         return "no command \"" + arguments[1] + "\" to bind " + arguments[0] + " to";
     }
@@ -305,6 +308,23 @@ std::string ConfigReader::useTheme(std::string name, const std::string& previous
     return "no theme \"" + name + "\"" +
            (configDirectory_ ? " in " + utf8Text(*configDirectory_ / "themes") : std::string{}) +
            ", nor built in";
+}
+
+std::string_view builtInModalrc()
+{
+    const auto bytes = builtInModalrcBytes();
+    return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
+}
+
+void runStartupFiles(ConfigReader& reader,
+                     const std::optional<std::filesystem::path>& configDirectory)
+{
+    reader.runText(builtInModalrc(), "built-in modalrc",
+                   configDirectory.value_or(std::filesystem::path{}));
+    if (configDirectory && std::filesystem::is_regular_file(*configDirectory / "modalrc"))
+    {
+        reader.runFile(*configDirectory / "modalrc");
+    }
 }
 
 } // namespace modal::ui

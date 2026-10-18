@@ -1,0 +1,36 @@
+" Modal's built-in command file: the default key bindings. It runs first, then modalrc in
+" your config directory, which can change any of it. modal --write-config FILE writes every
+" setting, binding and colour there is, to start from.
+
+" Moving the cursor
+nmap h          cursor-left       "Left"
+nmap <Left>     cursor-left       "Left"
+nmap j          cursor-down       "Down"
+nmap <Down>     cursor-down       "Down"
+nmap k          cursor-up         "Up"
+nmap <Up>       cursor-up         "Up"
+nmap l          cursor-right      "Right"
+nmap <Right>    cursor-right      "Right"
+nmap 0          cursor-first      "First column"
+nmap <Home>     cursor-first      "First column"
+nmap $          cursor-last       "Last column"
+nmap <End>      cursor-last       "Last column"
+nmap gg         go-first          "First row, or row {count}"
+nmap G          go-last           "Last row, or row {count}"
+
+" Scrolling and zooming
+nmap <C-d>      scroll-half-down  "Half a page down"
+nmap <C-u>      scroll-half-up    "Half a page up"
+nmap <C-f>      scroll-page-down  "A page down"
+nmap <PageDown> scroll-page-down  "A page down"
+nmap <C-b>      scroll-page-up    "A page up"
+nmap <PageUp>   scroll-page-up    "A page up"
+nmap z          scroll-centre     "Centre the view on the cursor"
+nmap zz         zoom-reset        "Default zoom"
+nmap +          zoom-in           "Zoom in"
+nmap =          zoom-in           "Zoom in"
+nmap -          zoom-out          "Zoom out"
+
+" The test view, until the event list
+nmap <Tab>      test-next-page    "Next test page"
+nmap <Esc>      cancel            "Cancel"

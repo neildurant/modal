@@ -1,3 +1,4 @@
+#include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
 
 #include <algorithm>
@@ -75,7 +76,7 @@ Settings::Settings()
           setting("timeoutlen",
                   "How long to wait, in milliseconds, after keys that are a binding and also "
                   "start a longer one, before running the shorter",
-                  std::int64_t{500}, 0, 10000),
+                  kDefaultTimeout, 0, 10000),
       }
 {
 }

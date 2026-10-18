@@ -4,11 +4,13 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/test_view.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <initializer_list>
 #include <iterator>
 #include <string>
@@ -89,10 +91,20 @@ std::string rightAligned(const std::string& text, int width)
 
 } // namespace
 
-TestView::TestView(Keymap keymap)
+Keymap TestView::defaultKeymap()
+{
+    Config config;
+    ConfigReader reader{config, commands()};
+    reader.runText(builtInModalrc(), "built-in modalrc", {});
+    assert(reader.errors().empty()); // the tests run the built-in modalrc too
+    return config.keymap;
+}
+
+TestView::TestView(Keymap keymap, std::int64_t timeout)
     : cursor_(kGridRows, kGridColumns)
     , arrange_(demoSong())
     , keymap_(std::move(keymap))
+    , keys_(timeout)
 {
 }
 
@@ -113,38 +125,39 @@ namespace
 {
 
 constexpr std::array kCommands{
-    TestView::CommandInfo{"cursor-left", "Move left a column, or a bar"},
-    TestView::CommandInfo{"cursor-down", "Move down a row, or a track"},
-    TestView::CommandInfo{"cursor-up", "Move up a row, or a track"},
-    TestView::CommandInfo{"cursor-right", "Move right a column, or a bar"},
-    TestView::CommandInfo{"cursor-first", "Move to the first column, or bar"},
-    TestView::CommandInfo{"cursor-last", "Move to the last column, or bar"},
-    TestView::CommandInfo{"go-first", "Go to the first row or bar, or the one counted"},
-    TestView::CommandInfo{"go-last", "Go to the last row or bar, or the one counted"},
-    TestView::CommandInfo{"scroll-half-down", "Scroll down half a page"},
-    TestView::CommandInfo{"scroll-half-up", "Scroll up half a page"},
-    TestView::CommandInfo{"scroll-page-down", "Scroll down a page"},
-    TestView::CommandInfo{"scroll-page-up", "Scroll up a page"},
-    TestView::CommandInfo{"scroll-centre", "Scroll the cursor to the middle of the view"},
-    TestView::CommandInfo{"zoom-in", "Zoom in"},
-    TestView::CommandInfo{"zoom-out", "Zoom out"},
-    TestView::CommandInfo{"zoom-reset", "Zoom to the default"},
-    TestView::CommandInfo{"test-next-page", "Show the next page of the test view"},
-    TestView::CommandInfo{"cancel", "Cancel"},
+    CommandInfo{"cursor-left", "Move left a column, or a bar"},
+    CommandInfo{"cursor-down", "Move down a row, or a track"},
+    CommandInfo{"cursor-up", "Move up a row, or a track"},
+    CommandInfo{"cursor-right", "Move right a column, or a bar"},
+    CommandInfo{"cursor-first", "Move to the first column, or bar"},
+    CommandInfo{"cursor-last", "Move to the last column, or bar"},
+    CommandInfo{"go-first", "Go to the first row or bar, or the one counted"},
+    CommandInfo{"go-last", "Go to the last row or bar, or the one counted"},
+    CommandInfo{"scroll-half-down", "Scroll down half a page"},
+    CommandInfo{"scroll-half-up", "Scroll up half a page"},
+    CommandInfo{"scroll-page-down", "Scroll down a page"},
+    CommandInfo{"scroll-page-up", "Scroll up a page"},
+    CommandInfo{"scroll-centre", "Scroll the cursor to the middle of the view"},
+    CommandInfo{"zoom-in", "Zoom in"},
+    CommandInfo{"zoom-out", "Zoom out"},
+    CommandInfo{"zoom-reset", "Zoom to the default"},
+    CommandInfo{"test-next-page", "Show the next page of the test view"},
+    CommandInfo{"cancel", "Cancel"},
 };
 
 } // namespace
 
-std::span<const TestView::CommandInfo> TestView::commands()
+std::span<const CommandInfo> TestView::commands()
 {
     return kCommands;
 }
 
 bool TestView::handle(const Key& key, std::int64_t now)
 {
+    const bool hadMessage = !std::exchange(message_, std::string{}).empty();
     const auto before = keys_.pending();
     const bool changed = runAll(keys_.key(keymap_, Mode::Normal, key, now));
-    return changed || keys_.pending() != before;
+    return changed || hadMessage || keys_.pending() != before;
 }
 
 bool TestView::wake(std::int64_t now)
@@ -459,7 +472,11 @@ void TestView::addBars(Frame& frame) const
                            : page_ == Page::Arrange ? "  arrange"
                                                     : "  samples";
     bottom.left = {{" NORMAL ", {Role::ModeText, Role::Mode, kBold}}, {pageName, bar}};
-    if (page_ == Page::Grid)
+    if (!message_.empty())
+    {
+        bottom.left.push_back({"  " + message_, {Role::Warning, Role::Bar, kPlain}});
+    }
+    else if (page_ == Page::Grid)
     {
         bottom.centre = {
             {"row " + number(cursor_.row() + 1) + "  col " + number(cursor_.column() + 1), bar}};
