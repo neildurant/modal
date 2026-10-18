@@ -26,7 +26,10 @@ add_executable(modal_tests
     platform/midi_io_test.cpp
     platform/midi_ports_test.cpp
     platform/thread_priority_test.cpp
+    ui/bar_test.cpp
     ui/block_glyphs_test.cpp
+    ui/cell_grid_test.cpp
+    ui/layout_test.cpp
     ui/window_test.cpp
 )
 
