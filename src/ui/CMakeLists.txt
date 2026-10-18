@@ -5,6 +5,7 @@ add_library(modal_ui STATIC
     bar_lines.cpp
     block_glyphs.cpp
     cell_grid.cpp
+    config.cpp
     default_keymap.cpp
     demo_song.cpp
     frame.cpp

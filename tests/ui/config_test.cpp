@@ -1,0 +1,166 @@
+#include <modal/ui/config.hpp>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <array>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <string_view>
+#include <vector>
+
+using namespace modal::ui;
+
+namespace
+{
+
+constexpr std::array<std::string_view, 3> kCommands{"cursor-down", "go-first", "cancel"};
+
+// A directory of its own for a test's files, removed afterwards.
+class TempDirectory
+{
+public:
+    explicit TempDirectory(std::string_view name)
+        : path_(std::filesystem::temp_directory_path() / utf8Path(name))
+    {
+        std::filesystem::remove_all(path_);
+        std::filesystem::create_directories(path_);
+    }
+
+    ~TempDirectory() { std::filesystem::remove_all(path_); }
+
+    TempDirectory(const TempDirectory&) = delete;
+    TempDirectory& operator=(const TempDirectory&) = delete;
+
+    const std::filesystem::path& path() const { return path_; }
+
+    std::filesystem::path write(std::string_view name, std::string_view text) const
+    {
+        const auto file = path_ / utf8Path(name);
+        std::filesystem::create_directories(file.parent_path());
+        std::ofstream{file, std::ios::binary} << text;
+        return file;
+    }
+
+private:
+    std::filesystem::path path_;
+};
+
+const Binding* binding(const Config& config, Mode mode, std::vector<Key> keys)
+{
+    return config.keymap.match(mode, keys).binding;
+}
+
+} // namespace
+
+TEST_CASE("command files set settings and bind keys, skipping blank lines and comments")
+{
+    Config config;
+    ConfigReader reader{config, kCommands};
+    reader.runText(R"(" A comment, then a blank line
+
+set timeoutlen=300
+  set fontsize=14 minsize=100x30
+nmap J cursor-down
+nmap <C-g> go-first "Top of the song"
+vmap j cursor-down
+)",
+                   "modalrc", {});
+    CHECK(reader.errors().empty());
+    CHECK(config.settings.integer("timeoutlen") == 300);
+    CHECK(config.settings.number("fontsize") == 14.0);
+    CHECK(config.settings.cells("minsize") == CellCount{100, 30});
+    CHECK(*binding(config, Mode::Normal, {Key::typed(U'J')}) == Binding{"cursor-down", ""});
+    CHECK(*binding(config, Mode::Normal, {Key::typed(U'g', kCtrl)}) ==
+          Binding{"go-first", "Top of the song"});
+    CHECK(binding(config, Mode::Visual, {Key::typed(U'j')}) != nullptr);
+    CHECK(binding(config, Mode::Normal, {Key::typed(U'j')}) == nullptr);
+}
+
+TEST_CASE("map commands unbind keys too")
+{
+    Config config;
+    ConfigReader reader{config, kCommands};
+    reader.runText("nmap J cursor-down\nnunmap J\nnunmap J\n", "modalrc", {});
+    CHECK(binding(config, Mode::Normal, {Key::typed(U'J')}) == nullptr);
+    CHECK(reader.errors() == std::vector<ConfigError>{{"modalrc", 3, "no binding of J"}});
+}
+
+TEST_CASE("a command that fails is reported with its line, and the rest still run")
+{
+    Config config;
+    ConfigReader reader{config, kCommands};
+    reader.runText("set fontsiz=14\r\n"
+                   "set timeoutlen=lots\r\n"
+                   "set fontsize\r\n"
+                   "nmap J\r\n"
+                   "nmap J nothing\r\n"
+                   "nmap <Nope> cancel\r\n"
+                   "xmap J cancel\r\n"
+                   "frobnicate\r\n"
+                   "nmap J cancel \"unclosed\r\n"
+                   "set timeoutlen=250\r\n",
+                   "modalrc", {});
+    const std::vector<ConfigError> expected{
+        {"modalrc", 1, "unknown setting \"fontsiz\""},
+        {"modalrc", 2, "timeoutlen must be a whole number from 0 to 10000"},
+        {"modalrc", 3, "set needs NAME=VALUE, not fontsize"},
+        {"modalrc", 4, "nmap needs KEYS COMMAND, and perhaps \"HINT\""},
+        {"modalrc", 5, "no command \"nothing\" to bind J to"},
+        {"modalrc", 6, "unknown key <Nope>"},
+        {"modalrc", 7, "unknown command \"xmap\""},
+        {"modalrc", 8, "unknown command \"frobnicate\""},
+        {"modalrc", 9, "no closing \" for a quoted argument"},
+    };
+    CHECK(reader.errors() == expected);
+    CHECK(config.settings.integer("timeoutlen") == 250);
+    CHECK(expected[1].text() == "modalrc:2: timeoutlen must be a whole number from 0 to 10000");
+}
+
+TEST_CASE("quotes keep spaces in arguments, as in a shell, but not in keys")
+{
+    Config config;
+    ConfigReader reader{config, kCommands};
+    CHECK(reader.runCommand(R"(nmap J cursor-down "Say \"down\" \\ go")", {}).empty());
+    CHECK(binding(config, Mode::Normal, {Key::typed(U'J')})->hint == R"(Say "down" \ go)");
+    CHECK(reader.runCommand(R"(set font="C:/My Fonts/Mono.ttf")", {}).empty());
+    CHECK(config.settings.text("font") == "C:/My Fonts/Mono.ttf");
+
+    // A map's keys are as they are: " is a key, as Vim's register key is.
+    CHECK(reader.runCommand(R"(nmap "a cancel "Cancel")", {}).empty());
+    CHECK(*binding(config, Mode::Normal, {Key::typed(U'"'), Key::typed(U'a')}) ==
+          Binding{"cancel", "Cancel"});
+}
+
+TEST_CASE("files run other files, relative to themselves, in UTF-8 names")
+{
+    const TempDirectory directory{"modal-config-test"};
+    const auto modalrc = directory.write("modalrc", "\xEF\xBB\xBF" // a byte order mark
+                                                    "source more/keys\n"
+                                                    "source missing\n");
+    directory.write("more/keys", "nmap J cursor-down\nsource ../thème\n");
+    directory.write("thème", "set timeoutlen=123\n");
+
+    Config config;
+    ConfigReader reader{config, kCommands};
+    reader.runFile(modalrc);
+    CHECK(binding(config, Mode::Normal, {Key::typed(U'J')}) != nullptr);
+    CHECK(config.settings.integer("timeoutlen") == 123);
+    REQUIRE(reader.errors().size() == 1);
+    CHECK(reader.errors()[0].line == 2);
+    CHECK(reader.errors()[0].message.starts_with("can't read "));
+
+    reader.runFile(directory.path() / "nothing here");
+    CHECK(reader.errors().back().message == "can't be read");
+}
+
+TEST_CASE("files that source each other stop, and say so")
+{
+    const TempDirectory directory{"modal-config-loop-test"};
+    const auto file = directory.write("loop", "source loop\n");
+    Config config;
+    ConfigReader reader{config, kCommands};
+    reader.runFile(file);
+    REQUIRE_FALSE(reader.errors().empty());
+    CHECK(reader.errors().front().message == "files source each other more than 16 deep");
+}
