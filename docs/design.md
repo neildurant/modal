@@ -265,7 +265,7 @@ The arrangement is the home view; Enter on a track opens it in the piano roll fo
 
 **Piano roll pages (decided October 2026).** The piano roll shows a whole number of bars at a time, not a freely scrolling timeline.
 
-- The bars on a page are stretched to fill the window width, whatever their length: a 7/8 bar fills the page as a 4/4 bar does.
+- The bars on a page together are stretched to fill the window width, whatever their length: a one-bar page of 7/8 is as wide as one of 4/4. Within a page, time keeps one scale, so on a page mixing meters a 7/8 bar is a little narrower than a 4/4 bar.
 - When the cursor moves past the last bar on screen, the view turns to the next page.
 - `zi` / `zo` change the number of bars per page, stepping through a list: 1, 2, 4, 8, 16 by default, configurable (e.g. `set pagebars=1,2,3,4,6,8,12,16`). A count sets the page size directly: `3zp` is 3 bars per page. When zooming, the new page is the one containing the cursor.
 - **Pages restart at each marker.** With a marker at bar 3, 4-bar pages show bars 3–6, 7–10 and so on, so pages follow the song's sections.
@@ -567,7 +567,6 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [ ] Scale-lock toggle key. Proposed `, s`. `\` was considered, but it is the proposed key for repeating an `f` search backwards (since `,` is the leader). Decide which key gets `\`.
 - [ ] Confirm `Ctrl-h` / `Ctrl-l` for grid size on both platforms (no conflicts expected in an SDL3 GUI app).
 - [ ] Velocity used by `o`: the last-used velocity, or a per-track default velocity setting?
-- [ ] On a piano roll page whose bars differ in length (a 7/8 bar beside 4/4 bars), is each bar given the same width, or is time kept to one scale across the page?
 
 **Later milestones**
 
