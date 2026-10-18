@@ -96,46 +96,10 @@ bool sameName(std::u32string_view a, std::string_view b)
     return true;
 }
 
-void appendUtf8(std::string& out, char32_t c)
-{
-    if (c < 0x80)
-    {
-        out += static_cast<char>(c);
-    }
-    else if (c < 0x800)
-    {
-        out += static_cast<char>(0xc0 | (c >> 6));
-        out += static_cast<char>(0x80 | (c & 0x3f));
-    }
-    else if (c < 0x10000)
-    {
-        out += static_cast<char>(0xe0 | (c >> 12));
-        out += static_cast<char>(0x80 | ((c >> 6) & 0x3f));
-        out += static_cast<char>(0x80 | (c & 0x3f));
-    }
-    else
-    {
-        out += static_cast<char>(0xf0 | (c >> 18));
-        out += static_cast<char>(0x80 | ((c >> 12) & 0x3f));
-        out += static_cast<char>(0x80 | ((c >> 6) & 0x3f));
-        out += static_cast<char>(0x80 | (c & 0x3f));
-    }
-}
-
-std::string toUtf8(std::u32string_view text)
-{
-    std::string out;
-    for (const char32_t c : text)
-    {
-        appendUtf8(out, c);
-    }
-    return out;
-}
-
 // The key written between angle brackets, or why it can't be read.
 std::variant<Key, std::string> parseBracketed(std::u32string_view token)
 {
-    const auto whole = "<" + toUtf8(token) + ">";
+    const auto whole = "<" + encodeUtf8(token) + ">";
     Modifiers modifiers = kNoModifiers;
     while (token.size() > 2 && token[1] == U'-')
     {
@@ -191,7 +155,7 @@ std::variant<Key, std::string> parseBracketed(std::u32string_view token)
     {
         if (!isLetter(c))
         {
-            return "Shift with " + toUtf8(std::u32string(1, c)) +
+            return "Shift with " + encodeUtf8(std::u32string(1, c)) +
                    " is written as the character it types, in " + whole;
         }
         return Key::typed(upper(c));
@@ -266,7 +230,7 @@ std::string formatKey(const Key& key)
     }
     else
     {
-        appendUtf8(character, key.character);
+        character = encodeUtf8(std::u32string(1, key.character));
     }
     const bool bracketed =
         key.modifiers != kNoModifiers || key.character == U'<' || key.character == U' ';

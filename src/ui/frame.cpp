@@ -5,6 +5,47 @@
 namespace modal::ui
 {
 
+namespace
+{
+
+void appendUtf8(std::string& out, char32_t c)
+{
+    if (c < 0x80)
+    {
+        out += static_cast<char>(c);
+    }
+    else if (c < 0x800)
+    {
+        out += static_cast<char>(0xc0 | (c >> 6));
+        out += static_cast<char>(0x80 | (c & 0x3f));
+    }
+    else if (c < 0x10000)
+    {
+        out += static_cast<char>(0xe0 | (c >> 12));
+        out += static_cast<char>(0x80 | ((c >> 6) & 0x3f));
+        out += static_cast<char>(0x80 | (c & 0x3f));
+    }
+    else
+    {
+        out += static_cast<char>(0xf0 | (c >> 18));
+        out += static_cast<char>(0x80 | ((c >> 12) & 0x3f));
+        out += static_cast<char>(0x80 | ((c >> 6) & 0x3f));
+        out += static_cast<char>(0x80 | (c & 0x3f));
+    }
+}
+
+} // namespace
+
+std::string encodeUtf8(std::u32string_view text)
+{
+    std::string out;
+    for (const char32_t c : text)
+    {
+        appendUtf8(out, c);
+    }
+    return out;
+}
+
 std::u32string decodeUtf8(std::string_view text)
 {
     constexpr char32_t kReplacement = 0xFFFD;

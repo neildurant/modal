@@ -82,4 +82,7 @@ using Frame = std::vector<Region>;
 // The characters of UTF-8 text; a malformed sequence becomes U+FFFD.
 std::u32string decodeUtf8(std::string_view text);
 
+// Characters as UTF-8.
+std::string encodeUtf8(std::u32string_view text);
+
 } // namespace modal::ui

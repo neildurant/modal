@@ -33,6 +33,7 @@ add_executable(modal_tests
     ui/bar_test.cpp
     ui/block_glyphs_test.cpp
     ui/cell_grid_test.cpp
+    ui/command_line_test.cpp
     ui/config_test.cpp
     ui/demo_song_test.cpp
     ui/grid_cursor_test.cpp
