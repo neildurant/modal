@@ -1,10 +1,12 @@
 #include <modal/core/event.hpp>
 #include <modal/core/meter_map.hpp>
 #include <modal/ui/arrange_page.hpp>
+#include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 #include <variant>
 
@@ -15,6 +17,7 @@ namespace
 {
 
 constexpr Style kDim{Role::Dim, Role::Background, kPlain};
+constexpr std::uint8_t kFaint = 96; // the opacity of marker lines across the tracks
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -261,7 +264,7 @@ void ArrangePage::addRegions(Frame& frame) const
     // The track headers, in text cells.
     CellGrid headers{columns, rows};
     headers.write(1, 0, song_.title, {Role::Accent, Role::Background, kBold});
-    headers.write(0, kRulerRows - 1, "Trk Name           Meter", kDim);
+    headers.write(0, kRulerRows - 1, "Trk Name", kDim);
     for (int row = 0; row < rows; ++row)
     {
         headers.set(kHeaderColumns - 1, row, {U'│', kDim});
@@ -287,10 +290,6 @@ void ArrangePage::addRegions(Frame& frame) const
         {
             headers.write(4, row, track.name.substr(0, kNameColumns), {});
         }
-        headers.write(4 + kNameColumns + 1, row, signatureText(track.meter.signatureAt(time_)),
-                      track.meter == song_.referenceMeter()
-                          ? kDim
-                          : Style{Role::Accent, Role::Background, kPlain});
     }
     frame.push_back(gridRegion(headers, main_, cell_, Role::Background));
 
@@ -323,18 +322,27 @@ void ArrangePage::addRegions(Frame& frame) const
     const auto spaced = [&](core::Tick ticks)
     { return ticks * cell_.width >= kMinLineSpacing * column; };
 
-    // The cursor's bar, as a span of time across every track and a highlight on its own.
+    // The cursor's bar, as a span of time across every track, and boxed on its own track: its
+    // sides in the gaps either side of the bar's block, its top and bottom above and below it.
     {
         const auto& meter = currentTrack().meter;
         const auto barNumber = meter.toBarBeatTick(time_).bar;
         const int x0 = scale.toX(meter.barStart(barNumber));
-        const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_));
+        const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
         timeline.under.push_back(
             {{x0, tracksTop, x1 - x0, tracksBottom - tracksTop}, Role::Selection, 255});
         if (track_ >= topTrack_ && track_ < topTrack_ + static_cast<std::size_t>(shownTracks))
         {
             const int y = tracksTop + static_cast<int>(track_ - topTrack_) * cell_.height;
-            timeline.under.push_back({{x0, y, x1 - x0, cell_.height}, Role::Cursor, 255});
+            const int side = std::max(gap, 1);
+            const int edge = std::max(cell_.height / 10, 1);
+            const int width = std::max(x1 - x0, 2 * side);
+            timeline.over.push_back({{x0, y, width, edge}, Role::Cursor, 255});
+            timeline.over.push_back(
+                {{x0, y + cell_.height - edge, width, edge}, Role::Cursor, 255});
+            timeline.over.push_back({{x0, y, side, cell_.height}, Role::Cursor, 255});
+            timeline.over.push_back(
+                {{x0 + width - side, y, side, cell_.height}, Role::Cursor, 255});
         }
     }
 
@@ -373,7 +381,7 @@ void ArrangePage::addRegions(Frame& frame) const
                 const int thickness = std::max(cell_.height / 16, 1);
                 timeline.under.push_back(
                     {{x0, y + (cell_.height - thickness) / 2, width, thickness},
-                     Role::BarLine,
+                     Role::BeatLine,
                      255});
             }
             else
@@ -387,16 +395,39 @@ void ArrangePage::addRegions(Frame& frame) const
 
     // The ruler: markers by name, the reference track's meters, and its bars, numbered where
     // there's room for the numbers.
-    Labels markerLabels{timeline, 0, cell_};
-    for (const auto& marker : song_.markers())
+    // Markers: lines under the text and bars, solid beside their names and faint across the
+    // tracks so as not to distract, leaving the meters and bar numbers clear between; named
+    // up to the next marker, cut short with an ellipsis or left out if there's no room.
+    const auto markers = song_.markers();
+    for (std::size_t i = 0; i < markers.size(); ++i)
     {
-        if (marker.tick < leftTick_ || marker.tick >= shownEnd)
+        const auto tick = markers[i].tick;
+        if (tick < leftTick_ || tick >= shownEnd)
         {
             continue;
         }
-        const int x = scale.toX(marker.tick);
-        timeline.over.push_back({{x, 0, lineWidth, tracksBottom}, Role::Marker, 255});
-        markerLabels.add(x + lineWidth + 2, marker.name, {Role::Marker, Role::Background, kBold});
+        const int x = scale.toX(tick);
+        timeline.under.push_back({{x, 0, lineWidth, cell_.height}, Role::Marker, 255});
+        timeline.under.push_back(
+            {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Marker, kFaint});
+        const int textX = x + lineWidth + 2;
+        int room = timeline.bounds.width; // characters, to the next marker or past the edge
+        if (i + 1 < markers.size())
+        {
+            room = (scale.toX(markers[i + 1].tick) - textX - 2) / cell_.width;
+        }
+        auto name = decodeUtf8(markers[i].name);
+        if (static_cast<int>(name.size()) > room)
+        {
+            if (room < kMinSegmentCharacters + 1)
+            {
+                continue;
+            }
+            name.resize(static_cast<std::size_t>(room - 1));
+            name += U'\u2026';
+        }
+        timeline.text.push_back(
+            {textX, 0, std::move(name), {Role::Marker, Role::Background, kBold}});
     }
     const auto& reference = song_.referenceMeter();
     Labels meterLabels{timeline, cell_.height, cell_};
@@ -407,14 +438,21 @@ void ArrangePage::addRegions(Frame& frame) const
             meterLabels.add(scale.toX(change.tick) + 2, signatureText(change.signature), kDim);
         }
     }
-    // Numbers every 1, 2, 4, 8... bars, as few as leave room for four characters between.
+    // Bar numbers on bars 1, 1 + n, 1 + 2n... for n of 1, 2, 4, 8..., as few as fit the
+    // widest number and a space into n of the shortest bar, so none crowd the next.
+    core::Tick shortest = reference.barStart(2);
+    for (const auto& change : reference.changes())
+    {
+        shortest = std::min(shortest, change.signature.barLength().toTicks(song_.ppqn()));
+    }
+    const auto lastNumber = std::to_string(reference.toBarBeatTick(end_ - 1).bar);
+    const core::Tick label = static_cast<core::Tick>(lastNumber.size() + 1) * cell_.width;
     std::int64_t every = 1;
-    while (every < 1024 && every * reference.barStart(2) * cell_.width < 4 * cell_.width * column)
+    while (every < 1024 && every * shortest * cell_.width < label * column)
     {
         every *= 2;
     }
     Labels numbers{timeline, 2 * cell_.height, cell_};
-    const int rulerY = 2 * cell_.height;
     for (auto bar = reference.toBarBeatTick(leftTick_).bar;; ++bar)
     {
         const core::Tick start = reference.barStart(bar);
@@ -422,18 +460,9 @@ void ArrangePage::addRegions(Frame& frame) const
         {
             break;
         }
-        const int x = scale.toX(start);
-        const bool numbered = bar == 1 || bar % every == 0;
-        if (numbered)
+        if ((bar - 1) % every == 0)
         {
-            timeline.under.push_back({{x, rulerY, lineWidth, cell_.height}, Role::BarLine, 255});
-            numbers.add(x + lineWidth + 2, std::to_string(bar), {});
-        }
-        else if (spaced(reference.barStart(bar + 1) - start))
-        {
-            const int height = cell_.height / 3;
-            timeline.under.push_back(
-                {{x, rulerY + cell_.height - height, lineWidth, height}, Role::BarLine, 255});
+            numbers.add(scale.toX(start), std::to_string(bar), {});
         }
     }
     // The end of the song.

@@ -15,16 +15,16 @@ namespace modal::ui
 {
 
 // The test view's arrangement page: a sketch of the arrangement (milestone 6), to try out
-// how it's drawn. A row for each track, with its number, name and the meter at the cursor in
-// text cells, then its bars as blocks on one time scale, so a bar's block is as wide as the
-// bar is long: shaded by how busy the bar is, with a gap before each while bars are wide
-// enough, and a thin line for a bar with no notes. Markers are lines across every track.
-// The ruler shows the markers by name, and the reference track's meters and bar numbers.
+// how it's drawn. A row for each track, with its number and name in text cells, then its
+// bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded by
+// how busy the bar is, with a gap before each while bars are wide enough, and a faint line
+// for a bar with no notes. Markers are faint lines across every track. The ruler shows the
+// markers by name, and the reference track's meters and bar numbers.
 class ArrangePage
 {
 public:
     static constexpr int kRulerRows = 3;
-    static constexpr int kHeaderColumns = 26; // the track's number, name and meter, and a line
+    static constexpr int kHeaderColumns = 20; // the track's number and name, and a line
     static constexpr int kNameColumns = 14;
 
     // The length of time in a column of cells at each zoom, from zoomed in to out.

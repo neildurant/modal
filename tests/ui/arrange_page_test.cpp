@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -15,7 +16,7 @@ namespace
 
 constexpr CellSize kCell{10, 20};
 
-// The demo song's page in a main area of 80 by 22 cells: 54 columns of timeline, and 19
+// The demo song's page in a main area of 80 by 22 cells: 60 columns of timeline, and 19
 // tracks' rows below the ruler.
 ArrangePage page80x22()
 {
@@ -127,7 +128,7 @@ TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in 
     CHECK(page.leftTick() > 0);
     CHECK(page.leftTick() % column == 0);
     // The song's end at the view's right edge: 205 quarter notes, in columns of two.
-    CHECK(page.leftTick() == (103 - 54) * column);
+    CHECK(page.leftTick() == (103 - 60) * column);
 
     type(page, U"0");
     CHECK(page.leftTick() == 0);
@@ -160,7 +161,7 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
     REQUIRE(frame.size() == 2); // the headers, then the timeline
     const auto& timeline = frame[1];
     CHECK(timeline.bounds == Rect{ArrangePage::kHeaderColumns * kCell.width, kCell.height,
-                                  54 * kCell.width, 22 * kCell.height});
+                                  60 * kCell.width, 22 * kCell.height});
 
     // Drums: eight bars of 4/4 at density 3, each two columns less a gap of one pixel, then
     // six bars of 7/8 at density 4, each one and three quarter columns.
@@ -183,7 +184,7 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
     CHECK(blocks[9].rect.x == 161 + 17); // 17.5 pixels on, rounded down
 
     // The bass is silent in the intro: a thin line in each bar.
-    const auto bass = rowShapes(timeline, 1, Role::BarLine);
+    const auto bass = rowShapes(timeline, 1, Role::BeatLine);
     REQUIRE(bass.size() >= 8);
     CHECK(bass[0].rect.height == 1);
 
@@ -198,20 +199,27 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
                                }));
 }
 
-TEST_CASE("markers are lines across every track, named in the ruler")
+TEST_CASE("markers are named in the ruler, with faint lines across every track")
 {
     auto page = page80x22();
     Frame frame;
     page.addRegions(frame);
     const auto& timeline = frame[1];
+    const int tracksTop = ArrangePage::kRulerRows * kCell.height;
     std::vector<int> lines;
-    for (const auto& shape : timeline.over)
+    for (const auto& shape : timeline.under)
     {
-        if (shape.role == Role::Marker)
+        if (shape.role == Role::Marker && shape.rect.y == 0)
         {
             lines.push_back(shape.rect.x);
-            CHECK(shape.rect.y == 0);
-            CHECK(shape.rect.height == (ArrangePage::kRulerRows + 14) * kCell.height);
+            CHECK(shape.rect.height == kCell.height); // beside the name only
+            CHECK(shape.alpha == 255);
+        }
+        else if (shape.role == Role::Marker)
+        {
+            CHECK(shape.rect.y == tracksTop);
+            CHECK(shape.rect.height == 14 * kCell.height);
+            CHECK(shape.alpha < 255);
         }
     }
     // Intro at 0, the verse at bar 9 (16 columns), the chorus 21 quarter notes later, and
@@ -224,6 +232,74 @@ TEST_CASE("markers are lines across every track, named in the ruler")
         names += run.y == 0 && run.style.foreground == Role::Marker ? 1 : 0;
     }
     CHECK(names == 4);
+}
+
+namespace
+{
+
+// The text of the runs on a row of the ruler, in order.
+std::vector<std::u32string> rulerText(const Region& timeline, int row)
+{
+    std::vector<std::u32string> texts;
+    for (const auto& run : timeline.text)
+    {
+        if (run.y == row * kCell.height)
+        {
+            texts.push_back(run.text);
+        }
+    }
+    return texts;
+}
+
+} // namespace
+
+TEST_CASE("marker names are cut short at the next marker, or left out if there's no room")
+{
+    auto page = page80x22();
+    type(page, U"-", 2); // eight quarter notes to a column
+    Frame frame;
+    page.addRegions(frame);
+    // The intro, verse and bridge have room for fewer than three characters and an
+    // ellipsis; the choruses have room for four; the last marker runs on.
+    CHECK(rulerText(frame[1], 0) == std::vector<std::u32string>{U"Chor…", U"Chor…", U"Outro"});
+}
+
+TEST_CASE("bars are numbered every so many bars, as many as fit, from bar 1")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    // The shortest bar, of 2/4, is ten pixels, and "53 " is thirty: every fourth bar.
+    const auto numbers = rulerText(frame[1], 2);
+    REQUIRE(numbers.size() >= 5);
+    for (std::size_t i = 0; i < numbers.size(); ++i)
+    {
+        CHECK(numbers[i] == modal::ui::decodeUtf8(std::to_string(1 + 4 * i)));
+    }
+
+    type(page, U"-", 2); // a 2/4 bar is now 2.5 pixels: every sixteenth bar
+    frame.clear();
+    page.addRegions(frame);
+    CHECK(rulerText(frame[1], 2) == std::vector<std::u32string>{U"1", U"17", U"33", U"49"});
+}
+
+TEST_CASE("the cursor boxes its bar on all four sides")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    std::vector<Rect> sides;
+    for (const auto& shape : frame[1].over)
+    {
+        if (shape.role == Role::Cursor)
+        {
+            sides.push_back(shape.rect);
+        }
+    }
+    // Bar 1 of the drums, from 0 to the end of the gap after it at 21.
+    const int y = ArrangePage::kRulerRows * kCell.height;
+    CHECK(sides ==
+          std::vector<Rect>{{0, y, 21, 2}, {0, y + 18, 21, 2}, {0, y, 1, 20}, {20, y, 1, 20}});
 }
 
 TEST_CASE("narrow bars lose their gaps")
