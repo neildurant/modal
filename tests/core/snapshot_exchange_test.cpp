@@ -169,7 +169,10 @@ TEST_CASE("snapshots cross threads without the consumer freeing any")
 
         producer.join();
         consumer.join();
-        exchange.update(); // retires the snapshot the last one replaced
+        // The consumer's last update can leave the retired queue full, so make room before
+        // retiring the snapshot the last one replaced.
+        exchange.reclaim();
+        exchange.update();
         exchange.reclaim();
         CHECK(monotonic);
         CHECK(exchange.current()->version == kCount);
