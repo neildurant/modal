@@ -4,6 +4,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/demo_song.hpp>
 #include <modal/ui/test_view.hpp>
 
 #include <algorithm>
@@ -88,6 +89,7 @@ std::string rightAligned(const std::string& text, int width)
 
 TestView::TestView()
     : cursor_(kGridRows, kGridColumns)
+    , arrange_(demoSong())
 {
 }
 
@@ -101,6 +103,7 @@ void TestView::resize(int width, int height, CellSize cell)
     // that are fully shown.
     cursor_.setView(layout_.fullRows - kDemoRows - 1,
                     (layout_.fullColumns - kRowLabelColumns) / kCellColumns);
+    arrange_.resize(layout_.main, cell_);
 }
 
 bool TestView::handle(const Key& key)
@@ -115,10 +118,14 @@ bool TestView::handle(const Key& key)
     const int count = std::exchange(count_, 0);
     if (key == Key::of(NamedKey::Tab))
     {
-        page_ = page_ == Page::Grid ? Page::Samples : Page::Grid;
+        page_ = page_ == Page::Grid      ? Page::Arrange
+                : page_ == Page::Arrange ? Page::Samples
+                                         : Page::Grid;
         return true;
     }
-    const bool moved = page_ == Page::Grid && move(key, count);
+    const bool moved = page_ == Page::Grid      ? move(key, count)
+                       : page_ == Page::Arrange ? arrange_.handle(key, count)
+                                                : false;
     return moved || count > 0; // a count given up is shown no more
 }
 
@@ -189,6 +196,10 @@ Frame TestView::frame() const
     {
         frame.push_back(demoRegion());
         frame.push_back(cellsRegion());
+    }
+    else if (page_ == Page::Arrange)
+    {
+        arrange_.addRegions(frame);
     }
     else
     {
@@ -357,12 +368,18 @@ void TestView::addBars(Frame& frame) const
     top.right = {{"cell " + number(cell_.width) + "×" + number(cell_.height) + " px", bar}};
 
     Bar bottom;
-    bottom.left = {{" NORMAL ", {Role::ModeText, Role::Mode, kBold}},
-                   {page_ == Page::Grid ? "  grid" : "  samples", bar}};
+    const char* pageName = page_ == Page::Grid      ? "  grid"
+                           : page_ == Page::Arrange ? "  arrange"
+                                                    : "  samples";
+    bottom.left = {{" NORMAL ", {Role::ModeText, Role::Mode, kBold}}, {pageName, bar}};
     if (page_ == Page::Grid)
     {
         bottom.centre = {
             {"row " + number(cursor_.row() + 1) + "  col " + number(cursor_.column() + 1), bar}};
+    }
+    else if (page_ == Page::Arrange)
+    {
+        bottom.centre = {{arrange_.status(), bar}};
     }
     if (count_ > 0)
     {

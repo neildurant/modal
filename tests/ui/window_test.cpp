@@ -229,8 +229,9 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
     CHECK(window->saveFrame(path != nullptr ? path : "font-sample.bmp"));
 }
 
-// Hidden: writes both pages of the test view to look at, to MODAL_SAMPLE_BMP with "-grid" and
-// "-samples" before its extension, or test-view-grid.bmp and test-view-samples.bmp.
+// Hidden: writes the pages of the test view to look at, to MODAL_SAMPLE_BMP with "-grid",
+// "-arrange", "-arrange-out" (zoomed out) and "-samples" before its extension, or to
+// test-view-grid.bmp and so on.
 TEST_CASE("a sample of the test view", "[.sample]")
 {
     auto window = offscreen(1000, 600);
@@ -245,6 +246,17 @@ TEST_CASE("a sample of the test view", "[.sample]")
     base = base.substr(0, base.rfind('.'));
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-grid.bmp"));
+    view.handle(Key::of(NamedKey::Tab));
+    for (const char32_t key : std::u32string_view{U"6j9l"})
+    {
+        view.handle(Key::typed(key));
+    }
+    window->draw(view.frame(), Theme::dark());
+    CHECK(window->saveFrame(base + "-arrange.bmp"));
+    view.handle(Key::typed(U'-'));
+    view.handle(Key::typed(U'-'));
+    window->draw(view.frame(), Theme::dark());
+    CHECK(window->saveFrame(base + "-arrange-out.bmp"));
     view.handle(Key::of(NamedKey::Tab));
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-samples.bmp"));

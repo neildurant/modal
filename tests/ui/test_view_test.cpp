@@ -139,9 +139,11 @@ TEST_CASE("the test view pages by half and whole screens, keeping two rows")
     CHECK(view.cursor().top() == 26);
 }
 
-TEST_CASE("Tab switches between the grid and the samples, where the cursor keys do nothing")
+TEST_CASE("Tab goes through the grid, the arrangement and the samples")
 {
     auto view = view80x24();
+    CHECK(view.handle(Key::of(NamedKey::Tab)));
+    CHECK(view.page() == TestView::Page::Arrange);
     CHECK(view.handle(Key::of(NamedKey::Tab)));
     CHECK(view.page() == TestView::Page::Samples);
     CHECK_FALSE(view.handle(Key::typed(U'j')));

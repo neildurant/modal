@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/ui/arrange_page.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
@@ -12,14 +13,16 @@ namespace modal::ui
 
 // What the program shows until the event list arrives (milestone 4), to try out the grid
 // renderer: a large grid of labelled cells to move the cursor around, with headers that stay
-// put as it scrolls, under a demo of bar lines in two meters on one time scale; and a page
-// of samples of each theme role and the characters the views use.
+// put as it scrolls, under a demo of bar lines in two meters on one time scale; a sketch of
+// the arrangement, with a made-up song (see ArrangePage); and a page of samples of each
+// theme role and the characters the views use.
 class TestView
 {
 public:
     enum class Page : std::uint8_t
     {
         Grid,
+        Arrange,
         Samples,
     };
 
@@ -36,14 +39,16 @@ public:
     void resize(int width, int height, CellSize cell);
 
     // Handles a key with the test view's own bindings, until there's a keymap: counts, hjkl
-    // and the arrow keys, 0 and $, G, Ctrl-D, Ctrl-U, Ctrl-F and Ctrl-B, Escape, and Tab to
-    // switch pages. Returns whether what's shown changed.
+    // and the arrow keys, 0 and $, G, Ctrl-D, Ctrl-U, Ctrl-F and Ctrl-B, Escape, Tab to go
+    // through the pages, and on the arrangement page + and - to zoom. Returns whether what's
+    // shown changed.
     bool handle(const Key& key);
 
     Frame frame() const;
 
     Page page() const { return page_; }
     const GridCursor& cursor() const { return cursor_; }
+    const ArrangePage& arrange() const { return arrange_; }
     int count() const { return count_; } // 0 when none has been typed
 
 private:
@@ -55,6 +60,7 @@ private:
 
     Page page_ = Page::Grid;
     GridCursor cursor_;
+    ArrangePage arrange_;
     int count_ = 0;
     int width_ = 0;
     int height_ = 0;

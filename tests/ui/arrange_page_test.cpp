@@ -1,0 +1,248 @@
+#include <modal/ui/arrange_page.hpp>
+#include <modal/ui/demo_song.hpp>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <string_view>
+#include <vector>
+
+using namespace modal;
+using namespace modal::ui;
+
+namespace
+{
+
+constexpr CellSize kCell{10, 20};
+
+// The demo song's page in a main area of 80 by 22 cells: 54 columns of timeline, and 19
+// tracks' rows below the ruler.
+ArrangePage page80x22()
+{
+    ArrangePage page{demoSong()};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    return page;
+}
+
+void type(ArrangePage& page, std::u32string_view keys, int count = 0)
+{
+    for (const char32_t key : keys)
+    {
+        page.handle(Key::typed(key), count);
+    }
+}
+
+// The shapes in a role across a track's row, in the timeline region.
+std::vector<Shape> rowShapes(const Region& timeline, int track, Role role)
+{
+    std::vector<Shape> shapes;
+    const int top = (ArrangePage::kRulerRows + track) * kCell.height;
+    for (const auto& shape : timeline.under)
+    {
+        if (shape.role == role && shape.rect.y >= top && shape.rect.y < top + kCell.height)
+        {
+            shapes.push_back(shape);
+        }
+    }
+    return shapes;
+}
+
+bool isDensity(Role role)
+{
+    return role == Role::Density1 || role == Role::Density2 || role == Role::Density3 ||
+           role == Role::Density4;
+}
+
+} // namespace
+
+TEST_CASE("density goes from sparse to busy by the notes starting to a quarter note")
+{
+    const auto ppqn = core::kPpqn;
+    const auto bar = core::NoteFraction{1, 1}.toTicks(ppqn); // four quarter notes
+    CHECK(ArrangePage::density(0, bar, ppqn) == 0);
+    CHECK(ArrangePage::density(1, bar, ppqn) == 1);
+    CHECK(ArrangePage::density(2, bar, ppqn) == 1);
+    CHECK(ArrangePage::density(3, bar, ppqn) == 2); // 0.75 to a quarter note
+    CHECK(ArrangePage::density(5, bar, ppqn) == 2);
+    CHECK(ArrangePage::density(6, bar, ppqn) == 3);
+    CHECK(ArrangePage::density(11, bar, ppqn) == 3);
+    CHECK(ArrangePage::density(12, bar, ppqn) == 4);
+    CHECK(ArrangePage::density(64, bar, ppqn) == 4);
+}
+
+TEST_CASE("the arrangement's cursor moves by each track's bars, and between tracks in time")
+{
+    auto page = page80x22();
+    const auto song = demoSong();
+    const auto& drums = song.tracks()[0]->meter;
+
+    type(page, U"l", 8); // to bar 9, the verse in 7/8
+    CHECK(page.track() == 0);
+    CHECK(page.bar() == 9);
+    CHECK(page.time() == drums.barStart(9));
+
+    // 32 quarter notes in, so in the eleventh bar of 3/4 on the ostinato, from 30.
+    type(page, U"j", 6);
+    CHECK(page.track() == 6);
+    CHECK(page.bar() == 11);
+    type(page, U"k", 6); // back where it was, since the time is kept
+    CHECK(page.track() == 0);
+    CHECK(page.bar() == 9);
+
+    // Moving by the ostinato's bars moves the time: its bar 11 starts in the drums' bar 8.
+    type(page, U"j", 6);
+    type(page, U"l");
+    CHECK(page.bar() == 12);
+    type(page, U"h");
+    type(page, U"k", 6);
+    CHECK(page.bar() == 8);
+
+    type(page, U"$");
+    CHECK(page.bar() == 53);
+    type(page, U"j", 6);
+    CHECK(page.bar() == 67);
+    type(page, U"$");
+    CHECK(page.bar() == 69); // the last 3/4 bar, cut short by the song's end
+    type(page, U"0");
+    CHECK(page.bar() == 1);
+    type(page, U"G", 20);
+    CHECK(page.bar() == 20);
+    type(page, U"G");
+    CHECK(page.bar() == 69);
+
+    type(page, U"j", 100);
+    CHECK(page.track() == 13);
+    type(page, U"h", 1000);
+    CHECK(page.bar() == 1);
+    CHECK_FALSE(page.handle(Key::typed(U'x'), 0));
+}
+
+TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in view")
+{
+    auto page = page80x22();
+    CHECK(page.leftTick() == 0);
+    const auto column = ArrangePage::kZooms[ArrangePage::kDefaultZoom].toTicks(core::kPpqn);
+
+    type(page, U"$");
+    CHECK(page.leftTick() > 0);
+    CHECK(page.leftTick() % column == 0);
+    // The song's end at the view's right edge: 205 quarter notes, in columns of two.
+    CHECK(page.leftTick() == (103 - 54) * column);
+
+    type(page, U"0");
+    CHECK(page.leftTick() == 0);
+}
+
+TEST_CASE("zooming changes the time in a column, within its limits")
+{
+    auto page = page80x22();
+    type(page, U"-");
+    CHECK(page.zoom() == ArrangePage::kDefaultZoom + 1);
+    type(page, U"-", 100);
+    CHECK(page.zoom() == ArrangePage::kZooms.size() - 1);
+    type(page, U"+", 100);
+    CHECK(page.zoom() == 0);
+    type(page, U"=");
+    CHECK(page.zoom() == 0);
+
+    // Zoomed in, the view follows the cursor's bar, in the new zoom's columns.
+    type(page, U"G", 30);
+    const auto column = ArrangePage::kZooms[0].toTicks(core::kPpqn);
+    CHECK(page.leftTick() % column == 0);
+    CHECK(page.leftTick() <= page.time());
+}
+
+TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    REQUIRE(frame.size() == 2); // the headers, then the timeline
+    const auto& timeline = frame[1];
+    CHECK(timeline.bounds == Rect{ArrangePage::kHeaderColumns * kCell.width, kCell.height,
+                                  54 * kCell.width, 22 * kCell.height});
+
+    // Drums: eight bars of 4/4 at density 3, each two columns less a gap of one pixel, then
+    // six bars of 7/8 at density 4, each one and three quarter columns.
+    std::vector<Shape> blocks;
+    for (const auto& shape : timeline.under)
+    {
+        const int top = ArrangePage::kRulerRows * kCell.height;
+        if (isDensity(shape.role) && shape.rect.y >= top && shape.rect.y < top + kCell.height)
+        {
+            blocks.push_back(shape);
+        }
+    }
+    REQUIRE(blocks.size() >= 14);
+    CHECK(blocks[0].role == Role::Density3);
+    CHECK(blocks[0].rect.x == 1);
+    CHECK(blocks[0].rect.width == 19);
+    CHECK(blocks[1].rect.x == 21);
+    CHECK(blocks[8].role == Role::Density4);
+    CHECK(blocks[8].rect.x == 161);
+    CHECK(blocks[9].rect.x == 161 + 17); // 17.5 pixels on, rounded down
+
+    // The bass is silent in the intro: a thin line in each bar.
+    const auto bass = rowShapes(timeline, 1, Role::BarLine);
+    REQUIRE(bass.size() >= 8);
+    CHECK(bass[0].rect.height == 1);
+
+    // The empty tracks have dots.
+    CHECK(rowShapes(timeline, 10, Role::Dim).size() >= 20);
+    CHECK(std::ranges::none_of(timeline.under,
+                               [](const Shape& shape)
+                               {
+                                   return isDensity(shape.role) &&
+                                          shape.rect.y >=
+                                              (ArrangePage::kRulerRows + 10) * kCell.height;
+                               }));
+}
+
+TEST_CASE("markers are lines across every track, named in the ruler")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    const auto& timeline = frame[1];
+    std::vector<int> lines;
+    for (const auto& shape : timeline.over)
+    {
+        if (shape.role == Role::Marker)
+        {
+            lines.push_back(shape.rect.x);
+            CHECK(shape.rect.y == 0);
+            CHECK(shape.rect.height == (ArrangePage::kRulerRows + 14) * kCell.height);
+        }
+    }
+    // Intro at 0, the verse at bar 9 (16 columns), the chorus 21 quarter notes later, and
+    // the bridge 50 after that; the second chorus is out of view.
+    CHECK(lines == std::vector<int>{0, 160, 265, 515});
+
+    int names = 0;
+    for (const auto& run : timeline.text)
+    {
+        names += run.y == 0 && run.style.foreground == Role::Marker ? 1 : 0;
+    }
+    CHECK(names == 4);
+}
+
+TEST_CASE("narrow bars lose their gaps")
+{
+    auto page = page80x22();
+    type(page, U"-", 2); // two whole notes to a column: a bar of 4/4 is five pixels
+    Frame frame;
+    page.addRegions(frame);
+    const auto drums = rowShapes(frame[1], 0, Role::Density3);
+    REQUIRE(drums.size() >= 2);
+    CHECK(drums[0].rect.x == 0);
+    CHECK(drums[0].rect.width == 5);
+    CHECK(drums[1].rect.x == 5);
+}
+
+TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
+{
+    auto page = page80x22();
+    type(page, U"l", 8);
+    type(page, U"j", 6);
+    CHECK(page.status() == "track 7  bar 11/69  3/4  zoom 1/2");
+}
