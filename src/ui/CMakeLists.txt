@@ -4,6 +4,7 @@ add_library(modal_ui STATIC
     bar_lines.cpp
     block_glyphs.cpp
     cell_grid.cpp
+    demo_song.cpp
     frame.cpp
     grid_cursor.cpp
     layout.cpp
