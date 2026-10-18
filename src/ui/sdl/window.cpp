@@ -1,6 +1,9 @@
+#include "font.hpp"
+
 #include <modal/ui/sdl/window.hpp>
 
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <utility>
 
@@ -13,9 +16,17 @@ struct Window::Impl
     SDL_Renderer* renderer = nullptr;
     SDL_Surface* lastFrame = nullptr; // offscreen only
     bool offscreen = false;
+    bool ttf = false; // SDL_ttf initialised
+    FontOptions fontOptions;
+    std::unique_ptr<Font> font;
 
     ~Impl()
     {
+        font.reset();
+        if (ttf)
+        {
+            TTF_Quit();
+        }
         SDL_DestroySurface(lastFrame);
         if (renderer != nullptr)
         {
@@ -51,7 +62,18 @@ std::variant<std::unique_ptr<Window>, std::string> Window::open(const WindowOpti
         return std::string{"can't open a window: "} + SDL_GetError();
     }
     SDL_SetRenderVSync(impl->renderer, 1); // where the renderer can; otherwise unsynced
-    return std::unique_ptr<Window>{new Window{std::move(impl)}};
+
+    if (!TTF_Init())
+    {
+        return std::string{"can't start SDL_ttf: "} + SDL_GetError();
+    }
+    impl->ttf = true;
+    std::unique_ptr<Window> window{new Window{std::move(impl)}};
+    if (auto error = window->setFont(options.font); !error.empty())
+    {
+        return error;
+    }
+    return window;
 }
 
 Window::Window(std::unique_ptr<Impl> impl)
@@ -78,6 +100,36 @@ void Window::drawFrame(Colour background, const std::function<void()>& draw)
     SDL_RenderPresent(impl_->renderer);
 }
 
+void Window::drawText(int column, int row, std::string_view text, Colour colour)
+{
+    const auto cell = impl_->font->cell();
+    const char* next = text.data();
+    std::size_t left = text.size();
+    for (int c = column; left > 0; ++c)
+    {
+        const auto character = static_cast<char32_t>(SDL_StepUTF8(&next, &left));
+        impl_->font->draw(character, static_cast<float>(c * cell.width),
+                          static_cast<float>(row * cell.height), colour);
+    }
+}
+
+std::string Window::setFont(const FontOptions& font)
+{
+    auto opened = Font::open(impl_->renderer, font, SDL_GetWindowDisplayScale(impl_->window));
+    if (auto* error = std::get_if<std::string>(&opened))
+    {
+        return std::move(*error);
+    }
+    impl_->font = std::move(std::get<std::unique_ptr<Font>>(opened));
+    impl_->fontOptions = font;
+    return {};
+}
+
+CellSize Window::cellSize() const
+{
+    return impl_->font->cell();
+}
+
 void Window::run(const std::function<void(Window&)>& redraw)
 {
     bool needsFrame = true;
@@ -101,10 +153,13 @@ void Window::run(const std::function<void(Window&)>& redraw)
             case SDL_EVENT_QUIT:
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
                 return;
+            case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+                setFont(impl_->fontOptions); // if it fails, the old size will do
+                needsFrame = true;
+                break;
             case SDL_EVENT_WINDOW_SHOWN:
             case SDL_EVENT_WINDOW_EXPOSED:
             case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-            case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
                 needsFrame = true;
                 break;
             default:
@@ -130,6 +185,11 @@ std::optional<Colour> Window::pixel(int x, int y) const
         return std::nullopt;
     }
     return Colour{r, g, b};
+}
+
+bool Window::saveFrame(const std::string& path) const
+{
+    return impl_->lastFrame != nullptr && SDL_SaveBMP(impl_->lastFrame, path.c_str());
 }
 
 int Window::pixelWidth() const

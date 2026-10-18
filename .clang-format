@@ -25,7 +25,7 @@ IncludeCategories:
     Priority: 1
   - Regex: '^<modal/'
     Priority: 2
-  - Regex: '^<(catch2|libremidi|SDL3)/'
+  - Regex: '^<(catch2|libremidi|SDL3|SDL3_ttf)/'
     Priority: 3
   - Regex: '^<'
     Priority: 4

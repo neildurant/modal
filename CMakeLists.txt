@@ -14,6 +14,7 @@ option(MODAL_BUILD_TESTS "Build the unit tests" ON)
 set(MODAL_SANITIZE "" CACHE STRING "Sanitizers to enable, e.g. address,undefined (GCC/Clang only)")
 
 include(cmake/ModalWarnings.cmake)
+include(cmake/EmbedFile.cmake)
 
 add_subdirectory(src/core)
 add_subdirectory(src/platform)

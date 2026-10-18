@@ -13,6 +13,10 @@
         { "name": "wayland", "platform": "linux" },
         { "name": "x11", "platform": "linux" }
       ]
+    },
+    {
+      "name": "sdl3-ttf",
+      "default-features": false
     }
   ]
 }
