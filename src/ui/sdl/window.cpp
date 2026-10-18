@@ -5,6 +5,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace modal::ui::sdl
@@ -19,6 +21,8 @@ struct Window::Impl
     bool ttf = false; // SDL_ttf initialised
     FontOptions fontOptions;
     std::unique_ptr<Font> font;
+    int minimumColumns = 0;
+    int minimumRows = 0;
 
     ~Impl()
     {
@@ -55,9 +59,14 @@ std::variant<std::unique_ptr<Window>, std::string> Window::open(const WindowOpti
 
     auto impl = std::make_unique<Impl>();
     impl->offscreen = options.offscreen;
-    const SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    if (!SDL_CreateWindowAndRenderer(options.title.c_str(), options.width, options.height, flags,
-                                     &impl->window, &impl->renderer))
+    // Hidden until it has its font and size.
+    const SDL_WindowFlags flags =
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
+    // Sized in cells, it starts at a placeholder size until it has its font.
+    const bool inCells = options.columns > 0 && options.rows > 0;
+    if (!SDL_CreateWindowAndRenderer(options.title.c_str(), inCells ? 640 : options.width,
+                                     inCells ? 400 : options.height, flags, &impl->window,
+                                     &impl->renderer))
     {
         return std::string{"can't open a window: "} + SDL_GetError();
     }
@@ -68,11 +77,20 @@ std::variant<std::unique_ptr<Window>, std::string> Window::open(const WindowOpti
         return std::string{"can't start SDL_ttf: "} + SDL_GetError();
     }
     impl->ttf = true;
+    impl->minimumColumns = options.minimumColumns;
+    impl->minimumRows = options.minimumRows;
     std::unique_ptr<Window> window{new Window{std::move(impl)}};
     if (auto error = window->setFont(options.font); !error.empty())
     {
         return error;
     }
+    if (inCells)
+    {
+        window->resizeToCells(options.columns, options.rows);
+        SDL_SetWindowPosition(window->impl_->window, SDL_WINDOWPOS_CENTERED,
+                              SDL_WINDOWPOS_CENTERED);
+    }
+    SDL_ShowWindow(window->impl_->window);
     return window;
 }
 
@@ -83,33 +101,98 @@ Window::Window(std::unique_ptr<Impl> impl)
 
 Window::~Window() = default;
 
-void Window::drawFrame(Colour background, const std::function<void()>& draw)
+namespace
 {
-    SDL_SetRenderDrawColor(impl_->renderer, background.r, background.g, background.b,
-                           SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(impl_->renderer);
-    if (draw)
+
+void fill(SDL_Renderer* renderer, const Rect& rect, Colour colour, Uint8 alpha = SDL_ALPHA_OPAQUE)
+{
+    SDL_SetRenderDrawColor(renderer, colour.r, colour.g, colour.b, alpha);
+    const SDL_FRect area{static_cast<float>(rect.x), static_cast<float>(rect.y),
+                         static_cast<float>(rect.width), static_cast<float>(rect.height)};
+    SDL_RenderFillRect(renderer, &area);
+}
+
+Rect offset(Rect rect, const Rect& by)
+{
+    rect.x += by.x;
+    rect.y += by.y;
+    return rect;
+}
+
+} // namespace
+
+void Window::draw(const Frame& frame, const Theme& theme)
+{
+    SDL_Renderer* renderer = impl_->renderer;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    const auto background = theme[Role::Background];
+    SDL_SetRenderDrawColor(renderer, background.r, background.g, background.b, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(renderer);
+    for (const auto& region : frame)
     {
-        draw();
+        drawRegion(region, theme);
     }
+    SDL_SetRenderClipRect(renderer, nullptr);
+
     if (impl_->offscreen)
     {
         SDL_DestroySurface(impl_->lastFrame);
-        impl_->lastFrame = SDL_RenderReadPixels(impl_->renderer, nullptr);
+        impl_->lastFrame = SDL_RenderReadPixels(renderer, nullptr);
     }
-    SDL_RenderPresent(impl_->renderer);
+    SDL_RenderPresent(renderer);
 }
 
-void Window::drawText(int column, int row, std::string_view text, Colour colour)
+void Window::drawRegion(const Region& region, const Theme& theme)
 {
-    const auto cell = impl_->font->cell();
-    const char* next = text.data();
-    std::size_t left = text.size();
-    for (int c = column; left > 0; ++c)
+    const Rect& bounds = region.bounds;
+    if (bounds.width <= 0 || bounds.height <= 0)
     {
-        const auto character = static_cast<char32_t>(SDL_StepUTF8(&next, &left));
-        impl_->font->draw(character, static_cast<float>(c * cell.width),
-                          static_cast<float>(row * cell.height), colour);
+        return;
+    }
+    SDL_Renderer* renderer = impl_->renderer;
+    const SDL_Rect clip{bounds.x, bounds.y, bounds.width, bounds.height};
+    SDL_SetRenderClipRect(renderer, &clip);
+
+    Font& font = *impl_->font;
+    const auto cell = font.cell();
+    const auto regionBackground = theme[region.background];
+    fill(renderer, bounds, regionBackground);
+
+    for (const auto& run : region.text)
+    {
+        const auto colour = theme.background(run.style);
+        if (colour != regionBackground)
+        {
+            const auto width = static_cast<int>(run.text.size()) * cell.width;
+            fill(renderer, offset({run.x, run.y, width, cell.height}, bounds), colour);
+        }
+    }
+    for (const auto& shape : region.under)
+    {
+        fill(renderer, offset(shape.rect, bounds), theme[shape.role], shape.alpha);
+    }
+    for (const auto& run : region.text)
+    {
+        const auto colour = theme.foreground(run.style);
+        const bool bold = (run.style.attributes & kBold) != 0;
+        int x = bounds.x + run.x;
+        const int y = bounds.y + run.y;
+        for (const char32_t character : run.text)
+        {
+            font.draw(character, bold, static_cast<float>(x), static_cast<float>(y), colour);
+            x += cell.width;
+        }
+        if ((run.style.attributes & kUnderline) != 0)
+        {
+            const auto width = static_cast<int>(run.text.size()) * cell.width;
+            fill(renderer,
+                 {bounds.x + run.x, y + font.underlineTop(), width, font.underlineThickness()},
+                 colour);
+        }
+    }
+    for (const auto& shape : region.over)
+    {
+        fill(renderer, offset(shape.rect, bounds), theme[shape.role], shape.alpha);
     }
 }
 
@@ -122,12 +205,56 @@ std::string Window::setFont(const FontOptions& font)
     }
     impl_->font = std::move(std::get<std::unique_ptr<Font>>(opened));
     impl_->fontOptions = font;
+    applyMinimumSize();
     return {};
 }
 
 CellSize Window::cellSize() const
 {
     return impl_->font->cell();
+}
+
+void Window::setMinimumCells(int columns, int rows)
+{
+    impl_->minimumColumns = std::max(columns, 0);
+    impl_->minimumRows = std::max(rows, 0);
+    applyMinimumSize();
+}
+
+namespace
+{
+
+// SDL takes window sizes in the display's units, which on some systems aren't pixels.
+int toWindowUnits(SDL_Window* window, int pixels)
+{
+    const float density = std::max(SDL_GetWindowPixelDensity(window), 0.01f);
+    return static_cast<int>(std::ceil(static_cast<float>(pixels) / density));
+}
+
+} // namespace
+
+void Window::resizeToCells(int columns, int rows)
+{
+    const auto cell = impl_->font->cell();
+    SDL_SetWindowSize(impl_->window, toWindowUnits(impl_->window, columns * cell.width),
+                      toWindowUnits(impl_->window, rows * cell.height));
+    SDL_SyncWindow(impl_->window);
+}
+
+void Window::applyMinimumSize()
+{
+    const auto cell = impl_->font->cell();
+    const int width = toWindowUnits(impl_->window, impl_->minimumColumns * cell.width);
+    const int height = toWindowUnits(impl_->window, impl_->minimumRows * cell.height);
+    SDL_SetWindowMinimumSize(impl_->window, width, height);
+
+    int current[2] = {};
+    SDL_GetWindowSize(impl_->window, &current[0], &current[1]);
+    if (current[0] < width || current[1] < height)
+    {
+        SDL_SetWindowSize(impl_->window, std::max(current[0], width), std::max(current[1], height));
+        SDL_SyncWindow(impl_->window);
+    }
 }
 
 namespace

@@ -8,6 +8,9 @@ add_library(modal_ui_sdl STATIC
 modal_embed_file(TARGET modal_ui_sdl
     FILE "${PROJECT_SOURCE_DIR}/assets/fonts/JetBrainsMonoNL-Regular.ttf"
     FUNCTION modal::ui::sdl::builtInFont)
+modal_embed_file(TARGET modal_ui_sdl
+    FILE "${PROJECT_SOURCE_DIR}/assets/fonts/JetBrainsMonoNL-Bold.ttf"
+    FUNCTION modal::ui::sdl::builtInBoldFont)
 add_library(modal::ui_sdl ALIAS modal_ui_sdl)
 
 target_include_directories(modal_ui_sdl PUBLIC include)

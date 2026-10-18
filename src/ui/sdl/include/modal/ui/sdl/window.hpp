@@ -1,24 +1,16 @@
 #pragma once
 
-#include <cstdint>
+#include <modal/ui/frame.hpp>
+#include <modal/ui/style.hpp>
+
 #include <functional>
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <variant>
 
 namespace modal::ui::sdl
 {
-
-struct Colour
-{
-    std::uint8_t r = 0;
-    std::uint8_t g = 0;
-    std::uint8_t b = 0;
-
-    friend bool operator==(Colour, Colour) = default;
-};
 
 struct FontOptions
 {
@@ -28,19 +20,15 @@ struct FontOptions
     friend bool operator==(const FontOptions&, const FontOptions&) = default;
 };
 
-// The size of a grid cell, in pixels.
-struct CellSize
-{
-    int width = 0;
-    int height = 0;
-
-    friend bool operator==(CellSize, CellSize) = default;
-};
-
 struct WindowOptions
 {
     std::string title = "Modal";
-    int width = 1280; // in the display's logical units, before any scaling
+
+    // The size to open at: in cells of its font if columns and rows are set, so that it's the
+    // same size relative to its text on any display, or else in the display's units.
+    int columns = 0;
+    int rows = 0;
+    int width = 1280;
     int height = 800;
 
     // Draws off screen, through SDL's offscreen video driver and software renderer, so tests
@@ -48,9 +36,13 @@ struct WindowOptions
     bool offscreen = false;
 
     FontOptions font;
+
+    // The smallest the window can be made, in cells of its font; 0 for no limit.
+    int minimumColumns = 0;
+    int minimumRows = 0;
 };
 
-// A window with a renderer and a monospace font, drawn as a grid of cells. SDL's video
+// A window with a renderer and a monospace font, which draws frames of regions. SDL's video
 // subsystem is initialised while it exists, so there is one at a time.
 class Window
 {
@@ -63,15 +55,18 @@ public:
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
-    // Draws a frame and shows it: fills the window with a colour, then calls draw.
-    void drawFrame(Colour background, const std::function<void()>& draw = {});
+    // Draws a frame and shows it: the window in the theme's background, then each region in
+    // turn, clipped to its bounds (see Region).
+    void draw(const Frame& frame, const Theme& theme);
 
-    // Draws UTF-8 text from a cell, one character to a cell, during drawFrame.
-    void drawText(int column, int row, std::string_view text, Colour colour);
-
-    // Changes the font, or says why it couldn't and keeps the one it had.
+    // Changes the font, or says why it couldn't and keeps the one it had. The minimum size
+    // follows the new cell size, and the window grows if it is now below it.
     std::string setFont(const FontOptions& font);
     CellSize cellSize() const;
+
+    // Sets the smallest the window can be made, in cells; 0 for no limit. If the window is
+    // smaller, it grows to fit, as far as the screen allows.
+    void setMinimumCells(int columns, int rows);
 
     // Handles events until the window is closed, calling redraw (which draws a frame) only
     // when the window needs one: when it is shown, resized or uncovered, or moved to a display
@@ -91,6 +86,10 @@ public:
 private:
     struct Impl;
     explicit Window(std::unique_ptr<Impl> impl);
+
+    void resizeToCells(int columns, int rows);
+    void applyMinimumSize();
+    void drawRegion(const Region& region, const Theme& theme);
 
     std::unique_ptr<Impl> impl_;
 };
