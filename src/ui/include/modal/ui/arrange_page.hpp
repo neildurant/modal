@@ -4,7 +4,6 @@
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/ui/frame.hpp>
-#include <modal/ui/key.hpp>
 
 #include <array>
 #include <cstddef>
@@ -32,19 +31,35 @@ public:
         core::NoteFraction{1, 16}, core::NoteFraction{1, 8}, core::NoteFraction{1, 4},
         core::NoteFraction{1, 2},  core::NoteFraction{1, 1}, core::NoteFraction{2, 1},
         core::NoteFraction{4, 1}};
-    static constexpr std::size_t kDefaultZoom = 3;
+    static constexpr std::size_t kDefaultZoom = 2; // a quarter note to a column
 
     explicit ArrangePage(core::Song song);
 
     // Fits the page to the main area, scrolling if the cursor would be out of view.
     void resize(Rect main, CellSize cell);
 
-    // Handles a key with a count (0 for none): h and l (or the arrow keys) by the current
-    // track's bars, j and k between tracks at the same time, 0 and $ to the first and last
-    // bar, G to the last bar or {count}G to a bar of the current track, Ctrl-D, Ctrl-U,
-    // Ctrl-F and Ctrl-B through the tracks, and + and - to zoom. Returns whether it was one
-    // of these.
-    bool handle(const Key& key, int count);
+    // The cursor moves by the current track's bars, and between tracks keeping its time, so
+    // it lands on the bar there that holds it. Each of these keeps the cursor in view.
+    void moveBars(std::int64_t by);
+    void moveTracks(std::int64_t by);
+    void goToBar(std::int64_t bar); // on the current track, counting from 1
+    void goToLastBar();
+
+    // Scrolls the tracks by some rows, down if positive, and moves the cursor as far, as
+    // Vim's Ctrl-D does.
+    void scrollTracks(std::int64_t by);
+
+    // Zooms out by some steps, or in if negative, as far as the zooms go; or back to the
+    // default.
+    void zoomBy(int steps);
+    void resetZoom();
+
+    // Scrolls to put the cursor's bar and track in the middle of the view, as far as the
+    // song allows.
+    void centre();
+
+    // How many tracks' rows are fully in view.
+    int viewTracks() const;
 
     void addRegions(Frame& frame) const;
 
@@ -67,11 +82,8 @@ public:
 private:
     const core::Track& currentTrack() const;
     std::int64_t lastBar(const core::Track& track) const;
-    void goToBar(std::int64_t bar);
-    void moveTracks(std::int64_t by);
     void follow();
     core::Tick columnTicks() const;
-    int viewTracks() const;
     int viewColumns() const;
 
     core::Song song_;

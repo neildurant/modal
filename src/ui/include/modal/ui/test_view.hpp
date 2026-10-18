@@ -1,12 +1,18 @@
 #pragma once
 
 #include <modal/ui/arrange_page.hpp>
+#include <modal/ui/default_keymap.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
+#include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
 
 #include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
 
 namespace modal::ui
 {
@@ -31,28 +37,43 @@ public:
     static constexpr int kCellColumns = 10;    // characters to a labelled cell
     static constexpr int kRowLabelColumns = 5; // the row numbers down the left
     static constexpr int kDemoRows = 6;        // the bar-line demo, above the grid
-    static constexpr int kMaxCount = 99999;
 
-    TestView();
+    struct CommandInfo
+    {
+        std::string_view name;
+        std::string_view description;
+    };
+
+    // The commands keys can be bound to, until there's an editor with commands of its own.
+    static std::span<const CommandInfo> commands();
+
+    explicit TestView(Keymap keymap = defaultKeymap());
 
     // Fits the view to the window, scrolling if the cursor would be out of it.
     void resize(int width, int height, CellSize cell);
 
-    // Handles a key with the test view's own bindings, until there's a keymap: counts, hjkl
-    // and the arrow keys, 0 and $, G, Ctrl-D, Ctrl-U, Ctrl-F and Ctrl-B, Escape, Tab to go
-    // through the pages, and on the arrangement page + and - to zoom. Returns whether what's
-    // shown changed.
-    bool handle(const Key& key);
+    // Handles a key pressed at a time in milliseconds, through the keymap, returning whether
+    // what's shown changed.
+    bool handle(const Key& key, std::int64_t now);
+
+    // When wake should next be called, for keys waiting on a timeout; and the call, which
+    // returns whether what's shown changed.
+    std::optional<std::int64_t> deadline() const { return keys_.deadline(); }
+    bool wake(std::int64_t now);
+
+    // Runs a command with a count (0 for none), returning whether it changed what's shown,
+    // or nothing if there's no such command.
+    std::optional<bool> run(std::string_view command, int count);
 
     Frame frame() const;
 
     Page page() const { return page_; }
     const GridCursor& cursor() const { return cursor_; }
     const ArrangePage& arrange() const { return arrange_; }
-    int count() const { return count_; } // 0 when none has been typed
+    std::string pending() const { return keys_.pending(); } // the count and keys typed so far
 
 private:
-    bool move(const Key& key, int count);
+    bool runAll(const std::vector<Action>& actions);
     Region demoRegion() const;
     Region cellsRegion() const;
     Region samplesRegion() const;
@@ -61,7 +82,8 @@ private:
     Page page_ = Page::Grid;
     GridCursor cursor_;
     ArrangePage arrange_;
-    int count_ = 0;
+    Keymap keymap_;
+    KeyDispatcher keys_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};

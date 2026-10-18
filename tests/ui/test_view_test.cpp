@@ -1,7 +1,10 @@
+#include <modal/ui/default_keymap.hpp>
+#include <modal/ui/keymap.hpp>
 #include <modal/ui/test_view.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,7 +30,7 @@ void type(TestView& view, std::u32string_view keys)
 {
     for (const char32_t key : keys)
     {
-        view.handle(Key::typed(key));
+        view.handle(Key::typed(key), 0);
     }
 }
 
@@ -81,8 +84,8 @@ TEST_CASE("the test view's motions take counts, as in Vim")
     CHECK(view.cursor().row() == 9);
     CHECK(view.cursor().column() == 0);
 
-    view.handle(Key::of(NamedKey::Down));
-    view.handle(Key::of(NamedKey::Right));
+    view.handle(Key::of(NamedKey::Down), 0);
+    view.handle(Key::of(NamedKey::Right), 0);
     CHECK(view.cursor().row() == 10);
     CHECK(view.cursor().column() == 1);
 
@@ -95,27 +98,27 @@ TEST_CASE("the test view's motions take counts, as in Vim")
     CHECK(view.cursor().row() == TestView::kGridRows - 1);
     type(view, U"40G");
     CHECK(view.cursor().row() == 39);
-    view.handle(Key::of(NamedKey::Home));
+    view.handle(Key::of(NamedKey::Home), 0);
     CHECK(view.cursor().column() == 0);
 }
 
 TEST_CASE("a count shows until a key uses it or Escape gives it up")
 {
     auto view = view80x24();
-    CHECK(view.handle(Key::typed(U'4')));
-    CHECK(view.handle(Key::typed(U'0')));
-    CHECK(view.count() == 40);
-    CHECK(view.handle(Key::of(NamedKey::Escape))); // the count is no longer shown
-    CHECK(view.count() == 0);
-    CHECK_FALSE(view.handle(Key::of(NamedKey::Escape)));
+    CHECK(view.handle(Key::typed(U'4'), 0));
+    CHECK(view.handle(Key::typed(U'0'), 0));
+    CHECK(view.pending() == "40");
+    CHECK(view.handle(Key::of(NamedKey::Escape), 0)); // the count is no longer shown
+    CHECK(view.pending().empty());
+    CHECK_FALSE(view.handle(Key::of(NamedKey::Escape), 0));
 
     type(view, U"5x"); // a key with no binding gives the count up too
-    CHECK(view.count() == 0);
+    CHECK(view.pending().empty());
     type(view, U"j");
     CHECK(view.cursor().row() == 1);
 
     type(view, U"9999999");
-    CHECK(view.count() == TestView::kMaxCount);
+    CHECK(view.pending() == "99999");
 }
 
 TEST_CASE("the test view pages by half and whole screens, keeping two rows")
@@ -124,29 +127,29 @@ TEST_CASE("the test view pages by half and whole screens, keeping two rows")
     REQUIRE(view.cursor().viewRows() == 15);
     REQUIRE(view.cursor().viewColumns() == 7);
 
-    view.handle(Key::typed(U'd', kCtrl));
+    view.handle(Key::typed(U'd', kCtrl), 0);
     CHECK(view.cursor().top() == 7);
     CHECK(view.cursor().row() == 7);
-    view.handle(Key::typed(U'u', kCtrl));
+    view.handle(Key::typed(U'u', kCtrl), 0);
     CHECK(view.cursor().top() == 0);
 
-    view.handle(Key::typed(U'f', kCtrl));
+    view.handle(Key::typed(U'f', kCtrl), 0);
     CHECK(view.cursor().top() == 13);
     type(view, U"2");
-    view.handle(Key::of(NamedKey::PageDown));
+    view.handle(Key::of(NamedKey::PageDown), 0);
     CHECK(view.cursor().top() == 39);
-    view.handle(Key::typed(U'b', kCtrl));
+    view.handle(Key::typed(U'b', kCtrl), 0);
     CHECK(view.cursor().top() == 26);
 }
 
 TEST_CASE("Tab goes through the grid, the arrangement and the samples")
 {
     auto view = view80x24();
-    CHECK(view.handle(Key::of(NamedKey::Tab)));
+    CHECK(view.handle(Key::of(NamedKey::Tab), 0));
     CHECK(view.page() == TestView::Page::Arrange);
-    CHECK(view.handle(Key::of(NamedKey::Tab)));
+    CHECK(view.handle(Key::of(NamedKey::Tab), 0));
     CHECK(view.page() == TestView::Page::Samples);
-    CHECK_FALSE(view.handle(Key::typed(U'j')));
+    CHECK_FALSE(view.handle(Key::typed(U'j'), 0));
     CHECK(view.cursor().row() == 0);
 
     const auto frame = view.frame();
@@ -154,7 +157,7 @@ TEST_CASE("Tab goes through the grid, the arrangement and the samples")
     CHECK(contains(rowText(frame[0], 0), U"Theme roles"));
     CHECK(contains(rowText(frame[2], 0), U"samples"));
 
-    view.handle(Key::of(NamedKey::Tab));
+    view.handle(Key::of(NamedKey::Tab), 0);
     CHECK(view.page() == TestView::Page::Grid);
 }
 
@@ -247,4 +250,66 @@ TEST_CASE("the demo draws bars of 4/4 above bars of 7/8, numbered at their bar l
         numbers += run.style.foreground == Role::Dim && run.x % kCell.width != 0 ? 1 : 0;
     }
     CHECK(numbers >= 4);
+}
+
+TEST_CASE("gg goes to the first row, or the one counted, as G does to the last")
+{
+    auto view = view80x24();
+    type(view, U"G");
+    CHECK(view.cursor().row() == TestView::kGridRows - 1);
+    type(view, U"g");
+    CHECK(view.pending() == "g");
+    type(view, U"g");
+    CHECK(view.cursor().row() == 0);
+    type(view, U"25gg");
+    CHECK(view.cursor().row() == 24);
+}
+
+TEST_CASE("z centres the view once the time for zz has passed, and zz resets the zoom")
+{
+    auto view = view80x24();
+    type(view, U"40j");
+    REQUIRE(view.cursor().top() == 26); // the cursor on the view's last row
+    view.handle(Key::typed(U'z'), 1000);
+    CHECK(view.pending() == "z");
+    REQUIRE(view.deadline() == 1000 + kDefaultTimeout);
+    CHECK_FALSE(view.wake(1999));
+    CHECK(view.cursor().top() == 26);
+    CHECK(view.wake(2000));
+    CHECK(view.cursor().top() == 33); // row 40 in the middle of 15
+    CHECK(view.pending().empty());
+    CHECK_FALSE(view.deadline());
+
+    // A key straight after z doesn't wait: z runs, then the key.
+    type(view, U"G");
+    view.handle(Key::typed(U'z'), 3000);
+    view.handle(Key::typed(U'k'), 3001);
+    CHECK(view.cursor().row() == TestView::kGridRows - 2);
+    CHECK(view.cursor().top() == TestView::kGridRows - 15);
+
+    // On the arrangement, zz zooms back to a quarter note to a column.
+    view.handle(Key::of(NamedKey::Tab), 4000);
+    type(view, U"--");
+    CHECK(view.arrange().zoom() == ArrangePage::kDefaultZoom + 2);
+    type(view, U"zz");
+    CHECK(view.arrange().zoom() == ArrangePage::kDefaultZoom);
+}
+
+TEST_CASE("every default key binding runs one of the test view's commands")
+{
+    for (const auto& binding : defaultBindings())
+    {
+        CAPTURE(binding.keys, binding.command);
+        CHECK(std::ranges::any_of(TestView::commands(), [&](const auto& command)
+                                  { return command.name == binding.command; }));
+        CHECK_FALSE(binding.hint.empty());
+    }
+    // And every command is one the test view runs.
+    TestView view;
+    for (const auto& command : TestView::commands())
+    {
+        CAPTURE(command.name);
+        CHECK(view.run(command.name, 0).has_value());
+    }
+    CHECK_FALSE(view.run("no-such-command", 0).has_value());
 }

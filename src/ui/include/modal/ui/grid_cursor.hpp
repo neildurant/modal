@@ -36,6 +36,9 @@ public:
     // Ctrl-D does. At the grid's edge the view stops and the cursor goes on to the edge.
     void scrollBy(int rows);
 
+    // Scrolls to put the cursor in the middle of the view, as far as the grid allows.
+    void centre();
+
 private:
     void follow();
 

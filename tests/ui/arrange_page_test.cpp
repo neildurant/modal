@@ -24,14 +24,48 @@ ArrangePage page80x22()
 {
     ArrangePage page{demoSong()};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.zoomBy(1); // to a half note to a column, as these tests measure
     return page;
 }
 
+// Moves as the test view's default key bindings do, with a count (0 for none).
 void type(ArrangePage& page, std::u32string_view keys, int count = 0)
 {
+    const int n = std::max(count, 1);
     for (const char32_t key : keys)
     {
-        page.handle(Key::typed(key), count);
+        switch (key)
+        {
+        case U'h':
+            page.moveBars(-n);
+            break;
+        case U'l':
+            page.moveBars(n);
+            break;
+        case U'j':
+            page.moveTracks(n);
+            break;
+        case U'k':
+            page.moveTracks(-n);
+            break;
+        case U'0':
+            page.goToBar(1);
+            break;
+        case U'$':
+            page.goToLastBar();
+            break;
+        case U'G':
+            count > 0 ? page.goToBar(count) : page.goToLastBar();
+            break;
+        case U'+':
+            page.zoomBy(-n);
+            break;
+        case U'-':
+            page.zoomBy(n);
+            break;
+        default:
+            FAIL("no such key in these tests");
+        }
     }
 }
 
@@ -117,14 +151,13 @@ TEST_CASE("the arrangement's cursor moves by each track's bars, and between trac
     CHECK(page.track() == 13);
     type(page, U"h", 1000);
     CHECK(page.bar() == 1);
-    CHECK_FALSE(page.handle(Key::typed(U'x'), 0));
 }
 
 TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in view")
 {
     auto page = page80x22();
     CHECK(page.leftTick() == 0);
-    const auto column = ArrangePage::kZooms[ArrangePage::kDefaultZoom].toTicks(core::kPpqn);
+    const auto column = ArrangePage::kZooms[page.zoom()].toTicks(core::kPpqn);
 
     type(page, U"$");
     CHECK(page.leftTick() > 0);
@@ -136,17 +169,22 @@ TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in 
     CHECK(page.leftTick() == 0);
 }
 
-TEST_CASE("zooming changes the time in a column, within its limits")
+TEST_CASE("zooming changes the time in a column, within its limits, and back to a quarter")
 {
-    auto page = page80x22();
+    ArrangePage page{demoSong()};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    CHECK(ArrangePage::kZooms[page.zoom()] == core::NoteFraction{1, 4});
     type(page, U"-");
     CHECK(page.zoom() == ArrangePage::kDefaultZoom + 1);
     type(page, U"-", 100);
     CHECK(page.zoom() == ArrangePage::kZooms.size() - 1);
     type(page, U"+", 100);
     CHECK(page.zoom() == 0);
-    type(page, U"=");
+    type(page, U"+");
     CHECK(page.zoom() == 0);
+    page.resetZoom();
+    CHECK(page.zoom() == ArrangePage::kDefaultZoom);
+    type(page, U"+", 2);
 
     // Zoomed in, the view follows the cursor's bar, in the new zoom's columns.
     type(page, U"G", 30);
@@ -352,6 +390,7 @@ TEST_CASE("a marker's line through the ruler breaks only where a label sits acro
     song.setMarker(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.zoomBy(1); // a half note to a column, so the marker is ten pixels in
     Frame frame;
     page.addRegions(frame);
 
@@ -378,6 +417,22 @@ TEST_CASE("narrow bars lose their gaps")
     CHECK(drums[0].rect.x == 0);
     CHECK(drums[0].rect.width == 5);
     CHECK(drums[1].rect.x == 5);
+}
+
+TEST_CASE("centring puts the cursor's bar and track in the middle of the view")
+{
+    auto page = page80x22(); // 60 columns of two quarter notes, 19 tracks' rows
+    type(page, U"G", 30);    // bar 30, from 109 quarter notes, of three
+    CHECK(page.leftTick() == 0);
+    page.centre();
+    // The bar's middle, 110.5 quarter notes in, less 60 quarter notes, in whole columns.
+    const auto column = ArrangePage::kZooms[page.zoom()].toTicks(core::kPpqn);
+    CHECK(page.leftTick() == 25 * column);
+    CHECK(page.topTrack() == 0); // all 14 tracks fit
+
+    type(page, U"0");
+    page.centre();
+    CHECK(page.leftTick() == 0); // no further left than the start
 }
 
 TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")

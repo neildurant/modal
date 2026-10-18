@@ -8,10 +8,12 @@
 #include <modal/ui/test_view.hpp>
 
 #include <algorithm>
+#include <array>
 #include <initializer_list>
 #include <iterator>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace modal::ui
 {
@@ -87,9 +89,10 @@ std::string rightAligned(const std::string& text, int width)
 
 } // namespace
 
-TestView::TestView()
+TestView::TestView(Keymap keymap)
     : cursor_(kGridRows, kGridColumns)
     , arrange_(demoSong())
+    , keymap_(std::move(keymap))
 {
 }
 
@@ -106,87 +109,170 @@ void TestView::resize(int width, int height, CellSize cell)
     arrange_.resize(layout_.main, cell_);
 }
 
-bool TestView::handle(const Key& key)
+namespace
 {
-    const bool plain = key.named == NamedKey::None && key.modifiers == kNoModifiers;
-    const char32_t c = key.character;
-    if (plain && ((c >= U'1' && c <= U'9') || (c == U'0' && count_ > 0)))
+
+constexpr std::array kCommands{
+    TestView::CommandInfo{"cursor-left", "Move left a column, or a bar"},
+    TestView::CommandInfo{"cursor-down", "Move down a row, or a track"},
+    TestView::CommandInfo{"cursor-up", "Move up a row, or a track"},
+    TestView::CommandInfo{"cursor-right", "Move right a column, or a bar"},
+    TestView::CommandInfo{"cursor-first", "Move to the first column, or bar"},
+    TestView::CommandInfo{"cursor-last", "Move to the last column, or bar"},
+    TestView::CommandInfo{"go-first", "Go to the first row or bar, or the one counted"},
+    TestView::CommandInfo{"go-last", "Go to the last row or bar, or the one counted"},
+    TestView::CommandInfo{"scroll-half-down", "Scroll down half a page"},
+    TestView::CommandInfo{"scroll-half-up", "Scroll up half a page"},
+    TestView::CommandInfo{"scroll-page-down", "Scroll down a page"},
+    TestView::CommandInfo{"scroll-page-up", "Scroll up a page"},
+    TestView::CommandInfo{"scroll-centre", "Scroll the cursor to the middle of the view"},
+    TestView::CommandInfo{"zoom-in", "Zoom in"},
+    TestView::CommandInfo{"zoom-out", "Zoom out"},
+    TestView::CommandInfo{"zoom-reset", "Zoom to the default"},
+    TestView::CommandInfo{"test-next-page", "Show the next page of the test view"},
+    TestView::CommandInfo{"cancel", "Cancel"},
+};
+
+} // namespace
+
+std::span<const TestView::CommandInfo> TestView::commands()
+{
+    return kCommands;
+}
+
+bool TestView::handle(const Key& key, std::int64_t now)
+{
+    const auto before = keys_.pending();
+    const bool changed = runAll(keys_.key(keymap_, Mode::Normal, key, now));
+    return changed || keys_.pending() != before;
+}
+
+bool TestView::wake(std::int64_t now)
+{
+    const auto before = keys_.pending();
+    const bool changed = runAll(keys_.timeout(keymap_, now));
+    return changed || keys_.pending() != before;
+}
+
+bool TestView::runAll(const std::vector<Action>& actions)
+{
+    bool changed = false;
+    for (const auto& action : actions)
     {
-        count_ = std::min(count_ * 10 + static_cast<int>(c - U'0'), kMaxCount);
+        changed = run(action.command, action.count).value_or(false) || changed;
+    }
+    return changed;
+}
+
+std::optional<bool> TestView::run(std::string_view command, int count)
+{
+    const int n = std::max(count, 1);
+    const bool grid = page_ == Page::Grid;
+    const bool arrange = page_ == Page::Arrange;
+    // Runs the action for the page shown, if it has one.
+    const auto onPage = [&](auto onGrid, auto onArrange)
+    {
+        if (grid)
+        {
+            onGrid();
+        }
+        else if (arrange)
+        {
+            onArrange();
+        }
+        return grid || arrange;
+    };
+    const auto rows = [&](bool half)
+    {
+        const int view = grid ? cursor_.viewRows() : arrange_.viewTracks();
+        return std::max(half ? view / 2 : view - 2, 1); // a page keeps two rows, as in Vim
+    };
+
+    if (command == "cursor-left")
+    {
+        return onPage([&] { cursor_.moveBy(0, -n); }, [&] { arrange_.moveBars(-n); });
+    }
+    if (command == "cursor-right")
+    {
+        return onPage([&] { cursor_.moveBy(0, n); }, [&] { arrange_.moveBars(n); });
+    }
+    if (command == "cursor-down")
+    {
+        return onPage([&] { cursor_.moveBy(n, 0); }, [&] { arrange_.moveTracks(n); });
+    }
+    if (command == "cursor-up")
+    {
+        return onPage([&] { cursor_.moveBy(-n, 0); }, [&] { arrange_.moveTracks(-n); });
+    }
+    if (command == "cursor-first")
+    {
+        return onPage([&] { cursor_.moveTo(cursor_.row(), 0); }, [&] { arrange_.goToBar(1); });
+    }
+    if (command == "cursor-last") // with a count, on a row further down, as in Vim
+    {
+        return onPage([&] { cursor_.moveTo(cursor_.row() + n - 1, kGridColumns - 1); },
+                      [&] { arrange_.goToLastBar(); });
+    }
+    if (command == "go-first" || command == "go-last")
+    {
+        const bool first = command == "go-first";
+        return onPage(
+            [&]
+            {
+                const int row = count > 0 ? count - 1 : first ? 0 : kGridRows - 1;
+                cursor_.moveTo(row, cursor_.column());
+            },
+            [&]
+            {
+                if (count > 0 || first)
+                {
+                    arrange_.goToBar(std::max(count, 1));
+                }
+                else
+                {
+                    arrange_.goToLastBar();
+                }
+            });
+    }
+    if (command == "scroll-half-down" || command == "scroll-half-up" ||
+        command == "scroll-page-down" || command == "scroll-page-up")
+    {
+        const bool half = command.starts_with("scroll-half");
+        const int by = n * rows(half) * (command.ends_with("down") ? 1 : -1);
+        return onPage([&] { cursor_.scrollBy(by); }, [&] { arrange_.scrollTracks(by); });
+    }
+    if (command == "scroll-centre")
+    {
+        return onPage([&] { cursor_.centre(); }, [&] { arrange_.centre(); });
+    }
+    if (command == "zoom-in" || command == "zoom-out" || command == "zoom-reset")
+    {
+        if (!arrange)
+        {
+            return false;
+        }
+        if (command == "zoom-reset")
+        {
+            arrange_.resetZoom();
+        }
+        else
+        {
+            arrange_.zoomBy(command == "zoom-in" ? -n : n);
+        }
         return true;
     }
-    const int count = std::exchange(count_, 0);
-    if (key == Key::of(NamedKey::Tab))
+    if (command == "test-next-page")
     {
         page_ = page_ == Page::Grid      ? Page::Arrange
                 : page_ == Page::Arrange ? Page::Samples
                                          : Page::Grid;
         return true;
     }
-    const bool moved = page_ == Page::Grid      ? move(key, count)
-                       : page_ == Page::Arrange ? arrange_.handle(key, count)
-                                                : false;
-    return moved || count > 0; // a count given up is shown no more
-}
-
-bool TestView::move(const Key& key, int count)
-{
-    const int n = std::max(count, 1);
-    const int halfPage = std::max(cursor_.viewRows() / 2, 1);
-    const int page = std::max(cursor_.viewRows() - 2, 1); // as in Vim, keeping two rows
-    const auto ctrl = [&](char32_t c) { return key == Key::typed(c, kCtrl); };
-    const auto is = [&](char32_t c, NamedKey named)
-    { return key == Key::typed(c) || (named != NamedKey::None && key == Key::of(named)); };
-
-    if (is(U'h', NamedKey::Left))
-    {
-        cursor_.moveBy(0, -n);
-    }
-    else if (is(U'l', NamedKey::Right))
-    {
-        cursor_.moveBy(0, n);
-    }
-    else if (is(U'j', NamedKey::Down))
-    {
-        cursor_.moveBy(n, 0);
-    }
-    else if (is(U'k', NamedKey::Up))
-    {
-        cursor_.moveBy(-n, 0);
-    }
-    else if (is(U'0', NamedKey::Home))
-    {
-        cursor_.moveTo(cursor_.row(), 0);
-    }
-    else if (is(U'$', NamedKey::End)) // with a count, on rows further down, as in Vim
-    {
-        cursor_.moveTo(cursor_.row() + n - 1, kGridColumns - 1);
-    }
-    else if (is(U'G', NamedKey::None))
-    {
-        cursor_.moveTo(count > 0 ? count - 1 : kGridRows - 1, cursor_.column());
-    }
-    else if (ctrl(U'd'))
-    {
-        cursor_.scrollBy(n * halfPage);
-    }
-    else if (ctrl(U'u'))
-    {
-        cursor_.scrollBy(-n * halfPage);
-    }
-    else if (ctrl(U'f') || key == Key::of(NamedKey::PageDown))
-    {
-        cursor_.scrollBy(n * page);
-    }
-    else if (ctrl(U'b') || key == Key::of(NamedKey::PageUp))
-    {
-        cursor_.scrollBy(-n * page);
-    }
-    else
+    if (command == "cancel")
     {
         return false;
     }
-    return true;
+    return std::nullopt;
 }
 
 Frame TestView::frame() const
@@ -381,9 +467,9 @@ void TestView::addBars(Frame& frame) const
     {
         bottom.centre = {{arrange_.status(), bar}};
     }
-    if (count_ > 0)
+    if (const auto pending = keys_.pending(); !pending.empty())
     {
-        bottom.right.push_back({number(count_) + "   ", {Role::Accent, Role::Bar, kBold}});
+        bottom.right.push_back({pending + "   ", {Role::Accent, Role::Bar, kBold}});
     }
     bottom.right.push_back({number(width_) + "×" + number(height_) + " px   " +
                                 number(layout_.fullColumns) + "×" + number(layout_.fullRows) +

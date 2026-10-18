@@ -241,25 +241,27 @@ TEST_CASE("a sample of the test view", "[.sample]")
     view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
     for (const char32_t key : std::u32string_view{U"12j3l"})
     {
-        view.handle(Key::typed(key));
+        view.handle(Key::typed(key), 0);
     }
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
     std::string base = path != nullptr ? path : "test-view.bmp";
     base = base.substr(0, base.rfind('.'));
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-grid.bmp"));
-    view.handle(Key::of(NamedKey::Tab));
+    view.handle(Key::of(NamedKey::Tab), 0);
     for (const char32_t key : std::u32string_view{U"6j9l"})
     {
-        view.handle(Key::typed(key));
+        view.handle(Key::typed(key), 0);
     }
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-arrange.bmp"));
-    view.handle(Key::typed(U'-'));
-    view.handle(Key::typed(U'-'));
+    for (int i = 0; i < 3; ++i) // to two whole notes to a column
+    {
+        view.handle(Key::typed(U'-'), 0);
+    }
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-arrange-out.bmp"));
-    view.handle(Key::of(NamedKey::Tab));
+    view.handle(Key::of(NamedKey::Tab), 0);
     window->draw(view.frame(), Theme::dark());
     CHECK(window->saveFrame(base + "-samples.bmp"));
 }

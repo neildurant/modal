@@ -138,88 +138,80 @@ int ArrangePage::viewColumns() const
 
 void ArrangePage::goToBar(std::int64_t bar)
 {
+    if (song_.tracks().empty())
+    {
+        return;
+    }
     time_ =
         currentTrack().meter.barStart(std::clamp<std::int64_t>(bar, 1, lastBar(currentTrack())));
+    follow();
 }
 
 void ArrangePage::moveTracks(std::int64_t by)
 {
+    if (song_.tracks().empty())
+    {
+        return;
+    }
     const auto last = static_cast<std::int64_t>(song_.tracks().size()) - 1;
     track_ = static_cast<std::size_t>(
         std::clamp<std::int64_t>(static_cast<std::int64_t>(track_) + by, 0, last));
+    follow();
 }
 
-bool ArrangePage::handle(const Key& key, int count)
+void ArrangePage::moveBars(std::int64_t by)
 {
-    if (song_.tracks().empty())
+    if (!song_.tracks().empty())
     {
-        return false;
+        goToBar(bar() + by);
     }
-    const std::int64_t n = std::max(count, 1);
-    const auto is = [&](char32_t c, NamedKey named)
-    { return key == Key::typed(c) || (named != NamedKey::None && key == Key::of(named)); };
-    const auto ctrl = [&](char32_t c) { return key == Key::typed(c, kCtrl); };
-    const int halfPage = std::max(viewTracks() / 2, 1);
-    const int page = std::max(viewTracks() - 2, 1);
+}
 
-    if (is(U'h', NamedKey::Left))
-    {
-        goToBar(bar() - n);
-    }
-    else if (is(U'l', NamedKey::Right))
-    {
-        goToBar(bar() + n);
-    }
-    else if (is(U'j', NamedKey::Down))
-    {
-        moveTracks(n);
-    }
-    else if (is(U'k', NamedKey::Up))
-    {
-        moveTracks(-n);
-    }
-    else if (is(U'0', NamedKey::Home))
-    {
-        goToBar(1);
-    }
-    else if (is(U'$', NamedKey::End))
+void ArrangePage::goToLastBar()
+{
+    if (!song_.tracks().empty())
     {
         goToBar(lastBar(currentTrack()));
     }
-    else if (is(U'G', NamedKey::None))
-    {
-        goToBar(count > 0 ? count : lastBar(currentTrack()));
-    }
-    else if (ctrl(U'd') || ctrl(U'u'))
-    {
-        const auto by = n * halfPage * (ctrl(U'd') ? 1 : -1);
-        topTrack_ = static_cast<std::size_t>(
-            std::max<std::int64_t>(static_cast<std::int64_t>(topTrack_) + by, 0));
-        moveTracks(by);
-    }
-    else if (ctrl(U'f') || ctrl(U'b') || key == Key::of(NamedKey::PageDown) ||
-             key == Key::of(NamedKey::PageUp))
-    {
-        const bool down = ctrl(U'f') || key == Key::of(NamedKey::PageDown);
-        const auto by = n * page * (down ? 1 : -1);
-        topTrack_ = static_cast<std::size_t>(
-            std::max<std::int64_t>(static_cast<std::int64_t>(topTrack_) + by, 0));
-        moveTracks(by);
-    }
-    else if (is(U'+', NamedKey::None) || is(U'=', NamedKey::None))
-    {
-        zoom_ = zoom_ > 0 ? zoom_ - std::min<std::size_t>(static_cast<std::size_t>(n), zoom_) : 0;
-    }
-    else if (is(U'-', NamedKey::None))
-    {
-        zoom_ = std::min(zoom_ + static_cast<std::size_t>(n), kZooms.size() - 1);
-    }
-    else
-    {
-        return false;
-    }
+}
+
+void ArrangePage::scrollTracks(std::int64_t by)
+{
+    topTrack_ = static_cast<std::size_t>(
+        std::max<std::int64_t>(static_cast<std::int64_t>(topTrack_) + by, 0));
+    moveTracks(by);
+}
+
+void ArrangePage::zoomBy(int steps)
+{
+    const auto last = static_cast<std::int64_t>(kZooms.size()) - 1;
+    zoom_ = static_cast<std::size_t>(
+        std::clamp<std::int64_t>(static_cast<std::int64_t>(zoom_) + steps, 0, last));
     follow();
-    return true;
+}
+
+void ArrangePage::resetZoom()
+{
+    zoom_ = kDefaultZoom;
+    follow();
+}
+
+void ArrangePage::centre()
+{
+    if (song_.tracks().empty())
+    {
+        return;
+    }
+    topTrack_ = static_cast<std::size_t>(
+        std::max<std::int64_t>(static_cast<std::int64_t>(track_) - viewTracks() / 2, 0));
+    const auto& meter = currentTrack().meter;
+    const auto barNumber = meter.toBarBeatTick(time_).bar;
+    const core::Tick middle =
+        (meter.barStart(barNumber) + std::min(meter.barStart(barNumber + 1), end_)) / 2;
+    const core::Tick column = columnTicks();
+    const core::Tick left = std::max<core::Tick>(middle - viewColumns() * column / 2, 0);
+    leftTick_ = left / column * column;
+    follow(); // and back from past the song's end
 }
 
 void ArrangePage::follow()

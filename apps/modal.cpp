@@ -38,8 +38,8 @@ int main()
                     view.resize(w.pixelWidth(), w.pixelHeight(), w.cellSize());
                     w.draw(view.frame(), theme);
                 },
-                .key = [&](const ui::Key& key, std::int64_t) { return view.handle(key); },
-                .deadline = {},
-                .wake = {}});
+                .key = [&](const ui::Key& key, std::int64_t now) { return view.handle(key, now); },
+                .deadline = [&] { return view.deadline(); },
+                .wake = [&](std::int64_t now) { return view.wake(now); }});
     return 0;
 }

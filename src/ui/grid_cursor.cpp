@@ -54,6 +54,13 @@ void GridCursor::scrollBy(int rows)
     follow();
 }
 
+void GridCursor::centre()
+{
+    top_ = std::clamp(row_ - viewRows_ / 2, 0, std::max(rows_ - viewRows_, 0));
+    left_ = std::clamp(column_ - viewColumns_ / 2, 0, std::max(columns_ - viewColumns_, 0));
+    follow();
+}
+
 void GridCursor::follow()
 {
     top_ = std::clamp(top_, row_ - viewRows_ + 1, row_);

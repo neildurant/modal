@@ -132,3 +132,23 @@ TEST_CASE("a grid smaller than its view doesn't scroll")
     CHECK(cursor.row() == 4);
     CHECK(cursor.column() == 2);
 }
+
+TEST_CASE("centring scrolls the cursor to the middle of the view, as far as the grid allows")
+{
+    GridCursor cursor{100, 50};
+    cursor.setView(10, 5);
+    cursor.moveTo(40, 20);
+    CHECK(cursor.top() == 31);
+    cursor.centre();
+    CHECK(cursor.top() == 35);
+    CHECK(cursor.left() == 18);
+
+    cursor.moveTo(2, 1); // near the start, it can't go further up or left
+    cursor.centre();
+    CHECK(cursor.top() == 0);
+    CHECK(cursor.left() == 0);
+    cursor.moveTo(98, 49); // nor past the end
+    cursor.centre();
+    CHECK(cursor.top() == 90);
+    CHECK(cursor.left() == 45);
+}
