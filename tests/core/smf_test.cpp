@@ -262,6 +262,38 @@ TEST_CASE("type 1 files: conductor track, tempo, meter and markers")
     }
 }
 
+TEST_CASE("an imported file is one section, with a conductor track's cue points as bookmarks")
+{
+    const std::uint16_t division = 96;
+    const std::uint32_t bar = 4 * division;
+    SmfTrack conductor;
+    conductor.text(0, 0x07, "count in").text(2 * bar, 0x07, "fix this").end();
+    SmfTrack bass;
+    bass.text(0, 0x07, "kept")
+        .event(0, {0x90, 40, 100})
+        .event(2 * bar + division, {0x80, 40, 0})
+        .end();
+    const auto song = importOk(makeSmf(1, division, {conductor, bass}));
+
+    REQUIRE(song.tracks().size() == 1); // the cue points don't make a track
+    REQUIRE(song.markers().size() == 2);
+    CHECK(song.markers()[0] == Marker{0, "count in"});
+    CHECK(song.markers()[1] == Marker{2 * kPpqn.whole(), "fix this"});
+
+    // A cue point among a track's notes stays one of its events.
+    const auto id = song.tracks()[0]->id();
+    const auto& events = song.events(id);
+    REQUIRE(events.size() == 2);
+    CHECK(events[0].data == EventData{makeMetaText(MetaText::Kind::CuePoint, "kept")});
+
+    // One section, ending on the bar line after the last note, which every track follows.
+    REQUIRE(song.sections().size() == 1);
+    CHECK(song.sections()[0]->name() == "Song");
+    CHECK(song.end() == 3 * kPpqn.whole());
+    REQUIRE(song.sections()[0]->content(id));
+    CHECK_FALSE(song.sections()[0]->content(id)->meter);
+}
+
 TEST_CASE("a track with only SysEx or text still becomes a track")
 {
     SmfTrack conductor;

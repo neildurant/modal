@@ -271,9 +271,20 @@ SmfExportResult exportSmf(const Song& song, SmfType type)
              meta(0x58, {static_cast<std::uint8_t>(signature.numerator),
                          static_cast<std::uint8_t>(power), static_cast<std::uint8_t>(clocks), 8})});
     }
+    // Section starts as markers, so other software sees the structure (unless there's only
+    // the one), and bookmarks as cue points, so they can be told apart.
+    const auto sections = song.sections();
+    if (sections.size() > 1)
+    {
+        for (std::size_t i = 0; i < sections.size(); ++i)
+        {
+            conductor.push_back(
+                {song.sectionStart(i), Slot::Conductor, meta(0x06, sections[i]->name())});
+        }
+    }
     for (const auto& marker : song.markers())
     {
-        conductor.push_back({marker.tick, Slot::Conductor, meta(0x06, marker.name)});
+        conductor.push_back({marker.tick, Slot::Conductor, meta(0x07, marker.name)});
     }
 
     // The tracks.

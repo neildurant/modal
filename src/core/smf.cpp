@@ -560,6 +560,27 @@ Song buildSong(ParsedFile& file)
             }
         });
 
+    // Cue points in a conductor track (one with no channel events) are bookmarks, as Modal
+    // writes them; elsewhere they stay among the track's events.
+    for (auto& parsed : file.tracks)
+    {
+        if (parsed.hasChannelEvents())
+        {
+            continue;
+        }
+        std::erase_if(parsed.events,
+                      [&](const ParsedEvent& e)
+                      {
+                          const auto* meta = std::get_if<MetaText>(&e.event.data);
+                          if (meta == nullptr || meta->kind != MetaText::Kind::CuePoint)
+                          {
+                              return false;
+                          }
+                          file.markers.push_back({e.event.tick, meta->text ? *meta->text : ""});
+                          return true;
+                      });
+    }
+
     // Tracks: one per channel used by each file track.
     for (const auto& parsed : file.tracks)
     {
