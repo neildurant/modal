@@ -87,6 +87,7 @@ public:
 
 private:
     const core::Track& currentTrack() const;
+    const core::MeterMap& meterOf(const core::Track& track) const;
     std::int64_t lastBar(const core::Track& track) const;
     void follow();
     core::Tick columnTicks() const;

@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
@@ -61,8 +62,10 @@ TEST_CASE("a count-in uses the tempo and meter at the record point")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.meter.set(4 * q, {6, 8}); });
-    song.tempo().set(4 * q, Tempo{1'000'000}); // 60 BPM from bar 2
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(4 * q, {6, 8}); });
+    song.updateTempo([&](TempoMap& tempo)
+                     { tempo.set(4 * q, Tempo{1'000'000}); }); // 60 BPM from bar 2
     song.countIn.bars = 2;
 
     const auto start = planRecordStart(song, 4 * q, kClick);
@@ -107,7 +110,8 @@ TEST_CASE("a click is cut short where the count-in's beat is shorter")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [](Track& track) { track.meter.set(0, {4, 64}); });
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(0, {4, 64}); });
 
     const auto start = planRecordStart(song, 0, kClick);
     REQUIRE(start.countIn);
@@ -139,7 +143,8 @@ TEST_CASE("a pre-roll starts bars before the record point, but not before the so
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.meter.set(8 * q, {3, 4}); });
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(8 * q, {3, 4}); });
     song.countIn.mode = Mode::PreRoll;
 
     CHECK(song.countIn.preRollBars == 1);

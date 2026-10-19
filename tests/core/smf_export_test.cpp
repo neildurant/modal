@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/ppqn.hpp"
 
 #include <modal/core/smf.hpp>
@@ -14,6 +15,7 @@
 #include <vector>
 
 using namespace modal::core;
+using namespace modal::test;
 using Bytes = std::vector<std::uint8_t>;
 
 namespace
@@ -62,21 +64,23 @@ Bytes tracksOf(const Bytes& file)
     return {file.begin() + 14, file.end()};
 }
 
-TrackId addTrack(Song& song, std::string name, int channel, const std::function<void(Track&)>& edit)
+TrackId addTrack(Song& song, std::string name, int channel,
+                 const std::function<void(EditTrack&)>& edit)
 {
     const auto id = song.addTrack(std::move(name));
-    song.updateTrack(id,
-                     [&](Track& track)
-                     {
-                         track.channel = channel;
-                         edit(track);
-                     });
+    editTrack(song, id,
+              [&](EditTrack& track)
+              {
+                  track.channel = channel;
+                  edit(track);
+              });
     return id;
 }
 
-std::vector<Event> eventsOf(const Track& track)
+std::vector<Event> eventsOf(const Song& song, const Track& track)
 {
-    return {track.events.all().begin(), track.events.all().end()};
+    const auto& events = song.events(track.id());
+    return {events.all().begin(), events.all().end()};
 }
 
 Song reimported(const Bytes& bytes)
@@ -95,16 +99,15 @@ TEST_CASE("an exported song reads back the same")
     const Tick q = kPpqn.quarter();
     Song song{kPpqn};
     song.title = "Song";
-    song.tempo().set(0, Tempo{500'000});
-    song.tempo().set(8 * q, Tempo::fromBpm(90));
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{500'000}); });
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(8 * q, Tempo::fromBpm(90)); });
     song.setMarker(4 * q, "Verse");
     song.setMarker(10 * q, "Chorus");
-    const auto withMeter = [&](Track& track) { track.meter.set(4 * q, {3, 4}); };
+    song.updateMeter([&](MeterMap& meter) { meter.set(4 * q, {3, 4}); });
 
     addTrack(song, "Piano", 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
-                 withMeter(track);
                  track.events.insert({0, ProgramChange{5}});
                  track.events.insert({0, ControlChange{7, 100}});
                  track.events.insert({0, Note{60, 100, q, 30}});
@@ -118,9 +121,8 @@ TEST_CASE("an exported song reads back the same")
                  track.events.insert({20 * q, Note{72, 100, q}});
              });
     addTrack(song, "Bass", 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
-                 withMeter(track);
                  track.events.insert({0, Note{36, 100, q}});
                  track.events.insert({q, Note{36, 80, q}}); // touching the one before
                  track.events.insert({2 * q, Note{38, 70, 0}});
@@ -144,8 +146,8 @@ TEST_CASE("an exported song reads back the same")
         const auto& copy = *back.tracks()[i];
         CHECK(copy.name == original.name);
         CHECK(copy.channel == original.channel);
-        CHECK(copy.meter == original.meter);
-        CHECK(eventsOf(copy) == eventsOf(original));
+        CHECK(back.meter(copy.id()) == song.meter(original.id()));
+        CHECK(eventsOf(back, copy) == eventsOf(song, original));
     }
 }
 
@@ -155,7 +157,7 @@ TEST_CASE("at each tick come note-offs, other events, note-ons, then zero-length
     const Tick q = ppqn.quarter();
     Song song{ppqn};
     addTrack(song, "T", 3,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, q}});
                  track.events.insert({q, Note{60, 90, q}});
@@ -199,7 +201,7 @@ TEST_CASE("running status is used between channel messages, but not across meta 
     const Tick q = ppqn.quarter();
     Song song{ppqn};
     addTrack(song, "", 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, ControlChange{1, 10}});
                  track.events.insert({0, ControlChange{1, 20}});
@@ -229,9 +231,10 @@ TEST_CASE("a type 0 export puts everything in one track")
     const Tick q = kPpqn.quarter();
     Song song{kPpqn};
     song.title = "Song";
-    addTrack(song, "Piano", 1, [&](Track& track) { track.events.insert({0, Note{60, 100, q}}); });
+    addTrack(song, "Piano", 1,
+             [&](EditTrack& track) { track.events.insert({0, Note{60, 100, q}}); });
     addTrack(song, "Bass", 2,
-             [&](Track& track) { track.events.insert({q, Note{36, 100, 2 * q}}); });
+             [&](EditTrack& track) { track.events.insert({q, Note{36, 100, 2 * q}}); });
 
     const auto result = exportSmf(song, SmfType::Type0);
     REQUIRE(result.error.empty());
@@ -244,9 +247,9 @@ TEST_CASE("a type 0 export puts everything in one track")
     CHECK(back.title == "Song");
     REQUIRE(back.tracks().size() == 2);
     CHECK(back.tracks()[0]->channel == 1);
-    CHECK(eventsOf(*back.tracks()[0]) == eventsOf(*song.tracks()[0]));
+    CHECK(eventsOf(back, *back.tracks()[0]) == eventsOf(song, *song.tracks()[0]));
     CHECK(back.tracks()[1]->channel == 2);
-    CHECK(eventsOf(*back.tracks()[1]) == eventsOf(*song.tracks()[1]));
+    CHECK(eventsOf(back, *back.tracks()[1]) == eventsOf(song, *song.tracks()[1]));
 }
 
 TEST_CASE("each track ends at its last event, and the first track at the song's end")
@@ -254,8 +257,9 @@ TEST_CASE("each track ends at its last event, and the first track at the song's 
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song{ppqn};
-    addTrack(song, "", 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 5 * q}}); });
-    addTrack(song, "", 1, [&](Track& track) { track.events.insert({q, ControlChange{7, 1}}); });
+    addTrack(song, "", 1,
+             [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 5 * q}}); });
+    addTrack(song, "", 1, [&](EditTrack& track) { track.events.insert({q, ControlChange{7, 1}}); });
 
     const auto result = exportSmf(song);
     REQUIRE(result.error.empty());
@@ -280,7 +284,8 @@ TEST_CASE("each track ends at its last event, and the first track at the song's 
 TEST_CASE("export clamps tempos too slow for a MIDI file, and refuses what won't fit")
 {
     Song slow{kPpqn};
-    slow.tempo().set(0, Tempo{Tempo::kMaxMicrosPerQuarter}); // 1 BPM
+    slow.updateTempo([&](TempoMap& tempo)
+                     { tempo.set(0, Tempo{Tempo::kMaxMicrosPerQuarter}); }); // 1 BPM
     const auto clamped = exportSmf(slow);
     REQUIRE(clamped.error.empty());
     REQUIRE(clamped.warnings.size() == 1);
@@ -294,7 +299,7 @@ TEST_CASE("export clamps tempos too slow for a MIDI file, and refuses what won't
 
     Song gap{kPpqn};
     addTrack(gap, "", 1,
-             [](Track& track) { track.events.insert({0x1000'0000, ControlChange{7, 1}}); });
+             [](EditTrack& track) { track.events.insert({0x1000'0000, ControlChange{7, 1}}); });
     const auto tooLong = exportSmf(gap);
     CHECK_FALSE(tooLong.error.empty());
     CHECK(tooLong.bytes.empty());
@@ -309,7 +314,7 @@ TEST_CASE("exporting to a file replaces it whole")
         old << "an older, longer file that the export replaces";
     }
     Song song{kPpqn};
-    addTrack(song, "T", 1, [](Track& track) { track.events.insert({0, Note{60, 100, 1}}); });
+    addTrack(song, "T", 1, [](EditTrack& track) { track.events.insert({0, Note{60, 100, 1}}); });
 
     const auto result = exportSmfFile(song, path);
     REQUIRE(result.error.empty());

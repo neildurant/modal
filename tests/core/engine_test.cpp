@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
@@ -41,7 +42,7 @@ std::shared_ptr<const PlaybackPlan> fourNotes(Ppqn ppqn)
 {
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  Tick tick = 0;
                  for (const int pitch : {60, 62, 64, 65})
@@ -162,7 +163,7 @@ TEST_CASE("a new plan during playback applies from the current position")
 
     Song song = songAt(ppqn);
     addTrack(song, 2,
-             [&](Track& track) { track.events.insert({3 * ppqn.quarter(), Note{72, 90, 1}}); });
+             [&](EditTrack& track) { track.events.insert({3 * ppqn.quarter(), Note{72, 90, 1}}); });
     engine.setPlan(std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName)));
     sink.sent.clear();
     runUntil(engine, clock, kStart + 2s);
@@ -349,7 +350,7 @@ namespace
 std::shared_ptr<const PlaybackPlan> armedPlan(Ppqn ppqn)
 {
     Song song = songAt(ppqn);
-    addTrack(song, 2, [](Track& track) { track.arm = true; });
+    addTrack(song, 2, [](EditTrack& track) { track.arm = true; });
     return std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName));
 }
 

@@ -432,28 +432,28 @@ StreamSong streamSong(const Options& options)
 {
     StreamSong stream;
     auto& song = stream.song;
-    song.tempo().set(0, core::Tempo::fromBpm(120.0));
+    song.updateTempo([](core::TempoMap& tempo) { tempo.set(0, core::Tempo::fromBpm(120.0)); });
     song.metronome.when = core::MetronomeSettings::When::Off;
     song.countIn.mode = core::CountInSettings::Mode::None;
 
     const auto interval = intervalOf(options);
-    const auto& tempo = song.tempo();
+    const auto tempo = song.tempo();
     stream.sent = song.addTrack("Sent");
-    song.updateTrack(stream.sent,
-                     [&](core::Track& track)
-                     {
-                         for (int i = 0; i < options.count; ++i)
-                         {
-                             const auto on = tempo.toTick(kLeadIn + interval * i);
-                             const auto off = tempo.toTick(kLeadIn + interval * i + interval / 2);
-                             for (int c = 0; c < options.chord; ++c)
-                             {
-                                 const int n = i * options.chord + c;
-                                 track.events.insert({on, core::Note{pitchOf(n), velocityOf(n),
-                                                                     off - on, velocityOf(n)}});
-                             }
-                         }
-                     });
+    song.updateEvents(stream.sent,
+                      [&](core::EventList& events)
+                      {
+                          for (int i = 0; i < options.count; ++i)
+                          {
+                              const auto on = tempo.toTick(kLeadIn + interval * i);
+                              const auto off = tempo.toTick(kLeadIn + interval * i + interval / 2);
+                              for (int c = 0; c < options.chord; ++c)
+                              {
+                                  const int n = i * options.chord + c;
+                                  events.insert({on, core::Note{pitchOf(n), velocityOf(n), off - on,
+                                                                velocityOf(n)}});
+                              }
+                          }
+                      });
     stream.recorded = song.addTrack("Recorded");
     song.updateTrack(stream.recorded,
                      [](core::Track& track)
@@ -563,7 +563,7 @@ RecordCheck checkRecording(const StreamSong& stream, const core::Song& recorded,
 {
     using Key = std::pair<std::uint8_t, std::uint8_t>; // pitch, velocity
     std::map<Key, std::deque<const core::Event*>> sent;
-    for (const auto& event : stream.song.track(stream.sent)->events.all())
+    for (const auto& event : stream.song.events(stream.sent).all())
     {
         const auto& note = std::get<core::Note>(event.data);
         sent[{note.pitch, note.velocity}].push_back(&event);
@@ -581,7 +581,7 @@ RecordCheck checkRecording(const StreamSong& stream, const core::Song& recorded,
     const auto timeOf = [&](core::Tick tick)
     { return tempo.toTime(std::max(tick, core::Tick{0})); };
     RecordCheck check;
-    for (const auto& event : recorded.track(stream.recorded)->events.all())
+    for (const auto& event : recorded.events(stream.recorded).all())
     {
         const auto* note = std::get_if<core::Note>(&event.data);
         if (note == nullptr)
@@ -792,7 +792,7 @@ int run(const Options& options)
 
     // The recording, against what was sent.
     const auto recorded = recorder->finish(*stoppedAt);
-    const auto sentNotes = stream->song.track(stream->sent)->events.size();
+    const auto sentNotes = stream->song.events(stream->sent).size();
     const auto origin = sink.due.front() - plan->events.front().time;
     const auto check = checkRecording(*stream, recorded, arrivals, origin);
     std::cout << "\nRecorded " << check.late.size() << " of " << sentNotes << " notes. Missing "

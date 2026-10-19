@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
@@ -49,7 +50,7 @@ TEST_CASE("events are sent at their times, and note-offs at the notes' ends")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, q, 70}});
                  track.events.insert({q, ControlChange{7, 90}});
@@ -86,7 +87,7 @@ TEST_CASE("events sent late keep their order and their intended times")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, q}});
                  track.events.insert({q / 2, ProgramChange{3}});
@@ -111,7 +112,7 @@ TEST_CASE("a note ending as the same pitch starts is ended first")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, q}});
                  track.events.insert({q, Note{60, 90, q}});
@@ -137,14 +138,14 @@ TEST_CASE("overlapping notes retrigger and end at the latest end")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, 4 * q, 10}});
                  track.events.insert({q, Note{60, 90, q, 20}});         // inside the first
                  track.events.insert({3 * q, Note{60, 80, 2 * q, 30}}); // past its end
              });
     // A track on another channel doesn't overlap with them.
-    addTrack(song, 2, [&](Track& track) { track.events.insert({q, Note{60, 70, q}}); });
+    addTrack(song, 2, [&](EditTrack& track) { track.events.insert({q, Note{60, 70, q}}); });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -169,9 +170,9 @@ TEST_CASE("notes on different destinations don't overlap")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 2 * q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 2 * q}}); });
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.port = "2";
                  track.events.insert({q, Note{60, 100, q}});
@@ -196,7 +197,7 @@ TEST_CASE("SysEx is sent whole")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const Bytes bytes{0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7};
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, makeSysEx(bytes)}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, makeSysEx(bytes)}); });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -213,7 +214,7 @@ TEST_CASE("starting mid-song sends the chased events first, then plays from the 
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, ProgramChange{4}});
                  track.events.insert({0, Note{48, 100, 3 * q}});
@@ -222,7 +223,7 @@ TEST_CASE("starting mid-song sends the chased events first, then plays from the 
              });
     // Sent after the start point, but stored before it, so it's chased rather than played.
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = 100ms;
                  track.events.insert({2 * q - 1, ControlChange{1, 64}});
@@ -251,9 +252,9 @@ TEST_CASE("a negative time offset starts playback early by the lead-in")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({q, Note{60, 100, q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({q, Note{60, 100, q}}); });
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = -40ms;
                  track.events.insert({q, Note{64, 100, q}});
@@ -279,7 +280,7 @@ TEST_CASE("the position during a lead-in from the song start is tick 0")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = -40ms;
                  track.events.insert({0, Note{60, 100, ppqn.quarter()}});
@@ -302,7 +303,7 @@ TEST_CASE("ticks for input during a lead-in from the song start are before tick 
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.timeOffset = -40ms; });
+    addTrack(song, 1, [&](EditTrack& track) { track.timeOffset = -40ms; });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -326,10 +327,10 @@ TEST_CASE("stop ends the notes sounding, with optional All Notes Off and sustain
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 4 * q}}); });
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{64, 100, 4 * q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 4 * q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{64, 100, 4 * q}}); });
     addTrack(song, 3,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.port = "2";
                  track.events.insert({4 * q, Note{67, 100, q}});
@@ -384,13 +385,13 @@ TEST_CASE("panic resets every channel of every destination any plan has used")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const auto id = addTrack(song, 1,
-                             [&](Track& track)
+                             [&](EditTrack& track)
                              {
                                  track.port = "5";
                                  track.events.insert({0, Note{60, 100, ppqn.quarter()}});
                              });
     const auto first = compilePlan(song, byPortName);
-    song.updateTrack(id, [](Track& track) { track.port = "6"; });
+    editTrack(song, id, [](EditTrack& track) { track.port = "6"; });
     const auto second = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -422,7 +423,7 @@ TEST_CASE("playing again while playing ends the notes sounding first")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 4 * q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 4 * q}}); });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -446,26 +447,26 @@ TEST_CASE("a new plan during playback applies to the events not yet sent")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto kept = addTrack(song, 1,
-                               [&](Track& track)
+                               [&](EditTrack& track)
                                {
                                    track.events.insert({0, Note{60, 100, 4 * q}});
                                    track.events.insert({2 * q, Note{62, 100, q}});
                                });
-    const auto muted =
-        addTrack(song, 2, [&](Track& track) { track.events.insert({0, Note{64, 100, 4 * q}}); });
+    const auto muted = addTrack(song, 2, [&](EditTrack& track)
+                                { track.events.insert({0, Note{64, 100, 4 * q}}); });
     const auto before = compilePlan(song, byPortName);
 
     // Halfway through the second beat: lengthen the sounding note (which still ends as
     // planned), move the later note and add one before the position, and mute a track.
-    song.updateTrack(kept,
-                     [&](Track& track)
-                     {
-                         track.events = {};
-                         track.events.insert({0, Note{60, 100, 8 * q}});
-                         track.events.insert({q, Note{65, 100, q}});
-                         track.events.insert({3 * q, Note{62, 100, q}});
-                     });
-    song.updateTrack(muted, [](Track& track) { track.mute = true; });
+    editTrack(song, kept,
+              [&](EditTrack& track)
+              {
+                  track.events = {};
+                  track.events.insert({0, Note{60, 100, 8 * q}});
+                  track.events.insert({q, Note{65, 100, q}});
+                  track.events.insert({3 * q, Note{62, 100, q}});
+              });
+    editTrack(song, muted, [](EditTrack& track) { track.mute = true; });
     const auto after = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -492,19 +493,21 @@ TEST_CASE("a tempo change during playback keeps the position and re-times what's
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{60, 100, 2 * q}});
                  track.events.insert({2 * q, Note{62, 100, q}});
              });
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = 10ms;
                  track.events.insert({0, Note{64, 100, 2 * q}});
              });
     const auto before = compilePlan(song, byPortName);
-    song.tempo().set(0, Tempo{1'000'000}); // half speed: a quarter note is now a second
+    song.updateTempo(
+        [&](TempoMap& tempo)
+        { tempo.set(0, Tempo{1'000'000}); }); // half speed: a quarter note is now a second
     const auto after = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -536,7 +539,7 @@ TEST_CASE("note-ons beyond the table of sounding notes aren't sent")
         for (int channel = 1; channel <= 16; ++channel)
         {
             addTrack(song, channel,
-                     [&](Track& track)
+                     [&](EditTrack& track)
                      {
                          track.port = std::to_string(port);
                          for (std::uint8_t pitch = 0; pitch < 128; ++pitch)
@@ -636,7 +639,7 @@ TEST_CASE("when not recording, the metronome stops when the song ends")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, Note{60, 100, 2 * q}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 2 * q}}); });
     const auto plan = withMetronome(song, false);
 
     RecordingSink sink;
@@ -656,7 +659,8 @@ TEST_CASE("in 6/8 the metronome clicks on every eighth")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [](Track& track) { track.meter.set(0, {6, 8}); });
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(0, {6, 8}); });
     const auto plan = withMetronome(song);
 
     RecordingSink sink;
@@ -697,7 +701,8 @@ TEST_CASE("a click ends by the next beat when the beat is shorter")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [](Track& track) { track.meter.set(0, {4, 64}); });
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(0, {4, 64}); });
     const auto plan = withMetronome(song);
 
     RecordingSink sink;
@@ -717,7 +722,7 @@ TEST_CASE("the metronome isn't offset with the tracks")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = -100ms;
                  track.events.insert({0, Note{60, 100, ppqn.quarter() / 4}});
@@ -753,7 +758,7 @@ TEST_CASE("after a tempo change the metronome carries on from the next beat")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const auto before = withMetronome(song);
-    song.tempo().set(0, Tempo{1'000'000}); // 60 BPM
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{1'000'000}); }); // 60 BPM
     const auto after = withMetronome(song);
 
     RecordingSink sink;
@@ -800,20 +805,20 @@ TEST_CASE("stop lets up each pedal playback left down, on just its channel")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, ControlChange{64, 100}}); // a half pedal is down
                  track.events.insert({0, ControlChange{67, 127}});
                  track.events.insert({q, ControlChange{67, 0}}); // up again
              });
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.port = "2";
                  track.events.insert({0, ControlChange{66, 127}});
                  track.events.insert({0, ControlChange{7, 127}}); // not a pedal
              });
-    addTrack(song, 3, [&](Track& track) { track.events.insert({0, ControlChange{64, 20}}); });
+    addTrack(song, 3, [&](EditTrack& track) { track.events.insert({0, ControlChange{64, 20}}); });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -840,7 +845,7 @@ TEST_CASE("chased pedals are let up on stop, and restarting lets pedals up first
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, ControlChange{64, 127}});
                  track.events.insert({4 * q, ControlChange{64, 0}});
@@ -868,7 +873,7 @@ TEST_CASE("after a panic, stop has no pedals to let up")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, ControlChange{64, 127}}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, ControlChange{64, 127}}); });
     const auto plan = compilePlan(song, byPortName);
 
     RecordingSink sink;
@@ -889,7 +894,7 @@ TEST_CASE("a count-in clicks before the record point, with the song silent until
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({2 * q, Note{50, 100, q}}); // in the count-in's time
                  track.events.insert({4 * q, Note{60, 100, q / 4}});
@@ -945,7 +950,7 @@ TEST_CASE("a lead-in longer than the count-in starts playback earlier")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = -1000ms;
                  track.events.insert({4 * q, Note{60, 100, q}});

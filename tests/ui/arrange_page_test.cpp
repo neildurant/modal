@@ -1,3 +1,5 @@
+#include "support/edit_track.hpp"
+
 #include <modal/core/event.hpp>
 #include <modal/core/song.hpp>
 #include <modal/ui/arrange_page.hpp>
@@ -111,7 +113,7 @@ TEST_CASE("the arrangement's cursor moves by each track's bars, and between trac
 {
     auto page = page80x22();
     const auto song = demoSong();
-    const auto& drums = song.tracks()[0]->meter;
+    const auto& drums = song.meter(song.tracks()[0]->id());
 
     type(page, U"l", 8); // to bar 9, the verse in 7/8
     CHECK(page.track() == 0);
@@ -385,8 +387,8 @@ TEST_CASE("a marker's line through the ruler breaks only where a label sits acro
     // A marker halfway through bar 1, which its meter and number run across.
     core::Song song;
     const auto id = song.addTrack("Piano");
-    song.updateTrack(id, [&](core::Track& track)
-                     { track.events.insert({0, core::Note{60, 100, song.ppqn().quarter()}}); });
+    song.updateEvents(id, [&](core::EventList& events)
+                      { events.insert({0, core::Note{60, 100, song.ppqn().quarter()}}); });
     song.setMarker(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
@@ -447,7 +449,7 @@ TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
 {
     auto page = page80x22(); // 60 columns of two quarter notes: 120 quarter notes in view
     const auto song = demoSong();
-    const auto& ostinato = song.tracks()[6]->meter; // 3/4 throughout
+    const auto& ostinato = song.meter(song.tracks()[6]->id()); // 3/4 throughout
 
     // At the start the view can't scroll left, so the cursor just moves.
     page.scrollBars(-1);

@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/ppqn.hpp"
 
 #include <modal/core/playback_plan.hpp>
@@ -9,6 +10,7 @@
 #include <vector>
 
 using namespace modal::core;
+using namespace modal::test;
 using namespace std::chrono_literals;
 using std::chrono::nanoseconds;
 
@@ -36,22 +38,22 @@ ShortMessage bytes(std::uint8_t a, std::uint8_t b, std::uint8_t c)
 Song songAt(Ppqn ppqn)
 {
     Song song{ppqn};
-    song.tempo().set(0, Tempo{500'000});
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{500'000}); });
     return song;
 }
 
-TrackId addTrack(Song& song, int channel, const std::function<void(Track&)>& edit = {})
+TrackId addTrack(Song& song, int channel, const std::function<void(EditTrack&)>& edit = {})
 {
     const auto id = song.addTrack();
-    song.updateTrack(id,
-                     [&](Track& track)
-                     {
-                         track.channel = channel;
-                         if (edit)
-                         {
-                             edit(track);
-                         }
-                     });
+    editTrack(song, id,
+              [&](EditTrack& track)
+              {
+                  track.channel = channel;
+                  if (edit)
+                  {
+                      edit(track);
+                  }
+              });
     return id;
 }
 
@@ -73,7 +75,7 @@ TEST_CASE("events become channel messages on the track's channel")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 10,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, Note{36, 100, q, 70}});
                  track.events.insert({q, ControlChange{7, 90}});
@@ -115,8 +117,9 @@ TEST_CASE("event times follow the tempo map")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    song.tempo().set(4 * q, Tempo{1'000'000}); // 60 BPM from bar 2
-    addTrack(song, 1, [&](Track& track) { track.events.insert({5 * q, Note{60, 100, q}}); });
+    song.updateTempo([&](TempoMap& tempo)
+                     { tempo.set(4 * q, Tempo{1'000'000}); }); // 60 BPM from bar 2
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({5 * q, Note{60, 100, q}}); });
 
     const auto plan = compilePlan(song, everythingToPort);
     REQUIRE(plan.events.size() == 1);
@@ -129,7 +132,7 @@ TEST_CASE("SysEx is sent as stored")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const std::vector<std::uint8_t> reset{0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7};
-    addTrack(song, 1, [&](Track& track) { track.events.insert({0, makeSysEx(reset)}); });
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, makeSysEx(reset)}); });
 
     const auto plan = compilePlan(song, everythingToPort);
     REQUIRE(plan.events.size() == 1);
@@ -144,7 +147,7 @@ TEST_CASE("transpose and velocity offset apply at playback")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.transpose = 12;
                  track.velocityOffset = 40;
@@ -159,12 +162,12 @@ TEST_CASE("transpose and velocity offset apply at playback")
     CHECK(plan.events[1].message == bytes(0xA0, 72, 50));
     CHECK(plan.transposeWarnings == std::vector<TransposeWarning>{{song.tracks()[0]->id(), 1}});
 
-    song.updateTrack(song.tracks()[0]->id(),
-                     [](Track& track)
-                     {
-                         track.transpose = 0;
-                         track.velocityOffset = -127;
-                     });
+    editTrack(song, song.tracks()[0]->id(),
+              [](EditTrack& track)
+              {
+                  track.transpose = 0;
+                  track.velocityOffset = -127;
+              });
     plan = compilePlan(song, everythingToPort);
     CHECK(plan.events[0].message == bytes(0x90, 60, 1)); // never velocity 0, a note-off
     CHECK(plan.transposeWarnings.empty());
@@ -176,7 +179,7 @@ TEST_CASE("mute and solo")
     Song song = songAt(ppqn);
     const auto addNoteTrack = [&](int channel)
     {
-        return addTrack(song, channel, [&](Track& track)
+        return addTrack(song, channel, [&](EditTrack& track)
                         { track.events.insert({0, Note{60, 100, ppqn.quarter()}}); });
     };
     const auto a = addNoteTrack(1);
@@ -195,12 +198,12 @@ TEST_CASE("mute and solo")
 
     CHECK(tracksIn(compilePlan(song, everythingToPort)) == std::vector<TrackId>{a, b, c});
 
-    song.updateTrack(b, [](Track& track) { track.mute = true; });
+    editTrack(song, b, [](EditTrack& track) { track.mute = true; });
     CHECK(tracksIn(compilePlan(song, everythingToPort)) == std::vector<TrackId>{a, c});
 
     // Any solo plays only the soloed tracks, even a muted one.
-    song.updateTrack(b, [](Track& track) { track.solo = true; });
-    song.updateTrack(c, [](Track& track) { track.solo = true; });
+    editTrack(song, b, [](EditTrack& track) { track.solo = true; });
+    editTrack(song, c, [](EditTrack& track) { track.solo = true; });
     const auto plan = compilePlan(song, everythingToPort);
     CHECK(tracksIn(plan) == std::vector<TrackId>{b, c});
     CHECK(plan.events.size() == 2);
@@ -210,8 +213,8 @@ TEST_CASE("tracks without a destination are left out and reported")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    const auto routed = addTrack(song, 1, [](Track& track) { track.port = "Synth"; });
-    const auto unrouted = addTrack(song, 2, [](Track& track) { track.port = "Missing"; });
+    const auto routed = addTrack(song, 1, [](EditTrack& track) { track.port = "Synth"; });
+    const auto unrouted = addTrack(song, 2, [](EditTrack& track) { track.port = "Missing"; });
 
     const auto plan = compilePlan(song,
                                   [](const Track& track) -> std::optional<DestinationId>
@@ -235,19 +238,19 @@ TEST_CASE("track time offsets move events in time but not in ticks")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto strings = addTrack(song, 1,
-                                  [&](Track& track)
+                                  [&](EditTrack& track)
                                   {
                                       track.timeOffset = -40ms;
                                       track.events.insert({0, Note{60, 100, q}});
                                       track.events.insert({q, Note{64, 100, q}});
                                   });
     const auto late = addTrack(song, 2,
-                               [&](Track& track)
+                               [&](EditTrack& track)
                                {
                                    track.timeOffset = 25ms;
                                    track.events.insert({q, Note{48, 100, q}});
                                });
-    addTrack(song, 3, [&](Track& track) { track.events.insert({q, Note{36, 100, q}}); });
+    addTrack(song, 3, [&](EditTrack& track) { track.events.insert({q, Note{36, 100, q}}); });
 
     const auto plan = compilePlan(song, everythingToPort);
     CHECK(plan.leadIn == 40ms);
@@ -270,13 +273,13 @@ TEST_CASE("events at the same time keep track order, then stored order")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const auto first = addTrack(song, 1,
-                                [&](Track& track)
+                                [&](EditTrack& track)
                                 {
                                     track.events.insert({0, Note{60, 100, ppqn.quarter()}});
                                     track.events.insert({0, ProgramChange{1}});
                                 });
     const auto second =
-        addTrack(song, 2, [](Track& track) { track.events.insert({0, ProgramChange{2}}); });
+        addTrack(song, 2, [](EditTrack& track) { track.events.insert({0, ProgramChange{2}}); });
 
     const auto plan = compilePlan(song, everythingToPort);
     REQUIRE(plan.events.size() == 3);
@@ -293,7 +296,7 @@ TEST_CASE("finding the first event at or after a time")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  for (Tick i = 0; i < 4; ++i)
                  {
@@ -314,7 +317,7 @@ TEST_CASE("chasing sends the latest values before the start, in the order sent")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.events.insert({0, ControlChange{0, 1}}); // bank select
                  track.events.insert({0, ProgramChange{10}});
@@ -350,7 +353,7 @@ TEST_CASE("chasing restarts notes still sounding, for tracks that chase notes")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto pad = addTrack(song, 1,
-                              [&](Track& track)
+                              [&](EditTrack& track)
                               {
                                   track.transpose = 2;
                                   track.events.insert({0, Note{60, 90, 8 * q}}); // sounding
@@ -359,7 +362,7 @@ TEST_CASE("chasing restarts notes still sounding, for tracks that chase notes")
                                   track.events.insert({2 * q, Note{67, 90, q}}); // at the start
                               });
     addTrack(song, 10,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.chaseNotes = false;
                  track.events.insert({0, ProgramChange{1}});
@@ -387,13 +390,13 @@ TEST_CASE("chasing with time offsets uses positions, and starts early by the lea
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     addTrack(song, 1,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = 30ms;
                  track.events.insert({q - 1, ControlChange{7, 50}}); // sent after the start time
              });
     addTrack(song, 2,
-             [&](Track& track)
+             [&](EditTrack& track)
              {
                  track.timeOffset = -40ms;
                  track.events.insert({q, ControlChange{7, 60}}); // sent before the start time
@@ -414,7 +417,7 @@ TEST_CASE("armed tracks with thru on are thru targets, muted or not")
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
     const auto armed = addTrack(song, 3,
-                                [](Track& track)
+                                [](EditTrack& track)
                                 {
                                     track.arm = true;
                                     track.port = "4";
@@ -423,20 +426,20 @@ TEST_CASE("armed tracks with thru on are thru targets, muted or not")
                                     track.timeOffset = std::chrono::milliseconds{-20};
                                 });
     const auto mutedArmed = addTrack(song, 1,
-                                     [](Track& track)
+                                     [](EditTrack& track)
                                      {
                                          track.arm = true;
                                          track.mute = true;
                                      });
     addTrack(song, 1); // not armed
     addTrack(song, 1,
-             [](Track& track)
+             [](EditTrack& track)
              {
                  track.arm = true;
                  track.thru = false;
              });
     addTrack(song, 1,
-             [](Track& track)
+             [](EditTrack& track)
              {
                  track.arm = true;
                  track.port = "Missing";
@@ -461,7 +464,8 @@ TEST_CASE("the metronome is planned when its settings say it plays, and it has a
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Song song = songAt(ppqn);
-    addTrack(song, 1, [](Track& track) { track.meter.set(0, {3, 4}); });
+    addTrack(song, 1);
+    song.updateMeter([&](MeterMap& meter) { meter.set(0, {3, 4}); });
     constexpr DestinationId kClick{9};
     using When = MetronomeSettings::When;
 
@@ -481,7 +485,7 @@ TEST_CASE("the metronome is planned when its settings say it plays, and it has a
     CHECK(plan.metronome->beatNote == 77);
     CHECK(plan.metronome->beatVelocity == 80);
     CHECK(plan.metronome->length == ppqn.quarter() / 8);
-    CHECK(plan.metronome->meter == song.referenceMeter());
+    CHECK(plan.metronome->meter == song.meter());
     CHECK(plan.metronome->meter.signatureAt(0) == TimeSignature{3, 4});
     CHECK(plan.metronome->pastEnd);
 

@@ -41,9 +41,8 @@ void EventList::erase(std::size_t index)
     events_.erase(events_.begin() + static_cast<std::ptrdiff_t>(index));
 }
 
-Track::Track(TrackId id, Ppqn ppqn)
-    : meter(ppqn)
-    , id_(id)
+Track::Track(TrackId id)
+    : id_(id)
 {
 }
 

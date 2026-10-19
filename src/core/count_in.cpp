@@ -25,7 +25,7 @@ std::optional<PlannedCountIn> planCountIn(const Song& song, Tick recordPoint,
 {
     const auto& settings = song.countIn;
     const auto& metronome = song.metronome;
-    const auto& meter = song.referenceMeter();
+    const auto& meter = song.meter();
     const auto signature = meter.signatureAt(recordPoint);
     const std::int64_t beats =
         settings.beats > 0 ? settings.beats : std::int64_t{settings.bars} * signature.numerator;
@@ -82,8 +82,7 @@ RecordStart planRecordStart(const Song& song, Tick recordPoint,
         }
         break;
     case CountInMode::PreRoll:
-        return {preRollStart(song.referenceMeter(), recordPoint, settings.preRollBars),
-                std::nullopt};
+        return {preRollStart(song.meter(), recordPoint, settings.preRollBars), std::nullopt};
     }
     return {recordPoint, std::nullopt};
 }

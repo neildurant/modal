@@ -26,27 +26,6 @@ std::string signatureText(core::TimeSignature signature)
     return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
 }
 
-// The end of a song: the end of its last note or event, or of its last marker, rounded up to
-// the reference track's next bar line, and at least one bar.
-core::Tick songEnd(const core::Song& song)
-{
-    core::Tick last = 0;
-    for (const auto& track : song.tracks())
-    {
-        for (const auto& event : track->events.all())
-        {
-            const auto* note = std::get_if<core::Note>(&event.data);
-            last = std::max(last, event.tick + (note != nullptr ? note->duration : 0));
-        }
-    }
-    for (const auto& marker : song.markers())
-    {
-        last = std::max(last, marker.tick + 1);
-    }
-    const auto& meter = song.referenceMeter();
-    return last == 0 ? meter.barStart(2) : meter.barStart(meter.toBarBeatTick(last - 1).bar + 1);
-}
-
 // Text placed at pixel positions along a row, left to right, leaving out any that would
 // overlap the one before.
 class Labels
@@ -81,7 +60,7 @@ private:
 
 ArrangePage::ArrangePage(core::Song song)
     : song_(std::move(song))
-    , end_(songEnd(song_))
+    , end_(song_.end())
 {
 }
 
@@ -111,14 +90,19 @@ const core::Track& ArrangePage::currentTrack() const
     return *song_.tracks()[track_];
 }
 
+const core::MeterMap& ArrangePage::meterOf(const core::Track& track) const
+{
+    return song_.meter(track.id());
+}
+
 std::int64_t ArrangePage::bar() const
 {
-    return currentTrack().meter.toBarBeatTick(time_).bar;
+    return meterOf(currentTrack()).toBarBeatTick(time_).bar;
 }
 
 std::int64_t ArrangePage::lastBar(const core::Track& track) const
 {
-    return track.meter.toBarBeatTick(end_ - 1).bar;
+    return meterOf(track).toBarBeatTick(end_ - 1).bar;
 }
 
 core::Tick ArrangePage::columnTicks() const
@@ -143,7 +127,7 @@ void ArrangePage::goToBar(std::int64_t bar)
         return;
     }
     time_ =
-        currentTrack().meter.barStart(std::clamp<std::int64_t>(bar, 1, lastBar(currentTrack())));
+        meterOf(currentTrack()).barStart(std::clamp<std::int64_t>(bar, 1, lastBar(currentTrack())));
     follow();
 }
 
@@ -202,7 +186,7 @@ void ArrangePage::scrollBars(std::int64_t by)
     {
         return;
     }
-    const auto& meter = currentTrack().meter;
+    const auto& meter = meterOf(currentTrack());
     const core::Tick from = meter.barStart(bar());
     const core::Tick to =
         meter.barStart(std::clamp<std::int64_t>(bar() + by, 1, lastBar(currentTrack())));
@@ -219,7 +203,7 @@ void ArrangePage::centre()
     }
     topTrack_ = static_cast<std::size_t>(
         std::max<std::int64_t>(static_cast<std::int64_t>(track_) - viewTracks() / 2, 0));
-    const auto& meter = currentTrack().meter;
+    const auto& meter = meterOf(currentTrack());
     const auto barNumber = meter.toBarBeatTick(time_).bar;
     const core::Tick middle =
         (meter.barStart(barNumber) + std::min(meter.barStart(barNumber + 1), end_)) / 2;
@@ -249,7 +233,7 @@ void ArrangePage::follow()
     // longer than the view, and don't show more than needed after the end.
     const core::Tick column = columnTicks();
     const core::Tick visible = viewColumns() * column;
-    const auto& meter = currentTrack().meter;
+    const auto& meter = meterOf(currentTrack());
     const auto barNumber = meter.toBarBeatTick(time_).bar;
     const core::Tick start = meter.barStart(barNumber);
     const core::Tick barEnd = std::min(meter.barStart(barNumber + 1), end_);
@@ -339,7 +323,7 @@ void ArrangePage::addRegions(Frame& frame) const
     // The cursor's bar, as a span of time across every track, and boxed on its own track: its
     // sides in the gaps either side of the bar's block, its top and bottom above and below it.
     {
-        const auto& meter = currentTrack().meter;
+        const auto& meter = meterOf(currentTrack());
         const auto barNumber = meter.toBarBeatTick(time_).bar;
         const int x0 = scale.toX(meter.barStart(barNumber));
         const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
@@ -366,8 +350,9 @@ void ArrangePage::addRegions(Frame& frame) const
     {
         const auto& track = *tracks[topTrack_ + static_cast<std::size_t>(line)];
         const int y = tracksTop + line * cell_.height;
-        const bool empty = track.events.empty();
-        const auto& meter = track.meter;
+        const auto& events = song_.events(track.id());
+        const bool empty = events.empty();
+        const auto& meter = meterOf(track);
         for (auto bar = meter.toBarBeatTick(leftTick_).bar;; ++bar)
         {
             const core::Tick start = meter.barStart(bar);
@@ -391,8 +376,8 @@ void ArrangePage::addRegions(Frame& frame) const
                 }
                 continue;
             }
-            const auto level = density(track.events.startingIn(start, barEnd).size(),
-                                       barEnd - start, song_.ppqn());
+            const auto level =
+                density(events.startingIn(start, barEnd).size(), barEnd - start, song_.ppqn());
             if (level == 0)
             {
                 const int thickness = std::max(cell_.height / 16, 1);
@@ -450,7 +435,7 @@ void ArrangePage::addRegions(Frame& frame) const
     // The reference track's meter changes, each named if the name fits before the next
     // change, or else shown by a tick, so a short change, such as a single bar, never hides
     // the one after it.
-    const auto& reference = song_.referenceMeter();
+    const auto& reference = song_.meter();
     const auto changes = reference.changes();
     for (std::size_t i = 0; i < changes.size(); ++i)
     {
@@ -562,8 +547,9 @@ std::string ArrangePage::status() const
     }
     const auto& track = currentTrack();
     return "track " + std::to_string(track_ + 1) + "  bar " + std::to_string(bar()) + "/" +
-           std::to_string(lastBar(track)) + "  " + signatureText(track.meter.signatureAt(time_)) +
-           "  zoom " + core::toString(kZooms[zoom_]);
+           std::to_string(lastBar(track)) + "  " +
+           signatureText(meterOf(track).signatureAt(time_)) + "  zoom " +
+           core::toString(kZooms[zoom_]);
 }
 
 } // namespace modal::ui

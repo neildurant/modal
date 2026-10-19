@@ -1,3 +1,4 @@
+#include "support/edit_track.hpp"
 #include "support/ppqn.hpp"
 
 #include <modal/core/recorder.hpp>
@@ -12,6 +13,7 @@
 #include <vector>
 
 using namespace modal::core;
+using namespace modal::test;
 using namespace std::chrono_literals;
 using std::chrono::nanoseconds;
 using Bytes = std::vector<std::uint8_t>;
@@ -26,23 +28,23 @@ constexpr InputId kInput{0};
 Song songAt(Ppqn ppqn)
 {
     Song song{ppqn};
-    song.tempo().set(0, Tempo{500'000});
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{500'000}); });
     return song;
 }
 
-TrackId addTrack(Song& song, int channel, const std::function<void(Track&)>& edit = {})
+TrackId addTrack(Song& song, int channel, const std::function<void(EditTrack&)>& edit = {})
 {
     const auto id = song.addTrack();
-    song.updateTrack(id,
-                     [&](Track& track)
-                     {
-                         track.channel = channel;
-                         track.arm = true;
-                         if (edit)
-                         {
-                             edit(track);
-                         }
-                     });
+    editTrack(song, id,
+              [&](EditTrack& track)
+              {
+                  track.channel = channel;
+                  track.arm = true;
+                  if (edit)
+                  {
+                      edit(track);
+                  }
+              });
     return id;
 }
 
@@ -61,7 +63,7 @@ StampedInput stamped(nanoseconds songTime, const Bytes& bytes, InputId input = k
 
 std::vector<Event> eventsOf(const Song& song, TrackId id)
 {
-    const auto events = song.track(id)->events.all();
+    const auto events = song.events(id).all();
     return {events.begin(), events.end()};
 }
 
@@ -84,7 +86,7 @@ TEST_CASE("a take is recorded onto the armed track, at the ticks it was played")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto id = addTrack(song, 3);
-    const auto unarmed = addTrack(song, 4, [](Track& track) { track.arm = false; });
+    const auto unarmed = addTrack(song, 4, [](EditTrack& track) { track.arm = false; });
 
     Recorder recorder{song, kPlay, 0};
     recorder.receive(stamped(0ms, {0x95, 60, 100})); // input channel 6: rechannelised
@@ -108,8 +110,8 @@ TEST_CASE("a take is recorded onto the armed track, at the ticks it was played")
                                       {2 * q, PolyPressure{62, 50}},
                                   });
     CHECK(result.track(id)->channel == 3);
-    CHECK(result.track(unarmed)->events.empty());
-    CHECK(song.track(id)->events.empty()); // the song recorded onto is unchanged
+    CHECK(result.events(unarmed).empty());
+    CHECK(song.events(id).empty()); // the song recorded onto is unchanged
 }
 
 TEST_CASE("input from another play, or while stopped, isn't recorded")
@@ -129,8 +131,8 @@ TEST_CASE("a track's time offset is taken off, so the take plays back as it was 
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    const auto late = addTrack(song, 1, [](Track& track) { track.timeOffset = 125ms; });
-    const auto early = addTrack(song, 2, [](Track& track) { track.timeOffset = -125ms; });
+    const auto late = addTrack(song, 1, [](EditTrack& track) { track.timeOffset = 125ms; });
+    const auto early = addTrack(song, 2, [](EditTrack& track) { track.timeOffset = -125ms; });
 
     Recorder recorder{song, kPlay, 0};
     recorder.receive(stamped(625ms, {0x90, 60, 100}));
@@ -212,7 +214,7 @@ TEST_CASE("replacing removes what started in the recorded range, cutting notes r
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto id = addTrack(song, 1,
-                             [&](Track& track)
+                             [&](EditTrack& track)
                              {
                                  track.events.insert(note(0, 50, 6 * q)); // runs into the range
                                  track.events.insert(note(q, 51, q));     // ends before it
@@ -238,7 +240,7 @@ TEST_CASE("replacing patches the old pedals at both edges of the recorded range"
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto id = addTrack(song, 1,
-                             [&](Track& track)
+                             [&](EditTrack& track)
                              {
                                  track.events.insert(cc(0, 64, 127)); // down at the record point
                                  track.events.insert(cc(5 * q, 64, 0));
@@ -267,7 +269,8 @@ TEST_CASE("a pedal held into the record point follows the old pedal's patch")
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
-    const auto id = addTrack(song, 1, [&](Track& track) { track.events.insert(cc(0, 64, 127)); });
+    const auto id =
+        addTrack(song, 1, [&](EditTrack& track) { track.events.insert(cc(0, 64, 127)); });
 
     Recorder recorder{song, kPlay, 4 * q};
     recorder.receive(stamped(1500ms, {0xB0, 64, 100}));
@@ -287,7 +290,7 @@ TEST_CASE("overdubbing keeps what was there, ending overlapping notes of one pit
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto id = addTrack(song, 1,
-                             [&](Track& track)
+                             [&](EditTrack& track)
                              {
                                  track.events.insert(note(0, 60, 2 * q)); // the take's note cuts it
                                  track.events.insert(note(3 * q, 62, q)); // cuts the take's note
@@ -413,7 +416,7 @@ TEST_CASE("stopping at or before the record point leaves the song unchanged")
     const Tick q = ppqn.quarter();
     Song song = songAt(ppqn);
     const auto id =
-        addTrack(song, 1, [&](Track& track) { track.events.insert(note(4 * q, 50, q)); });
+        addTrack(song, 1, [&](EditTrack& track) { track.events.insert(note(4 * q, 50, q)); });
 
     Recorder recorder{song, kPlay, 4 * q};
     recorder.receive(stamped(1500ms, {0x90, 60, 100}));

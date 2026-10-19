@@ -292,12 +292,13 @@ Song Recorder::finish(Tick stop) const
     }
     for (const auto& take : takes_)
     {
-        song.updateTrack(take.track, [&](Track& track) { track = applied(track, take, stop); });
+        song.updateEvents(take.track,
+                          [&](EventList& events) { events = applied(events, take, stop); });
     }
     return song;
 }
 
-Track Recorder::applied(const Track& track, const TrackTake& take, Tick stop) const
+EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick stop) const
 {
     // The take, kept to [start, stop), with what was held at the record point starting there.
     PedalState takeAtStart;
@@ -348,7 +349,7 @@ Track Recorder::applied(const Track& track, const TrackTake& take, Tick stop) co
     PedalState oldAtStart;
     PedalState oldAtStop;
     std::vector<Event> old;
-    for (const auto& event : track.events.all())
+    for (const auto& event : events.all())
     {
         if (event.tick < start_)
         {
@@ -401,11 +402,10 @@ Track Recorder::applied(const Track& track, const TrackTake& take, Tick stop) co
     }
     std::ranges::stable_sort(all, {}, &Event::tick);
 
-    Track result = track;
-    result.events = {};
+    EventList result;
     for (auto& event : all)
     {
-        result.events.insert(std::move(event));
+        result.insert(std::move(event));
     }
     return result;
 }

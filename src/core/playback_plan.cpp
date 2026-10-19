@@ -177,7 +177,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
             metronome.beatNote,
             metronome.beatVelocity,
             std::max(metronome.length.toTicks(song.ppqn()), Tick{1}),
-            song.referenceMeter(),
+            song.meter(),
             options.recording,
         };
     }
@@ -216,7 +216,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
         plan.leadIn = std::max(plan.leadIn, -offset);
 
         std::size_t dropped = 0;
-        for (const auto& event : track.events.all())
+        for (const auto& event : song.events(track.id()).all())
         {
             PlannedEvent planned{};
             planned.time = plan.tempo.toTime(event.tick) + offset;

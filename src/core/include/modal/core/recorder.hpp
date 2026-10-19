@@ -85,7 +85,7 @@ private:
                 std::uint8_t velocity, Tick tick);
     void noteOff(TrackTake& take, InputId input, std::uint8_t inChannel, std::uint8_t pitch,
                  std::uint8_t releaseVelocity, Tick tick);
-    Track applied(const Track& track, const TrackTake& take, Tick stop) const;
+    EventList applied(const EventList& events, const TrackTake& take, Tick stop) const;
 
     Song song_;
     std::uint64_t play_;

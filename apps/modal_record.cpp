@@ -409,7 +409,12 @@ std::variant<Prepared, std::string> prepareSong(const Options& options)
     }
     else
     {
-        song.tempo().set(0, core::Tempo::fromBpm(options.tempo.value_or(120.0)));
+        song.updateTempo([&](core::TempoMap& tempo)
+                         { tempo.set(0, core::Tempo::fromBpm(options.tempo.value_or(120.0))); });
+        if (options.meter)
+        {
+            song.updateMeter([&](core::MeterMap& meter) { meter.set(0, *options.meter); });
+        }
     }
 
     core::TrackId track{0};
@@ -424,18 +429,8 @@ std::variant<Prepared, std::string> prepareSong(const Options& options)
     }
     else
     {
-        const auto meter = song.referenceMeter(); // before the new track can become it
         track = song.addTrack("Recorded");
-        song.updateTrack(track,
-                         [&](core::Track& t)
-                         {
-                             t.channel = options.channel;
-                             t.meter = meter;
-                             if (options.meter)
-                             {
-                                 t.meter.set(0, *options.meter);
-                             }
-                         });
+        song.updateTrack(track, [&](core::Track& t) { t.channel = options.channel; });
     }
     song.updateTrack(track,
                      [&](core::Track& t)
@@ -451,11 +446,11 @@ std::variant<Prepared, std::string> prepareSong(const Options& options)
 }
 
 // Notes and other events on a track starting in [from, to).
-std::pair<std::size_t, std::size_t> countEvents(const core::Track& track, Tick from, Tick to)
+std::pair<std::size_t, std::size_t> countEvents(const core::EventList& events, Tick from, Tick to)
 {
     std::size_t notes = 0;
     std::size_t others = 0;
-    for (const auto& event : track.events.startingIn(from, to))
+    for (const auto& event : events.startingIn(from, to))
     {
         ++(event.isNote() ? notes : others);
     }
@@ -499,7 +494,7 @@ enum class Ending : std::uint8_t
 int record(const Options& options, Prepared prepared)
 {
     auto& song = prepared.song;
-    const auto& meter = song.referenceMeter();
+    const auto& meter = song.meter();
     const auto recordPoint = meter.toTick(options.start);
     if (!recordPoint)
     {
@@ -667,9 +662,10 @@ int record(const Options& options, Prepared prepared)
     else
     {
         const auto recorded = recorder.finish(*stoppedAt);
-        const auto [notesBefore, othersBefore] = countEvents(track, *recordPoint, *stoppedAt);
+        const auto [notesBefore, othersBefore] =
+            countEvents(song.events(prepared.track), *recordPoint, *stoppedAt);
         const auto [notes, others] =
-            countEvents(*recorded.track(prepared.track), *recordPoint, *stoppedAt);
+            countEvents(recorded.events(prepared.track), *recordPoint, *stoppedAt);
         std::cout << "Recorded " << barBeat(meter, *recordPoint) << " to "
                   << barBeat(meter, *stoppedAt) << ": " << notes << " notes and " << others
                   << " other events";

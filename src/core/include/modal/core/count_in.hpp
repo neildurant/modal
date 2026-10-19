@@ -44,7 +44,7 @@ struct RecordStart
 };
 
 // Plans the start of recording from the song's count-in and metronome settings: a count-in
-// at the tempo and in the reference meter at the record point (none without a metronome
+// at the tempo and in the conductor's meter at the record point (none without a metronome
 // destination), or a pre-roll from that many bars before it, but not before the song's start.
 RecordStart planRecordStart(const Song& song, Tick recordPoint,
                             std::optional<DestinationId> metronomeDestination);

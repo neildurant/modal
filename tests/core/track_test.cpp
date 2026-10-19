@@ -90,11 +90,9 @@ TEST_CASE("erasing events")
 
 TEST_CASE("track settings")
 {
-    const auto ppqn = MODAL_ANY_PPQN();
-    Track track{TrackId{7}, ppqn};
+    Track track{TrackId{7}};
 
     CHECK(track.id() == TrackId{7});
-    CHECK(track.meter.ppqn() == ppqn);
     CHECK(track.channel == 1);
     CHECK(track.chaseNotes);
     CHECK(track.timeOffset == 0ms);

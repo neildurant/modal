@@ -154,7 +154,7 @@ struct PlanOptions
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside
 // 0-127 are left out and reported in transposeWarnings; velocities are clamped to 1-127
 // after the velocity offset. Also lists the thru targets, and plans the metronome on the
-// reference meter if the song's settings say it plays.
+// conductor's meter if the song's settings say it plays.
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
                          const PlanOptions& options = {});
 

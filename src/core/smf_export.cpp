@@ -100,13 +100,13 @@ std::uint8_t textType(MetaText::Kind kind)
 }
 
 // Adds a track's events, on its channel.
-void addTrackEvents(const Track& track, std::vector<OutEvent>& out)
+void addTrackEvents(const Track& track, const EventList& events, std::vector<OutEvent>& out)
 {
     const auto channel = static_cast<std::uint8_t>(track.channel - 1);
     const auto status = [channel](std::uint8_t type)
     { return static_cast<std::uint8_t>(type | channel); };
 
-    for (const auto& event : track.events.all())
+    for (const auto& event : events.all())
     {
         const Tick tick = event.tick;
         std::visit(
@@ -261,7 +261,7 @@ SmfExportResult exportSmf(const Song& song, SmfType type)
         result.warnings.push_back("clamped " + std::to_string(clamped) +
                                   " tempo(s) to the slowest a MIDI file can hold");
     }
-    for (const auto& change : song.referenceMeter().changes())
+    for (const auto& change : song.meter().changes())
     {
         const auto& signature = change.signature;
         const auto power = std::countr_zero(static_cast<std::uint32_t>(signature.denominator));
@@ -290,7 +290,7 @@ SmfExportResult exportSmf(const Song& song, SmfType type)
             events.push_back(
                 {0, Slot::Header, meta(0x20, {static_cast<std::uint8_t>(track->channel - 1)})});
         }
-        addTrackEvents(*track, events);
+        addTrackEvents(*track, song.events(track->id()), events);
     }
 
     Tick end = endOf(conductor);

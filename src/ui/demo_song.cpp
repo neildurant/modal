@@ -108,43 +108,52 @@ core::Song demoSong(core::Ppqn ppqn)
         return i;
     };
 
+    song.updateMeter([&](core::MeterMap& meter) { meter = sections; });
+
     for (std::size_t t = 0; t < kTracks; ++t)
     {
         const auto& demo = kDemoTracks[t];
         const auto id = song.addTrack(demo.name);
-        song.updateTrack(
-            id,
-            [&](core::Track& track)
-            {
-                track.channel = demo.pitch < 40 ? 10 : static_cast<int>(t) + 1;
-                track.meter = demo.meter ? core::MeterMap{ppqn, *demo.meter} : sections;
-                for (std::int64_t bar = 1;; ++bar)
-                {
-                    const core::Tick barStart = track.meter.barStart(bar);
-                    if (barStart >= end)
-                    {
-                        break;
-                    }
-                    const int density = demo.density[sectionAt(barStart)];
-                    if (density == 0 || (demo.gappy && skipped(t, bar)))
-                    {
-                        continue;
-                    }
-                    const core::Tick barEnd = std::min(track.meter.barStart(bar + 1), end);
-                    const core::Tick step =
-                        kSteps[static_cast<std::size_t>(density - 1)].toTicks(ppqn);
-                    for (core::Tick at = barStart; at < barEnd; at += step)
-                    {
-                        const core::Tick length = std::min(step, barEnd - at);
-                        track.events.insert({at, core::Note{demo.pitch, 100, length * 3 / 4}});
-                    }
-                }
-            });
+        song.updateTrack(id, [&](core::Track& track)
+                         { track.channel = demo.pitch < 40 ? 10 : static_cast<int>(t) + 1; });
+        if (demo.meter)
+        {
+            song.updateMeter(id, [&](core::MeterMap& meter)
+                             { meter = core::MeterMap{ppqn, *demo.meter}; });
+        }
+        const core::MeterMap meter = song.meter(id);
+        song.updateEvents(id,
+                          [&](core::EventList& events)
+                          {
+                              for (std::int64_t bar = 1;; ++bar)
+                              {
+                                  const core::Tick barStart = meter.barStart(bar);
+                                  if (barStart >= end)
+                                  {
+                                      break;
+                                  }
+                                  const int density = demo.density[sectionAt(barStart)];
+                                  if (density == 0 || (demo.gappy && skipped(t, bar)))
+                                  {
+                                      continue;
+                                  }
+                                  const core::Tick barEnd = std::min(meter.barStart(bar + 1), end);
+                                  const core::Tick step =
+                                      kSteps[static_cast<std::size_t>(density - 1)].toTicks(ppqn);
+                                  for (core::Tick at = barStart; at < barEnd; at += step)
+                                  {
+                                      const core::Tick length = std::min(step, barEnd - at);
+                                      events.insert(
+                                          {at, core::Note{demo.pitch, 100, length * 3 / 4}});
+                                  }
+                              }
+                          });
     }
     for (int i = 0; i < kEmptyTracks; ++i)
     {
-        song.updateTrack(song.addTrack(), [&](core::Track& track) { track.meter = sections; });
+        song.addTrack();
     }
+    song.fitToContent();
     return song;
 }
 

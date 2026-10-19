@@ -28,9 +28,9 @@ Song importOk(const std::vector<std::uint8_t>& bytes)
     return std::move(*result.song);
 }
 
-const Note& noteAt(const Track& track, std::size_t index)
+const Note& noteAt(const EventList& events, std::size_t index)
 {
-    return std::get<Note>(track.events[index].data);
+    return std::get<Note>(events[index].data);
 }
 
 bool hasWarning(const SmfImportResult& result, std::string_view fragment)
@@ -73,18 +73,18 @@ TEST_CASE("notes become single events with durations, rescaled to kPpqn")
 
     INFO("division " << division);
     REQUIRE(song.tracks().size() == 1);
-    const auto& piano = *song.tracks()[0];
-    CHECK(piano.name == "Piano");
-    CHECK(piano.channel == 1);
-    REQUIRE(piano.events.size() == 2);
+    CHECK(song.tracks()[0]->name == "Piano");
+    CHECK(song.tracks()[0]->channel == 1);
+    const auto& piano = song.events(song.tracks()[0]->id());
+    REQUIRE(piano.size() == 2);
 
-    CHECK(piano.events[0].tick == 0);
+    CHECK(piano[0].tick == 0);
     CHECK(noteAt(piano, 0) == Note{60, 100, rescaled(division), 40});
-    CHECK(piano.events[1].tick == rescaled(division));
+    CHECK(piano[1].tick == rescaled(division));
     CHECK(noteAt(piano, 1).pitch == 64);
     CHECK(noteAt(piano, 1).releaseVelocity == 64);
     // Start and end are rescaled separately, so notes that touch still touch.
-    CHECK(piano.events[1].tick + noteAt(piano, 1).duration == rescaled(division + division / 2));
+    CHECK(piano[1].tick + noteAt(piano, 1).duration == rescaled(division + division / 2));
     if (division % 4 == 0)
     {
         CHECK(noteAt(piano, 0).duration == q);
@@ -104,13 +104,13 @@ TEST_CASE("running status")
         .end();
     const auto song = importOk(makeSmf(0, 96, {track}));
 
-    const auto& t = *song.tracks()[0];
-    CHECK(t.channel == 2);
-    REQUIRE(t.events.size() == 4);
+    CHECK(song.tracks()[0]->channel == 2);
+    const auto& t = song.events(song.tracks()[0]->id());
+    REQUIRE(t.size() == 4);
     CHECK(noteAt(t, 0).pitch == 60);
     CHECK(noteAt(t, 1).pitch == 62);
     CHECK(noteAt(t, 1).duration == kPpqn.quarter());
-    CHECK(std::holds_alternative<MetaText>(t.events[2].data));
+    CHECK(std::holds_alternative<MetaText>(t[2].data));
     CHECK(noteAt(t, 3).pitch == 64);
 }
 
@@ -124,11 +124,11 @@ TEST_CASE("overlapping notes of the same pitch pair first on, first off")
         .end();
     const auto song = importOk(makeSmf(0, 96, {track}));
 
-    const auto& t = *song.tracks()[0];
-    REQUIRE(t.events.size() == 2);
+    const auto& t = song.events(song.tracks()[0]->id());
+    REQUIRE(t.size() == 2);
     const Tick q = kPpqn.quarter();
     CHECK(noteAt(t, 0) == Note{60, 100, 2 * q, 0});
-    CHECK(t.events[1].tick == q);
+    CHECK(t[1].tick == q);
     CHECK(noteAt(t, 1) == Note{60, 80, 2 * q, 0});
 }
 
@@ -143,8 +143,8 @@ TEST_CASE("unpaired note-offs and unfinished notes")
     const auto result = importSmf(makeSmf(0, 96, {track}));
 
     REQUIRE(result.song);
-    const auto& t = *result.song->tracks()[0];
-    REQUIRE(t.events.size() == 2);
+    const auto& t = result.song->events(result.song->tracks()[0]->id());
+    REQUIRE(t.size() == 2);
     CHECK(noteAt(t, 0).duration == kPpqn.whole());
     CHECK(hasWarning(result, "1 note-off(s) without a note-on"));
     CHECK(hasWarning(result, "1 note(s) never ended"));
@@ -163,15 +163,15 @@ TEST_CASE("channel messages")
         .end();
     const auto song = importOk(makeSmf(0, 96, {track}));
 
-    const auto& t = *song.tracks()[0];
-    REQUIRE(t.events.size() == 7);
-    CHECK(t.events[0].data == EventData{ControlChange{7, 100}});
-    CHECK(t.events[1].data == EventData{ProgramChange{5}});
-    CHECK(t.events[2].data == EventData{PitchBend{0}});
-    CHECK(t.events[3].data == EventData{PitchBend{PitchBend::kMax}});
-    CHECK(t.events[4].data == EventData{PitchBend{PitchBend::kMin}});
-    CHECK(t.events[5].data == EventData{ChannelPressure{33}});
-    CHECK(t.events[6].data == EventData{PolyPressure{60, 44}});
+    const auto& t = song.events(song.tracks()[0]->id());
+    REQUIRE(t.size() == 7);
+    CHECK(t[0].data == EventData{ControlChange{7, 100}});
+    CHECK(t[1].data == EventData{ProgramChange{5}});
+    CHECK(t[2].data == EventData{PitchBend{0}});
+    CHECK(t[3].data == EventData{PitchBend{PitchBend::kMax}});
+    CHECK(t[4].data == EventData{PitchBend{PitchBend::kMin}});
+    CHECK(t[5].data == EventData{ChannelPressure{33}});
+    CHECK(t[6].data == EventData{PolyPressure{60, 44}});
 }
 
 TEST_CASE("non-note events go before notes at the same tick")
@@ -183,10 +183,10 @@ TEST_CASE("non-note events go before notes at the same tick")
         .end();
     const auto song = importOk(makeSmf(0, 96, {track}));
 
-    const auto& t = *song.tracks()[0];
-    REQUIRE(t.events.size() == 2);
-    CHECK(std::holds_alternative<ProgramChange>(t.events[0].data));
-    CHECK(t.events[1].isNote());
+    const auto& t = song.events(song.tracks()[0]->id());
+    REQUIRE(t.size() == 2);
+    CHECK(std::holds_alternative<ProgramChange>(t[0].data));
+    CHECK(t[1].isNote());
 }
 
 TEST_CASE("multi-channel tracks split into one track per channel")
@@ -203,18 +203,18 @@ TEST_CASE("multi-channel tracks split into one track per channel")
 
     CHECK(song.title == "Band");
     REQUIRE(song.tracks().size() == 2);
-    const auto& first = *song.tracks()[0];
-    const auto& tenth = *song.tracks()[1];
-    CHECK(first.name == "Band (ch 1)");
-    CHECK(first.channel == 1);
-    CHECK(tenth.name == "Band (ch 10)");
-    CHECK(tenth.channel == 10);
+    const auto& first = song.events(song.tracks()[0]->id());
+    const auto& tenth = song.events(song.tracks()[1]->id());
+    CHECK(song.tracks()[0]->name == "Band (ch 1)");
+    CHECK(song.tracks()[0]->channel == 1);
+    CHECK(song.tracks()[1]->name == "Band (ch 10)");
+    CHECK(song.tracks()[1]->channel == 10);
 
     // The SysEx goes with the first channel's track.
-    REQUIRE(first.events.size() == 2);
-    CHECK(std::holds_alternative<SysEx>(first.events[0].data));
+    REQUIRE(first.size() == 2);
+    CHECK(std::holds_alternative<SysEx>(first[0].data));
     CHECK(noteAt(first, 1).pitch == 48);
-    REQUIRE(tenth.events.size() == 1);
+    REQUIRE(tenth.size() == 1);
     CHECK(noteAt(tenth, 0).pitch == 36);
 }
 
@@ -256,9 +256,9 @@ TEST_CASE("type 1 files: conductor track, tempo, meter and markers")
     // Time signatures apply to every track.
     for (const auto& track : song.tracks())
     {
-        CHECK(track->meter.signatureAt(0) == TimeSignature{4, 4});
-        CHECK(track->meter.signatureAt(bar5) == TimeSignature{3, 4});
-        CHECK(track->meter.barStart(6) == bar5 + 3 * kPpqn.quarter());
+        CHECK(song.meter(track->id()).signatureAt(0) == TimeSignature{4, 4});
+        CHECK(song.meter(track->id()).signatureAt(bar5) == TimeSignature{3, 4});
+        CHECK(song.meter(track->id()).barStart(6) == bar5 + 3 * kPpqn.quarter());
     }
 }
 
@@ -274,7 +274,7 @@ TEST_CASE("a track with only SysEx or text still becomes a track")
     REQUIRE(song.tracks().size() == 1);
     CHECK(song.tracks()[0]->name == "GM Reset");
     CHECK(song.tracks()[0]->channel == 1);
-    CHECK(song.tracks()[0]->events.size() == 1);
+    CHECK(song.events(song.tracks()[0]->id()).size() == 1);
 }
 
 TEST_CASE("SysEx: complete, split into packets, and as escapes")
@@ -291,14 +291,14 @@ TEST_CASE("SysEx: complete, split into packets, and as escapes")
     const auto result = importSmf(makeSmf(0, 96, {track}));
 
     REQUIRE(result.song);
-    const auto& t = *result.song->tracks()[0];
-    REQUIRE(t.events.size() == 3);
-    for (const auto& event : t.events.all())
+    const auto& t = result.song->events(result.song->tracks()[0]->id());
+    REQUIRE(t.size() == 3);
+    for (const auto& event : t.all())
     {
         CHECK(*std::get<SysEx>(event.data).bytes == message);
     }
     // The split message is placed at its first packet.
-    CHECK(t.events[1].tick == (2 * Tick{10} * kPpqn.value + 96) / (2 * 96));
+    CHECK(t[1].tick == (2 * Tick{10} * kPpqn.value + 96) / (2 * 96));
     CHECK(hasWarning(result, "dropped 1"));
 }
 
@@ -313,11 +313,11 @@ TEST_CASE("text events")
         .end();
     const auto song = importOk(makeSmf(0, 96, {track}));
 
-    const auto& t = *song.tracks()[0];
-    REQUIRE(t.events.size() == 4);
-    CHECK(t.events[0].data == EventData{makeMetaText(MetaText::Kind::Copyright, "(c) Me")});
-    CHECK(t.events[1].data == EventData{makeMetaText(MetaText::Kind::Lyric, "la")});
-    CHECK(t.events[2].data == EventData{makeMetaText(MetaText::Kind::CuePoint, "cue")});
+    const auto& t = song.events(song.tracks()[0]->id());
+    REQUIRE(t.size() == 4);
+    CHECK(t[0].data == EventData{makeMetaText(MetaText::Kind::Copyright, "(c) Me")});
+    CHECK(t[1].data == EventData{makeMetaText(MetaText::Kind::Lyric, "la")});
+    CHECK(t[2].data == EventData{makeMetaText(MetaText::Kind::CuePoint, "cue")});
 }
 
 // SMF tempos (24 bits of microseconds) can only be too fast: the slowest is about 3.6 BPM.
@@ -344,7 +344,7 @@ TEST_CASE("a time signature between beats moves to the next beat")
     const auto result = importSmf(makeSmf(0, 96, {track}));
 
     REQUIRE(result.song);
-    const auto& meter = result.song->tracks()[0]->meter;
+    const auto& meter = result.song->meter(result.song->tracks()[0]->id());
     const Tick q = kPpqn.quarter();
     CHECK(meter.signatureAt(2 * q) == TimeSignature{3, 4});
     CHECK(meter.signatureAt(0) == TimeSignature{2, 4}); // the remainder bar
@@ -359,7 +359,7 @@ TEST_CASE("damaged files are read as far as possible")
         track.event(0, {0x90, 60, 100}).event(96, {0x80, 60, 0}).raw({0, 0x90, 62});
         const auto result = importSmf(makeSmf(0, 96, {track}));
         REQUIRE(result.song);
-        CHECK(result.song->tracks()[0]->events.size() == 1);
+        CHECK(result.song->events(result.song->tracks()[0]->id()).size() == 1);
         CHECK(hasWarning(result, "ended early"));
     }
 
@@ -390,7 +390,7 @@ TEST_CASE("damaged files are read as far as possible")
         SmfTrack track;
         track.event(0, {0x90, 60, 100}).event(96, {0x80, 60, 0}).end().event(0, {0x90, 62, 100});
         const auto song = importOk(makeSmf(0, 96, {track}));
-        CHECK(song.tracks()[0]->events.size() == 1);
+        CHECK(song.events(song.tracks()[0]->id()).size() == 1);
     }
 }
 

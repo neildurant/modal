@@ -196,7 +196,7 @@ Tick songEnd(const core::Song& song)
     Tick end = 0;
     for (const auto& track : song.tracks())
     {
-        for (const auto& event : track->events.all())
+        for (const auto& event : song.events(track->id()).all())
         {
             const auto* note = std::get_if<core::Note>(&event.data);
             end = std::max(end, event.tick + (note != nullptr ? note->duration : 0));
@@ -207,7 +207,7 @@ Tick songEnd(const core::Song& song)
 
 void printSong(const core::Song& song, const std::string& file)
 {
-    const auto& meter = song.referenceMeter();
+    const auto& meter = song.meter();
     const auto signature = meter.signatureAt(0);
     const auto tempo = song.tempo();
     const Tick end = songEnd(song);
@@ -224,8 +224,8 @@ void printSong(const core::Song& song, const std::string& file)
     for (const auto& track : song.tracks())
     {
         std::cout << "  " << std::setw(2) << number++ << "  ch " << std::setw(2) << track->channel
-                  << "  " << std::setw(6) << track->events.size() << " events  " << track->name
-                  << '\n';
+                  << "  " << std::setw(6) << song.events(track->id()).size() << " events  "
+                  << track->name << '\n';
     }
 }
 
@@ -280,7 +280,7 @@ int play(const Options& options, const core::SmfImportResult& imported,
     }
     printSong(song, options.file);
 
-    const auto& meter = song.referenceMeter();
+    const auto& meter = song.meter();
     const auto start = meter.toTick(options.start);
     if (!start)
     {

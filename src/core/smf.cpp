@@ -521,26 +521,25 @@ Song buildSong(ParsedFile& file)
     // Tempo.
     std::ranges::stable_sort(file.tempos, {}, &TempoAt::tick);
     int clamped = 0;
-    for (const auto& [tick, micros] : file.tempos)
-    {
-        Tempo tempo{micros};
-        if (!tempo.isValid())
+    song.updateTempo(
+        [&](TempoMap& map)
         {
-            tempo.microsPerQuarter = std::clamp<std::int64_t>(micros, Tempo::kMinMicrosPerQuarter,
-                                                              Tempo::kMaxMicrosPerQuarter);
-            ++clamped;
-        }
-        song.tempo().set(rescale(tick), tempo);
-    }
+            for (const auto& [tick, micros] : file.tempos)
+            {
+                Tempo tempo{micros};
+                if (!tempo.isValid())
+                {
+                    tempo.microsPerQuarter = std::clamp<std::int64_t>(
+                        micros, Tempo::kMinMicrosPerQuarter, Tempo::kMaxMicrosPerQuarter);
+                    ++clamped;
+                }
+                map.set(rescale(tick), tempo);
+            }
+        });
     if (clamped > 0)
     {
         file.warnings.push_back("clamped " + std::to_string(clamped) +
                                 " tempo(s) to the range 1-1000 BPM");
-    }
-
-    for (const auto& marker : file.markers)
-    {
-        song.setMarker(rescale(marker.tick), marker.name);
     }
 
     if (!file.tracks.empty() && (file.format == 0 || !file.tracks.front().hasChannelEvents()))
@@ -548,9 +547,20 @@ Song buildSong(ParsedFile& file)
         song.title = file.tracks.front().name;
     }
 
-    // Tracks: one per channel used by each file track.
+    // Time signatures go to the conductor, which every track follows.
     std::ranges::stable_sort(file.meters, {}, &MeterAt::tick);
     bool meterMoved = false;
+    song.updateMeter(
+        [&](MeterMap& meter)
+        {
+            for (const auto& [tick, signature] : file.meters)
+            {
+                const Tick at = rescale(tick);
+                meterMoved = meterMoved || meter.set(at, signature) != at;
+            }
+        });
+
+    // Tracks: one per channel used by each file track.
     for (const auto& parsed : file.tracks)
     {
         std::vector<int> channels;
@@ -582,33 +592,37 @@ Song buildSong(ParsedFile& file)
             const bool takesOtherEvents = channel == channels.front();
 
             const auto id = song.addTrack(std::move(name));
-            song.updateTrack(
-                id,
-                [&](Track& track)
-                {
-                    track.channel = channel + 1;
-                    for (const auto& [tick, signature] : file.meters)
-                    {
-                        const Tick at = rescale(tick);
-                        meterMoved = meterMoved || track.meter.set(at, signature) != at;
-                    }
-                    for (const auto& e : parsed.events)
-                    {
-                        if (e.channel != channel && !(e.channel == kNoChannel && takesOtherEvents))
-                        {
-                            continue;
-                        }
-                        Event event = e.event;
-                        event.tick = rescale(e.event.tick);
-                        if (auto* note = std::get_if<Note>(&event.data))
-                        {
-                            note->duration = rescale(e.end) - event.tick;
-                        }
-                        track.events.insert(std::move(event));
-                    }
-                });
+            song.updateTrack(id, [&](Track& track) { track.channel = channel + 1; });
+            song.updateEvents(id,
+                              [&](EventList& events)
+                              {
+                                  for (const auto& e : parsed.events)
+                                  {
+                                      if (e.channel != channel &&
+                                          !(e.channel == kNoChannel && takesOtherEvents))
+                                      {
+                                          continue;
+                                      }
+                                      Event event = e.event;
+                                      event.tick = rescale(e.event.tick);
+                                      if (auto* note = std::get_if<Note>(&event.data))
+                                      {
+                                          note->duration = rescale(e.end) - event.tick;
+                                      }
+                                      events.insert(std::move(event));
+                                  }
+                              });
         }
     }
+
+    // Markers become bookmarks, and the song's one section ends after the last of
+    // everything.
+    for (const auto& marker : file.markers)
+    {
+        song.setMarker(rescale(marker.tick), marker.name);
+    }
+    song.fitToContent();
+
     if (meterMoved)
     {
         file.warnings.push_back(

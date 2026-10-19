@@ -1,7 +1,6 @@
 #pragma once
 
 #include <modal/core/event.hpp>
-#include <modal/core/meter_map.hpp>
 #include <modal/core/tick.hpp>
 
 #include <chrono>
@@ -48,6 +47,7 @@ struct TrackId
     friend constexpr auto operator<=>(TrackId, TrackId) = default;
 };
 
+// A track's settings. Its meter and events are held by the song's sections.
 class Track
 {
 public:
@@ -57,14 +57,13 @@ public:
     static constexpr int kMaxVelocityOffset = 127;
     static constexpr std::chrono::milliseconds kMaxTimeOffset{1000};
 
-    Track(TrackId id, Ppqn ppqn);
+    explicit Track(TrackId id);
 
     TrackId id() const { return id_; }
 
     std::string name;
     std::string port; // output port name, resolved through the machine's port aliases
     int channel = kMinChannel;
-    MeterMap meter;
     bool mute = false;
     bool solo = false;
     bool arm = false;
@@ -75,8 +74,6 @@ public:
     int transpose = 0;
     int velocityOffset = 0;
     std::chrono::milliseconds timeOffset{0}; // negative sends early
-
-    EventList events;
 
     // Whether channel and the playback settings are in range.
     bool hasValidSettings() const;

@@ -2,6 +2,8 @@
 
 // Helpers for tests that play songs: building them, and recording what is sent.
 
+#include "edit_track.hpp"
+
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/scheduler.hpp>
 #include <modal/core/song.hpp>
@@ -71,22 +73,22 @@ inline std::optional<DestinationId> byPortName(const Track& track)
 inline Song songAt(Ppqn ppqn)
 {
     Song song{ppqn};
-    song.tempo().set(0, Tempo{500'000});
+    song.updateTempo([&](core::TempoMap& tempo) { tempo.set(0, Tempo{500'000}); });
     return song;
 }
 
-inline TrackId addTrack(Song& song, int channel, const std::function<void(Track&)>& edit = {})
+inline TrackId addTrack(Song& song, int channel, const std::function<void(EditTrack&)>& edit = {})
 {
     const auto id = song.addTrack();
-    song.updateTrack(id,
-                     [&](Track& track)
-                     {
-                         track.channel = channel;
-                         if (edit)
-                         {
-                             edit(track);
-                         }
-                     });
+    editTrack(song, id,
+              [&](EditTrack& track)
+              {
+                  track.channel = channel;
+                  if (edit)
+                  {
+                      edit(track);
+                  }
+              });
     return id;
 }
 
