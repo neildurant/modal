@@ -187,12 +187,27 @@ void ArrangePage::zoomBy(int steps)
     const auto last = static_cast<std::int64_t>(kZooms.size()) - 1;
     zoom_ = static_cast<std::size_t>(
         std::clamp<std::int64_t>(static_cast<std::int64_t>(zoom_) + steps, 0, last));
+    leftTick_ = leftTick_ / columnTicks() * columnTicks(); // to a column of the new zoom
     follow();
 }
 
 void ArrangePage::resetZoom()
 {
-    zoom_ = kDefaultZoom;
+    zoomBy(static_cast<int>(kDefaultZoom) - static_cast<int>(zoom_));
+}
+
+void ArrangePage::scrollBars(std::int64_t by)
+{
+    if (song_.tracks().empty())
+    {
+        return;
+    }
+    const auto& meter = currentTrack().meter;
+    const core::Tick from = meter.barStart(bar());
+    const core::Tick to =
+        meter.barStart(std::clamp<std::int64_t>(bar() + by, 1, lastBar(currentTrack())));
+    time_ = to;
+    leftTick_ = std::max<core::Tick>(leftTick_ + (to - from), 0);
     follow();
 }
 
@@ -238,15 +253,20 @@ void ArrangePage::follow()
     const auto barNumber = meter.toBarBeatTick(time_).bar;
     const core::Tick start = meter.barStart(barNumber);
     const core::Tick barEnd = std::min(meter.barStart(barNumber + 1), end_);
+    // The view may start anywhere, as scrollBars leaves it; when it must move to show the
+    // cursor's bar, it moves to a column.
     const core::Tick endColumns = (end_ + column - 1) / column;
-    core::Tick left = std::clamp<core::Tick>(leftTick_ / column, 0,
-                                             std::max<core::Tick>(endColumns - viewColumns(), 0));
-    if (barEnd > (left * column) + visible)
+    const core::Tick lastLeft = std::max<core::Tick>(endColumns - viewColumns(), 0) * column;
+    core::Tick left = std::clamp<core::Tick>(leftTick_, 0, lastLeft);
+    if (barEnd > left + visible)
     {
-        left = (barEnd - visible + column - 1) / column;
+        left = (barEnd - visible + column - 1) / column * column;
     }
-    left = std::min(left, start / column);
-    leftTick_ = left * column;
+    if (start < left)
+    {
+        left = start / column * column;
+    }
+    leftTick_ = left;
 }
 
 void ArrangePage::addRegions(Frame& frame) const

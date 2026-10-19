@@ -32,9 +32,11 @@ public:
     void moveTo(int row, int column);
     void moveBy(int rows, int columns);
 
-    // Scrolls the view by some rows (up if negative) and moves the cursor as far, as Vim's
-    // Ctrl-D does. At the grid's edge the view stops and the cursor goes on to the edge.
-    void scrollBy(int rows);
+    // Scrolls the view by some rows (up if negative), or columns (left if negative), and
+    // moves the cursor as far, so it stays where it is in the view, as Vim's Ctrl-D does. At
+    // the grid's edge the view stops and the cursor goes on to the edge.
+    void scrollRowsBy(int rows);
+    void scrollColumnsBy(int columns);
 
     // Scrolls to put the cursor in the middle of the view, as far as the grid allows.
     void centre();

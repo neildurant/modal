@@ -406,3 +406,19 @@ TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line o
     CHECK(view.mode() == Mode::Normal);
     CHECK(lines.size() == 1);
 }
+
+TEST_CASE("Ctrl with a direction moves the cursor and scrolls with it")
+{
+    auto view = view80x24();
+    type(view, U"5j3l");
+    view.handle(Key::typed(U'j', kCtrl), 0);
+    CHECK(view.cursor().row() == 6);
+    CHECK(view.cursor().top() == 1);
+    view.handle(Key::of(NamedKey::Right, kCtrl), 0);
+    CHECK(view.cursor().column() == 4);
+    CHECK(view.cursor().left() == 1);
+    type(view, U"4");
+    view.handle(Key::typed(U'k', kCtrl), 0); // the view stops at the top, the cursor goes on
+    CHECK(view.cursor().top() == 0);
+    CHECK(view.cursor().row() == 2);
+}

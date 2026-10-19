@@ -47,10 +47,17 @@ void GridCursor::moveBy(int rows, int columns)
     follow();
 }
 
-void GridCursor::scrollBy(int rows)
+void GridCursor::scrollRowsBy(int rows)
 {
     top_ = moved(top_, rows, std::max(rows_ - viewRows_ + 1, 1));
     row_ = moved(row_, rows, rows_);
+    follow();
+}
+
+void GridCursor::scrollColumnsBy(int columns)
+{
+    left_ = moved(left_, columns, std::max(columns_ - viewColumns_ + 1, 1));
+    column_ = moved(column_, columns, columns_);
     follow();
 }
 

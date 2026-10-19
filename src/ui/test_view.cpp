@@ -136,6 +136,10 @@ constexpr std::array kCommands{
     CommandInfo{"cursor-last", "Move to the last column, or bar"},
     CommandInfo{"go-first", "Go to the first row or bar, or the one counted"},
     CommandInfo{"go-last", "Go to the last row or bar, or the one counted"},
+    CommandInfo{"cursor-left-scroll", "Move left, scrolling to keep the cursor in place"},
+    CommandInfo{"cursor-down-scroll", "Move down, scrolling to keep the cursor in place"},
+    CommandInfo{"cursor-up-scroll", "Move up, scrolling to keep the cursor in place"},
+    CommandInfo{"cursor-right-scroll", "Move right, scrolling to keep the cursor in place"},
     CommandInfo{"scroll-half-down", "Scroll down half a page"},
     CommandInfo{"scroll-half-up", "Scroll up half a page"},
     CommandInfo{"scroll-page-down", "Scroll down a page"},
@@ -279,7 +283,17 @@ std::optional<bool> TestView::run(std::string_view command, int count)
     {
         const bool half = command.starts_with("scroll-half");
         const int by = n * rows(half) * (command.ends_with("down") ? 1 : -1);
-        return onPage([&] { cursor_.scrollBy(by); }, [&] { arrange_.scrollTracks(by); });
+        return onPage([&] { cursor_.scrollRowsBy(by); }, [&] { arrange_.scrollTracks(by); });
+    }
+    if (command == "cursor-left-scroll" || command == "cursor-right-scroll")
+    {
+        const int by = command == "cursor-left-scroll" ? -n : n;
+        return onPage([&] { cursor_.scrollColumnsBy(by); }, [&] { arrange_.scrollBars(by); });
+    }
+    if (command == "cursor-up-scroll" || command == "cursor-down-scroll")
+    {
+        const int by = command == "cursor-up-scroll" ? -n : n;
+        return onPage([&] { cursor_.scrollRowsBy(by); }, [&] { arrange_.scrollTracks(by); });
     }
     if (command == "scroll-centre")
     {

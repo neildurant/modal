@@ -49,6 +49,12 @@ public:
     // Vim's Ctrl-D does.
     void scrollTracks(std::int64_t by);
 
+    // Moves the cursor by some of the current track's bars, right if positive, and scrolls
+    // the view by as long in time, so the cursor stays exactly where it is on screen; at the
+    // start or end of the song the view stops and the cursor moves on. The view can then
+    // start anywhere, not only at a column.
+    void scrollBars(std::int64_t by);
+
     // Zooms out by some steps, or in if negative, as far as the zooms go; or back to the
     // default.
     void zoomBy(int steps);

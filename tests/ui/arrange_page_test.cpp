@@ -442,3 +442,38 @@ TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
     type(page, U"j", 6);
     CHECK(page.status() == "track 7  bar 11/69  3/4  zoom 1/2");
 }
+
+TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
+{
+    auto page = page80x22(); // 60 columns of two quarter notes: 120 quarter notes in view
+    const auto song = demoSong();
+    const auto& ostinato = song.tracks()[6]->meter; // 3/4 throughout
+
+    // At the start the view can't scroll left, so the cursor just moves.
+    page.scrollBars(-1);
+    CHECK(page.bar() == 1);
+    CHECK(page.leftTick() == 0);
+
+    // In the middle, the view moves as far as the cursor, by bars that aren't whole columns.
+    type(page, U"j", 6);
+    page.goToBar(10);
+    const auto onScreen = [&] { return page.time() - page.leftTick(); };
+    const auto before = onScreen();
+    page.scrollBars(1);
+    CHECK(page.bar() == 11);
+    CHECK(page.leftTick() == ostinato.barStart(11) - ostinato.barStart(10)); // 3 quarters
+    CHECK(onScreen() == before);
+    page.scrollBars(3);
+    CHECK(page.bar() == 14);
+    CHECK(onScreen() == before);
+    page.scrollBars(-4);
+    CHECK(page.leftTick() == 0);
+    CHECK(onScreen() == before);
+
+    // Near the end, the view scrolls only as far as the song's end at its right edge (86
+    // quarter notes in, the last 120 of 205 rounded up to columns), and the cursor moves on.
+    page.goToBar(60);
+    page.scrollBars(100);
+    CHECK(page.bar() == 69);
+    CHECK(page.leftTick() == 86 * core::kPpqn.quarter());
+}

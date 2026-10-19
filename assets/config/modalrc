@@ -18,7 +18,16 @@ nmap <End>      cursor-last       "Last column"
 nmap gg         go-first          "First row, or row {count}"
 nmap G          go-last           "Last row, or row {count}"
 
-" Scrolling and zooming
+" Scrolling and zooming. Ctrl with a direction moves the cursor and scrolls with it, so
+" it stays in place on screen, until the view can't scroll further.
+nmap <C-h>      cursor-left-scroll  "Left, scrolling"
+nmap <C-Left>   cursor-left-scroll  "Left, scrolling"
+nmap <C-j>      cursor-down-scroll  "Down, scrolling"
+nmap <C-Down>   cursor-down-scroll  "Down, scrolling"
+nmap <C-k>      cursor-up-scroll    "Up, scrolling"
+nmap <C-Up>     cursor-up-scroll    "Up, scrolling"
+nmap <C-l>      cursor-right-scroll "Right, scrolling"
+nmap <C-Right>  cursor-right-scroll "Right, scrolling"
 nmap <C-d>      scroll-half-down  "Half a page down"
 nmap <C-u>      scroll-half-up    "Half a page up"
 nmap <C-f>      scroll-page-down  "A page down"

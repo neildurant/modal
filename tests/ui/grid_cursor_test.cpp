@@ -102,19 +102,19 @@ TEST_CASE("scrolling moves the view and the cursor together, stopping at the edg
     cursor.setView(10, 5);
     cursor.moveTo(3, 0);
 
-    cursor.scrollBy(5);
+    cursor.scrollRowsBy(5);
     CHECK(cursor.top() == 5);
     CHECK(cursor.row() == 8);
 
-    cursor.scrollBy(100); // the view stops at the end, the cursor goes on to the last row
+    cursor.scrollRowsBy(100); // the view stops at the end, the cursor goes on to the last row
     CHECK(cursor.top() == 90);
     CHECK(cursor.row() == 99);
 
-    cursor.scrollBy(-5);
+    cursor.scrollRowsBy(-5);
     CHECK(cursor.top() == 85);
     CHECK(cursor.row() == 94);
 
-    cursor.scrollBy(-100);
+    cursor.scrollRowsBy(-100);
     CHECK(cursor.top() == 0);
     CHECK(cursor.row() == 0);
 }
@@ -123,7 +123,7 @@ TEST_CASE("a grid smaller than its view doesn't scroll")
 {
     GridCursor cursor{5, 3};
     cursor.setView(10, 10);
-    cursor.scrollBy(3);
+    cursor.scrollRowsBy(3);
     CHECK(cursor.top() == 0);
     CHECK(cursor.row() == 3);
     cursor.moveBy(10, 10);
@@ -151,4 +151,20 @@ TEST_CASE("centring scrolls the cursor to the middle of the view, as far as the 
     cursor.centre();
     CHECK(cursor.top() == 90);
     CHECK(cursor.left() == 45);
+}
+
+TEST_CASE("scrolling by columns moves the view and the cursor together, stopping at the edges")
+{
+    GridCursor cursor{100, 50};
+    cursor.setView(10, 5);
+    cursor.moveTo(0, 2);
+    cursor.scrollColumnsBy(3);
+    CHECK(cursor.left() == 3);
+    CHECK(cursor.column() == 5);
+    cursor.scrollColumnsBy(-10); // the view stops at the start, the cursor goes on to it
+    CHECK(cursor.left() == 0);
+    CHECK(cursor.column() == 0);
+    cursor.scrollColumnsBy(100);
+    CHECK(cursor.left() == 45);
+    CHECK(cursor.column() == 49);
 }
