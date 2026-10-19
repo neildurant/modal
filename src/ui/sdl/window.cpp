@@ -23,6 +23,7 @@ struct Window::Impl
     std::unique_ptr<Font> font;
     int minimumColumns = 0;
     int minimumRows = 0;
+    bool closing = false; // asked to close, so run returns
 
     ~Impl()
     {
@@ -526,7 +527,16 @@ void Window::run(const WindowHandlers& handlers)
                 break;
             }
         } while (SDL_PollEvent(&event)); // all that's waiting, then one frame for them
+        if (impl_->closing)
+        {
+            return;
+        }
     }
+}
+
+void Window::close()
+{
+    impl_->closing = true;
 }
 
 std::optional<Colour> Window::pixel(int x, int y) const

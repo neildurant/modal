@@ -96,6 +96,9 @@ public:
     // handlers' deadline even with no events, as for a key binding's timeout.
     void run(const WindowHandlers& handlers);
 
+    // Ends run once the events it's handling are done, as for a quit command.
+    void close();
+
     // The time now, in milliseconds since some fixed point, as passed to the handlers.
     static std::int64_t now();
 

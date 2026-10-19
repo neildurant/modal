@@ -3,6 +3,7 @@
 #include <modal/platform/paths.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/key.hpp>
+#include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/test_view.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -116,8 +117,9 @@ int main(int argc, char* argv[])
     // the first to the status line.
     const auto commands = allCommands();
     ui::Config config;
-    ui::ConfigReader reader{config, commands, platform::configDirectory()};
-    ui::runStartupFiles(reader, platform::configDirectory());
+    const auto configDirectory = platform::configDirectory();
+    ui::ConfigReader reader{config, commands, configDirectory};
+    ui::runStartupFiles(reader, configDirectory);
     std::string message;
     for (const auto& error : reader.errors())
     {
@@ -202,6 +204,31 @@ int main(int argc, char* argv[])
                                 " px",
                             ui::TestView::MessageKind::Information);
             return true;
+        });
+
+    // Lines run at the : prompt, after which settings and bindings apply at once.
+    view.setLineHandler(
+        [&](const std::string& line)
+        {
+            const auto result = ui::runPromptLine(reader, config, line, configDirectory);
+            if (result.quit)
+            {
+                window.close();
+                return;
+            }
+            view.setKeymap(config.keymap);
+            auto message = result.message;
+            bool warning = result.warning;
+            if (auto error = apply(settings, window, view); !error.empty())
+            {
+                message = error;
+                warning = true;
+            }
+            if (!message.empty())
+            {
+                view.setMessage(message, warning ? ui::TestView::MessageKind::Warning
+                                                 : ui::TestView::MessageKind::Information);
+            }
         });
 
     const auto& theme = config.theme;

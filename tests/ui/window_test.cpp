@@ -387,3 +387,22 @@ TEST_CASE("a window wakes at its handlers' deadline with no events, and draws if
     CHECK(wokeAt >= start + 30);
     CHECK(frames >= 2); // the first, and the one the wake-up asked for
 }
+
+TEST_CASE("closing a window ends its event loop once the events in hand are done")
+{
+    auto window = offscreen(320, 200);
+    pushKey(SDLK_ESCAPE);
+    pushKey(SDLK_ESCAPE);
+    int keys = 0;
+    window->run({.redraw = [](Window&) {},
+                 .key =
+                     [&](const Key&, std::int64_t)
+                 {
+                     ++keys;
+                     window->close();
+                     return false;
+                 },
+                 .deadline = {},
+                 .wake = {}});
+    CHECK(keys >= 1); // and it returned, with no quit event
+}

@@ -13,6 +13,7 @@ add_library(modal_ui STATIC
     keymap.cpp
     grid_cursor.cpp
     layout.cpp
+    prompt.cpp
     settings.cpp
     style.cpp
     test_view.cpp
