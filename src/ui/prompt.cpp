@@ -53,7 +53,8 @@ PromptResult errorsSince(const ConfigReader& reader, std::size_t before)
 } // namespace
 
 PromptResult runPromptLine(ConfigReader& reader, const Config& config, std::string_view line,
-                           const std::optional<std::filesystem::path>& configDirectory)
+                           const std::optional<std::filesystem::path>& configDirectory,
+                           std::span<const CommandInfo> commands)
 {
     const auto parts = words(line);
     if (parts.empty())
@@ -81,6 +82,22 @@ PromptResult runPromptLine(ConfigReader& reader, const Config& config, std::stri
                 (shown.empty() ? "" : "  ") + std::string{name} + "=" + formatValue(setting->value);
         }
         return {shown, false, false};
+    }
+    if (command == "write-config" || command == "write-config!")
+    {
+        if (parts.size() != 2)
+        {
+            return {std::string{command} + " needs FILE", true, false};
+        }
+        const auto file = configDirectory.value_or(std::filesystem::path{}) / utf8Path(parts[1]);
+        const bool overwrite = command.ends_with('!');
+        if (auto error =
+                writeConfigFile(file, configText(config, commands, configDirectory), overwrite);
+            !error.empty())
+        {
+            return {error + (overwrite ? "" : "; write-config! overwrites it"), true, false};
+        }
+        return {"wrote " + utf8Text(file), false, false};
     }
     const auto before = reader.errors().size();
     if (command == "source" && parts.size() == 1)

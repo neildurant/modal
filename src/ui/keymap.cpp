@@ -46,6 +46,12 @@ bool Keymap::unbind(Mode mode, const std::vector<Key>& keys)
     return modes_[static_cast<std::size_t>(mode)].erase(keys) > 0;
 }
 
+std::vector<std::pair<std::vector<Key>, Binding>> Keymap::bindings(Mode mode) const
+{
+    const auto& bindings = modes_[static_cast<std::size_t>(mode)];
+    return {bindings.begin(), bindings.end()};
+}
+
 Keymap::Match Keymap::match(Mode mode, std::span<const Key> keys) const
 {
     const auto& bindings = modes_[static_cast<std::size_t>(mode)];

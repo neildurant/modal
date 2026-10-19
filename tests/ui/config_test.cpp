@@ -311,3 +311,48 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
         CHECK(written.settings.find(setting.name)->value == setting.value);
     }
 }
+
+TEST_CASE("the config text has what's changed as commands, and reads back the same")
+{
+    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
+    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
+    Config config;
+    ConfigReader reader{config, commands};
+    runStartupFiles(reader, std::nullopt);
+    reader.runText("set fontsize=14 theme=light font=\"C:/My Fonts/x.ttf\"\n"
+                   "nmap Q go-first \"Top \\\"row\\\"\"\n"
+                   "nmap G go-first\n"
+                   "nunmap <PageUp>\n"
+                   "highlight cursor #ff0000\n",
+                   "modalrc", {});
+    REQUIRE(reader.errors().empty());
+
+    const auto text = configText(config, commands, std::nullopt);
+    const auto has = [&](std::string_view line)
+    { return text.find("\n" + std::string{line} + "\n") != std::string::npos; };
+    CHECK(has("set fontsize=14"));
+    CHECK(has("set theme=light"));
+    CHECK(has("set font=\"C:/My Fonts/x.ttf\""));
+    CHECK(has("\"set timeoutlen=500")); // unchanged, so commented out
+    CHECK(has("nmap Q go-first \"Top \\\"row\\\"\""));
+    CHECK(has("nmap G go-first"));
+    CHECK(has("nunmap <PageUp>"));
+    CHECK_FALSE(has("nmap gg go-first")); // as built in
+    CHECK(text.find("The light theme's:") != std::string::npos);
+    CHECK(has("\"highlight background  #e1e2e7")); // the light theme's, commented out
+    CHECK(has("highlight cursor      #ff0000"));
+
+    // Read back from the defaults, it gives the same config.
+    Config again;
+    ConfigReader againReader{again, commands};
+    runStartupFiles(againReader, std::nullopt);
+    againReader.runText(text, "written", {});
+    CHECK(againReader.errors().empty());
+    CHECK(again.keymap == config.keymap);
+    CHECK(again.theme == config.theme);
+    for (const auto& setting : config.settings.all())
+    {
+        CAPTURE(setting.name);
+        CHECK(again.settings.find(setting.name)->value == setting.value);
+    }
+}

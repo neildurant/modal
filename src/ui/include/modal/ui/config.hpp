@@ -92,10 +92,22 @@ private:
     int depth_ = 0; // of files sourcing others, which stops at a limit
 };
 
-// A command file of every setting, key binding and colour, each commented out at its
-// default, with what it does, so a user uncomments only what they change and keeps later
-// versions' defaults for the rest; and the commands keys can be bound to, listed.
+// A command file of every setting, key binding and colour, with what each does, to start a
+// modalrc from (decided in milestone 3): those changed from their defaults as commands,
+// and the rest commented out at their defaults, so a user changes only what they want and
+// keeps later versions' defaults for the rest. Settings are compared with their defaults,
+// key bindings with the built-in modalrc's (changes listed as map and unmap commands), and
+// colours with the chosen theme's. The commands keys can be bound to are listed too.
+std::string configText(const Config& config, std::span<const CommandInfo> commands,
+                       const std::optional<std::filesystem::path>& configDirectory);
+
+// The config text of a config at its defaults, with the built-in modalrc's bindings.
 std::string defaultConfigText(std::span<const CommandInfo> commands);
+
+// Writes text to a file, making its directory if needed, unless the file exists and
+// overwrite is false. Returns why not, or else nothing.
+std::string writeConfigFile(const std::filesystem::path& file, std::string_view text,
+                            bool overwrite);
 
 // The built-in command file, assets/config/modalrc, which holds the default key bindings.
 std::string_view builtInModalrc();

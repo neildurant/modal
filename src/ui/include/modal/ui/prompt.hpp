@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -25,11 +26,14 @@ struct PromptResult
 //
 //   set NAME?...        shows settings' values, as in Vim
 //   source              with no file, runs modalrc in the config directory again
+//   write-config FILE   writes the config (see configText) to a file, relative to the config
+//                       directory; write-config! overwrites it
 //   q, quit             quits
 //
 // Errors, including those in files a command runs, come back as a warning: the first, and
 // how many more.
 PromptResult runPromptLine(ConfigReader& reader, const Config& config, std::string_view line,
-                           const std::optional<std::filesystem::path>& configDirectory);
+                           const std::optional<std::filesystem::path>& configDirectory,
+                           std::span<const CommandInfo> commands);
 
 } // namespace modal::ui

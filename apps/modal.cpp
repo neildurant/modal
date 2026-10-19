@@ -64,23 +64,16 @@ void fail(const std::string& message)
     ui::sdl::showError("Modal", "Modal " + message + "."); // there's no console on Windows
 }
 
-// modal --write-config FILE [--force]: writes every setting, key binding and colour, each
-// commented out at its default, to start a modalrc from. Returns the exit status.
-int writeConfig(const std::filesystem::path& file, bool force)
+// modal --write-config FILE [--force]: writes the config, after modalrc, to start a modalrc
+// from (see configText). Returns the exit status.
+int writeConfig(const std::filesystem::path& file, bool force, const std::string& text)
 {
-    if (!force && std::filesystem::exists(file))
+    if (auto error = ui::writeConfigFile(file, text, force); !error.empty())
     {
-        fail("won't overwrite " + file.string() + " without --force");
+        fail(error + (force ? "" : "; add --force to overwrite it"));
         return 1;
     }
-    std::ofstream out{file, std::ios::binary};
-    out << ui::defaultConfigText(allCommands());
-    if (!out.flush())
-    {
-        fail("can't write " + file.string());
-        return 1;
-    }
-    std::printf("Wrote %s\n", file.string().c_str());
+    std::printf("Wrote %s\n", ui::utf8Text(file).c_str());
     return 0;
 }
 
@@ -108,10 +101,6 @@ int main(int argc, char* argv[])
             return 2;
         }
     }
-    if (configFile)
-    {
-        return writeConfig(*configFile, force);
-    }
 
     // The built-in modalrc, then the user's. Errors go to stderr, where there is one, and
     // the first to the status line.
@@ -134,6 +123,10 @@ int main(int argc, char* argv[])
         {
             message += " (and " + std::to_string(reader.errors().size() - 1) + " more)";
         }
+    }
+    if (configFile)
+    {
+        return writeConfig(*configFile, force, ui::configText(config, commands, configDirectory));
     }
     auto& settings = config.settings;
     const double configuredSize = settings.number("fontsize");
@@ -210,7 +203,7 @@ int main(int argc, char* argv[])
     view.setLineHandler(
         [&](const std::string& line)
         {
-            const auto result = ui::runPromptLine(reader, config, line, configDirectory);
+            const auto result = ui::runPromptLine(reader, config, line, configDirectory, commands);
             if (result.quit)
             {
                 window.close();

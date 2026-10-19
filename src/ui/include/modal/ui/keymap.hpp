@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
@@ -62,6 +63,9 @@ public:
         bool longer = false;
     };
     Match match(Mode mode, std::span<const Key> keys) const;
+
+    // A mode's bindings, in the order of their keys.
+    std::vector<std::pair<std::vector<Key>, Binding>> bindings(Mode mode) const;
 
     friend bool operator==(const Keymap&, const Keymap&) = default;
 

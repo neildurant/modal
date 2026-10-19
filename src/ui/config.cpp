@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <system_error>
 #include <utility>
 #include <variant>
 
@@ -380,32 +381,96 @@ std::string commentedOut(std::string_view text)
 
 } // namespace
 
-std::string defaultConfigText(std::span<const CommandInfo> commands)
+namespace
+{
+
+// A value or hint in double quotes, if it needs them, with \" and \\ inside.
+std::string quotedIfNeeded(std::string_view text, bool always)
+{
+    if (!always && !text.empty() && text.find_first_of(" \t\"\\") == std::string_view::npos)
+    {
+        return std::string{text};
+    }
+    std::string out = "\"";
+    for (const char c : text)
+    {
+        if (c == '"' || c == '\\')
+        {
+            out += '\\';
+        }
+        out += c;
+    }
+    return out + "\"";
+}
+
+// The lines that change a default keymap into another: map commands for bindings added or
+// changed, unmap commands for those removed.
+std::string keymapChanges(const Keymap& keymap, const Keymap& defaults)
+{
+    std::string text;
+    for (const auto& [prefix, mode] : kMapModes)
+    {
+        const auto current = keymap.bindings(mode);
+        const auto before = defaults.bindings(mode);
+        for (const auto& binding : current)
+        {
+            if (std::ranges::find(before, binding) == before.end())
+            {
+                text += std::string(1, prefix) + "map " + formatKeys(binding.first) + " " +
+                        binding.second.command;
+                if (!binding.second.hint.empty())
+                {
+                    text += " " + quotedIfNeeded(binding.second.hint, true);
+                }
+                text += "\n";
+            }
+        }
+        for (const auto& binding : before)
+        {
+            if (std::ranges::find(current, binding.first,
+                                  &std::pair<std::vector<Key>, Binding>::first) == current.end())
+            {
+                text += std::string(1, prefix) + "unmap " + formatKeys(binding.first) + "\n";
+            }
+        }
+    }
+    return text;
+}
+
+} // namespace
+
+std::string configText(const Config& config, std::span<const CommandInfo> commands,
+                       const std::optional<std::filesystem::path>& configDirectory)
 {
     std::string text =
-        "\" Modal's configuration: every setting, key binding and colour, each commented out\n"
-        "\" at its default. Uncomment and change only what you want, and the rest will follow\n"
-        "\" later versions' defaults. Put it in modalrc in the config directory.\n"
+        "\" Modal's configuration: every setting, key binding and colour. Those changed from\n"
+        "\" their defaults are commands; the rest are commented out at their defaults, to\n"
+        "\" uncomment and change as you want, and otherwise follow later versions' defaults.\n"
+        "\" Put it in modalrc in the config directory.\n"
         "\"\n"
         "\" A line starting with \" is a comment. Keys are written as in Vim: <C-d>, <Esc>,\n"
         "\" <S-Tab>, <lt> for <, <Space>.\n\n"
         "\" Settings\n\n";
-    const Settings defaults;
-    for (const auto& setting : defaults.all())
+    for (const auto& setting : config.settings.all())
     {
         text += wrappedComment(setting.description);
-        auto value = formatValue(setting.defaultValue);
-        if (value.empty() || value.find(' ') != std::string::npos)
-        {
-            value = "\"" + value + "\"";
-        }
-        text += "\"set " + std::string{setting.name} + "=" + value + "\n\n";
+        const bool changed = setting.value != setting.defaultValue;
+        text += std::string{changed ? "" : "\""} + "set " + std::string{setting.name} + "=" +
+                quotedIfNeeded(formatValue(setting.value), false) + "\n\n";
     }
 
     text +=
         "\" Key bindings: nmap KEYS COMMAND \"HINT\" binds keys in Normal mode, and nunmap KEYS\n"
-        "\" unbinds them.\n\n";
+        "\" unbinds them; vmap, imap, omap and cmap are for the other modes. The built-in "
+        "ones:\n\n";
     text += commentedOut(builtInModalrc());
+    Config defaults;
+    ConfigReader reader{defaults, commands};
+    reader.runText(builtInModalrc(), "built-in modalrc", {});
+    if (const auto changes = keymapChanges(config.keymap, defaults.keymap); !changes.empty())
+    {
+        text += "\n\" Changes to the built-in key bindings\n" + changes;
+    }
     text += "\n\" The commands keys can be bound to:\n\"\n";
     std::size_t width = 0;
     for (const auto& command : commands)
@@ -419,10 +484,59 @@ std::string defaultConfigText(std::span<const CommandInfo> commands)
                 std::string{command.description} + "\n";
     }
 
-    text += "\n\" Colours: highlight ROLE #rrggbb sets a role's colour, after the theme's. These\n"
-            "\" are the dark theme's.\n\n";
-    text += commentedOut(*builtInThemeText("dark"));
+    // The colours of the theme chosen, to compare the config's with.
+    const auto& themeName = config.settings.text("theme");
+    Config base;
+    ConfigReader themeReader{base, commands, configDirectory};
+    themeReader.runCommand("set theme=" + quotedIfNeeded(themeName, false), {});
+    text += "\n\" Colours: highlight ROLE #rrggbb sets a role's colour, after the theme's. The " +
+            base.settings.text("theme") + " theme's:\n\n";
+    std::string changes;
+    for (std::size_t i = 0; i < kRoleCount; ++i)
+    {
+        const auto role = static_cast<Role>(i);
+        const auto name = std::string{roleName(role)};
+        const auto padding = std::string(name.size() < 12 ? 12 - name.size() : 1, ' ');
+        text += "\"highlight " + name + padding + formatColour(base.theme[role]) + "\n";
+        if (config.theme[role] != base.theme[role])
+        {
+            changes += "highlight " + name + padding + formatColour(config.theme[role]) + "\n";
+        }
+    }
+    if (!changes.empty())
+    {
+        text += "\n\" Changes to the theme's colours\n" + changes;
+    }
     return text;
+}
+
+std::string defaultConfigText(std::span<const CommandInfo> commands)
+{
+    Config defaults;
+    ConfigReader reader{defaults, commands};
+    reader.runText(builtInModalrc(), "built-in modalrc", {});
+    return configText(defaults, commands, std::nullopt);
+}
+
+std::string writeConfigFile(const std::filesystem::path& file, std::string_view text,
+                            bool overwrite)
+{
+    std::error_code ignored;
+    if (!overwrite && std::filesystem::exists(file, ignored))
+    {
+        return utf8Text(file) + " exists already";
+    }
+    if (file.has_parent_path())
+    {
+        std::filesystem::create_directories(file.parent_path(), ignored);
+    }
+    std::ofstream out{file, std::ios::binary};
+    out << text;
+    if (!out.flush())
+    {
+        return "can't write " + utf8Text(file);
+    }
+    return {};
 }
 
 } // namespace modal::ui
