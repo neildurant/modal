@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modal/ui/arrange_page.hpp>
+#include <modal/ui/command_line.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
@@ -73,6 +74,13 @@ public:
     using CommandHandler = std::function<std::optional<bool>(std::string_view command, int count)>;
     void setCommandHandler(CommandHandler handler) { handler_ = std::move(handler); }
 
+    // What runs a line entered at the : prompt, such as the program's command runner.
+    using LineHandler = std::function<void(const std::string& line)>;
+    void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
+
+    // Replaces the keymap, as when the config changes it.
+    void setKeymap(Keymap keymap) { keymap_ = std::move(keymap); }
+
     // How long to wait for a longer key binding, in milliseconds (timeoutlen).
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
 
@@ -81,6 +89,8 @@ public:
     Page page() const { return page_; }
     const GridCursor& cursor() const { return cursor_; }
     const ArrangePage& arrange() const { return arrange_; }
+    Mode mode() const { return mode_; } // Normal, or CommandLine at the : prompt
+    const CommandLine& commandLine() const { return line_; }
     std::string pending() const { return keys_.pending(); } // the count and keys typed so far
 
     // Shows a message in the status line until the next key.
@@ -96,6 +106,8 @@ private:
     Region demoRegion() const;
     Region cellsRegion() const;
     Region samplesRegion() const;
+    Region promptRegion() const;
+    std::optional<bool> runCommandLine(std::string_view command);
     void addBars(Frame& frame) const;
 
     Page page_ = Page::Grid;
@@ -106,6 +118,9 @@ private:
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;
     CommandHandler handler_;
+    LineHandler lineHandler_;
+    Mode mode_ = Mode::Normal;
+    CommandLine line_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};

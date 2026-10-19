@@ -146,6 +146,18 @@ constexpr std::array kCommands{
     CommandInfo{"zoom-reset", "Zoom to the default"},
     CommandInfo{"test-next-page", "Show the next page of the test view"},
     CommandInfo{"cancel", "Cancel"},
+    CommandInfo{"command-line", "Open the : command line"},
+    CommandInfo{"command-line-run", "Run the command line"},
+    CommandInfo{"command-line-cancel", "Close the command line"},
+    CommandInfo{"command-line-backspace", "Delete the character before the cursor"},
+    CommandInfo{"command-line-delete", "Delete the character at the cursor"},
+    CommandInfo{"command-line-left", "Move the cursor left"},
+    CommandInfo{"command-line-right", "Move the cursor right"},
+    CommandInfo{"command-line-start", "Move the cursor to the start"},
+    CommandInfo{"command-line-end", "Move the cursor to the end"},
+    CommandInfo{"command-line-clear", "Clear the command line"},
+    CommandInfo{"command-line-older", "Recall the line run before"},
+    CommandInfo{"command-line-newer", "Recall the line run after"},
 };
 
 } // namespace
@@ -158,8 +170,20 @@ std::span<const CommandInfo> TestView::commands()
 bool TestView::handle(const Key& key, std::int64_t now)
 {
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
+    // At the prompt, a character that starts no command-line binding is typed.
+    if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
+        (key.modifiers & (kCtrl | kAlt)) == 0)
+    {
+        const std::vector<Key> keys{key};
+        const auto match = keymap_.match(Mode::CommandLine, keys);
+        if (match.binding == nullptr && !match.longer)
+        {
+            line_.insert(key.character);
+            return true;
+        }
+    }
     const auto before = keys_.pending();
-    const bool changed = runAll(keys_.key(keymap_, Mode::Normal, key, now));
+    const bool changed = runAll(keys_.key(keymap_, mode_, key, now));
     return changed || hadMessage || keys_.pending() != before;
 }
 
@@ -288,7 +312,110 @@ std::optional<bool> TestView::run(std::string_view command, int count)
     {
         return false;
     }
+    if (command == "command-line")
+    {
+        mode_ = Mode::CommandLine;
+        line_.open();
+        return true;
+    }
+    if (command.starts_with("command-line-"))
+    {
+        return runCommandLine(command);
+    }
     return handler_ ? handler_(command, count) : std::nullopt;
+}
+
+std::optional<bool> TestView::runCommandLine(std::string_view command)
+{
+    if (mode_ != Mode::CommandLine)
+    {
+        return false;
+    }
+    if (command == "command-line-run")
+    {
+        mode_ = Mode::Normal;
+        const auto line = line_.take();
+        if (lineHandler_ && !line.empty())
+        {
+            lineHandler_(line);
+        }
+        return true;
+    }
+    if (command == "command-line-cancel" ||
+        (command == "command-line-backspace" && line_.text().empty())) // as in Vim
+    {
+        mode_ = Mode::Normal;
+        return true;
+    }
+    if (command == "command-line-backspace")
+    {
+        return line_.backspace();
+    }
+    if (command == "command-line-delete")
+    {
+        return line_.erase();
+    }
+    if (command == "command-line-left")
+    {
+        line_.left();
+    }
+    else if (command == "command-line-right")
+    {
+        line_.right();
+    }
+    else if (command == "command-line-start")
+    {
+        line_.start();
+    }
+    else if (command == "command-line-end")
+    {
+        line_.end();
+    }
+    else if (command == "command-line-clear")
+    {
+        line_.clear();
+    }
+    else if (command == "command-line-older")
+    {
+        return line_.older();
+    }
+    else if (command == "command-line-newer")
+    {
+        return line_.newer();
+    }
+    else
+    {
+        return std::nullopt;
+    }
+    return true;
+}
+
+Region TestView::promptRegion() const
+{
+    // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const auto& text = line_.text();
+    const auto cursor = line_.cursor();
+    const auto room =
+        static_cast<std::size_t>(std::max((width_ - 2 * margin) / cell_.width - 2, 1));
+    const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
+    const Style bar{Role::BarText, Role::Bar, kPlain};
+    Region region{
+        .bounds = layout_.bottom[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
+    const auto x = [&](std::size_t column)
+    { return margin + static_cast<int>(column) * cell_.width; };
+    region.text.push_back({x(0), 0, U":", bar});
+    region.text.push_back({x(1), 0, text.substr(first, cursor - first), bar});
+    const char32_t under = cursor < text.size() ? text[cursor] : U' ';
+    region.text.push_back({x(1 + cursor - first),
+                           0,
+                           std::u32string(1, under),
+                           {Role::CursorText, Role::Cursor, kPlain}});
+    if (cursor + 1 < text.size())
+    {
+        region.text.push_back({x(2 + cursor - first), 0, text.substr(cursor + 1), bar});
+    }
+    return region;
 }
 
 Frame TestView::frame() const
@@ -502,6 +629,11 @@ void TestView::addBars(Frame& frame) const
     auto topRegion = layoutBar(top, width_, cell_, spacing);
     topRegion.bounds = layout_.top[0];
     frame.push_back(std::move(topRegion));
+    if (mode_ == Mode::CommandLine)
+    {
+        frame.push_back(promptRegion());
+        return;
+    }
     auto bottomRegion = layoutBar(bottom, width_, cell_, spacing);
     bottomRegion.bounds = layout_.bottom[0];
     frame.push_back(std::move(bottomRegion));

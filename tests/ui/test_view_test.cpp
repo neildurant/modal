@@ -364,3 +364,45 @@ TEST_CASE("commands the view doesn't have go to its handler, such as the window'
           std::vector<std::pair<std::string, int>>{{"font-bigger", 0}, {"font-bigger", 3}});
     CHECK_FALSE(view.run("no-such-command", 0).has_value());
 }
+
+TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line on")
+{
+    auto view = view80x24();
+    std::vector<std::string> lines;
+    view.setLineHandler([&](const std::string& line) { lines.push_back(line); });
+
+    type(view, U":set fontsize=14j"); // digits and j are typed, not counted or moved
+    CHECK(view.mode() == Mode::CommandLine);
+    CHECK(view.commandLine().text() == U"set fontsize=14j");
+    CHECK(view.cursor().row() == 0);
+    view.handle(Key::of(NamedKey::Backspace), 0);
+    view.handle(Key::of(NamedKey::Left), 0);
+    type(view, U"2");
+    CHECK(view.commandLine().text() == U"set fontsize=124");
+
+    // The bottom bar is the prompt, with the cursor as a cell of its own.
+    const auto frame = view.frame();
+    const auto& prompt = frame[3];
+    CHECK(contains(rowText(prompt, 0), U":set fontsize=124"));
+    bool cursor = false;
+    for (const auto& run : prompt.text)
+    {
+        cursor = cursor || (run.text == U"4" && run.style.background == Role::Cursor);
+    }
+    CHECK(cursor);
+
+    view.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(view.mode() == Mode::Normal);
+    CHECK(lines == std::vector<std::string>{"set fontsize=124"});
+
+    // Up recalls it; Escape, or Backspace on an empty line, closes the prompt.
+    type(view, U":");
+    view.handle(Key::of(NamedKey::Up), 0);
+    CHECK(view.commandLine().text() == U"set fontsize=124");
+    view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(view.mode() == Mode::Normal);
+    type(view, U":");
+    view.handle(Key::of(NamedKey::Backspace), 0);
+    CHECK(view.mode() == Mode::Normal);
+    CHECK(lines.size() == 1);
+}

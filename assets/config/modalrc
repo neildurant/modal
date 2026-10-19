@@ -42,6 +42,21 @@ nmap <C-kMinus> font-smaller      "Smaller text"
 nmap <C-0>      font-reset        "Text size from the config"
 nmap <C-k0>     font-reset        "Text size from the config"
 
+" The command line: : opens it, and in it these keys edit, run and recall lines. Other
+" characters are typed.
+nmap :          command-line            "Command line"
+cmap <CR>       command-line-run        "Run"
+cmap <Esc>      command-line-cancel     "Cancel"
+cmap <BS>       command-line-backspace  "Delete back"
+cmap <Del>      command-line-delete     "Delete"
+cmap <Left>     command-line-left       "Left"
+cmap <Right>    command-line-right      "Right"
+cmap <Home>     command-line-start      "Start"
+cmap <End>      command-line-end        "End"
+cmap <C-u>      command-line-clear      "Clear"
+cmap <Up>       command-line-older      "Older line"
+cmap <Down>     command-line-newer      "Newer line"
+
 " The test view, until the event list
 nmap <Tab>      test-next-page    "Next test page"
 nmap <Esc>      cancel            "Cancel"

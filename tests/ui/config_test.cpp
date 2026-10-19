@@ -265,7 +265,11 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
     CHECK(text.find("\"set font=\"\"\n") != std::string::npos);
     CHECK(text.find("\"nmap gg") != std::string::npos);
     CHECK(text.find("\"highlight cursor-text") != std::string::npos);
-    CHECK(text.find("\"   scroll-half-down  Scroll down half a page\n") != std::string::npos);
+    // Each command on a line of its own, with its description in a column after the names.
+    const auto listed = text.find("\"   scroll-half-down ");
+    REQUIRE(listed != std::string::npos);
+    CHECK(text.substr(listed, text.find('\n', listed) - listed)
+              .ends_with(" Scroll down half a page"));
 
     Config defaults;
     ConfigReader defaultReader{defaults, commands};
@@ -286,7 +290,7 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
         const auto end = text.find('\n', start);
         auto line = text.substr(start, end - start);
         start = end + 1;
-        for (const auto* command : {"\"set ", "\"nmap ", "\"highlight "})
+        for (const auto* command : {"\"set ", "\"nmap ", "\"cmap ", "\"highlight "})
         {
             if (line.starts_with(command))
             {
