@@ -34,16 +34,20 @@ The full design is in `docs/design.md`. Read it before starting any task, and fo
 - Never hard-code tick values. PPQN is a single named constant; musical lengths are note fractions converted to ticks at the point of use. Tests run at more than one PPQN.
 - Times are 64-bit integer ticks. Notes are stored as single events with a duration.
 
-## Repository layout (initial)
+## Repository layout
 
 ```
 CMakeLists.txt
 CMakePresets.json
-docs/design.md
+README.md
+docs/           design.md (the design), configuration.md and tools.md (for users)
+assets/         fonts, the built-in modalrc and themes, built into the program
+cmake/          the step that builds files from assets/ into the program
 src/core/       engine library: song model, scheduler, recorder, file I/O (no UI dependencies)
-src/platform/   MIDI backend interface and implementations, threads, timers
-src/ui/         grid renderer and editor (from milestone 3)
-apps/           executables: command-line player, recorder, loopback timing tool, later the GUI
+src/platform/   MIDI backend interface and implementations, threads, timers, config directory
+src/ui/         grid, layout, views, keys, keymaps and config, with no SDL (all unit-tested)
+src/ui/sdl/     the SDL3 window, renderer, font and key translation
+apps/           executables: modal (the GUI), command-line player, recorder, loopback timing tool
 tests/          unit tests
 ```
 
@@ -68,3 +72,5 @@ Check formatting: `git ls-files -z '*.cpp' '*.hpp' | xargs -0 clang-format --dry
 The command-line tools (`modal-ports`, `modal-play`, `modal-record`, `modal-loopback`), the hidden `[.timing]` tests and the `MODAL_TEST_ALSA_SEQ` flag for ALSA tests are described in `docs/tools.md`.
 
 Configuration (`modalrc`, settings, key bindings, themes and `modal --write-config`) is described in `docs/configuration.md`.
+
+The GUI is `modal` (in `build/<preset>/apps/Debug` or `Release`); until milestone 4 it shows the test view. Window tests run through SDL's offscreen video driver. The hidden `[.sample]` tests draw the font and each test view page to BMP files to look at (`MODAL_SAMPLE_BMP` names them), e.g. `modal_tests "[.sample]"`.
