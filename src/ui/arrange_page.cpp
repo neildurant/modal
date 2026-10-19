@@ -395,12 +395,25 @@ void ArrangePage::addRegions(Frame& frame) const
         }
     }
 
-    // The ruler: markers by name, the reference track's meters, and its bars, numbered where
-    // there's room for the numbers.
-    // Markers: faint lines under the text and bars, so as not to distract, through the ruler
-    // and across the tracks; named up to the next marker, cut short with an ellipsis or left
-    // out if there's no room.
-    const auto markers = song_.markers();
+    // The ruler: section starts and markers by name, the conductor's meters, and its bars,
+    // numbered where there's room for the numbers.
+    // Section starts and markers: faint lines under the text and bars, so as not to distract,
+    // through the ruler and across the tracks; named up to the next, cut short with an
+    // ellipsis or left out if there's no room. A section's name wins over a marker's at the
+    // same tick.
+    std::vector<core::Marker> markers;
+    for (std::size_t i = 0; i < song_.sections().size(); ++i)
+    {
+        markers.push_back({song_.sectionStart(i), song_.sections()[i]->name()});
+    }
+    for (const auto& marker : song_.markers())
+    {
+        if (std::ranges::find(markers, marker.tick, &core::Marker::tick) == markers.end())
+        {
+            markers.push_back(marker);
+        }
+    }
+    std::ranges::stable_sort(markers, {}, &core::Marker::tick);
     std::vector<int> markerLines; // drawn through the ruler once its text is placed
     for (std::size_t i = 0; i < markers.size(); ++i)
     {
@@ -432,7 +445,7 @@ void ArrangePage::addRegions(Frame& frame) const
         timeline.text.push_back(
             {textX, 0, std::move(name), {Role::Marker, Role::Background, kBold}});
     }
-    // The reference track's meter changes, each named if the name fits before the next
+    // The conductor's meter changes, each named if the name fits before the next
     // change, or else shown by a tick, so a short change, such as a single bar, never hides
     // the one after it.
     const auto& reference = song_.meter();
@@ -459,7 +472,8 @@ void ArrangePage::addRegions(Frame& frame) const
                 {{x, cell_.height + height, lineWidth, height}, Role::Dim, 255});
         }
     }
-    // Bar numbers, counted in sections: bar 1 and the bar of each marker start one. Each
+    // Bar numbers, counted in sections: bar 1 and the bar of each section start and marker
+    // start one. Each
     // section's first bar is numbered, then every n bars into it, for n of 1, 2, 4, 8..., as
     // few as fit the widest number and a space into n of the shortest bar. A number shows
     // only if it fits before the next section's, so the sections' numbers come first.

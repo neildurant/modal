@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -11,7 +12,7 @@
 using namespace modal;
 using namespace modal::ui;
 
-TEST_CASE("the demo song has sections in several meters, marked, on most tracks")
+TEST_CASE("the demo song has sections in several meters, on most tracks")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     CAPTURE(ppqn.value);
@@ -26,22 +27,30 @@ TEST_CASE("the demo song has sections in several meters, marked, on most tracks"
     CHECK(drums.signatureAt(drums.barStart(48)) == core::TimeSignature{5, 4});
     CHECK(song.meter(song.tracks()[1]->id()) == drums); // the same changes on every track but two
 
-    // Two tracks keep meters of their own throughout.
-    const auto& ostinato = song.meter(song.tracks()[6]->id());
-    CHECK(ostinato.changes().size() == 1);
-    CHECK(ostinato.signatureAt(0) == core::TimeSignature{3, 4});
-    CHECK(song.meter(song.tracks()[7]->id()).signatureAt(0) == core::TimeSignature{5, 8});
+    // Six sections, the first chorus ending in the extra bar; the second chorus is numbered.
+    REQUIRE(song.sections().size() == 6);
+    const std::array<std::string, 6> names{"Intro",  "Verse",    "Chorus",
+                                           "Bridge", "Chorus 2", "Outro"};
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        CHECK(song.sections()[i]->name() == names[i]);
+    }
+    CHECK(song.sectionStart(1) == drums.barStart(9));
+    CHECK(song.sectionStart(3) == drums.barStart(28));
+    CHECK(song.sectionStart(5) == drums.barStart(48));
+    CHECK(song.markers().empty());
 
-    // Markers at each section but the extra bar.
-    const auto markers = song.markers();
-    REQUIRE(markers.size() == 6);
-    CHECK(markers[0].tick == 0);
-    CHECK(markers[0].name == "Intro");
-    CHECK(markers[1].tick == drums.barStart(9));
-    CHECK(markers[1].name == "Verse");
-    CHECK(markers[3].tick == drums.barStart(28));
-    CHECK(markers[3].name == "Bridge");
-    CHECK(markers[5].tick == drums.barStart(48));
+    // Two tracks have meters of their own, whose bars start again at each section.
+    const auto& ostinato = song.meter(song.tracks()[6]->id());
+    const auto& clave = song.meter(song.tracks()[7]->id());
+    for (std::size_t i = 0; i < song.sections().size(); ++i)
+    {
+        const auto start = song.sectionStart(i);
+        CHECK(ostinato.signatureAt(start) == core::TimeSignature{3, 4});
+        CHECK(ostinato.barStart(ostinato.toBarBeatTick(start).bar) == start);
+        CHECK(clave.signatureAt(start) == core::TimeSignature{5, 8});
+        CHECK(clave.barStart(clave.toBarBeatTick(start).bar) == start);
+    }
 
     // Every note ends by the end of the last bar, and the empty tracks are empty.
     const auto end = drums.barStart(54);

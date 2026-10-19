@@ -17,8 +17,8 @@ namespace modal::ui
 // how it's drawn. A row for each track, with its number and name in text cells, then its
 // bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded by
 // how busy the bar is, with a gap before each while bars are wide enough, and a faint line
-// for a bar with no notes. Markers are faint lines across every track. The ruler shows the
-// markers by name, and the reference track's meters and bar numbers.
+// for a bar with no notes. Section starts and markers are faint lines across every track. The
+// ruler shows them by name, and the conductor's meters and bar numbers.
 class ArrangePage
 {
 public:

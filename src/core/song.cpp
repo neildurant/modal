@@ -255,6 +255,18 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
     return split;
 }
 
+bool Song::renameSection(std::size_t index, std::string name)
+{
+    if (index >= sections_.size())
+    {
+        return false;
+    }
+    auto section = std::make_shared<Section>(*sections_[index]);
+    section->name_ = uniqueSectionName(std::move(name), index);
+    replaceSection(index, std::move(section));
+    return true;
+}
+
 void Song::fitToContent()
 {
     const auto last = sections_.size() - 1;
@@ -572,12 +584,18 @@ void Song::rebuildMeters()
     }
 }
 
-std::string Song::uniqueSectionName(std::string name) const
+std::string Song::uniqueSectionName(std::string name, std::optional<std::size_t> except) const
 {
-    const auto taken = [this](const std::string& candidate)
+    const auto taken = [&](const std::string& candidate)
     {
-        return std::ranges::any_of(sections_, [&](const auto& section)
-                                   { return section->name_ == candidate; });
+        for (std::size_t i = 0; i < sections_.size(); ++i)
+        {
+            if (i != except && sections_[i]->name_ == candidate)
+            {
+                return true;
+            }
+        }
+        return false;
     };
     std::string unique = name;
     for (int n = 2; taken(unique); ++n)

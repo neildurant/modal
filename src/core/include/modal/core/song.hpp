@@ -141,6 +141,10 @@ public:
     // numbered if another section has it. Returns nothing if the tick isn't inside a section.
     std::optional<Split> splitSection(Tick tick, std::string name);
 
+    // Renames a section, numbering the name if another section has it. Returns false if
+    // there's no such section.
+    bool renameSection(std::size_t index, std::string name);
+
     // Sets the last section to the fewest whole bars, at least one, that hold everything in
     // it, including the ends of notes.
     void fitToContent();
@@ -200,7 +204,9 @@ private:
     void rebuildEvents(std::size_t trackIndex);
     void rebuildAll();
 
-    std::string uniqueSectionName(std::string name) const;
+    // The name, numbered if a section other than the one given has it.
+    std::string uniqueSectionName(std::string name,
+                                  std::optional<std::size_t> except = std::nullopt) const;
 
     std::vector<std::shared_ptr<const Track>> tracks_;
     std::vector<std::shared_ptr<const Section>> sections_;

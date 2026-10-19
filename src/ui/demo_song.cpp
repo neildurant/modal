@@ -23,7 +23,7 @@ constexpr int kEmptyTracks = 4;
 
 struct Section
 {
-    const char* marker; // none for the extra bar
+    const char* name; // none for the extra bar, which ends the first chorus
     int bars;
     core::TimeSignature meter;
 };
@@ -89,14 +89,20 @@ core::Song demoSong(core::Ppqn ppqn)
         const auto& section = kSongSections[i];
         sections.set(tick, section.meter);
         starts[i] = tick;
-        if (section.marker != nullptr)
-        {
-            song.setMarker(tick, section.marker);
-        }
         tick += section.bars * section.meter.barLength().toTicks(ppqn);
     }
     const core::Tick end = tick;
     starts[kSections] = end;
+
+    song.updateMeter([&](core::MeterMap& conductor) { conductor = sections; });
+    song.renameSection(0, kSongSections[0].name);
+    for (std::size_t i = 1; i < kSections; ++i)
+    {
+        if (kSongSections[i].name != nullptr)
+        {
+            song.splitSection(starts[i], kSongSections[i].name);
+        }
+    }
 
     const auto sectionAt = [&](core::Tick at)
     {
@@ -107,8 +113,6 @@ core::Song demoSong(core::Ppqn ppqn)
         }
         return i;
     };
-
-    song.updateMeter([&](core::MeterMap& meter) { meter = sections; });
 
     for (std::size_t t = 0; t < kTracks; ++t)
     {

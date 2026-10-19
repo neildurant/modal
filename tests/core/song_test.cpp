@@ -326,6 +326,18 @@ TEST_CASE("splitting a section")
         CHECK(song.sections()[3]->name() == "Chorus 3");
     }
 
+    SECTION("renaming")
+    {
+        song.splitSection(4 * bar, "Verse");
+        CHECK(song.renameSection(0, "Intro"));
+        CHECK(song.sections()[0]->name() == "Intro");
+        CHECK(song.renameSection(0, "Intro")); // its own name isn't taken
+        CHECK(song.sections()[0]->name() == "Intro");
+        CHECK(song.renameSection(0, "Verse"));
+        CHECK(song.sections()[0]->name() == "Verse 2");
+        CHECK_FALSE(song.renameSection(2, "None"));
+    }
+
     SECTION("only inside a section, not at its start")
     {
         CHECK_FALSE(song.splitSection(0, "No"));

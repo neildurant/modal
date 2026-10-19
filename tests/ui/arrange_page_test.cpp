@@ -120,26 +120,29 @@ TEST_CASE("the arrangement's cursor moves by each track's bars, and between trac
     CHECK(page.bar() == 9);
     CHECK(page.time() == drums.barStart(9));
 
-    // 32 quarter notes in, so in the eleventh bar of 3/4 on the ostinato, from 30.
+    // 32 quarter notes in, where the ostinato's bars start again with the verse: ten bars of
+    // 3/4 and a 2/4 remainder bar make up the intro, so this is its bar 12.
     type(page, U"j", 6);
     CHECK(page.track() == 6);
-    CHECK(page.bar() == 11);
+    CHECK(page.bar() == 12);
     type(page, U"k", 6); // back where it was, since the time is kept
     CHECK(page.track() == 0);
     CHECK(page.bar() == 9);
 
-    // Moving by the ostinato's bars moves the time: its bar 11 starts in the drums' bar 8.
+    // Moving by the ostinato's bars moves the time: its remainder bar starts in the drums'
+    // bar 8.
     type(page, U"j", 6);
     type(page, U"l");
-    CHECK(page.bar() == 12);
-    type(page, U"h");
+    CHECK(page.bar() == 13);
+    type(page, U"h", 2);
+    CHECK(page.bar() == 11);
     type(page, U"k", 6);
     CHECK(page.bar() == 8);
 
     type(page, U"$");
     CHECK(page.bar() == 53);
     type(page, U"j", 6);
-    CHECK(page.bar() == 67);
+    CHECK(page.bar() == 68);
     type(page, U"$");
     CHECK(page.bar() == 69); // the last 3/4 bar, cut short by the song's end
     type(page, U"0");
@@ -442,14 +445,14 @@ TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
     auto page = page80x22();
     type(page, U"l", 8);
     type(page, U"j", 6);
-    CHECK(page.status() == "track 7  bar 11/69  3/4  zoom 1/2");
+    CHECK(page.status() == "track 7  bar 12/69  3/4  zoom 1/2");
 }
 
 TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
 {
     auto page = page80x22(); // 60 columns of two quarter notes: 120 quarter notes in view
     const auto song = demoSong();
-    const auto& ostinato = song.meter(song.tracks()[6]->id()); // 3/4 throughout
+    const auto& ostinato = song.meter(song.tracks()[6]->id()); // 3/4, from each section
 
     // At the start the view can't scroll left, so the cursor just moves.
     page.scrollBars(-1);
@@ -474,7 +477,7 @@ TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
 
     // Near the end, the view scrolls only as far as the song's end at its right edge (86
     // quarter notes in, the last 120 of 205 rounded up to columns), and the cursor moves on.
-    page.goToBar(60);
+    page.goToBar(40);
     page.scrollBars(100);
     CHECK(page.bar() == 69);
     CHECK(page.leftTick() == 86 * core::kPpqn.quarter());
