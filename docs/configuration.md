@@ -11,15 +11,26 @@ Modal is configured with a plain-text command file, `modalrc`, in the style of a
 
 At startup Modal runs its built-in command file (the default key bindings), then `modalrc` in the config directory, if there is one. Your own themes go in `themes/` in the same directory.
 
-To start a `modalrc`, have Modal write one with everything in it, each line commented out at its default:
+To start a `modalrc`, have Modal write one with everything in it: at the `:` prompt, `:write-config modalrc` writes it straight into the config directory (`:write-config!` to overwrite one that's there), or from a terminal:
 
 ```
 modal --write-config modalrc
 ```
 
-It won't overwrite a file unless you add `--force`. Move the file into the config directory, and uncomment and change only the lines you want; the rest keep following Modal's defaults as they improve.
+which won't overwrite a file unless you add `--force`. Whatever you've changed from the defaults (in your `modalrc`, or since starting) is written as commands; everything else is there commented out at its default, with what it does. Uncomment and change only the lines you want, and the rest keep following Modal's defaults as they improve.
 
 If a command fails, the first error shows in the status line until you press a key, as `modalrc:12: unknown setting "fontsiz"`, and the rest of the file still runs. On Linux all errors are also printed to stderr.
+
+## The : prompt
+
+`:` opens a prompt in the bottom bar, as in Vim, where any of the commands below can be typed, and Enter runs them. They take effect at once: a new theme, font size or key binding applies straight away. Escape closes the prompt, Up and Down recall the lines run before (for the session), and Backspace, Delete, the arrow keys, Home, End and `Ctrl-U` edit the line.
+
+As well as the commands below, the prompt takes:
+
+- `set NAME?` shows a setting's value, such as `fontsize=12`. Several can be asked for at once.
+- `source` with no file runs your `modalrc` again, after you've edited it. It runs over what's set already, so a line you've deleted keeps its effect until Modal restarts.
+- `write-config FILE` writes the config, as above. A relative FILE is in the config directory. `write-config!` overwrites.
+- `q` or `quit` quits.
 
 ## Commands
 
@@ -85,4 +96,4 @@ The roles are:
 | `note`, `marker` | notes, and markers |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |
 
-`modal --write-config` lists the dark theme's colours for every role. The test view's samples page (Tab to it) shows each role in the current theme.
+`:write-config` lists the colours of every role in the theme you've chosen. The test view's samples page (Tab to it) shows each role in the current theme.
