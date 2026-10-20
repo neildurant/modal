@@ -229,14 +229,13 @@ TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k
     CHECK(v.view.top() == 10);
 }
 
-TEST_CASE("lengths show as lenformat says")
+TEST_CASE("a note's length shows as bars, beats and ticks, with the value it's close to")
 {
     View v;
-    type(v.view, U"8j"); // the verse's note
-    CHECK(v.view.list().text(v.view.row())[Column::Length] == "1/8 + 12");
-    v.view.setLengthFormat(LengthFormat::Beats);
-    CHECK(v.view.row() == 8);
-    CHECK(v.view.list().text(v.view.row())[Column::Length] == "0:0:492");
+    type(v.view, U"4j");
+    CHECK(v.view.list().text(v.view.row())[Column::Length] == "0:0:480 (1/8)");
+    type(v.view, U"4j"); // the verse's note
+    CHECK(v.view.list().text(v.view.row())[Column::Length] == "0:0:492 (≈1/8)");
 }
 
 TEST_CASE("the list shows the song as it is after a change, at the same time")

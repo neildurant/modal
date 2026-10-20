@@ -51,8 +51,6 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
-    view.setLengthFormat(settings.text("lenformat") == "beats" ? ui::LengthFormat::Beats
-                                                               : ui::LengthFormat::Note);
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     return error;
 }

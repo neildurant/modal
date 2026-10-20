@@ -171,15 +171,6 @@ Column EventListView::field() const
     return best;
 }
 
-void EventListView::setLengthFormat(LengthFormat format)
-{
-    if (format != lengths_)
-    {
-        lengths_ = format;
-        refresh();
-    }
-}
-
 void EventListView::refresh()
 {
     // The same time, and as far down the rows at that time as can be.
@@ -199,8 +190,8 @@ void EventListView::refresh()
 EventList EventListView::listOf(std::size_t track) const
 {
     const auto& song = document_.song();
-    return EventList{
-        song, track == 0 ? std::nullopt : std::optional{song.tracks()[track - 1]->id()}, lengths_};
+    return EventList{song,
+                     track == 0 ? std::nullopt : std::optional{song.tracks()[track - 1]->id()}};
 }
 
 void EventListView::showTrack(std::size_t track, core::Tick tick)

@@ -57,10 +57,9 @@ std::string_view textKindName(core::MetaText::Kind kind)
 
 } // namespace
 
-EventList::EventList(core::Song song, std::optional<core::TrackId> track, LengthFormat lengths)
+EventList::EventList(core::Song song, std::optional<core::TrackId> track)
     : song_(std::move(song))
     , track_(track)
-    , lengths_(lengths)
 {
     const bool conductor = !track_;
     const auto add = [this](RowKind kind, core::Tick tick, std::size_t index, bool dim)
@@ -152,8 +151,7 @@ RowText EventList::text(std::size_t row) const
                     set(Column::Event, "note");
                     set(Column::Data, pitchText(data.pitch));
                     set(Column::Value, std::to_string(data.velocity));
-                    set(Column::Length,
-                        lengthText(data.duration, song_.ppqn(), lengths_, signature));
+                    set(Column::Length, lengthText(data.duration, song_.ppqn(), signature));
                     set(Column::Release, std::to_string(data.releaseVelocity));
                 }
                 else if constexpr (std::is_same_v<T, core::ControlChange>)

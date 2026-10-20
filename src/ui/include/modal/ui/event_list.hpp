@@ -71,7 +71,7 @@ class EventList
 {
 public:
     // A track's list, or with no track, the conductor's.
-    EventList(core::Song song, std::optional<core::TrackId> track, LengthFormat lengths);
+    EventList(core::Song song, std::optional<core::TrackId> track);
 
     const core::Song& song() const { return song_; }
     const std::optional<core::TrackId>& track() const { return track_; }
@@ -88,7 +88,6 @@ public:
 private:
     core::Song song_;
     std::optional<core::TrackId> track_;
-    LengthFormat lengths_;
     std::vector<EventRow> rows_;
 };
 

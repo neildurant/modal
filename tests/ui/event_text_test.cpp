@@ -18,33 +18,43 @@ TEST_CASE("positions pad their ticks to a quarter note's width")
     CHECK(positionText(core::MeterMap{core::Ppqn{96}}, 97) == "1:2:01");
 }
 
-TEST_CASE("lengths show as note values, with ticks over or under when not exact")
+TEST_CASE("lengths show as bars, beats and ticks, in the meter where they start")
+{
+    const core::Ppqn ppqn = core::kPpqn;
+    CHECK(lengthText(252 + 480, ppqn, {6, 8}) == "0:1:252 (≈1/8.)");
+    CHECK(lengthText(960 * 4 + 960 + 12, ppqn, {4, 4}) == "1:1:012");
+    CHECK(lengthText(0, ppqn, {4, 4}) == "0:0:000");
+    CHECK(lengthText(5, core::Ppqn{96}, {4, 4}) == "0:0:05");
+}
+
+TEST_CASE("a length close to a common note value shows it in brackets")
 {
     const auto ppqn = core::Ppqn{GENERATE(960, 6720)};
     CAPTURE(ppqn.value);
     const auto ticks = [&](core::NoteFraction f) { return f.toTicks(ppqn); };
-    const core::TimeSignature common{4, 4};
-    const auto note = [&](core::Tick length)
-    { return lengthText(length, ppqn, LengthFormat::Note, common); };
+    const auto value = [&](core::Tick length)
+    {
+        const auto text = lengthText(length, ppqn, {4, 4});
+        const auto open = text.find(" (");
+        return open == std::string::npos ? std::string{} : text.substr(open + 1);
+    };
 
-    CHECK(note(ticks({1, 8})) == "1/8");
-    CHECK(note(ticks({3, 16})) == "1/8.");
-    CHECK(note(ticks({1, 12})) == "1/8t");
-    CHECK(note(ticks({3, 1})) == "3/1");
-    CHECK(note(0) == "0");
+    CHECK(value(ticks({1, 8})) == "(1/8)");
+    CHECK(value(ticks({3, 16})) == "(1/8.)");
+    CHECK(value(ticks({1, 12})) == "(1/8t)");
+    CHECK(value(ticks({1, 16})) == "(1/16)");
+    CHECK(value(ticks({3, 1})) == "(3/1)");
 
-    // The nearest common length, and how far off.
-    CHECK(note(ticks({1, 8}) + 12) == "1/8 + 12");
-    CHECK(note(ticks({1, 4}) - 7) == "1/4 - 7");
-    CHECK(note(2 * ppqn.whole() + 5) == "2/1 + 5");
-    CHECK(note(1) == "1 tick");
-    CHECK(note(3) == "3 ticks");
-}
+    // Within 5% of one, close to it.
+    CHECK(value(ticks({1, 8}) + 12) == "(≈1/8)");
+    CHECK(value(ticks({1, 4}) - ticks({1, 4}) / 20) == "(≈1/4)");
+    CHECK(value(ticks({1, 4}) - ticks({1, 4}) / 20 - 1).empty());
+    CHECK(value(ticks({23, 128})) == "(≈1/8.)"); // 4% short of 3/16
 
-TEST_CASE("lengths show as bars, beats and ticks, in the meter where they start")
-{
-    const core::Ppqn ppqn = core::kPpqn;
-    CHECK(lengthText(252 + 480 * 1, ppqn, LengthFormat::Beats, {6, 8}) == "0:1:252");
-    CHECK(lengthText(960 * 4 + 960 + 12, ppqn, LengthFormat::Beats, {4, 4}) == "1:1:012");
-    CHECK(lengthText(0, ppqn, LengthFormat::Beats, {4, 4}) == "0:0:000");
+    // Lengths no musician would name, and smaller values, show none.
+    CHECK(value(ticks({13, 48})).empty());
+    CHECK(value(ticks({7, 96})).empty());
+    CHECK(value(ticks({1, 32})).empty());
+    CHECK(value(ticks({1, 24})).empty()); // 1/16t
+    CHECK(value(0).empty());
 }

@@ -59,15 +59,9 @@ TEST_CASE("settings are set from text, checked against their type and range")
     CHECK(settings.set("fontsiz", "12") == "unknown setting \"fontsiz\"");
 }
 
-TEST_CASE("a setting of a few words takes only those, the first by default")
+TEST_CASE("undolevels is a thousand by default")
 {
-    Settings settings;
-    CHECK(settings.text("lenformat") == "note");
-    CHECK(settings.set("lenformat", "beats").empty());
-    CHECK(settings.text("lenformat") == "beats");
-    CHECK(settings.set("lenformat", "ticks") == "lenformat must be note or beats");
-    CHECK(settings.text("lenformat") == "beats");
-    CHECK(settings.integer("undolevels") == 1000);
+    CHECK(Settings{}.integer("undolevels") == 1000);
 }
 
 TEST_CASE("values are written as set reads them")

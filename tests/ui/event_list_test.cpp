@@ -65,7 +65,7 @@ std::vector<bool> dim(const EventList& list)
 TEST_CASE("a track's list has its events, the conductor's rows dimmed, and the end")
 {
     const Two two;
-    const EventList list{two.song, two.bass, LengthFormat::Note};
+    const EventList list{two.song, two.bass};
     CHECK(column(list, Column::Event) ==
           std::vector<std::string>{"section", "meter", "tempo", "program", "note", "cc", "marker",
                                    "section", "tempo", "note", "end"});
@@ -79,7 +79,7 @@ TEST_CASE("a track's list has its events, the conductor's rows dimmed, and the e
     const auto note = list.text(9);
     CHECK(note[Column::Data] == "F1 (29)");
     CHECK(note[Column::Value] == "90");
-    CHECK(note[Column::Length] == "1/8 + 12");
+    CHECK(note[Column::Length] == "0:0:492 (≈1/8)");
     CHECK(note[Column::Release] == "40");
     CHECK(note.fields == std::vector<Column>{Column::Position, Column::Data, Column::Value,
                                              Column::Length, Column::Release});
@@ -95,7 +95,7 @@ TEST_CASE("the order at a tick: section, meter, tempo, markers, then events as s
 {
     // At 1:1:000 the program comes before the note, as sent.
     const Two two;
-    const EventList list{two.song, two.bass, LengthFormat::Note};
+    const EventList list{two.song, two.bass};
     CHECK(list.rows()[3].kind == RowKind::Event);
     CHECK(list.text(3)[Column::Event] == "program");
     CHECK(list.rowAt(4 * Two::q) == 7); // the verse's section row
@@ -105,7 +105,7 @@ TEST_CASE("the order at a tick: section, meter, tempo, markers, then events as s
 TEST_CASE("a track with its own meter shows it undimmed, in its own bars")
 {
     const Two two;
-    const EventList list{two.song, two.lead, LengthFormat::Note};
+    const EventList list{two.song, two.lead};
     std::vector<std::string> meters;
     for (std::size_t i = 0; i < list.rows().size(); ++i)
     {
@@ -123,7 +123,7 @@ TEST_CASE("a track with its own meter shows it undimmed, in its own bars")
 TEST_CASE("the conductor's list has its own rows, undimmed, and no events")
 {
     const Two two;
-    const EventList list{two.song, std::nullopt, LengthFormat::Note};
+    const EventList list{two.song, std::nullopt};
     CHECK(column(list, Column::Event) == std::vector<std::string>{"section", "meter", "tempo",
                                                                   "marker", "section", "tempo",
                                                                   "end"});

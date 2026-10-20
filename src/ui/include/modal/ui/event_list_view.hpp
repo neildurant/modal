@@ -79,7 +79,6 @@ public:
 
     void setKeymap(Keymap keymap) { keymap_ = std::move(keymap); }
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
-    void setLengthFormat(LengthFormat format);
 
     Frame frame() const;
 
@@ -121,7 +120,6 @@ private:
 
     CommandRegistry& commands_;
     const core::Document& document_;
-    LengthFormat lengths_ = LengthFormat::Note;
     std::size_t track_ = 0;
     EventList list_;
     std::size_t row_ = 0;
