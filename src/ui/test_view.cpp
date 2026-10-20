@@ -95,20 +95,27 @@ std::string rightAligned(const std::string& text, int width)
 Keymap TestView::defaultKeymap()
 {
     Config config;
-    std::vector<CommandInfo> all{commands().begin(), commands().end()};
-    all.insert(all.end(), windowCommands().begin(), windowCommands().end());
+    CommandRegistry all;
+    all.add(commands());
+    all.add(windowCommands());
     ConfigReader reader{config, all};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     assert(reader.errors().empty()); // the tests run the built-in modalrc too
     return config.keymap;
 }
 
-TestView::TestView(Keymap keymap, std::int64_t timeout)
-    : cursor_(kGridRows, kGridColumns)
+TestView::TestView(CommandRegistry& registry, Keymap keymap, std::int64_t timeout)
+    : commands_(registry)
+    , cursor_(kGridRows, kGridColumns)
     , arrange_(demoSong())
     , keymap_(std::move(keymap))
     , keys_(timeout)
 {
+    for (const auto& info : commands())
+    {
+        registry.add(info, [this, name = info.name](const CommandCall& call)
+                     { return CommandResult{runOwn(name, call.count).value_or(false)}; });
+    }
 }
 
 void TestView::resize(int width, int height, CellSize cell)
@@ -127,41 +134,53 @@ void TestView::resize(int width, int height, CellSize cell)
 namespace
 {
 
+// A command that takes a count, and one that works only at the : prompt.
+constexpr CommandInfo counted(std::string_view name, std::string_view description)
+{
+    return {.name = name, .description = description, .count = true};
+}
+
+constexpr CommandInfo atPrompt(std::string_view name, std::string_view description)
+{
+    return {.name = name, .description = description, .modes = modeBit(Mode::CommandLine)};
+}
+
 constexpr std::array kCommands{
-    CommandInfo{"cursor-left", "Move left a column, or a bar"},
-    CommandInfo{"cursor-down", "Move down a row, or a track"},
-    CommandInfo{"cursor-up", "Move up a row, or a track"},
-    CommandInfo{"cursor-right", "Move right a column, or a bar"},
-    CommandInfo{"cursor-first", "Move to the first column, or bar"},
-    CommandInfo{"cursor-last", "Move to the last column, or bar"},
-    CommandInfo{"go-first", "Go to the first row or bar, or the one counted"},
-    CommandInfo{"go-last", "Go to the last row or bar, or the one counted"},
-    CommandInfo{"cursor-left-scroll", "Move left, scrolling to keep the cursor in place"},
-    CommandInfo{"cursor-down-scroll", "Move down, scrolling to keep the cursor in place"},
-    CommandInfo{"cursor-up-scroll", "Move up, scrolling to keep the cursor in place"},
-    CommandInfo{"cursor-right-scroll", "Move right, scrolling to keep the cursor in place"},
-    CommandInfo{"scroll-half-down", "Scroll down half a page"},
-    CommandInfo{"scroll-half-up", "Scroll up half a page"},
-    CommandInfo{"scroll-page-down", "Scroll down a page"},
-    CommandInfo{"scroll-page-up", "Scroll up a page"},
-    CommandInfo{"scroll-centre", "Scroll the cursor to the middle of the view"},
-    CommandInfo{"zoom-in", "Zoom in"},
-    CommandInfo{"zoom-out", "Zoom out"},
-    CommandInfo{"zoom-reset", "Zoom to the default"},
-    CommandInfo{"test-next-page", "Show the next page of the test view"},
-    CommandInfo{"cancel", "Cancel"},
-    CommandInfo{"command-line", "Open the : command line"},
-    CommandInfo{"command-line-run", "Run the command line"},
-    CommandInfo{"command-line-cancel", "Close the command line"},
-    CommandInfo{"command-line-backspace", "Delete the character before the cursor"},
-    CommandInfo{"command-line-delete", "Delete the character at the cursor"},
-    CommandInfo{"command-line-left", "Move the cursor left"},
-    CommandInfo{"command-line-right", "Move the cursor right"},
-    CommandInfo{"command-line-start", "Move the cursor to the start"},
-    CommandInfo{"command-line-end", "Move the cursor to the end"},
-    CommandInfo{"command-line-clear", "Clear the command line"},
-    CommandInfo{"command-line-older", "Recall the line run before"},
-    CommandInfo{"command-line-newer", "Recall the line run after"},
+    counted("cursor-left", "Move left a column, or a bar"),
+    counted("cursor-down", "Move down a row, or a track"),
+    counted("cursor-up", "Move up a row, or a track"),
+    counted("cursor-right", "Move right a column, or a bar"),
+    counted("cursor-first", "Move to the first column, or bar"),
+    counted("cursor-last", "Move to the last column, or bar"),
+    counted("go-first", "Go to the first row or bar, or the one counted"),
+    counted("go-last", "Go to the last row or bar, or the one counted"),
+    counted("cursor-left-scroll", "Move left, scrolling to keep the cursor in place"),
+    counted("cursor-down-scroll", "Move down, scrolling to keep the cursor in place"),
+    counted("cursor-up-scroll", "Move up, scrolling to keep the cursor in place"),
+    counted("cursor-right-scroll", "Move right, scrolling to keep the cursor in place"),
+    counted("scroll-half-down", "Scroll down half a page"),
+    counted("scroll-half-up", "Scroll up half a page"),
+    counted("scroll-page-down", "Scroll down a page"),
+    counted("scroll-page-up", "Scroll up a page"),
+    CommandInfo{.name = "scroll-centre",
+                .description = "Scroll the cursor to the middle of the view"},
+    counted("zoom-in", "Zoom in"),
+    counted("zoom-out", "Zoom out"),
+    CommandInfo{.name = "zoom-reset", .description = "Zoom to the default"},
+    CommandInfo{.name = "test-next-page", .description = "Show the next page of the test view"},
+    CommandInfo{.name = "cancel", .description = "Cancel"},
+    CommandInfo{.name = "command-line", .description = "Open the : command line"},
+    atPrompt("command-line-run", "Run the command line"),
+    atPrompt("command-line-cancel", "Close the command line"),
+    atPrompt("command-line-backspace", "Delete the character before the cursor"),
+    atPrompt("command-line-delete", "Delete the character at the cursor"),
+    atPrompt("command-line-left", "Move the cursor left"),
+    atPrompt("command-line-right", "Move the cursor right"),
+    atPrompt("command-line-start", "Move the cursor to the start"),
+    atPrompt("command-line-end", "Move the cursor to the end"),
+    atPrompt("command-line-clear", "Clear the command line"),
+    atPrompt("command-line-older", "Recall the line run before"),
+    atPrompt("command-line-newer", "Recall the line run after"),
 };
 
 } // namespace
@@ -203,12 +222,23 @@ bool TestView::runAll(const std::vector<Action>& actions)
     bool changed = false;
     for (const auto& action : actions)
     {
-        changed = run(action.command, action.count).value_or(false) || changed;
+        changed = run(action.command, action.count).changed || changed;
     }
     return changed;
 }
 
-std::optional<bool> TestView::run(std::string_view command, int count)
+CommandResult TestView::run(std::string_view command, int count)
+{
+    auto result = commands_.run(command, count, mode_);
+    if (!result.message.empty())
+    {
+        setMessage(result.message,
+                   result.warning ? MessageKind::Warning : MessageKind::Information);
+    }
+    return result;
+}
+
+std::optional<bool> TestView::runOwn(std::string_view command, int count)
 {
     const int n = std::max(count, 1);
     const bool grid = page_ == Page::Grid;
@@ -336,7 +366,7 @@ std::optional<bool> TestView::run(std::string_view command, int count)
     {
         return runCommandLine(command);
     }
-    return handler_ ? handler_(command, count) : std::nullopt;
+    return std::nullopt;
 }
 
 std::optional<bool> TestView::runCommandLine(std::string_view command)

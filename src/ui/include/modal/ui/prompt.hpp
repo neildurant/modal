@@ -34,6 +34,6 @@ struct PromptResult
 // how many more.
 PromptResult runPromptLine(ConfigReader& reader, const Config& config, std::string_view line,
                            const std::optional<std::filesystem::path>& configDirectory,
-                           std::span<const CommandInfo> commands);
+                           const CommandRegistry& commands);
 
 } // namespace modal::ui

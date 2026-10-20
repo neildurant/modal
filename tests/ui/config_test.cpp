@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,16 @@ constexpr std::array<CommandInfo, 3> kCommands{{
     {"go-first", "First"},
     {"cancel", "Cancel"},
 }};
+
+// The commands, described, as the config sees them.
+CommandRegistry registryOf(std::span<const CommandInfo> infos)
+{
+    CommandRegistry registry;
+    registry.add(infos);
+    return registry;
+}
+
+const CommandRegistry kRegistry = registryOf(kCommands);
 
 // A directory of its own for a test's files, removed afterwards.
 class TempDirectory
@@ -65,7 +76,7 @@ const Binding* binding(const Config& config, Mode mode, std::vector<Key> keys)
 TEST_CASE("command files set settings and bind keys, skipping blank lines and comments")
 {
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     reader.runText(R"(" A comment, then a blank line
 
 set timeoutlen=300
@@ -89,7 +100,7 @@ vmap j cursor-down
 TEST_CASE("map commands unbind keys too")
 {
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     reader.runText("nmap J cursor-down\nnunmap J\nnunmap J\n", "modalrc", {});
     CHECK(binding(config, Mode::Normal, {Key::typed(U'J')}) == nullptr);
     CHECK(reader.errors() == std::vector<ConfigError>{{"modalrc", 3, "no binding of J"}});
@@ -98,7 +109,7 @@ TEST_CASE("map commands unbind keys too")
 TEST_CASE("a command that fails is reported with its line, and the rest still run")
 {
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     reader.runText("set fontsiz=14\r\n"
                    "set timeoutlen=lots\r\n"
                    "set fontsize\r\n"
@@ -129,7 +140,7 @@ TEST_CASE("a command that fails is reported with its line, and the rest still ru
 TEST_CASE("quotes keep spaces in arguments, as in a shell, but not in keys")
 {
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     CHECK(reader.runCommand(R"(nmap J cursor-down "Say \"down\" \\ go")", {}).empty());
     CHECK(binding(config, Mode::Normal, {Key::typed(U'J')})->hint == R"(Say "down" \ go)");
     CHECK(reader.runCommand(R"(set font="C:/My Fonts/Mono.ttf")", {}).empty());
@@ -151,7 +162,7 @@ TEST_CASE("files run other files, relative to themselves, in UTF-8 names")
     directory.write("thème", "set timeoutlen=123\n");
 
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     reader.runFile(modalrc);
     CHECK(binding(config, Mode::Normal, {Key::typed(U'J')}) != nullptr);
     CHECK(config.settings.integer("timeoutlen") == 123);
@@ -168,7 +179,7 @@ TEST_CASE("files that source each other stop, and say so")
     const TempDirectory directory{"modal-config-loop-test"};
     const auto file = directory.write("loop", "source loop\n");
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     reader.runFile(file);
     REQUIRE_FALSE(reader.errors().empty());
     CHECK(reader.errors().front().message == "files source each other more than 16 deep");
@@ -177,7 +188,7 @@ TEST_CASE("files that source each other stop, and say so")
 TEST_CASE("highlight sets a role's colour, and themes are command files of highlights")
 {
     Config config;
-    ConfigReader reader{config, kCommands};
+    ConfigReader reader{config, kRegistry};
     CHECK(config.theme[Role::Background] == Colour{0x1a, 0x1b, 0x26}); // dark, to begin with
     CHECK(reader.runCommand("highlight cursor-text #FFEEDD", {}).empty());
     CHECK(config.theme[Role::CursorText] == Colour{0xff, 0xee, 0xdd});
@@ -197,7 +208,7 @@ TEST_CASE("a theme in the config directory comes before a built-in one, from dar
     directory.write("themes/light", "highlight background #000001\n");
     directory.write("themes/mine", "highlight text #000002\nhighlight nope #000000\n");
     Config config;
-    ConfigReader reader{config, kCommands, directory.path()};
+    ConfigReader reader{config, kRegistry, directory.path()};
 
     CHECK(reader.runCommand("set theme=light", {}).empty());
     CHECK(config.theme[Role::Background] == Colour{0, 0, 1});
@@ -232,7 +243,7 @@ TEST_CASE("the built-in themes give every role a colour of its own reading")
             CHECK(text->find("highlight " + role + " ") != std::string_view::npos);
         }
         Config config;
-        ConfigReader reader{config, kCommands};
+        ConfigReader reader{config, kRegistry};
         reader.runText(*text, name, {});
         CHECK(reader.errors().empty());
         CHECK(config.theme == *builtInTheme(name));
@@ -258,8 +269,9 @@ TEST_CASE("roles and colours read back as they're written")
 TEST_CASE("the default config changes nothing, and uncommented gives the defaults")
 {
     // The commands of the built-in modalrc: the test view's and the window's.
-    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
-    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
+    CommandRegistry commands;
+    commands.add(TestView::commands());
+    commands.add(windowCommands());
     const auto text = defaultConfigText(commands);
     CHECK(text.find("\"set timeoutlen=500\n") != std::string::npos);
     CHECK(text.find("\"set font=\"\"\n") != std::string::npos);
@@ -314,8 +326,9 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
 
 TEST_CASE("the config text has what's changed as commands, and reads back the same")
 {
-    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
-    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
+    CommandRegistry commands;
+    commands.add(TestView::commands());
+    commands.add(windowCommands());
     Config config;
     ConfigReader reader{config, commands};
     runStartupFiles(reader, std::nullopt);

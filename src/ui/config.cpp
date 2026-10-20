@@ -123,7 +123,7 @@ std::string ConfigError::text() const
     return source + ":" + std::to_string(line) + ": " + message;
 }
 
-ConfigReader::ConfigReader(Config& config, std::span<const CommandInfo> commands,
+ConfigReader::ConfigReader(Config& config, const CommandRegistry& commands,
                            std::optional<std::filesystem::path> configDirectory)
     : config_(config)
     , commands_(commands)
@@ -226,6 +226,10 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
     {
         return map(command, arguments);
     }
+    if (commands_.find(command) != nullptr)
+    {
+        return command + " can't be used in a config file";
+    }
     return "unknown command \"" + command + "\"";
 }
 
@@ -256,9 +260,14 @@ std::string ConfigReader::map(std::string_view command, const std::vector<std::s
         return config_.keymap.unbind(it->mode, sequence) ? std::string{}
                                                          : "no binding of " + arguments[0];
     }
-    if (std::ranges::find(commands_, arguments[1], &CommandInfo::name) == commands_.end())
+    const auto* target = commands_.find(arguments[1]);
+    if (target == nullptr)
     {
         return "no command \"" + arguments[1] + "\" to bind " + arguments[0] + " to";
+    }
+    if (!target->keys)
+    {
+        return arguments[1] + " can't be bound to keys";
     }
     config_.keymap.bind(it->mode, std::move(sequence),
                         {arguments[1], arguments.size() > 2 ? arguments[2] : std::string{}});
@@ -439,7 +448,7 @@ std::string keymapChanges(const Keymap& keymap, const Keymap& defaults)
 
 } // namespace
 
-std::string configText(const Config& config, std::span<const CommandInfo> commands,
+std::string configText(const Config& config, const CommandRegistry& commands,
                        const std::optional<std::filesystem::path>& configDirectory)
 {
     std::string text =
@@ -472,12 +481,15 @@ std::string configText(const Config& config, std::span<const CommandInfo> comman
         text += "\n\" Changes to the built-in key bindings\n" + changes;
     }
     text += "\n\" The commands keys can be bound to:\n\"\n";
+    std::vector<CommandInfo> bindable;
+    std::ranges::copy_if(commands.all(), std::back_inserter(bindable),
+                         [](const CommandInfo& command) { return command.keys; });
     std::size_t width = 0;
-    for (const auto& command : commands)
+    for (const auto& command : bindable)
     {
         width = std::max(width, command.name.size());
     }
-    for (const auto& command : commands)
+    for (const auto& command : bindable)
     {
         text += "\"   " + std::string{command.name} +
                 std::string(width - command.name.size() + 2, ' ') +
@@ -510,7 +522,7 @@ std::string configText(const Config& config, std::span<const CommandInfo> comman
     return text;
 }
 
-std::string defaultConfigText(std::span<const CommandInfo> commands)
+std::string defaultConfigText(const CommandRegistry& commands)
 {
     Config defaults;
     ConfigReader reader{defaults, commands};

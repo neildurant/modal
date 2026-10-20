@@ -2,10 +2,10 @@
 
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/command_line.hpp>
+#include <modal/ui/commands.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
-#include <modal/ui/commands.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
 
@@ -46,14 +46,20 @@ public:
     static constexpr int kRowLabelColumns = 5; // the row numbers down the left
     static constexpr int kDemoRows = 6;        // the bar-line demo, above the grid
 
-    // The commands keys can be bound to, until there's an editor with commands of its own.
+    // The view's commands, until there's an editor with commands of its own.
     static std::span<const CommandInfo> commands();
 
     // The keymap of the built-in modalrc alone, whose bindings run the view's commands and
-    // the window's (see windowCommands), which the view hands to its command handler.
+    // the window's (see windowCommands).
     static Keymap defaultKeymap();
 
-    explicit TestView(Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
+    // Gives the registry what runs the view's commands, which keys then run through it, with
+    // the registry's other commands, such as the window's. The registry outlives the view;
+    // the view can't be copied or moved, since the registry runs its commands on it.
+    explicit TestView(CommandRegistry& registry, Keymap keymap = defaultKeymap(),
+                      std::int64_t timeout = kDefaultTimeout);
+    TestView(const TestView&) = delete;
+    TestView& operator=(const TestView&) = delete;
 
     // Fits the view to the window, scrolling if the cursor would be out of it.
     void resize(int width, int height, CellSize cell);
@@ -67,13 +73,9 @@ public:
     std::optional<std::int64_t> deadline() const { return keys_.deadline(); }
     bool wake(std::int64_t now);
 
-    // Runs a command with a count (0 for none), returning whether it changed what's shown,
-    // or nothing if there's no such command. Commands the view doesn't have go to the
-    // handler, if there is one, such as the program's own.
-    std::optional<bool> run(std::string_view command, int count);
-
-    using CommandHandler = std::function<std::optional<bool>(std::string_view command, int count)>;
-    void setCommandHandler(CommandHandler handler) { handler_ = std::move(handler); }
+    // Runs a command through the registry with a count (0 for none), as a key bound to it
+    // does, showing any message it gives.
+    CommandResult run(std::string_view command, int count);
 
     // What runs a line entered at the : prompt, such as the program's command runner.
     using LineHandler = std::function<void(const std::string& line)>;
@@ -104,6 +106,7 @@ public:
 
 private:
     bool runAll(const std::vector<Action>& actions);
+    std::optional<bool> runOwn(std::string_view command, int count);
     Region demoRegion() const;
     Region cellsRegion() const;
     Region samplesRegion() const;
@@ -111,6 +114,7 @@ private:
     std::optional<bool> runCommandLine(std::string_view command);
     void addBars(Frame& frame) const;
 
+    CommandRegistry& commands_;
     Page page_ = Page::Grid;
     GridCursor cursor_;
     ArrangePage arrange_;
@@ -118,7 +122,6 @@ private:
     KeyDispatcher keys_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;
-    CommandHandler handler_;
     LineHandler lineHandler_;
     Mode mode_ = Mode::Normal;
     CommandLine line_;

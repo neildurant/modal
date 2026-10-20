@@ -72,6 +72,14 @@ std::string titleOf(const CommandInfo& info)
 
 void CommandRegistry::add(const CommandInfo& info, CommandHandler handler)
 {
+    const auto it =
+        std::ranges::find(entries_, info.name, [](const Entry& e) { return e.info.name; });
+    if (it != entries_.end() && !it->handler && handler)
+    {
+        it->info = info;
+        it->handler = std::move(handler);
+        return;
+    }
     assert(entry(info.name) == nullptr);
     entries_.push_back({info, std::move(handler)});
 }

@@ -62,8 +62,8 @@ struct ConfigError
 class ConfigReader
 {
 public:
-    // The commands keys can be bound to, by name, and the directory themes are found in.
-    ConfigReader(Config& config, std::span<const CommandInfo> commands,
+    // The commands keys can be bound to, and the directory themes are found in.
+    ConfigReader(Config& config, const CommandRegistry& commands,
                  std::optional<std::filesystem::path> configDirectory = std::nullopt);
 
     // Runs a file's commands. If it can't be read, that's an error.
@@ -87,7 +87,7 @@ private:
     std::string useTheme(std::string name, const std::string& previous);
 
     Config& config_;
-    std::span<const CommandInfo> commands_;
+    const CommandRegistry& commands_;
     std::optional<std::filesystem::path> configDirectory_;
     std::vector<ConfigError> errors_;
     int depth_ = 0; // of files sourcing others, which stops at a limit
@@ -99,11 +99,11 @@ private:
 // keeps later versions' defaults for the rest. Settings are compared with their defaults,
 // key bindings with the built-in modalrc's (changes listed as map and unmap commands), and
 // colours with the chosen theme's. The commands keys can be bound to are listed too.
-std::string configText(const Config& config, std::span<const CommandInfo> commands,
+std::string configText(const Config& config, const CommandRegistry& commands,
                        const std::optional<std::filesystem::path>& configDirectory);
 
 // The config text of a config at its defaults, with the built-in modalrc's bindings.
-std::string defaultConfigText(std::span<const CommandInfo> commands);
+std::string defaultConfigText(const CommandRegistry& commands);
 
 // Writes text to a file, making its directory if needed, unless the file exists and
 // overwrite is false. Returns why not, or else nothing.

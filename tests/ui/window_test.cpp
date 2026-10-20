@@ -240,7 +240,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
 TEST_CASE("a sample of the test view", "[.sample]")
 {
     auto window = offscreen(1000, 600);
-    TestView view;
+    CommandRegistry registry;
+    TestView view{registry};
     view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
     for (const char32_t key : std::u32string_view{U"12j3l"})
     {

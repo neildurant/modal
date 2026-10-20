@@ -9,9 +9,9 @@ namespace
 {
 
 constexpr std::array<CommandInfo, 3> kWindowCommands{{
-    {"font-bigger", "Make the text a point bigger"},
-    {"font-smaller", "Make the text a point smaller"},
-    {"font-reset", "Make the text the size the config sets"},
+    {.name = "font-bigger", .description = "Make the text a point bigger", .count = true},
+    {.name = "font-smaller", .description = "Make the text a point smaller", .count = true},
+    {.name = "font-reset", .description = "Make the text the size the config sets"},
 }};
 
 } // namespace

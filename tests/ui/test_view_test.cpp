@@ -19,13 +19,21 @@ constexpr CellSize kCell{10, 20};
 
 // A view in a window of 80 by 24 cells: 22 rows between the bars, 6 of them the demo, 1 the
 // column numbers, so 15 rows of labelled cells; 75 columns right of the row numbers, so 7
-// labelled cells fully shown.
-TestView view80x24()
+// labelled cells fully shown. With its registry, the window's commands described there.
+struct View80x24
 {
-    TestView view;
-    view.resize(80 * kCell.width, 24 * kCell.height, kCell);
-    return view;
-}
+    CommandRegistry registry = withWindowCommands();
+    TestView view{registry};
+
+    View80x24() { view.resize(80 * kCell.width, 24 * kCell.height, kCell); }
+
+    static CommandRegistry withWindowCommands()
+    {
+        CommandRegistry registry;
+        registry.add(windowCommands());
+        return registry;
+    }
+};
 
 void type(TestView& view, std::u32string_view keys)
 {
@@ -74,7 +82,8 @@ bool contains(const std::u32string& text, std::u32string_view part)
 
 TEST_CASE("the test view's motions take counts, as in Vim")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"12j");
     CHECK(view.cursor().row() == 12);
     type(view, U"10l");
@@ -105,7 +114,8 @@ TEST_CASE("the test view's motions take counts, as in Vim")
 
 TEST_CASE("a count shows until a key uses it or Escape gives it up")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     CHECK(view.handle(Key::typed(U'4'), 0));
     CHECK(view.handle(Key::typed(U'0'), 0));
     CHECK(view.pending() == "40");
@@ -124,7 +134,8 @@ TEST_CASE("a count shows until a key uses it or Escape gives it up")
 
 TEST_CASE("the test view pages by half and whole screens, keeping two rows")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     REQUIRE(view.cursor().viewRows() == 15);
     REQUIRE(view.cursor().viewColumns() == 7);
 
@@ -145,7 +156,8 @@ TEST_CASE("the test view pages by half and whole screens, keeping two rows")
 
 TEST_CASE("Tab goes through the grid, the arrangement and the samples")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     CHECK(view.handle(Key::of(NamedKey::Tab), 0));
     CHECK(view.page() == TestView::Page::Arrange);
     CHECK(view.handle(Key::of(NamedKey::Tab), 0));
@@ -164,7 +176,8 @@ TEST_CASE("Tab goes through the grid, the arrangement and the samples")
 
 TEST_CASE("the grid shows labelled cells under fixed column and row numbers")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"jl");
     auto frame = view.frame();
     REQUIRE(frame.size() == 4); // the demo, the grid and two bars
@@ -197,7 +210,8 @@ TEST_CASE("the grid shows labelled cells under fixed column and row numbers")
 
 TEST_CASE("the status line shows a count being typed")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"25");
     const auto frame = view.frame();
     CHECK(contains(rowText(frame[3], 0), U"25   800×480 px   80×22 cells"));
@@ -205,7 +219,8 @@ TEST_CASE("the status line shows a count being typed")
 
 TEST_CASE("when the window shrinks, the grid scrolls to keep the cursor fully in view")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"14j6l");
     CHECK(view.cursor().top() == 0);
     // A pixel short of a row, and of a labelled cell's columns.
@@ -218,7 +233,8 @@ TEST_CASE("when the window shrinks, the grid scrolls to keep the cursor fully in
 
 TEST_CASE("the demo draws bars of 4/4 above bars of 7/8, numbered at their bar lines")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     const auto frame = view.frame();
     const auto& demo = frame[0];
     CHECK(demo.bounds == Rect{0, kCell.height, 80 * kCell.width, 6 * kCell.height});
@@ -255,7 +271,8 @@ TEST_CASE("the demo draws bars of 4/4 above bars of 7/8, numbered at their bar l
 
 TEST_CASE("gg goes to the first row, or the one counted, as G does to the last")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"G");
     CHECK(view.cursor().row() == TestView::kGridRows - 1);
     type(view, U"g");
@@ -268,7 +285,8 @@ TEST_CASE("gg goes to the first row, or the one counted, as G does to the last")
 
 TEST_CASE("z centres the view once the time for zz has passed, and zz resets the zoom")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"40j");
     REQUIRE(view.cursor().top() == 26); // the cursor on the view's last row
     view.handle(Key::typed(U'z'), 1000);
@@ -299,25 +317,30 @@ TEST_CASE("z centres the view once the time for zz has passed, and zz resets the
 TEST_CASE("the built-in modalrc binds keys only to the test view's and the window's commands")
 {
     Config config;
-    std::vector<CommandInfo> commands{TestView::commands().begin(), TestView::commands().end()};
-    commands.insert(commands.end(), windowCommands().begin(), windowCommands().end());
+    CommandRegistry commands;
+    commands.add(TestView::commands());
+    commands.add(windowCommands());
     ConfigReader reader{config, commands};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     CHECK(reader.errors().empty());
 
     // And every command is one the test view runs.
-    TestView view;
+    CommandRegistry registry;
+    TestView view{registry};
     for (const auto& command : TestView::commands())
     {
         CAPTURE(command.name);
-        CHECK(view.run(command.name, 0).has_value());
+        const auto result = view.run(command.name, 0);
+        CHECK((!result.warning || result.message.find("works only in") != std::string::npos));
     }
-    CHECK_FALSE(view.run("no-such-command", 0).has_value());
+    CHECK(view.run("no-such-command", 0) ==
+          CommandResult::error("unknown command \"no-such-command\""));
 }
 
 TEST_CASE("a message shows in the status line until the next key")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     view.setMessage("modalrc:3: unknown setting \"fontsiz\"", TestView::MessageKind::Warning);
     CHECK(contains(rowText(view.frame()[3], 0), U"modalrc:3: unknown setting"));
     CHECK(view.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
@@ -343,31 +366,32 @@ TEST_CASE("a message shows in the status line until the next key")
     CHECK(messageStyle() == Role::Message);
 }
 
-TEST_CASE("commands the view doesn't have go to its handler, such as the window's")
+TEST_CASE("keys run the registry's other commands too, such as the window's, showing messages")
 {
-    auto view = view80x24();
-    std::vector<std::pair<std::string, int>> handled;
-    view.setCommandHandler(
-        [&](std::string_view command, int count) -> std::optional<bool>
-        {
-            if (command != "font-bigger")
-            {
-                return std::nullopt;
-            }
-            handled.emplace_back(command, count);
-            return true;
-        });
+    View80x24 fixture;
+    auto& view = fixture.view;
+    std::vector<int> counts;
+    fixture.registry.add(windowCommands()[0],
+                         [&](const CommandCall& call)
+                         {
+                             counts.push_back(call.count);
+                             return CommandResult{true, "bigger", false};
+                         });
     CHECK(view.handle(Key::typed(U'=', kCtrl), 0));
+    CHECK(view.message() == "bigger");
     view.handle(Key::typed(U'3'), 0);
     view.handle(Key::of(NamedKey::KeypadPlus, kCtrl), 0);
-    CHECK(handled ==
-          std::vector<std::pair<std::string, int>>{{"font-bigger", 0}, {"font-bigger", 3}});
-    CHECK_FALSE(view.run("no-such-command", 0).has_value());
+    CHECK(counts == std::vector<int>{0, 3});
+
+    // One with nothing to run it says so.
+    view.handle(Key::typed(U'-', kCtrl), 0);
+    CHECK(view.message() == "font-smaller can't be run here");
 }
 
 TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line on")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     std::vector<std::string> lines;
     view.setLineHandler([&](const std::string& line) { lines.push_back(line); });
 
@@ -409,7 +433,8 @@ TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line o
 
 TEST_CASE("Ctrl with a direction moves the cursor and scrolls with it")
 {
-    auto view = view80x24();
+    View80x24 fixture;
+    auto& view = fixture.view;
     type(view, U"5j3l");
     view.handle(Key::typed(U'j', kCtrl), 0);
     CHECK(view.cursor().row() == 6);

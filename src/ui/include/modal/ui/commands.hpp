@@ -70,7 +70,9 @@ using CommandHandler = std::function<CommandResult(const CommandCall&)>;
 class CommandRegistry
 {
 public:
-    // Adds a command; its name and aliases must be new.
+    // Adds a command, whose name and aliases must be new; or, for a command described
+    // without a handler, gives it one. So commands can be described before what runs them
+    // exists, as when the config, which binds keys to them, is read before the views.
     void add(const CommandInfo& info, CommandHandler handler = {});
     void add(std::span<const CommandInfo> infos);
 

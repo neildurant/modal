@@ -54,7 +54,7 @@ PromptResult errorsSince(const ConfigReader& reader, std::size_t before)
 
 PromptResult runPromptLine(ConfigReader& reader, const Config& config, std::string_view line,
                            const std::optional<std::filesystem::path>& configDirectory,
-                           std::span<const CommandInfo> commands)
+                           const CommandRegistry& commands)
 {
     const auto parts = words(line);
     if (parts.empty())

@@ -61,6 +61,17 @@ TEST_CASE("commands are found by name or alias, in the order added")
     CHECK(all[4].name == "described");
 }
 
+TEST_CASE("a command can be described first, and given its handler later")
+{
+    Recorded r;
+    CHECK(r.registry.run("described", 0, Mode::Normal).warning);
+    r.registry.add({.name = "described", .description = "Now it runs"},
+                   [](const CommandCall&) { return CommandResult{true, "ran", false}; });
+    CHECK(r.registry.run("described", 0, Mode::Normal) == CommandResult{true, "ran", false});
+    CHECK(r.registry.find("described")->description == "Now it runs");
+    CHECK(r.registry.all().size() == 5);
+}
+
 TEST_CASE("a command's title comes from its name unless it has one")
 {
     CHECK(titleOf({.name = "cursor-left", .description = ""}) == "Cursor left");

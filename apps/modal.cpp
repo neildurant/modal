@@ -26,15 +26,6 @@ namespace
 
 using namespace modal;
 
-// The test view's commands and the window's.
-std::vector<ui::CommandInfo> allCommands()
-{
-    std::vector<ui::CommandInfo> commands{ui::TestView::commands().begin(),
-                                          ui::TestView::commands().end()};
-    commands.insert(commands.end(), ui::windowCommands().begin(), ui::windowCommands().end());
-    return commands;
-}
-
 // Applies the settings to the window and the view, as at startup or after a change. A font
 // that can't be opened is replaced by the built-in one, the font setting too so it isn't
 // tried again, and that's the error returned.
@@ -104,7 +95,11 @@ int main(int argc, char* argv[])
 
     // The built-in modalrc, then the user's. Errors go to stderr, where there is one, and
     // the first to the status line.
-    const auto commands = allCommands();
+    // Every command, described before the config binds keys to them; the view and the
+    // window give them what runs them once they exist.
+    ui::CommandRegistry commands;
+    commands.add(ui::TestView::commands());
+    commands.add(ui::windowCommands());
     ui::Config config;
     const auto configDirectory = platform::configDirectory();
     ui::ConfigReader reader{config, commands, configDirectory};
@@ -150,7 +145,7 @@ int main(int argc, char* argv[])
     auto& window = *std::get<std::unique_ptr<ui::sdl::Window>>(opened);
 
     // Until the event list (milestone 4), the test view.
-    ui::TestView view{config.keymap};
+    ui::TestView view{commands, config.keymap};
     if (auto error = apply(settings, window, view); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());
@@ -162,42 +157,32 @@ int main(int argc, char* argv[])
     }
 
     // The window's commands (see windowCommands): the text size, for now.
-    view.setCommandHandler(
-        [&](std::string_view command, int count) -> std::optional<bool>
+    const auto fontSize = [&](std::string_view command, const ui::CommandCall& call)
+    {
+        const auto* setting = settings.find("fontsize");
+        double size = settings.number("fontsize");
+        const int steps = std::max(call.count, 1);
+        size = command == "font-bigger"    ? size + steps
+               : command == "font-smaller" ? size - steps
+                                           : configuredSize;
+        size = std::clamp(size, setting->minimum, setting->maximum);
+        settings.set("fontsize", ui::formatValue(size));
+        if (auto error = apply(settings, window, view); !error.empty())
         {
-            const auto* setting = settings.find("fontsize");
-            double size = settings.number("fontsize");
-            const int steps = std::max(count, 1);
-            if (command == "font-bigger")
-            {
-                size += steps;
-            }
-            else if (command == "font-smaller")
-            {
-                size -= steps;
-            }
-            else if (command == "font-reset")
-            {
-                size = configuredSize;
-            }
-            else
-            {
-                return std::nullopt;
-            }
-            size = std::clamp(size, setting->minimum, setting->maximum);
-            settings.set("fontsize", ui::formatValue(size));
-            if (auto error = apply(settings, window, view); !error.empty())
-            {
-                view.setMessage(error, ui::TestView::MessageKind::Warning);
-                return true;
-            }
-            const auto cell = window.cellSize();
-            view.setMessage("font " + ui::formatValue(size) + " pt, cells " +
-                                std::to_string(cell.width) + "×" + std::to_string(cell.height) +
-                                " px",
-                            ui::TestView::MessageKind::Information);
-            return true;
-        });
+            return ui::CommandResult::error(std::move(error));
+        }
+        const auto cell = window.cellSize();
+        return ui::CommandResult{true,
+                                 "font " + ui::formatValue(size) + " pt, cells " +
+                                     std::to_string(cell.width) + "×" +
+                                     std::to_string(cell.height) + " px",
+                                 false};
+    };
+    for (const auto& info : ui::windowCommands())
+    {
+        commands.add(info, [&, name = info.name](const ui::CommandCall& call)
+                     { return fontSize(name, call); });
+    }
 
     // Lines run at the : prompt, after which settings and bindings apply at once.
     view.setLineHandler(
