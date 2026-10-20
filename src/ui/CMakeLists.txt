@@ -21,6 +21,7 @@ add_library(modal_ui STATIC
     style.cpp
     event_list_view.cpp
     themes.cpp
+    time_motions.cpp
     window_commands.cpp
 )
 modal_embed_file(TARGET modal_ui
