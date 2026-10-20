@@ -26,9 +26,11 @@ struct SmfImportResult
 //   end there.
 // - Each file track becomes one track per MIDI channel it uses. Its SysEx and text go to the
 //   first of those, or to a track of their own if it has no channel events.
-// - Tempo changes and markers from any track go to the song; time signatures from any track
-//   apply to every track. The first track's name is the song title in a type 0 file, and in
-//   a type 1 file whose first track has no channel events (the usual conductor track).
+// - Tempo changes and time signatures from any track go to the conductor, which every track
+//   follows, and markers from any track, and cue points in a track with no channel events,
+//   become bookmarks. The song is one section, "Song". The first track's name is the song
+//   title in a type 0 file, and in a type 1 file whose first track has no channel events
+//   (the usual conductor track).
 // - Tempos outside 1-1000 BPM are clamped.
 SmfImportResult importSmf(std::span<const std::uint8_t> bytes);
 
@@ -49,8 +51,9 @@ struct SmfExportResult
 
 // Exports a Standard MIDI File at the song's resolution.
 //
-// - The first track holds the title (as its name), the tempo map, the reference track's
-//   meter and the markers. In a type 1 file each Modal track follows, with its name and a
+// - The first track holds the title (as its name), the tempo map, the conductor's meter,
+//   each section's start as a marker (unless there's only one) and bookmarks as cue
+//   points. In a type 1 file each Modal track follows, with its name and a
 //   channel prefix; in a type 0 file, everything is in the one track and track names are
 //   left out.
 // - Events are written as stored, on the track's channel: transpose, velocity and time

@@ -1,10 +1,11 @@
+#include "files.hpp"
+
 #include <modal/core/smf.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <deque>
-#include <fstream>
 #include <iterator>
 #include <map>
 #include <string_view>
@@ -671,26 +672,10 @@ SmfImportResult importSmf(std::span<const std::uint8_t> bytes)
 SmfImportResult importSmfFile(const std::filesystem::path& path)
 {
     constexpr std::uintmax_t kMaxSize = 256u * 1024 * 1024;
-
-    std::error_code error;
-    const auto size = std::filesystem::file_size(path, error);
     SmfImportResult result;
-    if (error)
+    const auto bytes = readFile(path, kMaxSize, "a MIDI file", result.error);
+    if (!result.error.empty())
     {
-        result.error = "can't read " + path.string() + ": " + error.message();
-        return result;
-    }
-    if (size > kMaxSize)
-    {
-        result.error = path.string() + " is too large to be a MIDI file";
-        return result;
-    }
-
-    std::ifstream stream{path, std::ios::binary};
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
-    if (!stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size)))
-    {
-        result.error = "can't read " + path.string();
         return result;
     }
     return importSmf(bytes);

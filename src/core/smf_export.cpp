@@ -1,8 +1,9 @@
+#include "files.hpp"
+
 #include <modal/core/smf.hpp>
 
 #include <algorithm>
 #include <bit>
-#include <fstream>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -356,29 +357,9 @@ SmfExportResult exportSmfFile(const Song& song, const std::filesystem::path& pat
         return result;
     }
 
-    auto temporary = path;
-    temporary += ".tmp";
+    result.error = writeFileAtomically(path, result.bytes);
+    if (!result.error.empty())
     {
-        std::ofstream stream{temporary, std::ios::binary | std::ios::trunc};
-        stream.write(reinterpret_cast<const char*>(result.bytes.data()),
-                     static_cast<std::streamsize>(result.bytes.size()));
-        stream.close();
-        if (!stream)
-        {
-            std::error_code ignored;
-            std::filesystem::remove(temporary, ignored);
-            result.error = "can't write " + temporary.string();
-            result.bytes.clear();
-            return result;
-        }
-    }
-    std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error)
-    {
-        std::error_code ignored;
-        std::filesystem::remove(temporary, ignored);
-        result.error = "can't write " + path.string() + ": " + error.message();
         result.bytes.clear();
     }
     return result;

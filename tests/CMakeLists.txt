@@ -17,6 +17,7 @@ add_executable(modal_tests
     core/smf_export_test.cpp
     core/smf_test.cpp
     core/snapshot_exchange_test.cpp
+    core/song_file_test.cpp
     core/song_test.cpp
     core/spsc_queue_test.cpp
     core/tempo_map_test.cpp

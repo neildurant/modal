@@ -1,5 +1,6 @@
 add_library(modal_core STATIC
     engine.cpp
+    files.cpp
     timing_stats.cpp
     event.cpp
     input_queue.cpp
@@ -12,6 +13,7 @@ add_library(modal_core STATIC
     scheduler.cpp
     smf.cpp
     smf_export.cpp
+    song_file.cpp
     song.cpp
     tempo_map.cpp
     thru.cpp
