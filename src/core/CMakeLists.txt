@@ -7,6 +7,7 @@ add_library(modal_core STATIC
     meter_map.cpp
     note_fraction.cpp
     count_in.cpp
+    document.cpp
     pitch.cpp
     playback_plan.cpp
     recorder.cpp

@@ -164,6 +164,25 @@ Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
     rebuildAll();
 }
 
+Song::Song(Parts parts)
+    : title(std::move(parts.title))
+    , metronome(std::move(parts.metronome))
+    , countIn(parts.countIn)
+    , tracks_(std::move(parts.tracks))
+    , sections_(std::move(parts.sections))
+    , nextTrackId_(parts.nextTrackId)
+    , tempo_(parts.ppqn)
+    , meter_(parts.ppqn)
+{
+    assert(!sections_.empty());
+    rebuildAll();
+}
+
+Song::Parts Song::parts() const
+{
+    return {ppqn(), title, metronome, countIn, tracks_, sections_, nextTrackId_};
+}
+
 bool operator==(const Song& a, const Song& b)
 {
     const auto same = [](const auto& x, const auto& y) { return x == y || *x == *y; };

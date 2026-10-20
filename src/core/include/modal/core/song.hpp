@@ -195,6 +195,25 @@ public:
     // Whether two songs have the same settings, tracks and sections.
     friend bool operator==(const Song& a, const Song& b);
 
+    // A song without its flattened timeline, which can be rebuilt from the rest: for keeping
+    // past versions of a song, as undo does, without the timeline's copy of every event.
+    // The tracks and sections are shared with the song's.
+    struct Parts
+    {
+        Ppqn ppqn;
+        std::string title;
+        MetronomeSettings metronome;
+        CountInSettings countIn;
+        std::vector<std::shared_ptr<const Track>> tracks;
+        std::vector<std::shared_ptr<const Section>> sections;
+        std::uint64_t nextTrackId;
+    };
+
+    Parts parts() const;
+
+    // The song again from its parts, rebuilding the timeline.
+    explicit Song(Parts parts);
+
 private:
     struct Flattened
     {
