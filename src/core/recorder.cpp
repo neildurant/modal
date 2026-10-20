@@ -68,64 +68,6 @@ void setEnd(Event& event, Tick end)
     std::get<Note>(event.data).duration = end - event.tick;
 }
 
-// Keeps notes of one pitch from overlapping where a take note meets an old one: whichever
-// starts first ends where the other starts, and at the same tick the take's note wins. Old
-// notes that overlap each other are left as they are.
-void resolveOverlaps(std::vector<Event>& old, std::vector<Event>& take)
-{
-    std::map<std::uint8_t, std::vector<std::size_t>> oldByPitch;
-    for (std::size_t i = 0; i < old.size(); ++i)
-    {
-        if (const auto* note = std::get_if<Note>(&old[i].data))
-        {
-            oldByPitch[note->pitch].push_back(i);
-        }
-    }
-    std::vector<bool> removed(old.size(), false);
-    for (auto& event : take)
-    {
-        const auto* note = std::get_if<Note>(&event.data);
-        if (note == nullptr)
-        {
-            continue;
-        }
-        const auto found = oldByPitch.find(note->pitch);
-        if (found == oldByPitch.end())
-        {
-            continue;
-        }
-        for (const auto i : found->second) // in tick order
-        {
-            auto& other = old[i];
-            if (removed[i])
-            {
-                continue;
-            }
-            if (other.tick == event.tick)
-            {
-                removed[i] = true;
-            }
-            else if (other.tick < event.tick && event.tick < endOf(other))
-            {
-                setEnd(other, event.tick);
-            }
-            else if (event.tick < other.tick && other.tick < endOf(event))
-            {
-                setEnd(event, other.tick);
-            }
-        }
-    }
-    std::vector<Event> kept;
-    for (std::size_t i = 0; i < old.size(); ++i)
-    {
-        if (!removed[i])
-        {
-            kept.push_back(std::move(old[i]));
-        }
-    }
-    old = std::move(kept);
-}
-
 } // namespace
 
 Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode)

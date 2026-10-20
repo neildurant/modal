@@ -39,6 +39,15 @@ private:
     std::vector<Event> events_;
 };
 
+// Keeps notes of one pitch from overlapping where an added note meets an old one, as the
+// editor and the recorder never create overlaps: whichever starts first ends where the other
+// starts, and at the same tick the added note replaces the old. Old notes that overlap each
+// other, as an imported file's may, are left as they are.
+void resolveOverlaps(std::vector<Event>& old, std::vector<Event>& added);
+
+// Events with others added, put in without overlaps (see resolveOverlaps).
+EventList merged(const EventList& old, std::vector<Event> added);
+
 // Identifies a track for its whole life, across edits and song snapshots.
 struct TrackId
 {

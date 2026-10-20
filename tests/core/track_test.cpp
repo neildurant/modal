@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -112,4 +113,36 @@ TEST_CASE("track settings")
     CHECK_FALSE(track.hasValidSettings());
     track.channel = 0;
     CHECK_FALSE(track.hasValidSettings());
+}
+
+TEST_CASE("merging events in never makes notes of one pitch overlap")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    EventList old;
+    old.insert({0, Note{60, 100, 2 * q}});
+    old.insert({0, Note{64, 100, q}});
+    old.insert({2 * q, Note{67, 100, q}});
+
+    const auto result = merged(old, {{q, Note{60, 90, 2 * q}},     // into the old 60
+                                     {0, Note{64, 80, q / 2}},     // at the old 64's tick
+                                     {q + q / 2, Note{67, 70, q}}, // runs into the old 67
+                                     {q, ControlChange{1, 2}}});
+    std::vector<std::string> notes;
+    for (const auto& event : result.all())
+    {
+        if (const auto* note = std::get_if<Note>(&event.data))
+        {
+            notes.push_back(std::to_string(event.tick) + " " + std::to_string(note->pitch) + " " +
+                            std::to_string(note->duration) + " " + std::to_string(note->velocity));
+        }
+    }
+    CHECK(notes == std::vector<std::string>{
+                       "0 60 " + std::to_string(q) + " 100",    // ends where the new one starts
+                       "0 64 " + std::to_string(q / 2) + " 80", // replaced by the new one
+                       std::to_string(q) + " 60 " + std::to_string(2 * q) + " 90",
+                       std::to_string(q + q / 2) + " 67 " + std::to_string(q / 2) + " 70",
+                       std::to_string(2 * q) + " 67 " + std::to_string(q) + " 100",
+                   });
+    CHECK(result.size() == 6);
 }
