@@ -32,7 +32,7 @@ As well as the commands below, the prompt takes:
 - `write-config FILE` writes the config, as above. A relative FILE is in the config directory. `write-config!` overwrites.
 - `q` or `quit` quits.
 
-Any command keys can be bound to can be run at the prompt too, by name, such as `:test-next-page`; one that takes a count takes it after its name, so `:cursor-down 3` moves down three rows. `write-config` and `quit` can't go in `modalrc`, and the movement and window commands can't either, since there's nothing to move when it runs; the file says so if they're there.
+Any command keys can be bound to can be run at the prompt too, by name, such as `:track-next`; one that takes a count takes it after its name, so `:cursor-down 3` moves down three rows. `write-config` and `quit` can't go in `modalrc`, and the movement and window commands can't either, since there's nothing to move when it runs; the file says so if they're there.
 
 ## Commands
 
@@ -98,4 +98,4 @@ The roles are:
 | `note`, `marker` | notes, and markers |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |
 
-`:write-config` lists the colours of every role in the theme you've chosen. The test view's samples page (Tab to it) shows each role in the current theme.
+`:write-config` lists the colours of every role in the theme you've chosen.

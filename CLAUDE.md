@@ -73,4 +73,4 @@ The command-line tools (`modal-ports`, `modal-play`, `modal-record`, `modal-loop
 
 Configuration (`modalrc`, settings, key bindings, themes and `modal --write-config`) is described in `docs/configuration.md`.
 
-The GUI is `modal` (in `build/<preset>/apps/Debug` or `Release`); until milestone 4 it shows the test view. Window tests run through SDL's offscreen video driver. The hidden `[.sample]` tests draw the font and each test view page to BMP files to look at (`MODAL_SAMPLE_BMP` names them), e.g. `modal_tests "[.sample]"`.
+The GUI is `modal` (in `build/<preset>/apps/Debug` or `Release`): `modal FILE` shows the event list of a `.modal` song or an imported `.mid` file, and plain `modal` the demo song. Window tests run through SDL's offscreen video driver. The hidden `[.sample]` tests draw the font, the event list and the arrangement sketch to BMP files to look at (`MODAL_SAMPLE_BMP` names them), e.g. `modal_tests "[.sample]"`.

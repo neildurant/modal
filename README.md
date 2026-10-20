@@ -8,9 +8,10 @@ Early, and not yet usable for making music. Built so far:
 
 1. **Engine and MIDI layer:** playing Standard MIDI Files with timing measured on real hardware.
 2. **Recording:** with metronome, count-in and pre-roll.
-3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt, shown through a test view.
+3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt.
+4. **Under way:** songs made of sections, saved in a plain-text format, with undo, and the event list, the first real view.
 
-The first real view, the event list, comes next. The plan for the rest is in [docs/design.md](docs/design.md).
+Editing comes next. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
@@ -31,23 +32,19 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 - `modal` is the GUI.
 - `modal-ports`, `modal-play`, `modal-record` and `modal-loopback` list MIDI ports, play and record MIDI files, and measure timing. See [docs/tools.md](docs/tools.md).
 
-### The test view
+### The event list
 
-Until the event list arrives, `modal` shows a test view of three pages, which Tab goes through:
-
-- **Grid:** a large grid to move around.
-- **Arrange:** a sketch of the arrangement view, with a made-up song.
-- **Samples:** every theme colour, and the characters the views use.
+`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`) and shows its event list, one track at a time; plain `modal` shows a made-up demo song. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
 
 | Keys | What they do |
 |------|--------------|
-| `h` `j` `k` `l`, arrow keys | Move, with counts such as `12j` |
-| `0` `$`, Home End | First and last column, or bar |
-| `gg` `G` | First and last row, or bar; with a count, that one |
-| Ctrl with `h` `j` `k` `l` or the arrows | Move, scrolling so the cursor stays in place on screen |
+| `j` `k`, `h` `l`, arrow keys | Move between events and fields, with counts such as `12j` |
+| `0` `$`, Home End | First and last field |
+| `gg` `G` | First event and the end; with a count, that bar |
+| `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
+| Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
-| `z`, `zz` | Centre the view on the cursor; reset the arrangement's zoom |
-| `+` `-` | Zoom the arrangement |
+| `zz` | Centre the cursor |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
 | `:` | The command prompt: `:set theme=light`, `:set fontsize?`, `:write-config modalrc`, `:q` |
 
