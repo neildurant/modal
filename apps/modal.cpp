@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -51,6 +52,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
+    view.setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     return error;
 }

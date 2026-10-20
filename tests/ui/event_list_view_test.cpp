@@ -177,6 +177,96 @@ TEST_CASE("gg goes to the first row and G to the end, or with a count to that ba
     CHECK(v.view.row() == 0);
 }
 
+TEST_CASE("time motions go to the event at or after where they land, in the track's bars")
+{
+    // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
+    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    View v;
+    type(v.view, U"4j");
+    type(v.view, U"w"); // the beat after is 1:2:000; the next event, the cc
+    CHECK(v.view.row() == 5);
+    type(v.view, U"w");
+    CHECK(v.view.row() == 6);
+    type(v.view, U"gg4j2w");
+    CHECK(v.view.row() == 6); // a count of beats, then the event at or after
+    type(v.view, U"}");       // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
+    CHECK(v.view.row() == 9);
+    type(v.view, U"gg}");
+    CHECK(v.view.row() == 7); // a bar on from 1:1:000, the verse's section row
+
+    // Going back keeps going until it's somewhere earlier: from the note at 2:1:000, a beat
+    // back is 1:4:000, whose event at or after is no earlier, so another beat, and another.
+    type(v.view, U"j");
+    REQUIRE(v.view.row() == 8);
+    type(v.view, U"b");
+    CHECK(v.view.row() == 6);
+    type(v.view, U"G[[");
+    CHECK(v.view.row() == 7); // the bar line before the end is 2:1:000
+    type(v.view, U"[[");
+    CHECK(v.view.row() == 0);
+    type(v.view, U"]]");
+    CHECK(v.view.row() == 7);
+    type(v.view, U"{");
+    CHECK(v.view.row() == 0);
+    type(v.view, U"b");
+    CHECK(v.view.row() == 0); // nowhere earlier to go
+}
+
+TEST_CASE("( and ) go by chords: events starting within the chord window of each other")
+{
+    View v;
+    // The program and the note at 1:1:000 are one chord, then the cc, then the verse's note.
+    type(v.view, U")");
+    CHECK(v.view.row() == 3);
+    type(v.view, U")");
+    CHECK(v.view.row() == 5);
+    type(v.view, U"2)");
+    CHECK(v.view.row() == 9); // past the last, the end
+    type(v.view, U"(");
+    CHECK(v.view.row() == 8);
+    type(v.view, U"k(");
+    CHECK(v.view.row() == 5); // from inside a chord, its start first
+    type(v.view, U"gg(");
+    CHECK(v.view.row() == 0); // nothing before
+
+    // Notes a little apart are one chord, until the window is narrowed.
+    core::Song song{core::kPpqn};
+    const auto keys = song.addTrack("Keys");
+    song.updateEvents(keys,
+                      [](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{60, 100, q}});
+                          events.insert({20, core::Note{64, 100, q}}); // about 10 ms later
+                          events.insert({40, core::Note{67, 100, q}});
+                          events.insert({q, core::Note{72, 100, q}});
+                      });
+    View chord{song};
+    type(chord.view, U")");
+    CHECK(chord.view.list().rows()[chord.view.row()].tick == 0);
+    type(chord.view, U")");
+    CHECK(chord.view.list().rows()[chord.view.row()].tick == q);
+    chord.view.setChordWindow(std::chrono::milliseconds{5});
+    type(chord.view, U"gg))");
+    CHECK(chord.view.list().rows()[chord.view.row()].tick == 20);
+}
+
+TEST_CASE("section and marker motions go to their rows")
+{
+    View v;
+    type(v.view, U"]s");
+    CHECK(v.view.row() == 7);
+    type(v.view, U"j[s");
+    CHECK(v.view.row() == 0); // from the verse's first note, at its start, the section before
+    type(v.view, U"6j[s");
+    CHECK(v.view.row() == 0); // from inside a section, its start
+    type(v.view, U"]m");
+    CHECK(v.view.row() == 6);
+    type(v.view, U"G[m");
+    CHECK(v.view.row() == 6);
+    type(v.view, U"]m");
+    CHECK(v.view.row() == 6); // none after: it stays
+}
+
 TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping the time")
 {
     View v;

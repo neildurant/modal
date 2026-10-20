@@ -9,6 +9,7 @@
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -80,6 +81,9 @@ public:
     void setKeymap(Keymap keymap) { keymap_ = std::move(keymap); }
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
 
+    // How far apart events can start and still be one chord, for ( and ) (chordwindow).
+    void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
+
     Frame frame() const;
 
     // The track shown: 0 for the conductor, then 1 for the first track.
@@ -111,6 +115,15 @@ private:
     void showTrack(std::size_t track, core::Tick tick);
     EventList listOf(std::size_t track) const;
     void moveRows(std::int64_t by);
+
+    // Moves to the first row at or after a time a motion reached. Going back, if that row
+    // isn't earlier than the cursor's, the motion is taken again from there until it is, or it
+    // can go no further, so it never sticks.
+    void land(core::Tick target, bool forward, const std::function<core::Tick(core::Tick)>& again);
+
+    // The rows starting chords: events starting together, within the chord window of the
+    // first of them; in the conductor's list, its rows.
+    std::vector<std::size_t> chordStarts() const;
     void moveFields(int by);
     void follow();
 
@@ -123,7 +136,9 @@ private:
     std::size_t track_ = 0;
     EventList list_;
     std::size_t row_ = 0;
-    Column wanted_ = Column::Position; // the field the cursor keeps to, as rows change
+    Column wanted_ = Column::Position;    // the field the cursor keeps to, as rows change
+    std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated
+    std::chrono::milliseconds chordWindow_{30};
     std::size_t top_ = 0;
     Keymap keymap_;
     KeyDispatcher keys_;

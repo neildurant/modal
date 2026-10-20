@@ -78,6 +78,10 @@ Settings::Settings()
                   "How long to wait, in milliseconds, after keys that are a binding and also "
                   "start a longer one, before running the shorter",
                   kDefaultTimeout, 0, 10000),
+          setting("chordwindow",
+                  "How far apart, in milliseconds, events can start and still be one chord, "
+                  "as a chord's notes played a little apart are",
+                  std::int64_t{30}, 0, 1000),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
       }

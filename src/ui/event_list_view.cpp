@@ -2,6 +2,7 @@
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/time_motions.hpp>
 #include <modal/ui/window_commands.hpp>
 
 #include <algorithm>
@@ -66,6 +67,18 @@ constexpr std::array kCommands{
     counted("cursor-up", "Move up an event"),
     CommandInfo{.name = "cursor-first", .description = "Move to the first field"},
     CommandInfo{.name = "cursor-last", .description = "Move to the last field"},
+    counted("cursor-beat-next", "Move to the event at or after the next beat"),
+    counted("cursor-beat-previous", "Move to the event at or after the beat before"),
+    counted("cursor-bar-next", "Move to the event at or after the same place a bar on"),
+    counted("cursor-bar-previous", "Move to the event at or after the same place a bar back"),
+    counted("cursor-bar-line-next", "Move to the event at or after the next bar line"),
+    counted("cursor-bar-line-previous", "Move to the event at or after the bar line before"),
+    counted("cursor-chord-next", "Move to the next chord, or event"),
+    counted("cursor-chord-previous", "Move to the chord, or event, before"),
+    counted("cursor-section-next", "Move to the next section's start"),
+    counted("cursor-section-previous", "Move to the section's start, or the one before"),
+    counted("cursor-marker-next", "Move to the next marker"),
+    counted("cursor-marker-previous", "Move to the marker before"),
     counted("go-first", "Go to the first event, or bar {count}"),
     counted("go-last", "Go to the end, or bar {count}"),
     counted("cursor-left-scroll", "Move to the field before"),
@@ -290,8 +303,51 @@ void EventListView::follow()
     }
 }
 
+void EventListView::land(core::Tick target, bool forward,
+                         const std::function<core::Tick(core::Tick)>& again)
+{
+    // Going back means earlier in time, not just an earlier row at the same time.
+    const auto from = list_.rows()[row_].tick;
+    auto row = list_.rowAt(target);
+    while (!forward && list_.rows()[row].tick >= from && target > 0)
+    {
+        target = again(target);
+        row = list_.rowAt(target);
+    }
+    if (forward || list_.rows()[row].tick < from)
+    {
+        row_ = row;
+    }
+}
+
+std::vector<std::size_t> EventListView::chordStarts() const
+{
+    const auto& song = document_.song();
+    const auto rows = list_.rows();
+    std::vector<std::size_t> starts;
+    std::optional<core::Tick> first;
+    for (std::size_t i = 0; i + 1 < rows.size(); ++i) // not the end
+    {
+        if (track_ != 0 && rows[i].kind != RowKind::Event)
+        {
+            continue;
+        }
+        if (!first || !together(song, *first, rows[i].tick, chordWindow_))
+        {
+            starts.push_back(i);
+            first = rows[i].tick;
+        }
+    }
+    return starts;
+}
+
 std::optional<bool> EventListView::runOwn(std::string_view command, int count)
 {
+    const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous";
+    if (!keepsBarOffset)
+    {
+        barOffset_.reset();
+    }
     const int n = std::max(count, 1);
     const auto rows = static_cast<std::int64_t>(viewRows());
     const auto scroll = [&](std::int64_t by)
@@ -308,9 +364,105 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     {
         return runCommandLine(command);
     }
+    const auto& meter = list_.meter();
+    const auto tick = list_.rows()[row_].tick;
+    const auto& song = document_.song();
+
     if (command == "cursor-down" || command == "cursor-up")
     {
         moveRows(command == "cursor-down" ? n : -n);
+    }
+    else if (command == "cursor-beat-next")
+    {
+        land(beatAfter(meter, tick, n), true, {});
+    }
+    else if (command == "cursor-beat-previous")
+    {
+        land(beatBefore(meter, tick, n), false,
+             [&](core::Tick t) { return beatBefore(meter, t, 1); });
+    }
+    else if (keepsBarOffset)
+    {
+        const auto offset = barOffset_.value_or(offsetInBar(meter, tick));
+        if (command == "cursor-bar-next")
+        {
+            land(sameInBar(meter, tick, n, offset), true, {});
+        }
+        else
+        {
+            land(sameInBar(meter, tick, -n, offset), false,
+                 [&](core::Tick t) { return sameInBar(meter, t, -1, offset); });
+        }
+        barOffset_ = offset;
+    }
+    else if (command == "cursor-bar-line-next")
+    {
+        land(barLineAfter(meter, tick, n), true, {});
+    }
+    else if (command == "cursor-bar-line-previous")
+    {
+        land(barLineBefore(meter, tick, n), false,
+             [&](core::Tick t) { return barLineBefore(meter, t, 1); });
+    }
+    else if (command == "cursor-chord-next" || command == "cursor-chord-previous")
+    {
+        const auto starts = chordStarts();
+        // The chord the cursor is in: the last starting at or before its row.
+        const auto after = std::ranges::upper_bound(starts, row_);
+        auto at = after - starts.begin() - 1;
+        if (command == "cursor-chord-next")
+        {
+            at += n;
+        }
+        else
+        {
+            at -= at >= 0 && starts[static_cast<std::size_t>(at)] == row_ ? n : n - 1;
+        }
+        if (at >= static_cast<std::ptrdiff_t>(starts.size()))
+        {
+            row_ = list_.rows().size() - 1; // past the last chord, the end
+        }
+        else if (!starts.empty())
+        {
+            const auto to = starts[static_cast<std::size_t>(std::max<std::ptrdiff_t>(at, 0))];
+            if (command == "cursor-chord-next" || to < row_) // never back to a later row
+            {
+                row_ = to;
+            }
+        }
+    }
+    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
+    {
+        const bool sections = command.starts_with("cursor-section-");
+        std::vector<core::Tick> ticks;
+        if (sections)
+        {
+            for (std::size_t i = 0; i < song.sections().size(); ++i)
+            {
+                ticks.push_back(song.sectionStart(i));
+            }
+        }
+        else
+        {
+            for (const auto& marker : song.markers())
+            {
+                ticks.push_back(marker.tick);
+            }
+        }
+        const auto to =
+            command.ends_with("-next") ? nextOf(ticks, tick, n) : previousOf(ticks, tick, n);
+        if (!to)
+        {
+            return false;
+        }
+        // On its row: a section's is the first at its tick; a marker's comes after any
+        // section, meter or tempo change there.
+        row_ = list_.rowAt(*to);
+        const auto kind = sections ? RowKind::Section : RowKind::Marker;
+        while (list_.rows()[row_].kind != kind)
+        {
+            ++row_;
+        }
     }
     else if (command == "cursor-left" || command == "cursor-left-scroll")
     {
