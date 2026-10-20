@@ -9,6 +9,7 @@ add_library(modal_ui STATIC
     commands.cpp
     config.cpp
     demo_song.cpp
+    event_text.cpp
     frame.cpp
     key_notation.cpp
     keymap.cpp
