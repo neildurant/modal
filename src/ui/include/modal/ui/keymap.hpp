@@ -28,13 +28,6 @@ enum class Mode : std::uint8_t
 
 inline constexpr std::size_t kModeCount = static_cast<std::size_t>(Mode::CommandLine) + 1;
 
-// A command keys can be bound to, by name, with what it does in a line.
-struct CommandInfo
-{
-    std::string_view name;
-    std::string_view description;
-};
-
 // What a sequence of keys does: a command, by name, and a short label for hints.
 struct Binding
 {

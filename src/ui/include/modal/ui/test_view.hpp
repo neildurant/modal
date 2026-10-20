@@ -5,6 +5,7 @@
 #include <modal/ui/frame.hpp>
 #include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
+#include <modal/ui/commands.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
 

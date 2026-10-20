@@ -1,5 +1,6 @@
 #pragma once
 
+#include <modal/ui/commands.hpp>
 #include <modal/ui/keymap.hpp>
 
 #include <span>

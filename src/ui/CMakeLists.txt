@@ -6,6 +6,7 @@ add_library(modal_ui STATIC
     block_glyphs.cpp
     cell_grid.cpp
     command_line.cpp
+    commands.cpp
     config.cpp
     demo_song.cpp
     frame.cpp
