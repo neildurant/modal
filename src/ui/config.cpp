@@ -320,6 +320,41 @@ std::string ConfigReader::useTheme(std::string name, const std::string& previous
            ", nor built in";
 }
 
+namespace
+{
+
+constexpr CommandInfo configCommand(std::string_view name, std::string_view description,
+                                    std::string_view usage)
+{
+    return {
+        .name = name, .description = description, .usage = usage, .config = true, .keys = false};
+}
+
+constexpr std::string_view kMapUsage = "KEYS COMMAND [\"HINT\"]";
+
+constexpr std::array kConfigCommands{
+    configCommand("set", "Set settings; set NAME? shows one", "NAME=VALUE..."),
+    configCommand("highlight", "Set a theme role's colour", "ROLE #rrggbb"),
+    configCommand("nmap", "Bind keys to a command in Normal mode", kMapUsage),
+    configCommand("vmap", "Bind keys to a command in Visual mode", kMapUsage),
+    configCommand("imap", "Bind keys to a command in Insert mode", kMapUsage),
+    configCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage),
+    configCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage),
+    configCommand("nunmap", "Unbind keys in Normal mode", "KEYS"),
+    configCommand("vunmap", "Unbind keys in Visual mode", "KEYS"),
+    configCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
+    configCommand("ounmap", "Unbind keys in operator-pending mode", "KEYS"),
+    configCommand("cunmap", "Unbind keys in command-line mode", "KEYS"),
+    configCommand("source", "Run a command file; at the : prompt, modalrc again if none", "FILE"),
+};
+
+} // namespace
+
+std::span<const CommandInfo> configCommands()
+{
+    return kConfigCommands;
+}
+
 std::string_view builtInModalrc()
 {
     const auto bytes = builtInModalrcBytes();

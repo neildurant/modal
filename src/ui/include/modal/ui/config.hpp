@@ -110,6 +110,10 @@ std::string defaultConfigText(const CommandRegistry& commands);
 std::string writeConfigFile(const std::filesystem::path& file, std::string_view text,
                             bool overwrite);
 
+// The commands a command file takes, described for the command registry, so the : prompt
+// runs them too and they're listed with the rest. ConfigReader runs them itself.
+std::span<const CommandInfo> configCommands();
+
 // The built-in command file, assets/config/modalrc, which holds the default key bindings.
 std::string_view builtInModalrc();
 

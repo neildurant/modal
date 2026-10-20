@@ -100,6 +100,8 @@ int main(int argc, char* argv[])
     ui::CommandRegistry commands;
     commands.add(ui::TestView::commands());
     commands.add(ui::windowCommands());
+    commands.add(ui::configCommands());
+    commands.add(ui::promptCommands());
     ui::Config config;
     const auto configDirectory = platform::configDirectory();
     ui::ConfigReader reader{config, commands, configDirectory};
@@ -184,16 +186,13 @@ int main(int argc, char* argv[])
                      { return fontSize(name, call); });
     }
 
-    // Lines run at the : prompt, after which settings and bindings apply at once.
+    // Lines run at the : prompt, through the registry, after which settings and bindings
+    // apply at once.
+    ui::addPromptCommands(commands, reader, config, configDirectory, [&] { window.close(); });
     view.setLineHandler(
         [&](const std::string& line)
         {
-            const auto result = ui::runPromptLine(reader, config, line, configDirectory, commands);
-            if (result.quit)
-            {
-                window.close();
-                return;
-            }
+            const auto result = commands.runLine(line);
             view.setKeymap(config.keymap);
             auto message = result.message;
             bool warning = result.warning;
