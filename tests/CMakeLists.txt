@@ -40,6 +40,7 @@ add_executable(modal_tests
     ui/commands_test.cpp
     ui/config_test.cpp
     ui/demo_song_test.cpp
+    ui/event_list_test.cpp
     ui/event_text_test.cpp
     ui/grid_cursor_test.cpp
     ui/key_notation_test.cpp

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace modal::core
@@ -33,6 +34,10 @@ struct Tempo
 };
 
 inline constexpr Tempo kDefaultTempo{500'000}; // 120 BPM
+
+// The tempo in BPM, with as few decimals as read back to the same microseconds per quarter:
+// 120, 114.6228.
+std::string bpmText(Tempo tempo);
 
 struct TempoChange
 {

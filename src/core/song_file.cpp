@@ -117,23 +117,6 @@ std::string signedText(std::int64_t value)
     return (value > 0 ? "+" : "") + std::to_string(value);
 }
 
-// The tempo in BPM, with as few decimals as read back to the same microseconds per quarter.
-std::string bpmText(Tempo tempo)
-{
-    std::array<char, 64> buffer{};
-    for (int precision = 0;; ++precision)
-    {
-        const auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
-                                                tempo.bpm(), std::chars_format::fixed, precision);
-        double value = 0;
-        std::from_chars(buffer.data(), end, value);
-        if (Tempo::fromBpm(value) == tempo || precision == 17)
-        {
-            return {buffer.data(), end};
-        }
-    }
-}
-
 std::string lengthText(Tick duration, Ppqn ppqn)
 {
     if (duration > 0)

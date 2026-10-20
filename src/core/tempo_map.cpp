@@ -1,7 +1,9 @@
 #include <modal/core/tempo_map.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <charconv>
 #include <cmath>
 #include <iterator>
 
@@ -53,6 +55,22 @@ Tempo Tempo::fromBpm(double bpm)
 double Tempo::bpm() const
 {
     return kMicrosPerMinute / static_cast<double>(microsPerQuarter);
+}
+
+std::string bpmText(Tempo tempo)
+{
+    std::array<char, 64> buffer{};
+    for (int precision = 0;; ++precision)
+    {
+        const auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
+                                                tempo.bpm(), std::chars_format::fixed, precision);
+        double value = 0;
+        std::from_chars(buffer.data(), end, value);
+        if (Tempo::fromBpm(value) == tempo || precision == 17)
+        {
+            return {buffer.data(), end};
+        }
+    }
 }
 
 TempoMap::TempoMap(Ppqn ppqn, Tempo initial)
