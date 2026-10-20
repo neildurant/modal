@@ -1,10 +1,13 @@
+#include <modal/core/document.hpp>
+#include <modal/ui/arrange_page.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/demo_song.hpp>
+#include <modal/ui/event_list_view.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
-#include <modal/ui/test_view.hpp>
 #include <modal/ui/themes.hpp>
 
 #include <SDL3/SDL.h>
@@ -233,47 +236,49 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
     CHECK(window->saveFrame(path != nullptr ? path : "font-sample.bmp"));
 }
 
-// Hidden: writes the pages of the test view to look at, to MODAL_SAMPLE_BMP with "-grid",
-// "-arrange", "-arrange-out" (zoomed out), "-samples", and "-samples-light" and
-// "-arrange-light" in the light theme, before its extension, or to
-// test-view-grid.bmp and so on.
-TEST_CASE("a sample of the test view", "[.sample]")
+// Hidden: writes the event list and the arrangement sketch to look at, to MODAL_SAMPLE_BMP
+// with "-events", "-events-light", "-conductor", "-arrange" and "-arrange-out" (zoomed out)
+// before its extension, or to sample.bmp and so on.
+TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
 {
     auto window = offscreen(1000, 600);
-    CommandRegistry registry;
-    TestView view{registry};
-    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
-    for (const char32_t key : std::u32string_view{U"12j3l"})
-    {
-        view.handle(Key::typed(key), 0);
-    }
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
-    std::string base = path != nullptr ? path : "test-view.bmp";
+    std::string base = path != nullptr ? path : "sample.bmp";
     base = base.substr(0, base.rfind('.'));
-    window->draw(view.frame(), *builtInTheme("dark"));
-    CHECK(window->saveFrame(base + "-grid.bmp"));
-    view.handle(Key::of(NamedKey::Tab), 0);
-    for (const char32_t key : std::u32string_view{U"6j9l"})
+
+    const modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    EventListView view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    for (const char32_t key : std::u32string_view{U"12jll"})
     {
         view.handle(Key::typed(key), 0);
     }
     window->draw(view.frame(), *builtInTheme("dark"));
-    CHECK(window->saveFrame(base + "-arrange.bmp"));
-    for (int i = 0; i < 3; ++i) // to two whole notes to a column
+    CHECK(window->saveFrame(base + "-events.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-events-light.bmp"));
+    view.run("track-previous", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-conductor.bmp"));
+
+    const auto layout =
+        layoutWindow(window->pixelWidth(), window->pixelHeight(), window->cellSize(), 1, 1);
+    ArrangePage arrange{demoSong()};
+    arrange.resize(layout.main, window->cellSize());
+    arrange.moveTracks(6);
+    arrange.moveBars(9);
+    const auto draw = [&]
     {
-        view.handle(Key::typed(U'-'), 0);
-    }
-    window->draw(view.frame(), *builtInTheme("dark"));
+        Frame frame;
+        arrange.addRegions(frame);
+        window->draw(frame, *builtInTheme("dark"));
+    };
+    draw();
+    CHECK(window->saveFrame(base + "-arrange.bmp"));
+    arrange.zoomBy(3); // to two whole notes to a column
+    draw();
     CHECK(window->saveFrame(base + "-arrange-out.bmp"));
-    view.handle(Key::of(NamedKey::Tab), 0);
-    window->draw(view.frame(), *builtInTheme("dark"));
-    CHECK(window->saveFrame(base + "-samples.bmp"));
-    window->draw(view.frame(), *builtInTheme("light"));
-    CHECK(window->saveFrame(base + "-samples-light.bmp"));
-    view.handle(Key::of(NamedKey::Tab), 0);
-    view.handle(Key::of(NamedKey::Tab), 0);
-    window->draw(view.frame(), *builtInTheme("light"));
-    CHECK(window->saveFrame(base + "-arrange-light.bmp"));
 }
 
 TEST_CASE("a window can open at a size in cells")

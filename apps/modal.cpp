@@ -1,11 +1,15 @@
 // modal: the sequencer.
 
+#include <modal/core/document.hpp>
+#include <modal/core/smf.hpp>
+#include <modal/core/song_file.hpp>
 #include <modal/platform/paths.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/demo_song.hpp>
+#include <modal/ui/event_list_view.hpp>
 #include <modal/ui/key.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
-#include <modal/ui/test_view.hpp>
 #include <modal/ui/window_commands.hpp>
 
 #include <algorithm>
@@ -26,10 +30,11 @@ namespace
 
 using namespace modal;
 
-// Applies the settings to the window and the view, as at startup or after a change. A font
-// that can't be opened is replaced by the built-in one, the font setting too so it isn't
-// tried again, and that's the error returned.
-std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::TestView& view)
+// Applies the settings to the window, the view and the document, as at startup or after a
+// change. A font that can't be opened is replaced by the built-in one, the font setting too
+// so it isn't tried again, and that's the error returned.
+std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventListView& view,
+                  core::Document& document)
 {
     std::string error;
     const ui::sdl::FontOptions font{.file = settings.text("font"),
@@ -46,7 +51,43 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::TestView&
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
+    view.setLengthFormat(settings.text("lenformat") == "beats" ? ui::LengthFormat::Beats
+                                                               : ui::LengthFormat::Note);
+    document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     return error;
+}
+
+// Opens a song file, or imports a MIDI file (.mid or .midi) as a new song, not to be saved
+// over it. Returns what went wrong, or the first warning and how many more.
+std::string open(core::Document& document, const std::filesystem::path& file)
+{
+    auto extension = ui::utf8Text(file.extension());
+    std::ranges::transform(extension, extension.begin(), [](char c)
+                           { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
+    if (extension == ".mid" || extension == ".midi")
+    {
+        auto result = core::importSmfFile(file);
+        if (!result.song)
+        {
+            return "can't import " + ui::utf8Text(file) + ": " + result.error;
+        }
+        document.replace(std::move(*result.song), std::nullopt);
+        if (result.warnings.empty())
+        {
+            return {};
+        }
+        return ui::utf8Text(file.filename()) + ": " + result.warnings.front() +
+               (result.warnings.size() > 1
+                    ? " (and " + std::to_string(result.warnings.size() - 1) + " more)"
+                    : std::string{});
+    }
+    auto result = core::readSongFile(file);
+    if (!result.song)
+    {
+        return result.error;
+    }
+    document.replace(std::move(*result.song), file);
+    return {};
 }
 
 void fail(const std::string& message)
@@ -73,6 +114,7 @@ int writeConfig(const std::filesystem::path& file, bool force, const std::string
 int main(int argc, char* argv[])
 {
     std::optional<std::filesystem::path> configFile;
+    std::optional<std::filesystem::path> songFile;
     bool force = false;
     for (int i = 1; i < argc; ++i)
     {
@@ -85,10 +127,15 @@ int main(int argc, char* argv[])
         {
             force = true;
         }
+        else if (!argument.starts_with("--") && !songFile)
+        {
+            songFile = ui::utf8Path(argument);
+        }
         else
         {
             fail("doesn't know " + std::string{argument} +
-                 "; it takes --write-config FILE, with --force to overwrite FILE");
+                 "; it takes a song or MIDI file to open, or --write-config FILE, with --force "
+                 "to overwrite FILE");
             return 2;
         }
     }
@@ -98,7 +145,7 @@ int main(int argc, char* argv[])
     // Every command, described before the config binds keys to them; the view and the
     // window give them what runs them once they exist.
     ui::CommandRegistry commands;
-    commands.add(ui::TestView::commands());
+    commands.add(ui::EventListView::commands());
     commands.add(ui::windowCommands());
     commands.add(ui::configCommands());
     commands.add(ui::promptCommands());
@@ -146,16 +193,27 @@ int main(int argc, char* argv[])
     }
     auto& window = *std::get<std::unique_ptr<ui::sdl::Window>>(opened);
 
-    // Until the event list (milestone 4), the test view.
-    ui::TestView view{commands, config.keymap};
-    if (auto error = apply(settings, window, view); !error.empty())
+    // The song: the file given, or else the demo song from the arrangement sketch, until
+    // there are file commands.
+    core::Document document{ui::demoSong()};
+    if (songFile)
+    {
+        if (auto error = open(document, *songFile); !error.empty())
+        {
+            std::fprintf(stderr, "%s\n", error.c_str());
+            message = message.empty() ? error : message + "; " + error;
+        }
+    }
+
+    ui::EventListView view{commands, document, config.keymap};
+    if (auto error = apply(settings, window, view, document); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());
         message = message.empty() ? error : message + "; " + error;
     }
     if (!message.empty())
     {
-        view.setMessage(message, ui::TestView::MessageKind::Warning);
+        view.setMessage(message, ui::EventListView::MessageKind::Warning);
     }
 
     // The window's commands (see windowCommands): the text size, for now.
@@ -169,7 +227,7 @@ int main(int argc, char* argv[])
                                            : configuredSize;
         size = std::clamp(size, setting->minimum, setting->maximum);
         settings.set("fontsize", ui::formatValue(size));
-        if (auto error = apply(settings, window, view); !error.empty())
+        if (auto error = apply(settings, window, view, document); !error.empty())
         {
             return ui::CommandResult::error(std::move(error));
         }
@@ -196,15 +254,15 @@ int main(int argc, char* argv[])
             view.setKeymap(config.keymap);
             auto message = result.message;
             bool warning = result.warning;
-            if (auto error = apply(settings, window, view); !error.empty())
+            if (auto error = apply(settings, window, view, document); !error.empty())
             {
                 message = error;
                 warning = true;
             }
             if (!message.empty())
             {
-                view.setMessage(message, warning ? ui::TestView::MessageKind::Warning
-                                                 : ui::TestView::MessageKind::Information);
+                view.setMessage(message, warning ? ui::EventListView::MessageKind::Warning
+                                                 : ui::EventListView::MessageKind::Information);
             }
         });
 

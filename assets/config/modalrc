@@ -11,15 +11,19 @@ nmap k          cursor-up         "Up"
 nmap <Up>       cursor-up         "Up"
 nmap l          cursor-right      "Right"
 nmap <Right>    cursor-right      "Right"
-nmap 0          cursor-first      "First column"
-nmap <Home>     cursor-first      "First column"
-nmap $          cursor-last       "Last column"
-nmap <End>      cursor-last       "Last column"
-nmap gg         go-first          "First row, or row {count}"
-nmap G          go-last           "Last row, or row {count}"
+nmap 0          cursor-first      "First field"
+nmap <Home>     cursor-first      "First field"
+nmap $          cursor-last       "Last field"
+nmap <End>      cursor-last       "Last field"
+nmap gg         go-first          "First event, or bar {count}"
+nmap G          go-last           "End, or bar {count}"
 
-" Scrolling and zooming. Ctrl with a direction moves the cursor and scrolls with it, so
-" it stays in place on screen, until the view can't scroll further.
+" Tracks: the conductor's list is track 0, before track 1
+nmap gt         track-next        "Next track, or track {count}"
+nmap gT         track-previous    "Track before"
+
+" Scrolling. Ctrl with a direction moves the cursor and scrolls with it, so it stays in
+" place on screen, until the view can't scroll further.
 nmap <C-h>      cursor-left-scroll  "Left, scrolling"
 nmap <C-Left>   cursor-left-scroll  "Left, scrolling"
 nmap <C-j>      cursor-down-scroll  "Down, scrolling"
@@ -34,11 +38,7 @@ nmap <C-f>      scroll-page-down  "A page down"
 nmap <PageDown> scroll-page-down  "A page down"
 nmap <C-b>      scroll-page-up    "A page up"
 nmap <PageUp>   scroll-page-up    "A page up"
-nmap z          scroll-centre     "Centre the view on the cursor"
-nmap zz         zoom-reset        "Default zoom"
-nmap +          zoom-in           "Zoom in"
-nmap =          zoom-in           "Zoom in"
-nmap -          zoom-out          "Zoom out"
+nmap zz         scroll-centre     "Centre the cursor"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
@@ -66,6 +66,4 @@ cmap <C-u>      command-line-clear      "Clear"
 cmap <Up>       command-line-older      "Older line"
 cmap <Down>     command-line-newer      "Newer line"
 
-" The test view, until the event list
-nmap <Tab>      test-next-page    "Next test page"
 nmap <Esc>      cancel            "Cancel"

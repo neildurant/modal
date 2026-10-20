@@ -1,14 +1,15 @@
 #pragma once
 
-#include <modal/ui/arrange_page.hpp>
+#include <modal/core/document.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
+#include <modal/ui/event_list.hpp>
 #include <modal/ui/frame.hpp>
-#include <modal/ui/grid_cursor.hpp>
 #include <modal/ui/key.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -19,12 +20,14 @@
 namespace modal::ui
 {
 
-// What the program shows until the event list arrives (milestone 4), to try out the grid
-// renderer: a large grid of labelled cells to move the cursor around, with headers that stay
-// put as it scrolls, under a demo of bar lines in two meters on one time scale; a sketch of
-// the arrangement, with a made-up song (see ArrangePage); and a page of samples of each
-// theme role and the characters the views use.
-class TestView
+// The event list (decided in milestone 4): one track's events at a time, with the
+// conductor's section starts, meter and tempo changes and markers among them, dimmed, and
+// the end of the song last; or the conductor's own list, track 0. A row for each event,
+// with its fields in columns under fixed headings; the cursor is on one field of one row.
+// A bar at the top names the track and the section the cursor is in, and the status line at
+// the bottom shows the mode, the cursor's position, keys waiting and messages, or the :
+// prompt.
+class EventListView
 {
 public:
     enum class MessageKind : std::uint8_t
@@ -33,33 +36,22 @@ public:
         Warning,     // in the warning colour
     };
 
-    enum class Page : std::uint8_t
-    {
-        Grid,
-        Arrange,
-        Samples,
-    };
-
-    static constexpr int kGridRows = 1000;
-    static constexpr int kGridColumns = 1000;
-    static constexpr int kCellColumns = 10;    // characters to a labelled cell
-    static constexpr int kRowLabelColumns = 5; // the row numbers down the left
-    static constexpr int kDemoRows = 6;        // the bar-line demo, above the grid
-
-    // The view's commands, until there's an editor with commands of its own.
+    // The view's commands.
     static std::span<const CommandInfo> commands();
 
     // The keymap of the built-in modalrc alone, whose bindings run the view's commands and
     // the window's (see windowCommands).
     static Keymap defaultKeymap();
 
-    // Gives the registry what runs the view's commands, which keys then run through it, with
-    // the registry's other commands, such as the window's. The registry outlives the view;
-    // the view can't be copied or moved, since the registry runs its commands on it.
-    explicit TestView(CommandRegistry& registry, Keymap keymap = defaultKeymap(),
-                      std::int64_t timeout = kDefaultTimeout);
-    TestView(const TestView&) = delete;
-    TestView& operator=(const TestView&) = delete;
+    // Shows the document's song, from track 1 (or the conductor's list, if there are no
+    // tracks). Gives the registry what runs the view's commands, which keys then run through
+    // it with the registry's others, such as the window's. The registry and the document
+    // outlive the view, which can't be copied or moved, since the registry runs its commands
+    // on it.
+    EventListView(CommandRegistry& registry, const core::Document& document,
+                  Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
+    EventListView(const EventListView&) = delete;
+    EventListView& operator=(const EventListView&) = delete;
 
     // Fits the view to the window, scrolling if the cursor would be out of it.
     void resize(int width, int height, CellSize cell);
@@ -77,21 +69,28 @@ public:
     // does, showing any message it gives.
     CommandResult run(std::string_view command, int count);
 
+    // Shows the document's song as it is now, as after a change, keeping the cursor at the
+    // same time on the same track if it's still there.
+    void refresh();
+
     // What runs a line entered at the : prompt, such as the program's command runner.
     using LineHandler = std::function<void(const std::string& line)>;
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
 
-    // Replaces the keymap, as when the config changes it.
     void setKeymap(Keymap keymap) { keymap_ = std::move(keymap); }
-
-    // How long to wait for a longer key binding, in milliseconds (timeoutlen).
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
+    void setLengthFormat(LengthFormat format);
 
     Frame frame() const;
 
-    Page page() const { return page_; }
-    const GridCursor& cursor() const { return cursor_; }
-    const ArrangePage& arrange() const { return arrange_; }
+    // The track shown: 0 for the conductor, then 1 for the first track.
+    std::size_t track() const { return track_; }
+    const EventList& list() const { return list_; }
+    std::size_t row() const { return row_; }
+    Column field() const; // the cursor's, on its row
+    std::size_t top() const { return top_; }
+    int viewRows() const; // rows of events fully shown
+
     Mode mode() const { return mode_; } // Normal, or CommandLine at the : prompt
     const CommandLine& commandLine() const { return line_; }
     std::string pending() const { return keys_.pending(); } // the count and keys typed so far
@@ -107,17 +106,27 @@ public:
 private:
     bool runAll(const std::vector<Action>& actions);
     std::optional<bool> runOwn(std::string_view command, int count);
-    Region demoRegion() const;
-    Region cellsRegion() const;
-    Region samplesRegion() const;
-    Region promptRegion() const;
     std::optional<bool> runCommandLine(std::string_view command);
+
+    // Shows a track's list, the cursor at or after a tick.
+    void showTrack(std::size_t track, core::Tick tick);
+    EventList listOf(std::size_t track) const;
+    void moveRows(std::int64_t by);
+    void moveFields(int by);
+    void follow();
+
+    Region listRegion() const;
+    Region promptRegion() const;
     void addBars(Frame& frame) const;
 
     CommandRegistry& commands_;
-    Page page_ = Page::Grid;
-    GridCursor cursor_;
-    ArrangePage arrange_;
+    const core::Document& document_;
+    LengthFormat lengths_ = LengthFormat::Note;
+    std::size_t track_ = 0;
+    EventList list_;
+    std::size_t row_ = 0;
+    Column wanted_ = Column::Position; // the field the cursor keeps to, as rows change
+    std::size_t top_ = 0;
     Keymap keymap_;
     KeyDispatcher keys_;
     std::string message_;

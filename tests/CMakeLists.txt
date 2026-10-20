@@ -48,7 +48,7 @@ add_executable(modal_tests
     ui/layout_test.cpp
     ui/prompt_test.cpp
     ui/settings_test.cpp
-    ui/test_view_test.cpp
+    ui/event_list_view_test.cpp
     ui/window_test.cpp
 )
 

@@ -19,7 +19,7 @@ add_library(modal_ui STATIC
     prompt.cpp
     settings.cpp
     style.cpp
-    test_view.cpp
+    event_list_view.cpp
     themes.cpp
     window_commands.cpp
 )
