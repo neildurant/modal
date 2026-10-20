@@ -260,6 +260,17 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
     first->meter_ = meterBetween(old.meter_, 0, at);
     Split split{index + 1, cutAt(first->meter_, at), {}};
 
+    // The new section starts a new bar, so the rest of the old one may no longer be whole
+    // bars: the last section grows to the next bar line, and any other ends in a remainder.
+    if (index + 1 == sections_.size())
+    {
+        second->length_ = barLineAtOrAfter(second->meter_, second->length_);
+    }
+    else
+    {
+        cutAt(second->meter_, second->length_);
+    }
+
     std::erase_if(first->tempo_, [at](const auto& change) { return change.tick >= at; });
     for (const auto& change : old.tempo_)
     {

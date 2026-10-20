@@ -150,8 +150,10 @@ public:
 
     // Starts a new section at the tick, which must be inside a section and not at its start,
     // taking the rest of that section. A bar the tick falls inside becomes a remainder bar in
-    // the earlier section, and the new section starts a new bar in the same meter. The name is
-    // numbered if another section has it. Returns nothing if the tick isn't inside a section.
+    // the earlier section, and the new section starts a new bar in the same meter; so its end
+    // too may become a remainder bar, or if it's the last section, grow to the next bar line.
+    // The name is numbered if another section has it. Returns nothing if the tick isn't
+    // inside a section.
     std::optional<Split> splitSection(Tick tick, std::string name);
 
     // Renames a section, numbering the name if another section has it. Returns false if

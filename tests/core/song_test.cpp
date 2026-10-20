@@ -313,6 +313,10 @@ TEST_CASE("splitting a section")
         CHECK(changesOf(song.sections()[0]->meter()) ==
               std::vector<MeterChange>{{0, {4, 4}}, {4 * bar, {2, 4}}});
         CHECK(song.meter().barStart(6) == 4 * bar + 2 * q);
+
+        // The rest, three and a half bars, grows to four, since it's the last section.
+        CHECK(song.sections()[1]->length() == 4 * bar);
+        CHECK(song.end() == 8 * bar + 2 * q);
     }
 
     SECTION("names are numbered if taken")
