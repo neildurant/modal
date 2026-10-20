@@ -98,6 +98,35 @@ const TrackContent* Section::content(TrackId id) const
     return it == content_.end() ? nullptr : it->second.get();
 }
 
+void Section::addTempo(TempoChange change)
+{
+    assert(change.tick >= 0 && change.tick < length_);
+    if (change.tick == 0)
+    {
+        tempo_.front() = change;
+        return;
+    }
+    assert(change.tick > tempo_.back().tick);
+    tempo_.push_back(change);
+}
+
+void Section::addMarker(Marker marker)
+{
+    assert(marker.tick >= 0 && marker.tick < length_);
+    assert(markers_.empty() || marker.tick > markers_.back().tick);
+    markers_.push_back(std::move(marker));
+}
+
+void Section::setContent(TrackId id, TrackContent content)
+{
+    if (!content.meter && content.events.empty())
+    {
+        content_.erase(id);
+        return;
+    }
+    content_[id] = std::make_shared<const TrackContent>(std::move(content));
+}
+
 bool operator==(const Section& a, const Section& b)
 {
     const auto sameContent = [](const auto& x, const auto& y)
@@ -115,6 +144,32 @@ Song::Song(Ppqn ppqn)
     sections_.push_back(
         std::make_shared<Section>("Song", meter.barStart(kNewSongBars + 1), meter, kDefaultTempo));
     rebuildConductor();
+}
+
+Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
+    : tempo_(ppqn)
+    , meter_(ppqn)
+{
+    assert(!sections.empty());
+    for (auto& track : tracks)
+    {
+        nextTrackId_ = std::max(nextTrackId_, track.id().value + 1);
+        tracks_.push_back(std::make_shared<const Track>(std::move(track)));
+    }
+    for (auto& section : sections)
+    {
+        assert(section.meter_.ppqn() == ppqn);
+        sections_.push_back(std::make_shared<const Section>(std::move(section)));
+    }
+    rebuildAll();
+}
+
+bool operator==(const Song& a, const Song& b)
+{
+    const auto same = [](const auto& x, const auto& y) { return x == y || *x == *y; };
+    return a.ppqn() == b.ppqn() && a.title == b.title && a.metronome == b.metronome &&
+           a.countIn == b.countIn && std::ranges::equal(a.tracks_, b.tracks_, same) &&
+           std::ranges::equal(a.sections_, b.sections_, same);
 }
 
 const Track* Song::track(TrackId id) const
@@ -557,6 +612,36 @@ void Song::rebuildConductor()
         start += section->length_;
     }
     starts_.push_back(start);
+}
+
+void Song::rebuildEvents(std::size_t trackIndex)
+{
+    const auto id = tracks_[trackIndex]->id();
+    auto events = std::make_shared<EventList>();
+    for (std::size_t s = 0; s < sections_.size(); ++s)
+    {
+        if (const auto* content = sections_[s]->content(id))
+        {
+            for (auto event : content->events.all())
+            {
+                event.tick += starts_[s];
+                events->insert(std::move(event));
+            }
+        }
+    }
+    flattened_[trackIndex].events = std::move(events);
+}
+
+void Song::rebuildAll()
+{
+    rebuildConductor();
+    flattened_.clear();
+    for (std::size_t i = 0; i < tracks_.size(); ++i)
+    {
+        flattened_.push_back({meter_, nullptr});
+        rebuildEvents(i);
+    }
+    rebuildMeters();
 }
 
 void Song::rebuildMeters()

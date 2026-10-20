@@ -400,3 +400,43 @@ TEST_CASE("editing a track's settings and events together")
     CHECK(song.track(piano)->mute);
     CHECK(song.events(piano).size() == 1);
 }
+
+TEST_CASE("a song made from its parts")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick bar = ppqn.whole();
+
+    Track bass{TrackId{3}};
+    bass.name = "Bass";
+    EventList events;
+    events.insert({0, Note{40, 100, q}});
+
+    Section intro{"Intro", 2 * bar, MeterMap{ppqn}, kDefaultTempo};
+    intro.addTempo({bar, Tempo{400'000}});
+    intro.addMarker({bar, "fill"});
+    intro.setContent(TrackId{3}, {std::nullopt, events});
+    Section verse{"Verse", 6 * q, MeterMap{ppqn, {3, 4}}, Tempo{400'000}};
+    verse.setColour("blue");
+    verse.setContent(TrackId{3}, {std::nullopt, events});
+
+    const Song song{ppqn, {bass}, {intro, verse}};
+    REQUIRE(song.tracks().size() == 1);
+    CHECK(song.tracks()[0]->name == "Bass");
+    CHECK(song.sectionStart(1) == 2 * bar);
+    CHECK(song.end() == 2 * bar + 6 * q);
+    CHECK(song.sections()[1]->colour() == "blue");
+    CHECK(ticksOf(song.events(TrackId{3})) == std::vector<Tick>{0, 2 * bar});
+    CHECK(song.tempo().changes().size() == 2); // the verse's tempo repeats the one before
+    CHECK(song.markers()[0] == Marker{bar, "fill"});
+    CHECK(song.meter(TrackId{3}).signatureAt(2 * bar) == TimeSignature{3, 4});
+
+    // Equal to a copy until one changes; new tracks get IDs after the highest.
+    Song copy = song;
+    CHECK(copy == song);
+    CHECK(copy.addTrack("Keys") == TrackId{4});
+    CHECK(copy != song);
+    copy = song;
+    copy.renameSection(1, "Chorus");
+    CHECK(copy != song);
+}

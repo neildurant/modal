@@ -62,6 +62,13 @@ public:
     // A track's content here, or null if it has no events and follows the conductor.
     const TrackContent* content(TrackId id) const;
 
+    // For building a section to make a song from, as reading a file does. A section in a
+    // song can't be changed this way, since the song gives out only const sections.
+    void setColour(std::optional<std::string> colour) { colour_ = std::move(colour); }
+    void addTempo(TempoChange change); // after the others; at 0, replaces the first
+    void addMarker(Marker marker);     // after the others
+    void setContent(TrackId id, TrackContent content);
+
     friend bool operator==(const Section& a, const Section& b);
 
 private:
@@ -92,6 +99,12 @@ public:
 
     // A song of one section, "Song", eight bars of 4/4 at 120 BPM.
     explicit Song(Ppqn ppqn = kPpqn);
+
+    // A song made from its parts, as reading a file does: its tracks in display order, and at
+    // least one section, whose content is for those tracks, in order. The parts must fit
+    // together: each section's conductor meter a whole number of bars, and its tempo changes,
+    // markers and events inside it.
+    Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections);
 
     Ppqn ppqn() const { return tempo_.ppqn(); }
 
@@ -177,6 +190,9 @@ public:
     void setMarker(Tick tick, std::string name);
     bool removeMarker(Tick tick);
 
+    // Whether two songs have the same settings, tracks and sections.
+    friend bool operator==(const Song& a, const Song& b);
+
 private:
     struct Flattened
     {
@@ -197,8 +213,8 @@ private:
     void updateContent(std::size_t index, TrackId id,
                        const std::function<void(TrackContent&)>& edit);
 
-    // Rebuilds the flattened timeline: the conductor's (with the section starts and markers)
-    // and the tracks' meters, and the events of one track or of all.
+    // Rebuilds the flattened timeline: the conductor's (with the section starts and markers),
+    // the tracks' meters, one track's events, or all of it.
     void rebuildConductor();
     void rebuildMeters();
     void rebuildEvents(std::size_t trackIndex);
