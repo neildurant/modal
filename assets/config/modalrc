@@ -34,6 +34,16 @@ nmap [s         cursor-section-previous   "Section before"
 nmap ]m         cursor-marker-next        "Next marker"
 nmap [m         cursor-marker-previous    "Marker before"
 
+" Changing events: d and y take a motion (d} up to where } goes, dj this event and the next),
+" or dd and yy this event; x deletes it, p puts what was yanked or deleted at the cursor's
+" time, and u and Ctrl-R undo and redo
+nmap d          operator-delete   "Delete"
+nmap y          operator-yank     "Yank"
+nmap x          event-delete      "Delete this event"
+nmap p          register-put      "Put"
+nmap u          undo              "Undo"
+nmap <C-r>      redo              "Redo"
+
 " Tracks: the conductor's list is track 0, before track 1
 nmap gt         track-next        "Next track, or track {count}"
 nmap gT         track-previous    "Track before"

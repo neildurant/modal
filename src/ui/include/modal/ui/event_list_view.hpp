@@ -49,7 +49,7 @@ public:
     // it with the registry's others, such as the window's. The registry and the document
     // outlive the view, which can't be copied or moved, since the registry runs its commands
     // on it.
-    EventListView(CommandRegistry& registry, const core::Document& document,
+    EventListView(CommandRegistry& registry, core::Document& document,
                   Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
     EventListView(const EventListView&) = delete;
     EventListView& operator=(const EventListView&) = delete;
@@ -78,7 +78,7 @@ public:
     using LineHandler = std::function<void(const std::string& line)>;
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
 
-    void setKeymap(Keymap keymap) { keymap_ = std::move(keymap); }
+    void setKeymap(Keymap keymap);
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
 
     // How far apart events can start and still be one chord, for ( and ) (chordwindow).
@@ -94,9 +94,13 @@ public:
     std::size_t top() const { return top_; }
     int viewRows() const; // rows of events fully shown
 
-    Mode mode() const { return mode_; } // Normal, or CommandLine at the : prompt
+    // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the : prompt.
+    Mode mode() const { return mode_; }
     const CommandLine& commandLine() const { return line_; }
-    std::string pending() const { return keys_.pending(); } // the count and keys typed so far
+    std::string pending() const; // the operator, count and keys typed so far
+
+    // What the unnamed register holds: events yanked or deleted, their ticks from the first's.
+    const std::vector<core::Event>& registerEvents() const { return register_; }
 
     // Shows a message in the status line until the next key.
     void setMessage(std::string message, MessageKind kind)
@@ -124,6 +128,24 @@ private:
     // The rows starting chords: events starting together, within the chord window of the
     // first of them; in the conductor's list, its rows.
     std::vector<std::size_t> chordStarts() const;
+
+    // The keymap in operator-pending mode: the Normal mode's motions, the operator's own keys
+    // again for the event under the cursor (dd), and Escape, unless omap binds those keys.
+    void buildOperatorKeymap();
+
+    // Runs a motion or the operator's own key after an operator, then the operator on the
+    // rows from the cursor's to where the motion goes.
+    std::optional<bool> runOperator(std::string_view command, int count);
+
+    // Deletes or yanks the track's own events among some rows, which may be in either order.
+    bool operate(std::string_view op, std::size_t from, std::size_t to);
+    bool put();
+    bool undoOrRedo(bool undo);
+
+    // Changes the song as one undo step, made where the cursor is, and shows the change.
+    bool edit(std::string title, const std::function<void(core::Song&)>& change);
+    core::EditPlace place() const;
+    std::string trackName() const;
     void moveFields(int by);
     void follow();
 
@@ -132,7 +154,7 @@ private:
     void addBars(Frame& frame) const;
 
     CommandRegistry& commands_;
-    const core::Document& document_;
+    core::Document& document_;
     std::size_t track_ = 0;
     EventList list_;
     std::size_t row_ = 0;
@@ -141,7 +163,15 @@ private:
     std::chrono::milliseconds chordWindow_{30};
     std::size_t top_ = 0;
     Keymap keymap_;
+    Keymap operatorKeymap_;
     KeyDispatcher keys_;
+    struct PendingOperator
+    {
+        std::string name; // operator-delete or operator-yank
+        int count;
+    };
+    std::optional<PendingOperator> operator_;
+    std::vector<core::Event> register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;
     LineHandler lineHandler_;

@@ -246,7 +246,7 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
     std::string base = path != nullptr ? path : "sample.bmp";
     base = base.substr(0, base.rfind('.'));
 
-    const modal::core::Document document{demoSong()};
+    modal::core::Document document{demoSong()};
     CommandRegistry registry;
     EventListView view{registry, document};
     view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());

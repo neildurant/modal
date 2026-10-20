@@ -55,6 +55,12 @@ constexpr CommandInfo counted(std::string_view name, std::string_view descriptio
     return {.name = name, .description = description, .count = true};
 }
 
+// A motion, which also takes a count.
+constexpr CommandInfo motion(std::string_view name, std::string_view description)
+{
+    return {.name = name, .description = description, .count = true, .motion = true};
+}
+
 constexpr CommandInfo atPrompt(std::string_view name, std::string_view description)
 {
     return {.name = name, .description = description, .modes = modeBit(Mode::CommandLine)};
@@ -63,24 +69,24 @@ constexpr CommandInfo atPrompt(std::string_view name, std::string_view descripti
 constexpr std::array kCommands{
     counted("cursor-left", "Move to the field before"),
     counted("cursor-right", "Move to the next field"),
-    counted("cursor-down", "Move down an event"),
-    counted("cursor-up", "Move up an event"),
+    motion("cursor-down", "Move down an event"),
+    motion("cursor-up", "Move up an event"),
     CommandInfo{.name = "cursor-first", .description = "Move to the first field"},
     CommandInfo{.name = "cursor-last", .description = "Move to the last field"},
-    counted("cursor-beat-next", "Move to the event at or after the next beat"),
-    counted("cursor-beat-previous", "Move to the event at or after the beat before"),
-    counted("cursor-bar-next", "Move to the event at or after the same place a bar on"),
-    counted("cursor-bar-previous", "Move to the event at or after the same place a bar back"),
-    counted("cursor-bar-line-next", "Move to the event at or after the next bar line"),
-    counted("cursor-bar-line-previous", "Move to the event at or after the bar line before"),
-    counted("cursor-chord-next", "Move to the next chord, or event"),
-    counted("cursor-chord-previous", "Move to the chord, or event, before"),
-    counted("cursor-section-next", "Move to the next section's start"),
-    counted("cursor-section-previous", "Move to the section's start, or the one before"),
-    counted("cursor-marker-next", "Move to the next marker"),
-    counted("cursor-marker-previous", "Move to the marker before"),
-    counted("go-first", "Go to the first event, or bar {count}"),
-    counted("go-last", "Go to the end, or bar {count}"),
+    motion("cursor-beat-next", "Move to the event at or after the next beat"),
+    motion("cursor-beat-previous", "Move to the event at or after the beat before"),
+    motion("cursor-bar-next", "Move to the event at or after the same place a bar on"),
+    motion("cursor-bar-previous", "Move to the event at or after the same place a bar back"),
+    motion("cursor-bar-line-next", "Move to the event at or after the next bar line"),
+    motion("cursor-bar-line-previous", "Move to the event at or after the bar line before"),
+    motion("cursor-chord-next", "Move to the next chord, or event"),
+    motion("cursor-chord-previous", "Move to the chord, or event, before"),
+    motion("cursor-section-next", "Move to the next section's start"),
+    motion("cursor-section-previous", "Move to the section's start, or the one before"),
+    motion("cursor-marker-next", "Move to the next marker"),
+    motion("cursor-marker-previous", "Move to the marker before"),
+    motion("go-first", "Go to the first event, or bar {count}"),
+    motion("go-last", "Go to the end, or bar {count}"),
     counted("cursor-left-scroll", "Move to the field before"),
     counted("cursor-right-scroll", "Move to the next field"),
     counted("cursor-down-scroll", "Move down, scrolling to keep the cursor in place"),
@@ -92,6 +98,17 @@ constexpr std::array kCommands{
     CommandInfo{.name = "scroll-centre", .description = "Scroll the cursor to the middle"},
     counted("track-next", "Show the next track's list, or track {count}'s"),
     counted("track-previous", "Show the track's list before, {count} tracks back"),
+    counted("operator-delete", "Delete the events a motion goes over (d}), or dd this event"),
+    counted("operator-yank", "Yank the events a motion goes over (y}), or yy this event"),
+    CommandInfo{.name = "operator-line",
+                .description = "After an operator, this event, or {count} events from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true},
+    counted("event-delete", "Delete this event, or {count} events from it"),
+    CommandInfo{.name = "register-put",
+                .description = "Put the yanked or deleted events, the first at the cursor's time"},
+    counted("undo", "Undo the last change, or {count} changes"),
+    counted("redo", "Redo the change undone last, or {count} changes"),
     CommandInfo{.name = "cancel", .description = "Cancel"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
     atPrompt("command-line-run", "Run the command line"),
@@ -148,8 +165,8 @@ Keymap EventListView::defaultKeymap()
     return config.keymap;
 }
 
-EventListView::EventListView(CommandRegistry& registry, const core::Document& document,
-                             Keymap keymap, std::int64_t timeout)
+EventListView::EventListView(CommandRegistry& registry, core::Document& document, Keymap keymap,
+                             std::int64_t timeout)
     : commands_(registry)
     , document_(document)
     , track_(document.song().tracks().empty() ? 0 : 1)
@@ -162,6 +179,41 @@ EventListView::EventListView(CommandRegistry& registry, const core::Document& do
         registry.add(info, [this, name = info.name](const CommandCall& call)
                      { return CommandResult{runOwn(name, call.count).value_or(false)}; });
     }
+    buildOperatorKeymap();
+}
+
+void EventListView::setKeymap(Keymap keymap)
+{
+    keymap_ = std::move(keymap);
+    buildOperatorKeymap();
+}
+
+void EventListView::buildOperatorKeymap()
+{
+    operatorKeymap_ = keymap_;
+    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+    {
+        const auto* info = commands_.find(binding.command);
+        const bool again =
+            binding.command == "operator-delete" || binding.command == "operator-yank";
+        const bool wanted = again || binding.command == "cancel" || (info && info->motion);
+        if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
+        {
+            operatorKeymap_.bind(Mode::OperatorPending, keys,
+                                 again ? Binding{"operator-line", binding.hint} : binding);
+        }
+    }
+}
+
+std::string EventListView::pending() const
+{
+    std::string text;
+    if (operator_)
+    {
+        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
+               (operator_->name == "operator-delete" ? "d" : "y");
+    }
+    return text + keys_.pending();
 }
 
 void EventListView::resize(int width, int height, CellSize cell)
@@ -239,15 +291,24 @@ bool EventListView::handle(const Key& key, std::int64_t now)
             return true;
         }
     }
-    const auto before = keys_.pending();
-    const bool changed = runAll(keys_.key(keymap_, mode_, key, now));
-    return changed || hadMessage || keys_.pending() != before;
+    const auto before = pending();
+    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const auto actions = keys_.key(keymap, mode_, key, now);
+    const bool changed = runAll(actions);
+    // Keys after an operator that are no motion give the operator up, as in Vim.
+    if (mode_ == Mode::OperatorPending && actions.empty() && keys_.pending().empty())
+    {
+        operator_.reset();
+        mode_ = Mode::Normal;
+    }
+    return changed || hadMessage || pending() != before;
 }
 
 bool EventListView::wake(std::int64_t now)
 {
     const auto before = keys_.pending();
-    const bool changed = runAll(keys_.timeout(keymap_, now));
+    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const bool changed = runAll(keys_.timeout(keymap, now));
     return changed || keys_.pending() != before;
 }
 
@@ -343,6 +404,10 @@ std::vector<std::size_t> EventListView::chordStarts() const
 
 std::optional<bool> EventListView::runOwn(std::string_view command, int count)
 {
+    if (mode_ == Mode::OperatorPending)
+    {
+        return runOperator(command, count);
+    }
     const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous";
     if (!keepsBarOffset)
     {
@@ -515,6 +580,29 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
         showTrack(static_cast<std::size_t>(to), list_.rows()[row_].tick);
         return true;
     }
+    else if (command == "operator-delete" || command == "operator-yank")
+    {
+        operator_ = PendingOperator{std::string{command}, count};
+        mode_ = Mode::OperatorPending;
+        return true;
+    }
+    else if (command == "event-delete")
+    {
+        return operate("operator-delete", row_, row_ + static_cast<std::size_t>(n) - 1);
+    }
+    else if (command == "register-put")
+    {
+        return put();
+    }
+    else if (command == "undo" || command == "redo")
+    {
+        bool changed = false;
+        for (int i = 0; i < n; ++i)
+        {
+            changed = undoOrRedo(command == "undo") || changed;
+        }
+        return changed;
+    }
     else if (command == "cancel")
     {
         return false;
@@ -531,6 +619,200 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     }
     follow();
     return true;
+}
+
+std::optional<bool> EventListView::runOperator(std::string_view command, int count)
+{
+    const auto op = *operator_;
+    operator_.reset();
+    mode_ = Mode::Normal;
+    if (command == "cancel")
+    {
+        return true;
+    }
+    // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
+    const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
+    if (command == "operator-line")
+    {
+        return operate(op.name, row_, row_ + static_cast<std::size_t>(std::max(total, 1)) - 1);
+    }
+    const auto* info = commands_.find(command);
+    if (info == nullptr || !info->motion)
+    {
+        return false;
+    }
+    const auto from = row_;
+    runOwn(command, total);
+    const auto to = row_;
+    row_ = from;
+    // Moving between rows takes them all, the one landed on too, as Vim's line motions do;
+    // the others stop before the row they land on.
+    const bool whole = command == "cursor-down" || command == "cursor-up" ||
+                       command == "go-first" || command == "go-last";
+    if (whole)
+    {
+        return operate(op.name, from, to);
+    }
+    if (to == from)
+    {
+        return false;
+    }
+    return to > from ? operate(op.name, from, to - 1) : operate(op.name, to, from - 1);
+}
+
+bool EventListView::operate(std::string_view op, std::size_t from, std::size_t to)
+{
+    if (track_ == 0)
+    {
+        setMessage("the conductor's list can't be edited yet", MessageKind::Warning);
+        return true;
+    }
+    if (from > to)
+    {
+        std::swap(from, to);
+    }
+    to = std::min(to, list_.rows().size() - 1);
+    // The track's own events among the rows; the conductor's rows and the end aren't touched.
+    std::vector<std::size_t> indices;
+    for (auto r = from; r <= to; ++r)
+    {
+        if (list_.rows()[r].kind == RowKind::Event)
+        {
+            indices.push_back(list_.rows()[r].index);
+        }
+    }
+    if (indices.empty())
+    {
+        return false;
+    }
+    const auto id = *list_.track();
+    const auto& events = document_.song().events(id);
+    const auto first = events[indices.front()].tick;
+    register_.clear();
+    for (const auto i : indices)
+    {
+        auto event = events[i];
+        event.tick -= first;
+        register_.push_back(std::move(event));
+    }
+    const auto what =
+        indices.size() == 1 ? std::string{"1 event"} : std::to_string(indices.size()) + " events";
+    if (op == "operator-yank")
+    {
+        setMessage(what + " yanked", MessageKind::Information);
+        return true;
+    }
+    edit("Delete " + what + " in " + trackName(),
+         [&](core::Song& song)
+         {
+             song.updateEvents(id,
+                               [&](core::EventList& list)
+                               {
+                                   for (auto it = indices.rbegin(); it != indices.rend(); ++it)
+                                   {
+                                       list.erase(*it);
+                                   }
+                               });
+         });
+    // On what followed, as in Vim.
+    row_ = std::min(from, list_.rows().size() - 1);
+    follow();
+    return true;
+}
+
+bool EventListView::put()
+{
+    if (track_ == 0)
+    {
+        setMessage("the conductor's list can't be edited yet", MessageKind::Warning);
+        return true;
+    }
+    if (register_.empty())
+    {
+        setMessage("nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    const auto at = list_.rows()[row_].tick;
+    auto added = register_;
+    for (auto& event : added)
+    {
+        event.tick += at;
+    }
+    const auto what =
+        added.size() == 1 ? std::string{"1 event"} : std::to_string(added.size()) + " events";
+    const auto id = *list_.track();
+    edit("Put " + what + " in " + trackName(),
+         [&](core::Song& song)
+         {
+             song.updateEvents(id, [&](core::EventList& events)
+                               { events = core::merged(events, added); });
+         });
+    return true;
+}
+
+bool EventListView::undoOrRedo(bool undo)
+{
+    const auto step = undo ? document_.undo() : document_.redo();
+    if (!step)
+    {
+        setMessage(undo ? "nothing to undo" : "nothing to redo", MessageKind::Information);
+        return true;
+    }
+    // Back where the change was made: its track, time and scroll.
+    const auto tracks = document_.song().tracks();
+    if (!step->place.track)
+    {
+        track_ = 0;
+    }
+    else
+    {
+        const auto it = std::ranges::find_if(tracks, [&](const auto& track)
+                                             { return track->id() == *step->place.track; });
+        track_ = it != tracks.end() ? static_cast<std::size_t>(it - tracks.begin()) + 1
+                                    : std::min(track_, tracks.size());
+    }
+    list_ = listOf(track_);
+    row_ = list_.rowAt(step->place.tick);
+    const auto& view = step->place.view;
+    if (view.size() == 2)
+    {
+        top_ = static_cast<std::size_t>(std::max<std::int64_t>(view[0], 0));
+        const auto rows = list_.rows();
+        for (std::int64_t i = 0;
+             i < view[1] && row_ + 1 < rows.size() && rows[row_ + 1].tick == step->place.tick; ++i)
+        {
+            ++row_;
+        }
+    }
+    follow();
+    setMessage((undo ? "Undid: " : "Redid: ") + step->title, MessageKind::Information);
+    return true;
+}
+
+bool EventListView::edit(std::string title, const std::function<void(core::Song&)>& change)
+{
+    const bool changed = document_.edit(std::move(title), place(), change);
+    refresh();
+    return changed;
+}
+
+core::EditPlace EventListView::place() const
+{
+    // The view's state: the top row, and how far down the rows at the cursor's time it is.
+    const auto tick = list_.rows()[row_].tick;
+    return {list_.track(),
+            tick,
+            {static_cast<std::int64_t>(top_), static_cast<std::int64_t>(row_ - list_.rowAt(tick))}};
+}
+
+std::string EventListView::trackName() const
+{
+    if (track_ == 0)
+    {
+        return "the conductor";
+    }
+    const auto& name = document_.song().tracks()[track_ - 1]->name;
+    return name.empty() ? "track " + std::to_string(track_) : name;
 }
 
 std::optional<bool> EventListView::runCommandLine(std::string_view command)

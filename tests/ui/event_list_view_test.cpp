@@ -267,6 +267,117 @@ TEST_CASE("section and marker motions go to their rows")
     CHECK(v.view.row() == 6); // none after: it stays
 }
 
+TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back where it was")
+{
+    // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
+    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    View v;
+    const auto events = [&]
+    { return v.document.song().events(v.document.song().tracks()[0]->id()); };
+    REQUIRE(events().size() == 4);
+
+    type(v.view, U"4jdd"); // the note at 1:1:000
+    CHECK(events().size() == 3);
+    CHECK(v.view.row() == 4); // on what followed, the cc
+    CHECK(v.view.registerEvents().size() == 1);
+    CHECK(v.document.modified());
+
+    type(v.view, U"G");
+    type(v.view, U"u");
+    CHECK(events().size() == 4);
+    CHECK(v.view.row() == 4); // back on the note, though the section is first at its time
+    CHECK(v.view.message() == "Undid: Delete 1 event in Bass");
+    CHECK_FALSE(v.document.modified());
+    v.view.handle(Key::typed(U'r', kCtrl), 0);
+    CHECK(events().size() == 3);
+    CHECK(v.view.message() == "Redid: Delete 1 event in Bass");
+    type(v.view, U"uu");
+    CHECK(v.view.message() == "nothing to undo");
+
+    type(v.view, U"gg3j2x"); // the program and the note
+    CHECK(events().size() == 2);
+    type(v.view, U"u");
+
+    // On a row that isn't the track's, there's nothing to delete.
+    type(v.view, U"ggdd");
+    CHECK(events().size() == 4);
+    CHECK_FALSE(v.document.modified());
+}
+
+TEST_CASE("d and y take a motion: whole rows for j, k, gg and G, up to the row for the others")
+{
+    View v;
+    const auto events = [&]
+    { return v.document.song().events(v.document.song().tracks()[0]->id()); };
+
+    type(v.view, U"3jdj"); // the program and the note
+    CHECK(events().size() == 2);
+    type(v.view, U"u");
+
+    type(v.view, U"gg4jd}"); // from the note up to the verse's section row: the note and the cc
+    CHECK(events().size() == 2);
+    CHECK(events()[0].tick == 0); // the program is left
+    type(v.view, U"u");
+
+    type(v.view, U"Gkd{"); // back from the verse's note to 1:1:000: every event before it
+    CHECK(events().size() == 1);
+    CHECK(events()[0].tick == 4 * q);
+    type(v.view, U"u");
+
+    // Counts before and after the operator multiply: 2d2j from the program takes 5 rows.
+    type(v.view, U"gg3j2d2j");
+    CHECK(events().size() == 1);
+    type(v.view, U"u");
+
+    type(v.view, U"gg4jy}");
+    CHECK(v.view.message() == "2 events yanked");
+    CHECK(events().size() == 4);
+    CHECK(v.view.registerEvents().size() == 2);
+    CHECK(v.view.registerEvents()[1].tick == q + 240);
+}
+
+TEST_CASE("p puts the events at the cursor's time, never overlapping notes")
+{
+    View v;
+    const auto events = [&]
+    { return v.document.song().events(v.document.song().tracks()[0]->id()); };
+    type(v.view, U"p");
+    CHECK(v.view.message() == "nothing yanked or deleted to put");
+
+    type(v.view, U"4jyy"); // the E1 at 1:1:000
+    type(v.view, U"4jp");  // at 2:1:000, beside the F1 there
+    CHECK(events().size() == 5);
+    CHECK(events()[4].tick == 4 * q);
+    CHECK(std::get<core::Note>(events()[4].data).pitch == 28);
+
+    // The F1 put where an F1 starts replaces it, rather than doubling it.
+    type(v.view, U"u");
+    type(v.view, U"Gkyyp");
+    CHECK(events().size() == 4);
+}
+
+TEST_CASE("an operator waits for its motion, and Escape or another key gives it up")
+{
+    View v;
+    type(v.view, U"2d3");
+    CHECK(v.view.mode() == Mode::OperatorPending);
+    CHECK(v.view.pending() == "2d3");
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.view.mode() == Mode::Normal);
+    CHECK(v.view.pending().empty());
+    type(v.view, U"dQ"); // no motion
+    CHECK(v.view.mode() == Mode::Normal);
+    CHECK(v.document.song().events(v.document.song().tracks()[0]->id()).size() == 4);
+}
+
+TEST_CASE("the conductor's list can't be edited yet")
+{
+    View v;
+    type(v.view, U"gTdd");
+    CHECK(v.view.message() == "the conductor's list can't be edited yet");
+    CHECK_FALSE(v.document.modified());
+}
+
 TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping the time")
 {
     View v;
