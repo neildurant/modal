@@ -1,3 +1,4 @@
+#include <modal/core/document.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
 
@@ -40,6 +41,38 @@ Setting setting(std::string_view name, std::string_view description, SettingValu
     return {name, description, value, value, minimum, maximum};
 }
 
+// A setting that's one of a few words, the first the default.
+Setting choice(std::string_view name, std::string_view description, std::string_view choices)
+{
+    const auto first = std::string{choices.substr(0, choices.find(' '))};
+    return {name, description, first, first, 0, 0, choices};
+}
+
+std::vector<std::string_view> words(std::string_view text)
+{
+    std::vector<std::string_view> result;
+    while (!text.empty())
+    {
+        const auto space = text.find(' ');
+        result.push_back(text.substr(0, space));
+        text.remove_prefix(space == std::string_view::npos ? text.size() : space + 1);
+    }
+    return result;
+}
+
+// The choices as words: "note or beats", "a, b or c".
+std::string choiceList(std::string_view choices)
+{
+    const auto all = words(choices);
+    std::string list;
+    for (std::size_t i = 0; i < all.size(); ++i)
+    {
+        list += i == 0 ? "" : i + 1 == all.size() ? " or " : ", ";
+        list += all[i];
+    }
+    return list;
+}
+
 } // namespace
 
 std::string formatValue(const SettingValue& value)
@@ -77,6 +110,12 @@ Settings::Settings()
                   "How long to wait, in milliseconds, after keys that are a binding and also "
                   "start a longer one, before running the shorter",
                   kDefaultTimeout, 0, 10000),
+          choice("lenformat",
+                 "How note lengths show: note, as a note value with ticks over or under, such "
+                 "as 1/8 + 12; or beats, as bars, beats and ticks, such as 0:1:252",
+                 "note beats"),
+          setting("undolevels", "How many changes can be undone",
+                  std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
       }
 {
 }
@@ -136,6 +175,11 @@ std::string Settings::set(std::string_view name, std::string_view text)
     }
     else
     {
+        const auto choices = words(setting->choices);
+        if (!choices.empty() && std::ranges::find(choices, text) == choices.end())
+        {
+            return std::string{name} + " must be " + choiceList(setting->choices);
+        }
         setting->value = std::string{text};
     }
     return {};

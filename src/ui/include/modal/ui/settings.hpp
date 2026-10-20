@@ -34,6 +34,8 @@ struct Setting
     // The range of a number, or of each side of a size in cells.
     double minimum = 0;
     double maximum = 0;
+    // The values text may have, separated by spaces, or empty for any.
+    std::string_view choices = {};
 };
 
 // Every setting there is, each with its name, type, default and description, and its value.
