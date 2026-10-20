@@ -21,21 +21,30 @@ constexpr Style kHeading{Role::BarText, Role::Bar, kPlain};
 constexpr Style kCursor{Role::CursorText, Role::Cursor, kPlain};
 constexpr Style kBarText{Role::BarText, Role::Bar, kPlain};
 
-// The columns' headings and widths in cells, with a space after each.
+// The columns' headings and widths in cells, with two spaces after each, and whether
+// they're right-justified, as numbers are.
 struct ColumnInfo
 {
     const char* heading;
     int width;
+    bool right;
 };
 
 constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
-    {"Position", 0}, // as wide as the song's positions need
-    {"Event", 14},
-    {"Data", 20},
-    {"Value", 7},
-    {"Length", 14},
-    {"Release", 8},
-}};
+    {"Position", 0, false}, // as wide as the song's positions need
+    {"Event", 13, false},
+    {"Data", 18, false},
+    {"Vel/Value", 11, true},
+    {"Length", 19, false},
+    {"Release", 9, true},
+}}; // all within the smallest window, 80 cells
+
+// Where text starts in a column: at its left, or right-justified to two cells before the
+// next column.
+int textX(int x, int width, bool right, std::string_view text)
+{
+    return right ? x + width - 2 - static_cast<int>(decodeUtf8(text).size()) : x;
+}
 
 constexpr int kMargin = 1; // a cell before the first column
 
@@ -471,7 +480,9 @@ Region EventListView::listRegion() const
     grid.fill(0, 0, layout_.columns, 1, {U' ', kHeading});
     for (std::size_t c = 0; c < kColumnCount; ++c)
     {
-        grid.write(x[c], 0, kColumns[c].heading, kHeading);
+        const auto& column = kColumns[c];
+        grid.write(textX(x[c], width[c], column.right, column.heading), 0, column.heading,
+                   kHeading);
     }
 
     const auto cursorField = field();
@@ -492,16 +503,17 @@ Region EventListView::listRegion() const
                                 text[Column::Length].empty();
             const int room = runsOn ? layout_.columns - x[c] : width[c];
             const auto shown = fitted(text.cells[c], room);
+            const int start = textX(x[c], width[c], kColumns[c].right, shown);
             if (row == row_ && column == cursorField)
             {
-                grid.fill(x[c] - 1, line,
+                grid.fill(start - 1, line,
                           std::max(static_cast<int>(decodeUtf8(shown).size()), 1) + 2, 1,
                           {U' ', kCursor});
-                grid.write(x[c], line, shown, kCursor);
+                grid.write(start, line, shown, kCursor);
             }
             else
             {
-                grid.write(x[c], line, shown, style);
+                grid.write(start, line, shown, style);
             }
         }
     }
