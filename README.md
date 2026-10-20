@@ -44,6 +44,9 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 | `w` `b`, `}` `{`, `]]` `[[` | The event at or after the next or previous beat, the same place a bar on or back, or a bar line |
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
+| `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d}` up to where `}` goes |
+| `x`, `p` | Delete this event; put what was yanked or deleted at the cursor's time |
+| `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
 | `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
 | Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
