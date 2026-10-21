@@ -13,10 +13,12 @@ Document::Document(Song song, std::optional<std::filesystem::path> file)
     replace(song_, std::move(file));
 }
 
-void Document::replace(Song song, std::optional<std::filesystem::path> file)
+void Document::replace(Song song, std::optional<std::filesystem::path> file,
+                       std::optional<std::filesystem::path> importedFrom)
 {
     song_ = std::move(song);
     file_ = std::move(file);
+    importedFrom_ = std::move(importedFrom);
     states_.clear();
     states_.push_back({song_.parts(), nextId_++, std::nullopt});
     current_ = 0;
@@ -94,6 +96,7 @@ void Document::markSaved(std::optional<std::filesystem::path> file)
     if (file)
     {
         file_ = std::move(file);
+        importedFrom_.reset();
     }
 }
 

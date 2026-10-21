@@ -71,7 +71,7 @@ std::string open(core::Document& document, const std::filesystem::path& file)
         {
             return "can't import " + ui::utf8Text(file) + ": " + result.error;
         }
-        document.replace(std::move(*result.song), std::nullopt);
+        document.replace(std::move(*result.song), std::nullopt, file);
         if (result.warnings.empty())
         {
             return {};

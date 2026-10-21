@@ -53,8 +53,13 @@ public:
     // The file the song was loaded from or last saved to, if any.
     const std::optional<std::filesystem::path>& file() const { return file_; }
 
+    // The file the song was imported from, such as a MIDI file, which saving doesn't write
+    // over; none once the song is saved to a file of its own.
+    const std::optional<std::filesystem::path>& importedFrom() const { return importedFrom_; }
+
     // Starts again with another song, as when opening a file: no history, and unmodified.
-    void replace(Song song, std::optional<std::filesystem::path> file);
+    void replace(Song song, std::optional<std::filesystem::path> file,
+                 std::optional<std::filesystem::path> importedFrom = std::nullopt);
 
     // Changes a copy of the song and keeps it, as one undo step, unless the change left the
     // song as it was. Returns whether it changed the song.
@@ -108,6 +113,7 @@ private:
 
     Song song_;
     std::optional<std::filesystem::path> file_;
+    std::optional<std::filesystem::path> importedFrom_;
     std::deque<State> states_;
     std::size_t current_ = 0;
     std::uint64_t nextId_ = 0;

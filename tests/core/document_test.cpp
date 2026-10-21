@@ -167,6 +167,21 @@ TEST_CASE("the song is modified until saved, and unmodified when undone back to 
     CHECK_FALSE(e.document.file());
 }
 
+TEST_CASE("an imported song remembers where it came from, until saved to a file of its own")
+{
+    Edited e;
+    e.document.replace(Song{}, std::nullopt, "song.mid");
+    CHECK_FALSE(e.document.file());
+    CHECK(e.document.importedFrom() == std::filesystem::path{"song.mid"});
+    e.document.markSaved();
+    CHECK(e.document.importedFrom());
+    e.document.markSaved("song.modal");
+    CHECK(e.document.file() == std::filesystem::path{"song.modal"});
+    CHECK_FALSE(e.document.importedFrom());
+    e.document.replace(Song{}, std::nullopt);
+    CHECK_FALSE(e.document.importedFrom());
+}
+
 TEST_CASE("only so many steps are kept")
 {
     Edited e;
