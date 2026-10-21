@@ -153,6 +153,7 @@ private:
     // Starts editing the field under the cursor in place, with its value in it; then sets it
     // from what's typed, or steps it.
     bool openField();
+    bool addNote(); // o: a note at the cursor's time, editing its pitch first
     bool finishField();
     bool stepFieldBy(int steps);
 
@@ -194,7 +195,8 @@ private:
     {
         std::size_t row;
         Column column;
-        bool fresh; // typing replaces the value; keys that edit it keep it
+        bool fresh;                        // typing replaces the value; keys that edit it keep it
+        std::optional<core::Event> adding; // a note being added by o, shown after the row
     };
     std::optional<FieldPrompt> field_;
     CommandLine fieldLine_;

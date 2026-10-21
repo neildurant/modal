@@ -1,3 +1,4 @@
+#include <modal/core/note_fraction.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
@@ -101,6 +102,8 @@ constexpr std::array kCommands{
     counted("track-previous", "Show the track's list before, {count} tracks back"),
     CommandInfo{.name = "field-edit",
                 .description = "Edit the field under the cursor, typing a value or a change"},
+    CommandInfo{.name = "note-add",
+                .description = "Add a note at the cursor's time, typing its pitch"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
     counted("operator-delete", "Delete the events a motion goes over (d}), or dd this event"),
@@ -608,6 +611,10 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     {
         return openField();
     }
+    else if (command == "note-add")
+    {
+        return addNote();
+    }
     else if (command == "field-increase" || command == "field-decrease")
     {
         return stepFieldBy(command == "field-increase" ? n : -n);
@@ -825,9 +832,41 @@ bool EventListView::openField()
     const auto column = field();
     auto text = list_.text(row_)[column];
     text = text.substr(0, text.find(" ("));
-    field_ = FieldPrompt{row_, column, true};
+    field_ = FieldPrompt{row_, column, true, std::nullopt};
     fieldLine_.open(decodeUtf8(text));
     mode_ = Mode::CommandLine;
+    return true;
+}
+
+bool EventListView::addNote()
+{
+    if (track_ == 0)
+    {
+        setMessage("The conductor's list has no notes", MessageKind::Warning);
+        return true;
+    }
+    // At the cursor's time, with the velocity and length of the note before, if any.
+    const auto tick = list_.rows()[row_].tick;
+    core::Note note{60, 100, core::NoteFraction{1, 8}.toTicks(document_.song().ppqn())};
+    for (const auto& event : document_.song().events(*list_.track()).all())
+    {
+        if (event.tick > tick)
+        {
+            break;
+        }
+        if (const auto* before = std::get_if<core::Note>(&event.data))
+        {
+            note = *before;
+        }
+    }
+    field_ = FieldPrompt{row_, Column::Data, false, core::Event{tick, note}};
+    fieldLine_.open();
+    mode_ = Mode::CommandLine;
+    // Room for the new row below the cursor's.
+    if (row_ + 2 > top_ + static_cast<std::size_t>(viewRows()))
+    {
+        ++top_;
+    }
     return true;
 }
 
@@ -835,6 +874,50 @@ bool EventListView::finishField()
 {
     const auto prompt = *field_;
     const auto text = fieldLine_.take();
+    if (prompt.adding)
+    {
+        // The new note's pitch: added once it's typed, as one undo step.
+        const auto id = *list_.track();
+        auto result = setField(*prompt.adding, Column::Data, text, list_.meter());
+        std::optional<std::string> error;
+        if (text.empty())
+        {
+            error = "Type the note's pitch, such as C4 or 60";
+        }
+        else if (const auto* why = std::get_if<std::string>(&result))
+        {
+            error = *why;
+        }
+        else
+        {
+            error = overlap(document_.song().events(id), std::nullopt,
+                            std::get<core::Event>(result), list_.meter());
+        }
+        if (error)
+        {
+            setMessage(*error, MessageKind::Warning);
+            fieldLine_.open(decodeUtf8(text));
+            return true;
+        }
+        const auto note = std::get<core::Event>(result);
+        field_.reset();
+        mode_ = Mode::Normal;
+        edit("Add a note in " + trackName(), [&](core::Song& song)
+             { song.updateEvents(id, [&](core::EventList& events) { events.insert(note); }); });
+        const auto rows = list_.rows();
+        const auto& now = document_.song().events(id);
+        for (auto r = list_.rowAt(note.tick); r < rows.size(); ++r)
+        {
+            if (rows[r].kind == RowKind::Event && now[rows[r].index] == note)
+            {
+                row_ = r;
+                break;
+            }
+        }
+        wanted_ = Column::Data;
+        follow();
+        return true;
+    }
     const auto& row = list_.rows()[prompt.row];
     const auto& event = document_.song().events(*list_.track())[row.index];
     const auto result = setField(event, prompt.column, text, list_.meter());
@@ -1109,16 +1192,37 @@ Region EventListView::listRegion() const
                    kHeading);
     }
 
+    // A note being added by o shows as a row of its own after the cursor's, being edited.
+    const bool adding = field_ && field_->adding;
+    RowText added;
+    if (adding)
+    {
+        const auto& note = *field_->adding;
+        const auto& data = std::get<core::Note>(note.data);
+        added.cells[static_cast<std::size_t>(Column::Position)] =
+            positionText(list_.meter(), note.tick);
+        added.cells[static_cast<std::size_t>(Column::Event)] = "note";
+        added.cells[static_cast<std::size_t>(Column::Value)] = std::to_string(data.velocity);
+        added.cells[static_cast<std::size_t>(Column::Length)] = lengthText(
+            data.duration, document_.song().ppqn(), list_.meter().signatureAt(note.tick));
+        added.cells[static_cast<std::size_t>(Column::Release)] =
+            std::to_string(data.releaseVelocity);
+    }
     const auto cursorField = field();
     for (int line = 1; line < rows; ++line)
     {
-        const auto row = top_ + static_cast<std::size_t>(line - 1);
-        if (row >= list_.rows().size())
+        auto row = top_ + static_cast<std::size_t>(line - 1);
+        const bool isAdded = adding && row == field_->row + 1;
+        if (adding && row > field_->row + 1)
+        {
+            --row;
+        }
+        if (!isAdded && row >= list_.rows().size())
         {
             break;
         }
-        const auto text = list_.text(row);
-        const auto style = list_.rows()[row].dim ? kDimText : kPlainText;
+        const auto text = isAdded ? added : list_.text(row);
+        const auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
         for (std::size_t c = 0; c < kColumnCount; ++c)
         {
             const auto column = static_cast<Column>(c);
@@ -1128,7 +1232,9 @@ Region EventListView::listRegion() const
             const int room = runsOn ? layout_.columns - x[c] : width[c];
             const auto shown = fitted(text.cells[c], room);
             const int start = textX(x[c], width[c], kColumns[c].right, shown);
-            if (field_ && row == field_->row && column == field_->column)
+            const bool inPrompt =
+                field_ && column == field_->column && (adding ? isAdded : row == field_->row);
+            if (inPrompt)
             {
                 // The field being edited: what's typed, left-justified, with its cursor.
                 const Style editing{Role::Text, Role::Selection, kPlain};
@@ -1140,7 +1246,7 @@ Region EventListView::listRegion() const
                 grid.set(x[c] + static_cast<int>(cursor), line,
                          {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
             }
-            else if (row == row_ && column == cursorField)
+            else if (!adding && row == row_ && column == cursorField)
             {
                 grid.fill(start - 1, line,
                           std::max(static_cast<int>(decodeUtf8(shown).size()), 1) + 2, 1,

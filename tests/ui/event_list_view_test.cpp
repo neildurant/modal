@@ -485,6 +485,46 @@ TEST_CASE("+ and - step the field, with counts, as Ctrl-A and Ctrl-X do")
     CHECK(bassNote(v, 1).pitch == 27);
 }
 
+TEST_CASE("o adds a note at the cursor's time once its pitch is typed")
+{
+    View v;
+    const auto events = [&]
+    { return v.document.song().events(v.document.song().tracks()[0]->id()); };
+    type(v.view, U"5jo"); // on the cc at 1:2:240
+    CHECK(v.view.editingField());
+    CHECK(v.view.fieldLine().text().empty());
+    // The new row shows after the cursor's, with the velocity and length of the note before.
+    const auto list = v.view.frame()[0];
+    CHECK(contains(rowText(list, 7), U"1:2:240"));
+    CHECK(contains(rowText(list, 7), U"note"));
+    CHECK(contains(rowText(list, 7), U"96"));
+    CHECK(events().size() == 4);
+
+    enter(v.view); // no pitch yet
+    CHECK(v.view.message() == "Type the note's pitch, such as C4 or 60");
+    type(v.view, U"G2");
+    enter(v.view);
+    CHECK_FALSE(v.view.editingField());
+    REQUIRE(events().size() == 5);
+    CHECK(events()[3].tick == q + 240);
+    CHECK(std::get<core::Note>(events()[3].data) == core::Note{43, 96, q / 2, 64});
+    CHECK(v.view.list().text(v.view.row())[Column::Data] == "G2 (43)"); // on it
+    CHECK(v.view.field() == Column::Data);
+    type(v.view, U"u");
+    CHECK(v.view.message() == "Undid: Add a note in Bass");
+    CHECK(events().size() == 4);
+
+    // Escape leaves nothing behind, and a pitch already sounding there is refused.
+    type(v.view, U"o");
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(events().size() == 4);
+    type(v.view, U"ggo");
+    type(v.view, U"E1");
+    enter(v.view);
+    CHECK(v.view.message() == "Would overlap the E1 at 1:1:000");
+    CHECK(v.view.editingField());
+}
+
 TEST_CASE("only the track's own events are edited in its list")
 {
     View v;

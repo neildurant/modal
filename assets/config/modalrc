@@ -48,6 +48,7 @@ nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
 nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
+nmap o          note-add          "Add a note"
 nmap u          undo              "Undo"
 nmap <C-r>      redo              "Redo"
 
