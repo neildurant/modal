@@ -664,7 +664,7 @@ bool EventListView::operate(std::string_view op, std::size_t from, std::size_t t
 {
     if (track_ == 0)
     {
-        setMessage("the conductor's list can't be edited yet", MessageKind::Warning);
+        setMessage("The conductor's list can't be edited yet", MessageKind::Warning);
         return true;
     }
     if (from > to)
@@ -724,12 +724,12 @@ bool EventListView::put()
 {
     if (track_ == 0)
     {
-        setMessage("the conductor's list can't be edited yet", MessageKind::Warning);
+        setMessage("The conductor's list can't be edited yet", MessageKind::Warning);
         return true;
     }
     if (register_.empty())
     {
-        setMessage("nothing yanked or deleted to put", MessageKind::Warning);
+        setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     const auto at = list_.rows()[row_].tick;
@@ -755,7 +755,7 @@ bool EventListView::undoOrRedo(bool undo)
     const auto step = undo ? document_.undo() : document_.redo();
     if (!step)
     {
-        setMessage(undo ? "nothing to undo" : "nothing to redo", MessageKind::Information);
+        setMessage(undo ? "Nothing to undo" : "Nothing to redo", MessageKind::Information);
         return true;
     }
     // Back where the change was made: its track, time and scroll.

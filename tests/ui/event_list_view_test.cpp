@@ -292,7 +292,7 @@ TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back wh
     CHECK(events().size() == 3);
     CHECK(v.view.message() == "Redid: Delete 1 event in Bass");
     type(v.view, U"uu");
-    CHECK(v.view.message() == "nothing to undo");
+    CHECK(v.view.message() == "Nothing to undo");
 
     type(v.view, U"gg3j2x"); // the program and the note
     CHECK(events().size() == 2);
@@ -342,7 +342,7 @@ TEST_CASE("p puts the events at the cursor's time, never overlapping notes")
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
     type(v.view, U"p");
-    CHECK(v.view.message() == "nothing yanked or deleted to put");
+    CHECK(v.view.message() == "Nothing yanked or deleted to put");
 
     type(v.view, U"4jyy"); // the E1 at 1:1:000
     type(v.view, U"4jp");  // at 2:1:000, beside the F1 there
@@ -374,7 +374,7 @@ TEST_CASE("the conductor's list can't be edited yet")
 {
     View v;
     type(v.view, U"gTdd");
-    CHECK(v.view.message() == "the conductor's list can't be edited yet");
+    CHECK(v.view.message() == "The conductor's list can't be edited yet");
     CHECK_FALSE(v.document.modified());
 }
 
