@@ -25,7 +25,7 @@ TEST_CASE("every setting has a unique name, a description and its default to beg
     CHECK(settings.number("fontsize") == 12.0);
     CHECK(settings.text("font").empty());
     CHECK(settings.text("theme") == "dark");
-    CHECK(settings.cells("minsize") == CellCount{80, 24});
+    CHECK(settings.cells("minsize") == CellCount{120, 30});
     CHECK(settings.find("nope") == nullptr);
 }
 

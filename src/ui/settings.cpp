@@ -72,8 +72,8 @@ Settings::Settings()
                   std::string{}),
           setting("fontsize", "The font's size in points, before the display's scaling", 12.0, 4,
                   72),
-          setting("minsize", "The smallest the window can be made, in cells", CellCount{80, 24}, 20,
-                  1000),
+          setting("minsize", "The smallest the window can be made, in cells", CellCount{120, 30},
+                  20, 1000),
           setting("timeoutlen",
                   "How long to wait, in milliseconds, after keys that are a binding and also "
                   "start a longer one, before running the shorter",
