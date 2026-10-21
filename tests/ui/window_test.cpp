@@ -1,4 +1,8 @@
+#include "support/fake_clock.hpp"
+#include "support/playback.hpp"
+
 #include <modal/core/document.hpp>
+#include <modal/core/player.hpp>
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
@@ -238,8 +242,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
 }
 
 // Hidden: writes the event list and the arrangement sketch to look at, to MODAL_SAMPLE_BMP
-// with "-events", "-events-light", "-conductor", "-arrange" and "-arrange-out" (zoomed out)
-// before its extension, or to sample.bmp and so on.
+// with "-events", "-events-light", "-playing", "-playing-light", "-conductor", "-arrange" and
+// "-arrange-out" (zoomed out) before its extension, or to sample.bmp and so on.
 TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
 {
     auto window = offscreen(1000, 600);
@@ -259,6 +263,25 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
     CHECK(window->saveFrame(base + "-events.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-events-light.bmp"));
+
+    // Playing, three seconds in, the cursor left where it was.
+    modal::test::RecordingSink sink;
+    modal::test::FakeClock clock;
+    modal::core::Engine engine{sink, clock};
+    modal::core::Player player{engine,
+                               [](std::string_view) { return modal::core::DestinationId{1}; }};
+    player.update(document.song());
+    view.setPlayer(&player);
+    view.handle(Key::typed(U' '), 0);
+    modal::test::runUntil(engine, clock, clock.time + std::chrono::seconds{3});
+    view.wake(*view.deadline());
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-playing.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-playing-light.bmp"));
+    player.stop();
+    view.wake(*view.deadline());
+    view.setPlayer(nullptr);
     view.run("track-previous", 0);
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-conductor.bmp"));

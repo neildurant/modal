@@ -11,6 +11,7 @@ highlight message      #e0af68
 highlight cursor       #e0af68
 highlight cursor-text  #1a1b26
 highlight selection    #2e3c64
+highlight playhead     #2c4030
 highlight bar          #24283b
 highlight bar-text     #a9b1d6
 highlight panel        #343a52

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <modal/core/document.hpp>
+#include <modal/core/player.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/event_list.hpp>
@@ -61,10 +62,27 @@ public:
     // what's shown changed.
     bool handle(const Key& key, std::int64_t now);
 
-    // When wake should next be called, for keys waiting on a timeout; and the call, which
-    // returns whether what's shown changed.
-    std::optional<std::int64_t> deadline() const { return keys_.deadline(); }
+    // When wake should next be called, for keys waiting on a timeout, or for the next frame
+    // while playing; and the call, which returns whether what's shown changed.
+    std::optional<std::int64_t> deadline() const;
     bool wake(std::int64_t now);
+
+    // The player the transport commands play the song with, or none, when they do nothing.
+    // It must outlive the view.
+    void setPlayer(core::Player* player) { player_ = player; }
+
+    // Whether Space stops and goes back to where playback started (the rewind setting): the
+    // cursor then stays where it was while the view follows the playhead. Otherwise Space
+    // resumes where it stopped, and the cursor follows the playhead.
+    void setRewind(bool rewind) { rewind_ = rewind; }
+    bool rewind() const { return rewind_; }
+
+    // The row playing, while playing: the last at or before the playhead.
+    std::optional<std::size_t> playheadRow() const { return playheadRow_; }
+
+    // How often to draw a frame while playing, in milliseconds; the display's refresh rate
+    // may hold it back further.
+    static constexpr std::int64_t kFrameInterval = 8;
 
     // Runs a command through the registry with a count (0 for none), as a key bound to it
     // does, showing any message it gives.
@@ -176,6 +194,10 @@ private:
     void moveFields(int by);
     void follow();
 
+    // Runs a transport command; then shows the playhead, or where playback stopped.
+    bool transport(std::string_view command);
+    void showPlayhead();
+
     Region listRegion() const;
     Region inspectorRegion() const;
     int inspectorPadding() const { return cell_.height / 4; }
@@ -219,6 +241,11 @@ private:
     int height_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;
+    core::Player* player_ = nullptr;
+    bool rewind_ = true;
+    bool wasPlaying_ = false;
+    std::optional<std::size_t> playheadRow_;
+    std::int64_t lastTime_ = 0; // of the last key or wake-up
 };
 
 } // namespace modal::ui

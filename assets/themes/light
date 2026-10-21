@@ -9,6 +9,7 @@ highlight message      #8c6c3e
 highlight cursor       #8c6c3e
 highlight cursor-text  #e1e2e7
 highlight selection    #b7c1e3
+highlight playhead     #c5ddb8
 highlight bar          #d0d5e3
 highlight bar-text     #6172b0
 highlight panel        #c4c8da

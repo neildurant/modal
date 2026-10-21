@@ -122,6 +122,15 @@ constexpr std::array kCommands{
     counted("undo", "Undo the last change, or {count} changes"),
     counted("redo", "Redo the change undone last, or {count} changes"),
     CommandInfo{.name = "cancel", .description = "Cancel"},
+    CommandInfo{.name = "play-toggle",
+                .description = "Stop, or play from where playback started (rewind) or stopped"},
+    CommandInfo{.name = "play-cursor", .description = "Play from the cursor"},
+    CommandInfo{.name = "play-again", .description = "Play from where playback last started"},
+    CommandInfo{.name = "panic",
+                .description = "Stop, and send All Notes Off and Reset All Controllers"},
+    CommandInfo{.name = "rewind-toggle",
+                .description = "Turn rewind on or off: whether Space goes back to where "
+                               "playback started"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
     atPrompt("command-line-run", "Run the command line"),
     atPrompt("command-line-cancel", "Close the command line"),
@@ -230,6 +239,13 @@ std::string EventListView::pending() const
 
 void EventListView::resize(int width, int height, CellSize cell)
 {
+    // Called before every frame, so only a new size scrolls to the cursor, not playback.
+    cell = {std::max(cell.width, 1), std::max(cell.height, 1)};
+    if (width == width_ && height == height_ && cell.width == cell_.width &&
+        cell.height == cell_.height)
+    {
+        return;
+    }
     width_ = width;
     height_ = height;
     cell_ = {std::max(cell.width, 1), std::max(cell.height, 1)};
@@ -294,6 +310,7 @@ void EventListView::showTrack(std::size_t track, core::Tick tick)
 
 bool EventListView::handle(const Key& key, std::int64_t now)
 {
+    lastTime_ = now;
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
@@ -325,12 +342,98 @@ bool EventListView::handle(const Key& key, std::int64_t now)
     return changed || hadMessage || pending() != before;
 }
 
+std::optional<std::int64_t> EventListView::deadline() const
+{
+    auto deadline = keys_.deadline();
+    if (wasPlaying_)
+    {
+        const auto frame = lastTime_ + kFrameInterval;
+        deadline = deadline ? std::min(*deadline, frame) : frame;
+    }
+    return deadline;
+}
+
 bool EventListView::wake(std::int64_t now)
 {
+    lastTime_ = now;
     const auto before = keys_.pending();
     const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
-    const bool changed = runAll(keys_.timeout(keymap, now));
+    bool changed = runAll(keys_.timeout(keymap, now));
+    if (wasPlaying_)
+    {
+        player_->poll();
+        showPlayhead();
+        changed = true;
+    }
     return changed || keys_.pending() != before;
+}
+
+bool EventListView::transport(std::string_view command)
+{
+    if (player_ == nullptr)
+    {
+        setMessage("Nothing to play to", MessageKind::Warning);
+        return true;
+    }
+    if (command == "play-toggle")
+    {
+        player_->toggle(rewind_);
+    }
+    else if (command == "play-cursor")
+    {
+        player_->play(list_.rows()[row_].tick);
+    }
+    else if (command == "play-again")
+    {
+        player_->playAgain();
+    }
+    else
+    {
+        player_->panic();
+    }
+    showPlayhead();
+    return true;
+}
+
+void EventListView::showPlayhead()
+{
+    const bool playing = player_ != nullptr && player_->playing();
+    const auto position = playing ? player_->position() : std::nullopt;
+    const auto rowOf = [&](core::Tick tick)
+    {
+        const auto after = list_.rowAt(tick + 1);
+        return after > 0 ? after - 1 : 0;
+    };
+    if (playing)
+    {
+        // Until the engine starts, the playhead is where it will start.
+        const auto row = rowOf(position.value_or(player_->started()));
+        playheadRow_ = row;
+        if (!rewind_)
+        {
+            row_ = row; // the cursor follows the playhead
+            follow();
+        }
+        else if (const auto rows = static_cast<std::size_t>(viewRows());
+                 row < top_ || row >= top_ + rows)
+        {
+            // The view turns a page to keep the playhead in it, leaving the cursor be.
+            const auto count = list_.rows().size();
+            top_ = std::min(row, count > rows ? count - rows : 0);
+        }
+    }
+    else if (wasPlaying_)
+    {
+        // Stopped: with rewind, back to the cursor; otherwise the cursor stays where
+        // playback stopped.
+        playheadRow_.reset();
+        if (!rewind_)
+        {
+            row_ = rowOf(player_->stopped());
+        }
+        follow();
+    }
+    wasPlaying_ = playing;
 }
 
 bool EventListView::runAll(const std::vector<Action>& actions)
@@ -639,6 +742,27 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     else if (command == "cancel")
     {
         return false;
+    }
+    else if (command == "play-toggle" || command == "play-cursor" || command == "play-again" ||
+             command == "panic")
+    {
+        return transport(command);
+    }
+    else if (command == "rewind-toggle")
+    {
+        // Through the setting, where there is one, so it stays set as other settings change.
+        if (lineHandler_)
+        {
+            lineHandler_("set rewind!");
+        }
+        else
+        {
+            rewind_ = !rewind_;
+        }
+        setMessage(rewind_ ? "Rewind on: Space goes back to where playback started"
+                           : "Rewind off: Space resumes where playback stopped",
+                   MessageKind::Information);
+        return true;
     }
     else if (command == "command-line")
     {
@@ -1447,7 +1571,12 @@ Region EventListView::listRegion() const
             break;
         }
         const auto text = isAdded ? added : list_.text(row);
-        const auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
+        auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
+        if (!isAdded && row == playheadRow_)
+        {
+            style.background = Role::Playhead;
+            grid.fill(0, line, layout_.columns, 1, {U' ', style});
+        }
         for (std::size_t c = 0; c < kColumnCount; ++c)
         {
             const auto column = static_cast<Column>(c);
@@ -1633,6 +1762,14 @@ void EventListView::addBars(Frame& frame) const
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
         bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
     }
+    else if (const auto at = player_ != nullptr ? player_->position() : std::nullopt)
+    {
+        // While playing, where the playhead is.
+        bottom.left.push_back({"  ▶ " + positionText(meter, *at) + "  " +
+                                   signatureText(meter.signatureAt(*at)) + "  " +
+                                   song.sections()[song.sectionAt(*at)]->name(),
+                               {Role::Accent, Role::Bar, kBold}});
+    }
     else
     {
         bottom.left.push_back({"  " + list_.text(row_)[Column::Position] + "  " +
@@ -1644,6 +1781,7 @@ void EventListView::addBars(Frame& frame) const
     {
         bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
     }
+    bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();
     const auto& imported = document_.importedFrom();

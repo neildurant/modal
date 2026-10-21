@@ -94,6 +94,7 @@ The roles are:
 | `message` | a message in the status line, such as the new text size |
 | `cursor`, `cursor-text` | the cursor and the text on it |
 | `selection` | the background of what's selected |
+| `playhead` | the background of what's playing, such as the event list's row |
 | `bar`, `bar-text` | the status line and other bars |
 | `panel` | the background of the inspector |
 | `chrome` | the window around the view (the event list, piano roll or arrangement) and the gaps between bars; the view itself is on `background` |

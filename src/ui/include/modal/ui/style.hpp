@@ -31,6 +31,7 @@ enum class Role : std::uint8_t
     Cursor,  // the cursor's background
     CursorText,
     Selection, // the background of what's selected
+    Playhead,  // the background of what's playing, such as the event list's row
     Bar,       // the background of the status line and other bars
     BarText,
     Panel,  // the background of the inspector, a shade apart from the bars
