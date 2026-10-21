@@ -17,8 +17,9 @@ public:
     const std::u32string& text() const { return text_; }
     std::size_t cursor() const { return cursor_; }
 
-    // Starts a new, empty line.
+    // Starts a new, empty line, or one with text in it and the cursor at its end.
     void open();
+    void open(std::u32string text);
 
     void insert(char32_t character);
     // Deletes the character before the cursor, or after it; false if there's none.

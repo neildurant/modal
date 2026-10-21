@@ -14,6 +14,13 @@ void CommandLine::open()
     draft_.clear();
 }
 
+void CommandLine::open(std::u32string text)
+{
+    open();
+    text_ = std::move(text);
+    cursor_ = text_.size();
+}
+
 void CommandLine::insert(char32_t character)
 {
     text_.insert(cursor_++, 1, character);

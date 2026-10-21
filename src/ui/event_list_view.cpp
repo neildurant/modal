@@ -1,6 +1,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -98,6 +99,10 @@ constexpr std::array kCommands{
     CommandInfo{.name = "scroll-centre", .description = "Scroll the cursor to the middle"},
     counted("track-next", "Show the next track's list, or track {count}'s"),
     counted("track-previous", "Show the track's list before, {count} tracks back"),
+    CommandInfo{.name = "field-edit",
+                .description = "Edit the field under the cursor, typing a value or a change"},
+    counted("field-increase", "Step the field under the cursor up, {count} steps"),
+    counted("field-decrease", "Step the field under the cursor down, {count} steps"),
     counted("operator-delete", "Delete the events a motion goes over (d}), or dd this event"),
     counted("operator-yank", "Yank the events a motion goes over (y}), or yy this event"),
     CommandInfo{.name = "operator-line",
@@ -287,7 +292,12 @@ bool EventListView::handle(const Key& key, std::int64_t now)
         const auto match = keymap_.match(Mode::CommandLine, keys);
         if (match.binding == nullptr && !match.longer)
         {
-            line_.insert(key.character);
+            auto& line = activeLine();
+            if (field_ && std::exchange(field_->fresh, false))
+            {
+                line.clear(); // typing replaces the value, as in a spreadsheet
+            }
+            line.insert(key.character);
             return true;
         }
     }
@@ -594,6 +604,14 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     {
         return put();
     }
+    else if (command == "field-edit")
+    {
+        return openField();
+    }
+    else if (command == "field-increase" || command == "field-decrease")
+    {
+        return stepFieldBy(command == "field-increase" ? n : -n);
+    }
     else if (command == "undo" || command == "redo")
     {
         bool changed = false;
@@ -750,6 +768,168 @@ bool EventListView::put()
     return true;
 }
 
+namespace
+{
+
+// What a field is called in undo titles.
+std::string fieldName(Column field, const core::Event& event)
+{
+    switch (field)
+    {
+    case Column::Position:
+        return "position";
+    case Column::Data:
+        if (event.isNote() || std::holds_alternative<core::PolyPressure>(event.data))
+        {
+            return "pitch";
+        }
+        if (std::holds_alternative<core::ControlChange>(event.data))
+        {
+            return "controller";
+        }
+        if (std::holds_alternative<core::ProgramChange>(event.data))
+        {
+            return "program";
+        }
+        return "text";
+    case Column::Value:
+        return event.isNote() ? "velocity" : "value";
+    case Column::Length:
+        return "length";
+    case Column::Release:
+        return "release velocity";
+    case Column::Event:
+        break;
+    }
+    return "field";
+}
+
+} // namespace
+
+bool EventListView::openField()
+{
+    const auto& row = list_.rows()[row_];
+    if (row.kind == RowKind::End)
+    {
+        setMessage("Nothing to edit here", MessageKind::Information);
+        return true;
+    }
+    if (track_ == 0 || row.dim)
+    {
+        setMessage(row.dim ? "That's the conductor's: edit it in its list (gT)"
+                           : "The conductor's list can't be edited yet",
+                   MessageKind::Warning);
+        return true;
+    }
+    // The value as shown, less any note value or note number after it in brackets.
+    const auto column = field();
+    auto text = list_.text(row_)[column];
+    text = text.substr(0, text.find(" ("));
+    field_ = FieldPrompt{row_, column, true};
+    fieldLine_.open(decodeUtf8(text));
+    mode_ = Mode::CommandLine;
+    return true;
+}
+
+bool EventListView::finishField()
+{
+    const auto prompt = *field_;
+    const auto text = fieldLine_.take();
+    const auto& row = list_.rows()[prompt.row];
+    const auto& event = document_.song().events(*list_.track())[row.index];
+    const auto result = setField(event, prompt.column, text, list_.meter());
+    std::optional<std::string> error;
+    if (const auto* why = std::get_if<std::string>(&result))
+    {
+        error = *why;
+    }
+    else
+    {
+        error = replaceEvent(prompt.row, std::get<core::Event>(result), prompt.column);
+    }
+    if (error)
+    {
+        // The prompt stays open, with what was typed, to put right.
+        setMessage(*error, MessageKind::Warning);
+        fieldLine_.open(decodeUtf8(text));
+        field_->fresh = false;
+        return true;
+    }
+    field_.reset();
+    mode_ = Mode::Normal;
+    return true;
+}
+
+bool EventListView::stepFieldBy(int steps)
+{
+    const auto& row = list_.rows()[row_];
+    if (track_ == 0 || row.kind != RowKind::Event)
+    {
+        setMessage(row.dim       ? "That's the conductor's: edit it in its list (gT)"
+                   : track_ == 0 ? "The conductor's list can't be edited yet"
+                                 : "Nothing to change here",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto column = field();
+    const auto& event = document_.song().events(*list_.track())[row.index];
+    const auto result = stepField(event, column, steps, list_.meter());
+    std::optional<std::string> error;
+    if (const auto* why = std::get_if<std::string>(&result))
+    {
+        error = *why;
+    }
+    else
+    {
+        error = replaceEvent(row_, std::get<core::Event>(result), column);
+    }
+    if (error)
+    {
+        setMessage(*error, MessageKind::Warning);
+    }
+    return true;
+}
+
+std::optional<std::string> EventListView::replaceEvent(std::size_t row, const core::Event& changed,
+                                                       Column field)
+{
+    const auto id = *list_.track();
+    const auto index = list_.rows()[row].index;
+    const auto& events = document_.song().events(id);
+    if (changed == events[index])
+    {
+        return std::nullopt;
+    }
+    if (auto why = overlap(events, index, changed, list_.meter()))
+    {
+        return why;
+    }
+    const auto title = "Set " + fieldName(field, changed) + " in " + trackName();
+    edit(title,
+         [&](core::Song& song)
+         {
+             song.updateEvents(id,
+                               [&](core::EventList& list)
+                               {
+                                   list.erase(index);
+                                   list.insert(changed);
+                               });
+         });
+    // The cursor follows the event, as a change of position moves it.
+    const auto rows = list_.rows();
+    const auto& now = document_.song().events(id);
+    for (auto r = list_.rowAt(changed.tick); r < rows.size() && rows[r].tick == changed.tick; ++r)
+    {
+        if (rows[r].kind == RowKind::Event && now[rows[r].index] == changed)
+        {
+            row_ = r;
+            break;
+        }
+    }
+    follow();
+    return std::nullopt;
+}
+
 bool EventListView::undoOrRedo(bool undo)
 {
     const auto step = undo ? document_.undo() : document_.redo();
@@ -821,57 +1001,67 @@ std::optional<bool> EventListView::runCommandLine(std::string_view command)
     {
         return false;
     }
+    auto& line = activeLine();
     if (command == "command-line-run")
     {
-        mode_ = Mode::Normal;
-        const auto line = line_.take();
-        if (lineHandler_ && !line.empty())
+        if (field_)
         {
-            lineHandler_(line);
+            return finishField();
+        }
+        mode_ = Mode::Normal;
+        const auto text = line.take();
+        if (lineHandler_ && !text.empty())
+        {
+            lineHandler_(text);
         }
         return true;
     }
     if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && line_.text().empty())) // as in Vim
+        (command == "command-line-backspace" && line.text().empty())) // as in Vim
     {
+        field_.reset();
         mode_ = Mode::Normal;
         return true;
     }
+    if (field_)
+    {
+        field_->fresh = false; // keys that edit the value keep it
+    }
     if (command == "command-line-backspace")
     {
-        return line_.backspace();
+        return line.backspace();
     }
     if (command == "command-line-delete")
     {
-        return line_.erase();
+        return line.erase();
     }
     if (command == "command-line-older")
     {
-        return line_.older();
+        return line.older();
     }
     if (command == "command-line-newer")
     {
-        return line_.newer();
+        return line.newer();
     }
     if (command == "command-line-left")
     {
-        line_.left();
+        line.left();
     }
     else if (command == "command-line-right")
     {
-        line_.right();
+        line.right();
     }
     else if (command == "command-line-start")
     {
-        line_.start();
+        line.start();
     }
     else if (command == "command-line-end")
     {
-        line_.end();
+        line.end();
     }
     else if (command == "command-line-clear")
     {
-        line_.clear();
+        line.clear();
     }
     else
     {
@@ -938,7 +1128,19 @@ Region EventListView::listRegion() const
             const int room = runsOn ? layout_.columns - x[c] : width[c];
             const auto shown = fitted(text.cells[c], room);
             const int start = textX(x[c], width[c], kColumns[c].right, shown);
-            if (row == row_ && column == cursorField)
+            if (field_ && row == field_->row && column == field_->column)
+            {
+                // The field being edited: what's typed, left-justified, with its cursor.
+                const Style editing{Role::Text, Role::Selection, kPlain};
+                const auto& typed = fieldLine_.text();
+                const int span = std::max(width[c] - 1, static_cast<int>(typed.size()) + 1);
+                grid.fill(x[c] - 1, line, span + 1, 1, {U' ', editing});
+                grid.write(x[c], line, encodeUtf8(typed), editing);
+                const auto cursor = fieldLine_.cursor();
+                grid.set(x[c] + static_cast<int>(cursor), line,
+                         {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
+            }
+            else if (row == row_ && column == cursorField)
             {
                 grid.fill(start - 1, line,
                           std::max(static_cast<int>(decodeUtf8(shown).size()), 1) + 2, 1,
@@ -1007,7 +1209,7 @@ void EventListView::addBars(Frame& frame) const
                   kBarText}};
 
     Bar bottom;
-    bottom.left = {{" NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
+    bottom.left = {{field_ ? " EDIT " : " NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
     if (!message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
@@ -1029,7 +1231,7 @@ void EventListView::addBars(Frame& frame) const
     auto topRegion = layoutBar(top, width_, cell_, spacing);
     topRegion.bounds = layout_.top[0];
     frame.push_back(std::move(topRegion));
-    if (mode_ == Mode::CommandLine)
+    if (mode_ == Mode::CommandLine && !field_)
     {
         frame.push_back(promptRegion());
         return;

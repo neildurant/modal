@@ -34,9 +34,16 @@ nmap [s         cursor-section-previous   "Section before"
 nmap ]m         cursor-marker-next        "Next marker"
 nmap [m         cursor-marker-previous    "Marker before"
 
-" Changing events: d and y take a motion (d} up to where } goes, dj this event and the next),
+" Changing events: Enter edits the field under the cursor, typing a value or a change such
+" as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
+" with counts. d and y take a motion (d} up to where } goes, dj this event and the next),
 " or dd and yy this event; x deletes it, p puts what was yanked or deleted at the cursor's
 " time, and u and Ctrl-R undo and redo
+nmap <CR>       field-edit        "Edit this field"
+nmap +          field-increase    "Step up"
+nmap <C-a>      field-increase    "Step up"
+nmap -          field-decrease    "Step down"
+nmap <C-x>      field-decrease    "Step down"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
 nmap x          event-delete      "Delete this event"

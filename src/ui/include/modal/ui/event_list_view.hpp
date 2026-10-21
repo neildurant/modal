@@ -94,9 +94,14 @@ public:
     std::size_t top() const { return top_; }
     int viewRows() const; // rows of events fully shown
 
-    // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the : prompt.
+    // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
+    // prompt, or editing a field in place.
     Mode mode() const { return mode_; }
     const CommandLine& commandLine() const { return line_; }
+
+    // Whether a field is being edited in place (after Enter), and what's typed there.
+    bool editingField() const { return field_.has_value(); }
+    const CommandLine& fieldLine() const { return fieldLine_; }
     std::string pending() const; // the operator, count and keys typed so far
 
     // What the unnamed register holds: events yanked or deleted, their ticks from the first's.
@@ -142,6 +147,20 @@ private:
     bool put();
     bool undoOrRedo(bool undo);
 
+    // The line keys type into: a field's, while one is being edited, or the : prompt's.
+    CommandLine& activeLine() { return field_ ? fieldLine_ : line_; }
+
+    // Starts editing the field under the cursor in place, with its value in it; then sets it
+    // from what's typed, or steps it.
+    bool openField();
+    bool finishField();
+    bool stepFieldBy(int steps);
+
+    // Replaces the event of a row with a changed one, if it doesn't overlap a note of its
+    // pitch, and puts the cursor on it. Returns why not, or nothing.
+    std::optional<std::string> replaceEvent(std::size_t row, const core::Event& changed,
+                                            Column field);
+
     // Changes the song as one undo step, made where the cursor is, and shows the change.
     bool edit(std::string title, const std::function<void(core::Song&)>& change);
     core::EditPlace place() const;
@@ -171,6 +190,14 @@ private:
         int count;
     };
     std::optional<PendingOperator> operator_;
+    struct FieldPrompt
+    {
+        std::size_t row;
+        Column column;
+        bool fresh; // typing replaces the value; keys that edit it keep it
+    };
+    std::optional<FieldPrompt> field_;
+    CommandLine fieldLine_;
     std::vector<core::Event> register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;

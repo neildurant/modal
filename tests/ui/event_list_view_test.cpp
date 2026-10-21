@@ -378,6 +378,126 @@ TEST_CASE("the conductor's list can't be edited yet")
     CHECK_FALSE(v.document.modified());
 }
 
+namespace
+{
+
+core::Note bassNote(const View& v, std::size_t index)
+{
+    return std::get<core::Note>(
+        v.document.song().events(v.document.song().tracks()[0]->id())[index].data);
+}
+
+void enter(EventListView& view)
+{
+    view.handle(Key::of(NamedKey::Enter), 0);
+}
+
+} // namespace
+
+TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
+{
+    View v;
+    type(v.view, U"4j2l"); // the E1's velocity, 96
+    enter(v.view);
+    CHECK(v.view.editingField());
+    CHECK(v.view.mode() == Mode::CommandLine);
+    CHECK(v.view.fieldLine().text() == U"96");
+    CHECK(contains(rowText(v.view.frame()[2], 0), U"EDIT"));
+    type(v.view, U"80");
+    CHECK(v.view.fieldLine().text() == U"80");
+    enter(v.view);
+    CHECK_FALSE(v.view.editingField());
+    CHECK(bassNote(v, 1).velocity == 80);
+    type(v.view, U"u");
+    CHECK(v.view.message() == "Undid: Set velocity in Bass");
+
+    // A change; keys that edit keep the value.
+    enter(v.view);
+    type(v.view, U"+10");
+    enter(v.view);
+    CHECK(bassNote(v, 1).velocity == 106);
+    enter(v.view);
+    v.view.handle(Key::of(NamedKey::Backspace), 0);
+    type(v.view, U"0");
+    CHECK(v.view.fieldLine().text() == U"100");
+    enter(v.view);
+    CHECK(bassNote(v, 1).velocity == 100);
+
+    // A value out of range keeps the prompt open to put right; Escape leaves it as it was.
+    enter(v.view);
+    type(v.view, U"200");
+    enter(v.view);
+    CHECK(v.view.editingField());
+    CHECK(v.view.message().starts_with("A velocity must be from 1 to 127"));
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK_FALSE(v.view.editingField());
+    CHECK(bassNote(v, 1).velocity == 100);
+}
+
+TEST_CASE("editing a note's pitch, length and position, never into another of its pitch")
+{
+    View v;
+    type(v.view, U"4jl"); // the E1's pitch, shown as E1 (28), edited as E1
+    enter(v.view);
+    CHECK(v.view.fieldLine().text() == U"E1");
+    type(v.view, U"F1");
+    enter(v.view);
+    CHECK(bassNote(v, 1).pitch == 29);
+
+    type(v.view, U"2l"); // its length, 0:0:480 (1/8), edited as 0:0:480
+    enter(v.view);
+    CHECK(v.view.fieldLine().text() == U"0:0:480");
+    type(v.view, U"+1/16");
+    enter(v.view);
+    CHECK(bassNote(v, 1).duration == 720);
+
+    // Moved to where the other F1 starts: refused, naming it.
+    type(v.view, U"0");
+    enter(v.view);
+    type(v.view, U"2:1:000");
+    enter(v.view);
+    CHECK(v.view.editingField());
+    CHECK(v.view.message() == "Would overlap the F1 at 2:1:000");
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+
+    // Moved a beat on instead, the cursor following it.
+    enter(v.view);
+    type(v.view, U"+0:1:000");
+    enter(v.view);
+    CHECK(v.view.list().rows()[v.view.row()].tick == q);
+    CHECK(v.view.list().text(v.view.row())[Column::Data] == "F1 (29)");
+}
+
+TEST_CASE("+ and - step the field, with counts, as Ctrl-A and Ctrl-X do")
+{
+    View v;
+    type(v.view, U"4j2l");
+    type(v.view, U"+");
+    CHECK(bassNote(v, 1).velocity == 97);
+    type(v.view, U"5-");
+    CHECK(bassNote(v, 1).velocity == 92);
+    v.view.handle(Key::typed(U'a', kCtrl), 0);
+    CHECK(bassNote(v, 1).velocity == 93);
+    type(v.view, U"200");
+    v.view.handle(Key::typed(U'x', kCtrl), 0);
+    CHECK(bassNote(v, 1).velocity == 1); // kept in range
+    type(v.view, U"h-");                 // the pitch, a semitone down
+    CHECK(bassNote(v, 1).pitch == 27);
+}
+
+TEST_CASE("only the track's own events are edited in its list")
+{
+    View v;
+    enter(v.view); // the section row
+    CHECK_FALSE(v.view.editingField());
+    CHECK(v.view.message() == "That's the conductor's: edit it in its list (gT)");
+    type(v.view, U"G");
+    enter(v.view);
+    CHECK(v.view.message() == "Nothing to edit here");
+    type(v.view, U"+");
+    CHECK(v.view.message() == "Nothing to change here");
+}
+
 TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping the time")
 {
     View v;
