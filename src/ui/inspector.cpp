@@ -38,6 +38,21 @@ std::string hexBytes(const std::vector<std::uint8_t>& bytes)
     return text;
 }
 
+// Microseconds as milliseconds, with only the decimals it takes: 500 ms, 594.059 ms.
+std::string millisText(std::int64_t micros)
+{
+    auto text = std::to_string(micros / 1000) + "." + padded(micros % 1000, 3);
+    while (text.back() == '0')
+    {
+        text.pop_back();
+    }
+    if (text.back() == '.')
+    {
+        text.pop_back();
+    }
+    return text + " ms";
+}
+
 std::string barsText(std::int64_t bars)
 {
     return std::to_string(bars) + (bars == 1 ? " bar" : " bars");
@@ -107,7 +122,7 @@ Inspection inspect(const EventList& list, std::size_t row)
         result.kind = "Tempo";
         const auto tempo = song.tempo().changes()[r.index].tempo;
         add("Tempo", core::bpmText(tempo) + " BPM");
-        add("Per quarter", std::to_string(tempo.microsPerQuarter) + " µs");
+        add("Per quarter", millisText(tempo.microsPerQuarter));
         return result;
     }
     case RowKind::Meter:

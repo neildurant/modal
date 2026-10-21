@@ -100,7 +100,14 @@ TEST_CASE("on a row that isn't an event, the inspector says what the row is")
                                                         {"Length", "1 bar, 0:02.000"}});
     const auto tempo = of(list, RowKind::Tempo);
     CHECK(tempo.fields[2] == InspectorField{"Tempo", "120 BPM"});
-    CHECK(tempo.fields[3] == InspectorField{"Per quarter", "500000 µs"});
+    CHECK(tempo.fields[3] == InspectorField{"Per quarter", "500 ms"});
+    auto odd = song();
+    odd.updateTempo([](core::TempoMap& t) { t.set(0, core::Tempo{594'059}); });
+    const EventList oddList{odd, odd.tracks()[0]->id()};
+    CHECK(of(oddList, RowKind::Tempo).fields[3] == InspectorField{"Per quarter", "594.059 ms"});
+    odd.updateTempo([](core::TempoMap& t) { t.set(0, core::Tempo{594'500}); });
+    const EventList halfList{odd, odd.tracks()[0]->id()};
+    CHECK(of(halfList, RowKind::Tempo).fields[3] == InspectorField{"Per quarter", "594.5 ms"});
     CHECK(of(list, RowKind::Meter).fields[2] == InspectorField{"Meter", "4/4"});
     CHECK(of(list, RowKind::Marker).fields[2] == InspectorField{"Marker", "fill"});
     CHECK(of(list, RowKind::End).fields[2] == InspectorField{"Song", "2 bars, 0:04.000"});
