@@ -481,6 +481,18 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     type(v.view, U"u");
     CHECK(v.view.message() == "Undid: Set velocity in Bass");
 
+    // Long text stays in the field's box, scrolling to keep the cursor in it, rather than
+    // spilling over the columns beside it.
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+    enter(v.view);
+    type(v.view, U"1234567890123456789");
+    const auto editing = rowText(v.view.frame()[0], 5);
+    CHECK(contains(editing, U"0:0:480 (1/8)"));     // the length beside it, still there
+    CHECK(contains(editing, U"6789"));              // the end, where the cursor is
+    CHECK_FALSE(contains(editing, U"12345678901")); // more than fits
+    CHECK(contains(editing, U"64"));                // the release beyond, untouched
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+
     // A change; keys that edit keep the value.
     enter(v.view);
     type(v.view, U"+10");

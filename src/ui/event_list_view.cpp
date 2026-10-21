@@ -1456,19 +1456,22 @@ Region EventListView::listRegion() const
                 field_ && column == field_->column && (adding ? isAdded : row == field_->row);
             if (inPrompt)
             {
-                // The field being edited: what's typed, justified as the column is, so it
-                // stays where it was, with its cursor (after the text, at its end).
+                // The field being edited, in a box as wide as the column, or to the edge for
+                // text that runs on: what's typed, justified as the column is so it stays
+                // where it was, with its cursor; longer text scrolls to keep the cursor in it,
+                // as at the : prompt.
                 const Style editing{Role::Text, Role::Selection, kPlain};
+                const auto box =
+                    static_cast<std::size_t>(std::max(runsOn ? room : width[c] - 1, 2));
                 const auto& typed = fieldLine_.text();
-                const auto typedText = encodeUtf8(typed);
-                const int from = textX(x[c], width[c], kColumns[c].right, typedText);
-                const int left = std::min(from, x[c]);
-                const int right =
-                    std::max(from + static_cast<int>(typed.size()) + 1, x[c] + width[c] - 1);
-                grid.fill(left - 1, line, right - left + 1, 1, {U' ', editing});
-                grid.write(from, line, typedText, editing);
                 const auto cursor = fieldLine_.cursor();
-                grid.set(from + static_cast<int>(cursor), line,
+                const std::size_t first = cursor + 1 > box ? cursor + 1 - box : 0;
+                const auto visible = encodeUtf8(typed.substr(first, box));
+                const bool fits = typed.size() + 1 <= box;
+                const int from = fits ? textX(x[c], width[c], kColumns[c].right, visible) : x[c];
+                grid.fill(x[c] - 1, line, static_cast<int>(box) + 1, 1, {U' ', editing});
+                grid.write(from, line, visible, editing);
+                grid.set(from + static_cast<int>(cursor - first), line,
                          {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
             }
             else if (!adding && row == row_ && column == cursorField)
