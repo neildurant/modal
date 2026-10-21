@@ -35,7 +35,8 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
         return result;
     }
 
-    for (std::size_t i = 0; i < ports_.size(); ++i)
+    const auto opened = opened_.load(std::memory_order_relaxed);
+    for (std::size_t i = 0; i < opened; ++i)
     {
         if (ports_[i]->name == result.portName)
         {
@@ -44,6 +45,12 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
         }
     }
 
+    if (opened == ports_.size())
+    {
+        result.error = "can't open \"" + result.portName + "\": no more than " +
+                       std::to_string(ports_.size()) + " output ports can be open";
+        return result;
+    }
     auto apiConfig = libremidi::midi_out_configuration_for(*api);
     detail::nameClient(apiConfig);
     libremidi::midi_out out{libremidi::output_configuration{}, std::move(apiConfig)};
@@ -52,8 +59,9 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
         result.error = "can't open \"" + result.portName + "\": " + detail::errorText(error);
         return result;
     }
-    result.destination = core::DestinationId{static_cast<std::uint32_t>(ports_.size())};
-    ports_.push_back(std::make_unique<Port>(Port{result.portName, std::move(out)}));
+    result.destination = core::DestinationId{static_cast<std::uint32_t>(opened)};
+    ports_[opened] = std::make_unique<Port>(Port{result.portName, std::move(out)});
+    opened_.store(opened + 1, std::memory_order_release);
     return result;
 }
 
@@ -61,7 +69,7 @@ void MidiOutputs::send(core::DestinationId destination, std::span<const std::uin
                        std::chrono::nanoseconds) noexcept
 {
     bool sent = false;
-    if (destination.value < ports_.size())
+    if (destination.value < opened_.load(std::memory_order_acquire))
     {
         try
         {

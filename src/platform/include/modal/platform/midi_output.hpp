@@ -3,6 +3,7 @@
 #include <modal/core/scheduler.hpp>
 #include <modal/platform/midi_ports.hpp>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -10,7 +11,6 @@
 #include <memory>
 #include <span>
 #include <string_view>
-#include <vector>
 
 namespace modal::platform
 {
@@ -20,8 +20,9 @@ struct OutputOpenResult : PortOpenResult
     core::DestinationId destination{};
 };
 
-// The MIDI output ports the engine sends to, each one a destination. Ports are opened before
-// playback starts, never while the engine is sending.
+// The MIDI output ports the engine sends to, each one a destination. Ports are opened on the
+// control side, and can be opened while the engine is sending: the list of them never moves,
+// and a new port is published to the engine only once it's open.
 class MidiOutputs final : public core::MessageSink
 {
 public:
@@ -32,7 +33,7 @@ public:
     MidiOutputs& operator=(const MidiOutputs&) = delete;
 
     // Opens the output port a name refers to (see matchPort), or returns the destination
-    // already opened for it.
+    // already opened for it. Only one thread may call this.
     OutputOpenResult open(std::string_view name);
 
     // Sends at once; due is ignored. A failed send is counted, not reported. On Windows, a
@@ -47,7 +48,9 @@ public:
 
 private:
     struct Port;
-    std::vector<std::unique_ptr<Port>> ports_; // indexed by destination
+    // Indexed by destination, as many as the scheduler can reach.
+    std::array<std::unique_ptr<Port>, core::Scheduler::kMaxDestinations> ports_;
+    std::atomic<std::size_t> opened_{0}; // published after the port it counts
     std::atomic<std::size_t> failedSends_{0};
 };
 
