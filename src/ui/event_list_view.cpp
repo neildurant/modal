@@ -4,6 +4,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/inspector.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/window_commands.hpp>
 
@@ -232,7 +233,10 @@ void EventListView::resize(int width, int height, CellSize cell)
     width_ = width;
     height_ = height;
     cell_ = {std::max(cell.width, 1), std::max(cell.height, 1)};
-    layout_ = layoutWindow(width, height, cell_, 1, 1);
+    // The inspector, two lines with a quarter of a line's padding above and below, and the
+    // track's bar, each with half a line after it.
+    const std::array heights{2 * cell_.height + inspectorPadding() * 2, cell_.height};
+    layout_ = layoutWindow(width, height, cell_, heights, 1, cell_.height / 2);
     follow();
 }
 
@@ -1514,33 +1518,81 @@ Region EventListView::promptRegion() const
     return region;
 }
 
+Region EventListView::inspectorRegion() const
+{
+    // Headings above their values, each column as wide as the wider of the two, after the
+    // kind of row; a value that doesn't fit is cut short, and those after it left out.
+    const auto inspection = inspect(list_, row_);
+    Region region{
+        .bounds = layout_.top[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int columns = std::max((width_ - 2 * margin) / cell_.width, 0);
+    const Style kind{Role::Accent, Role::Bar, kBold};
+    const Style heading{Role::Dim, Role::Bar, kPlain};
+    const auto x = [&](int column) { return margin + column * cell_.width; };
+
+    const int top = inspectorPadding();
+    region.text.push_back({x(0), top, decodeUtf8(inspection.kind), kind});
+    int at = static_cast<int>(decodeUtf8(inspection.kind).size()) + 3;
+    for (const auto& field : inspection.fields)
+    {
+        auto title = decodeUtf8(field.heading);
+        auto value = decodeUtf8(field.value);
+        const int room = columns - at;
+        if (room < kMinSegmentCharacters + 1)
+        {
+            break;
+        }
+        const auto cut = [&](std::u32string& text)
+        {
+            if (static_cast<int>(text.size()) > room)
+            {
+                text.resize(static_cast<std::size_t>(room - 1));
+                text += U'…';
+            }
+        };
+        cut(title);
+        cut(value);
+        region.text.push_back({x(at), top, title, heading});
+        region.text.push_back({x(at), top + cell_.height, value, kBarText});
+        at += static_cast<int>(std::max(title.size(), value.size())) + 3;
+    }
+    return region;
+}
+
 void EventListView::addBars(Frame& frame) const
 {
     const auto& song = document_.song();
     const auto tick = list_.rows()[row_].tick;
     const auto section = song.sectionAt(tick);
     const auto& meter = list_.meter();
+    const Style label{Role::Dim, Role::Bar, kPlain};
 
+    frame.push_back(inspectorRegion());
+
+    // The track's bar: each value after its label.
     Bar top;
+    const auto pair = [&](std::vector<Segment>& group, std::string name, std::string value)
+    {
+        group.push_back({std::move(name), label});
+        group.push_back({" " + std::move(value) + "     ", kBarText});
+    };
     if (track_ == 0)
     {
-        top.left = {{"0 Conductor", {Role::Accent, Role::Bar, kBold}}};
+        pair(top.left, "Track 0:", "Conductor");
     }
     else
     {
         const auto& track = *song.tracks()[track_ - 1];
-        top.left = {{std::to_string(track_) + " " + track.name, {Role::Accent, Role::Bar, kBold}},
-                    {"   ch " + std::to_string(track.channel), kBarText}};
-        if (!track.port.empty())
-        {
-            top.left.push_back({"   " + track.port, kBarText});
-        }
+        pair(top.left, "Track " + std::to_string(track_) + ":", track.name);
+        pair(top.left, "Channel:", std::to_string(track.channel));
+        pair(top.left, "Port:", track.port.empty() ? "default" : track.port);
     }
     const auto first = meter.toBarBeatTick(song.sectionStart(section)).bar;
     const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
-    top.right = {{song.sections()[section]->name() + " · bars " + std::to_string(first) + "–" +
-                      std::to_string(last),
-                  kBarText}};
+    pair(top.right, "Section:", song.sections()[section]->name());
+    pair(top.right, "Bars:", std::to_string(first) + "–" + std::to_string(last));
+    top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
 
     Bar bottom;
     bottom.left = {{field_ ? " EDIT " : " NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
@@ -1556,14 +1608,19 @@ void EventListView::addBars(Frame& frame) const
                                    song.sections()[section]->name(),
                                kBarText});
     }
-    if (const auto pending = keys_.pending(); !pending.empty())
+    if (const auto keys = pending(); !keys.empty())
     {
-        bottom.right.push_back({pending + "   ", {Role::Accent, Role::Bar, kBold}});
+        bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
     }
+    // The song's file, and [+] if it has changes not saved, as in Vim.
+    const auto& file = document_.file();
+    bottom.right.push_back({(file ? utf8Text(file->filename()) : std::string{"No file"}) +
+                                (document_.modified() ? " [+]" : ""),
+                            kBarText});
 
     const auto spacing = BarSpacing::forCell(cell_);
     auto topRegion = layoutBar(top, width_, cell_, spacing);
-    topRegion.bounds = layout_.top[0];
+    topRegion.bounds = layout_.top[1];
     frame.push_back(std::move(topRegion));
     if (mode_ == Mode::CommandLine && !field_)
     {

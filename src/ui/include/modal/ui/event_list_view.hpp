@@ -177,6 +177,8 @@ private:
     void follow();
 
     Region listRegion() const;
+    Region inspectorRegion() const;
+    int inspectorPadding() const { return cell_.height / 4; }
     Region promptRegion() const;
     void addBars(Frame& frame) const;
 

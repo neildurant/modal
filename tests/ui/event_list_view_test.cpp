@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -123,18 +124,38 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(v.view.field() == Column::Position);
 
     const auto frame = v.view.frame();
-    REQUIRE(frame.size() == 3);
-    CHECK(contains(rowText(frame[1], 0), U"1 Bass"));
-    CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
-    CHECK(contains(rowText(frame[1], 0), U"Song · bars 1–1"));
+    REQUIRE(frame.size() == 4);
+    CHECK(contains(rowText(frame[2], 0), U"Track 1: Bass"));
+    CHECK(contains(rowText(frame[2], 0), U"Pro-800"));
+    CHECK(contains(rowText(frame[2], 0), U"Section: Song"));
+    CHECK(contains(rowText(frame[2], 0), U"Bars: 1–1"));
+
+    // The inspector: the kind of row, then headings above their values.
+    const auto has = [&](std::u32string_view text, int line)
+    {
+        return std::ranges::any_of(
+            frame[1].text,
+            [&](const auto& run) { return run.text == text && run.y == 5 + line * kCell.height; });
+    };
+    CHECK(has(U"Section", 0));
+    CHECK(has(U"Position", 0));
+    CHECK(has(U"1:1:000", 1));
+    CHECK(has(U"Song", 1));
+
+    // The status line names the song's file, with [+] once it has changes not saved.
+    CHECK(contains(rowText(frame[3], 0), U"No file"));
+    type(v.view, U"4jx");
+    CHECK(contains(rowText(v.view.frame()[3], 0), U"No file [+]"));
+    type(v.view, U"u");
+    CHECK_FALSE(contains(rowText(v.view.frame()[3], 0), U"[+]"));
     const auto list = frame[0];
     CHECK(contains(rowText(list, 0), U"Position"));
     CHECK(contains(rowText(list, 0), U"Release"));
     CHECK(contains(rowText(list, 5), U"note"));
     CHECK(contains(rowText(list, 5), U"E1 (28)"));
     CHECK(contains(rowText(list, 5), U"1/8"));
-    CHECK(contains(rowText(frame[2], 0), U"NORMAL"));
-    CHECK(contains(rowText(frame[2], 0), U"1:1:000  4/4  Song"));
+    CHECK(contains(rowText(frame[3], 0), U"NORMAL"));
+    CHECK(contains(rowText(frame[3], 0), U"1:1:000  4/4  Song"));
 
     // The conductor's rows are dimmed; the cursor's field is in the cursor's colours.
     CHECK(styleAt(list, 2, 1).background == Role::Cursor);
@@ -472,7 +493,7 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     CHECK(rowText(v.view.frame()[0], 5).find(U"96") == before); // right-justified as it was
     CHECK(v.view.mode() == Mode::CommandLine);
     CHECK(v.view.fieldLine().text() == U"96");
-    CHECK(contains(rowText(v.view.frame()[2], 0), U"EDIT"));
+    CHECK(contains(rowText(v.view.frame()[3], 0), U"EDIT"));
     type(v.view, U"80");
     CHECK(v.view.fieldLine().text() == U"80");
     enter(v.view);
@@ -628,10 +649,10 @@ TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping th
     type(v.view, U"gt");
     CHECK(v.view.track() == 2);
     CHECK(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    CHECK(contains(rowText(v.view.frame()[1], 0), U"2 Lead"));
+    CHECK(contains(rowText(v.view.frame()[2], 0), U"Track 2: Lead"));
     type(v.view, U"gt");
     CHECK(v.view.track() == 0); // round to the conductor
-    CHECK(contains(rowText(v.view.frame()[1], 0), U"0 Conductor"));
+    CHECK(contains(rowText(v.view.frame()[2], 0), U"Track 0: Conductor"));
     type(v.view, U"gt");
     CHECK(v.view.track() == 1);
     type(v.view, U"gT");
@@ -647,21 +668,21 @@ TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping th
 TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k keep place")
 {
     View v{demoSong()};
-    REQUIRE(v.view.viewRows() == 21);
+    REQUIRE(v.view.viewRows() == 17); // below the inspector, the track's bar and the headings
     v.view.handle(Key::typed(U'd', kCtrl), 0);
-    CHECK(v.view.row() == 10);
-    CHECK(v.view.top() == 10);
+    CHECK(v.view.row() == 8);
+    CHECK(v.view.top() == 8);
     v.view.handle(Key::typed(U'f', kCtrl), 0);
-    CHECK(v.view.row() == 29); // a page less two rows, as in Vim
-    CHECK(v.view.top() == 29);
+    CHECK(v.view.row() == 23); // a page less two rows, as in Vim
+    CHECK(v.view.top() == 23);
     v.view.handle(Key::typed(U'u', kCtrl), 0);
-    CHECK(v.view.top() == 19);
+    CHECK(v.view.top() == 15);
 
     v.view.handle(Key::typed(U'j', kCtrl), 0);
-    CHECK(v.view.row() == 20);
-    CHECK(v.view.top() == 20);
+    CHECK(v.view.row() == 16);
+    CHECK(v.view.top() == 16);
     type(v.view, U"zz");
-    CHECK(v.view.top() == 10); // row 20 in the middle of 21
+    CHECK(v.view.top() == 8); // row 16 in the middle of 17
     type(v.view, U"gg");
     v.view.handle(Key::typed(U'k', kCtrl), 0); // the view stops at the top
     CHECK(v.view.top() == 0);
@@ -669,7 +690,7 @@ TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k
 
     // The cursor stays in view as it moves.
     type(v.view, U"30j");
-    CHECK(v.view.top() == 10);
+    CHECK(v.view.top() == 14);
 }
 
 TEST_CASE("a note's length shows as bars, beats and ticks, with the value it's close to")
@@ -722,7 +743,7 @@ TEST_CASE("a count shows until a key uses it or Escape gives it up")
     CHECK(v.view.handle(Key::typed(U'4'), 0));
     CHECK(v.view.handle(Key::typed(U'0'), 0));
     CHECK(v.view.pending() == "40");
-    CHECK(contains(rowText(v.view.frame()[2], 0), U"40"));
+    CHECK(contains(rowText(v.view.frame()[3], 0), U"40"));
     CHECK(v.view.handle(Key::of(NamedKey::Escape), 0));
     CHECK(v.view.pending().empty());
     type(v.view, U"5x"); // a key with no binding gives the count up too
@@ -735,7 +756,7 @@ TEST_CASE("a message shows in the status line until the next key")
 {
     View v;
     v.view.setMessage("modalrc:3: unknown setting", EventListView::MessageKind::Warning);
-    CHECK(contains(rowText(v.view.frame()[2], 0), U"modalrc:3: unknown setting"));
+    CHECK(contains(rowText(v.view.frame()[3], 0), U"modalrc:3: unknown setting"));
     CHECK(v.view.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
     CHECK(v.view.message().empty());
 }
@@ -770,7 +791,7 @@ TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line o
     CHECK(v.view.commandLine().text() == U"set fontsize=14j");
     CHECK(v.view.row() == 0);
     v.view.handle(Key::of(NamedKey::Backspace), 0);
-    CHECK(contains(rowText(v.view.frame()[2], 0), U":set fontsize=14"));
+    CHECK(contains(rowText(v.view.frame()[3], 0), U":set fontsize=14"));
     v.view.handle(Key::of(NamedKey::Enter), 0);
     CHECK(v.view.mode() == Mode::Normal);
     CHECK(lines == std::vector<std::string>{"set fontsize=14"});

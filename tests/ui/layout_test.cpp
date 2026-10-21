@@ -2,6 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
+
 using namespace modal::ui;
 
 TEST_CASE("bars are anchored to their edges, and the main area takes the rest")
@@ -44,4 +46,17 @@ TEST_CASE("a window too small for its bars leaves the main area empty")
     CHECK(layout.rows == 0);
     CHECK(layout.fullRows == 0);
     CHECK(layoutWindow(-5, -5, {10, 20}, 0, 0).main == Rect{0, 0, 0, 0});
+}
+
+TEST_CASE("bars along the top can be of any height, with gaps after them")
+{
+    const CellSize cell{10, 20};
+    const std::array heights{40, 20};
+    const auto layout = layoutWindow(800, 480, cell, heights, 1, 10);
+    REQUIRE(layout.top.size() == 2);
+    CHECK(layout.top[0] == Rect{0, 0, 800, 40});
+    CHECK(layout.top[1] == Rect{0, 50, 800, 20});
+    CHECK(layout.main == Rect{0, 80, 800, 380}); // after the second bar's gap, to the bottom bar
+    CHECK(layout.bottom[0] == Rect{0, 460, 800, 20});
+    CHECK(layout.fullRows == 19);
 }
