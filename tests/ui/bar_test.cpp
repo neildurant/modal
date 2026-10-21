@@ -101,3 +101,39 @@ TEST_CASE("the centre group shows only if it fits between the others")
     const auto narrow = layoutBar(bar, 200, kCell, kSpacing);
     CHECK(placed(narrow) == std::vector<Placed>{{5, U"left"}, {145, U"right"}});
 }
+
+TEST_CASE("the left group never runs into the right, however narrow the bar")
+{
+    const CellSize cell{10, 20};
+    const Style label{Role::Dim, Role::Bar, kPlain};
+    const Style value{Role::BarText, Role::Bar, kPlain};
+    Bar bar;
+    bar.left = {{"Track 1:", label}, {" Bass     ", value}, {"Channel:", label},
+                {" 10     ", value}, {"Port:", label},      {" Pro-800     ", value}};
+    bar.right = {
+        {"Section:", label}, {" Chorus 2     ", value}, {"Bars:", label}, {" 36–47", value}};
+    for (int columns = 40; columns <= 90; ++columns)
+    {
+        const auto region = layoutBar(bar, columns * cell.width, cell, BarSpacing::forCell(cell));
+        int leftEnd = 0;
+        int rightStart = columns * cell.width;
+        for (const auto& run : region.text)
+        {
+            const int end = run.x + static_cast<int>(run.text.size()) * cell.width;
+            const bool isRight = run.text.find(U"Section") != std::u32string::npos ||
+                                 run.text.find(U"Chorus") != std::u32string::npos ||
+                                 run.text.find(U"Bars") != std::u32string::npos ||
+                                 run.text.find(U"36") != std::u32string::npos;
+            if (isRight)
+            {
+                rightStart = std::min(rightStart, run.x);
+            }
+            else
+            {
+                leftEnd = std::max(leftEnd, end);
+            }
+        }
+        CAPTURE(columns);
+        CHECK(leftEnd <= rightStart);
+    }
+}

@@ -125,22 +125,40 @@ TEST_CASE("the event list opens on track 1, at its first row")
 
     const auto frame = v.view.frame();
     REQUIRE(frame.size() == 4);
-    CHECK(contains(rowText(frame[2], 0), U"Track 1: Bass"));
-    CHECK(contains(rowText(frame[2], 0), U"Pro-800"));
-    CHECK(contains(rowText(frame[2], 0), U"Section: Song"));
-    CHECK(contains(rowText(frame[2], 0), U"Bars: 1–1"));
+    CHECK(contains(rowText(frame[1], 0), U"Track 1: Bass"));
+    CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
+    CHECK(contains(rowText(frame[1], 0), U"Section: Song"));
+    CHECK(contains(rowText(frame[1], 0), U"Bars: 1–1"));
 
-    // The inspector: the kind of row, then headings above their values.
+    // The inspector, on a panel of its own: the kind of row, then headings above their values.
+    CHECK(frame[2].background == Role::Panel);
     const auto has = [&](std::u32string_view text, int line)
     {
         return std::ranges::any_of(
-            frame[1].text,
+            frame[2].text,
             [&](const auto& run) { return run.text == text && run.y == 5 + line * kCell.height; });
     };
     CHECK(has(U"Section", 0));
     CHECK(has(U"Position", 0));
     CHECK(has(U"1:1:000", 1));
     CHECK(has(U"Song", 1));
+
+    // Its columns stay put from row to row, whatever the kind of row and its values.
+    const auto xOf = [](const Region& region, std::u32string_view text)
+    {
+        const auto it = std::ranges::find(region.text, text, &TextRun::text);
+        return it == region.text.end() ? -1 : it->x;
+    };
+    const int time = xOf(frame[2], U"Time");
+    CHECK(time > 0);
+    type(v.view, U"5j"); // a note
+    REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Event);
+    const auto note = v.view.frame()[2];
+    CHECK(xOf(note, U"Time") == time);
+    const int ends = xOf(note, U"Ends");
+    type(v.view, U"j");
+    CHECK(xOf(v.view.frame()[2], U"Ends") == ends);
+    type(v.view, U"gg");
 
     // The status line names the song's file, with [+] once it has changes not saved.
     CHECK(contains(rowText(frame[3], 0), U"No file"));
@@ -649,10 +667,10 @@ TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping th
     type(v.view, U"gt");
     CHECK(v.view.track() == 2);
     CHECK(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    CHECK(contains(rowText(v.view.frame()[2], 0), U"Track 2: Lead"));
+    CHECK(contains(rowText(v.view.frame()[1], 0), U"Track 2: Lead"));
     type(v.view, U"gt");
     CHECK(v.view.track() == 0); // round to the conductor
-    CHECK(contains(rowText(v.view.frame()[2], 0), U"Track 0: Conductor"));
+    CHECK(contains(rowText(v.view.frame()[1], 0), U"Track 0: Conductor"));
     type(v.view, U"gt");
     CHECK(v.view.track() == 1);
     type(v.view, U"gT");

@@ -70,9 +70,7 @@ TEST_CASE("the inspector shows every property of an event, with what the row can
                                                      {"Velocity", "96"},
                                                      {"Length", "0:0:480 (1/8)"},
                                                      {"Ends", "1:2:480"},
-                                                     {"Release", "40"},
-                                                     {"Channel", "3"},
-                                                     {"Track", "1 Bass"}});
+                                                     {"Release", "40"}});
 
     const auto cc = of(list, RowKind::Event, 0);
     CHECK(cc.kind == "CC");

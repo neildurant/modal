@@ -189,11 +189,6 @@ Inspection inspect(const EventList& list, std::size_t row)
             }
         },
         event.data);
-
-    const auto tracks = song.tracks();
-    const auto it = std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == id; });
-    add("Channel", std::to_string((*it)->channel));
-    add("Track", std::to_string(it - tracks.begin() + 1) + " " + (*it)->name);
     return result;
 }
 

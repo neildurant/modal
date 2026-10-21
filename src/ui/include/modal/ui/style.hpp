@@ -33,7 +33,8 @@ enum class Role : std::uint8_t
     Selection, // the background of what's selected
     Bar,       // the background of the status line and other bars
     BarText,
-    Mode, // the mode indicator's background, such as NORMAL
+    Panel, // the background of the inspector, a shade apart from the bars
+    Mode,  // the mode indicator's background, such as NORMAL
     ModeText,
     GridLine, // grid steps in a timeline
     BeatLine,

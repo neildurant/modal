@@ -21,8 +21,9 @@ struct InspectorField
 
 // What the inspector shows for a row (decided in milestone 4): the kind of row, and every
 // property of what's there, including what the row can't show: a note's end, a controller's
-// name, text and SysEx whole, the time from the song's start, and the track and channel. On
-// a row that isn't an event, what the row is: a section's bars and length, a tempo, a meter,
+// name, text and SysEx whole, and the time from the song's start; the track and channel
+// are in the view's bar, until a view shows several tracks at once. On a row that isn't an
+// event, what the row is: a section's bars and length, a tempo, a meter,
 // a marker, or at the end the song's length.
 struct Inspection
 {

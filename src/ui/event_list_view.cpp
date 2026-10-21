@@ -233,9 +233,10 @@ void EventListView::resize(int width, int height, CellSize cell)
     width_ = width;
     height_ = height;
     cell_ = {std::max(cell.width, 1), std::max(cell.height, 1)};
-    // The inspector, two lines with a quarter of a line's padding above and below, and the
-    // track's bar, each with half a line after it.
-    const std::array heights{2 * cell_.height + inspectorPadding() * 2, cell_.height};
+    // The view's own bar, a title for it, then the inspector, two lines with a quarter of a
+    // line's padding above and below, each with half a line after it (decided in milestone 4:
+    // every view has its bar first, then the inspector, then the view).
+    const std::array heights{cell_.height, 2 * cell_.height + inspectorPadding() * 2};
     layout_ = layoutWindow(width, height, cell_, heights, 1, cell_.height / 2);
     follow();
 }
@@ -1520,42 +1521,75 @@ Region EventListView::promptRegion() const
 
 Region EventListView::inspectorRegion() const
 {
-    // Headings above their values, each column as wide as the wider of the two, after the
-    // kind of row; a value that doesn't fit is cut short, and those after it left out.
+    // On a panel of its own: the kind of row, then headings above their values. Each column
+    // is as wide as its longest value can be, so the columns stay put as the cursor moves;
+    // a value that doesn't fit is cut short, and those after it left out.
     const auto inspection = inspect(list_, row_);
     Region region{
-        .bounds = layout_.top[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
+        .bounds = layout_.top[1], .background = Role::Panel, .text = {}, .under = {}, .over = {}};
     const int margin = BarSpacing::forCell(cell_).margin;
     const int columns = std::max((width_ - 2 * margin) / cell_.width, 0);
-    const Style kind{Role::Accent, Role::Bar, kBold};
-    const Style heading{Role::Dim, Role::Bar, kPlain};
+    const Style kind{Role::Accent, Role::Panel, kBold};
+    const Style heading{Role::Dim, Role::Panel, kPlain};
+    const Style value{Role::Text, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell_.width; };
+    const int position =
+        static_cast<int>(list_.text(list_.rows().size() - 1)[Column::Position].size());
+    const auto widthOf = [&](std::string_view name)
+    {
+        constexpr std::array<std::pair<std::string_view, int>, 16> kWidths{{
+            {"Time", 9},
+            {"Pitch", 9},
+            {"Velocity", 8},
+            {"Length", 15},
+            {"Release", 7},
+            {"Controller", 25},
+            {"Value", 5},
+            {"Program", 7},
+            {"Bend", 6},
+            {"Pressure", 8},
+            {"Bytes", 5},
+            {"Tempo", 12},
+            {"Per quarter", 12},
+            {"Meter", 6},
+            {"Bars", 9},
+            {"Kind", 13},
+        }};
+        if (name == "Position" || name == "Ends")
+        {
+            return std::max(position, 8);
+        }
+        const auto it = std::ranges::find(kWidths, name, &std::pair<std::string_view, int>::first);
+        return it == kWidths.end() ? 0 : it->second;
+    };
 
     const int top = inspectorPadding();
     region.text.push_back({x(0), top, decodeUtf8(inspection.kind), kind});
-    int at = static_cast<int>(decodeUtf8(inspection.kind).size()) + 3;
+    int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
         auto title = decodeUtf8(field.heading);
-        auto value = decodeUtf8(field.value);
+        auto text = decodeUtf8(field.value);
         const int room = columns - at;
         if (room < kMinSegmentCharacters + 1)
         {
             break;
         }
-        const auto cut = [&](std::u32string& text)
+        const auto cut = [&](std::u32string& line)
         {
-            if (static_cast<int>(text.size()) > room)
+            if (static_cast<int>(line.size()) > room)
             {
-                text.resize(static_cast<std::size_t>(room - 1));
-                text += U'…';
+                line.resize(static_cast<std::size_t>(room - 1));
+                line += U'…';
             }
         };
         cut(title);
-        cut(value);
+        cut(text);
         region.text.push_back({x(at), top, title, heading});
-        region.text.push_back({x(at), top + cell_.height, value, kBarText});
-        at += static_cast<int>(std::max(title.size(), value.size())) + 3;
+        region.text.push_back({x(at), top + cell_.height, text, value});
+        at += std::max({static_cast<int>(title.size()), static_cast<int>(text.size()),
+                        widthOf(field.heading)}) +
+              3;
     }
     return region;
 }
@@ -1567,8 +1601,6 @@ void EventListView::addBars(Frame& frame) const
     const auto section = song.sectionAt(tick);
     const auto& meter = list_.meter();
     const Style label{Role::Dim, Role::Bar, kPlain};
-
-    frame.push_back(inspectorRegion());
 
     // The track's bar: each value after its label.
     Bar top;
@@ -1614,14 +1646,17 @@ void EventListView::addBars(Frame& frame) const
     }
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();
-    bottom.right.push_back({(file ? utf8Text(file->filename()) : std::string{"No file"}) +
-                                (document_.modified() ? " [+]" : ""),
-                            kBarText});
+    const auto& imported = document_.importedFrom();
+    const auto name = file       ? utf8Text(file->filename())
+                      : imported ? utf8Text(imported->filename()) + " (imported)"
+                                 : std::string{"No file"};
+    bottom.right.push_back({name + (document_.modified() ? " [+]" : ""), kBarText});
 
     const auto spacing = BarSpacing::forCell(cell_);
     auto topRegion = layoutBar(top, width_, cell_, spacing);
-    topRegion.bounds = layout_.top[1];
+    topRegion.bounds = layout_.top[0];
     frame.push_back(std::move(topRegion));
+    frame.push_back(inspectorRegion());
     if (mode_ == Mode::CommandLine && !field_)
     {
         frame.push_back(promptRegion());

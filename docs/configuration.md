@@ -77,7 +77,7 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `theme`      | `dark`  | The colour theme: `themes/NAME` in the config directory, or a built-in theme, `dark` or `light` |
 | `font`       | (empty) | A TrueType or OpenType font file, or empty for the built-in JetBrains Mono |
 | `fontsize`   | `12`    | The font size in points (4 to 72), before the display's own scaling |
-| `minsize`    | `80x24` | The smallest the window can be made, in cells |
+| `minsize`    | `120x30` | The smallest the window can be made, in cells |
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
 
 ## Themes
@@ -93,6 +93,7 @@ The roles are:
 | `cursor`, `cursor-text` | the cursor and the text on it |
 | `selection` | the background of what's selected |
 | `bar`, `bar-text` | the status line and other bars |
+| `panel` | the background of the inspector |
 | `mode`, `mode-text` | the mode indicator, such as NORMAL |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `marker` | notes, and markers |
