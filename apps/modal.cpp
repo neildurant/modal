@@ -1,9 +1,15 @@
 // modal: the sequencer.
 
 #include <modal/core/document.hpp>
+#include <modal/core/engine.hpp>
+#include <modal/core/player.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/platform/clock.hpp>
+#include <modal/platform/midi_output.hpp>
+#include <modal/platform/midi_ports.hpp>
 #include <modal/platform/paths.hpp>
+#include <modal/platform/thread_priority.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
@@ -19,10 +25,12 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <variant>
 #include <vector>
 
@@ -31,11 +39,105 @@ namespace
 
 using namespace modal;
 
+// Playback: the engine on a thread of its own at realtime priority, sending to the MIDI
+// outputs, and the player, which opens the ports the tracks name as they're needed. When it
+// goes, playback stops and the thread ends.
+class Playback
+{
+public:
+    explicit Playback(const ui::Settings& settings)
+        : settings_(settings)
+    {
+        std::promise<std::string> priority;
+        auto error = priority.get_future();
+        thread_ = std::thread{[this, &priority]
+                              {
+                                  const platform::RealtimePriority realtime;
+                                  priority.set_value(realtime.error());
+                                  engine_.run();
+                              }};
+        priorityError_ = error.get();
+    }
+
+    ~Playback()
+    {
+        engine_.stop();
+        while (!engine_.quit())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
+        thread_.join();
+    }
+
+    Playback(const Playback&) = delete;
+    Playback& operator=(const Playback&) = delete;
+
+    core::Player& player() { return player_; }
+
+    // Why the engine runs at normal priority, or nothing.
+    const std::string& priorityError() const { return priorityError_; }
+
+    // Hands the player the song, looking the ports up the first time and again whenever the
+    // port setting has changed. Then returns which ports weren't found, if any.
+    std::string update(const core::Song& song)
+    {
+        const bool lookUp = !lookedUp_ || settings_.text("port") != port_;
+        if (lookUp)
+        {
+            port_ = settings_.text("port");
+            lookedUp_ = true;
+            player_.forgetPorts();
+        }
+        player_.update(song);
+        if (!lookUp)
+        {
+            return {};
+        }
+        std::string missing;
+        for (const auto& name : player_.missingPorts())
+        {
+            missing += (missing.empty() ? "" : ", ") +
+                       (!name.empty()   ? name
+                        : port_.empty() ? std::string{"any output, for tracks without a port"}
+                                        : port_ + ", for tracks without a port");
+        }
+        return missing.empty() ? missing : "Ports not found, so not played: " + missing;
+    }
+
+private:
+    // A track's port, or for one without a port, the port setting's or the first found.
+    std::optional<core::DestinationId> open(std::string_view name)
+    {
+        std::string wanted{name.empty() ? std::string_view{port_} : name};
+        if (wanted.empty())
+        {
+            const auto ports = platform::listMidiPorts().outputs;
+            if (ports.empty())
+            {
+                return std::nullopt;
+            }
+            wanted = ports.front().name;
+        }
+        const auto opened = outputs_.open(wanted);
+        return opened.ok() ? std::optional{opened.destination} : std::nullopt;
+    }
+
+    const ui::Settings& settings_;
+    std::string port_; // the port setting when ports were last looked up
+    bool lookedUp_ = false;
+    platform::MidiOutputs outputs_;
+    platform::SystemClock clock_;
+    core::Engine engine_{outputs_, clock_};
+    core::Player player_{engine_, [this](std::string_view name) { return open(name); }};
+    std::thread thread_;
+    std::string priorityError_;
+};
+
 // Applies the settings to the window, the view and the document, as at startup or after a
 // change. A font that can't be opened is replaced by the built-in one, the font setting too
 // so it isn't tried again, and that's the error returned.
 std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventListView& view,
-                  core::Document& document)
+                  core::Document& document, Playback& playback)
 {
     std::string error;
     const ui::sdl::FontOptions font{.file = settings.text("font"),
@@ -54,6 +156,11 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     view.setTimeout(settings.integer("timeoutlen"));
     view.setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
+    view.setRewind(settings.flag("rewind"));
+    if (auto missing = playback.update(document.song()); error.empty())
+    {
+        error = std::move(missing);
+    }
     return error;
 }
 
@@ -193,9 +300,20 @@ int main(int argc, char* argv[])
     }
     auto& window = *std::get<std::unique_ptr<ui::sdl::Window>>(opened);
 
+    // Playing, through the engine; each change to the song is handed to it.
+    Playback playback{settings};
+    if (!playback.priorityError().empty())
+    {
+        const auto warning =
+            "Playback runs at normal priority, so timing may suffer: " + playback.priorityError();
+        std::fprintf(stderr, "%s\n", warning.c_str());
+        message = message.empty() ? warning : message + "; " + warning;
+    }
+
     // The song: the file given, or else the demo song from the arrangement sketch, until
     // there are file commands.
     core::Document document{ui::demoSong()};
+    document.setListener([&](const core::Song& song) { playback.player().update(song); });
     if (songFile)
     {
         if (auto error = open(document, *songFile); !error.empty())
@@ -206,7 +324,8 @@ int main(int argc, char* argv[])
     }
 
     ui::EventListView view{commands, document, config.keymap};
-    if (auto error = apply(settings, window, view, document); !error.empty())
+    view.setPlayer(&playback.player());
+    if (auto error = apply(settings, window, view, document, playback); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());
         message = message.empty() ? error : message + "; " + error;
@@ -227,7 +346,7 @@ int main(int argc, char* argv[])
                                            : configuredSize;
         size = std::clamp(size, setting->minimum, setting->maximum);
         settings.set("fontsize", ui::formatValue(size));
-        if (auto error = apply(settings, window, view, document); !error.empty())
+        if (auto error = apply(settings, window, view, document, playback); !error.empty())
         {
             return ui::CommandResult::error(std::move(error));
         }
@@ -254,7 +373,7 @@ int main(int argc, char* argv[])
             view.setKeymap(config.keymap);
             auto message = result.message;
             bool warning = result.warning;
-            if (auto error = apply(settings, window, view, document); !error.empty())
+            if (auto error = apply(settings, window, view, document, playback); !error.empty())
             {
                 message = error;
                 warning = true;
