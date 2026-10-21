@@ -466,8 +466,10 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
 {
     View v;
     type(v.view, U"4j2l"); // the E1's velocity, 96
+    const auto before = rowText(v.view.frame()[0], 5).find(U"96");
     enter(v.view);
     CHECK(v.view.editingField());
+    CHECK(rowText(v.view.frame()[0], 5).find(U"96") == before); // right-justified as it was
     CHECK(v.view.mode() == Mode::CommandLine);
     CHECK(v.view.fieldLine().text() == U"96");
     CHECK(contains(rowText(v.view.frame()[2], 0), U"EDIT"));

@@ -1456,14 +1456,19 @@ Region EventListView::listRegion() const
                 field_ && column == field_->column && (adding ? isAdded : row == field_->row);
             if (inPrompt)
             {
-                // The field being edited: what's typed, left-justified, with its cursor.
+                // The field being edited: what's typed, justified as the column is, so it
+                // stays where it was, with its cursor (after the text, at its end).
                 const Style editing{Role::Text, Role::Selection, kPlain};
                 const auto& typed = fieldLine_.text();
-                const int span = std::max(width[c] - 1, static_cast<int>(typed.size()) + 1);
-                grid.fill(x[c] - 1, line, span + 1, 1, {U' ', editing});
-                grid.write(x[c], line, encodeUtf8(typed), editing);
+                const auto typedText = encodeUtf8(typed);
+                const int from = textX(x[c], width[c], kColumns[c].right, typedText);
+                const int left = std::min(from, x[c]);
+                const int right =
+                    std::max(from + static_cast<int>(typed.size()) + 1, x[c] + width[c] - 1);
+                grid.fill(left - 1, line, right - left + 1, 1, {U' ', editing});
+                grid.write(from, line, typedText, editing);
                 const auto cursor = fieldLine_.cursor();
-                grid.set(x[c] + static_cast<int>(cursor), line,
+                grid.set(from + static_cast<int>(cursor), line,
                          {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
             }
             else if (!adding && row == row_ && column == cursorField)
