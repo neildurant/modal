@@ -11,6 +11,7 @@ add_library(modal_ui STATIC
     demo_song.cpp
     event_list.cpp
     event_text.cpp
+    inspector.cpp
     frame.cpp
     key_notation.cpp
     keymap.cpp

@@ -44,6 +44,7 @@ add_executable(modal_tests
     ui/event_edit_test.cpp
     ui/event_list_test.cpp
     ui/event_text_test.cpp
+    ui/inspector_test.cpp
     ui/grid_cursor_test.cpp
     ui/key_notation_test.cpp
     ui/keymap_test.cpp

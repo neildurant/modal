@@ -1,0 +1,39 @@
+#pragma once
+
+#include <modal/ui/event_list.hpp>
+
+#include <chrono>
+#include <cstddef>
+#include <string>
+#include <vector>
+
+namespace modal::ui
+{
+
+// One of the inspector's fields: a heading, shown above its value.
+struct InspectorField
+{
+    std::string heading;
+    std::string value;
+
+    friend bool operator==(const InspectorField&, const InspectorField&) = default;
+};
+
+// What the inspector shows for a row (decided in milestone 4): the kind of row, and every
+// property of what's there, including what the row can't show: a note's end, a controller's
+// name, text and SysEx whole, the time from the song's start, and the track and channel. On
+// a row that isn't an event, what the row is: a section's bars and length, a tempo, a meter,
+// a marker, or at the end the song's length.
+struct Inspection
+{
+    std::string kind; // Note, CC, Section, End and so on
+    std::vector<InspectorField> fields;
+};
+
+Inspection inspect(const EventList& list, std::size_t row);
+
+// A time from the song's start, as minutes, seconds and milliseconds, 1:02.250, with hours
+// before them once there are any, 1:00:02.250.
+std::string songTime(std::chrono::nanoseconds time);
+
+} // namespace modal::ui
