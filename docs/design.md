@@ -153,7 +153,7 @@ Motions in time work the same in every view. In the piano roll the cursor is als
 | `gk` / `gj` | To the next note above / below that is sounding at the cursor's time (moving through a chord voicing) |
 | `gp` + pitch | Straight to a pitch, e.g. `gp C4 Enter` |
 
-**Scale lock** is a toggle, shown in the status line (key to decide; `, s` proposed). When it is on, `k` / `j` move by scale steps in the song's key and scale (later, following the chord track if one exists). From a pitch outside the key, `k` / `j` move to the nearest scale tone in that direction. Scale lock also applies to moving notes (`Alt-k` / `Alt-j`) and to step entry.
+**Scale lock** is a toggle, shown in the status line (key to decide; `, t s` proposed, with the other toggles under `, t`). When it is on, `k` / `j` move by scale steps in the song's key and scale (later, following the chord track if one exists). From a pitch outside the key, `k` / `j` move to the nearest scale tone in that direction. Scale lock also applies to moving notes (`Alt-k` / `Alt-j`) and to step entry.
 
 **Moving and editing notes**
 
@@ -232,8 +232,12 @@ Examples: `d2}` deletes from the cursor to the same position two bars later, `>i
 - Linear undo/redo in version 1 (`u`, `Ctrl-R`); an undo tree later.
 - **Undo steps (decided for milestone 4).** Each operator, field edit or command is one undo step; so are a whole recording pass (milestone 7) and a whole macro run (milestone 5), and `.` repeats a change as one step.
 - **Undo history (decided in milestone 4).** Every change to the song is an undo step, the track settings, mute, solo and renames included, since they're saved in the file; an edit that leaves the song as it was is none. Moving and scrolling aren't steps, so `u` never has to wade through navigation: instead each step records where it was made, the cursor's track and position and the view's state (scroll and zoom, or page), and undo and redo go back there, so stepping through the history shows each change where it was made. A view scrolls further only if the change reaches beyond that. Undoing back to the version last saved or loaded makes the song unmodified again. `undolevels` (1,000 by default) is how many steps can be undone; what can be redone doesn't count. Past versions are kept without their flattened timeline, which is rebuilt on undo, so a step costs only what it changed (typically one track's part of one section), and a thousand steps take a few tens of MB at most. Each step has a title that reads on its own, as in an undo list one day ("Delete 3 events in Bass"), shown as "Undid: …", and its time. The core's `Document` holds the song, its file and the history, and calls a listener after every change, which hands the engine each new snapshot.
-- Transport keys work in every mode: Space play/stop, Enter play from cursor, `R` record.
-- **Playing in milestone 4 (decided for milestone 4).** Space plays and stops, Enter plays from the cursor, `Ctrl-.` panics, and the list follows the playhead; recording in the GUI comes in milestone 7. `:port NAME` sets the current track's output port, matching names as the command-line tools do, and a `port` setting names the default for new tracks. The test view goes when the event list arrives; its arrange page's code stays in the UI library for milestone 6 to build on.
+- Transport keys: Space play/stop, `Ctrl-Enter` play from the cursor, `R` record. Space and the play keys work in Normal mode and the views' other non-typing modes; where text is typed (a field edit, the `:` prompt) Space types a space. `Ctrl-.` panics in every mode.
+- **Playing in milestone 4 (decided for milestone 4).** Space plays and stops, `Ctrl-Enter` plays from the cursor, `Ctrl-.` panics, and the list follows the playhead; recording in the GUI comes in milestone 7. `:port NAME` sets the current track's output port, matching names as the command-line tools do, and a `port` setting names the default for new tracks. The test view goes when the event list arrives; its arrange page's code stays in the UI library for milestone 6 to build on.
+- **Enter edits, `Ctrl-Enter` plays (decided in milestone 4).** Enter was first to play from the cursor, but in the event list it edits the field under the cursor, so play-from-cursor is `Ctrl-Enter` in every view. Enter keeps to editing everywhere: in the arrangement, Enter on a bar opens it in the piano roll.
+- **Rewind (decided in milestone 4).** A setting, `rewind` (on by default), with `, t Space` to flip it while playing, chooses between two ways of working, shown in the status line. On, playback goes back to where you were: Space stops and returns to where playback started, so the next Space plays that passage again; the cursor stays where it was left while the view follows the playhead, and the view goes back to the cursor on stopping, for listening to a passage over and over while tweaking it. Off, playback carries on from where it got to: Space stops and the next Space resumes there, and the cursor follows the playhead and stays where playback stopped, ready to edit there. `Ctrl-Enter` plays from the cursor either way. A `play-again` command plays from where playback last started, whatever the setting.
+- **Tracks without a port (decided in milestone 4).** A track with no port, as every track of an imported MIDI file, plays to the `port` setting's port, or, if that is empty (the default), to the first output port found, so a fresh setup makes sound (on Windows through the GS Wavetable Synth). The track's bar shows it as `Port: default`. New tracks leave their port empty rather than copying the setting.
+- **Toggles on `, t` (decided in milestone 4).** Toggles go under the leader and `t`, since they're used now and then rather than all the time: `, t Space` for rewind first, and later scale lock (`, t s`), the metronome, follow and thru, which the hint menu lists together. Until the leader menu (milestone 5), `, t Space` is an ordinary key sequence. `t` itself stays the time-shift operator.
 
 **Notes crossing a range's edges**
 
@@ -311,7 +315,7 @@ Less frequent commands live behind a leader key, as in Doom Emacs: press the lea
 | `, v a` / `, v p` | View: arrangement / piano roll |
 | `, p o` | Ports: choose output for this track |
 | `, l` … | Default note length (see Default note length) |
-| `, s` | Scale lock on/off (proposed; see To decide) |
+| `, t s` | Scale lock on/off (proposed; see To decide) |
 
 The most frequent operations stay on single keys for speed and muscle memory; the leader tree holds everything else. Both are defined in the keymap file, and hint labels come from the same definitions.
 
@@ -734,6 +738,8 @@ The engine does its own timing on both platforms, so behaviour doesn't depend on
 | Sleeping until next event | Absolute `timerfd` on `CLOCK_MONOTONIC`, polled with an `eventfd` for wakes | High-resolution waitable timer |
 | Compiler | GCC / Clang | MSVC |
 
+- **Modal's own ports (decided in milestone 4).** On Linux, Modal creates its own output port, "Modal" by default (a setting), which a plugin host or another program connects to like any other port; built after milestone 4's playback step. WinMM can't create ports, so on Windows a virtual cable driver such as loopMIDI does the job for now, with Modal playing to it by name, until Windows MIDI Services (see To decide).
+
 - **Clock.** The engine's clock is the steady clock (`CLOCK_MONOTONIC` on Linux, the performance counter on Windows). MIDI input is timestamped on the same clock when it arrives, so recorded and loopback times compare directly with send times. The sleep never wakes early. Before an event, the engine sleeps until a margin before it (1.5 ms by default) and busy-waits the rest, since the first Windows loopback run (October 2026, Babyface, WinMM) showed sleeping alone woke 99% of the time within 0.95 ms, at worst 1.7 ms late. The engine always tells the clock when the next event is due, so the spin starts a margin before it even when that falls inside a routine 1 ms wake-up; a command arriving during a spin waits for it, so commands are seen within the margin rather than 1 ms. With the spin, the engine's own waking on that machine (measured without MIDI) went from 99% within 0.85 ms to 99% within 0.05 ms. The margin is a `--spin` option on the command-line tools, for measuring.
 - **Measured timing, Windows.** Loopback runs by Neil, October 2026, on one PC with a Babyface interface through WinMM and a MIDI cable, using `modal-loopback`'s default stream (2,000 notes, one every 10 ms):
 
@@ -832,7 +838,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Milestone 2's recording, pedal, metronome, export and tool decisions (October 2026): see Input and recording, Playback and recording behaviour, Metronome and count-in, Other files, Architecture, and Build and tooling.
 - [x] Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
 - [ ] Linux timing and recording, on a native Linux install with real MIDI hardware and a loopback cable: `modal-loopback`, plain and with `--record`, with and without the spin, as was done on Windows. Milestones 1 and 2 are otherwise done; if Linux shows too much jitter, its backend switches to OS-timestamped delivery (see Scheduler look-ahead).
-- [ ] Windows MIDI Services. vcpkg's libremidi port is built without its Windows MIDI Services backend, so Windows uses WinMM for now. Using Windows MIDI Services (loopback ports, multi-client access) would need a local overlay port that enables it. Shelved for now, since WinMM measures well (October 2026).
+- [ ] Windows MIDI Services. vcpkg's libremidi port is built without its Windows MIDI Services backend, so Windows uses WinMM for now. Using Windows MIDI Services (loopback ports, multi-client access) would need a local overlay port that enables it. Shelved for now, since WinMM measures well (October 2026). It would also give Modal ports of its own on Windows (see Platform specifics); until then, a virtual cable driver such as loopMIDI does the job, with Modal playing to it by name.
 - [x] An imported SMF's time signatures apply to all tracks; a change that falls mid-bar starts a remainder bar. (Moved up from milestones 3–4, since import needs it.)
 
 **Milestones 3–4: grid and first editing view**
@@ -876,7 +882,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestone 6: piano roll and arrangement views**
 
-- [ ] Scale-lock toggle key. Proposed `, s`. `\` was considered, but it is the proposed key for repeating an `f` search backwards (since `,` is the leader). Decide which key gets `\`.
+- [ ] Scale-lock toggle key. Proposed `, t s`, with the other toggles under `, t` (decided in milestone 4). `\` was considered, but it is the proposed key for repeating an `f` search backwards (since `,` is the leader).
 - [ ] Keys for grid size. `Ctrl-h` / `Ctrl-l` were proposed, but Ctrl with `hjkl` and the arrows now moves the cursor and scrolls with it, in every view (decided in milestone 3), so grid size needs other keys.
 - [ ] Velocity used by `o`: the last-used velocity, or a per-track default velocity setting?
 - [x] `zz` centres on the cursor in the views, as Vim's centres the line (October 2026), rather than the test view's `z` to centre and `zz` to reset the zoom; zoom reset needs another key.
