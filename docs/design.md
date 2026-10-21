@@ -533,6 +533,8 @@ Splits (later): two views side by side, e.g. arrangement above event list, as wi
 
 **Inspector**
 
+- **As built in milestone 4.** A panel of two rows at the top of the window: the kind of row (Note, CC, Section…) in the accent colour, then each property's heading, dim, above its value, every column as wide as the wider of the two, with a quarter of a line's padding above and below. It shows what a row can't: a note's end as well as its length, a controller's standard name (`74 Brightness`, from a table in the core the piano roll's lanes and the palette will share), text and SysEx whole, the time from the song's start (`1:02.250`), and the track and channel. On a row that isn't an event it says what the row is: a section's bars and length, a tempo in BPM and microseconds per quarter, a meter, a marker, or at the end the song's length in bars and time. Below it, the list's own bar labels its values, `Track 1: Bass   Channel: 1   Port: Pro-800 ... Section: Song   Bars: 1–8`, labels dim and values in the text colour; it stays separate from the inspector, so the piano roll can use the same inspector. Half a line of space separates the inspector, the bar and the list, each on the bars' tint, rather than boxes or rules that cost whole rows. The status line ends with the song's file, and `[+]` while it has changes not saved, as in Vim.
+
 Inspired by SPG's note information area, a strip at the top of the window always shows every property of the event under the cursor, in every view. For a note: position, note name, MIDI note number, velocity, duration, release velocity, channel and track. For a CC: controller number and name, value, channel.
 
 ```
