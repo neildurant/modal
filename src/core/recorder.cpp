@@ -44,6 +44,8 @@ public:
     std::vector<ControlChange> down() const
     {
         std::vector<ControlChange> result;
+        // Reserved, or GCC 13 at -O3 wrongly warns of an overflow in push_back.
+        result.reserve(kPedals.size());
         for (std::size_t i = 0; i < kPedals.size(); ++i)
         {
             if (values_[i] && *values_[i] >= kPedalDown)
