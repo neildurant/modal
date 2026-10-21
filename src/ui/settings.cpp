@@ -57,6 +57,10 @@ std::string formatValue(const SettingValue& value)
     {
         return std::to_string(cells->columns) + "x" + std::to_string(cells->rows);
     }
+    if (const auto* on = std::get_if<bool>(&value))
+    {
+        return *on ? "on" : "off";
+    }
     return std::get<std::string>(value);
 }
 
@@ -84,6 +88,14 @@ Settings::Settings()
                   std::int64_t{30}, 0, 1000),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
+          setting("port",
+                  "The output port for tracks without one: its name, or part of it, or empty "
+                  "for the first port found",
+                  std::string{}),
+          setting("rewind",
+                  "Whether Space stops and goes back to where playback started (on), or "
+                  "stops and resumes where it stopped (off)",
+                  true),
       }
 {
 }
@@ -141,10 +153,38 @@ std::string Settings::set(std::string_view name, std::string_view text)
         }
         setting->value = CellCount{*columns, *rows};
     }
+    else if (std::holds_alternative<bool>(setting->value))
+    {
+        if (text != "on" && text != "off")
+        {
+            return std::string{name} + " must be on or off";
+        }
+        setting->value = text == "on";
+    }
     else
     {
         setting->value = std::string{text};
     }
+    return {};
+}
+
+std::string Settings::setFlag(std::string_view word)
+{
+    const bool toggle = word.ends_with('!');
+    auto name = word.substr(0, word.size() - (toggle ? 1 : 0));
+    const bool off = !toggle && findSetting(name) == nullptr && name.starts_with("no");
+    name.remove_prefix(off ? 2 : 0);
+    Setting* setting = findSetting(name);
+    if (setting == nullptr)
+    {
+        return "unknown setting \"" + std::string{name} + "\"";
+    }
+    auto* on = std::get_if<bool>(&setting->value);
+    if (on == nullptr)
+    {
+        return "set needs NAME=VALUE, not " + std::string{word};
+    }
+    *on = toggle ? !*on : !off;
     return {};
 }
 
@@ -170,6 +210,12 @@ CellCount Settings::cells(std::string_view name) const
 {
     assert(find(name) != nullptr);
     return std::get<CellCount>(find(name)->value);
+}
+
+bool Settings::flag(std::string_view name) const
+{
+    assert(find(name) != nullptr);
+    return std::get<bool>(find(name)->value);
 }
 
 } // namespace modal::ui

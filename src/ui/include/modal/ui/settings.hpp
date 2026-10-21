@@ -19,10 +19,10 @@ struct CellCount
     friend bool operator==(CellCount, CellCount) = default;
 };
 
-// A setting's value: a whole number, a number, text or a size in cells.
-using SettingValue = std::variant<std::int64_t, double, std::string, CellCount>;
+// A setting's value: a whole number, a number, text, a size in cells, or on or off.
+using SettingValue = std::variant<std::int64_t, double, std::string, CellCount, bool>;
 
-// The value written as `set` reads it: 500, 10.5, dark, 80x24.
+// The value written as `set` reads it: 500, 10.5, dark, 80x24, on.
 std::string formatValue(const SettingValue& value);
 
 struct Setting
@@ -44,8 +44,13 @@ public:
     Settings();
 
     // Sets a setting from text, returning why not if there's no such setting or the text
-    // isn't a value for it, or else nothing; the value is unchanged then.
+    // isn't a value for it, or else nothing; the value is unchanged then. An on-or-off
+    // setting takes on or off.
     std::string set(std::string_view name, std::string_view value);
+
+    // Sets an on-or-off setting from one word, as Vim does: NAME turns it on, noNAME off, and
+    // NAME! the other way. Returns why not, or nothing.
+    std::string setFlag(std::string_view word);
 
     // The setting of a name, or null if there's none.
     const Setting* find(std::string_view name) const;
@@ -60,6 +65,7 @@ public:
     double number(std::string_view name) const;
     const std::string& text(std::string_view name) const;
     CellCount cells(std::string_view name) const;
+    bool flag(std::string_view name) const;
 
 private:
     Setting* findSetting(std::string_view name);

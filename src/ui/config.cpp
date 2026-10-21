@@ -194,7 +194,12 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
             const auto equals = argument.find('=');
             if (equals == std::string::npos)
             {
-                return "set needs NAME=VALUE, not " + argument;
+                // An on-or-off setting: rewind, norewind or rewind!.
+                if (auto error = config_.settings.setFlag(argument); !error.empty())
+                {
+                    return error;
+                }
+                continue;
             }
             const auto name = std::string_view{argument}.substr(0, equals);
             const auto previous = name == "theme" ? config_.settings.text("theme") : std::string{};

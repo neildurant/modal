@@ -81,6 +81,7 @@ TEST_CASE("command files set settings and bind keys, skipping blank lines and co
 
 set timeoutlen=300
   set fontsize=14 minsize=100x30
+set norewind port=Pro-800
 nmap J cursor-down
 nmap <C-g> go-first "Top of the song"
 vmap j cursor-down
@@ -90,6 +91,8 @@ vmap j cursor-down
     CHECK(config.settings.integer("timeoutlen") == 300);
     CHECK(config.settings.number("fontsize") == 14.0);
     CHECK(config.settings.cells("minsize") == CellCount{100, 30});
+    CHECK_FALSE(config.settings.flag("rewind"));
+    CHECK(config.settings.text("port") == "Pro-800");
     CHECK(*binding(config, Mode::Normal, {Key::typed(U'J')}) == Binding{"cursor-down", ""});
     CHECK(*binding(config, Mode::Normal, {Key::typed(U'g', kCtrl)}) ==
           Binding{"go-first", "Top of the song"});

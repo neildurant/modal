@@ -53,7 +53,7 @@ highlight cursor #ff9e64
 source more-keys
 ```
 
-- `set NAME=VALUE ...` sets settings. Several can go on one line.
+- `set NAME=VALUE ...` sets settings. Several can go on one line. A setting that's on or off can also be set as in Vim: `set rewind` turns it on, `set norewind` off, and `set rewind!` the other way.
 - `nmap KEYS COMMAND ["HINT"]` binds keys in Normal mode to a command, with an optional hint. `vmap`, `imap`, `omap` and `cmap` do the same for Visual, Insert, operator-pending and command-line mode (for later milestones). `nunmap KEYS` (and `vunmap` and so on) removes a binding.
 - `highlight ROLE #rrggbb` sets the colour of a theme role.
 - `source FILE` runs another command file, found relative to the file running it.
@@ -79,6 +79,8 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `fontsize`   | `12`    | The font size in points (4 to 72), before the display's own scaling |
 | `minsize`    | `120x30` | The smallest the window can be made, in cells |
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
+| `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
+| `rewind`     | `on`    | Whether Space stops and goes back to where playback started (`on`), or stops and resumes from where it stopped (`off`) |
 
 ## Themes
 

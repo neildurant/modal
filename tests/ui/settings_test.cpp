@@ -59,6 +59,31 @@ TEST_CASE("settings are set from text, checked against their type and range")
     CHECK(settings.set("fontsiz", "12") == "unknown setting \"fontsiz\"");
 }
 
+TEST_CASE("on-or-off settings take on or off, or a word as in Vim")
+{
+    Settings settings;
+    CHECK(settings.flag("rewind")); // on by default
+    CHECK(settings.set("rewind", "off").empty());
+    CHECK_FALSE(settings.flag("rewind"));
+    CHECK(settings.set("rewind", "yes") == "rewind must be on or off");
+    CHECK(settings.setFlag("rewind").empty());
+    CHECK(settings.flag("rewind"));
+    CHECK(settings.setFlag("norewind").empty());
+    CHECK_FALSE(settings.flag("rewind"));
+    CHECK(settings.setFlag("rewind!").empty());
+    CHECK(settings.flag("rewind"));
+    CHECK(settings.setFlag("rewind!").empty());
+    CHECK_FALSE(settings.flag("rewind"));
+    CHECK(settings.setFlag("fontsize") == "set needs NAME=VALUE, not fontsize");
+    CHECK(settings.setFlag("nofontsize") == "set needs NAME=VALUE, not nofontsize");
+    CHECK(settings.setFlag("rewnd") == "unknown setting \"rewnd\"");
+}
+
+TEST_CASE("the port for tracks without one is the first found, unless set")
+{
+    CHECK(Settings{}.text("port").empty());
+}
+
 TEST_CASE("undolevels is a thousand by default")
 {
     CHECK(Settings{}.integer("undolevels") == 1000);
@@ -71,6 +96,8 @@ TEST_CASE("values are written as set reads them")
     CHECK(formatValue(10.5) == "10.5");
     CHECK(formatValue(std::string{"dark"}) == "dark");
     CHECK(formatValue(CellCount{80, 24}) == "80x24");
+    CHECK(formatValue(true) == "on");
+    CHECK(formatValue(false) == "off");
 
     Settings settings;
     const Settings defaults;
