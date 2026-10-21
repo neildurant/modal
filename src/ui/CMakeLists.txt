@@ -19,6 +19,7 @@ add_library(modal_ui STATIC
     prompt.cpp
     settings.cpp
     style.cpp
+    event_edit.cpp
     event_list_view.cpp
     themes.cpp
     time_motions.cpp
