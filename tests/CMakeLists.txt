@@ -4,6 +4,7 @@ find_package(SDL3 CONFIG REQUIRED) # to push events at windows
 include(Catch)
 
 add_executable(modal_tests
+    core/controllers_test.cpp
     core/count_in_test.cpp
     core/document_test.cpp
     core/engine_test.cpp
