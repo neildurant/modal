@@ -13,7 +13,7 @@ highlight cursor-text  #1a1b26
 highlight selection    #2e3c64
 highlight bar          #24283b
 highlight bar-text     #a9b1d6
-highlight panel        #292e42
+highlight panel        #343a52
 highlight mode         #7aa2f7
 highlight mode-text    #1a1b26
 highlight grid-line    #24283b
