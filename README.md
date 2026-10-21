@@ -46,6 +46,9 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 | `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d}` up to where `}` goes |
 | `x`, `p` | Delete this event; put what was yanked or deleted at the cursor's time |
+| Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
+| `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
+| `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
 | `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
 | Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
