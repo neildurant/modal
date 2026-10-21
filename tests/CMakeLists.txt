@@ -14,6 +14,7 @@ add_executable(modal_tests
     core/note_fraction_test.cpp
     core/pitch_test.cpp
     core/playback_plan_test.cpp
+    core/player_test.cpp
     core/recorder_test.cpp
     core/scheduler_test.cpp
     core/smf_export_test.cpp

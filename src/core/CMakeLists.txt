@@ -11,6 +11,7 @@ add_library(modal_core STATIC
     document.cpp
     pitch.cpp
     playback_plan.cpp
+    player.cpp
     recorder.cpp
     scheduler.cpp
     smf.cpp

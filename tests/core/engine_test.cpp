@@ -1,4 +1,5 @@
 #include "support/edit_track.hpp"
+#include "support/fake_clock.hpp"
 #include "support/playback.hpp"
 #include "support/ppqn.hpp"
 
@@ -20,23 +21,6 @@ using std::chrono::nanoseconds;
 namespace
 {
 
-constexpr nanoseconds kStart = 1000s;
-
-// A clock that stands still until a test moves it, or until the engine sleeps.
-class FakeClock : public EngineClock
-{
-public:
-    nanoseconds now() noexcept override { return time; }
-    void sleepUntil(nanoseconds until, std::optional<nanoseconds>) noexcept override
-    {
-        time = std::max(time, until);
-    }
-    void wake() noexcept override { ++wakes; }
-
-    nanoseconds time = kStart;
-    std::atomic<int> wakes{0}; // from input threads too
-};
-
 // One note per quarter, starting on the beat, a quarter note long: pitches 60, 62, 64, 65.
 std::shared_ptr<const PlaybackPlan> fourNotes(Ppqn ppqn)
 {
@@ -53,15 +37,6 @@ std::shared_ptr<const PlaybackPlan> fourNotes(Ppqn ppqn)
                  }
              });
     return std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName));
-}
-
-// Steps the engine as run() would, until the clock reaches an end time.
-void runUntil(Engine& engine, FakeClock& clock, nanoseconds end)
-{
-    while (clock.time <= end)
-    {
-        clock.sleepUntil(engine.step().time, std::nullopt);
-    }
 }
 
 } // namespace
