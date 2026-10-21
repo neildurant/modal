@@ -126,7 +126,7 @@ void Window::draw(const Frame& frame, const Theme& theme)
 {
     SDL_Renderer* renderer = impl_->renderer;
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    const auto background = theme[Role::Background];
+    const auto background = theme[Role::Chrome];
     SDL_SetRenderDrawColor(renderer, background.r, background.g, background.b, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(renderer);
     for (const auto& region : frame)

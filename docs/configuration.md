@@ -94,6 +94,7 @@ The roles are:
 | `selection` | the background of what's selected |
 | `bar`, `bar-text` | the status line and other bars |
 | `panel` | the background of the inspector |
+| `chrome` | the window around the view (the event list, piano roll or arrangement) and the gaps between bars; the view itself is on `background` |
 | `mode`, `mode-text` | the mode indicator, such as NORMAL |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `marker` | notes, and markers |

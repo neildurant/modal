@@ -85,9 +85,9 @@ TEST_CASE("an offscreen window draws frames that can be read back")
 
     const auto theme = *builtInTheme("dark");
     window->draw({}, theme);
-    CHECK(window->pixel(0, 0) == theme[Role::Background]);
+    CHECK(window->pixel(0, 0) == theme[Role::Chrome]); // around the view
     CHECK(window->pixel(window->pixelWidth() - 1, window->pixelHeight() - 1) ==
-          theme[Role::Background]);
+          theme[Role::Chrome]);
     CHECK(window->pixel(window->pixelWidth(), 0) == std::nullopt);
 }
 
@@ -177,17 +177,18 @@ TEST_CASE("a region is clipped to its bounds, with shapes under and over its tex
                   .under = {{{-100, -100, 1000, 1000}, Role::Note, 255}},
                   .over = {{{20, 0, 5, 30}, Role::Marker, 255}}};
     window->draw({region}, theme);
-    CHECK(window->pixel(9, 9) == theme[Role::Background]);
+    CHECK(window->pixel(9, 9) == theme[Role::Chrome]);
     CHECK(window->pixel(10, 10) == theme[Role::Note]);
     CHECK(window->pixel(49, 39) == theme[Role::Note]);
-    CHECK(window->pixel(50, 40) == theme[Role::Background]);
+    CHECK(window->pixel(50, 40) == theme[Role::Chrome]);
     CHECK(window->pixel(32, 20) == theme[Role::Marker]); // over, offset by the bounds
 }
 
 TEST_CASE("a bottom bar touches the bottom edge, whatever the window's height")
 {
     auto window = offscreen(320, 203);
-    const auto theme = *builtInTheme("dark");
+    auto theme = *builtInTheme("dark");
+    theme.set(Role::Chrome, theme[Role::Background]); // the built-in chrome is the bar's colour
     const auto cell = window->cellSize();
     const int width = window->pixelWidth();
     const int height = window->pixelHeight();
