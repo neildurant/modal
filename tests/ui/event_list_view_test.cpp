@@ -102,6 +102,17 @@ Style styleAt(const Region& region, int column, int row)
     return {};
 }
 
+core::Note bassNote(const View& v, std::size_t index)
+{
+    return std::get<core::Note>(
+        v.document.song().events(v.document.song().tracks()[0]->id())[index].data);
+}
+
+void enter(EventListView& view)
+{
+    view.handle(Key::of(NamedKey::Enter), 0);
+}
+
 } // namespace
 
 TEST_CASE("the event list opens on track 1, at its first row")
@@ -370,29 +381,86 @@ TEST_CASE("an operator waits for its motion, and Escape or another key gives it 
     CHECK(v.document.song().events(v.document.song().tracks()[0]->id()).size() == 4);
 }
 
-TEST_CASE("the conductor's list can't be edited yet")
+TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes changes")
 {
+    // The conductor's rows: 0 section Song, 1 meter, 2 tempo, 3 marker at 1:3:000, 4 section
+    // Verse at 2:1:000, and 5 the end.
     View v;
-    type(v.view, U"gTdd");
-    CHECK(v.view.message() == "The conductor's list can't be edited yet");
-    CHECK_FALSE(v.document.modified());
+    const auto& song = [&]() -> const core::Song& { return v.document.song(); };
+    type(v.view, U"gT");
+    REQUIRE(v.view.track() == 0);
+
+    type(v.view, U"3jl"); // the marker's name
+    enter(v.view);
+    CHECK(v.view.fieldLine().text() == U"fill");
+    type(v.view, U"fix");
+    enter(v.view);
+    CHECK(song().markers()[0].name == "fix");
+    type(v.view, U"u");
+    CHECK(v.view.message() == "Undid: Rename marker fill to fix");
+
+    type(v.view, U"j"); // the verse's name
+    enter(v.view);
+    type(v.view, U"Chorus");
+    enter(v.view);
+    CHECK(song().sections()[1]->name() == "Chorus");
+
+    type(v.view, U"gg2j"); // the tempo at the start
+    enter(v.view);
+    CHECK(v.view.fieldLine().text() == U"120");
+    type(v.view, U"140");
+    enter(v.view);
+    CHECK(song().tempo().tempoAt(0) == core::Tempo::fromBpm(140));
+    type(v.view, U"+");
+    CHECK(song().tempo().tempoAt(0) == core::Tempo::fromBpm(141));
+    enter(v.view);
+    type(v.view, U"1001");
+    enter(v.view);
+    CHECK(v.view.message().starts_with("A tempo must be from 1 to 1000 BPM"));
+    v.view.handle(Key::of(NamedKey::Escape), 0);
+
+    type(v.view, U"k"); // the meter at the start
+    enter(v.view);
+    type(v.view, U"3/4");
+    enter(v.view);
+    CHECK(song().meter().signatureAt(0) == core::TimeSignature{3, 4});
+    CHECK(v.view.message().empty());
+    // The intro's four beats are now a 3/4 bar and a 1/4 remainder bar, which leaves no room
+    // for a whole 4/4 bar at the start: it says so, and changes nothing.
+    type(v.view, U"+");
+    CHECK(v.view.message() == "The meter change at 2:1:000 leaves no room for a whole 4/4 bar "
+                              "here; change or delete it first");
+    CHECK(song().meter().signatureAt(0) == core::TimeSignature{3, 4});
+    type(v.view, U"u");
+    CHECK(song().meter().signatureAt(0) == core::TimeSignature{4, 4});
+
+    // A section's own tempo and meter, and the section, can't be deleted; a marker can.
+    type(v.view, U"gg3dd");
+    CHECK(v.view.message().starts_with("Every section keeps its tempo and meter at its start"));
+    type(v.view, U"gg]m");
+    REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Marker);
+    type(v.view, U"dd");
+    CHECK(song().markers().empty());
+
+    // A tempo change inside a section can.
+    v.document.edit("Add a tempo change", {}, [](core::Song& s)
+                    { s.updateTempo([](core::TempoMap& t) { t.set(q, core::Tempo{400'000}); }); });
+    v.view.refresh();
+    type(v.view, U"gg3j");
+    REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Tempo);
+    type(v.view, U"x");
+    CHECK(song().tempo().changes().size() == 1);
+    CHECK(v.view.message().empty());
+
+    // Its positions, and yanking and putting there, wait.
+    type(v.view, U"0");
+    enter(v.view);
+    CHECK(v.view.message() == "Moving the conductor's changes comes later");
+    type(v.view, U"yy");
+    CHECK(v.view.message() == "Only a track's events can be yanked");
+    type(v.view, U"p");
+    CHECK(v.view.message() == "Only a track's events can be put");
 }
-
-namespace
-{
-
-core::Note bassNote(const View& v, std::size_t index)
-{
-    return std::get<core::Note>(
-        v.document.song().events(v.document.song().tracks()[0]->id())[index].data);
-}
-
-void enter(EventListView& view)
-{
-    view.handle(Key::of(NamedKey::Enter), 0);
-}
-
-} // namespace
 
 TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
 {

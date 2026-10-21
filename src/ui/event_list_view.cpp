@@ -10,6 +10,9 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <charconv>
+#include <cmath>
+#include <system_error>
 #include <utility>
 
 namespace modal::ui
@@ -689,8 +692,12 @@ bool EventListView::operate(std::string_view op, std::size_t from, std::size_t t
 {
     if (track_ == 0)
     {
-        setMessage("The conductor's list can't be edited yet", MessageKind::Warning);
-        return true;
+        if (op == "operator-yank")
+        {
+            setMessage("Only a track's events can be yanked", MessageKind::Warning);
+            return true;
+        }
+        return deleteConductor(std::min(from, to), std::max(from, to));
     }
     if (from > to)
     {
@@ -749,7 +756,7 @@ bool EventListView::put()
 {
     if (track_ == 0)
     {
-        setMessage("The conductor's list can't be edited yet", MessageKind::Warning);
+        setMessage("Only a track's events can be put", MessageKind::Warning);
         return true;
     }
     if (register_.empty())
@@ -821,11 +828,14 @@ bool EventListView::openField()
         setMessage("Nothing to edit here", MessageKind::Information);
         return true;
     }
-    if (track_ == 0 || row.dim)
+    if (row.dim)
     {
-        setMessage(row.dim ? "That's the conductor's: edit it in its list (gT)"
-                           : "The conductor's list can't be edited yet",
-                   MessageKind::Warning);
+        setMessage("That's the conductor's: edit it in its list (gT)", MessageKind::Warning);
+        return true;
+    }
+    if (track_ == 0 && field() != Column::Data)
+    {
+        setMessage("Moving the conductor's changes comes later", MessageKind::Warning);
         return true;
     }
     // The value as shown, less any note value or note number after it in brackets.
@@ -919,16 +929,23 @@ bool EventListView::finishField()
         return true;
     }
     const auto& row = list_.rows()[prompt.row];
-    const auto& event = document_.song().events(*list_.track())[row.index];
-    const auto result = setField(event, prompt.column, text, list_.meter());
     std::optional<std::string> error;
-    if (const auto* why = std::get_if<std::string>(&result))
+    if (track_ == 0)
     {
-        error = *why;
+        error = setConductor(prompt.row, text);
     }
     else
     {
-        error = replaceEvent(prompt.row, std::get<core::Event>(result), prompt.column);
+        const auto& event = document_.song().events(*list_.track())[row.index];
+        const auto result = setField(event, prompt.column, text, list_.meter());
+        if (const auto* why = std::get_if<std::string>(&result))
+        {
+            error = *why;
+        }
+        else
+        {
+            error = replaceEvent(prompt.row, std::get<core::Event>(result), prompt.column);
+        }
     }
     if (error)
     {
@@ -946,11 +963,18 @@ bool EventListView::finishField()
 bool EventListView::stepFieldBy(int steps)
 {
     const auto& row = list_.rows()[row_];
-    if (track_ == 0 || row.kind != RowKind::Event)
+    if (track_ == 0 && row.kind != RowKind::End)
     {
-        setMessage(row.dim       ? "That's the conductor's: edit it in its list (gT)"
-                   : track_ == 0 ? "The conductor's list can't be edited yet"
-                                 : "Nothing to change here",
+        if (auto error = stepConductor(row_, steps))
+        {
+            setMessage(*error, MessageKind::Warning);
+        }
+        return true;
+    }
+    if (row.kind != RowKind::Event)
+    {
+        setMessage(row.dim ? "That's the conductor's: edit it in its list (gT)"
+                           : "Nothing to change here",
                    MessageKind::Warning);
         return true;
     }
@@ -970,6 +994,202 @@ bool EventListView::stepFieldBy(int steps)
     {
         setMessage(*error, MessageKind::Warning);
     }
+    return true;
+}
+
+namespace
+{
+
+std::optional<core::TimeSignature> signatureOf(std::string_view text, core::Ppqn ppqn)
+{
+    const auto slash = text.find('/');
+    if (slash == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    int numerator = 0;
+    int denominator = 0;
+    const auto top = text.substr(0, slash);
+    const auto bottom = text.substr(slash + 1);
+    const auto a = std::from_chars(top.data(), top.data() + top.size(), numerator);
+    const auto b = std::from_chars(bottom.data(), bottom.data() + bottom.size(), denominator);
+    const core::TimeSignature signature{numerator, denominator};
+    if (a.ec != std::errc{} || a.ptr != top.data() + top.size() || b.ec != std::errc{} ||
+        b.ptr != bottom.data() + bottom.size() || !signature.isValid() ||
+        !signature.beatLength().isExact(ppqn))
+    {
+        return std::nullopt;
+    }
+    return signature;
+}
+
+} // namespace
+
+std::optional<std::string> EventListView::setConductor(std::size_t row, std::string_view text)
+{
+    const auto& r = list_.rows()[row];
+    const auto tick = r.tick;
+    const auto& song = document_.song();
+    switch (r.kind)
+    {
+    case RowKind::Section:
+        if (text.empty())
+        {
+            return "A section needs a name";
+        }
+        edit("Rename section " + song.sections()[r.index]->name() + " to " + std::string{text},
+             [&](core::Song& s) { s.renameSection(r.index, std::string{text}); });
+        return std::nullopt;
+    case RowKind::Marker:
+        if (text.empty())
+        {
+            return "A marker needs a name; dd deletes it";
+        }
+        edit("Rename marker " + song.markers()[r.index].name + " to " + std::string{text},
+             [&](core::Song& s) { s.setMarker(tick, std::string{text}); });
+        return std::nullopt;
+    case RowKind::Tempo:
+    {
+        const auto current = song.tempo().changes()[r.index].tempo.bpm();
+        double bpm = 0;
+        auto number = text;
+        int sign = 0;
+        if (number.size() > 1 && (number.front() == '+' || number.front() == '-'))
+        {
+            sign = number.front() == '+' ? 1 : -1;
+            number.remove_prefix(1);
+        }
+        const auto [ptr, error] =
+            std::from_chars(number.data(), number.data() + number.size(), bpm);
+        if (sign != 0)
+        {
+            bpm = current + sign * bpm;
+        }
+        if (error != std::errc{} || ptr != number.data() + number.size() || !(bpm >= 1) ||
+            bpm > 1000)
+        {
+            return "A tempo must be from 1 to 1000 BPM, or a change such as +5";
+        }
+        const auto tempo = core::Tempo::fromBpm(bpm);
+        edit("Set tempo to " + core::bpmText(tempo),
+             [&](core::Song& s) { s.updateTempo([&](core::TempoMap& t) { t.set(tick, tempo); }); });
+        return std::nullopt;
+    }
+    case RowKind::Meter:
+    {
+        const auto signature = signatureOf(text, song.ppqn());
+        if (!signature)
+        {
+            return "A meter is a time signature such as 3/4, its bottom a power of two to 64";
+        }
+        // A meter change soon after, such as a remainder bar, can leave no room for a whole
+        // bar of the new meter; then nothing changes, and it says so.
+        const auto apply = [&](core::Song& s)
+        { s.updateMeter([&](core::MeterMap& m) { m.set(tick, *signature); }); };
+        auto trial = song;
+        apply(trial);
+        if (trial.meter().signatureAt(tick) != *signature)
+        {
+            const auto changes = song.meter().changes();
+            const auto next = std::ranges::upper_bound(changes, tick, {}, &core::MeterChange::tick);
+            return "The meter change at " +
+                   positionText(song.meter(), next != changes.end() ? next->tick : tick) +
+                   " leaves no room for a whole " + std::string{text} +
+                   " bar here; change or delete it first";
+        }
+        edit("Set meter to " + std::string{text}, apply);
+        return std::nullopt;
+    }
+    default:
+        return "Nothing to change here";
+    }
+}
+
+std::optional<std::string> EventListView::stepConductor(std::size_t row, int steps)
+{
+    const auto& r = list_.rows()[row];
+    const auto& song = document_.song();
+    if (field() != Column::Data)
+    {
+        return "Moving the conductor's changes comes later";
+    }
+    if (r.kind == RowKind::Tempo)
+    {
+        // In whole BPM, from the nearest.
+        const auto bpm = std::clamp<long>(
+            std::lround(song.tempo().changes()[r.index].tempo.bpm()) + steps, 1, 1000);
+        return setConductor(row, std::to_string(bpm));
+    }
+    if (r.kind == RowKind::Meter)
+    {
+        auto signature = song.meter().changes()[r.index].signature;
+        signature.numerator =
+            std::clamp(signature.numerator + steps, 1, core::TimeSignature::kMaxNumerator);
+        return setConductor(row, std::to_string(signature.numerator) + "/" +
+                                     std::to_string(signature.denominator));
+    }
+    return "Only tempos and meters can be stepped";
+}
+
+bool EventListView::deleteConductor(std::size_t from, std::size_t to)
+{
+    const auto& song = document_.song();
+    to = std::min(to, list_.rows().size() - 1);
+    // Every section keeps its tempo and meter at its start, and sections are joined, not
+    // deleted.
+    std::vector<core::Tick> starts;
+    for (std::size_t i = 0; i < song.sections().size(); ++i)
+    {
+        starts.push_back(song.sectionStart(i));
+    }
+    const auto atStart = [&](core::Tick tick)
+    { return std::ranges::find(starts, tick) != starts.end(); };
+    std::vector<EventRow> doomed;
+    bool kept = false;
+    for (auto r = from; r <= to; ++r)
+    {
+        const auto& row = list_.rows()[r];
+        const bool fixed = row.kind == RowKind::Section || row.kind == RowKind::End ||
+                           (row.kind != RowKind::Marker && atStart(row.tick));
+        kept = kept || (fixed && row.kind != RowKind::End);
+        if (!fixed)
+        {
+            doomed.push_back(row);
+        }
+    }
+    if (doomed.empty())
+    {
+        if (kept)
+        {
+            setMessage("Every section keeps its tempo and meter at its start, and sections are "
+                       "joined, not deleted",
+                       MessageKind::Warning);
+        }
+        return kept;
+    }
+    const auto what =
+        doomed.size() == 1 ? std::string{"1 change"} : std::to_string(doomed.size()) + " changes";
+    edit("Delete " + what + " in the conductor",
+         [&](core::Song& s)
+         {
+             for (const auto& row : doomed)
+             {
+                 if (row.kind == RowKind::Marker)
+                 {
+                     s.removeMarker(row.tick);
+                 }
+                 else if (row.kind == RowKind::Tempo)
+                 {
+                     s.updateTempo([&](core::TempoMap& t) { t.remove(row.tick); });
+                 }
+                 else
+                 {
+                     s.updateMeter([&](core::MeterMap& m) { m.remove(row.tick); });
+                 }
+             }
+         });
+    row_ = std::min(from, list_.rows().size() - 1);
+    follow();
     return true;
 }
 

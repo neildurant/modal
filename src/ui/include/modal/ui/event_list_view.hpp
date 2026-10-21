@@ -157,6 +157,13 @@ private:
     bool finishField();
     bool stepFieldBy(int steps);
 
+    // The conductor's list: sets a row's value (a section's or marker's name, a tempo, a
+    // meter) from text or steps it, or deletes the tempo and meter changes and markers among
+    // some rows, but not a section's own tempo and meter at its start, nor a section.
+    std::optional<std::string> setConductor(std::size_t row, std::string_view text);
+    std::optional<std::string> stepConductor(std::size_t row, int steps);
+    bool deleteConductor(std::size_t from, std::size_t to);
+
     // Replaces the event of a row with a changed one, if it doesn't overlap a note of its
     // pitch, and puts the cursor on it. Returns why not, or nothing.
     std::optional<std::string> replaceEvent(std::size_t row, const core::Event& changed,
