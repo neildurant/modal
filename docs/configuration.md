@@ -81,6 +81,8 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `fontsize`   | `12`    | The font size in points (4 to 72), before the display's own scaling |
 | `minsize`    | `120x30` | The smallest the window can be made, in cells |
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
+| `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
+| `undolevels` | `1000`  | How many changes can be undone (0 to 100000) |
 | `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
 | `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |
 

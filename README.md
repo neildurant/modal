@@ -9,7 +9,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 1. **Engine and MIDI layer:** playing Standard MIDI Files with timing measured on real hardware.
 2. **Recording:** with metronome, count-in and pre-roll (from the command line, for now).
 3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt.
-4. **Nearly done: the event list,** the first real view. Songs made of sections, opened, saved and exported in a plain-text format or as MIDI files, with undo; Vim-style motions and operators; editing events in place; an inspector; and playback from a play-from marker.
+4. **The event list,** the first real view. Songs made of sections, opened, saved and exported in a plain-text format or as MIDI files, with undo; Vim-style motions and operators; editing events in place; an inspector; and playback from a play-from marker.
 
 ![The event list, playing](docs/screenshot.png)
 
