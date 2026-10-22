@@ -70,6 +70,8 @@ ctest --preset windows-msvc-debug
 
 Check formatting: `git ls-files -z '*.cpp' '*.hpp' | xargs -0 clang-format --dry-run --Werror`.
 
+On Linux (Debian or Ubuntu), `tools/setup-linux.sh` installs the packages, clang-format and vcpkg and configures the presets, and `tools/check-linux.sh` builds and tests every preset and checks the formatting, as CI does (`tools/check-linux.sh linux-gcc-debug` for one).
+
 The command-line tools (`modal-ports`, `modal-play`, `modal-record`, `modal-loopback`), the hidden `[.timing]` tests and the `MODAL_TEST_ALSA_SEQ` flag for ALSA tests are described in `docs/tools.md`.
 
 Configuration (`modalrc`, settings, key bindings, themes and `modal --write-config`) is described in `docs/configuration.md`.
