@@ -685,6 +685,8 @@ section "Verse 1" bars=16 colour=blue
 - **SMF import rules (milestone 1).** Files are rescaled to the song's PPQN, rounding each note's start and end separately so touching notes still touch. Note-ons and note-offs pair first on, first off; notes still sounding at the end of a track end there. Each file track becomes one track per channel it uses, named "Name (ch N)" when split; its SysEx and text go to the first of those, or to a track of their own if it has no channel events. A track with only tempo, meter, markers and a name (a conductor track) doesn't become a track; in a type 0 file, or a type 1 file whose first track is a conductor track, the first track's name is the song title. Tempo, time signatures (applied to every track) and markers are read from any track. Running status is accepted across meta and SysEx events, split SysEx packets are joined, and escapes other than complete SysEx messages are dropped. Not supported: type 2 files and SMPTE-timed files. Ignored: port and channel prefixes, SMPTE offset, key signature, sequencer-specific events. Text is kept as the file's raw bytes. Damaged files are read as far as possible, and every problem worked around is reported as a warning.
 - **Configuration and keymaps:** plain text, in the style of `.vimrc` / `.muttrc`, reloadable without restarting.
 - **File commands (decided for milestone 4).** `:e FILE` opens a song, or imports a `.mid` file; `:w` saves, and `:w FILE` saves as; `:export FILE.mid` writes a Standard MIDI File; `:new` starts a new song; `:q` refuses while there are unsaved changes, `:q!` quits anyway and `:wq` saves and quits; `modal FILE` opens a song from the command line. `:e` with no file, and `:w` on a song never saved, show the system's open and save dialogs, through SDL3 (native on Windows, the desktop portal or `zenity` on Linux), much as GUI Vim does.
+- **Unsaved changes and overwriting (decided in milestone 4, as Vim does).** `:e` and `:new` refuse while there are unsaved changes ("Unsaved changes: :w saves them, or :e! discards them"), and `:e!` and `:new!` go ahead anyway. `:w FILE` and `:export FILE` refuse to write over a file that exists, other than the song's own, unless given `!` (`:w! FILE`); the system's save dialog asks about overwriting itself. Closing the window (its close button or Alt-F4) with unsaved changes asks, in a system dialog, Save, Don't save or Cancel; without changes it just closes. A new song, or one just opened, is unmodified, so leaving it asks nothing. The window's title names the song as the status line does: `song.modal [+] – Modal`, `song.mid (imported) – Modal` or `Untitled – Modal`.
+- **A new song (decided in milestone 4).** `modal` with no file, and `:new`, start an empty song: one empty track, `Track 1` on channel 1, the conductor at 120 BPM in 4/4, and one section of 4 bars. `modal --demo` opens the made-up demo song instead, for trying things out.
 - **Port aliases:** a small per-machine file mapping friendly names to OS port names.
 
 ## Architecture
@@ -788,11 +790,13 @@ Each milestone ends with something runnable and testable on both platforms. Timi
 5. **Full grammar.** Remaining operators, text objects and MIDI transforms (velocity and pedalling tools among them), Visual modes, search, leader key and hint menu, command palette, counts, `.` repeat, registers, macros, command line.
 6. **Piano roll and arrangement views.** Shared cursor and selection, view switching, the section strip and outline view, ghost notes, split view, controller lanes, drum maps and folding.
 7. **Step entry, loop and punch recording.** Take handling, section looping and takes, cueing.
-8. **Polish for daily use.** Configurable status bar, settings, port aliases, backups, performance pass, documentation.
+8. **Polish for daily use.** Configurable status bar, settings, port aliases, backups, a menu bar, performance pass, documentation.
 
 Later: in-process plugin hosting, patterns, MIDI clock in, take lanes, splits, scripting, macOS.
 
 ## Ideas (not scheduled)
+
+- **A menu bar, for those who don't know Vim (planned for milestone 8, October 2026).** A conventional way in beside the keys: File, Edit, View and Play menus, File holding Open, Save, Export and Exit. SDL3 has no native menus, so it would be drawn on the grid like SPG's own menus or Turbo Vision's, the same on Windows and Linux: opened with a key (F10, say) or the mouse, every item a command from the registry with its keys shown beside it, so the menus can't drift from the keymap. Hideable (`set menubar`) for those who'd rather have the row.
 
 Distinctive features to consider after version 1. Not committed to any milestone.
 
