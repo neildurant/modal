@@ -36,7 +36,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 ### The arrangement
 
-Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the event list. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
+Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the event list. `d` and `y` take bars as Vim's operators take text: `dd` (or `x`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `p` puts what was yanked or deleted at the start of the cursor's bar. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
 
 ### The event list
 
