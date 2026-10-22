@@ -26,7 +26,8 @@ public:
         Midi, // a MIDI file to export
     };
 
-    // Asks for a file to open or to save to, suggesting one, and calls done with it, or with
+    // Asks for a file to open or to save to, suggesting one (beside the song's file, or the
+    // file it was imported from, if it has one), and calls done with it, or with
     // nothing if the dialog was cancelled. done may be called later, on the program's own
     // thread, after other events, so the command has finished by then.
     using Chosen = std::function<void(std::optional<std::filesystem::path>)>;

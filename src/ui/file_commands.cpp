@@ -128,7 +128,7 @@ public:
             return saved(*document_.file(), thenQuit);
         }
         const auto& imported = document_.importedFrom();
-        auto suggested = imported ? imported->filename().replace_extension(".modal")
+        auto suggested = imported ? std::filesystem::path{*imported}.replace_extension(".modal")
                                   : std::filesystem::path{"Untitled.modal"};
         host_.chooseSave(FileHost::FileKind::Song, suggested,
                          [this, thenQuit](std::optional<std::filesystem::path> file)
@@ -153,7 +153,7 @@ public:
             return exported(*file);
         }
         const auto& file = document_.file() ? document_.file() : document_.importedFrom();
-        auto suggested = file ? file->filename().replace_extension(".mid")
+        auto suggested = file ? std::filesystem::path{*file}.replace_extension(".mid")
                               : std::filesystem::path{"Untitled.mid"};
         host_.chooseSave(FileHost::FileKind::Midi, suggested,
                          [this](std::optional<std::filesystem::path> chosen)

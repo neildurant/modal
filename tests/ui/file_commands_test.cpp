@@ -152,7 +152,7 @@ TEST_CASE(":e opens a song or imports a MIDI file, refusing to lose unsaved chan
     CHECK_FALSE(f.document.file());
     CHECK(f.document.importedFrom() == f.directory / "song.mid");
     f.run("w");
-    CHECK(f.host.suggested == "song.modal");
+    CHECK(f.host.suggested == f.directory / "song.modal"); // beside the MIDI file
     f.host.answer(std::nullopt);
 
     // With no file, the open dialog.

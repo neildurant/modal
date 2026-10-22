@@ -150,15 +150,22 @@ public:
     {
     }
 
-    void chooseOpen(Chosen) override
+    void chooseOpen(Chosen done) override
     {
-        report(ui::CommandResult::error("Give the file to open: :e FILE"));
+        const auto& file = document_.file() ? document_.file() : document_.importedFrom();
+        window_.chooseFile(false,
+                           {{"Songs and MIDI files", "modal;mid;midi"},
+                            {"Songs", "modal"},
+                            {"MIDI files", "mid;midi"}},
+                           file ? file->parent_path() : std::filesystem::path{}, std::move(done));
     }
 
-    void chooseSave(FileKind kind, const std::filesystem::path&, Chosen) override
+    void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
-        report(ui::CommandResult::error(kind == FileKind::Song ? "Give the file to save to: :w FILE"
-                                                               : "Give the file: :export FILE"));
+        window_.chooseFile(true,
+                           {kind == FileKind::Song ? ui::sdl::FileFilter{"Songs", "modal"}
+                                                   : ui::sdl::FileFilter{"MIDI files", "mid"}},
+                           suggested, std::move(done));
     }
 
     void quit() override { window_.close(); }
@@ -449,15 +456,49 @@ int main(int argc, char* argv[])
             }
         });
 
+    // Closing with unsaved changes asks first (decided in milestone 4). Saving goes through
+    // :wq, which closes the window once it has saved, after the save dialog if it needs one.
+    const auto closing = [&]
+    {
+        if (!document.modified())
+        {
+            return true;
+        }
+        const std::array<std::string, 3> buttons{"Save", "Don't save", "Cancel"};
+        const auto name = document.file()           ? ui::utf8Text(document.file()->filename())
+                          : document.importedFrom() ? std::string{"The imported song"}
+                                                    : std::string{"The new song"};
+        const auto choice = window.ask(
+            "Modal", name + " has changes not saved. Save them before closing?", buttons);
+        if (choice == 0)
+        {
+            files.report(commands.runLine("wq"));
+        }
+        return choice == 1;
+    };
+
+    // The window's title names the song, as the status line does.
+    const auto title = [&]
+    {
+        const auto& file = document.file();
+        const auto& imported = document.importedFrom();
+        const auto name = file       ? ui::utf8Text(file->filename())
+                          : imported ? ui::utf8Text(imported->filename()) + " (imported)"
+                                     : std::string{"Untitled"};
+        return name + (document.modified() ? " [+]" : "") + " – Modal";
+    };
+
     const auto& theme = config.theme;
     window.run({.redraw =
                     [&](ui::sdl::Window& w)
                 {
                     view.resize(w.pixelWidth(), w.pixelHeight(), w.cellSize());
+                    w.setTitle(title());
                     w.draw(view.frame(), theme);
                 },
                 .key = [&](const ui::Key& key, std::int64_t now) { return view.handle(key, now); },
                 .deadline = [&] { return view.deadline(); },
-                .wake = [&](std::int64_t now) { return view.wake(now); }});
+                .wake = [&](std::int64_t now) { return view.wake(now); },
+                .closing = closing});
     return 0;
 }

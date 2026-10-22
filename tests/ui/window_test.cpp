@@ -489,6 +489,29 @@ TEST_CASE("events are handled between frames even when the deadline is always pa
     CHECK(wakes < kGiveUp);
 }
 
+TEST_CASE("a window asked to close asks its handler first, and stays open if told to")
+{
+    auto window = offscreen(320, 200);
+    SDL_Event quit{};
+    quit.type = SDL_EVENT_QUIT;
+    REQUIRE(SDL_PushEvent(&quit));
+    REQUIRE(SDL_PushEvent(&quit));
+    int asked = 0;
+    window->run({.redraw = [](Window&) {},
+                 .key = {},
+                 .deadline = {},
+                 .wake = {},
+                 .closing = [&] { return ++asked == 2; }}); // not the first time
+    CHECK(asked == 2);
+}
+
+TEST_CASE("a window's title can be changed")
+{
+    auto window = offscreen(320, 200);
+    window->setTitle("song.modal [+] – Modal");
+    CHECK(window->title() == "song.modal [+] – Modal");
+}
+
 TEST_CASE("closing a window ends its event loop once the events in hand are done")
 {
     auto window = offscreen(320, 200);

@@ -5,11 +5,16 @@
 #include <modal/ui/style.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
+#include <vector>
+
+union SDL_Event; // SDL's, kept out of this header
 
 namespace modal::ui::sdl
 {
@@ -46,6 +51,14 @@ struct WindowOptions
 
 class Window;
 
+// A kind of file a file dialog offers: its name, and its extensions separated by semicolons,
+// such as {"Songs and MIDI files", "modal;mid;midi"}.
+struct FileFilter
+{
+    std::string name;
+    std::string extensions;
+};
+
 // What a window's event loop calls. Times are in milliseconds, on the clock of Window::now().
 struct WindowHandlers
 {
@@ -60,6 +73,10 @@ struct WindowHandlers
 
     // Called at or after the deadline, returning whether it changed what's shown.
     std::function<bool(std::int64_t)> wake;
+
+    // Asked when the window's close button, or the system, asks it to close, returning
+    // whether it should; without it, it closes.
+    std::function<bool()> closing = {};
 };
 
 // A window with a renderer and a monospace font, which draws frames of regions. SDL's video
@@ -99,6 +116,23 @@ public:
     // Ends run once the events it's handling are done, as for a quit command.
     void close();
 
+    // Shows the system's dialog for a file to open, or to save to (which asks about writing
+    // over a file itself), offering the filters' kinds of file and starting from a suggested
+    // file. done gets the file chosen, or nothing if the dialog was cancelled or couldn't be
+    // shown, later, from run's event loop.
+    using FileChosen = std::function<void(std::optional<std::filesystem::path>)>;
+    void chooseFile(bool save, std::vector<FileFilter> filters,
+                    const std::filesystem::path& suggested, FileChosen done);
+
+    void setTitle(const std::string& title);
+    std::string title() const;
+
+    // Asks a question in the system's message box, its buttons left to right, the first
+    // chosen by Enter and the last by Escape; returns the one chosen, or the last if the box
+    // couldn't be shown.
+    std::size_t ask(const std::string& title, const std::string& question,
+                    std::span<const std::string> buttons);
+
     // The time now, in milliseconds since some fixed point, as passed to the handlers.
     static std::int64_t now();
 
@@ -119,6 +153,7 @@ private:
     void resizeToCells(int columns, int rows);
     void applyMinimumSize();
     void drawRegion(const Region& region, const Theme& theme);
+    void answerDialog(const SDL_Event& event);
 
     std::unique_ptr<Impl> impl_;
 };

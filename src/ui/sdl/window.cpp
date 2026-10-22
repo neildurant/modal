@@ -1,5 +1,6 @@
 #include "font.hpp"
 
+#include <modal/ui/config.hpp>
 #include <modal/ui/sdl/window.hpp>
 
 #include <SDL3/SDL.h>
@@ -7,7 +8,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace modal::ui::sdl
 {
@@ -23,7 +27,8 @@ struct Window::Impl
     std::unique_ptr<Font> font;
     int minimumColumns = 0;
     int minimumRows = 0;
-    bool closing = false; // asked to close, so run returns
+    bool closing = false;   // asked to close, so run returns
+    Uint32 dialogEvent = 0; // a file dialog's answer, back on run's thread
 
     ~Impl()
     {
@@ -517,7 +522,12 @@ void Window::run(const WindowHandlers& handlers)
             {
             case SDL_EVENT_QUIT:
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-                return;
+                if (!handlers.closing || handlers.closing())
+                {
+                    return;
+                }
+                needsFrame = true;
+                break;
             case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
                 setFont(impl_->fontOptions); // if it fails, the old size will do
                 needsFrame = true;
@@ -528,6 +538,12 @@ void Window::run(const WindowHandlers& handlers)
                 needsFrame = true;
                 break;
             default:
+                if (event.type == impl_->dialogEvent && impl_->dialogEvent != 0)
+                {
+                    answerDialog(event);
+                    needsFrame = true;
+                    break;
+                }
                 needsFrame = keys.read(event) || needsFrame;
                 break;
             }
@@ -542,6 +558,125 @@ void Window::run(const WindowHandlers& handlers)
 void Window::close()
 {
     impl_->closing = true;
+}
+
+namespace
+{
+
+// A file dialog waiting for its answer, which SDL may give on another thread: kept with what
+// it was asked, which SDL reads until then, and sent back to run's thread as an event.
+struct PendingDialog
+{
+    Window::FileChosen done;
+    std::vector<FileFilter> filters;
+    std::vector<SDL_DialogFileFilter> sdlFilters;
+    std::string suggested;
+    Uint32 event = 0;
+    std::optional<std::filesystem::path> chosen;
+};
+
+void SDLCALL dialogAnswered(void* userdata, const char* const* files, int)
+{
+    auto* pending = static_cast<PendingDialog*>(userdata);
+    if (files != nullptr && files[0] != nullptr)
+    {
+        pending->chosen = utf8Path(files[0]);
+    }
+    SDL_Event event{};
+    event.user.type = pending->event;
+    event.user.data1 = pending;
+    if (!SDL_PushEvent(&event))
+    {
+        delete pending; // never answered, rather than answered on the wrong thread
+    }
+}
+
+} // namespace
+
+void Window::chooseFile(bool save, std::vector<FileFilter> filters,
+                        const std::filesystem::path& suggested, FileChosen done)
+{
+    if (impl_->dialogEvent == 0)
+    {
+        impl_->dialogEvent = SDL_RegisterEvents(1);
+    }
+    auto pending = std::make_unique<PendingDialog>();
+    pending->done = std::move(done);
+    pending->filters = std::move(filters);
+    for (const auto& filter : pending->filters)
+    {
+        pending->sdlFilters.push_back({filter.name.c_str(), filter.extensions.c_str()});
+    }
+    pending->suggested = utf8Text(suggested);
+    pending->event = impl_->dialogEvent;
+    auto* raw = pending.release(); // until dialogAnswered's event comes back
+    const auto count = static_cast<int>(raw->sdlFilters.size());
+    const char* location = raw->suggested.empty() ? nullptr : raw->suggested.c_str();
+    if (save)
+    {
+        SDL_ShowSaveFileDialog(&dialogAnswered, raw, impl_->window, raw->sdlFilters.data(), count,
+                               location);
+    }
+    else
+    {
+        SDL_ShowOpenFileDialog(&dialogAnswered, raw, impl_->window, raw->sdlFilters.data(), count,
+                               location, false);
+    }
+}
+
+void Window::answerDialog(const SDL_Event& event)
+{
+    const std::unique_ptr<PendingDialog> pending{static_cast<PendingDialog*>(event.user.data1)};
+    if (pending->done)
+    {
+        pending->done(pending->chosen);
+    }
+}
+
+void Window::setTitle(const std::string& title)
+{
+    if (title != this->title())
+    {
+        SDL_SetWindowTitle(impl_->window, title.c_str());
+    }
+}
+
+std::string Window::title() const
+{
+    const char* title = SDL_GetWindowTitle(impl_->window);
+    return title != nullptr ? title : "";
+}
+
+std::size_t Window::ask(const std::string& title, const std::string& question,
+                        std::span<const std::string> buttons)
+{
+    std::vector<SDL_MessageBoxButtonData> data;
+    for (std::size_t i = 0; i < buttons.size(); ++i)
+    {
+        SDL_MessageBoxButtonFlags flags = 0;
+        if (i == 0)
+        {
+            flags |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+        }
+        if (i + 1 == buttons.size())
+        {
+            flags |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+        }
+        data.push_back({flags, static_cast<int>(i), buttons[i].c_str()});
+    }
+    const SDL_MessageBoxData box{SDL_MESSAGEBOX_INFORMATION | SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT,
+                                 impl_->window,
+                                 title.c_str(),
+                                 question.c_str(),
+                                 static_cast<int>(data.size()),
+                                 data.data(),
+                                 nullptr};
+    int chosen = -1;
+    if (!SDL_ShowMessageBox(&box, &chosen) || chosen < 0)
+    {
+        return buttons.empty() ? 0 : buttons.size() - 1;
+    }
+    return static_cast<std::size_t>(chosen);
 }
 
 std::optional<Colour> Window::pixel(int x, int y) const
