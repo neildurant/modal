@@ -221,6 +221,9 @@ private:
     // :port NAME sets the track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
 
+    // :section NAME starts a new section at the bar line of the cursor's bar.
+    CommandResult section(std::string_view name);
+
     Region listRegion() const;
     Region inspectorRegion() const;
     int inspectorPadding() const { return cell_.height / 4; }

@@ -136,6 +136,11 @@ constexpr std::array kCommands{
                                "with no name, show it and list the ports",
                 .usage = "[NAME]",
                 .keys = false},
+    CommandInfo{.name = "section",
+                .description = "Start a new section at the cursor's bar line, splitting the "
+                               "section it's in; named Section and a number if no name is given",
+                .usage = "[NAME]",
+                .keys = false},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
@@ -208,6 +213,11 @@ EventListView::EventListView(CommandRegistry& registry, core::Document& document
         if (info.name == "port")
         {
             registry.add(info, [this](const CommandCall& call) { return port(call.arguments); });
+            continue;
+        }
+        if (info.name == "section")
+        {
+            registry.add(info, [this](const CommandCall& call) { return section(call.arguments); });
             continue;
         }
         registry.add(info, [this, name = info.name](const CommandCall& call)
@@ -1454,6 +1464,57 @@ core::EditPlace EventListView::place() const
     return {list_.track(),
             tick,
             {static_cast<std::int64_t>(top_), static_cast<std::int64_t>(row_ - list_.rowAt(tick))}};
+}
+
+CommandResult EventListView::section(std::string_view name)
+{
+    const auto first = name.find_first_not_of(" \t");
+    name = first == std::string_view::npos
+               ? std::string_view{}
+               : name.substr(first, name.find_last_not_of(" \t") - first + 1);
+    auto& song = document_.song();
+    const auto& meter = list_.meter();
+    const auto tick = meter.barStart(meter.toBarBeatTick(list_.rows()[row_].tick).bar);
+    const auto at = positionText(meter, tick);
+    const auto current = song.sectionAt(tick);
+    if (tick >= song.end())
+    {
+        return CommandResult::error("There's no section after the song's end to split");
+    }
+    if (song.sectionStart(current) == tick)
+    {
+        return CommandResult::error(song.sections()[current]->name() + " starts at " + at +
+                                    " already");
+    }
+    const std::string wanted =
+        name.empty() ? "Section " + std::to_string(song.sections().size() + 1) : std::string{name};
+    std::optional<core::Song::Split> split;
+    edit("Start section " + wanted + " at " + at,
+         [&](core::Song& s) { split = s.splitSection(tick, wanted); });
+    if (!split)
+    {
+        return CommandResult::error("Can't start a section at " + at);
+    }
+    // The name it got, numbered if another section had it.
+    const auto& named = document_.song().sections()[split->index]->name();
+    std::string cut;
+    if (split->conductor)
+    {
+        cut = "the conductor and the tracks following it";
+    }
+    for (const auto id : split->tracks)
+    {
+        const auto track = document_.song().track(id);
+        cut += (cut.empty() ? "" : ", ") +
+               (track->name.empty() ? std::string{"a track"} : track->name);
+    }
+    if (!cut.empty())
+    {
+        // A bar the new section starts inside ends short, as a remainder bar.
+        return CommandResult{true, named + " starts at " + at + "; this cuts a bar short in " + cut,
+                             true};
+    }
+    return {true, named + " starts at " + at, false};
 }
 
 CommandResult EventListView::port(std::string_view name)

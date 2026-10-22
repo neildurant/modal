@@ -894,3 +894,66 @@ TEST_CASE(":port without MIDI says so")
     CHECK(result.warning);
     CHECK(result.message == "There are no MIDI ports here");
 }
+
+TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
+{
+    core::Song song{core::kPpqn}; // one section of eight bars of 4/4
+    const auto bass = song.addTrack("Bass");
+    const auto lead = song.addTrack("Lead");
+    song.updateEvents(bass, [](core::EventList& events)
+                      { events.insert({2 * 4 * q + q, core::Note{40, 100, q}}); }); // 3:2:000
+    song.updateMeter(lead,
+                     [](core::MeterMap& meter) { meter = core::MeterMap{meter.ppqn(), {2, 4}}; });
+    song.updateEvents(lead, [](core::EventList& events)
+                      { events.insert({2 * q + q / 2, core::Note{60, 100, q}}); }); // its 2:1:480
+    View v{std::move(song)};
+    const auto names = [&]
+    {
+        std::vector<std::string> result;
+        for (const auto& s : v.document.song().sections())
+        {
+            result.push_back(s->name());
+        }
+        return result;
+    };
+
+    // At the first section's start there's nothing to split.
+    CHECK(v.registry.runLine("section Intro") ==
+          CommandResult::error("Section 1 starts at 1:1:000 already"));
+
+    type(v.view, U"G"); // the end
+    CHECK(v.registry.runLine("section Outro").warning);
+
+    // On the bass's note in bar 3, the section starts at 3:1:000.
+    type(v.view, U"gg");
+    while (v.view.list().rows()[v.view.row()].kind != RowKind::Event)
+    {
+        type(v.view, U"j");
+    }
+    CHECK(v.registry.runLine("section Chorus") ==
+          CommandResult{true, "Chorus starts at 3:1:000", false});
+    CHECK(names() == std::vector<std::string>{"Section 1", "Chorus"});
+    CHECK(v.document.song().sectionStart(1) == 2 * 4 * q);
+
+    // Without a name, Section and a number; one named again gets a number of its own.
+    type(v.view, U"u");
+    CHECK(names() == std::vector<std::string>{"Section 1"});
+    CHECK(v.registry.runLine("section").message == "Section 2 starts at 3:1:000");
+    CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
+
+    // From the lead, in 2/4, its second bar starts in the middle of the conductor's first,
+    // which ends short.
+    type(v.view, U"gt");
+    REQUIRE(v.view.track() == 2);
+    type(v.view, U"gg");
+    while (v.view.list().rows()[v.view.row()].kind != RowKind::Event)
+    {
+        type(v.view, U"j");
+    }
+    const auto result = v.registry.runLine("section Bridge");
+    CHECK(result.warning);
+    CHECK(result.message ==
+          "Bridge starts at 2:1:000; this cuts a bar short in the conductor and the tracks "
+          "following it");
+    CHECK(v.document.song().sectionStart(1) == 2 * q);
+}
