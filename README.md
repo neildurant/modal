@@ -34,9 +34,13 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 - `modal` is the GUI.
 - `modal-ports`, `modal-play`, `modal-record` and `modal-loopback` list MIDI ports, play and record MIDI files, and measure timing. See [docs/tools.md](docs/tools.md).
 
+### The arrangement
+
+Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the event list. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
+
 ### The event list
 
-`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`) and shows its event list, one track at a time; plain `modal` starts a new song, and `modal --demo` opens a made-up demo song. `:w` saves, `:e FILE` opens, `:export FILE.mid` exports a MIDI file and `:q` quits, as in Vim; closing the window with changes not saved asks whether to save them. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
+`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`), and the event list shows it one track at a time; plain `modal` starts a new song, and `modal --demo` opens a made-up demo song. `:w` saves, `:e FILE` opens, `:export FILE.mid` exports a MIDI file and `:q` quits, as in Vim; closing the window with changes not saved asks whether to save them. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
 
 | Keys | What they do |
 |------|--------------|
@@ -61,6 +65,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 | `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |
 | `, t Space` | Rewind on or off: whether the marker stays put when playback stops, or moves to where it stopped |
 | `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
+| `ga`, `ge`, Backspace | The arrangement, the event list, and back to the view before |
 | `:` | The command prompt: `:set theme=light`, `:set fontsize?`, `:port loopMIDI`, `:write-config modalrc`, `:q` |
 
 Tracks play to their own output port, or if they have none (as in an imported MIDI file) to the `port` setting's, or else the first output port found. `:section NAME` starts a new section at the cursor's bar line. `:port NAME` sets the current track's port, by its name or any part of it that matches only one port; `:port` alone says which it plays to and lists the ports. On Linux, Modal also makes a port of its own, `Modal`, for a plugin host or another program to connect to (`set ownports=4` for `Modal 1` to `Modal 4`); on Windows, a virtual cable such as loopMIDI does the same job. While playing, the list scrolls to keep the row playing a third of the way down.
