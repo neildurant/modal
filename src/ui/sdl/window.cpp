@@ -486,15 +486,20 @@ void Window::run(const WindowHandlers& handlers)
         }
 
         // Wake at the deadline, if there is one; it may already have passed while handling a
-        // stream of events.
+        // stream of events, or drawing. Then take whatever events are waiting before the next
+        // frame, since the deadline may be past again by then, as while playing when a frame
+        // takes longer to draw than the time between frames, and events must never wait on it.
         const auto deadline = handlers.deadline ? handlers.deadline() : std::nullopt;
+        SDL_Event event;
         if (deadline && now() >= *deadline)
         {
             needsFrame = (handlers.wake && handlers.wake(now())) || needsFrame;
-            continue;
+            if (!SDL_PollEvent(&event))
+            {
+                continue;
+            }
         }
-        SDL_Event event;
-        if (deadline)
+        else if (deadline)
         {
             const auto wait = std::clamp<std::int64_t>(*deadline - now(), 0, 1'000'000);
             if (!SDL_WaitEventTimeout(&event, static_cast<Sint32>(wait)))

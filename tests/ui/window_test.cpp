@@ -418,6 +418,42 @@ TEST_CASE("a window wakes at its handlers' deadline with no events, and draws if
     CHECK(frames >= 2); // the first, and the one the wake-up asked for
 }
 
+TEST_CASE("events are handled between frames even when the deadline is always past")
+{
+    // As while playing, when a frame takes longer to draw than the time between frames.
+    auto window = offscreen(320, 200);
+    pushKey(SDLK_ESCAPE);
+    int keys = 0;
+    int wakes = 0;
+    constexpr int kGiveUp = 200; // then stop waking, so a loop that starves events still ends
+    window->run({.redraw = [](Window&) {},
+                 .key =
+                     [&](const Key&, std::int64_t)
+                 {
+                     ++keys;
+                     SDL_Event quit{};
+                     quit.type = SDL_EVENT_QUIT;
+                     SDL_PushEvent(&quit);
+                     return false;
+                 },
+                 .deadline = [&]() -> std::optional<std::int64_t>
+                 {
+                     if (wakes >= kGiveUp)
+                     {
+                         return std::nullopt;
+                     }
+                     return Window::now() - 1;
+                 },
+                 .wake =
+                     [&](std::int64_t)
+                 {
+                     ++wakes;
+                     return true;
+                 }});
+    CHECK(keys == 1);
+    CHECK(wakes < kGiveUp);
+}
+
 TEST_CASE("closing a window ends its event loop once the events in hand are done")
 {
     auto window = offscreen(320, 200);
