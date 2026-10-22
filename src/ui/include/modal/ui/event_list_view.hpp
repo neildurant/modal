@@ -18,6 +18,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace modal::ui
 {
@@ -76,6 +77,18 @@ public:
     // cursor follows the playhead there.
     void setRewind(bool rewind);
     bool rewind() const { return rewind_; }
+
+    // What a port name given to :port refers to: the output port's full name, or else the
+    // ports it could be when several match equally well (none when none match); and every
+    // output port there is. An empty name only lists them.
+    struct PortLookup
+    {
+        std::optional<std::string> port;
+        std::vector<std::string> candidates;
+        std::vector<std::string> ports;
+    };
+    using PortFinder = std::function<PortLookup(std::string_view name)>;
+    void setPortFinder(PortFinder finder) { portFinder_ = std::move(finder); }
 
     // The row playing, while playing: the last at or before the playhead.
     std::optional<std::size_t> playheadRow() const { return playheadRow_; }
@@ -199,6 +212,9 @@ private:
     void showPlayhead();
     std::size_t rowAtOrBefore(core::Tick tick) const;
 
+    // :port NAME sets the track's output port; :port alone says what it is.
+    CommandResult port(std::string_view name);
+
     Region listRegion() const;
     Region inspectorRegion() const;
     int inspectorPadding() const { return cell_.height / 4; }
@@ -236,6 +252,7 @@ private:
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;
     LineHandler lineHandler_;
+    PortFinder portFinder_;
     Mode mode_ = Mode::Normal;
     CommandLine line_;
     int width_ = 0;

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <system_error>
@@ -128,6 +129,11 @@ constexpr std::array kCommands{
     CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
     CommandInfo{.name = "panic",
                 .description = "Stop, and send All Notes Off and Reset All Controllers"},
+    CommandInfo{.name = "port",
+                .description = "Set the track's output port, by its name or part of it; or "
+                               "with no name, show it and list the ports",
+                .usage = "[NAME]",
+                .keys = false},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
@@ -197,6 +203,11 @@ EventListView::EventListView(CommandRegistry& registry, core::Document& document
 {
     for (const auto& info : commands())
     {
+        if (info.name == "port")
+        {
+            registry.add(info, [this](const CommandCall& call) { return port(call.arguments); });
+            continue;
+        }
         registry.add(info, [this, name = info.name](const CommandCall& call)
                      { return CommandResult{runOwn(name, call.count).value_or(false)}; });
     }
@@ -1435,6 +1446,61 @@ core::EditPlace EventListView::place() const
     return {list_.track(),
             tick,
             {static_cast<std::int64_t>(top_), static_cast<std::int64_t>(row_ - list_.rowAt(tick))}};
+}
+
+CommandResult EventListView::port(std::string_view name)
+{
+    const auto trim = [](std::string_view text)
+    {
+        const auto first = text.find_first_not_of(" \t");
+        return first == std::string_view::npos
+                   ? std::string_view{}
+                   : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+    };
+    name = trim(name);
+    if (!portFinder_)
+    {
+        return CommandResult::error("There are no MIDI ports here");
+    }
+    if (track_ == 0)
+    {
+        return CommandResult::error("The conductor has no port; its tempo and meter aren't sent");
+    }
+    const auto found = portFinder_(name);
+    const auto list = [](const std::vector<std::string>& names)
+    {
+        std::string text;
+        for (const auto& n : names)
+        {
+            text += (text.empty() ? "" : ", ") + n;
+        }
+        return text;
+    };
+    const auto outputs = found.ports.empty() ? std::string{"there are no output ports"}
+                                             : "outputs: " + list(found.ports);
+    const auto& track = *document_.song().tracks()[track_ - 1];
+    auto who = trackName(); // starting the message, with a capital
+    who[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(who[0])));
+    if (name.empty())
+    {
+        return {false,
+                who + " plays to " +
+                    (track.port.empty() ? std::string{"the default port"} : track.port) + "; " +
+                    outputs,
+                false};
+    }
+    if (!found.port)
+    {
+        return CommandResult::error(
+            found.candidates.empty()
+                ? "No output port matches \"" + std::string{name} + "\"; " + outputs
+                : "\"" + std::string{name} + "\" could be " + list(found.candidates));
+    }
+    const auto id = track.id();
+    const auto& full = *found.port;
+    edit("Set port of " + trackName() + " to " + full,
+         [&](core::Song& song) { song.updateTrack(id, [&](core::Track& t) { t.port = full; }); });
+    return {true, who + " plays to " + full, false};
 }
 
 std::string EventListView::trackName() const

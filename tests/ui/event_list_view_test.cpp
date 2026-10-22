@@ -751,7 +751,9 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
     {
         CAPTURE(command.name);
         const auto result = v.view.run(command.name, 0);
-        CHECK((!result.warning || result.message.find("works only in") != std::string::npos));
+        // Commands only for the : line, such as port, may want what this view lacks.
+        CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
+               !command.keys));
     }
 }
 
@@ -820,4 +822,72 @@ TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line o
     v.view.handle(Key::of(NamedKey::Escape), 0);
     CHECK(v.view.mode() == Mode::Normal);
     CHECK(lines.size() == 1);
+}
+
+TEST_CASE(":port sets the track's output port by its name or part of it")
+{
+    View v;
+    const std::vector<std::string> outputs{"Microsoft GS Wavetable Synth", "loopMIDI Port",
+                                           "loopMIDI Port 2"};
+    // As the platform's matching does: the whole name, or else the one port containing it.
+    v.view.setPortFinder(
+        [&](std::string_view name)
+        {
+            EventListView::PortLookup lookup{.port = {}, .candidates = {}, .ports = outputs};
+            for (const auto& port : outputs)
+            {
+                if (port == name)
+                {
+                    lookup.port = port;
+                    return lookup;
+                }
+                if (!name.empty() && port.find(name) != std::string::npos)
+                {
+                    lookup.candidates.push_back(port);
+                }
+            }
+            if (lookup.candidates.size() == 1)
+            {
+                lookup.port = lookup.candidates.front();
+                lookup.candidates.clear();
+            }
+            return lookup;
+        });
+    const auto port = [&] { return v.document.song().tracks()[0]->port; };
+
+    auto result = v.registry.runLine("port");
+    CHECK(result.message == "Bass plays to Pro-800; outputs: Microsoft GS Wavetable Synth, "
+                            "loopMIDI Port, loopMIDI Port 2");
+    CHECK_FALSE(result.warning);
+
+    result = v.registry.runLine("port GS");
+    CHECK(result.message == "Bass plays to Microsoft GS Wavetable Synth");
+    CHECK(port() == "Microsoft GS Wavetable Synth");
+    CHECK(v.document.modified());
+
+    result = v.registry.runLine("port loop");
+    CHECK(result.warning);
+    CHECK(result.message == "\"loop\" could be loopMIDI Port, loopMIDI Port 2");
+    result = v.registry.runLine("port Pro-800");
+    CHECK(result.message == "No output port matches \"Pro-800\"; outputs: Microsoft GS Wavetable "
+                            "Synth, loopMIDI Port, loopMIDI Port 2");
+    CHECK(port() == "Microsoft GS Wavetable Synth"); // unchanged
+
+    // One undo step, back to the port it had.
+    type(v.view, U"u");
+    CHECK(port() == "Pro-800");
+
+    // The conductor sends nothing, so has no port.
+    type(v.view, U"gT");
+    result = v.registry.runLine("port GS");
+    CHECK(result.warning);
+    CHECK(result.message == "The conductor has no port; its tempo and meter aren't sent");
+}
+
+TEST_CASE(":port without MIDI says so")
+{
+    View v;
+    const auto result = v.registry.runLine("port GS");
+    CHECK(result.warning);
+    CHECK(result.message == "There are no MIDI ports here");
 }

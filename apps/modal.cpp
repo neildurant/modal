@@ -325,6 +325,29 @@ int main(int argc, char* argv[])
 
     ui::EventListView view{commands, document, config.keymap};
     view.setPlayer(&playback.player());
+    view.setPortFinder(
+        [](std::string_view name)
+        {
+            const auto outputs = platform::listMidiPorts().outputs;
+            ui::EventListView::PortLookup lookup;
+            for (const auto& port : outputs)
+            {
+                lookup.ports.push_back(port.name);
+            }
+            if (!name.empty())
+            {
+                const auto match = platform::matchPort(outputs, name);
+                if (match.index)
+                {
+                    lookup.port = outputs[*match.index].name;
+                }
+                for (const auto i : match.candidates)
+                {
+                    lookup.candidates.push_back(outputs[i].name);
+                }
+            }
+            return lookup;
+        });
     if (auto error = apply(settings, window, view, document, playback); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());
