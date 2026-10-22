@@ -102,7 +102,7 @@ cmap <Down>     command-line-newer      "Newer line"
 
 nmap <Esc>      cancel            "Cancel"
 
-" Playing: Space plays from the play-from marker (the ▷ in the margin), or stops; m Space puts
+" Playing: Space plays from the play-from marker (the ▶ in the margin), or stops; m Space puts
 " the marker at the cursor, and Ctrl-Space puts it there and plays. With rewind (on by
 " default) the marker stays put; without, it moves to where playback stops. , t Space turns
 " rewind on or off.

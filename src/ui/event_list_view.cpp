@@ -1644,7 +1644,7 @@ Region EventListView::listRegion() const
         if (!isAdded && player_ != nullptr && row == rowAtOrBefore(player_->marker()))
         {
             const bool onCursor = !adding && row == row_ && cursorField == Column::Position;
-            grid.write(0, line, "▷",
+            grid.write(0, line, "▶",
                        onCursor ? kCursor : Style{Role::Accent, style.background, kPlain});
         }
     }

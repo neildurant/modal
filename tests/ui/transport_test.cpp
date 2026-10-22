@@ -73,7 +73,7 @@ struct Playing
         const auto frame = view.frame();
         for (const auto& run : frame.front().text)
         {
-            if (run.x == 0 && run.text.starts_with(U"▷"))
+            if (run.x == 0 && run.text.starts_with(U"▶"))
             {
                 // The first line is the headings.
                 return view.top() + static_cast<std::size_t>(run.y / kCell.height) - 1;
