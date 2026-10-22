@@ -515,6 +515,7 @@ Sections behave like lines in Vim:
 - `V` selects a run of sections, for `d`, `y` and `Alt-h` / `Alt-l` to act on the block, and `, L` to loop it.
 - `Enter` plays from the start of the section, `Shift-Enter` cues it during playback, `, L` loops it and `:cue F3` gives it a cue slot.
 - Splitting is done from the tracks (`:section NAME`), where the cursor has an exact bar position; the strip works on whole sections.
+- **Decided for milestone 5's strip.** Shortening a section with `-` deletes everything starting in the bar that goes, as `d` over it would (undo brings it back), and never shortens below a bar. A new empty section from `i` / `a` is 4 bars, or the count (`8a`). New sections are named `Section` and one more than the highest number among sections named that way, so they count up in the order they're made even when that leaves gaps; any name stays unique, numbered if another section has it ("Chorus 2"). `i` / `a` then open the `:` prompt with `section-rename` and the new name, to type over or keep with Enter, and `c` does the same for the section under the cursor; editing it in the inspector with `e` comes later. Yanked or deleted sections go in the one unnamed register, as Vim keeps characters and lines in one; `p` with bars in it on the strip, or with sections in it on the tracks, says what it holds rather than guessing. Until sections can be given colours, neighbouring sections on the strip alternate between two shades. A song always keeps at least one section, so deleting every one is refused.
 
 **The outline view (decided October 2026)**
 
@@ -896,7 +897,8 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] `zz` centres on the cursor in the views, as Vim's centres the line (October 2026), rather than the test view's `z` to centre and `zz` to reset the zoom; zoom reset needs another key.
 - [ ] The semitone motion that ignores scale lock: `Ctrl-k` / `Ctrl-j` scroll (decided in milestone 3), so it needs other keys.
 - [ ] Velocity step keys in the piano roll's note area (the event list has `+` / `-` and `Ctrl-A` / `Ctrl-X`), together with the default note length keys above.
-- [ ] Section strip: keys for selecting several sections, and the length of a new empty section from `i` / `a` (4 bars, or the page).
+- [x] The length of a new empty section from `i` / `a`: 4 bars, or the count (decided for milestone 5).
+- [ ] Section strip: keys for selecting several sections (with Visual mode, milestone 6).
 
 **Milestone 6: full grammar**
 
