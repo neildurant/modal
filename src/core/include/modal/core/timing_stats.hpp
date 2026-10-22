@@ -29,7 +29,8 @@ struct TimingStats
     void record(std::chrono::nanoseconds duration) noexcept;
 
     // A time that at least a fraction (e.g. 0.99) of the durations were within, rounded up to
-    // the next step, or none if that's beyond 20 ms or nothing has been recorded.
+    // the next step but never past the longest, or none if that's beyond 20 ms or nothing has
+    // been recorded.
     std::optional<std::chrono::nanoseconds> within(double fraction) const;
 };
 

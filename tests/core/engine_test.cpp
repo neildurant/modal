@@ -218,11 +218,11 @@ TEST_CASE("lateness is measured from each message's due time, in two parts")
     CHECK(status.lateness.count == 3);
     CHECK(status.lateness.max == 3400us);
     CHECK(status.lateness.within(0.3) == 250us);
-    CHECK(status.lateness.within(0.99) == 3450us);
+    CHECK(status.lateness.within(0.99) == 3400us); // the step's edge, but no more than the max
     CHECK(status.wakeLateness.max == 3200us);
     CHECK(status.wakeLateness.within(0.3) == 50us);
     CHECK(status.sendTime.max == 200us);
-    CHECK(status.sendTime.within(1.0) == 250us);
+    CHECK(status.sendTime.within(1.0) == 200us);
 }
 
 // The engine on a thread of its own, with a clock that never really sleeps.

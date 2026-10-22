@@ -51,7 +51,8 @@ std::optional<nanoseconds> TimingStats::within(double fraction) const
         sofar += buckets[i];
         if (sofar >= needed)
         {
-            return kStep * static_cast<std::int64_t>(i + 1);
+            // The bucket's upper edge, but never past the latest seen.
+            return std::min(kStep * static_cast<std::int64_t>(i + 1), max);
         }
     }
     return std::nullopt;

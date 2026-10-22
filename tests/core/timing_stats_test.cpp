@@ -59,3 +59,11 @@ TEST_CASE("shared timing stats read back what was recorded")
     CHECK(read.max == plain.max);
     CHECK(read.buckets == plain.buckets);
 }
+
+TEST_CASE("the time a fraction were within is never more than the longest")
+{
+    TimingStats stats;
+    stats.record(30us);
+    stats.record(10us);
+    CHECK(stats.within(0.99) == 30us); // not the 50 us step's edge
+}
