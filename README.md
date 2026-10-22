@@ -34,7 +34,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 ### The event list
 
-`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`) and shows its event list, one track at a time; plain `modal` shows a made-up demo song. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
+`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`) and shows its event list, one track at a time; plain `modal` starts a new song, and `modal --demo` opens a made-up demo song. `:w` saves, `:e FILE` opens, `:export FILE.mid` exports a MIDI file and `:q` quits, as in Vim; closing the window with changes not saved asks whether to save them. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
 
 | Keys | What they do |
 |------|--------------|
