@@ -81,6 +81,19 @@ TEST_CASE("on-or-off settings take on or off, or a word as in Vim")
     CHECK(settings.setFlag("rewnd") == "unknown setting \"rewnd\"");
 }
 
+TEST_CASE("Modal has one port of its own, Modal, unless set otherwise")
+{
+    Settings settings;
+    CHECK(ownPortNames(settings) == std::vector<std::string>{"Modal"});
+    CHECK(settings.set("ownports", "3").empty());
+    CHECK(ownPortNames(settings) == std::vector<std::string>{"Modal 1", "Modal 2", "Modal 3"});
+    CHECK(settings.set("ownportname", "Seq").empty());
+    CHECK(ownPortNames(settings) == std::vector<std::string>{"Seq 1", "Seq 2", "Seq 3"});
+    CHECK(settings.set("ownports", "0").empty());
+    CHECK(ownPortNames(settings).empty());
+    CHECK(settings.set("ownports", "17") == "ownports must be a whole number from 0 to 16");
+}
+
 TEST_CASE("the port for tracks without one is the first found, unless set")
 {
     CHECK(Settings{}.text("port").empty());

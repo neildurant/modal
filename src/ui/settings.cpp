@@ -90,6 +90,12 @@ Settings::Settings()
                   std::int64_t{30}, 0, 1000),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
+          setting("ownports",
+                  "How many MIDI output ports of its own Modal makes, for other programs to "
+                  "connect to (where the system lets it: Linux, not Windows)",
+                  std::int64_t{1}, 0, 16),
+          setting("ownportname", "The name of Modal's own ports; several are numbered after it",
+                  std::string{"Modal"}),
           setting("port",
                   "The output port for tracks without one: its name, or part of it, or empty "
                   "for the first port found",
@@ -212,6 +218,18 @@ CellCount Settings::cells(std::string_view name) const
 {
     assert(find(name) != nullptr);
     return std::get<CellCount>(find(name)->value);
+}
+
+std::vector<std::string> ownPortNames(const Settings& settings)
+{
+    const auto count = settings.integer("ownports");
+    const auto& name = settings.text("ownportname");
+    std::vector<std::string> names;
+    for (std::int64_t i = 1; i <= count && !name.empty(); ++i)
+    {
+        names.push_back(count == 1 ? name : name + " " + std::to_string(i));
+    }
+    return names;
 }
 
 bool Settings::flag(std::string_view name) const

@@ -63,7 +63,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 | `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
 | `:` | The command prompt: `:set theme=light`, `:set fontsize?`, `:port loopMIDI`, `:write-config modalrc`, `:q` |
 
-Tracks play to their own output port, or if they have none (as in an imported MIDI file) to the `port` setting's, or else the first output port found. `:section NAME` starts a new section at the cursor's bar line. `:port NAME` sets the current track's port, by its name or any part of it that matches only one port; `:port` alone says which it plays to and lists the ports. While playing, the list scrolls to keep the row playing a third of the way down.
+Tracks play to their own output port, or if they have none (as in an imported MIDI file) to the `port` setting's, or else the first output port found. `:section NAME` starts a new section at the cursor's bar line. `:port NAME` sets the current track's port, by its name or any part of it that matches only one port; `:port` alone says which it plays to and lists the ports. On Linux, Modal also makes a port of its own, `Modal`, for a plugin host or another program to connect to (`set ownports=4` for `Modal 1` to `Modal 4`); on Windows, a virtual cable such as loopMIDI does the same job. While playing, the list scrolls to keep the row playing a third of the way down.
 
 ## Configuring
 

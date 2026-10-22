@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -34,6 +35,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -110,27 +112,106 @@ public:
         return missing.empty() ? missing : "Ports not found, so not played: " + missing;
     }
 
+    // Modal's own ports, then the system's output ports.
+    std::vector<platform::MidiPort> allPorts(
+        const std::vector<platform::MidiPort>& system = platform::listMidiPorts().outputs) const
+    {
+        std::vector<platform::MidiPort> ports;
+        for (const auto& own : own_)
+        {
+            ports.push_back({own.first});
+        }
+        ports.insert(ports.end(), system.begin(), system.end());
+        return ports;
+    }
+
+    // Makes the ports of its own the settings ask for that aren't made yet, and has the tracks'
+    // ports looked up again, since a track may name one. Returns what went wrong, if anything,
+    // or which ports no longer wanted stay until Modal restarts.
+    std::string openOwnPorts()
+    {
+        const auto wanted = ui::ownPortNames(settings_);
+        if (wanted == ownWanted_)
+        {
+            return {};
+        }
+        ownWanted_ = wanted;
+        lookedUp_ = false;
+        if (!wanted.empty() && !platform::canCreateOwnPorts())
+        {
+            // The default asks for one; only someone who asked for ports of their own is told.
+            const auto* setting = settings_.find("ownports");
+            if (setting->value == setting->defaultValue)
+            {
+                return {};
+            }
+        }
+        std::string problem;
+        for (const auto& name : wanted)
+        {
+            if (std::ranges::find(
+                    own_, name, &std::pair<std::string, core::DestinationId>::first) != own_.end())
+            {
+                continue;
+            }
+            auto made = outputs_.openOwn(name);
+            if (!made.ok())
+            {
+                problem = std::move(made.error);
+                break;
+            }
+            own_.emplace_back(name, made.destination);
+        }
+        if (!problem.empty())
+        {
+            problem[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(problem[0])));
+            return problem;
+        }
+        std::string staying;
+        for (const auto& own : own_)
+        {
+            if (std::ranges::find(wanted, own.first) == wanted.end())
+            {
+                staying += (staying.empty() ? "" : ", ") + own.first;
+            }
+        }
+        return staying.empty() ? staying : staying + " stay open until Modal restarts";
+    }
+
 private:
     // A track's port, or for one without a port, the port setting's or the first found.
     std::optional<core::DestinationId> open(std::string_view name)
     {
         std::string wanted{name.empty() ? std::string_view{port_} : name};
+        const auto system = platform::listMidiPorts().outputs;
         if (wanted.empty())
         {
-            const auto ports = platform::listMidiPorts().outputs;
-            if (ports.empty())
+            if (system.empty())
             {
                 return std::nullopt;
             }
-            wanted = ports.front().name;
+            wanted = system.front().name;
         }
-        const auto opened = outputs_.open(wanted);
+        // Modal's own ports first, then the system's, matched as :port matches them.
+        const auto ports = allPorts(system);
+        const auto match = platform::matchPort(ports, wanted);
+        if (!match.index)
+        {
+            return std::nullopt;
+        }
+        if (*match.index < own_.size())
+        {
+            return own_[*match.index].second;
+        }
+        const auto opened = outputs_.open(ports[*match.index].name);
         return opened.ok() ? std::optional{opened.destination} : std::nullopt;
     }
 
     const ui::Settings& settings_;
     std::string port_; // the port setting when ports were last looked up
     bool lookedUp_ = false;
+    std::vector<std::pair<std::string, core::DestinationId>> own_; // Modal's own ports
+    std::vector<std::string> ownWanted_;                           // as the settings last asked
     platform::MidiOutputs outputs_;
     platform::SystemClock clock_;
     core::Engine engine_{outputs_, clock_};
@@ -227,6 +308,10 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     view.setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
+    if (auto own = playback.openOwnPorts(); error.empty())
+    {
+        error = std::move(own);
+    }
     if (auto missing = playback.update(document.song()); error.empty())
     {
         error = std::move(missing);
@@ -369,9 +454,9 @@ int main(int argc, char* argv[])
     ui::EventListView view{commands, document, config.keymap};
     view.setPlayer(&playback.player());
     view.setPortFinder(
-        [](std::string_view name)
+        [&](std::string_view name)
         {
-            const auto outputs = platform::listMidiPorts().outputs;
+            const auto outputs = playback.allPorts();
             ui::EventListView::PortLookup lookup;
             for (const auto& port : outputs)
             {

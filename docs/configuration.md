@@ -83,6 +83,8 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
 | `undolevels` | `1000`  | How many changes can be undone (0 to 100000) |
+| `ownports`   | `1`     | How many MIDI output ports of its own Modal makes, for other programs such as a plugin host to connect to (0 to 16; Linux only, since Windows can't) |
+| `ownportname` | `Modal` | The name of Modal's own ports: one is `Modal`, several are `Modal 1`, `Modal 2` and so on |
 | `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
 | `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |
 

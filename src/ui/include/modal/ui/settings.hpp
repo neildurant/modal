@@ -27,6 +27,12 @@ using SettingValue = std::variant<std::int64_t, double, std::string, CellCount, 
 // The value written as `set` reads it: 500, 10.5, dark, 80x24, on.
 std::string formatValue(const SettingValue& value);
 
+class Settings;
+
+// The names of Modal's own MIDI output ports, as the ownports and ownportname settings ask:
+// one is named ownportname alone, several are numbered from 1 after it.
+std::vector<std::string> ownPortNames(const Settings& settings);
+
 struct Setting
 {
     std::string_view name;
