@@ -133,4 +133,32 @@ Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick
     return region;
 }
 
+Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at)
+{
+    Put put;
+    const auto tracks = song.tracks();
+    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    {
+        auto added = reg.tracks[i];
+        if (added.empty())
+        {
+            continue;
+        }
+        for (auto& event : added)
+        {
+            event.tick += at;
+        }
+        put.events += added.size();
+        ++put.tracks;
+        song.updateEvents(tracks[firstTrack + i]->id(), [&](core::EventList& events)
+                          { events = core::merged(events, std::move(added)); });
+    }
+    return put;
+}
+
+std::string eventCount(std::size_t events)
+{
+    return events == 1 ? std::string{"1 event"} : std::to_string(events) + " events";
+}
+
 } // namespace modal::ui

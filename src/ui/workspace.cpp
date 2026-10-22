@@ -236,6 +236,12 @@ void Workspace::buildOperatorKeymap()
     }
 }
 
+const std::vector<core::Event>& Workspace::registerEvents() const
+{
+    static const std::vector<core::Event> none;
+    return register_.tracks.empty() ? none : register_.tracks.front();
+}
+
 std::string Workspace::pending() const
 {
     std::string text;

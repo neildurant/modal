@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <string>
 #include <variant>
 
@@ -157,6 +158,14 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*to);
     }
+    else if (command == "register-put")
+    {
+        return put();
+    }
+    else if (command == "event-delete")
+    {
+        return operate("operator-delete", "operator-line", count); // x: the cursor's bar
+    }
     else if (command == "field-edit")
     {
         // Enter opens the bar to edit: in the piano roll, when it comes; until then, in the
@@ -170,11 +179,167 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     return true;
 }
 
-bool ArrangeView::operate(std::string_view, std::string_view, int)
+bool ArrangeView::operate(std::string_view op, std::string_view motion, int count)
 {
-    host_.setMessage("Deleting and yanking bars in the arrangement comes next",
-                     MessageKind::Information);
+    if (document_.song().tracks().empty())
+    {
+        return false;
+    }
+    // The cursor's bar, and its end, cut short by the song's.
+    const auto& m = meter();
+    const auto track = page_.track();
+    const auto time = page_.time();
+    const auto bar = m.toBarBeatTick(time).bar;
+    const auto end = [&](std::int64_t b)
+    { return std::min(m.barStart(b + 1), document_.song().end()); };
+    Area area{track, track, m.barStart(bar), end(bar)};
+    if (motion == "operator-line")
+    {
+        // dd, x: the cursor's bar, and as many after it as the count says less one.
+        area.to = end(bar + std::max(count, 1) - 1);
+        return operateOn(op, area);
+    }
+
+    // Where the motion goes, without moving the cursor or the view.
+    const auto top = page_.topTrack();
+    const auto left = page_.leftTick();
+    const auto zoom = page_.zoom();
+    run(motion, count);
+    const auto landedTrack = page_.track();
+    const auto landedTime = page_.time();
+    page_.setCursor(track, time);
+    page_.setView(top, left, zoom);
+
+    if (motion == "cursor-down" || motion == "cursor-up")
+    {
+        // Across tracks: the cursor's bar on each, as Vim's line motions take whole lines.
+        area.top = std::min(track, landedTrack);
+        area.bottom = std::max(track, landedTrack);
+        return operateOn(op, area);
+    }
+    // Across bars: up to the bar landed on, as Vim's character motions go, or with G, gg and $
+    // the bar landed on too, as its line motions do.
+    const bool inclusive = motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+    const auto landed = m.toBarBeatTick(landedTime).bar;
+    if (landed > bar)
+    {
+        area.to = inclusive ? end(landed) : m.barStart(landed);
+    }
+    else if (landed < bar)
+    {
+        area.from = m.barStart(landed);
+        area.to = inclusive ? end(bar) : m.barStart(bar);
+    }
+    else if (!inclusive)
+    {
+        return false;
+    }
+    return area.from < area.to && operateOn(op, area);
+}
+
+std::string ArrangeView::describe(const Area& area) const
+{
+    const auto& m = meter();
+    const auto first = m.toBarBeatTick(area.from).bar;
+    const auto last = m.toBarBeatTick(area.to - 1).bar;
+    const auto bars = first == last ? "bar " + std::to_string(first)
+                                    : "bars " + std::to_string(first) + "–" + std::to_string(last);
+    const auto tracks = document_.song().tracks();
+    const auto name = [&](std::size_t i)
+    { return tracks[i]->name.empty() ? "track " + std::to_string(i + 1) : tracks[i]->name; };
+    const auto which = area.top == area.bottom       ? name(area.top)
+                       : area.bottom == area.top + 1 ? name(area.top) + " and " + name(area.bottom)
+                                                     : name(area.top) + " to " + name(area.bottom);
+    return bars + " of " + which;
+}
+
+bool ArrangeView::operateOn(std::string_view op, const Area& area)
+{
+    // The events starting in the area, as the register's, their ticks from its start.
+    const auto& song = document_.song();
+    const auto tracks = song.tracks();
+    EventRegister taken;
+    std::size_t total = 0;
+    for (auto i = area.top; i <= area.bottom; ++i)
+    {
+        auto& events = taken.tracks.emplace_back();
+        for (auto event : song.events(tracks[i]->id()).startingIn(area.from, area.to))
+        {
+            event.tick -= area.from;
+            events.push_back(std::move(event));
+        }
+        total += events.size();
+    }
+    host_.eventRegister() = taken;
+    auto what = describe(area);
+    if (op == "operator-yank")
+    {
+        what[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(what[0])));
+        host_.setMessage(what + " yanked (" + eventCount(total) + ")", MessageKind::Information);
+        return true;
+    }
+    if (total == 0)
+    {
+        host_.setMessage("Nothing to delete in " + what, MessageKind::Information);
+        return true;
+    }
+    edit("Delete " + what,
+         [&](core::Song& s)
+         {
+             for (auto i = area.top; i <= area.bottom; ++i)
+             {
+                 s.updateEvents(tracks[i]->id(),
+                                [&](core::EventList& events)
+                                {
+                                    const auto inside = events.startingIn(area.from, area.to);
+                                    const auto first = static_cast<std::size_t>(
+                                        inside.data() - events.all().data());
+                                    for (auto k = inside.size(); k > 0; --k)
+                                    {
+                                        events.erase(first + k - 1);
+                                    }
+                                });
+             }
+         });
+    // The cursor at the area's start, on its top track.
+    page_.setCursor(area.top, area.from);
     return true;
+}
+
+bool ArrangeView::put()
+{
+    const auto& reg = host_.eventRegister();
+    if (reg.empty())
+    {
+        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    if (document_.song().tracks().empty())
+    {
+        return false;
+    }
+    // At the start of the cursor's bar, onto its track and those after it.
+    const auto& m = meter();
+    const auto at = m.barStart(m.toBarBeatTick(page_.time()).bar);
+    const auto track = page_.track();
+    std::size_t total = 0;
+    for (const auto& events : reg.tracks)
+    {
+        total += events.size();
+    }
+    const auto tracks = document_.song().tracks();
+    const auto name =
+        tracks[track]->name.empty() ? "track " + std::to_string(track + 1) : tracks[track]->name;
+    edit("Put " + eventCount(total) + " in " + name +
+             (reg.tracks.size() > 1 ? " and the tracks after it" : ""),
+         [&](core::Song& song) { putRegister(song, reg, track, at); });
+    return true;
+}
+
+void ArrangeView::edit(std::string title, const std::function<void(core::Song&)>& change)
+{
+    document_.edit(std::move(title), place(), change);
+    refresh();
 }
 
 Inspection ArrangeView::inspection() const

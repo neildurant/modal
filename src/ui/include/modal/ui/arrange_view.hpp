@@ -10,6 +10,7 @@
 #include <modal/ui/view.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <span>
@@ -56,6 +57,25 @@ public:
     const ArrangePage& page() const { return page_; }
 
 private:
+    // An area of the song: tracks (counting from 0), and a time range.
+    struct Area
+    {
+        std::size_t top;
+        std::size_t bottom;
+        core::Tick from;
+        core::Tick to;
+    };
+
+    // Deletes or yanks the events starting in an area; puts the register at the cursor's bar.
+    bool operateOn(std::string_view op, const Area& area);
+    bool put();
+
+    // Changes the song as one undo step, made where the cursor is, and shows the change.
+    void edit(std::string title, const std::function<void(core::Song&)>& change);
+
+    // An area's bars, in the cursor's track's bars, and its tracks, as words: "bars 3–4 of Bass".
+    std::string describe(const Area& area) const;
+
     // The cursor's track's meter, or the conductor's with no tracks.
     const core::MeterMap& meter() const;
     std::optional<core::TrackId> trackId() const;

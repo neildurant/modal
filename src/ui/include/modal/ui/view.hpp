@@ -12,6 +12,7 @@
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -49,6 +50,19 @@ enum class ViewKind : std::uint8_t
     EventList,
 };
 
+// The unnamed register, shared by the views (decided for milestone 5): what was yanked or
+// deleted, an area's events, a list for each of its tracks from the top down, their ticks from
+// the area's start.
+struct EventRegister
+{
+    std::vector<std::vector<core::Event>> tracks;
+
+    bool empty() const
+    {
+        return std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
+    }
+};
+
 // What a view asks of the workspace that shows it.
 class ViewHost
 {
@@ -63,9 +77,8 @@ public:
     virtual void startTyping() = 0;
     virtual void stopTyping() = 0;
 
-    // The unnamed register, shared by the views: events yanked or deleted, their ticks from
-    // the first's.
-    virtual std::vector<core::Event>& eventRegister() = 0;
+    // The unnamed register, shared by the views.
+    virtual EventRegister& eventRegister() = 0;
 
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;

@@ -71,12 +71,16 @@ constexpr CommandInfo motion(std::string_view name, std::string_view description
 }
 
 constexpr std::array kCommands{
-    counted("cursor-left", "Move to the field before"),
-    counted("cursor-right", "Move to the next field"),
+    motion("cursor-left", "Move to the field before, or the bar before"),
+    motion("cursor-right", "Move to the next field, or the next bar"),
     motion("cursor-down", "Move down an event"),
     motion("cursor-up", "Move up an event"),
-    CommandInfo{.name = "cursor-first", .description = "Move to the first field"},
-    CommandInfo{.name = "cursor-last", .description = "Move to the last field"},
+    CommandInfo{.name = "cursor-first",
+                .description = "Move to the first field, or the first bar",
+                .motion = true},
+    CommandInfo{.name = "cursor-last",
+                .description = "Move to the last field, or the last bar",
+                .motion = true},
     motion("cursor-beat-next", "Move to the event at or after the next beat"),
     motion("cursor-beat-previous", "Move to the event at or after the beat before"),
     motion("cursor-bar-next", "Move to the event at or after the same place a bar on"),
@@ -632,12 +636,13 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     const auto id = *list_.track();
     const auto& events = document_.song().events(id);
     const auto first = events[indices.front()].tick;
-    host_.eventRegister().clear();
+    auto& reg = host_.eventRegister();
+    reg.tracks.assign(1, {});
     for (const auto i : indices)
     {
         auto event = events[i];
         event.tick -= first;
-        host_.eventRegister().push_back(std::move(event));
+        reg.tracks.front().push_back(std::move(event));
     }
     const auto what =
         indices.size() == 1 ? std::string{"1 event"} : std::to_string(indices.size()) + " events";
@@ -677,20 +682,16 @@ bool EventListView::put()
         return true;
     }
     const auto at = list_.rows()[row_].tick;
-    auto added = host_.eventRegister();
-    for (auto& event : added)
+    const auto& reg = host_.eventRegister();
+    std::size_t total = 0;
+    for (const auto& events : reg.tracks)
     {
-        event.tick += at;
+        total += events.size();
     }
-    const auto what =
-        added.size() == 1 ? std::string{"1 event"} : std::to_string(added.size()) + " events";
-    const auto id = *list_.track();
-    edit("Put " + what + " in " + trackName(),
-         [&](core::Song& song)
-         {
-             song.updateEvents(id, [&](core::EventList& events)
-                               { events = core::merged(events, added); });
-         });
+    const auto where =
+        reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
+    edit("Put " + eventCount(total) + " in " + where,
+         [&](core::Song& song) { putRegister(song, reg, track_ - 1, at); });
     return true;
 }
 

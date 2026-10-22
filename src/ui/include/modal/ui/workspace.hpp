@@ -125,8 +125,10 @@ public:
     const CommandLine& commandLine() const { return line_; }
     std::string pending() const; // the operator, count and keys typed so far
 
-    // What the unnamed register holds: events yanked or deleted, their ticks from the first's.
-    const std::vector<core::Event>& registerEvents() const { return register_; }
+    // What the unnamed register holds: an area's events, yanked or deleted; and those of its
+    // first track alone.
+    const EventRegister& registerArea() const { return register_; }
+    const std::vector<core::Event>& registerEvents() const;
 
     // Shows a message in the status line until the next key.
     void setMessage(std::string message, MessageKind kind) override
@@ -139,7 +141,7 @@ public:
 private:
     void startTyping() override { mode_ = Mode::CommandLine; }
     void stopTyping() override { mode_ = Mode::Normal; }
-    std::vector<core::Event>& eventRegister() override { return register_; }
+    EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
 
     View& view() const { return *current_; }
@@ -195,7 +197,7 @@ private:
         int count;
     };
     std::optional<PendingOperator> operator_;
-    std::vector<core::Event> register_;
+    EventRegister register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;
     LineHandler lineHandler_;

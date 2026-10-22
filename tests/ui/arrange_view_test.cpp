@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace modal;
 using namespace modal::ui;
@@ -227,4 +228,147 @@ TEST_CASE(":section starts a section at the cursor's bar in the arrangement too"
     CHECK(a.document.song().sectionStart(1) == 2 * core::kPpqn.whole());
     CHECK(a.ws.shown() == ViewKind::Arrangement);
     CHECK(a.page().bar() == 3); // the cursor stays
+}
+
+namespace
+{
+
+// Two tracks of eight bars of 4/4: Bass with a note starting in each of bars 1 to 4, the one
+// in bar 2 held into bar 3, and Lead with a note in bar 2.
+core::Song operatorSong()
+{
+    core::Song song{core::kPpqn};
+    const auto bass = song.addTrack("Bass");
+    const auto lead = song.addTrack("Lead");
+    const auto bar = core::kPpqn.whole();
+    const auto q = core::kPpqn.quarter();
+    song.updateEvents(bass,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{40, 100, q}});
+                          events.insert({bar + 2 * q, core::Note{41, 100, bar}}); // into bar 3
+                          events.insert({2 * bar, core::Note{42, 100, q}});
+                          events.insert({3 * bar + q, core::Note{43, 100, q}});
+                      });
+    song.updateEvents(lead, [&](core::EventList& events)
+                      { events.insert({bar, core::Note{72, 90, q}}); });
+    return song;
+}
+
+std::vector<core::Tick> ticksOf(const core::Document& document, std::size_t track)
+{
+    std::vector<core::Tick> ticks;
+    for (const auto& event : document.song().events(document.song().tracks()[track]->id()).all())
+    {
+        ticks.push_back(event.tick);
+    }
+    return ticks;
+}
+
+constexpr core::Tick kBar = core::kPpqn.whole();
+constexpr core::Tick kQuarter = core::kPpqn.quarter();
+
+} // namespace
+
+TEST_CASE("dd deletes the events starting in the cursor's bar, and u brings them back")
+{
+    Arranging a{operatorSong()};
+    a.type(U"2l"); // bar 3
+    a.type(U"dd");
+    // The note held into bar 3 from bar 2 starts outside it, so it stays.
+    CHECK(ticksOf(a.document, 0) ==
+          std::vector<core::Tick>{0, kBar + 2 * kQuarter, 3 * kBar + kQuarter});
+    CHECK(a.page().bar() == 3);
+    CHECK(a.ws.registerArea().tracks.size() == 1);
+    CHECK(a.ws.registerEvents().size() == 1);
+    CHECK(a.ws.registerEvents()[0].tick == 0); // from the bar's start
+    a.type(U"u");
+    CHECK(a.ws.message() == "Undid: Delete bar 3 of Bass");
+    CHECK(ticksOf(a.document, 0).size() == 4);
+}
+
+TEST_CASE("operators take bars across to where a motion goes, or tracks down")
+{
+    SECTION("2dd and d2l: this bar and the next")
+    {
+        for (const auto* keys : {U"2dd", U"d2l"})
+        {
+            Arranging a{operatorSong()};
+            a.type(U"l");
+            a.type(keys);
+            CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, 3 * kBar + kQuarter});
+        }
+    }
+    SECTION("dh: the bar before")
+    {
+        Arranging a{operatorSong()};
+        a.type(U"2ldh");
+        CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, 2 * kBar, 3 * kBar + kQuarter});
+        CHECK(a.page().bar() == 2); // at the area's start
+    }
+    SECTION("dG and d$: to the end, the last bar too")
+    {
+        for (const auto* keys : {U"dG", U"d$"})
+        {
+            Arranging a{operatorSong()};
+            a.type(U"2l");
+            a.type(keys);
+            CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, kBar + 2 * kQuarter});
+        }
+    }
+    SECTION("dgg: from the first bar, this one too")
+    {
+        Arranging a{operatorSong()};
+        a.type(U"ldgg");
+        CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{2 * kBar, 3 * kBar + kQuarter});
+    }
+    SECTION("dj: this bar on this track and the next")
+    {
+        Arranging a{operatorSong()};
+        a.type(U"ldj");
+        CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, 2 * kBar, 3 * kBar + kQuarter});
+        CHECK(ticksOf(a.document, 1).empty());
+        CHECK(a.ws.message().empty());
+        a.type(U"u");
+        CHECK(a.ws.message() == "Undid: Delete bar 2 of Bass and Lead");
+    }
+}
+
+TEST_CASE("y yanks an area of several tracks, and p puts it at the cursor's bar")
+{
+    Arranging a{operatorSong()};
+    a.type(U"lyj");
+    CHECK(a.ws.message() == "Bar 2 of Bass and Lead yanked (2 events)");
+    REQUIRE(a.ws.registerArea().tracks.size() == 2);
+    a.type(U"4lp"); // bar 6
+    CHECK(ticksOf(a.document, 0).back() == 5 * kBar + 2 * kQuarter);
+    CHECK(ticksOf(a.document, 1).back() == 5 * kBar);
+    a.type(U"u");
+    CHECK(a.ws.message() == "Undid: Put 2 events in Bass and the tracks after it");
+}
+
+TEST_CASE("x deletes the cursor's bar, saying when there's nothing in it")
+{
+    Arranging a{operatorSong()};
+    a.type(U"6l"); // bar 7, empty
+    a.type(U"x");
+    CHECK(a.ws.message() == "Nothing to delete in bar 7 of Bass");
+    a.type(U"gg3x");
+    CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{3 * kBar + kQuarter});
+}
+
+TEST_CASE("events yanked in the event list are put in the arrangement at the cursor's bar")
+{
+    Arranging a{operatorSong()};
+    a.type(U"ge");
+    a.type(U"gg");
+    const auto& list = a.ws.eventList();
+    while (list.list().rows()[list.row()].kind != RowKind::Event)
+    {
+        a.type(U"j");
+    }
+    a.type(U"yy");
+    a.type(U"ga");
+    a.type(U"4lp"); // bar 5
+    CHECK(ticksOf(a.document, 0).back() == 4 * kBar);
 }
