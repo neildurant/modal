@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/ui/config.hpp>
 #include <modal/ui/key_notation.hpp>
 

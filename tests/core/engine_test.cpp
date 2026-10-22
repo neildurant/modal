@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "support/edit_track.hpp"
 #include "support/fake_clock.hpp"
 #include "support/playback.hpp"

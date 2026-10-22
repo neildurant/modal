@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/style.hpp>

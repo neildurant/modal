@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // modal-record: record MIDI input to a Standard MIDI File, optionally playing along with one.
 
 #include <modal/core/count_in.hpp>

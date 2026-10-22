@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/ui/config.hpp>

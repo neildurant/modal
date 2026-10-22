@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/count_in.hpp>
 
 #include <algorithm>

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/document.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "support/ppqn.hpp"
 
 #include <modal/core/document.hpp>

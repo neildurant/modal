@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // modal: the sequencer.
 
 #include <modal/core/document.hpp>

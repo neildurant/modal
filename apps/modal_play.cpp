@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // modal-play: play a Standard MIDI File through a MIDI output port.
 
 #include <modal/core/engine.hpp>

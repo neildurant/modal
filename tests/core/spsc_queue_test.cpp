@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/spsc_queue.hpp>
 
 #include <catch2/catch_test_macros.hpp>

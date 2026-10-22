@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "support/smf_builder.hpp"
 
 #include <modal/core/smf.hpp>

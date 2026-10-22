@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 // Reading and writing whole files, for the core's file formats. Private to the core library.

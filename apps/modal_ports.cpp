@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // modal-ports: list the MIDI input and output ports Modal can see.
 
 #include <modal/platform/midi_ports.hpp>

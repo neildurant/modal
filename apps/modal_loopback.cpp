@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // modal-loopback: measure MIDI timing through a cable from an output port back to an input.
 //
 // Plays a steady stream of notes through the engine, as modal-play does, and times each

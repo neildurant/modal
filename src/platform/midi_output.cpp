@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "port_lookup.hpp"
 
 #include <modal/platform/midi_output.hpp>

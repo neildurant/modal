@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/ui/grid_cursor.hpp>
 
 #include <algorithm>

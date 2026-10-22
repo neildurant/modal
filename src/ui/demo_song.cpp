@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/event.hpp>
 #include <modal/core/meter_map.hpp>
 #include <modal/core/note_fraction.hpp>

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <modal/core/controllers.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/ui/event_text.hpp>

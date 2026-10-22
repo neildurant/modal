@@ -24,6 +24,7 @@ The full design is in `docs/design.md`. Read it before starting any task, and fo
 
 ## Code conventions
 
+- Modal is licensed GPL-3.0-or-later. Every C++ file starts with `// SPDX-License-Identifier: GPL-3.0-or-later` and a blank line. A new library linked into the programs needs its licence added to `licenses/` and listed in `licenses/README.md`.
 - Formatting via `.clang-format` in the repo root (clang-format 22.1.8, as pinned in CI); run it before committing.
 - Naming: `PascalCase` types, `camelCase` functions and variables, `kPascalCase` constants, `member_` suffix for private data members, `snake_case` file names.
 - Public headers live in `src/<lib>/include/modal/<lib>/*.hpp` and are included as `<modal/<lib>/x.hpp>`; tests are `tests/<lib>/*_test.cpp`.
