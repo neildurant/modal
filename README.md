@@ -4,14 +4,16 @@ Modal is a fast, keyboard-driven MIDI sequencer for Linux and Windows, inspired 
 
 ## Status
 
-Early, and not yet usable for making music. Built so far:
+Early: it plays, opens, edits and saves songs, but it isn't yet ready for making music. Built so far:
 
 1. **Engine and MIDI layer:** playing Standard MIDI Files with timing measured on real hardware.
-2. **Recording:** with metronome, count-in and pre-roll.
+2. **Recording:** with metronome, count-in and pre-roll (from the command line, for now).
 3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt.
-4. **Under way:** songs made of sections, saved in a plain-text format, with undo, and the event list, the first real view.
+4. **Nearly done: the event list,** the first real view. Songs made of sections, opened, saved and exported in a plain-text format or as MIDI files, with undo; Vim-style motions and operators; editing events in place; an inspector; and playback from a play-from marker.
 
-Editing comes next. The plan for the rest is in [docs/design.md](docs/design.md).
+![The event list, playing](docs/screenshot.png)
+
+Next come Visual mode, transforms, search and the command palette (milestone 5), then the piano roll and arrangement views. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
@@ -69,4 +71,8 @@ Settings, key bindings and colours live in a Vim-style `modalrc` file. `:write-c
 
 ## Licence
 
-Not chosen yet. The bundled JetBrains Mono font is under the SIL Open Font License ([assets/fonts/OFL.txt](assets/fonts/OFL.txt)).
+Modal is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).
+
+Modal is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+The libraries it's built with, and its built-in JetBrains Mono font, are under their own licences, all compatible with the GPL: see [licenses/](licenses/README.md).
