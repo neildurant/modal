@@ -34,17 +34,16 @@ void Player::update(const Song& song)
         compilePlan(song, [&](const Track& track) { return destination(track.port); })));
 }
 
-void Player::play(Tick start)
+void Player::play()
 {
     if (playing_)
     {
         noteStopped();
     }
-    engine_.play(start);
+    engine_.play(marker_);
     play_ = engine_.lastPlay();
     playing_ = true;
-    started_ = start;
-    atEnd_ = false;
+    started_ = marker_;
 }
 
 void Player::stop()
@@ -56,7 +55,7 @@ void Player::stop()
     }
 }
 
-void Player::toggle(bool rewind)
+void Player::toggle()
 {
     if (playing_)
     {
@@ -64,7 +63,7 @@ void Player::toggle(bool rewind)
     }
     else
     {
-        play(rewind ? started_ : atEnd_ ? 0 : stopped_);
+        play();
     }
 }
 
@@ -79,10 +78,17 @@ void Player::panic()
 
 void Player::noteStopped()
 {
-    // Where the engine was last seen, until it says where it stopped.
-    stopped_ = position().value_or(started_);
+    stoppedAt(position().value_or(started_));
     stopExact_ = false;
     playing_ = false;
+}
+
+void Player::stoppedAt(Tick tick)
+{
+    if (!rewind_)
+    {
+        marker_ = std::max(tick, Tick{0});
+    }
 }
 
 bool Player::poll()
@@ -91,14 +97,17 @@ bool Player::poll()
     {
         if (const auto at = engine_.stoppedAt(play_))
         {
-            stopped_ = std::max(*at, Tick{0});
+            stoppedAt(*at);
             stopExact_ = true;
         }
     }
     if (playing_ && engine_.status().finished)
     {
-        stop();
-        atEnd_ = true;
+        // Resuming from the end would play nothing, so without rewind, back to the start.
+        engine_.stop();
+        playing_ = false;
+        stopExact_ = true;
+        stoppedAt(0);
         return true;
     }
     return false;

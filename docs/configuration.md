@@ -80,7 +80,7 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `minsize`    | `120x30` | The smallest the window can be made, in cells |
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
 | `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
-| `rewind`     | `on`    | Whether Space stops and goes back to where playback started (`on`), or stops and resumes from where it stopped (`off`) |
+| `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |
 
 ## Themes
 

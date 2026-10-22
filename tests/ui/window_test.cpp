@@ -242,8 +242,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
 }
 
 // Hidden: writes the event list and the arrangement sketch to look at, to MODAL_SAMPLE_BMP
-// with "-events", "-events-light", "-playing", "-playing-light", "-conductor", "-arrange" and
-// "-arrange-out" (zoomed out) before its extension, or to sample.bmp and so on.
+// with "-events", "-events-light", "-playing", "-playing-light", "-marker", "-conductor",
+// "-arrange" and "-arrange-out" (zoomed out) before its extension, or to sample.bmp and so on.
 TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
 {
     auto window = offscreen(1000, 600);
@@ -281,6 +281,12 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
     CHECK(window->saveFrame(base + "-playing-light.bmp"));
     player.stop();
     view.wake(*view.deadline());
+    for (const char32_t key : std::u32string_view{U"6km j"}) // the marker a row above the cursor
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-marker.bmp"));
     view.setPlayer(nullptr);
     view.run("track-previous", 0);
     window->draw(view.frame(), *builtInTheme("dark"));
@@ -418,11 +424,11 @@ TEST_CASE("a window wakes at its handlers' deadline with no events, and draws if
     CHECK(frames >= 2); // the first, and the one the wake-up asked for
 }
 
-TEST_CASE("Ctrl with Return or the keypad's Enter is Ctrl-Enter, which plays from the cursor")
+TEST_CASE("Ctrl with Space, from either Ctrl key, plays from the cursor")
 {
     auto window = offscreen(320, 200);
-    pushKey(SDLK_RETURN, SDL_KMOD_LCTRL, SDL_SCANCODE_RETURN);
-    pushKey(SDLK_KP_ENTER, SDL_KMOD_RCTRL, SDL_SCANCODE_KP_ENTER);
+    pushKey(SDLK_SPACE, SDL_KMOD_LCTRL, SDL_SCANCODE_SPACE);
+    pushKey(SDLK_SPACE, SDL_KMOD_RCTRL, SDL_SCANCODE_SPACE);
     SDL_Event quit{};
     quit.type = SDL_EVENT_QUIT;
     REQUIRE(SDL_PushEvent(&quit));
@@ -440,7 +446,7 @@ TEST_CASE("Ctrl with Return or the keypad's Enter is Ctrl-Enter, which plays fro
     const auto keymap = EventListView::defaultKeymap();
     for (const auto& key : keys)
     {
-        CHECK(key == Key::of(NamedKey::Enter, kCtrl));
+        CHECK(key == Key::typed(U' ', kCtrl));
         const auto match = keymap.match(Mode::Normal, std::vector<Key>{key});
         REQUIRE(match.binding != nullptr);
         CHECK(match.binding->command == "play-cursor");

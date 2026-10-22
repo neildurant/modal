@@ -69,12 +69,12 @@ public:
 
     // The player the transport commands play the song with, or none, when they do nothing.
     // It must outlive the view.
-    void setPlayer(core::Player* player) { player_ = player; }
+    void setPlayer(core::Player* player);
 
-    // Whether Space stops and goes back to where playback started (the rewind setting): the
-    // cursor then stays where it was while the view follows the playhead. Otherwise Space
-    // resumes where it stopped, and the cursor follows the playhead.
-    void setRewind(bool rewind) { rewind_ = rewind; }
+    // Whether the play-from marker stays put when playback stops (the rewind setting), and the
+    // cursor stays where it was; otherwise the marker moves to where playback stops, and the
+    // cursor follows the playhead there.
+    void setRewind(bool rewind);
     bool rewind() const { return rewind_; }
 
     // The row playing, while playing: the last at or before the playhead.
@@ -197,6 +197,7 @@ private:
     // Runs a transport command; then shows the playhead, or where playback stopped.
     bool transport(std::string_view command);
     void showPlayhead();
+    std::size_t rowAtOrBefore(core::Tick tick) const;
 
     Region listRegion() const;
     Region inspectorRegion() const;
@@ -243,7 +244,7 @@ private:
     WindowLayout layout_;
     core::Player* player_ = nullptr;
     bool rewind_ = true;
-    bool wasPlaying_ = false;
+    bool wasPlaying_ = false; // or stopping, until the player knows where it stopped
     std::optional<std::size_t> playheadRow_;
     std::int64_t lastTime_ = 0; // of the last key or wake-up
 };

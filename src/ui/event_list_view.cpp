@@ -122,15 +122,15 @@ constexpr std::array kCommands{
     counted("undo", "Undo the last change, or {count} changes"),
     counted("redo", "Redo the change undone last, or {count} changes"),
     CommandInfo{.name = "cancel", .description = "Cancel"},
-    CommandInfo{.name = "play-toggle",
-                .description = "Stop, or play from where playback started (rewind) or stopped"},
-    CommandInfo{.name = "play-cursor", .description = "Play from the cursor"},
-    CommandInfo{.name = "play-again", .description = "Play from where playback last started"},
+    CommandInfo{.name = "play-toggle", .description = "Play from the play-from marker, or stop"},
+    CommandInfo{.name = "play-cursor",
+                .description = "Put the play-from marker at the cursor, and play from there"},
+    CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
     CommandInfo{.name = "panic",
                 .description = "Stop, and send All Notes Off and Reset All Controllers"},
     CommandInfo{.name = "rewind-toggle",
-                .description = "Turn rewind on or off: whether Space goes back to where "
-                               "playback started"},
+                .description = "Turn rewind on or off: whether the play-from marker stays put "
+                               "when playback stops, or moves to where it stopped"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
     atPrompt("command-line-run", "Run the command line"),
     atPrompt("command-line-cancel", "Close the command line"),
@@ -377,15 +377,15 @@ bool EventListView::transport(std::string_view command)
     }
     if (command == "play-toggle")
     {
-        player_->toggle(rewind_);
+        player_->toggle();
     }
-    else if (command == "play-cursor")
+    else if (command == "play-cursor" || command == "marker-set")
     {
-        player_->play(list_.rows()[row_].tick);
-    }
-    else if (command == "play-again")
-    {
-        player_->playAgain();
+        player_->setMarker(list_.rows()[row_].tick);
+        if (command == "play-cursor")
+        {
+            player_->play();
+        }
     }
     else
     {
@@ -395,19 +395,38 @@ bool EventListView::transport(std::string_view command)
     return true;
 }
 
+void EventListView::setPlayer(core::Player* player)
+{
+    player_ = player;
+    if (player_ != nullptr)
+    {
+        player_->setRewind(rewind_);
+    }
+}
+
+void EventListView::setRewind(bool rewind)
+{
+    rewind_ = rewind;
+    if (player_ != nullptr)
+    {
+        player_->setRewind(rewind);
+    }
+}
+
+std::size_t EventListView::rowAtOrBefore(core::Tick tick) const
+{
+    const auto after = list_.rowAt(tick + 1);
+    return after > 0 ? after - 1 : 0;
+}
+
 void EventListView::showPlayhead()
 {
     const bool playing = player_ != nullptr && player_->playing();
     const auto position = playing ? player_->position() : std::nullopt;
-    const auto rowOf = [&](core::Tick tick)
-    {
-        const auto after = list_.rowAt(tick + 1);
-        return after > 0 ? after - 1 : 0;
-    };
     if (playing)
     {
-        // Until the engine starts, the playhead is where it will start.
-        const auto row = rowOf(position.value_or(player_->started()));
+        // Until the engine starts, the playhead is at the marker, where it will start.
+        const auto row = rowAtOrBefore(position.value_or(player_->marker()));
         playheadRow_ = row;
         if (!rewind_)
         {
@@ -425,16 +444,16 @@ void EventListView::showPlayhead()
     }
     else if (wasPlaying_)
     {
-        // Stopped: with rewind, back to the cursor; otherwise the cursor stays where
-        // playback stopped.
+        // Stopped: with rewind, back to the cursor; otherwise the cursor goes with the marker
+        // to where playback stopped, once the engine says where.
         playheadRow_.reset();
         if (!rewind_)
         {
-            row_ = rowOf(player_->stopped());
+            row_ = rowAtOrBefore(player_->marker());
         }
         follow();
     }
-    wasPlaying_ = playing;
+    wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
 }
 
 bool EventListView::runAll(const std::vector<Action>& actions)
@@ -744,7 +763,7 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     {
         return false;
     }
-    else if (command == "play-toggle" || command == "play-cursor" || command == "play-again" ||
+    else if (command == "play-toggle" || command == "play-cursor" || command == "marker-set" ||
              command == "panic")
     {
         return transport(command);
@@ -758,10 +777,10 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
         }
         else
         {
-            rewind_ = !rewind_;
+            setRewind(!rewind_);
         }
-        setMessage(rewind_ ? "Rewind on: Space goes back to where playback started"
-                           : "Rewind off: Space resumes where playback stopped",
+        setMessage(rewind_ ? "Rewind on: the play-from marker stays put"
+                           : "Rewind off: the play-from marker moves to where playback stops",
                    MessageKind::Information);
         return true;
     }
@@ -1621,6 +1640,13 @@ Region EventListView::listRegion() const
                 grid.write(start, line, shown, style);
             }
         }
+        // The play-from marker in the margin, over the cursor's box if it's there.
+        if (!isAdded && player_ != nullptr && row == rowAtOrBefore(player_->marker()))
+        {
+            const bool onCursor = !adding && row == row_ && cursorField == Column::Position;
+            grid.write(0, line, "▷",
+                       onCursor ? kCursor : Style{Role::Accent, style.background, kPlain});
+        }
     }
     return ui::gridRegion(grid, main, cell_, Role::Background);
 }
@@ -1781,6 +1807,11 @@ void EventListView::addBars(Frame& frame) const
     if (const auto keys = pending(); !keys.empty())
     {
         bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
+    }
+    if (player_ != nullptr)
+    {
+        bottom.right.push_back({"From ", label});
+        bottom.right.push_back({positionText(meter, player_->marker()) + "   ", kBarText});
     }
     bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.

@@ -102,13 +102,14 @@ cmap <Down>     command-line-newer      "Newer line"
 
 nmap <Esc>      cancel            "Cancel"
 
-" Playing: Space stops, or plays from where playback started (with rewind, on by default) or
-" where it stopped; Ctrl-Space or Ctrl-Enter plays from the cursor; , t Space turns rewind on
-" or off.
+" Playing: Space plays from the play-from marker (the ▷ in the margin), or stops; m Space puts
+" the marker at the cursor, and Ctrl-Space puts it there and plays. With rewind (on by
+" default) the marker stays put; without, it moves to where playback stops. , t Space turns
+" rewind on or off.
 " Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
 nmap <Space>    play-toggle       "Play or stop"
 nmap <C-Space>  play-cursor       "Play from the cursor"
-nmap <C-CR>     play-cursor       "Play from the cursor"
+nmap m<Space>   marker-set        "Play from here"
 nmap ,t<Space>  rewind-toggle     "Rewind on or off"
 nmap <C-.>      panic             "Panic"
 cmap <C-.>      panic             "Panic"

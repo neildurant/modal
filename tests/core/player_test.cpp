@@ -84,7 +84,7 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
 
     Playing p{song};
     CHECK(p.player.missingPorts() == std::vector<std::string>{"gone"});
-    p.player.play(0);
+    p.player.play();
     p.runFor(1ms);
     REQUIRE_FALSE(p.sink.sent.empty());
     CHECK(p.sink.sent.front().destination == DestinationId{2});
@@ -101,69 +101,86 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
     CHECK(p.lookedUp.size() == 4);
 }
 
-TEST_CASE("Space resumes from where playback stopped, or with rewind from where it started")
+TEST_CASE("playback starts from the marker, which stays put with rewind")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
     const Tick q = ppqn.quarter();
+    CHECK(p.player.marker() == 0);
+    CHECK(p.player.rewind());
 
-    p.player.play(q);
+    p.player.setMarker(q);
+    p.player.toggle();
     CHECK(p.player.playing());
-    CHECK(p.player.started() == q);
     p.runFor(750ms); // a quarter and a half on
     CHECK(p.player.position() == q + q + q / 2);
-    p.player.toggle(true);
+    p.player.toggle();
     CHECK_FALSE(p.player.playing());
     CHECK(p.player.position() == std::nullopt);
-    CHECK(p.player.stopped() == q + q + q / 2); // where it was last seen, until...
     p.runFor(1ms);
-    const Tick stopped = p.player.stopped(); // ...where the engine says it stopped
+    CHECK_FALSE(p.player.stopping());
+    CHECK(p.player.marker() == q);
+    p.player.toggle();
+    p.runFor(1ms);
+    CHECK(p.player.position() >= q);
+    CHECK(p.player.position() < q + q / 10);
+}
+
+TEST_CASE("without rewind, the marker moves to where playback stops")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Playing p{fourNotes(ppqn)};
+    const Tick q = ppqn.quarter();
+    p.player.setRewind(false);
+    p.player.setMarker(q);
+    p.player.play();
+    p.runFor(750ms);
+    p.player.stop();
+    CHECK(p.player.marker() == q + q + q / 2); // where it was last seen, until...
+    CHECK(p.player.stopping());
+    p.runFor(1ms);
+    CHECK_FALSE(p.player.stopping());
+    const Tick stopped = p.player.marker(); // ...where the engine says it stopped
     CHECK(stopped == p.engine.stoppedAt(p.engine.lastPlay()));
     CHECK(stopped >= q + q + q / 2);
-
-    SECTION("without rewind, from where it stopped")
-    {
-        p.player.toggle(false);
-        CHECK(p.player.started() == stopped);
-    }
-    SECTION("with rewind, from where it started")
-    {
-        p.player.toggle(true);
-        CHECK(p.player.started() == q);
-    }
-    SECTION("play again, from where it started, whatever the setting")
-    {
-        p.player.playAgain();
-        CHECK(p.player.started() == q);
-    }
-    CHECK(p.player.playing());
 }
 
 TEST_CASE("playback stops by itself at the song's end")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
-    p.player.play(0);
-    CHECK_FALSE(p.runFor(1s));
-    CHECK(p.player.playing());
-    CHECK(p.runFor(2s));
-    CHECK_FALSE(p.player.playing());
-    CHECK_FALSE(p.runFor(1s));
+    const Tick q = ppqn.quarter();
+    p.player.setMarker(q);
 
-    // Resuming from the end would play nothing, so Space starts from the song's start.
-    p.player.toggle(false);
-    CHECK(p.player.started() == 0);
+    SECTION("with rewind, the marker stays put")
+    {
+        p.player.play();
+        CHECK_FALSE(p.runFor(1s));
+        CHECK(p.player.playing());
+        CHECK(p.runFor(2s));
+        CHECK_FALSE(p.player.playing());
+        CHECK_FALSE(p.runFor(1s));
+        CHECK(p.player.marker() == q);
+    }
+    SECTION("without, it goes back to the start, since resuming at the end would play nothing")
+    {
+        p.player.setRewind(false);
+        p.player.play();
+        CHECK(p.runFor(3s));
+        CHECK_FALSE(p.runFor(1s));
+        CHECK(p.player.marker() == 0);
+    }
 }
 
-TEST_CASE("playing from elsewhere while playing starts again there")
+TEST_CASE("playing while playing starts again from the marker")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
-    p.player.play(0);
+    p.player.play();
     p.runFor(600ms);
-    p.player.play(3 * ppqn.quarter());
+    p.player.setMarker(3 * ppqn.quarter());
+    p.player.play();
     CHECK(p.player.playing());
-    CHECK(p.player.started() == 3 * ppqn.quarter());
     p.runFor(1ms);
     const auto position = p.player.position(); // a millisecond or so on
     REQUIRE(position);
@@ -175,7 +192,7 @@ TEST_CASE("panic stops playback and resets every channel")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
-    p.player.play(0);
+    p.player.play();
     p.runFor(100ms);
     p.player.panic();
     CHECK_FALSE(p.player.playing());
@@ -189,7 +206,7 @@ TEST_CASE("an edit during playback carries on playing the new song")
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = fourNotes(ppqn);
     Playing p{song};
-    p.player.play(0);
+    p.player.play();
     p.runFor(100ms);
     song.updateEvents(song.tracks()[0]->id(), [&](EventList& events)
                       { events.insert({2 * ppqn.quarter() + 1, Note{72, 100, 1}}); });

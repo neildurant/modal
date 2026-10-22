@@ -93,8 +93,8 @@ Settings::Settings()
                   "for the first port found",
                   std::string{}),
           setting("rewind",
-                  "Whether Space stops and goes back to where playback started (on), or "
-                  "stops and resumes where it stopped (off)",
+                  "Whether the play-from marker, which Space plays from, stays put when "
+                  "playback stops (on), or moves to where it stopped (off)",
                   true),
       }
 {
