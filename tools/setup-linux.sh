@@ -3,7 +3,8 @@
 #
 # Sets up a Debian or Ubuntu machine to build and test Modal: the packages CI installs, the
 # compilers, CMake and Ninja, and vcpkg (cloned to $VCPKG_ROOT, or ~/vcpkg if that isn't set).
-# Then configures every Linux preset. Safe to run again.
+# Then configures every Linux preset. Safe to run again, when it asks for no sudo if every
+# package is installed already.
 #
 #   tools/setup-linux.sh
 #
@@ -18,16 +19,23 @@ if ! command -v apt-get > /dev/null; then
 fi
 
 # The compilers and build tools; what vcpkg needs to fetch and build (autotools for ALSA); the
-# ALSA runtime, which libremidi loads; and the X11 and Wayland development files SDL3 builds
-# against. The same as CI's list, with the compilers and tools CI's image already has.
-sudo apt-get update
-sudo apt-get install -y build-essential gcc g++ clang cmake ninja-build git curl zip unzip tar \
-    pkg-config python3 autoconf autoconf-archive automake libtool libasound2t64 \
-    libx11-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev
+# ALSA runtime, which libremidi loads; the X11 and Wayland development files SDL3 builds
+# against; and pipx, for clang-format. CI's list, with what CI's image has already.
+packages=(build-essential gcc g++ clang cmake ninja-build git curl zip unzip tar pkg-config
+          python3 pipx autoconf autoconf-archive automake libtool libasound2t64 libx11-dev
+          libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev)
+missing=()
+for package in "${packages[@]}"; do
+    dpkg -s "$package" > /dev/null 2>&1 || missing+=("$package")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+    echo "Installing: ${missing[*]}"
+    sudo apt-get update
+    sudo apt-get install -y "${missing[@]}"
+fi
 
 # clang-format, pinned to CI's version, through pip, since distributions' versions differ.
 if ! clang-format --version 2> /dev/null | grep -q "22.1.8"; then
-    sudo apt-get install -y pipx
     pipx install "clang-format==22.1.8" --force
     echo "clang-format 22.1.8 is in ~/.local/bin; make sure that's on your PATH"
 fi
@@ -52,5 +60,5 @@ done
 
 echo
 echo "Set up. tools/check-linux.sh builds and tests every preset."
-echo "ThreadSanitizer needs 'sudo sysctl vm.mmap_rnd_bits=28' on recent kernels (check-linux.sh"
-echo "says so if it's needed)."
+echo "If ThreadSanitizer won't start, check-linux.sh says to run"
+echo "'sudo sysctl vm.mmap_rnd_bits=28' first."
