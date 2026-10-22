@@ -13,7 +13,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 
 ![The event list, playing](docs/screenshot.png)
 
-Next come Visual mode, transforms, search and the command palette (milestone 5), then the piano roll and arrangement views. The plan for the rest is in [docs/design.md](docs/design.md).
+Next come the piano roll and arrangement views (milestone 5), then Visual mode, transforms, search and the command palette across all three views (milestone 6). The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 

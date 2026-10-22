@@ -15,7 +15,7 @@
 namespace modal::ui
 {
 
-// The test view's arrangement page: a sketch of the arrangement (milestone 6), to try out
+// The test view's arrangement page: a sketch of the arrangement (milestone 5), to try out
 // how it's drawn. A row for each track, with its number and name in text cells, then its
 // bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded by
 // how busy the bar is, with a gap before each while bars are wide enough, and a faint line
