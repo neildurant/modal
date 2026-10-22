@@ -30,6 +30,7 @@ As well as the commands below, the prompt takes:
 - `set NAME?` shows a setting's value, such as `fontsize=12`. Several can be asked for at once.
 - `source` with no file runs your `modalrc` again, after you've edited it. It runs over what's set already, so a line you've deleted keeps its effect until Modal restarts.
 - `write-config FILE` writes the config, as above. A relative FILE is in the config directory. `write-config!` overwrites.
+- `port NAME` sets the current track's output port, by its full name or any part of it that matches only one port, ignoring case; `port` alone says which port the track plays to and lists the output ports.
 - `q` or `quit` quits.
 
 Any command keys can be bound to can be run at the prompt too, by name, such as `:track-next`; one that takes a count takes it after its name, so `:cursor-down 3` moves down three rows. `write-config` and `quit` can't go in `modalrc`, and the movement and window commands can't either, since there's nothing to move when it runs; the file says so if they're there.

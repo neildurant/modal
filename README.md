@@ -55,7 +55,13 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
 | `zz` | Centre the cursor |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
-| `:` | The command prompt: `:set theme=light`, `:set fontsize?`, `:write-config modalrc`, `:q` |
+| Space | Play from the play-from marker (the ▶ in the margin), or stop |
+| `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |
+| `, t Space` | Rewind on or off: whether the marker stays put when playback stops, or moves to where it stopped |
+| `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
+| `:` | The command prompt: `:set theme=light`, `:set fontsize?`, `:port loopMIDI`, `:write-config modalrc`, `:q` |
+
+Tracks play to their own output port, or if they have none (as in an imported MIDI file) to the `port` setting's, or else the first output port found. `:port NAME` sets the current track's port, by its name or any part of it that matches only one port; `:port` alone says which it plays to and lists the ports. While playing, the list scrolls to keep the row playing a third of the way down.
 
 ## Configuring
 
