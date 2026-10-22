@@ -418,6 +418,35 @@ TEST_CASE("a window wakes at its handlers' deadline with no events, and draws if
     CHECK(frames >= 2); // the first, and the one the wake-up asked for
 }
 
+TEST_CASE("Ctrl with Return or the keypad's Enter is Ctrl-Enter, which plays from the cursor")
+{
+    auto window = offscreen(320, 200);
+    pushKey(SDLK_RETURN, SDL_KMOD_LCTRL, SDL_SCANCODE_RETURN);
+    pushKey(SDLK_KP_ENTER, SDL_KMOD_RCTRL, SDL_SCANCODE_KP_ENTER);
+    SDL_Event quit{};
+    quit.type = SDL_EVENT_QUIT;
+    REQUIRE(SDL_PushEvent(&quit));
+    std::vector<Key> keys;
+    window->run({.redraw = [](Window&) {},
+                 .key =
+                     [&](const Key& key, std::int64_t)
+                 {
+                     keys.push_back(key);
+                     return false;
+                 },
+                 .deadline = {},
+                 .wake = {}});
+    REQUIRE(keys.size() == 2);
+    const auto keymap = EventListView::defaultKeymap();
+    for (const auto& key : keys)
+    {
+        CHECK(key == Key::of(NamedKey::Enter, kCtrl));
+        const auto match = keymap.match(Mode::Normal, std::vector<Key>{key});
+        REQUIRE(match.binding != nullptr);
+        CHECK(match.binding->command == "play-cursor");
+    }
+}
+
 TEST_CASE("events are handled between frames even when the deadline is always past")
 {
     // As while playing, when a frame takes longer to draw than the time between frames.
