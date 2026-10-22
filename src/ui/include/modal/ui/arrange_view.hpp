@@ -44,6 +44,7 @@ public:
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override;
+    const core::MeterMap& cursorMeter() const override { return meter(); }
     void setCursor(const SongCursor& cursor) override;
     core::EditPlace place() const override;
     void restore(const core::EditPlace& place) override;

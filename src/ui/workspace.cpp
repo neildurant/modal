@@ -2,6 +2,7 @@
 
 #include <modal/ui/bar.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/event_text.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -52,6 +53,11 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "port",
                 .description = "Set the track's output port, by its name or part of it; or "
                                "with no name, show it and list the ports",
+                .usage = "[NAME]",
+                .keys = false},
+    CommandInfo{.name = "section",
+                .description = "Start a new section at the cursor's bar line, splitting the "
+                               "section it's in; named Section and a number if no name is given",
                 .usage = "[NAME]",
                 .keys = false},
     CommandInfo{.name = "rewind-toggle",
@@ -181,6 +187,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "port")
                          {
                              return port(call.arguments);
+                         }
+                         if (name == "section")
+                         {
+                             return section(call.arguments);
                          }
                          if (auto result = view().runLine(name, call.arguments))
                          {
@@ -672,6 +682,58 @@ CommandResult Workspace::port(std::string_view name)
                    { song.updateTrack(*id, [&](core::Track& t) { t.port = full; }); });
     view().refresh();
     return {true, who + " plays to " + full, false};
+}
+
+CommandResult Workspace::section(std::string_view name)
+{
+    const auto first = name.find_first_not_of(" \t");
+    name = first == std::string_view::npos
+               ? std::string_view{}
+               : name.substr(first, name.find_last_not_of(" \t") - first + 1);
+    auto& song = document_.song();
+    const auto& meter = view().cursorMeter();
+    const auto tick = meter.barStart(meter.toBarBeatTick(view().cursor().tick).bar);
+    const auto at = positionText(meter, tick);
+    const auto current = song.sectionAt(tick);
+    if (tick >= song.end())
+    {
+        return CommandResult::error("There's no section after the song's end to split");
+    }
+    if (song.sectionStart(current) == tick)
+    {
+        return CommandResult::error(song.sections()[current]->name() + " starts at " + at +
+                                    " already");
+    }
+    const std::string wanted =
+        name.empty() ? "Section " + std::to_string(song.sections().size() + 1) : std::string{name};
+    std::optional<core::Song::Split> split;
+    document_.edit("Start section " + wanted + " at " + at, view().place(),
+                   [&](core::Song& s) { split = s.splitSection(tick, wanted); });
+    refresh();
+    if (!split)
+    {
+        return CommandResult::error("Can't start a section at " + at);
+    }
+    // The name it got, numbered if another section had it.
+    const auto& named = document_.song().sections()[split->index]->name();
+    std::string cut;
+    if (split->conductor)
+    {
+        cut = "the conductor and the tracks following it";
+    }
+    for (const auto id : split->tracks)
+    {
+        const auto track = document_.song().track(id);
+        cut += (cut.empty() ? "" : ", ") +
+               (track->name.empty() ? std::string{"a track"} : track->name);
+    }
+    if (!cut.empty())
+    {
+        // A bar the new section starts inside ends short, as a remainder bar.
+        return CommandResult{true, named + " starts at " + at + "; this cuts a bar short in " + cut,
+                             true};
+    }
+    return {true, named + " starts at " + at, false};
 }
 
 Frame Workspace::frame() const

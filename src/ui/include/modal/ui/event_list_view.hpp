@@ -45,14 +45,13 @@ public:
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
-    std::optional<CommandResult> runLine(std::string_view command,
-                                         std::string_view arguments) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
     void addRegions(Frame& frame) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override;
+    const core::MeterMap& cursorMeter() const override;
     void setCursor(const SongCursor& cursor) override;
     core::EditPlace place() const override;
     void restore(const core::EditPlace& place) override;
@@ -131,9 +130,6 @@ private:
     void moveFields(int by);
     void follow();
     std::size_t rowAtOrBefore(core::Tick tick) const;
-
-    // :section NAME starts a new section at the bar line of the cursor's bar.
-    CommandResult section(std::string_view name);
 
     Region listRegion() const;
     Region inspectorRegion() const;

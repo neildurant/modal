@@ -121,6 +121,10 @@ public:
     virtual SongCursor cursor() const = 0;
     virtual void setCursor(const SongCursor& cursor) = 0;
 
+    // The meter the cursor's time is counted in, in the view's own bars: its track's, or the
+    // conductor's in its list.
+    virtual const core::MeterMap& cursorMeter() const = 0;
+
     // Where an edit is made, for undo; and going back there, after undo or redo.
     virtual core::EditPlace place() const = 0;
     virtual void restore(const core::EditPlace& place) = 0;

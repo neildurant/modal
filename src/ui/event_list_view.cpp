@@ -111,11 +111,6 @@ constexpr std::array kCommands{
     counted("event-delete", "Delete this event, or {count} events from it"),
     CommandInfo{.name = "register-put",
                 .description = "Put the yanked or deleted events, the first at the cursor's time"},
-    CommandInfo{.name = "section",
-                .description = "Start a new section at the cursor's bar line, splitting the "
-                               "section it's in; named Section and a number if no name is given",
-                .usage = "[NAME]",
-                .keys = false},
 };
 
 // Text to show in a cell of a width, without control characters, cut short with an
@@ -153,16 +148,6 @@ EventListView::EventListView(core::Document& document, ViewHost& host)
     , track_(document.song().tracks().empty() ? 0 : 1)
     , list_(listOf(track_))
 {
-}
-
-std::optional<CommandResult> EventListView::runLine(std::string_view command,
-                                                    std::string_view arguments)
-{
-    if (command == "section")
-    {
-        return section(arguments);
-    }
-    return std::nullopt;
 }
 
 std::vector<int> EventListView::topHeights(CellSize cell) const
@@ -302,6 +287,11 @@ void EventListView::stopPlayhead(std::optional<core::Tick> cursorTo)
         row_ = rowAtOrBefore(*cursorTo);
     }
     follow();
+}
+
+const core::MeterMap& EventListView::cursorMeter() const
+{
+    return list_.meter();
 }
 
 SongCursor EventListView::cursor() const
@@ -1200,57 +1190,6 @@ core::EditPlace EventListView::place() const
     return {list_.track(),
             tick,
             {static_cast<std::int64_t>(top_), static_cast<std::int64_t>(row_ - list_.rowAt(tick))}};
-}
-
-CommandResult EventListView::section(std::string_view name)
-{
-    const auto first = name.find_first_not_of(" \t");
-    name = first == std::string_view::npos
-               ? std::string_view{}
-               : name.substr(first, name.find_last_not_of(" \t") - first + 1);
-    auto& song = document_.song();
-    const auto& meter = list_.meter();
-    const auto tick = meter.barStart(meter.toBarBeatTick(list_.rows()[row_].tick).bar);
-    const auto at = positionText(meter, tick);
-    const auto current = song.sectionAt(tick);
-    if (tick >= song.end())
-    {
-        return CommandResult::error("There's no section after the song's end to split");
-    }
-    if (song.sectionStart(current) == tick)
-    {
-        return CommandResult::error(song.sections()[current]->name() + " starts at " + at +
-                                    " already");
-    }
-    const std::string wanted =
-        name.empty() ? "Section " + std::to_string(song.sections().size() + 1) : std::string{name};
-    std::optional<core::Song::Split> split;
-    edit("Start section " + wanted + " at " + at,
-         [&](core::Song& s) { split = s.splitSection(tick, wanted); });
-    if (!split)
-    {
-        return CommandResult::error("Can't start a section at " + at);
-    }
-    // The name it got, numbered if another section had it.
-    const auto& named = document_.song().sections()[split->index]->name();
-    std::string cut;
-    if (split->conductor)
-    {
-        cut = "the conductor and the tracks following it";
-    }
-    for (const auto id : split->tracks)
-    {
-        const auto track = document_.song().track(id);
-        cut += (cut.empty() ? "" : ", ") +
-               (track->name.empty() ? std::string{"a track"} : track->name);
-    }
-    if (!cut.empty())
-    {
-        // A bar the new section starts inside ends short, as a remainder bar.
-        return CommandResult{true, named + " starts at " + at + "; this cuts a bar short in " + cut,
-                             true};
-    }
-    return {true, named + " starts at " + at, false};
 }
 
 std::string EventListView::trackName() const

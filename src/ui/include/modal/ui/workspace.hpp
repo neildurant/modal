@@ -173,6 +173,10 @@ private:
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
 
+    // :section NAME starts a new section at the bar line of the cursor's bar, in the view's
+    // own bars.
+    CommandResult section(std::string_view name);
+
     Region promptRegion() const;
     Region statusRegion() const;
 

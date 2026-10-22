@@ -213,3 +213,18 @@ TEST_CASE("a command a view doesn't have says so")
     a.type(U"zi");
     CHECK(a.ws.message() == "Zoom in isn't in the event list");
 }
+
+TEST_CASE(":section starts a section at the cursor's bar in the arrangement too")
+{
+    core::Song song{core::kPpqn}; // one section of eight bars of 4/4
+    song.addTrack("Bass");
+    Arranging a{std::move(song)};
+    a.type(U"2l"); // bar 3
+    CHECK(a.registry.runLine("section Chorus") ==
+          CommandResult{true, "Chorus starts at 3:1:000", false});
+    REQUIRE(a.document.song().sections().size() == 2);
+    CHECK(a.document.song().sections()[1]->name() == "Chorus");
+    CHECK(a.document.song().sectionStart(1) == 2 * core::kPpqn.whole());
+    CHECK(a.ws.shown() == ViewKind::Arrangement);
+    CHECK(a.page().bar() == 3); // the cursor stays
+}
