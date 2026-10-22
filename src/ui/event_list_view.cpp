@@ -304,6 +304,12 @@ void EventListView::refresh()
     follow();
 }
 
+void EventListView::showSong()
+{
+    top_ = 0;
+    showTrack(document_.song().tracks().empty() ? 0 : 1, 0);
+}
+
 EventList EventListView::listOf(std::size_t track) const
 {
     const auto& song = document_.song();

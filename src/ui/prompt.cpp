@@ -13,13 +13,12 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 2> kPromptCommands{{
+constexpr std::array<CommandInfo, 1> kPromptCommands{{
     {.name = "write-config",
      .description = "Write the config to a file, to start a modalrc from; ! overwrites it",
      .usage = "FILE",
      .bang = true,
      .keys = false},
-    {.name = "quit", .description = "Quit", .aliases = "q"},
 }};
 
 std::vector<std::string_view> words(std::string_view line)
@@ -89,8 +88,7 @@ std::span<const CommandInfo> promptCommands()
 }
 
 void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Config& config,
-                       std::optional<std::filesystem::path> configDirectory,
-                       std::function<void()> quit)
+                       std::optional<std::filesystem::path> configDirectory)
 {
     const auto directory = configDirectory.value_or(std::filesystem::path{});
 
@@ -149,13 +147,6 @@ void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Co
                              error + (call.bang ? "" : "; write-config! overwrites it"));
                      }
                      return CommandResult{true, "wrote " + utf8Text(file), false};
-                 });
-
-    registry.add(kPromptCommands[1],
-                 [quit = std::move(quit)](const CommandCall&)
-                 {
-                     quit();
-                     return CommandResult{true};
                  });
 }
 

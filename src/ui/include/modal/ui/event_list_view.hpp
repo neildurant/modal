@@ -105,6 +105,10 @@ public:
     // same time on the same track if it's still there.
     void refresh();
 
+    // Shows a song new to the document, opened or new, from the start of track 1's list (or
+    // the conductor's, if there are no tracks).
+    void showSong();
+
     // What runs a line entered at the : prompt, such as the program's command runner.
     using LineHandler = std::function<void(const std::string& line)>;
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }

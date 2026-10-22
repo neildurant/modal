@@ -13,6 +13,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/key.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
@@ -77,8 +78,11 @@ public:
     // Why the engine runs at normal priority, or nothing.
     const std::string& priorityError() const { return priorityError_; }
 
-    // Hands the player the song, looking the ports up the first time and again whenever the
-    // port setting has changed. Then returns which ports weren't found, if any.
+    // Looks the ports up again at the next update, for a new song.
+    void songReplaced() { lookedUp_ = false; }
+
+    // Hands the player the song, looking the ports up the first time, for a new song, and
+    // whenever the port setting has changed. Then returns which ports weren't found, if any.
     std::string update(const core::Song& song)
     {
         const bool lookUp = !lookedUp_ || settings_.text("port") != port_;
@@ -133,6 +137,63 @@ private:
     std::string priorityError_;
 };
 
+// The file commands' way to the window: its dialogs, closing it, and the view.
+class FileHost final : public ui::FileHost
+{
+public:
+    FileHost(ui::sdl::Window& window, ui::EventListView& view, core::Document& document,
+             Playback& playback)
+        : window_(window)
+        , view_(view)
+        , document_(document)
+        , playback_(playback)
+    {
+    }
+
+    void chooseOpen(Chosen) override
+    {
+        report(ui::CommandResult::error("Give the file to open: :e FILE"));
+    }
+
+    void chooseSave(FileKind kind, const std::filesystem::path&, Chosen) override
+    {
+        report(ui::CommandResult::error(kind == FileKind::Song ? "Give the file to save to: :w FILE"
+                                                               : "Give the file: :export FILE"));
+    }
+
+    void quit() override { window_.close(); }
+
+    void songReplaced() override
+    {
+        view_.showSong();
+        playback_.songReplaced();
+        if (auto missing = playback_.update(document_.song()); !missing.empty())
+        {
+            missing_ = std::move(missing);
+        }
+    }
+
+    void report(const ui::CommandResult& result) override
+    {
+        if (!result.message.empty())
+        {
+            view_.setMessage(result.message, result.warning
+                                                 ? ui::EventListView::MessageKind::Warning
+                                                 : ui::EventListView::MessageKind::Information);
+        }
+    }
+
+    // Which ports a new song names that weren't found, once, to show after what opened it.
+    std::string takeMissingPorts() { return std::exchange(missing_, {}); }
+
+private:
+    ui::sdl::Window& window_;
+    ui::EventListView& view_;
+    core::Document& document_;
+    Playback& playback_;
+    std::string missing_;
+};
+
 // Applies the settings to the window, the view and the document, as at startup or after a
 // change. A font that can't be opened is replaced by the built-in one, the font setting too
 // so it isn't tried again, and that's the error returned.
@@ -164,39 +225,6 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     return error;
 }
 
-// Opens a song file, or imports a MIDI file (.mid or .midi) as a new song, not to be saved
-// over it. Returns what went wrong, or the first warning and how many more.
-std::string open(core::Document& document, const std::filesystem::path& file)
-{
-    auto extension = ui::utf8Text(file.extension());
-    std::ranges::transform(extension, extension.begin(), [](char c)
-                           { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
-    if (extension == ".mid" || extension == ".midi")
-    {
-        auto result = core::importSmfFile(file);
-        if (!result.song)
-        {
-            return "can't import " + ui::utf8Text(file) + ": " + result.error;
-        }
-        document.replace(std::move(*result.song), std::nullopt, file);
-        if (result.warnings.empty())
-        {
-            return {};
-        }
-        return ui::utf8Text(file.filename()) + ": " + result.warnings.front() +
-               (result.warnings.size() > 1
-                    ? " (and " + std::to_string(result.warnings.size() - 1) + " more)"
-                    : std::string{});
-    }
-    auto result = core::readSongFile(file);
-    if (!result.song)
-    {
-        return result.error;
-    }
-    document.replace(std::move(*result.song), file);
-    return {};
-}
-
 void fail(const std::string& message)
 {
     std::fprintf(stderr, "modal: %s\n", message.c_str());
@@ -223,6 +251,7 @@ int main(int argc, char* argv[])
     std::optional<std::filesystem::path> configFile;
     std::optional<std::filesystem::path> songFile;
     bool force = false;
+    bool demo = false;
     for (int i = 1; i < argc; ++i)
     {
         const std::string_view argument = argv[i];
@@ -234,6 +263,10 @@ int main(int argc, char* argv[])
         {
             force = true;
         }
+        else if (argument == "--demo")
+        {
+            demo = true;
+        }
         else if (!argument.starts_with("--") && !songFile)
         {
             songFile = ui::utf8Path(argument);
@@ -241,8 +274,8 @@ int main(int argc, char* argv[])
         else
         {
             fail("doesn't know " + std::string{argument} +
-                 "; it takes a song or MIDI file to open, or --write-config FILE, with --force "
-                 "to overwrite FILE");
+                 "; it takes a song or MIDI file to open, or --demo for the demo song, or "
+                 "--write-config FILE, with --force to overwrite FILE");
             return 2;
         }
     }
@@ -256,6 +289,7 @@ int main(int argc, char* argv[])
     commands.add(ui::windowCommands());
     commands.add(ui::configCommands());
     commands.add(ui::promptCommands());
+    commands.add(ui::fileCommands());
     ui::Config config;
     const auto configDirectory = platform::configDirectory();
     ui::ConfigReader reader{config, commands, configDirectory};
@@ -310,16 +344,16 @@ int main(int argc, char* argv[])
         message = message.empty() ? warning : message + "; " + warning;
     }
 
-    // The song: the file given, or else the demo song from the arrangement sketch, until
-    // there are file commands.
-    core::Document document{ui::demoSong()};
+    // The song: the file given, or a new song, or with --demo the demo song from the
+    // arrangement sketch.
+    core::Document document{demo ? ui::demoSong() : ui::newSong()};
     document.setListener([&](const core::Song& song) { playback.player().update(song); });
     if (songFile)
     {
-        if (auto error = open(document, *songFile); !error.empty())
+        if (auto loaded = ui::openFile(document, *songFile); !loaded.message.empty())
         {
-            std::fprintf(stderr, "%s\n", error.c_str());
-            message = message.empty() ? error : message + "; " + error;
+            std::fprintf(stderr, "%s\n", loaded.message.c_str());
+            message = message.empty() ? loaded.message : message + "; " + loaded.message;
         }
     }
 
@@ -388,7 +422,9 @@ int main(int argc, char* argv[])
 
     // Lines run at the : prompt, through the registry, after which settings and bindings
     // apply at once.
-    ui::addPromptCommands(commands, reader, config, configDirectory, [&] { window.close(); });
+    ui::addPromptCommands(commands, reader, config, configDirectory);
+    FileHost files{window, view, document, playback};
+    ui::addFileCommands(commands, document, files);
     view.setLineHandler(
         [&](const std::string& line)
         {
@@ -399,6 +435,11 @@ int main(int argc, char* argv[])
             if (auto error = apply(settings, window, view, document, playback); !error.empty())
             {
                 message = error;
+                warning = true;
+            }
+            if (auto missing = files.takeMissingPorts(); !missing.empty())
+            {
+                message = message.empty() ? missing : message + "; " + missing;
                 warning = true;
             }
             if (!message.empty())

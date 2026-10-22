@@ -27,7 +27,7 @@ struct Prompt
         : reader{config, registry, directory}
     {
         registry.add(kCommands);
-        addPromptCommands(registry, reader, config, directory, [this] { quit = true; });
+        addPromptCommands(registry, reader, config, directory);
     }
 
     CommandResult run(std::string_view line) { return registry.runLine(line); }
@@ -35,7 +35,6 @@ struct Prompt
     Config config;
     CommandRegistry registry;
     ConfigReader reader;
-    bool quit = false;
 };
 
 CommandResult shows(std::string message)
@@ -68,23 +67,10 @@ TEST_CASE("the prompt runs any command, with a count for one that takes it")
     CHECK(prompt.run("cancel 3") == CommandResult::error("cancel takes nothing"));
 }
 
-TEST_CASE("q and quit quit")
-{
-    Prompt prompt;
-    prompt.run("q");
-    CHECK(prompt.quit);
-    Prompt again;
-    again.run("quit");
-    CHECK(again.quit);
-    Prompt typo;
-    CHECK(typo.run("quite") == CommandResult::error("unknown command \"quite\""));
-    CHECK_FALSE(typo.quit);
-}
-
 TEST_CASE("prompt commands can't go in a config file, nor be bound unless they're for keys")
 {
     Prompt prompt;
-    prompt.reader.runText("write-config x\nnmap Z set\nnmap ZZ quit\n", "modalrc", {});
+    prompt.reader.runText("write-config x\nnmap Z set\n", "modalrc", {});
     const auto& errors = prompt.reader.errors();
     REQUIRE(errors.size() == 2);
     CHECK(errors[0].message == "write-config can't be used in a config file");
@@ -130,7 +116,6 @@ TEST_CASE("write-config writes the config, relative to the config directory")
     in.close();
     CHECK(text.find("\nset fontsize=15\n") != std::string::npos);
     // The commands keys can be bound to are listed; those that can't aren't.
-    CHECK(text.find("\"   quit ") != std::string::npos);
     CHECK(text.find("\"   cursor-down ") != std::string::npos);
     CHECK(text.find("\"   write-config ") == std::string::npos);
 
