@@ -42,7 +42,7 @@ public:
     void stop();
 
     // Space: stops if playing; otherwise plays from where playback last started (rewind) or
-    // from where it stopped.
+    // from where it stopped, or from the song's start if it stopped at the end by itself.
     void toggle(bool rewind);
 
     // Plays from where playback last started.
@@ -76,6 +76,7 @@ private:
     Tick started_ = 0;
     Tick stopped_ = 0;
     bool stopExact_ = true; // whether stopped_ is where the engine says the last play stopped
+    bool atEnd_ = false;    // whether the last play stopped by itself at the song's end
 };
 
 } // namespace modal::core

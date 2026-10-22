@@ -149,6 +149,10 @@ TEST_CASE("playback stops by itself at the song's end")
     CHECK(p.runFor(2s));
     CHECK_FALSE(p.player.playing());
     CHECK_FALSE(p.runFor(1s));
+
+    // Resuming from the end would play nothing, so Space starts from the song's start.
+    p.player.toggle(false);
+    CHECK(p.player.started() == 0);
 }
 
 TEST_CASE("playing from elsewhere while playing starts again there")

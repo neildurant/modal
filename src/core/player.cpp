@@ -44,6 +44,7 @@ void Player::play(Tick start)
     play_ = engine_.lastPlay();
     playing_ = true;
     started_ = start;
+    atEnd_ = false;
 }
 
 void Player::stop()
@@ -63,7 +64,7 @@ void Player::toggle(bool rewind)
     }
     else
     {
-        play(rewind ? started_ : stopped_);
+        play(rewind ? started_ : atEnd_ ? 0 : stopped_);
     }
 }
 
@@ -97,6 +98,7 @@ bool Player::poll()
     if (playing_ && engine_.status().finished)
     {
         stop();
+        atEnd_ = true;
         return true;
     }
     return false;
