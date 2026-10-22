@@ -105,12 +105,12 @@ TEST_CASE("Space plays and stops; with rewind, the cursor stays and the view fol
     CHECK(p.view.row() == 5); // the cursor stays
     CHECK(contains(p.status(), U"▶"));
 
-    // The view turns pages to keep the playhead in it.
+    // Once the playhead is a third of the way down, the list scrolls under it.
+    const auto third = static_cast<std::size_t>(p.view.viewRows()) / 3;
     p.runFor(10s);
     const auto row = *p.view.playheadRow();
     CHECK(row > early);
-    CHECK(p.view.top() <= row);
-    CHECK(row < p.view.top() + static_cast<std::size_t>(p.view.viewRows()));
+    CHECK(row == p.view.top() + third);
     CHECK(p.view.row() == 5);
 
     // Stopped, back to the cursor; Space again plays from where playback started.
@@ -131,9 +131,10 @@ TEST_CASE("without rewind, the cursor follows the playhead and Space resumes whe
     p.view.setRewind(false);
     CHECK(contains(p.status(), U"Rewind off"));
     p.type(U" ");
-    p.runFor(2s);
+    p.runFor(10s);
     const auto row = *p.view.playheadRow();
     CHECK(p.view.row() == row);
+    CHECK(row == p.view.top() + static_cast<std::size_t>(p.view.viewRows()) / 3); // as with rewind
 
     p.type(U" ");
     p.runFor(1ms); // the engine says where it stopped
@@ -143,7 +144,7 @@ TEST_CASE("without rewind, the cursor follows the playhead and Space resumes whe
     CHECK(p.player.started() == p.player.stopped());
 }
 
-TEST_CASE("Ctrl-Enter plays from the cursor, whatever rewind says")
+TEST_CASE("Ctrl-Space or Ctrl-Enter plays from the cursor, whatever rewind says")
 {
     Playing p;
     p.type(U"9j");
@@ -151,6 +152,21 @@ TEST_CASE("Ctrl-Enter plays from the cursor, whatever rewind says")
     CHECK(p.player.playing());
     CHECK(p.player.started() == p.tickOf(9));
     CHECK(p.view.playheadRow() == 9);
+    p.type(U"j");
+    p.press(Key::typed(U' ', kCtrl));
+    CHECK(p.player.started() == p.tickOf(10));
+}
+
+TEST_CASE("near the list's end, the playhead goes on down the view")
+{
+    Playing p;
+    p.type(U"G5k");
+    const auto end = p.view.row() + 5;
+    p.press(Key::of(NamedKey::Enter, kCtrl));
+    p.runFor(1ms);
+    const auto rows = static_cast<std::size_t>(p.view.viewRows());
+    CHECK(p.view.top() == end + 1 - rows); // the last row at the bottom
+    CHECK(*p.view.playheadRow() > p.view.top() + rows / 3);
 }
 
 TEST_CASE("playback stopping by itself at the song's end goes back to the cursor")

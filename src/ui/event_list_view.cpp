@@ -412,14 +412,15 @@ void EventListView::showPlayhead()
         if (!rewind_)
         {
             row_ = row; // the cursor follows the playhead
-            follow();
         }
-        else if (const auto rows = static_cast<std::size_t>(viewRows());
-                 row < top_ || row >= top_ + rows)
+        // The playhead moves down to a third of the way down the view, and then the list
+        // scrolls under it, so what's coming next shows, until the list's end comes into view.
+        const auto rows = static_cast<std::size_t>(viewRows());
+        const auto third = rows / 3;
+        if (row < top_ || row > top_ + third)
         {
-            // The view turns a page to keep the playhead in it, leaving the cursor be.
             const auto count = list_.rows().size();
-            top_ = std::min(row, count > rows ? count - rows : 0);
+            top_ = std::min(row > third ? row - third : 0, count > rows ? count - rows : 0);
         }
     }
     else if (wasPlaying_)
