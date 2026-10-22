@@ -46,7 +46,7 @@ TEST_CASE("a new song")
     // One section of eight bars.
     REQUIRE(song.sections().size() == 1);
     const auto& section = *song.sections()[0];
-    CHECK(section.name() == "Song");
+    CHECK(section.name() == "Section 1");
     CHECK(section.length() == 8 * ppqn.whole());
     CHECK(song.sectionStart(0) == 0);
     CHECK(song.end() == 8 * ppqn.whole());
@@ -275,7 +275,7 @@ TEST_CASE("splitting a section")
         REQUIRE(song.sections().size() == 2);
         const auto& intro = *song.sections()[0];
         const auto& verse = *song.sections()[1];
-        CHECK(intro.name() == "Song");
+        CHECK(intro.name() == "Section 1");
         CHECK(verse.name() == "Verse");
         CHECK(intro.length() == 4 * bar);
         CHECK(verse.length() == 4 * bar);

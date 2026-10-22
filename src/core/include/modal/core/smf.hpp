@@ -28,7 +28,7 @@ struct SmfImportResult
 //   first of those, or to a track of their own if it has no channel events.
 // - Tempo changes and time signatures from any track go to the conductor, which every track
 //   follows, and markers from any track, and cue points in a track with no channel events,
-//   become bookmarks. The song is one section, "Song". The first track's name is the song
+//   become bookmarks. The song is one section, "Section 1". The first track's name is the song
 //   title in a type 0 file, and in a type 1 file whose first track has no channel events
 //   (the usual conductor track).
 // - Tempos outside 1-1000 BPM are clamped.

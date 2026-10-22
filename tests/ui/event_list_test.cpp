@@ -86,7 +86,7 @@ TEST_CASE("a track's list has its events, the conductor's rows dimmed, and the e
     CHECK(list.text(5).fields ==
           std::vector<Column>{Column::Position, Column::Data, Column::Value});
     CHECK(list.text(10).fields == std::vector<Column>{Column::Position});
-    CHECK(list.text(0)[Column::Data] == "Song");
+    CHECK(list.text(0)[Column::Data] == "Section 1");
     CHECK(list.text(2)[Column::Data] == "120");
     CHECK(list.text(8)[Column::Data] == "150");
 }

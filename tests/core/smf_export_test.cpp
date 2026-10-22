@@ -169,18 +169,19 @@ TEST_CASE("sections are written as markers, and bookmarks as cue points")
     const auto contains = [](const Bytes& bytes, const Bytes& part)
     { return !std::ranges::search(bytes, part).empty(); };
     auto result = exportSmf(song);
-    CHECK_FALSE(contains(result.bytes, meta(0x06, "Song")));
+    CHECK_FALSE(contains(result.bytes, meta(0x06, "Section 1")));
     CHECK(contains(result.bytes, meta(0x07, "fix this")));
 
     song.splitSection(4 * bar, "Verse");
     result = exportSmf(song);
-    CHECK(contains(result.bytes, meta(0x06, "Song")));
+    CHECK(contains(result.bytes, meta(0x06, "Section 1")));
     CHECK(contains(result.bytes, meta(0x06, "Verse")));
 
     // Read back, the section starts are bookmarks too, until they can become sections.
     const Song back = reimported(result.bytes);
     CHECK(std::ranges::equal(
-        back.markers(), std::vector<Marker>{{0, "Song"}, {bar, "fix this"}, {4 * bar, "Verse"}}));
+        back.markers(),
+        std::vector<Marker>{{0, "Section 1"}, {bar, "fix this"}, {4 * bar, "Verse"}}));
 }
 
 TEST_CASE("at each tick come note-offs, other events, note-ons, then zero-length note-offs")

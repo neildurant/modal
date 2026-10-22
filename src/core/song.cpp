@@ -141,8 +141,8 @@ Song::Song(Ppqn ppqn)
     , meter_(ppqn)
 {
     const MeterMap meter{ppqn};
-    sections_.push_back(
-        std::make_shared<Section>("Song", meter.barStart(kNewSongBars + 1), meter, kDefaultTempo));
+    sections_.push_back(std::make_shared<Section>("Section 1", meter.barStart(kNewSongBars + 1),
+                                                  meter, kDefaultTempo));
     rebuildConductor();
 }
 

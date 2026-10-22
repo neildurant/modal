@@ -288,7 +288,7 @@ TEST_CASE("an imported file is one section, with a conductor track's cue points 
 
     // One section, ending on the bar line after the last note, which every track follows.
     REQUIRE(song.sections().size() == 1);
-    CHECK(song.sections()[0]->name() == "Song");
+    CHECK(song.sections()[0]->name() == "Section 1");
     CHECK(song.end() == 3 * kPpqn.whole());
     REQUIRE(song.sections()[0]->content(id));
     CHECK_FALSE(song.sections()[0]->content(id)->meter);

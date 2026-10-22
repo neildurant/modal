@@ -97,7 +97,7 @@ class Song
 public:
     static constexpr std::int64_t kNewSongBars = 8;
 
-    // A song of one section, "Song", eight bars of 4/4 at 120 BPM.
+    // A song of one section, "Section 1", eight bars of 4/4 at 120 BPM.
     explicit Song(Ppqn ppqn = kPpqn);
 
     // A song made from its parts, as reading a file does: its tracks in display order, and at

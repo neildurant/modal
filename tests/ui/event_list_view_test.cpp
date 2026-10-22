@@ -45,15 +45,16 @@ core::Song twoTracks()
     return song;
 }
 
-// A view of a song in a window of 80 by 24 cells: 22 rows between the bars, the first the
-// headings, so 21 rows of events. With its registry, the window's commands described there.
+// A view of a song in a window of 120 by 24 cells (wide enough for the bars, as the minimum size
+// is): 22 rows between the bars, the first the headings, so 21 rows of events. With its registry,
+// the window's commands described there.
 struct View
 {
     explicit View(core::Song song = twoTracks())
         : document{std::move(song)}
     {
         registry.add(windowCommands());
-        view.resize(80 * kCell.width, 24 * kCell.height, kCell);
+        view.resize(120 * kCell.width, 24 * kCell.height, kCell);
     }
 
     core::Document document;
@@ -127,7 +128,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     REQUIRE(frame.size() == 4);
     CHECK(contains(rowText(frame[1], 0), U"Track 1: Bass"));
     CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
-    CHECK(contains(rowText(frame[1], 0), U"Section: Song"));
+    CHECK(contains(rowText(frame[1], 0), U"Section: Section 1"));
     CHECK(contains(rowText(frame[1], 0), U"Bars: 1–1"));
 
     // The inspector, on a panel of its own: the kind of row, then headings above their values.
@@ -141,7 +142,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(has(U"Section", 0));
     CHECK(has(U"Position", 0));
     CHECK(has(U"1:1:000", 1));
-    CHECK(has(U"Song", 1));
+    CHECK(has(U"Section 1", 1));
 
     // Its columns stay put from row to row, whatever the kind of row and its values.
     const auto xOf = [](const Region& region, std::u32string_view text)
@@ -173,7 +174,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(contains(rowText(list, 5), U"E1 (28)"));
     CHECK(contains(rowText(list, 5), U"1/8"));
     CHECK(contains(rowText(frame[3], 0), U"NORMAL"));
-    CHECK(contains(rowText(frame[3], 0), U"1:1:000  4/4  Song"));
+    CHECK(contains(rowText(frame[3], 0), U"1:1:000  4/4  Section 1"));
 
     // The conductor's rows are dimmed; the cursor's field is in the cursor's colours.
     CHECK(styleAt(list, 2, 1).background == Role::Cursor);
