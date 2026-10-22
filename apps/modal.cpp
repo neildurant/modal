@@ -14,12 +14,12 @@
 #include <modal/platform/thread_priority.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
-#include <modal/ui/event_list_view.hpp>
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/key.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/window_commands.hpp>
+#include <modal/ui/workspace.hpp>
 
 #include <algorithm>
 #include <array>
@@ -224,7 +224,7 @@ private:
 class FileHost final : public ui::FileHost
 {
 public:
-    FileHost(ui::sdl::Window& window, ui::EventListView& view, core::Document& document,
+    FileHost(ui::sdl::Window& window, ui::Workspace& view, core::Document& document,
              Playback& playback)
         : window_(window)
         , view_(view)
@@ -267,9 +267,8 @@ public:
     {
         if (!result.message.empty())
         {
-            view_.setMessage(result.message, result.warning
-                                                 ? ui::EventListView::MessageKind::Warning
-                                                 : ui::EventListView::MessageKind::Information);
+            view_.setMessage(result.message, result.warning ? ui::MessageKind::Warning
+                                                            : ui::MessageKind::Information);
         }
     }
 
@@ -278,7 +277,7 @@ public:
 
 private:
     ui::sdl::Window& window_;
-    ui::EventListView& view_;
+    ui::Workspace& view_;
     core::Document& document_;
     Playback& playback_;
     std::string missing_;
@@ -287,7 +286,7 @@ private:
 // Applies the settings to the window, the view and the document, as at startup or after a
 // change. A font that can't be opened is replaced by the built-in one, the font setting too
 // so it isn't tried again, and that's the error returned.
-std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventListView& view,
+std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace& view,
                   core::Document& document, Playback& playback)
 {
     std::string error;
@@ -305,7 +304,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::EventList
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
-    view.setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
+    view.eventList().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())
@@ -379,7 +378,7 @@ int main(int argc, char* argv[])
     // Every command, described before the config binds keys to them; the view and the
     // window give them what runs them once they exist.
     ui::CommandRegistry commands;
-    commands.add(ui::EventListView::commands());
+    commands.add(ui::Workspace::commands());
     commands.add(ui::windowCommands());
     commands.add(ui::configCommands());
     commands.add(ui::promptCommands());
@@ -451,13 +450,13 @@ int main(int argc, char* argv[])
         }
     }
 
-    ui::EventListView view{commands, document, config.keymap};
+    ui::Workspace view{commands, document, config.keymap};
     view.setPlayer(&playback.player());
     view.setPortFinder(
         [&](std::string_view name)
         {
             const auto outputs = playback.allPorts();
-            ui::EventListView::PortLookup lookup;
+            ui::Workspace::PortLookup lookup;
             for (const auto& port : outputs)
             {
                 lookup.ports.push_back(port.name);
@@ -483,7 +482,7 @@ int main(int argc, char* argv[])
     }
     if (!message.empty())
     {
-        view.setMessage(message, ui::EventListView::MessageKind::Warning);
+        view.setMessage(message, ui::MessageKind::Warning);
     }
 
     // The window's commands (see windowCommands): the text size, for now.
@@ -538,8 +537,8 @@ int main(int argc, char* argv[])
             }
             if (!message.empty())
             {
-                view.setMessage(message, warning ? ui::EventListView::MessageKind::Warning
-                                                 : ui::EventListView::MessageKind::Information);
+                view.setMessage(message,
+                                warning ? ui::MessageKind::Warning : ui::MessageKind::Information);
             }
         });
 

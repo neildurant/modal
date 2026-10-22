@@ -70,11 +70,6 @@ constexpr CommandInfo motion(std::string_view name, std::string_view description
     return {.name = name, .description = description, .count = true, .motion = true};
 }
 
-constexpr CommandInfo atPrompt(std::string_view name, std::string_view description)
-{
-    return {.name = name, .description = description, .modes = modeBit(Mode::CommandLine)};
-}
-
 constexpr std::array kCommands{
     counted("cursor-left", "Move to the field before"),
     counted("cursor-right", "Move to the next field"),
@@ -113,49 +108,14 @@ constexpr std::array kCommands{
                 .description = "Add a note at the cursor's time, typing its pitch"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
-    counted("operator-delete", "Delete the events a motion goes over (d}), or dd this event"),
-    counted("operator-yank", "Yank the events a motion goes over (y}), or yy this event"),
-    CommandInfo{.name = "operator-line",
-                .description = "After an operator, this event, or {count} events from it",
-                .modes = modeBit(Mode::OperatorPending),
-                .count = true},
     counted("event-delete", "Delete this event, or {count} events from it"),
     CommandInfo{.name = "register-put",
                 .description = "Put the yanked or deleted events, the first at the cursor's time"},
-    counted("undo", "Undo the last change, or {count} changes"),
-    counted("redo", "Redo the change undone last, or {count} changes"),
-    CommandInfo{.name = "cancel", .description = "Cancel"},
-    CommandInfo{.name = "play-toggle", .description = "Play from the play-from marker, or stop"},
-    CommandInfo{.name = "play-cursor",
-                .description = "Put the play-from marker at the cursor, and play from there"},
-    CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
-    CommandInfo{.name = "panic",
-                .description = "Stop, and send All Notes Off and Reset All Controllers"},
-    CommandInfo{.name = "port",
-                .description = "Set the track's output port, by its name or part of it; or "
-                               "with no name, show it and list the ports",
-                .usage = "[NAME]",
-                .keys = false},
     CommandInfo{.name = "section",
                 .description = "Start a new section at the cursor's bar line, splitting the "
                                "section it's in; named Section and a number if no name is given",
                 .usage = "[NAME]",
                 .keys = false},
-    CommandInfo{.name = "rewind-toggle",
-                .description = "Turn rewind on or off: whether the play-from marker stays put "
-                               "when playback stops, or moves to where it stopped"},
-    CommandInfo{.name = "command-line", .description = "Open the : command line"},
-    atPrompt("command-line-run", "Run the command line"),
-    atPrompt("command-line-cancel", "Close the command line"),
-    atPrompt("command-line-backspace", "Delete the character before the cursor"),
-    atPrompt("command-line-delete", "Delete the character at the cursor"),
-    atPrompt("command-line-left", "Move the cursor left"),
-    atPrompt("command-line-right", "Move the cursor right"),
-    atPrompt("command-line-start", "Move the cursor to the start"),
-    atPrompt("command-line-end", "Move the cursor to the end"),
-    atPrompt("command-line-clear", "Clear the command line"),
-    atPrompt("command-line-older", "Recall the line run before"),
-    atPrompt("command-line-newer", "Recall the line run after"),
 };
 
 // Text to show in a cell of a width, without control characters, cut short with an
@@ -187,96 +147,37 @@ std::span<const CommandInfo> EventListView::commands()
     return kCommands;
 }
 
-Keymap EventListView::defaultKeymap()
-{
-    Config config;
-    CommandRegistry all;
-    all.add(commands());
-    all.add(windowCommands());
-    ConfigReader reader{config, all};
-    reader.runText(builtInModalrc(), "built-in modalrc", {});
-    assert(reader.errors().empty()); // the tests run the built-in modalrc too
-    return config.keymap;
-}
-
-EventListView::EventListView(CommandRegistry& registry, core::Document& document, Keymap keymap,
-                             std::int64_t timeout)
-    : commands_(registry)
-    , document_(document)
+EventListView::EventListView(core::Document& document, ViewHost& host)
+    : document_(document)
+    , host_(host)
     , track_(document.song().tracks().empty() ? 0 : 1)
     , list_(listOf(track_))
-    , keymap_(std::move(keymap))
-    , keys_(timeout)
 {
-    for (const auto& info : commands())
-    {
-        if (info.name == "port")
-        {
-            registry.add(info, [this](const CommandCall& call) { return port(call.arguments); });
-            continue;
-        }
-        if (info.name == "section")
-        {
-            registry.add(info, [this](const CommandCall& call) { return section(call.arguments); });
-            continue;
-        }
-        registry.add(info, [this, name = info.name](const CommandCall& call)
-                     { return CommandResult{runOwn(name, call.count).value_or(false)}; });
-    }
-    buildOperatorKeymap();
 }
 
-void EventListView::setKeymap(Keymap keymap)
+std::optional<CommandResult> EventListView::runLine(std::string_view command,
+                                                    std::string_view arguments)
 {
-    keymap_ = std::move(keymap);
-    buildOperatorKeymap();
+    if (command == "section")
+    {
+        return section(arguments);
+    }
+    return std::nullopt;
 }
 
-void EventListView::buildOperatorKeymap()
+std::vector<int> EventListView::topHeights(CellSize cell) const
 {
-    operatorKeymap_ = keymap_;
-    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
-    {
-        const auto* info = commands_.find(binding.command);
-        const bool again =
-            binding.command == "operator-delete" || binding.command == "operator-yank";
-        const bool wanted = again || binding.command == "cancel" || (info && info->motion);
-        if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
-        {
-            operatorKeymap_.bind(Mode::OperatorPending, keys,
-                                 again ? Binding{"operator-line", binding.hint} : binding);
-        }
-    }
-}
-
-std::string EventListView::pending() const
-{
-    std::string text;
-    if (operator_)
-    {
-        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
-               (operator_->name == "operator-delete" ? "d" : "y");
-    }
-    return text + keys_.pending();
-}
-
-void EventListView::resize(int width, int height, CellSize cell)
-{
-    // Called before every frame, so only a new size scrolls to the cursor, not playback.
-    cell = {std::max(cell.width, 1), std::max(cell.height, 1)};
-    if (width == width_ && height == height_ && cell.width == cell_.width &&
-        cell.height == cell_.height)
-    {
-        return;
-    }
-    width_ = width;
-    height_ = height;
-    cell_ = {std::max(cell.width, 1), std::max(cell.height, 1)};
     // The view's own bar, a title for it, then the inspector, two lines with a quarter of a
-    // line's padding above and below, each with half a line after it (decided in milestone 4:
-    // every view has its bar first, then the inspector, then the view).
-    const std::array heights{cell_.height, 2 * cell_.height + inspectorPadding() * 2};
-    layout_ = layoutWindow(width, height, cell_, heights, 1, cell_.height / 2);
+    // line's padding above and below (decided in milestone 4: every view has its bar first,
+    // then the inspector, then the view).
+    return {cell.height, 2 * cell.height + (cell.height / 4) * 2};
+}
+
+void EventListView::resize(const WindowLayout& layout, int width, CellSize cell)
+{
+    layout_ = layout;
+    width_ = width;
+    cell_ = cell;
     follow();
 }
 
@@ -337,173 +238,54 @@ void EventListView::showTrack(std::size_t track, core::Tick tick)
     follow();
 }
 
-bool EventListView::handle(const Key& key, std::int64_t now)
-{
-    lastTime_ = now;
-    const bool hadMessage = !std::exchange(message_, std::string{}).empty();
-    // At the prompt, a character that starts no command-line binding is typed.
-    if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
-        (key.modifiers & (kCtrl | kAlt)) == 0)
-    {
-        const std::vector<Key> keys{key};
-        const auto match = keymap_.match(Mode::CommandLine, keys);
-        if (match.binding == nullptr && !match.longer)
-        {
-            auto& line = activeLine();
-            if (field_ && std::exchange(field_->fresh, false))
-            {
-                line.clear(); // typing replaces the value, as in a spreadsheet
-            }
-            line.insert(key.character);
-            return true;
-        }
-    }
-    const auto before = pending();
-    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
-    const auto actions = keys_.key(keymap, mode_, key, now);
-    const bool changed = runAll(actions);
-    // Keys after an operator that are no motion give the operator up, as in Vim.
-    if (mode_ == Mode::OperatorPending && actions.empty() && keys_.pending().empty())
-    {
-        operator_.reset();
-        mode_ = Mode::Normal;
-    }
-    return changed || hadMessage || pending() != before;
-}
-
-std::optional<std::int64_t> EventListView::deadline() const
-{
-    auto deadline = keys_.deadline();
-    if (wasPlaying_)
-    {
-        const auto frame = lastTime_ + kFrameInterval;
-        deadline = deadline ? std::min(*deadline, frame) : frame;
-    }
-    return deadline;
-}
-
-bool EventListView::wake(std::int64_t now)
-{
-    lastTime_ = now;
-    const auto before = keys_.pending();
-    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
-    bool changed = runAll(keys_.timeout(keymap, now));
-    if (wasPlaying_)
-    {
-        player_->poll();
-        showPlayhead();
-        changed = true;
-    }
-    return changed || keys_.pending() != before;
-}
-
-bool EventListView::transport(std::string_view command)
-{
-    if (player_ == nullptr)
-    {
-        setMessage("Nothing to play to", MessageKind::Warning);
-        return true;
-    }
-    if (command == "play-toggle")
-    {
-        player_->toggle();
-    }
-    else if (command == "play-cursor" || command == "marker-set")
-    {
-        player_->setMarker(list_.rows()[row_].tick);
-        if (command == "play-cursor")
-        {
-            player_->play();
-        }
-    }
-    else
-    {
-        player_->panic();
-    }
-    showPlayhead();
-    return true;
-}
-
-void EventListView::setPlayer(core::Player* player)
-{
-    player_ = player;
-    if (player_ != nullptr)
-    {
-        player_->setRewind(rewind_);
-    }
-}
-
-void EventListView::setRewind(bool rewind)
-{
-    rewind_ = rewind;
-    if (player_ != nullptr)
-    {
-        player_->setRewind(rewind);
-    }
-}
-
 std::size_t EventListView::rowAtOrBefore(core::Tick tick) const
 {
     const auto after = list_.rowAt(tick + 1);
     return after > 0 ? after - 1 : 0;
 }
 
-void EventListView::showPlayhead()
+void EventListView::showPlayhead(core::Tick playhead, bool cursorFollows)
 {
-    const bool playing = player_ != nullptr && player_->playing();
-    const auto position = playing ? player_->position() : std::nullopt;
-    if (playing)
+    const auto row = rowAtOrBefore(playhead);
+    playheadRow_ = row;
+    if (cursorFollows)
     {
-        // Until the engine starts, the playhead is at the marker, where it will start.
-        const auto row = rowAtOrBefore(position.value_or(player_->marker()));
-        playheadRow_ = row;
-        if (!rewind_)
-        {
-            row_ = row; // the cursor follows the playhead
-        }
-        // The playhead moves down to a third of the way down the view, and then the list
-        // scrolls under it, so what's coming next shows, until the list's end comes into view.
-        const auto rows = static_cast<std::size_t>(viewRows());
-        const auto third = rows / 3;
-        if (row < top_ || row > top_ + third)
-        {
-            const auto count = list_.rows().size();
-            top_ = std::min(row > third ? row - third : 0, count > rows ? count - rows : 0);
-        }
+        row_ = row;
     }
-    else if (wasPlaying_)
+    // The playhead moves down to a third of the way down the view, and then the list
+    // scrolls under it, so what's coming next shows, until the list's end comes into view.
+    const auto rows = static_cast<std::size_t>(viewRows());
+    const auto third = rows / 3;
+    if (row < top_ || row > top_ + third)
     {
-        // Stopped: with rewind, back to the cursor; otherwise the cursor goes with the marker
-        // to where playback stopped, once the engine says where.
-        playheadRow_.reset();
-        if (!rewind_)
-        {
-            row_ = rowAtOrBefore(player_->marker());
-        }
-        follow();
+        const auto count = list_.rows().size();
+        top_ = std::min(row > third ? row - third : 0, count > rows ? count - rows : 0);
     }
-    wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
 }
 
-bool EventListView::runAll(const std::vector<Action>& actions)
+void EventListView::stopPlayhead(std::optional<core::Tick> cursorTo)
 {
-    bool changed = false;
-    for (const auto& action : actions)
+    playheadRow_.reset();
+    if (cursorTo)
     {
-        changed = run(action.command, action.count).changed || changed;
+        row_ = rowAtOrBefore(*cursorTo);
     }
-    return changed;
+    follow();
 }
 
-CommandResult EventListView::run(std::string_view command, int count)
+SongCursor EventListView::cursor() const
 {
-    auto result = commands_.run(command, count, mode_);
-    if (!result.message.empty())
+    const auto& r = list_.rows()[row_];
+    SongCursor cursor{.track = list_.track(), .tick = r.tick, .pitch = 60};
+    if (r.kind == RowKind::Event)
     {
-        setMessage(result.message,
-                   result.warning ? MessageKind::Warning : MessageKind::Information);
+        if (const auto* note =
+                std::get_if<core::Note>(&document_.song().events(*list_.track())[r.index].data))
+        {
+            cursor.pitch = note->pitch;
+        }
     }
-    return result;
+    return cursor;
 }
 
 void EventListView::moveRows(std::int64_t by)
@@ -575,12 +357,8 @@ std::vector<std::size_t> EventListView::chordStarts() const
     return starts;
 }
 
-std::optional<bool> EventListView::runOwn(std::string_view command, int count)
+std::optional<bool> EventListView::run(std::string_view command, int count)
 {
-    if (mode_ == Mode::OperatorPending)
-    {
-        return runOperator(command, count);
-    }
     const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous";
     if (!keepsBarOffset)
     {
@@ -598,10 +376,6 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     };
     const auto barRow = [&](int bar) { return list_.rowAt(list_.meter().barStart(bar)); };
 
-    if (command.starts_with("command-line-"))
-    {
-        return runCommandLine(command);
-    }
     const auto& meter = list_.meter();
     const auto tick = list_.rows()[row_].tick;
     const auto& song = document_.song();
@@ -753,15 +527,9 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
         showTrack(static_cast<std::size_t>(to), list_.rows()[row_].tick);
         return true;
     }
-    else if (command == "operator-delete" || command == "operator-yank")
-    {
-        operator_ = PendingOperator{std::string{command}, count};
-        mode_ = Mode::OperatorPending;
-        return true;
-    }
     else if (command == "event-delete")
     {
-        return operate("operator-delete", row_, row_ + static_cast<std::size_t>(n) - 1);
+        return operateRows("operator-delete", row_, row_ + static_cast<std::size_t>(n) - 1);
     }
     else if (command == "register-put")
     {
@@ -779,46 +547,6 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     {
         return stepFieldBy(command == "field-increase" ? n : -n);
     }
-    else if (command == "undo" || command == "redo")
-    {
-        bool changed = false;
-        for (int i = 0; i < n; ++i)
-        {
-            changed = undoOrRedo(command == "undo") || changed;
-        }
-        return changed;
-    }
-    else if (command == "cancel")
-    {
-        return false;
-    }
-    else if (command == "play-toggle" || command == "play-cursor" || command == "marker-set" ||
-             command == "panic")
-    {
-        return transport(command);
-    }
-    else if (command == "rewind-toggle")
-    {
-        // Through the setting, where there is one, so it stays set as other settings change.
-        if (lineHandler_)
-        {
-            lineHandler_("set rewind!");
-        }
-        else
-        {
-            setRewind(!rewind_);
-        }
-        setMessage(rewind_ ? "Rewind on: the play-from marker stays put"
-                           : "Rewind off: the play-from marker moves to where playback stops",
-                   MessageKind::Information);
-        return true;
-    }
-    else if (command == "command-line")
-    {
-        mode_ = Mode::CommandLine;
-        line_.open();
-        return true;
-    }
     else
     {
         return std::nullopt;
@@ -827,46 +555,31 @@ std::optional<bool> EventListView::runOwn(std::string_view command, int count)
     return true;
 }
 
-std::optional<bool> EventListView::runOperator(std::string_view command, int count)
+bool EventListView::operate(std::string_view op, std::string_view motion, int count)
 {
-    const auto op = *operator_;
-    operator_.reset();
-    mode_ = Mode::Normal;
-    if (command == "cancel")
+    if (motion == "operator-line")
     {
-        return true;
-    }
-    // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
-    const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
-    if (command == "operator-line")
-    {
-        return operate(op.name, row_, row_ + static_cast<std::size_t>(std::max(total, 1)) - 1);
-    }
-    const auto* info = commands_.find(command);
-    if (info == nullptr || !info->motion)
-    {
-        return false;
+        return operateRows(op, row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1);
     }
     const auto from = row_;
-    runOwn(command, total);
+    run(motion, count);
     const auto to = row_;
     row_ = from;
     // Moving between rows takes them all, the one landed on too, as Vim's line motions do;
     // the others stop before the row they land on.
-    const bool whole = command == "cursor-down" || command == "cursor-up" ||
-                       command == "go-first" || command == "go-last";
+    const bool whole = motion == "cursor-down" || motion == "cursor-up" || motion == "go-first" ||
+                       motion == "go-last";
     if (whole)
     {
-        return operate(op.name, from, to);
+        return operateRows(op, from, to);
     }
     if (to == from)
     {
         return false;
     }
-    return to > from ? operate(op.name, from, to - 1) : operate(op.name, to, from - 1);
+    return to > from ? operateRows(op, from, to - 1) : operateRows(op, to, from - 1);
 }
-
-bool EventListView::operate(std::string_view op, std::size_t from, std::size_t to)
+bool EventListView::operateRows(std::string_view op, std::size_t from, std::size_t to)
 {
     if (track_ == 0)
     {
@@ -898,12 +611,12 @@ bool EventListView::operate(std::string_view op, std::size_t from, std::size_t t
     const auto id = *list_.track();
     const auto& events = document_.song().events(id);
     const auto first = events[indices.front()].tick;
-    register_.clear();
+    host_.eventRegister().clear();
     for (const auto i : indices)
     {
         auto event = events[i];
         event.tick -= first;
-        register_.push_back(std::move(event));
+        host_.eventRegister().push_back(std::move(event));
     }
     const auto what =
         indices.size() == 1 ? std::string{"1 event"} : std::to_string(indices.size()) + " events";
@@ -937,13 +650,13 @@ bool EventListView::put()
         setMessage("Only a track's events can be put", MessageKind::Warning);
         return true;
     }
-    if (register_.empty())
+    if (host_.eventRegister().empty())
     {
         setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     const auto at = list_.rows()[row_].tick;
-    auto added = register_;
+    auto added = host_.eventRegister();
     for (auto& event : added)
     {
         event.tick += at;
@@ -1022,7 +735,7 @@ bool EventListView::openField()
     text = text.substr(0, text.find(" ("));
     field_ = FieldPrompt{row_, column, true, std::nullopt};
     fieldLine_.open(decodeUtf8(text));
-    mode_ = Mode::CommandLine;
+    host_.startTyping();
     return true;
 }
 
@@ -1049,7 +762,7 @@ bool EventListView::addNote()
     }
     field_ = FieldPrompt{row_, Column::Data, false, core::Event{tick, note}};
     fieldLine_.open();
-    mode_ = Mode::CommandLine;
+    host_.startTyping();
     // Room for the new row below the cursor's.
     if (row_ + 2 > top_ + static_cast<std::size_t>(viewRows()))
     {
@@ -1089,7 +802,7 @@ bool EventListView::finishField()
         }
         const auto note = std::get<core::Event>(result);
         field_.reset();
-        mode_ = Mode::Normal;
+        host_.stopTyping();
         edit("Add a note in " + trackName(), [&](core::Song& song)
              { song.updateEvents(id, [&](core::EventList& events) { events.insert(note); }); });
         const auto rows = list_.rows();
@@ -1134,7 +847,7 @@ bool EventListView::finishField()
         return true;
     }
     field_.reset();
-    mode_ = Mode::Normal;
+    host_.stopTyping();
     return true;
 }
 
@@ -1411,43 +1124,35 @@ std::optional<std::string> EventListView::replaceEvent(std::size_t row, const co
     return std::nullopt;
 }
 
-bool EventListView::undoOrRedo(bool undo)
+void EventListView::restore(const core::EditPlace& place)
 {
-    const auto step = undo ? document_.undo() : document_.redo();
-    if (!step)
-    {
-        setMessage(undo ? "Nothing to undo" : "Nothing to redo", MessageKind::Information);
-        return true;
-    }
     // Back where the change was made: its track, time and scroll.
     const auto tracks = document_.song().tracks();
-    if (!step->place.track)
+    if (!place.track)
     {
         track_ = 0;
     }
     else
     {
         const auto it = std::ranges::find_if(tracks, [&](const auto& track)
-                                             { return track->id() == *step->place.track; });
+                                             { return track->id() == *place.track; });
         track_ = it != tracks.end() ? static_cast<std::size_t>(it - tracks.begin()) + 1
                                     : std::min(track_, tracks.size());
     }
     list_ = listOf(track_);
-    row_ = list_.rowAt(step->place.tick);
-    const auto& view = step->place.view;
+    row_ = list_.rowAt(place.tick);
+    const auto& view = place.view;
     if (view.size() == 2)
     {
         top_ = static_cast<std::size_t>(std::max<std::int64_t>(view[0], 0));
         const auto rows = list_.rows();
         for (std::int64_t i = 0;
-             i < view[1] && row_ + 1 < rows.size() && rows[row_ + 1].tick == step->place.tick; ++i)
+             i < view[1] && row_ + 1 < rows.size() && rows[row_ + 1].tick == place.tick; ++i)
         {
             ++row_;
         }
     }
     follow();
-    setMessage((undo ? "Undid: " : "Redid: ") + step->title, MessageKind::Information);
-    return true;
 }
 
 bool EventListView::edit(std::string title, const std::function<void(core::Song&)>& change)
@@ -1517,61 +1222,6 @@ CommandResult EventListView::section(std::string_view name)
     return {true, named + " starts at " + at, false};
 }
 
-CommandResult EventListView::port(std::string_view name)
-{
-    const auto trim = [](std::string_view text)
-    {
-        const auto first = text.find_first_not_of(" \t");
-        return first == std::string_view::npos
-                   ? std::string_view{}
-                   : text.substr(first, text.find_last_not_of(" \t") - first + 1);
-    };
-    name = trim(name);
-    if (!portFinder_)
-    {
-        return CommandResult::error("There are no MIDI ports here");
-    }
-    if (track_ == 0)
-    {
-        return CommandResult::error("The conductor has no port; its tempo and meter aren't sent");
-    }
-    const auto found = portFinder_(name);
-    const auto list = [](const std::vector<std::string>& names)
-    {
-        std::string text;
-        for (const auto& n : names)
-        {
-            text += (text.empty() ? "" : ", ") + n;
-        }
-        return text;
-    };
-    const auto outputs = found.ports.empty() ? std::string{"there are no output ports"}
-                                             : "outputs: " + list(found.ports);
-    const auto& track = *document_.song().tracks()[track_ - 1];
-    auto who = trackName(); // starting the message, with a capital
-    who[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(who[0])));
-    if (name.empty())
-    {
-        return {false,
-                who + " plays to " +
-                    (track.port.empty() ? std::string{"the default port"} : track.port) + "; " +
-                    outputs,
-                false};
-    }
-    if (!found.port)
-    {
-        return CommandResult::error(
-            found.candidates.empty()
-                ? "No output port matches \"" + std::string{name} + "\"; " + outputs
-                : "\"" + std::string{name} + "\" could be " + list(found.candidates));
-    }
-    const auto id = track.id();
-    const auto& full = *found.port;
-    edit("Set port of " + trackName() + " to " + full,
-         [&](core::Song& song) { song.updateTrack(id, [&](core::Track& t) { t.port = full; }); });
-    return {true, who + " plays to " + full, false};
-}
-
 std::string EventListView::trackName() const
 {
     if (track_ == 0)
@@ -1582,89 +1232,59 @@ std::string EventListView::trackName() const
     return name.empty() ? "track " + std::to_string(track_) : name;
 }
 
-std::optional<bool> EventListView::runCommandLine(std::string_view command)
+void EventListView::type(char32_t character)
 {
-    if (mode_ != Mode::CommandLine)
+    if (std::exchange(field_->fresh, false))
     {
-        return false;
+        fieldLine_.clear(); // typing replaces the value, as in a spreadsheet
     }
-    auto& line = activeLine();
+    fieldLine_.insert(character);
+}
+
+std::optional<bool> EventListView::runTyping(std::string_view command)
+{
     if (command == "command-line-run")
     {
-        if (field_)
-        {
-            return finishField();
-        }
-        mode_ = Mode::Normal;
-        const auto text = line.take();
-        if (lineHandler_ && !text.empty())
-        {
-            lineHandler_(text);
-        }
-        return true;
+        return finishField();
     }
     if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && line.text().empty())) // as in Vim
+        (command == "command-line-backspace" && fieldLine_.text().empty())) // as in Vim
     {
         field_.reset();
-        mode_ = Mode::Normal;
+        host_.stopTyping();
         return true;
     }
-    if (field_)
-    {
-        field_->fresh = false; // keys that edit the value keep it
-    }
-    if (command == "command-line-backspace")
-    {
-        return line.backspace();
-    }
-    if (command == "command-line-delete")
-    {
-        return line.erase();
-    }
-    if (command == "command-line-older")
-    {
-        return line.older();
-    }
-    if (command == "command-line-newer")
-    {
-        return line.newer();
-    }
-    if (command == "command-line-left")
-    {
-        line.left();
-    }
-    else if (command == "command-line-right")
-    {
-        line.right();
-    }
-    else if (command == "command-line-start")
-    {
-        line.start();
-    }
-    else if (command == "command-line-end")
-    {
-        line.end();
-    }
-    else if (command == "command-line-clear")
-    {
-        line.clear();
-    }
-    else
-    {
-        return std::nullopt;
-    }
-    return true;
+    field_->fresh = false; // keys that edit the value keep it
+    return editLine(fieldLine_, command);
 }
-
-Frame EventListView::frame() const
+void EventListView::addRegions(Frame& frame) const
 {
-    Frame frame;
     frame.push_back(listRegion());
-    addBars(frame);
-    return frame;
+    frame.push_back(barRegion());
+    frame.push_back(inspectorRegion());
 }
 
+std::string EventListView::position(core::Tick tick) const
+{
+    return positionText(list_.meter(), tick);
+}
+
+std::string EventListView::timeStatus(core::Tick tick) const
+{
+    const auto& song = document_.song();
+    return positionText(list_.meter(), tick) + "  " +
+           signatureText(list_.meter().signatureAt(tick)) + "  " +
+           song.sections()[song.sectionAt(tick)]->name();
+}
+
+std::string EventListView::cursorStatus() const
+{
+    const auto& song = document_.song();
+    const auto tick = list_.rows()[row_].tick;
+    return list_.text(row_)[Column::Position] + "  " +
+           signatureText(list_.meter().signatureAt(tick)) + "  " +
+           song.sections()[song.sectionAt(tick)]->name();
+}
 Region EventListView::listRegion() const
 {
     const Rect& main = layout_.main;
@@ -1776,7 +1396,7 @@ Region EventListView::listRegion() const
             }
         }
         // The play-from marker in the margin, over the cursor's box if it's there.
-        if (!isAdded && player_ != nullptr && row == rowAtOrBefore(player_->marker()))
+        if (!isAdded && host_.player() != nullptr && row == rowAtOrBefore(host_.player()->marker()))
         {
             const bool onCursor = !adding && row == row_ && cursorField == Column::Position;
             grid.write(0, line, "▶",
@@ -1784,30 +1404,6 @@ Region EventListView::listRegion() const
         }
     }
     return ui::gridRegion(grid, main, cell_, Role::Background);
-}
-
-Region EventListView::promptRegion() const
-{
-    // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own.
-    const int margin = BarSpacing::forCell(cell_).margin;
-    const auto& text = line_.text();
-    const auto cursor = line_.cursor();
-    const auto room =
-        static_cast<std::size_t>(std::max((width_ - 2 * margin) / cell_.width - 2, 1));
-    const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
-    Region region{
-        .bounds = layout_.bottom[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
-    const auto x = [&](std::size_t column)
-    { return margin + static_cast<int>(column) * cell_.width; };
-    region.text.push_back({x(0), 0, U":", kBarText});
-    region.text.push_back({x(1), 0, text.substr(first, cursor - first), kBarText});
-    const char32_t under = cursor < text.size() ? text[cursor] : U' ';
-    region.text.push_back({x(1 + cursor - first), 0, std::u32string(1, under), kCursor});
-    if (cursor + 1 < text.size())
-    {
-        region.text.push_back({x(2 + cursor - first), 0, text.substr(cursor + 1), kBarText});
-    }
-    return region;
 }
 
 Region EventListView::inspectorRegion() const
@@ -1885,7 +1481,7 @@ Region EventListView::inspectorRegion() const
     return region;
 }
 
-void EventListView::addBars(Frame& frame) const
+Region EventListView::barRegion() const
 {
     const auto& song = document_.song();
     const auto tick = list_.rows()[row_].tick;
@@ -1917,59 +1513,8 @@ void EventListView::addBars(Frame& frame) const
     pair(top.right, "Bars:", std::to_string(first) + "–" + std::to_string(last));
     top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
 
-    Bar bottom;
-    bottom.left = {{field_ ? " EDIT " : " NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
-    if (!message_.empty())
-    {
-        const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
-        bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
-    }
-    else if (const auto at = player_ != nullptr ? player_->position() : std::nullopt)
-    {
-        // While playing, where the playhead is.
-        bottom.left.push_back({"  ▶ " + positionText(meter, *at) + "  " +
-                                   signatureText(meter.signatureAt(*at)) + "  " +
-                                   song.sections()[song.sectionAt(*at)]->name(),
-                               {Role::Accent, Role::Bar, kBold}});
-    }
-    else
-    {
-        bottom.left.push_back({"  " + list_.text(row_)[Column::Position] + "  " +
-                                   signatureText(meter.signatureAt(tick)) + "  " +
-                                   song.sections()[section]->name(),
-                               kBarText});
-    }
-    if (const auto keys = pending(); !keys.empty())
-    {
-        bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
-    }
-    if (player_ != nullptr)
-    {
-        bottom.right.push_back({"From ", label});
-        bottom.right.push_back({positionText(meter, player_->marker()) + "   ", kBarText});
-    }
-    bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
-    // The song's file, and [+] if it has changes not saved, as in Vim.
-    const auto& file = document_.file();
-    const auto& imported = document_.importedFrom();
-    const auto name = file       ? utf8Text(file->filename())
-                      : imported ? utf8Text(imported->filename()) + " (imported)"
-                                 : std::string{"No file"};
-    bottom.right.push_back({name + (document_.modified() ? " [+]" : ""), kBarText});
-
-    const auto spacing = BarSpacing::forCell(cell_);
-    auto topRegion = layoutBar(top, width_, cell_, spacing);
-    topRegion.bounds = layout_.top[0];
-    frame.push_back(std::move(topRegion));
-    frame.push_back(inspectorRegion());
-    if (mode_ == Mode::CommandLine && !field_)
-    {
-        frame.push_back(promptRegion());
-        return;
-    }
-    auto bottomRegion = layoutBar(bottom, width_, cell_, spacing);
-    bottomRegion.bounds = layout_.bottom[0];
-    frame.push_back(std::move(bottomRegion));
+    auto region = layoutBar(top, width_, cell_, BarSpacing::forCell(cell_));
+    region.bounds = layout_.top[0];
+    return region;
 }
-
 } // namespace modal::ui

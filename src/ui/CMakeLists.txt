@@ -26,6 +26,7 @@ add_library(modal_ui STATIC
     themes.cpp
     time_motions.cpp
     window_commands.cpp
+    workspace.cpp
 )
 modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/config/modalrc"

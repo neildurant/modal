@@ -5,6 +5,7 @@
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
 #include <modal/ui/window_commands.hpp>
+#include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -275,7 +276,7 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
 {
     // The commands of the built-in modalrc: the event list's and the window's.
     CommandRegistry commands;
-    commands.add(EventListView::commands());
+    commands.add(Workspace::commands());
     commands.add(windowCommands());
     const auto text = defaultConfigText(commands);
     CHECK(text.find("\"set timeoutlen=500\n") != std::string::npos);
@@ -332,7 +333,7 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
 TEST_CASE("the config text has what's changed as commands, and reads back the same")
 {
     CommandRegistry commands;
-    commands.add(EventListView::commands());
+    commands.add(Workspace::commands());
     commands.add(windowCommands());
     Config config;
     ConfigReader reader{config, commands};

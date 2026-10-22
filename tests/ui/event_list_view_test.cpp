@@ -5,6 +5,7 @@
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/window_commands.hpp>
+#include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -50,21 +51,22 @@ core::Song twoTracks()
 // A view of a song in a window of 120 by 24 cells (wide enough for the bars, as the minimum size
 // is): 22 rows between the bars, the first the headings, so 21 rows of events. With its registry,
 // the window's commands described there.
-struct View
+struct Viewing
 {
-    explicit View(core::Song song = twoTracks())
+    explicit Viewing(core::Song song = twoTracks())
         : document{std::move(song)}
     {
         registry.add(windowCommands());
-        view.resize(120 * kCell.width, 24 * kCell.height, kCell);
+        ws.resize(120 * kCell.width, 24 * kCell.height, kCell);
     }
 
     core::Document document;
     CommandRegistry registry;
-    EventListView view{registry, document};
+    Workspace ws{registry, document};
+    EventListView& view = ws.eventList();
 };
 
-void type(EventListView& view, std::u32string_view keys)
+void type(Workspace& view, std::u32string_view keys)
 {
     for (const char32_t key : keys)
     {
@@ -106,13 +108,13 @@ Style styleAt(const Region& region, int column, int row)
     return {};
 }
 
-core::Note bassNote(const View& v, std::size_t index)
+core::Note bassNote(const Viewing& v, std::size_t index)
 {
     return std::get<core::Note>(
         v.document.song().events(v.document.song().tracks()[0]->id())[index].data);
 }
 
-void enter(EventListView& view)
+void enter(Workspace& view)
 {
     view.handle(Key::of(NamedKey::Enter), 0);
 }
@@ -121,12 +123,12 @@ void enter(EventListView& view)
 
 TEST_CASE("the event list opens on track 1, at its first row")
 {
-    View v;
+    Viewing v;
     CHECK(v.view.track() == 1);
     CHECK(v.view.row() == 0);
     CHECK(v.view.field() == Column::Position);
 
-    const auto frame = v.view.frame();
+    const auto frame = v.ws.frame();
     REQUIRE(frame.size() == 4);
     CHECK(contains(rowText(frame[1], 0), U"Track 1: Bass"));
     CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
@@ -154,21 +156,21 @@ TEST_CASE("the event list opens on track 1, at its first row")
     };
     const int time = xOf(frame[2], U"Time");
     CHECK(time > 0);
-    type(v.view, U"5j"); // a note
+    type(v.ws, U"5j"); // a note
     REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Event);
-    const auto note = v.view.frame()[2];
+    const auto note = v.ws.frame()[2];
     CHECK(xOf(note, U"Time") == time);
     const int ends = xOf(note, U"Ends");
-    type(v.view, U"j");
-    CHECK(xOf(v.view.frame()[2], U"Ends") == ends);
-    type(v.view, U"gg");
+    type(v.ws, U"j");
+    CHECK(xOf(v.ws.frame()[2], U"Ends") == ends);
+    type(v.ws, U"gg");
 
     // The status line names the song's file, with [+] once it has changes not saved.
     CHECK(contains(rowText(frame[3], 0), U"No file"));
-    type(v.view, U"4jx");
-    CHECK(contains(rowText(v.view.frame()[3], 0), U"No file [+]"));
-    type(v.view, U"u");
-    CHECK_FALSE(contains(rowText(v.view.frame()[3], 0), U"[+]"));
+    type(v.ws, U"4jx");
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U"No file [+]"));
+    type(v.ws, U"u");
+    CHECK_FALSE(contains(rowText(v.ws.frame()[3], 0), U"[+]"));
     const auto list = frame[0];
     CHECK(contains(rowText(list, 0), U"Position"));
     CHECK(contains(rowText(list, 0), U"Release"));
@@ -184,49 +186,49 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(styleAt(list, 14, 4).foreground == Role::Text);
 
     // A song with no tracks opens on the conductor's list.
-    View empty{core::Song{}};
+    Viewing empty{core::Song{}};
     CHECK(empty.view.track() == 0);
 }
 
 TEST_CASE("j and k move between rows, h and l between fields, with counts")
 {
-    View v;
-    type(v.view, U"4j"); // to the first note
+    Viewing v;
+    type(v.ws, U"4j"); // to the first note
     CHECK(v.view.row() == 4);
-    type(v.view, U"2l");
+    type(v.ws, U"2l");
     CHECK(v.view.field() == Column::Value);
-    type(v.view, U"$");
+    type(v.ws, U"$");
     CHECK(v.view.field() == Column::Release);
-    type(v.view, U"0");
+    type(v.ws, U"0");
     CHECK(v.view.field() == Column::Position);
 
     // The field kept to as rows change, shown on the last field before it where a row has
     // fewer.
-    type(v.view, U"$k");
+    type(v.ws, U"$k");
     CHECK(v.view.row() == 3); // the program change
     CHECK(v.view.field() == Column::Data);
-    type(v.view, U"j");
+    type(v.ws, U"j");
     CHECK(v.view.field() == Column::Release);
 
     // Dimmed rows are visited too.
-    type(v.view, U"k3k");
+    type(v.ws, U"k3k");
     CHECK(v.view.row() == 0);
-    type(v.view, U"99j");
+    type(v.ws, U"99j");
     CHECK(v.view.row() == v.view.list().rows().size() - 1); // the end row
-    type(v.view, U"99k");
+    type(v.ws, U"99k");
     CHECK(v.view.row() == 0);
 }
 
 TEST_CASE("gg goes to the first row and G to the end, or with a count to that bar")
 {
-    View v;
-    type(v.view, U"G");
+    Viewing v;
+    type(v.ws, U"G");
     CHECK(v.view.list().rows()[v.view.row()].kind == RowKind::End);
-    type(v.view, U"gg");
+    type(v.ws, U"gg");
     CHECK(v.view.row() == 0);
-    type(v.view, U"2G");
+    type(v.ws, U"2G");
     CHECK(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    type(v.view, U"1gg");
+    type(v.ws, U"1gg");
     CHECK(v.view.row() == 0);
 }
 
@@ -234,52 +236,52 @@ TEST_CASE("time motions go to the event at or after where they land, in the trac
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
-    View v;
-    type(v.view, U"4j");
-    type(v.view, U"w"); // the beat after is 1:2:000; the next event, the cc
+    Viewing v;
+    type(v.ws, U"4j");
+    type(v.ws, U"w"); // the beat after is 1:2:000; the next event, the cc
     CHECK(v.view.row() == 5);
-    type(v.view, U"w");
+    type(v.ws, U"w");
     CHECK(v.view.row() == 6);
-    type(v.view, U"gg4j2w");
+    type(v.ws, U"gg4j2w");
     CHECK(v.view.row() == 6); // a count of beats, then the event at or after
-    type(v.view, U"}");       // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
+    type(v.ws, U"}");         // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
     CHECK(v.view.row() == 9);
-    type(v.view, U"gg}");
+    type(v.ws, U"gg}");
     CHECK(v.view.row() == 7); // a bar on from 1:1:000, the verse's section row
 
     // Going back keeps going until it's somewhere earlier: from the note at 2:1:000, a beat
     // back is 1:4:000, whose event at or after is no earlier, so another beat, and another.
-    type(v.view, U"j");
+    type(v.ws, U"j");
     REQUIRE(v.view.row() == 8);
-    type(v.view, U"b");
+    type(v.ws, U"b");
     CHECK(v.view.row() == 6);
-    type(v.view, U"G[[");
+    type(v.ws, U"G[[");
     CHECK(v.view.row() == 7); // the bar line before the end is 2:1:000
-    type(v.view, U"[[");
+    type(v.ws, U"[[");
     CHECK(v.view.row() == 0);
-    type(v.view, U"]]");
+    type(v.ws, U"]]");
     CHECK(v.view.row() == 7);
-    type(v.view, U"{");
+    type(v.ws, U"{");
     CHECK(v.view.row() == 0);
-    type(v.view, U"b");
+    type(v.ws, U"b");
     CHECK(v.view.row() == 0); // nowhere earlier to go
 }
 
 TEST_CASE("( and ) go by chords: events starting within the chord window of each other")
 {
-    View v;
+    Viewing v;
     // The program and the note at 1:1:000 are one chord, then the cc, then the verse's note.
-    type(v.view, U")");
+    type(v.ws, U")");
     CHECK(v.view.row() == 3);
-    type(v.view, U")");
+    type(v.ws, U")");
     CHECK(v.view.row() == 5);
-    type(v.view, U"2)");
+    type(v.ws, U"2)");
     CHECK(v.view.row() == 9); // past the last, the end
-    type(v.view, U"(");
+    type(v.ws, U"(");
     CHECK(v.view.row() == 8);
-    type(v.view, U"k(");
+    type(v.ws, U"k(");
     CHECK(v.view.row() == 5); // from inside a chord, its start first
-    type(v.view, U"gg(");
+    type(v.ws, U"gg(");
     CHECK(v.view.row() == 0); // nothing before
 
     // Notes a little apart are one chord, until the window is narrowed.
@@ -293,30 +295,30 @@ TEST_CASE("( and ) go by chords: events starting within the chord window of each
                           events.insert({40, core::Note{67, 100, q}});
                           events.insert({q, core::Note{72, 100, q}});
                       });
-    View chord{song};
-    type(chord.view, U")");
+    Viewing chord{song};
+    type(chord.ws, U")");
     CHECK(chord.view.list().rows()[chord.view.row()].tick == 0);
-    type(chord.view, U")");
+    type(chord.ws, U")");
     CHECK(chord.view.list().rows()[chord.view.row()].tick == q);
     chord.view.setChordWindow(std::chrono::milliseconds{5});
-    type(chord.view, U"gg))");
+    type(chord.ws, U"gg))");
     CHECK(chord.view.list().rows()[chord.view.row()].tick == 20);
 }
 
 TEST_CASE("section and marker motions go to their rows")
 {
-    View v;
-    type(v.view, U"]s");
+    Viewing v;
+    type(v.ws, U"]s");
     CHECK(v.view.row() == 7);
-    type(v.view, U"j[s");
+    type(v.ws, U"j[s");
     CHECK(v.view.row() == 0); // from the verse's first note, at its start, the section before
-    type(v.view, U"6j[s");
+    type(v.ws, U"6j[s");
     CHECK(v.view.row() == 0); // from inside a section, its start
-    type(v.view, U"]m");
+    type(v.ws, U"]m");
     CHECK(v.view.row() == 6);
-    type(v.view, U"G[m");
+    type(v.ws, U"G[m");
     CHECK(v.view.row() == 6);
-    type(v.view, U"]m");
+    type(v.ws, U"]m");
     CHECK(v.view.row() == 6); // none after: it stays
 }
 
@@ -324,102 +326,102 @@ TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back wh
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
-    View v;
+    Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
     REQUIRE(events().size() == 4);
 
-    type(v.view, U"4jdd"); // the note at 1:1:000
+    type(v.ws, U"4jdd"); // the note at 1:1:000
     CHECK(events().size() == 3);
     CHECK(v.view.row() == 4); // on what followed, the cc
-    CHECK(v.view.registerEvents().size() == 1);
+    CHECK(v.ws.registerEvents().size() == 1);
     CHECK(v.document.modified());
 
-    type(v.view, U"G");
-    type(v.view, U"u");
+    type(v.ws, U"G");
+    type(v.ws, U"u");
     CHECK(events().size() == 4);
     CHECK(v.view.row() == 4); // back on the note, though the section is first at its time
-    CHECK(v.view.message() == "Undid: Delete 1 event in Bass");
+    CHECK(v.ws.message() == "Undid: Delete 1 event in Bass");
     CHECK_FALSE(v.document.modified());
-    v.view.handle(Key::typed(U'r', kCtrl), 0);
+    v.ws.handle(Key::typed(U'r', kCtrl), 0);
     CHECK(events().size() == 3);
-    CHECK(v.view.message() == "Redid: Delete 1 event in Bass");
-    type(v.view, U"uu");
-    CHECK(v.view.message() == "Nothing to undo");
+    CHECK(v.ws.message() == "Redid: Delete 1 event in Bass");
+    type(v.ws, U"uu");
+    CHECK(v.ws.message() == "Nothing to undo");
 
-    type(v.view, U"gg3j2x"); // the program and the note
+    type(v.ws, U"gg3j2x"); // the program and the note
     CHECK(events().size() == 2);
-    type(v.view, U"u");
+    type(v.ws, U"u");
 
     // On a row that isn't the track's, there's nothing to delete.
-    type(v.view, U"ggdd");
+    type(v.ws, U"ggdd");
     CHECK(events().size() == 4);
     CHECK_FALSE(v.document.modified());
 }
 
 TEST_CASE("d and y take a motion: whole rows for j, k, gg and G, up to the row for the others")
 {
-    View v;
+    Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
 
-    type(v.view, U"3jdj"); // the program and the note
+    type(v.ws, U"3jdj"); // the program and the note
     CHECK(events().size() == 2);
-    type(v.view, U"u");
+    type(v.ws, U"u");
 
-    type(v.view, U"gg4jd}"); // from the note up to the verse's section row: the note and the cc
+    type(v.ws, U"gg4jd}"); // from the note up to the verse's section row: the note and the cc
     CHECK(events().size() == 2);
     CHECK(events()[0].tick == 0); // the program is left
-    type(v.view, U"u");
+    type(v.ws, U"u");
 
-    type(v.view, U"Gkd{"); // back from the verse's note to 1:1:000: every event before it
+    type(v.ws, U"Gkd{"); // back from the verse's note to 1:1:000: every event before it
     CHECK(events().size() == 1);
     CHECK(events()[0].tick == 4 * q);
-    type(v.view, U"u");
+    type(v.ws, U"u");
 
     // Counts before and after the operator multiply: 2d2j from the program takes 5 rows.
-    type(v.view, U"gg3j2d2j");
+    type(v.ws, U"gg3j2d2j");
     CHECK(events().size() == 1);
-    type(v.view, U"u");
+    type(v.ws, U"u");
 
-    type(v.view, U"gg4jy}");
-    CHECK(v.view.message() == "2 events yanked");
+    type(v.ws, U"gg4jy}");
+    CHECK(v.ws.message() == "2 events yanked");
     CHECK(events().size() == 4);
-    CHECK(v.view.registerEvents().size() == 2);
-    CHECK(v.view.registerEvents()[1].tick == q + 240);
+    CHECK(v.ws.registerEvents().size() == 2);
+    CHECK(v.ws.registerEvents()[1].tick == q + 240);
 }
 
 TEST_CASE("p puts the events at the cursor's time, never overlapping notes")
 {
-    View v;
+    Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
-    type(v.view, U"p");
-    CHECK(v.view.message() == "Nothing yanked or deleted to put");
+    type(v.ws, U"p");
+    CHECK(v.ws.message() == "Nothing yanked or deleted to put");
 
-    type(v.view, U"4jyy"); // the E1 at 1:1:000
-    type(v.view, U"4jp");  // at 2:1:000, beside the F1 there
+    type(v.ws, U"4jyy"); // the E1 at 1:1:000
+    type(v.ws, U"4jp");  // at 2:1:000, beside the F1 there
     CHECK(events().size() == 5);
     CHECK(events()[4].tick == 4 * q);
     CHECK(std::get<core::Note>(events()[4].data).pitch == 28);
 
     // The F1 put where an F1 starts replaces it, rather than doubling it.
-    type(v.view, U"u");
-    type(v.view, U"Gkyyp");
+    type(v.ws, U"u");
+    type(v.ws, U"Gkyyp");
     CHECK(events().size() == 4);
 }
 
 TEST_CASE("an operator waits for its motion, and Escape or another key gives it up")
 {
-    View v;
-    type(v.view, U"2d3");
-    CHECK(v.view.mode() == Mode::OperatorPending);
-    CHECK(v.view.pending() == "2d3");
-    v.view.handle(Key::of(NamedKey::Escape), 0);
-    CHECK(v.view.mode() == Mode::Normal);
-    CHECK(v.view.pending().empty());
-    type(v.view, U"dQ"); // no motion
-    CHECK(v.view.mode() == Mode::Normal);
+    Viewing v;
+    type(v.ws, U"2d3");
+    CHECK(v.ws.mode() == Mode::OperatorPending);
+    CHECK(v.ws.pending() == "2d3");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.ws.mode() == Mode::Normal);
+    CHECK(v.ws.pending().empty());
+    type(v.ws, U"dQ"); // no motion
+    CHECK(v.ws.mode() == Mode::Normal);
     CHECK(v.document.song().events(v.document.song().tracks()[0]->id()).size() == 4);
 }
 
@@ -427,306 +429,306 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
 {
     // The conductor's rows: 0 section Song, 1 meter, 2 tempo, 3 marker at 1:3:000, 4 section
     // Verse at 2:1:000, and 5 the end.
-    View v;
+    Viewing v;
     const auto& song = [&]() -> const core::Song& { return v.document.song(); };
-    type(v.view, U"gT");
+    type(v.ws, U"gT");
     REQUIRE(v.view.track() == 0);
 
-    type(v.view, U"3jl"); // the marker's name
-    enter(v.view);
+    type(v.ws, U"3jl"); // the marker's name
+    enter(v.ws);
     CHECK(v.view.fieldLine().text() == U"fill");
-    type(v.view, U"fix");
-    enter(v.view);
+    type(v.ws, U"fix");
+    enter(v.ws);
     CHECK(song().markers()[0].name == "fix");
-    type(v.view, U"u");
-    CHECK(v.view.message() == "Undid: Rename marker fill to fix");
+    type(v.ws, U"u");
+    CHECK(v.ws.message() == "Undid: Rename marker fill to fix");
 
-    type(v.view, U"j"); // the verse's name
-    enter(v.view);
-    type(v.view, U"Chorus");
-    enter(v.view);
+    type(v.ws, U"j"); // the verse's name
+    enter(v.ws);
+    type(v.ws, U"Chorus");
+    enter(v.ws);
     CHECK(song().sections()[1]->name() == "Chorus");
 
-    type(v.view, U"gg2j"); // the tempo at the start
-    enter(v.view);
+    type(v.ws, U"gg2j"); // the tempo at the start
+    enter(v.ws);
     CHECK(v.view.fieldLine().text() == U"120");
-    type(v.view, U"140");
-    enter(v.view);
+    type(v.ws, U"140");
+    enter(v.ws);
     CHECK(song().tempo().tempoAt(0) == core::Tempo::fromBpm(140));
-    type(v.view, U"+");
+    type(v.ws, U"+");
     CHECK(song().tempo().tempoAt(0) == core::Tempo::fromBpm(141));
-    enter(v.view);
-    type(v.view, U"1001");
-    enter(v.view);
-    CHECK(v.view.message().starts_with("A tempo must be from 1 to 1000 BPM"));
-    v.view.handle(Key::of(NamedKey::Escape), 0);
+    enter(v.ws);
+    type(v.ws, U"1001");
+    enter(v.ws);
+    CHECK(v.ws.message().starts_with("A tempo must be from 1 to 1000 BPM"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
 
-    type(v.view, U"k"); // the meter at the start
-    enter(v.view);
-    type(v.view, U"3/4");
-    enter(v.view);
+    type(v.ws, U"k"); // the meter at the start
+    enter(v.ws);
+    type(v.ws, U"3/4");
+    enter(v.ws);
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{3, 4});
-    CHECK(v.view.message().empty());
+    CHECK(v.ws.message().empty());
     // The intro's four beats are now a 3/4 bar and a 1/4 remainder bar, which leaves no room
     // for a whole 4/4 bar at the start: it says so, and changes nothing.
-    type(v.view, U"+");
-    CHECK(v.view.message() == "The meter change at 2:1:000 leaves no room for a whole 4/4 bar "
-                              "here; change or delete it first");
+    type(v.ws, U"+");
+    CHECK(v.ws.message() == "The meter change at 2:1:000 leaves no room for a whole 4/4 bar "
+                            "here; change or delete it first");
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{3, 4});
-    type(v.view, U"u");
+    type(v.ws, U"u");
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{4, 4});
 
     // A section's own tempo and meter, and the section, can't be deleted; a marker can.
-    type(v.view, U"gg3dd");
-    CHECK(v.view.message().starts_with("Every section keeps its tempo and meter at its start"));
-    type(v.view, U"gg]m");
+    type(v.ws, U"gg3dd");
+    CHECK(v.ws.message().starts_with("Every section keeps its tempo and meter at its start"));
+    type(v.ws, U"gg]m");
     REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Marker);
-    type(v.view, U"dd");
+    type(v.ws, U"dd");
     CHECK(song().markers().empty());
 
     // A tempo change inside a section can.
     v.document.edit("Add a tempo change", {}, [](core::Song& s)
                     { s.updateTempo([](core::TempoMap& t) { t.set(q, core::Tempo{400'000}); }); });
     v.view.refresh();
-    type(v.view, U"gg3j");
+    type(v.ws, U"gg3j");
     REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Tempo);
-    type(v.view, U"x");
+    type(v.ws, U"x");
     CHECK(song().tempo().changes().size() == 1);
-    CHECK(v.view.message().empty());
+    CHECK(v.ws.message().empty());
 
     // Its positions, and yanking and putting there, wait.
-    type(v.view, U"0");
-    enter(v.view);
-    CHECK(v.view.message() == "Moving the conductor's changes comes later");
-    type(v.view, U"yy");
-    CHECK(v.view.message() == "Only a track's events can be yanked");
-    type(v.view, U"p");
-    CHECK(v.view.message() == "Only a track's events can be put");
+    type(v.ws, U"0");
+    enter(v.ws);
+    CHECK(v.ws.message() == "Moving the conductor's changes comes later");
+    type(v.ws, U"yy");
+    CHECK(v.ws.message() == "Only a track's events can be yanked");
+    type(v.ws, U"p");
+    CHECK(v.ws.message() == "Only a track's events can be put");
 }
 
 TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
 {
-    View v;
-    type(v.view, U"4j2l"); // the E1's velocity, 96
-    const auto before = rowText(v.view.frame()[0], 5).find(U"96");
-    enter(v.view);
+    Viewing v;
+    type(v.ws, U"4j2l"); // the E1's velocity, 96
+    const auto before = rowText(v.ws.frame()[0], 5).find(U"96");
+    enter(v.ws);
     CHECK(v.view.editingField());
-    CHECK(rowText(v.view.frame()[0], 5).find(U"96") == before); // right-justified as it was
-    CHECK(v.view.mode() == Mode::CommandLine);
+    CHECK(rowText(v.ws.frame()[0], 5).find(U"96") == before); // right-justified as it was
+    CHECK(v.ws.mode() == Mode::CommandLine);
     CHECK(v.view.fieldLine().text() == U"96");
-    CHECK(contains(rowText(v.view.frame()[3], 0), U"EDIT"));
-    type(v.view, U"80");
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U"EDIT"));
+    type(v.ws, U"80");
     CHECK(v.view.fieldLine().text() == U"80");
-    enter(v.view);
+    enter(v.ws);
     CHECK_FALSE(v.view.editingField());
     CHECK(bassNote(v, 1).velocity == 80);
-    type(v.view, U"u");
-    CHECK(v.view.message() == "Undid: Set velocity in Bass");
+    type(v.ws, U"u");
+    CHECK(v.ws.message() == "Undid: Set velocity in Bass");
 
     // Long text stays in the field's box, scrolling to keep the cursor in it, rather than
     // spilling over the columns beside it.
-    v.view.handle(Key::of(NamedKey::Escape), 0);
-    enter(v.view);
-    type(v.view, U"1234567890123456789");
-    const auto editing = rowText(v.view.frame()[0], 5);
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    enter(v.ws);
+    type(v.ws, U"1234567890123456789");
+    const auto editing = rowText(v.ws.frame()[0], 5);
     CHECK(contains(editing, U"0:0:480 (1/8)"));     // the length beside it, still there
     CHECK(contains(editing, U"6789"));              // the end, where the cursor is
     CHECK_FALSE(contains(editing, U"12345678901")); // more than fits
     CHECK(contains(editing, U"64"));                // the release beyond, untouched
-    v.view.handle(Key::of(NamedKey::Escape), 0);
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
 
     // A change; keys that edit keep the value.
-    enter(v.view);
-    type(v.view, U"+10");
-    enter(v.view);
+    enter(v.ws);
+    type(v.ws, U"+10");
+    enter(v.ws);
     CHECK(bassNote(v, 1).velocity == 106);
-    enter(v.view);
-    v.view.handle(Key::of(NamedKey::Backspace), 0);
-    type(v.view, U"0");
+    enter(v.ws);
+    v.ws.handle(Key::of(NamedKey::Backspace), 0);
+    type(v.ws, U"0");
     CHECK(v.view.fieldLine().text() == U"100");
-    enter(v.view);
+    enter(v.ws);
     CHECK(bassNote(v, 1).velocity == 100);
 
     // A value out of range keeps the prompt open to put right; Escape leaves it as it was.
-    enter(v.view);
-    type(v.view, U"200");
-    enter(v.view);
+    enter(v.ws);
+    type(v.ws, U"200");
+    enter(v.ws);
     CHECK(v.view.editingField());
-    CHECK(v.view.message().starts_with("A velocity must be from 1 to 127"));
-    v.view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.ws.message().starts_with("A velocity must be from 1 to 127"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
     CHECK_FALSE(v.view.editingField());
     CHECK(bassNote(v, 1).velocity == 100);
 }
 
 TEST_CASE("editing a note's pitch, length and position, never into another of its pitch")
 {
-    View v;
-    type(v.view, U"4jl"); // the E1's pitch, shown as E1 (28), edited as E1
-    enter(v.view);
+    Viewing v;
+    type(v.ws, U"4jl"); // the E1's pitch, shown as E1 (28), edited as E1
+    enter(v.ws);
     CHECK(v.view.fieldLine().text() == U"E1");
-    type(v.view, U"F1");
-    enter(v.view);
+    type(v.ws, U"F1");
+    enter(v.ws);
     CHECK(bassNote(v, 1).pitch == 29);
 
-    type(v.view, U"2l"); // its length, 0:0:480 (1/8), edited as 0:0:480
-    enter(v.view);
+    type(v.ws, U"2l"); // its length, 0:0:480 (1/8), edited as 0:0:480
+    enter(v.ws);
     CHECK(v.view.fieldLine().text() == U"0:0:480");
-    type(v.view, U"+1/16");
-    enter(v.view);
+    type(v.ws, U"+1/16");
+    enter(v.ws);
     CHECK(bassNote(v, 1).duration == 720);
 
     // Moved to where the other F1 starts: refused, naming it.
-    type(v.view, U"0");
-    enter(v.view);
-    type(v.view, U"2:1:000");
-    enter(v.view);
+    type(v.ws, U"0");
+    enter(v.ws);
+    type(v.ws, U"2:1:000");
+    enter(v.ws);
     CHECK(v.view.editingField());
-    CHECK(v.view.message() == "Would overlap the F1 at 2:1:000");
-    v.view.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.ws.message() == "Would overlap the F1 at 2:1:000");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
 
     // Moved a beat on instead, the cursor following it.
-    enter(v.view);
-    type(v.view, U"+0:1:000");
-    enter(v.view);
+    enter(v.ws);
+    type(v.ws, U"+0:1:000");
+    enter(v.ws);
     CHECK(v.view.list().rows()[v.view.row()].tick == q);
     CHECK(v.view.list().text(v.view.row())[Column::Data] == "F1 (29)");
 }
 
 TEST_CASE("+ and - step the field, with counts, as Ctrl-A and Ctrl-X do")
 {
-    View v;
-    type(v.view, U"4j2l");
-    type(v.view, U"+");
+    Viewing v;
+    type(v.ws, U"4j2l");
+    type(v.ws, U"+");
     CHECK(bassNote(v, 1).velocity == 97);
-    type(v.view, U"5-");
+    type(v.ws, U"5-");
     CHECK(bassNote(v, 1).velocity == 92);
-    v.view.handle(Key::typed(U'a', kCtrl), 0);
+    v.ws.handle(Key::typed(U'a', kCtrl), 0);
     CHECK(bassNote(v, 1).velocity == 93);
-    type(v.view, U"200");
-    v.view.handle(Key::typed(U'x', kCtrl), 0);
+    type(v.ws, U"200");
+    v.ws.handle(Key::typed(U'x', kCtrl), 0);
     CHECK(bassNote(v, 1).velocity == 1); // kept in range
-    type(v.view, U"h-");                 // the pitch, a semitone down
+    type(v.ws, U"h-");                   // the pitch, a semitone down
     CHECK(bassNote(v, 1).pitch == 27);
 }
 
 TEST_CASE("o adds a note at the cursor's time once its pitch is typed")
 {
-    View v;
+    Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
-    type(v.view, U"5jo"); // on the cc at 1:2:240
+    type(v.ws, U"5jo"); // on the cc at 1:2:240
     CHECK(v.view.editingField());
     CHECK(v.view.fieldLine().text().empty());
     // The new row shows after the cursor's, with the velocity and length of the note before.
-    const auto list = v.view.frame()[0];
+    const auto list = v.ws.frame()[0];
     CHECK(contains(rowText(list, 7), U"1:2:240"));
     CHECK(contains(rowText(list, 7), U"note"));
     CHECK(contains(rowText(list, 7), U"96"));
     CHECK(events().size() == 4);
 
-    enter(v.view); // no pitch yet
-    CHECK(v.view.message() == "Type the note's pitch, such as C4 or 60");
-    type(v.view, U"G2");
-    enter(v.view);
+    enter(v.ws); // no pitch yet
+    CHECK(v.ws.message() == "Type the note's pitch, such as C4 or 60");
+    type(v.ws, U"G2");
+    enter(v.ws);
     CHECK_FALSE(v.view.editingField());
     REQUIRE(events().size() == 5);
     CHECK(events()[3].tick == q + 240);
     CHECK(std::get<core::Note>(events()[3].data) == core::Note{43, 96, q / 2, 64});
     CHECK(v.view.list().text(v.view.row())[Column::Data] == "G2 (43)"); // on it
     CHECK(v.view.field() == Column::Data);
-    type(v.view, U"u");
-    CHECK(v.view.message() == "Undid: Add a note in Bass");
+    type(v.ws, U"u");
+    CHECK(v.ws.message() == "Undid: Add a note in Bass");
     CHECK(events().size() == 4);
 
     // Escape leaves nothing behind, and a pitch already sounding there is refused.
-    type(v.view, U"o");
-    v.view.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U"o");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
     CHECK(events().size() == 4);
-    type(v.view, U"ggo");
-    type(v.view, U"E1");
-    enter(v.view);
-    CHECK(v.view.message() == "Would overlap the E1 at 1:1:000");
+    type(v.ws, U"ggo");
+    type(v.ws, U"E1");
+    enter(v.ws);
+    CHECK(v.ws.message() == "Would overlap the E1 at 1:1:000");
     CHECK(v.view.editingField());
 }
 
 TEST_CASE("only the track's own events are edited in its list")
 {
-    View v;
-    enter(v.view); // the section row
+    Viewing v;
+    enter(v.ws); // the section row
     CHECK_FALSE(v.view.editingField());
-    CHECK(v.view.message() == "That's the conductor's: edit it in its list (gT)");
-    type(v.view, U"G");
-    enter(v.view);
-    CHECK(v.view.message() == "Nothing to edit here");
-    type(v.view, U"+");
-    CHECK(v.view.message() == "Nothing to change here");
+    CHECK(v.ws.message() == "That's the conductor's: edit it in its list (gT)");
+    type(v.ws, U"G");
+    enter(v.ws);
+    CHECK(v.ws.message() == "Nothing to edit here");
+    type(v.ws, U"+");
+    CHECK(v.ws.message() == "Nothing to change here");
 }
 
 TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping the time")
 {
-    View v;
-    type(v.view, U"7j"); // the verse's section row, at 2:1:000
+    Viewing v;
+    type(v.ws, U"7j"); // the verse's section row, at 2:1:000
     REQUIRE(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    type(v.view, U"gt");
+    type(v.ws, U"gt");
     CHECK(v.view.track() == 2);
     CHECK(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    CHECK(contains(rowText(v.view.frame()[1], 0), U"Track 2: Lead"));
-    type(v.view, U"gt");
+    CHECK(contains(rowText(v.ws.frame()[1], 0), U"Track 2: Lead"));
+    type(v.ws, U"gt");
     CHECK(v.view.track() == 0); // round to the conductor
-    CHECK(contains(rowText(v.view.frame()[1], 0), U"Track 0: Conductor"));
-    type(v.view, U"gt");
+    CHECK(contains(rowText(v.ws.frame()[1], 0), U"Track 0: Conductor"));
+    type(v.ws, U"gt");
     CHECK(v.view.track() == 1);
-    type(v.view, U"gT");
+    type(v.ws, U"gT");
     CHECK(v.view.track() == 0);
-    type(v.view, U"gT");
+    type(v.ws, U"gT");
     CHECK(v.view.track() == 2);
-    type(v.view, U"1gt"); // a count goes to that track
+    type(v.ws, U"1gt"); // a count goes to that track
     CHECK(v.view.track() == 1);
-    type(v.view, U"0gt");
+    type(v.ws, U"0gt");
     CHECK(v.view.track() == 2); // 0 is a motion, then gt
 }
 
 TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k keep place")
 {
-    View v{demoSong()};
+    Viewing v{demoSong()};
     REQUIRE(v.view.viewRows() == 17); // below the inspector, the track's bar and the headings
-    v.view.handle(Key::typed(U'd', kCtrl), 0);
+    v.ws.handle(Key::typed(U'd', kCtrl), 0);
     CHECK(v.view.row() == 8);
     CHECK(v.view.top() == 8);
-    v.view.handle(Key::typed(U'f', kCtrl), 0);
+    v.ws.handle(Key::typed(U'f', kCtrl), 0);
     CHECK(v.view.row() == 23); // a page less two rows, as in Vim
     CHECK(v.view.top() == 23);
-    v.view.handle(Key::typed(U'u', kCtrl), 0);
+    v.ws.handle(Key::typed(U'u', kCtrl), 0);
     CHECK(v.view.top() == 15);
 
-    v.view.handle(Key::typed(U'j', kCtrl), 0);
+    v.ws.handle(Key::typed(U'j', kCtrl), 0);
     CHECK(v.view.row() == 16);
     CHECK(v.view.top() == 16);
-    type(v.view, U"zz");
+    type(v.ws, U"zz");
     CHECK(v.view.top() == 8); // row 16 in the middle of 17
-    type(v.view, U"gg");
-    v.view.handle(Key::typed(U'k', kCtrl), 0); // the view stops at the top
+    type(v.ws, U"gg");
+    v.ws.handle(Key::typed(U'k', kCtrl), 0); // the view stops at the top
     CHECK(v.view.top() == 0);
     CHECK(v.view.row() == 0);
 
     // The cursor stays in view as it moves.
-    type(v.view, U"30j");
+    type(v.ws, U"30j");
     CHECK(v.view.top() == 14);
 }
 
 TEST_CASE("a note's length shows as bars, beats and ticks, with the value it's close to")
 {
-    View v;
-    type(v.view, U"4j");
+    Viewing v;
+    type(v.ws, U"4j");
     CHECK(v.view.list().text(v.view.row())[Column::Length] == "0:0:480 (1/8)");
-    type(v.view, U"4j"); // the verse's note
+    type(v.ws, U"4j"); // the verse's note
     CHECK(v.view.list().text(v.view.row())[Column::Length] == "0:0:492 (≈1/8)");
 }
 
 TEST_CASE("the list shows the song as it is after a change, at the same time")
 {
-    View v;
-    type(v.view, U"8j"); // the verse's note
+    Viewing v;
+    type(v.ws, U"8j"); // the verse's note
     v.document.edit("Add a note", {},
                     [&](core::Song& song)
                     {
@@ -742,18 +744,18 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
 {
     Config config;
     CommandRegistry commands;
-    commands.add(EventListView::commands());
+    commands.add(Workspace::commands());
     commands.add(windowCommands());
     ConfigReader reader{config, commands};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     CHECK(reader.errors().empty());
 
     // And every one of its commands is one the view runs.
-    View v;
-    for (const auto& command : EventListView::commands())
+    Viewing v;
+    for (const auto& command : Workspace::commands())
     {
         CAPTURE(command.name);
-        const auto result = v.view.run(command.name, 0);
+        const auto result = v.ws.run(command.name, 0);
         // Commands only for the : line, such as port, may want what this view lacks.
         CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
                !command.keys));
@@ -762,31 +764,31 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
 
 TEST_CASE("a count shows until a key uses it or Escape gives it up")
 {
-    View v;
-    CHECK(v.view.handle(Key::typed(U'4'), 0));
-    CHECK(v.view.handle(Key::typed(U'0'), 0));
-    CHECK(v.view.pending() == "40");
-    CHECK(contains(rowText(v.view.frame()[3], 0), U"40"));
-    CHECK(v.view.handle(Key::of(NamedKey::Escape), 0));
-    CHECK(v.view.pending().empty());
-    type(v.view, U"5x"); // a key with no binding gives the count up too
-    CHECK(v.view.pending().empty());
-    type(v.view, U"j");
+    Viewing v;
+    CHECK(v.ws.handle(Key::typed(U'4'), 0));
+    CHECK(v.ws.handle(Key::typed(U'0'), 0));
+    CHECK(v.ws.pending() == "40");
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U"40"));
+    CHECK(v.ws.handle(Key::of(NamedKey::Escape), 0));
+    CHECK(v.ws.pending().empty());
+    type(v.ws, U"5x"); // a key with no binding gives the count up too
+    CHECK(v.ws.pending().empty());
+    type(v.ws, U"j");
     CHECK(v.view.row() == 1);
 }
 
 TEST_CASE("a message shows in the status line until the next key")
 {
-    View v;
-    v.view.setMessage("modalrc:3: unknown setting", EventListView::MessageKind::Warning);
-    CHECK(contains(rowText(v.view.frame()[3], 0), U"modalrc:3: unknown setting"));
-    CHECK(v.view.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
-    CHECK(v.view.message().empty());
+    Viewing v;
+    v.ws.setMessage("modalrc:3: unknown setting", MessageKind::Warning);
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U"modalrc:3: unknown setting"));
+    CHECK(v.ws.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
+    CHECK(v.ws.message().empty());
 }
 
 TEST_CASE("keys run the registry's other commands too, such as the window's, showing messages")
 {
-    View v;
+    Viewing v;
     std::vector<int> counts;
     v.registry.add(windowCommands()[0],
                    [&](const CommandCall& call)
@@ -794,49 +796,49 @@ TEST_CASE("keys run the registry's other commands too, such as the window's, sho
                        counts.push_back(call.count);
                        return CommandResult{true, "bigger", false};
                    });
-    CHECK(v.view.handle(Key::typed(U'=', kCtrl), 0));
-    CHECK(v.view.message() == "bigger");
-    v.view.handle(Key::typed(U'3'), 0);
-    v.view.handle(Key::of(NamedKey::KeypadPlus, kCtrl), 0);
+    CHECK(v.ws.handle(Key::typed(U'=', kCtrl), 0));
+    CHECK(v.ws.message() == "bigger");
+    v.ws.handle(Key::typed(U'3'), 0);
+    v.ws.handle(Key::of(NamedKey::KeypadPlus, kCtrl), 0);
     CHECK(counts == std::vector<int>{0, 3});
-    v.view.handle(Key::typed(U'-', kCtrl), 0);
-    CHECK(v.view.message() == "font-smaller can't be run here");
+    v.ws.handle(Key::typed(U'-', kCtrl), 0);
+    CHECK(v.ws.message() == "font-smaller can't be run here");
 }
 
 TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line on")
 {
-    View v;
+    Viewing v;
     std::vector<std::string> lines;
-    v.view.setLineHandler([&](const std::string& line) { lines.push_back(line); });
+    v.ws.setLineHandler([&](const std::string& line) { lines.push_back(line); });
 
-    type(v.view, U":set fontsize=14j"); // digits and j are typed, not counted or moved
-    CHECK(v.view.mode() == Mode::CommandLine);
-    CHECK(v.view.commandLine().text() == U"set fontsize=14j");
+    type(v.ws, U":set fontsize=14j"); // digits and j are typed, not counted or moved
+    CHECK(v.ws.mode() == Mode::CommandLine);
+    CHECK(v.ws.commandLine().text() == U"set fontsize=14j");
     CHECK(v.view.row() == 0);
-    v.view.handle(Key::of(NamedKey::Backspace), 0);
-    CHECK(contains(rowText(v.view.frame()[3], 0), U":set fontsize=14"));
-    v.view.handle(Key::of(NamedKey::Enter), 0);
-    CHECK(v.view.mode() == Mode::Normal);
+    v.ws.handle(Key::of(NamedKey::Backspace), 0);
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U":set fontsize=14"));
+    v.ws.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(v.ws.mode() == Mode::Normal);
     CHECK(lines == std::vector<std::string>{"set fontsize=14"});
 
-    type(v.view, U":");
-    v.view.handle(Key::of(NamedKey::Up), 0);
-    CHECK(v.view.commandLine().text() == U"set fontsize=14");
-    v.view.handle(Key::of(NamedKey::Escape), 0);
-    CHECK(v.view.mode() == Mode::Normal);
+    type(v.ws, U":");
+    v.ws.handle(Key::of(NamedKey::Up), 0);
+    CHECK(v.ws.commandLine().text() == U"set fontsize=14");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.ws.mode() == Mode::Normal);
     CHECK(lines.size() == 1);
 }
 
 TEST_CASE(":port sets the track's output port by its name or part of it")
 {
-    View v;
+    Viewing v;
     const std::vector<std::string> outputs{"Microsoft GS Wavetable Synth", "loopMIDI Port",
                                            "loopMIDI Port 2"};
     // As the platform's matching does: the whole name, or else the one port containing it.
-    v.view.setPortFinder(
+    v.ws.setPortFinder(
         [&](std::string_view name)
         {
-            EventListView::PortLookup lookup{.port = {}, .candidates = {}, .ports = outputs};
+            Workspace::PortLookup lookup{.port = {}, .candidates = {}, .ports = outputs};
             for (const auto& port : outputs)
             {
                 if (port == name)
@@ -877,11 +879,11 @@ TEST_CASE(":port sets the track's output port by its name or part of it")
     CHECK(port() == "Microsoft GS Wavetable Synth"); // unchanged
 
     // One undo step, back to the port it had.
-    type(v.view, U"u");
+    type(v.ws, U"u");
     CHECK(port() == "Pro-800");
 
     // The conductor sends nothing, so has no port.
-    type(v.view, U"gT");
+    type(v.ws, U"gT");
     result = v.registry.runLine("port GS");
     CHECK(result.warning);
     CHECK(result.message == "The conductor has no port; its tempo and meter aren't sent");
@@ -889,7 +891,7 @@ TEST_CASE(":port sets the track's output port by its name or part of it")
 
 TEST_CASE(":port without MIDI says so")
 {
-    View v;
+    Viewing v;
     const auto result = v.registry.runLine("port GS");
     CHECK(result.warning);
     CHECK(result.message == "There are no MIDI ports here");
@@ -906,7 +908,7 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
                      [](core::MeterMap& meter) { meter = core::MeterMap{meter.ppqn(), {2, 4}}; });
     song.updateEvents(lead, [](core::EventList& events)
                       { events.insert({2 * q + q / 2, core::Note{60, 100, q}}); }); // its 2:1:480
-    View v{std::move(song)};
+    Viewing v{std::move(song)};
     const auto names = [&]
     {
         std::vector<std::string> result;
@@ -921,14 +923,14 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     CHECK(v.registry.runLine("section Intro") ==
           CommandResult::error("Section 1 starts at 1:1:000 already"));
 
-    type(v.view, U"G"); // the end
+    type(v.ws, U"G"); // the end
     CHECK(v.registry.runLine("section Outro").warning);
 
     // On the bass's note in bar 3, the section starts at 3:1:000.
-    type(v.view, U"gg");
+    type(v.ws, U"gg");
     while (v.view.list().rows()[v.view.row()].kind != RowKind::Event)
     {
-        type(v.view, U"j");
+        type(v.ws, U"j");
     }
     CHECK(v.registry.runLine("section Chorus") ==
           CommandResult{true, "Chorus starts at 3:1:000", false});
@@ -936,19 +938,19 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     CHECK(v.document.song().sectionStart(1) == 2 * 4 * q);
 
     // Without a name, Section and a number; one named again gets a number of its own.
-    type(v.view, U"u");
+    type(v.ws, U"u");
     CHECK(names() == std::vector<std::string>{"Section 1"});
     CHECK(v.registry.runLine("section").message == "Section 2 starts at 3:1:000");
     CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
 
     // From the lead, in 2/4, its second bar starts in the middle of the conductor's first,
     // which ends short.
-    type(v.view, U"gt");
+    type(v.ws, U"gt");
     REQUIRE(v.view.track() == 2);
-    type(v.view, U"gg");
+    type(v.ws, U"gg");
     while (v.view.list().rows()[v.view.row()].kind != RowKind::Event)
     {
-        type(v.view, U"j");
+        type(v.ws, U"j");
     }
     const auto result = v.registry.runLine("section Bridge");
     CHECK(result.warning);

@@ -3,14 +3,12 @@
 #pragma once
 
 #include <modal/core/document.hpp>
-#include <modal/core/player.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/event_list.hpp>
 #include <modal/ui/frame.hpp>
-#include <modal/ui/key.hpp>
-#include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
+#include <modal/ui/view.hpp>
 
 #include <chrono>
 #include <cstddef>
@@ -29,99 +27,43 @@ namespace modal::ui
 // conductor's section starts, meter and tempo changes and markers among them, dimmed, and
 // the end of the song last; or the conductor's own list, track 0. A row for each event,
 // with its fields in columns under fixed headings; the cursor is on one field of one row.
-// A bar at the top names the track and the section the cursor is in, and the status line at
-// the bottom shows the mode, the cursor's position, keys waiting and messages, or the :
-// prompt.
-class EventListView
+// A bar at the top names the track and the section the cursor is in, and the inspector below
+// it shows the cursor's row in full.
+class EventListView final : public View
 {
 public:
-    enum class MessageKind : std::uint8_t
-    {
-        Information, // in the message colour
-        Warning,     // in the warning colour
-    };
-
-    // The view's commands.
+    // The view's own commands.
     static std::span<const CommandInfo> commands();
 
-    // The keymap of the built-in modalrc alone, whose bindings run the view's commands and
-    // the window's (see windowCommands).
-    static Keymap defaultKeymap();
-
     // Shows the document's song, from track 1 (or the conductor's list, if there are no
-    // tracks). Gives the registry what runs the view's commands, which keys then run through
-    // it with the registry's others, such as the window's. The registry and the document
-    // outlive the view, which can't be copied or moved, since the registry runs its commands
-    // on it.
-    EventListView(CommandRegistry& registry, core::Document& document,
-                  Keymap keymap = defaultKeymap(), std::int64_t timeout = kDefaultTimeout);
+    // tracks). The document and the host outlive the view.
+    EventListView(core::Document& document, ViewHost& host);
     EventListView(const EventListView&) = delete;
     EventListView& operator=(const EventListView&) = delete;
 
-    // Fits the view to the window, scrolling if the cursor would be out of it.
-    void resize(int width, int height, CellSize cell);
-
-    // Handles a key pressed at a time in milliseconds, through the keymap, returning whether
-    // what's shown changed.
-    bool handle(const Key& key, std::int64_t now);
-
-    // When wake should next be called, for keys waiting on a timeout, or for the next frame
-    // while playing; and the call, which returns whether what's shown changed.
-    std::optional<std::int64_t> deadline() const;
-    bool wake(std::int64_t now);
-
-    // The player the transport commands play the song with, or none, when they do nothing.
-    // It must outlive the view.
-    void setPlayer(core::Player* player);
-
-    // Whether the play-from marker stays put when playback stops (the rewind setting), and the
-    // cursor stays where it was; otherwise the marker moves to where playback stops, and the
-    // cursor follows the playhead there.
-    void setRewind(bool rewind);
-    bool rewind() const { return rewind_; }
-
-    // What a port name given to :port refers to: the output port's full name, or else the
-    // ports it could be when several match equally well (none when none match); and every
-    // output port there is. An empty name only lists them.
-    struct PortLookup
-    {
-        std::optional<std::string> port;
-        std::vector<std::string> candidates;
-        std::vector<std::string> ports;
-    };
-    using PortFinder = std::function<PortLookup(std::string_view name)>;
-    void setPortFinder(PortFinder finder) { portFinder_ = std::move(finder); }
-
-    // The row playing, while playing: the last at or before the playhead.
-    std::optional<std::size_t> playheadRow() const { return playheadRow_; }
-
-    // How often to draw a frame while playing, in milliseconds; the display's refresh rate
-    // may hold it back further.
-    static constexpr std::int64_t kFrameInterval = 8;
-
-    // Runs a command through the registry with a count (0 for none), as a key bound to it
-    // does, showing any message it gives.
-    CommandResult run(std::string_view command, int count);
-
-    // Shows the document's song as it is now, as after a change, keeping the cursor at the
-    // same time on the same track if it's still there.
-    void refresh();
-
-    // Shows a song new to the document, opened or new, from the start of track 1's list (or
-    // the conductor's, if there are no tracks).
-    void showSong();
-
-    // What runs a line entered at the : prompt, such as the program's command runner.
-    using LineHandler = std::function<void(const std::string& line)>;
-    void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
-
-    void setKeymap(Keymap keymap);
-    void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
+    std::vector<int> topHeights(CellSize cell) const override;
+    void resize(const WindowLayout& layout, int width, CellSize cell) override;
+    std::optional<bool> run(std::string_view command, int count) override;
+    std::optional<CommandResult> runLine(std::string_view command,
+                                         std::string_view arguments) override;
+    bool operate(std::string_view op, std::string_view motion, int count) override;
+    void addRegions(Frame& frame) const override;
+    std::string cursorStatus() const override;
+    std::string timeStatus(core::Tick tick) const override;
+    std::string position(core::Tick tick) const override;
+    SongCursor cursor() const override;
+    core::EditPlace place() const override;
+    void restore(const core::EditPlace& place) override;
+    void refresh() override;
+    void showSong() override;
+    void showPlayhead(core::Tick playhead, bool cursorFollows) override;
+    void stopPlayhead(std::optional<core::Tick> cursorTo) override;
+    bool typing() const override { return field_.has_value(); }
+    void type(char32_t character) override;
+    std::optional<bool> runTyping(std::string_view command) override;
 
     // How far apart events can start and still be one chord, for ( and ) (chordwindow).
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
-
-    Frame frame() const;
 
     // The track shown: 0 for the conductor, then 1 for the first track.
     std::size_t track() const { return track_; }
@@ -131,31 +73,18 @@ public:
     std::size_t top() const { return top_; }
     int viewRows() const; // rows of events fully shown
 
-    // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
-    // prompt, or editing a field in place.
-    Mode mode() const { return mode_; }
-    const CommandLine& commandLine() const { return line_; }
+    // The row playing, while playing: the last at or before the playhead.
+    std::optional<std::size_t> playheadRow() const { return playheadRow_; }
 
     // Whether a field is being edited in place (after Enter), and what's typed there.
     bool editingField() const { return field_.has_value(); }
     const CommandLine& fieldLine() const { return fieldLine_; }
-    std::string pending() const; // the operator, count and keys typed so far
-
-    // What the unnamed register holds: events yanked or deleted, their ticks from the first's.
-    const std::vector<core::Event>& registerEvents() const { return register_; }
-
-    // Shows a message in the status line until the next key.
-    void setMessage(std::string message, MessageKind kind)
-    {
-        message_ = std::move(message);
-        messageKind_ = kind;
-    }
-    const std::string& message() const { return message_; }
 
 private:
-    bool runAll(const std::vector<Action>& actions);
-    std::optional<bool> runOwn(std::string_view command, int count);
-    std::optional<bool> runCommandLine(std::string_view command);
+    void setMessage(std::string message, MessageKind kind)
+    {
+        host_.setMessage(std::move(message), kind);
+    }
 
     // Shows a track's list, the cursor at or after a tick.
     void showTrack(std::size_t track, core::Tick tick);
@@ -171,21 +100,9 @@ private:
     // first of them; in the conductor's list, its rows.
     std::vector<std::size_t> chordStarts() const;
 
-    // The keymap in operator-pending mode: the Normal mode's motions, the operator's own keys
-    // again for the event under the cursor (dd), and Escape, unless omap binds those keys.
-    void buildOperatorKeymap();
-
-    // Runs a motion or the operator's own key after an operator, then the operator on the
-    // rows from the cursor's to where the motion goes.
-    std::optional<bool> runOperator(std::string_view command, int count);
-
     // Deletes or yanks the track's own events among some rows, which may be in either order.
-    bool operate(std::string_view op, std::size_t from, std::size_t to);
+    bool operateRows(std::string_view op, std::size_t from, std::size_t to);
     bool put();
-    bool undoOrRedo(bool undo);
-
-    // The line keys type into: a field's, while one is being edited, or the : prompt's.
-    CommandLine& activeLine() { return field_ ? fieldLine_ : line_; }
 
     // Starts editing the field under the cursor in place, with its value in it; then sets it
     // from what's typed, or steps it.
@@ -208,18 +125,10 @@ private:
 
     // Changes the song as one undo step, made where the cursor is, and shows the change.
     bool edit(std::string title, const std::function<void(core::Song&)>& change);
-    core::EditPlace place() const;
     std::string trackName() const;
     void moveFields(int by);
     void follow();
-
-    // Runs a transport command; then shows the playhead, or where playback stopped.
-    bool transport(std::string_view command);
-    void showPlayhead();
     std::size_t rowAtOrBefore(core::Tick tick) const;
-
-    // :port NAME sets the track's output port; :port alone says what it is.
-    CommandResult port(std::string_view name);
 
     // :section NAME starts a new section at the bar line of the cursor's bar.
     CommandResult section(std::string_view name);
@@ -227,11 +136,10 @@ private:
     Region listRegion() const;
     Region inspectorRegion() const;
     int inspectorPadding() const { return cell_.height / 4; }
-    Region promptRegion() const;
-    void addBars(Frame& frame) const;
+    Region barRegion() const;
 
-    CommandRegistry& commands_;
     core::Document& document_;
+    ViewHost& host_;
     std::size_t track_ = 0;
     EventList list_;
     std::size_t row_ = 0;
@@ -239,15 +147,6 @@ private:
     std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated
     std::chrono::milliseconds chordWindow_{30};
     std::size_t top_ = 0;
-    Keymap keymap_;
-    Keymap operatorKeymap_;
-    KeyDispatcher keys_;
-    struct PendingOperator
-    {
-        std::string name; // operator-delete or operator-yank
-        int count;
-    };
-    std::optional<PendingOperator> operator_;
     struct FieldPrompt
     {
         std::size_t row;
@@ -257,22 +156,10 @@ private:
     };
     std::optional<FieldPrompt> field_;
     CommandLine fieldLine_;
-    std::vector<core::Event> register_;
-    std::string message_;
-    MessageKind messageKind_ = MessageKind::Information;
-    LineHandler lineHandler_;
-    PortFinder portFinder_;
-    Mode mode_ = Mode::Normal;
-    CommandLine line_;
     int width_ = 0;
-    int height_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;
-    core::Player* player_ = nullptr;
-    bool rewind_ = true;
-    bool wasPlaying_ = false; // or stopping, until the player knows where it stopped
     std::optional<std::size_t> playheadRow_;
-    std::int64_t lastTime_ = 0; // of the last key or wake-up
 };
 
 } // namespace modal::ui

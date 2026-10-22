@@ -9,12 +9,12 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/demo_song.hpp>
-#include <modal/ui/event_list_view.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
+#include <modal/ui/workspace.hpp>
 
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
@@ -255,7 +255,7 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
 
     modal::core::Document document{demoSong()};
     CommandRegistry registry;
-    EventListView view{registry, document};
+    Workspace view{registry, document};
     view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
     for (const char32_t key : std::u32string_view{U"12jll"})
     {
@@ -445,7 +445,7 @@ TEST_CASE("Ctrl with Space, from either Ctrl key, plays from the cursor")
                  .deadline = {},
                  .wake = {}});
     REQUIRE(keys.size() == 2);
-    const auto keymap = EventListView::defaultKeymap();
+    const auto keymap = Workspace::defaultKeymap();
     for (const auto& key : keys)
     {
         CHECK(key == Key::typed(U' ', kCtrl));

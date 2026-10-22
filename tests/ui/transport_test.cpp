@@ -8,6 +8,7 @@
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/window_commands.hpp>
+#include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -33,12 +34,12 @@ struct Playing
     Playing()
     {
         registry.add(windowCommands());
-        view.resize(80 * kCell.width, 24 * kCell.height, kCell);
+        ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
         player.update(document.song());
-        view.setPlayer(&player);
+        ws.setPlayer(&player);
     }
 
-    void press(const Key& key) { view.handle(key, now); }
+    void press(const Key& key) { ws.handle(key, now); }
     void type(std::u32string_view keys)
     {
         for (const char32_t key : keys)
@@ -52,14 +53,14 @@ struct Playing
     void runFor(std::chrono::nanoseconds time)
     {
         test::runUntil(engine, clock, clock.time + time);
-        now = view.deadline().value_or(now);
-        view.wake(now);
+        now = ws.deadline().value_or(now);
+        ws.wake(now);
     }
 
     std::u32string status() const
     {
         std::u32string text;
-        const auto frame = view.frame();
+        const auto frame = ws.frame();
         for (const auto& run : frame.back().text)
         {
             text += run.text;
@@ -72,7 +73,7 @@ struct Playing
     // The row the marker shows on, as a run in the list's margin, if it's in view.
     std::optional<std::size_t> markerRow() const
     {
-        const auto frame = view.frame();
+        const auto frame = ws.frame();
         for (const auto& run : frame.front().text)
         {
             if (run.x == 0 && run.text.starts_with(U"▶"))
@@ -90,7 +91,8 @@ struct Playing
     core::Player player{engine, [](std::string_view) { return core::DestinationId{1}; }};
     core::Document document{demoSong()};
     CommandRegistry registry;
-    EventListView view{registry, document};
+    Workspace ws{registry, document};
+    EventListView& view = ws.eventList();
     std::int64_t now = 100;
 };
 
@@ -104,9 +106,9 @@ bool contains(const std::u32string& text, std::u32string_view part)
 TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays")
 {
     Playing p;
-    REQUIRE(p.view.rewind());
+    REQUIRE(p.ws.rewind());
     p.type(U"5j");
-    CHECK(p.view.deadline() == std::nullopt);
+    CHECK(p.ws.deadline() == std::nullopt);
     CHECK(contains(p.status(), U"Rewind on"));
 
     CHECK(contains(p.status(), U"From 1:1:000"));
@@ -114,7 +116,7 @@ TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays"
     p.type(U" ");
     CHECK(p.player.playing());
     CHECK(p.view.playheadRow() == 3); // the last of the rows at the start: section, meter, tempo
-    CHECK(p.view.deadline() == p.now + EventListView::kFrameInterval);
+    CHECK(p.ws.deadline() == p.now + Workspace::kFrameInterval);
 
     p.runFor(1s);
     REQUIRE(p.view.playheadRow());
@@ -138,7 +140,7 @@ TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays"
     CHECK(p.view.top() <= 5);
     CHECK_FALSE(contains(p.status(), U"▶"));
     p.runFor(1ms);
-    CHECK(p.view.deadline() == std::nullopt); // no more frames
+    CHECK(p.ws.deadline() == std::nullopt); // no more frames
     CHECK(p.player.marker() == 0);
     p.type(U"gg");
     CHECK(p.markerRow() == 3);
@@ -147,7 +149,7 @@ TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays"
 TEST_CASE("without rewind, the cursor follows the playhead, and the marker moves where it stops")
 {
     Playing p;
-    p.view.setRewind(false);
+    p.ws.setRewind(false);
     CHECK(contains(p.status(), U"Rewind off"));
     p.type(U" ");
     p.runFor(10s);
@@ -158,7 +160,7 @@ TEST_CASE("without rewind, the cursor follows the playhead, and the marker moves
     p.type(U" ");
     p.runFor(1ms); // the engine says where it stopped
     CHECK_FALSE(p.player.stopping());
-    CHECK(p.view.deadline() == std::nullopt);
+    CHECK(p.ws.deadline() == std::nullopt);
     CHECK(p.view.row() == row);
     CHECK(p.player.marker() >= p.tickOf(row));
     CHECK(p.markerRow() == row);
@@ -207,12 +209,12 @@ TEST_CASE("the leader then t and Space turns rewind on and off")
 {
     Playing p;
     p.type(U",t ");
-    CHECK_FALSE(p.view.rewind());
-    CHECK(p.view.message() == "Rewind off: the play-from marker moves to where playback stops");
+    CHECK_FALSE(p.ws.rewind());
+    CHECK(p.ws.message() == "Rewind off: the play-from marker moves to where playback stops");
     CHECK_FALSE(p.player.rewind());
     CHECK_FALSE(p.player.playing());
     p.type(U",t ");
-    CHECK(p.view.rewind());
+    CHECK(p.ws.rewind());
 }
 
 TEST_CASE("Ctrl-. panics, at the prompt too")
@@ -223,17 +225,17 @@ TEST_CASE("Ctrl-. panics, at the prompt too")
     CHECK_FALSE(p.player.playing());
 
     p.type(U" :");
-    REQUIRE(p.view.mode() == Mode::CommandLine);
+    REQUIRE(p.ws.mode() == Mode::CommandLine);
     p.press(Key::typed(U'.', kCtrl));
     CHECK_FALSE(p.player.playing());
-    CHECK(p.view.mode() == Mode::CommandLine);
-    CHECK(p.view.commandLine().text().empty()); // not typed
+    CHECK(p.ws.mode() == Mode::CommandLine);
+    CHECK(p.ws.commandLine().text().empty()); // not typed
 }
 
 TEST_CASE("without a player, the transport says there's nothing to play to")
 {
     Playing p;
-    p.view.setPlayer(nullptr);
+    p.ws.setPlayer(nullptr);
     p.type(U" ");
-    CHECK(p.view.message() == "Nothing to play to");
+    CHECK(p.ws.message() == "Nothing to play to");
 }
