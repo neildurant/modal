@@ -710,8 +710,7 @@ CommandResult Workspace::section(std::string_view name)
         return CommandResult::error(song.sections()[current]->name() + " starts at " + at +
                                     " already");
     }
-    const std::string wanted =
-        name.empty() ? "Section " + std::to_string(song.sections().size() + 1) : std::string{name};
+    const std::string wanted = name.empty() ? song.newSectionName() : std::string{name};
     std::optional<core::Song::Split> split;
     document_.edit("Start section " + wanted + " at " + at, view().place(),
                    [&](core::Song& s) { split = s.splitSection(tick, wanted); });

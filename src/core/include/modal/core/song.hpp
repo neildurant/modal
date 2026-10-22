@@ -162,6 +162,43 @@ public:
     // there's no such section.
     bool renameSection(std::size_t index, std::string name);
 
+    // A name for a new section: "Section" and one more than the highest number of a section
+    // already named that way, so new sections count up in the order they're made.
+    std::string newSectionName() const;
+
+    // Whole sections, as the section strip works on them (decided October 2026). Each keeps
+    // what's in it; the sections after follow on, so later material closes up or moves along.
+
+    // Removes sections from an index; at least one section always stays. Returns whether any
+    // went.
+    bool removeSections(std::size_t index, std::size_t count);
+
+    // Inserts copies of sections before an index (or after the last, at the number of
+    // sections), each numbered if another section has its name. Content for tracks the song
+    // no longer has is left out. Returns whether it inserted any.
+    bool insertSections(std::size_t index,
+                        std::span<const std::shared_ptr<const Section>> sections);
+
+    // Inserts an empty section of whole bars before an index (or after the last), in the meter
+    // and at the tempo where it goes, numbered if another section has its name. Returns
+    // whether it could.
+    bool insertEmptySection(std::size_t index, std::string name, std::int64_t bars);
+
+    // Moves a section by places, earlier if negative, as far as the ends go, past its
+    // neighbours. Returns where it is now.
+    std::size_t moveSection(std::size_t index, std::ptrdiff_t by);
+
+    // Lengthens a section by bars at its end, in the meter there, or shortens it, removing its
+    // last bars and everything starting in them, never to less than a bar. Returns whether it
+    // changed.
+    bool resizeSection(std::size_t index, std::int64_t bars);
+
+    // Joins a section with the one after it, which becomes its later part: its tempo and meter
+    // changes, markers and each track's events and meter, positioned from the first section's
+    // start. A track with a meter of its own in either keeps it, following the conductor's
+    // in the other part. Returns whether there was one after to join.
+    bool joinSections(std::size_t index);
+
     // Sets the last section to the fewest whole bars, at least one, that hold everything in
     // it, including the ends of notes.
     void fitToContent();

@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
 #include <iterator>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 namespace modal::core
@@ -340,6 +342,247 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
     rebuildConductor();
     rebuildMeters();
     return split;
+}
+
+std::string Song::newSectionName() const
+{
+    std::int64_t highest = 0;
+    for (const auto& section : sections_)
+    {
+        const std::string_view name = section->name_;
+        constexpr std::string_view kPrefix = "Section ";
+        std::int64_t number = 0;
+        const auto* end = name.data() + name.size();
+        if (name.starts_with(kPrefix) &&
+            std::from_chars(name.data() + kPrefix.size(), end, number).ptr == end)
+        {
+            highest = std::max(highest, number);
+        }
+    }
+    return "Section " + std::to_string(highest + 1);
+}
+
+bool Song::removeSections(std::size_t index, std::size_t count)
+{
+    count = std::min(count, sections_.size() - std::min(index, sections_.size()));
+    if (count == 0 || count >= sections_.size())
+    {
+        return false;
+    }
+    const auto first = sections_.begin() + static_cast<std::ptrdiff_t>(index);
+    sections_.erase(first, first + static_cast<std::ptrdiff_t>(count));
+    rebuildAll();
+    return true;
+}
+
+bool Song::insertSections(std::size_t index,
+                          std::span<const std::shared_ptr<const Section>> sections)
+{
+    index = std::min(index, sections_.size());
+    for (const auto& section : sections)
+    {
+        auto copy = std::make_shared<Section>(*section);
+        copy->name_ = uniqueSectionName(copy->name_);
+        std::erase_if(copy->content_,
+                      [this](const auto& entry)
+                      {
+                          return std::ranges::none_of(tracks_, [&](const auto& track)
+                                                      { return track->id() == entry.first; });
+                      });
+        sections_.insert(sections_.begin() + static_cast<std::ptrdiff_t>(index++), std::move(copy));
+    }
+    if (sections.empty())
+    {
+        return false;
+    }
+    rebuildAll();
+    return true;
+}
+
+bool Song::insertEmptySection(std::size_t index, std::string name, std::int64_t bars)
+{
+    if (bars < 1)
+    {
+        return false;
+    }
+    index = std::min(index, sections_.size());
+    // The meter and tempo where it goes: at the end of the section before, or the start of the
+    // first.
+    TimeSignature signature = sections_.front()->meter_.signatureAt(0);
+    Tempo tempo = sections_.front()->tempo_.front().tempo;
+    if (index > 0)
+    {
+        const Section& before = *sections_[index - 1];
+        signature = before.meter_.signatureAt(before.length_ - 1);
+        tempo = tempoAt(before.tempo_, before.length_ - 1);
+    }
+    MeterMap meter{ppqn(), signature};
+    sections_.insert(sections_.begin() + static_cast<std::ptrdiff_t>(index),
+                     std::make_shared<Section>(uniqueSectionName(std::move(name)),
+                                               meter.barStart(bars + 1), meter, tempo));
+    rebuildAll();
+    return true;
+}
+
+std::size_t Song::moveSection(std::size_t index, std::ptrdiff_t by)
+{
+    if (index >= sections_.size())
+    {
+        return index;
+    }
+    const auto to = static_cast<std::size_t>(
+        std::clamp<std::ptrdiff_t>(static_cast<std::ptrdiff_t>(index) + by, 0,
+                                   static_cast<std::ptrdiff_t>(sections_.size()) - 1));
+    if (to == index)
+    {
+        return index;
+    }
+    auto section = std::move(sections_[index]);
+    sections_.erase(sections_.begin() + static_cast<std::ptrdiff_t>(index));
+    sections_.insert(sections_.begin() + static_cast<std::ptrdiff_t>(to), std::move(section));
+    rebuildAll();
+    return to;
+}
+
+bool Song::resizeSection(std::size_t index, std::int64_t bars)
+{
+    if (index >= sections_.size() || bars == 0)
+    {
+        return false;
+    }
+    const Section& old = *sections_[index];
+    auto section = std::make_shared<Section>(old);
+    if (bars > 0)
+    {
+        // More bars of the last bar's meter, a whole bar of it even after a remainder bar.
+        const auto signature = old.meter_.signatureAt(old.length_ - 1);
+        section->meter_.set(old.length_, signature);
+        MeterMap added{ppqn(), signature};
+        section->length_ = old.length_ + added.barStart(bars + 1);
+        for (auto& [id, content] : section->content_)
+        {
+            if (content->meter)
+            {
+                auto longer = *content;
+                longer.meter->set(old.length_, longer.meter->signatureAt(old.length_ - 1));
+                content = std::make_shared<const TrackContent>(std::move(longer));
+            }
+        }
+    }
+    else
+    {
+        const auto last = old.meter_.toBarBeatTick(old.length_ - 1).bar;
+        if (last + bars < 1)
+        {
+            return false;
+        }
+        const Tick end = old.meter_.barStart(last + bars + 1);
+        section->length_ = end;
+        section->meter_ = meterBetween(old.meter_, 0, end);
+        std::erase_if(section->tempo_, [end](const auto& change) { return change.tick >= end; });
+        std::erase_if(section->markers_, [end](const auto& marker) { return marker.tick >= end; });
+        for (auto it = section->content_.begin(); it != section->content_.end();)
+        {
+            TrackContent shorter{std::nullopt, eventsBetween(it->second->events, 0, end)};
+            if (it->second->meter)
+            {
+                shorter.meter = meterBetween(*it->second->meter, 0, end);
+                cutAt(*shorter.meter, end);
+            }
+            if (!shorter.meter && shorter.events.empty())
+            {
+                it = section->content_.erase(it);
+                continue;
+            }
+            it->second = std::make_shared<const TrackContent>(std::move(shorter));
+            ++it;
+        }
+    }
+    sections_[index] = std::move(section);
+    rebuildAll();
+    return true;
+}
+
+bool Song::joinSections(std::size_t index)
+{
+    if (index + 1 >= sections_.size())
+    {
+        return false;
+    }
+    const Section& first = *sections_[index];
+    const Section& second = *sections_[index + 1];
+    const Tick at = first.length_;
+    auto joined = std::make_shared<Section>(first);
+    joined->length_ = first.length_ + second.length_;
+
+    // A meter, then another from where the first section ends.
+    const auto followedBy = [at](MeterMap meter, const MeterMap& after)
+    {
+        for (const auto& change : after.changes())
+        {
+            meter.set(at + change.tick, change.signature);
+        }
+        return meter;
+    };
+    joined->meter_ = followedBy(first.meter_, second.meter_);
+    for (const auto& change : second.tempo_)
+    {
+        if (change.tick > 0 || change.tempo != tempoAt(first.tempo_, at - 1))
+        {
+            joined->tempo_.push_back({at + change.tick, change.tempo});
+        }
+    }
+    for (const auto& marker : second.markers_)
+    {
+        // Names stay unique within the section.
+        std::string name = marker.name;
+        for (int n = 2;
+             std::ranges::find(joined->markers_, name, &Marker::name) != joined->markers_.end();
+             ++n)
+        {
+            name = marker.name + " " + std::to_string(n);
+        }
+        joined->markers_.push_back({at + marker.tick, std::move(name)});
+    }
+
+    joined->content_.clear();
+    std::vector<TrackId> ids;
+    for (const auto& [id, content] : first.content_)
+    {
+        ids.push_back(id);
+    }
+    for (const auto& [id, content] : second.content_)
+    {
+        if (!first.content_.contains(id))
+        {
+            ids.push_back(id);
+        }
+    }
+    for (const auto id : ids)
+    {
+        const auto* before = first.content(id);
+        const auto* after = second.content(id);
+        TrackContent content{std::nullopt, before ? before->events : EventList{}};
+        if (after)
+        {
+            for (auto event : after->events.all())
+            {
+                event.tick += at;
+                content.events.insert(std::move(event));
+            }
+        }
+        if ((before && before->meter) || (after && after->meter))
+        {
+            content.meter = followedBy(before && before->meter ? *before->meter : first.meter_,
+                                       after && after->meter ? *after->meter : second.meter_);
+        }
+        joined->content_.emplace(id, std::make_shared<const TrackContent>(std::move(content)));
+    }
+
+    sections_[index] = std::move(joined);
+    sections_.erase(sections_.begin() + static_cast<std::ptrdiff_t>(index) + 1);
+    rebuildAll();
+    return true;
 }
 
 bool Song::renameSection(std::size_t index, std::string name)
