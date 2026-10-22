@@ -25,6 +25,7 @@ add_library(modal_ui STATIC
     event_list_view.cpp
     themes.cpp
     time_motions.cpp
+    view_parts.cpp
     window_commands.cpp
     workspace.cpp
 )

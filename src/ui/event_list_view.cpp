@@ -8,6 +8,7 @@
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/time_motions.hpp>
+#include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 
 #include <algorithm>
@@ -29,7 +30,6 @@ constexpr Style kPlainText{Role::Text, Role::Background, kPlain};
 constexpr Style kDimText{Role::Dim, Role::Background, kPlain};
 constexpr Style kHeading{Role::BarText, Role::Bar, kPlain};
 constexpr Style kCursor{Role::CursorText, Role::Cursor, kPlain};
-constexpr Style kBarText{Role::BarText, Role::Bar, kPlain};
 
 // The columns' headings and widths in cells, with two spaces after each, and whether
 // they're right-justified, as numbers are.
@@ -170,7 +170,7 @@ std::vector<int> EventListView::topHeights(CellSize cell) const
     // The view's own bar, a title for it, then the inspector, two lines with a quarter of a
     // line's padding above and below (decided in milestone 4: every view has its bar first,
     // then the inspector, then the view).
-    return {cell.height, 2 * cell.height + (cell.height / 4) * 2};
+    return {cell.height, inspectorHeight(cell)};
 }
 
 void EventListView::resize(const WindowLayout& layout, int width, CellSize cell)
@@ -1408,113 +1408,14 @@ Region EventListView::listRegion() const
 
 Region EventListView::inspectorRegion() const
 {
-    // On a panel of its own: the kind of row, then headings above their values. Each column
-    // is as wide as its longest value can be, so the columns stay put as the cursor moves;
-    // a value that doesn't fit is cut short, and those after it left out.
-    const auto inspection = inspect(list_, row_);
-    Region region{
-        .bounds = layout_.top[1], .background = Role::Panel, .text = {}, .under = {}, .over = {}};
-    const int margin = BarSpacing::forCell(cell_).margin;
-    const int columns = std::max((width_ - 2 * margin) / cell_.width, 0);
-    const Style kind{Role::Accent, Role::Panel, kBold};
-    const Style heading{Role::Dim, Role::Panel, kPlain};
-    const Style value{Role::Text, Role::Panel, kPlain};
-    const auto x = [&](int column) { return margin + column * cell_.width; };
     const int position =
         static_cast<int>(list_.text(list_.rows().size() - 1)[Column::Position].size());
-    const auto widthOf = [&](std::string_view name)
-    {
-        constexpr std::array<std::pair<std::string_view, int>, 16> kWidths{{
-            {"Time", 9},
-            {"Pitch", 9},
-            {"Velocity", 8},
-            {"Length", 15},
-            {"Release", 7},
-            {"Controller", 25},
-            {"Value", 5},
-            {"Program", 7},
-            {"Bend", 6},
-            {"Pressure", 8},
-            {"Bytes", 5},
-            {"Tempo", 12},
-            {"Per quarter", 12},
-            {"Meter", 6},
-            {"Bars", 9},
-            {"Kind", 13},
-        }};
-        if (name == "Position" || name == "Ends")
-        {
-            return std::max(position, 8);
-        }
-        const auto it = std::ranges::find(kWidths, name, &std::pair<std::string_view, int>::first);
-        return it == kWidths.end() ? 0 : it->second;
-    };
-
-    const int top = inspectorPadding();
-    region.text.push_back({x(0), top, decodeUtf8(inspection.kind), kind});
-    int at = widthOf("Kind") + 3;
-    for (const auto& field : inspection.fields)
-    {
-        auto title = decodeUtf8(field.heading);
-        auto text = decodeUtf8(field.value);
-        const int room = columns - at;
-        if (room < kMinSegmentCharacters + 1)
-        {
-            break;
-        }
-        const auto cut = [&](std::u32string& line)
-        {
-            if (static_cast<int>(line.size()) > room)
-            {
-                line.resize(static_cast<std::size_t>(room - 1));
-                line += U'…';
-            }
-        };
-        cut(title);
-        cut(text);
-        region.text.push_back({x(at), top, title, heading});
-        region.text.push_back({x(at), top + cell_.height, text, value});
-        at += std::max({static_cast<int>(title.size()), static_cast<int>(text.size()),
-                        widthOf(field.heading)}) +
-              3;
-    }
-    return region;
+    return ui::inspectorRegion(inspect(list_, row_), layout_.top[1], width_, cell_, position);
 }
 
 Region EventListView::barRegion() const
 {
-    const auto& song = document_.song();
-    const auto tick = list_.rows()[row_].tick;
-    const auto section = song.sectionAt(tick);
-    const auto& meter = list_.meter();
-    const Style label{Role::Dim, Role::Bar, kPlain};
-
-    // The track's bar: each value after its label.
-    Bar top;
-    const auto pair = [&](std::vector<Segment>& group, std::string name, std::string value)
-    {
-        group.push_back({std::move(name), label});
-        group.push_back({" " + std::move(value) + "     ", kBarText});
-    };
-    if (track_ == 0)
-    {
-        pair(top.left, "Track 0:", "Conductor");
-    }
-    else
-    {
-        const auto& track = *song.tracks()[track_ - 1];
-        pair(top.left, "Track " + std::to_string(track_) + ":", track.name);
-        pair(top.left, "Channel:", std::to_string(track.channel));
-        pair(top.left, "Port:", track.port.empty() ? "default" : track.port);
-    }
-    const auto first = meter.toBarBeatTick(song.sectionStart(section)).bar;
-    const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
-    pair(top.right, "Section:", song.sections()[section]->name());
-    pair(top.right, "Bars:", std::to_string(first) + "–" + std::to_string(last));
-    top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
-
-    auto region = layoutBar(top, width_, cell_, BarSpacing::forCell(cell_));
-    region.bounds = layout_.top[0];
-    return region;
+    return trackBarRegion(document_.song(), track_, list_.rows()[row_].tick, list_.meter(),
+                          layout_.top[0], width_, cell_);
 }
 } // namespace modal::ui
