@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <iterator>
 #include <mutex>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -78,4 +79,46 @@ TEST_CASE("messages sent to Midi Through come back with their arrival times")
     CHECK(received[0].second >= sent);
     CHECK(received[0].second <= now());
     CHECK(outputs.failedSends() == 0);
+}
+
+TEST_CASE("Modal can't have ports of its own where the MIDI API can't create them")
+{
+#ifdef _WIN32
+    MidiOutputs outputs;
+    const auto own = outputs.openOwn("Modal");
+    CHECK_FALSE(own.ok());
+    CHECK(own.error.find("loopMIDI") != std::string::npos);
+#else
+    SKIP("Linux's ALSA can create ports; see the next test");
+#endif
+}
+
+// Needs the ALSA sequencer; see the port listing test.
+TEST_CASE("Modal's own port is a source other programs can read from")
+{
+    if (!modal::test::envFlagSet("MODAL_TEST_ALSA_SEQ"))
+    {
+        SKIP("set MODAL_TEST_ALSA_SEQ=1 on a Linux machine with the ALSA sequencer");
+    }
+    MidiOutputs outputs;
+    const auto own = outputs.openOwn("Modal test 7b1f");
+    REQUIRE(own.ok());
+    CHECK(outputs.openOwn("Modal test 7b1f").destination == own.destination);
+
+    // Another program sees it among its inputs, and hears what's sent to it.
+    std::mutex mutex;
+    std::condition_variable arrived;
+    std::vector<std::vector<std::uint8_t>> received;
+    MidiInput input{[&](std::span<const std::uint8_t> message, std::chrono::nanoseconds)
+                    {
+                        const std::lock_guard lock{mutex};
+                        received.emplace_back(message.begin(), message.end());
+                        arrived.notify_one();
+                    }};
+    REQUIRE(input.open("Modal test 7b1f").ok());
+    const std::uint8_t noteOn[] = {0x90, 64, 90};
+    outputs.send(own.destination, noteOn, now());
+    std::unique_lock lock{mutex};
+    REQUIRE(arrived.wait_for(lock, 2s, [&] { return !received.empty(); }));
+    CHECK(received[0] == std::vector<std::uint8_t>{0x90, 64, 90});
 }

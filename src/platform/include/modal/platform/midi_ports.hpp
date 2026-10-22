@@ -31,6 +31,10 @@ struct MidiPortList
 // including virtual ports created by other applications.
 MidiPortList listMidiPorts();
 
+// Whether the MIDI API in use lets Modal create ports of its own (see MidiOutputs::openOwn):
+// ALSA on Linux does, WinMM on Windows doesn't.
+bool canCreateOwnPorts();
+
 // Which port a name given by the user refers to: the port with exactly that name, or else
 // the one port whose name matches ignoring case, or else the one port whose name contains it
 // ignoring case. When several match equally well, none is chosen and they are the candidates;

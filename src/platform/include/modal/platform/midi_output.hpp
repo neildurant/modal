@@ -38,6 +38,12 @@ public:
     // already opened for it. Only one thread may call this.
     OutputOpenResult open(std::string_view name);
 
+    // Creates an output port of Modal's own with a name, which other programs connect to as a
+    // source of MIDI, or returns the destination already created for it. Possible where the
+    // MIDI API lets programs create ports (ALSA on Linux), not with WinMM on Windows. Only one
+    // thread may call this, the same as calls open.
+    OutputOpenResult openOwn(std::string_view name);
+
     // Sends at once; due is ignored. A failed send is counted, not reported. On Windows, a
     // SysEx message blocks until it has all been sent.
     void send(core::DestinationId destination, std::span<const std::uint8_t> bytes,

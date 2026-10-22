@@ -94,6 +94,12 @@ std::string errorText(const stdx::error& error)
 
 } // namespace detail
 
+bool canCreateOwnPorts()
+{
+    const auto api = detail::usableApi();
+    return api && *api != libremidi::API::WINDOWS_MM;
+}
+
 MidiPortList listMidiPorts()
 {
     MidiPortList list;

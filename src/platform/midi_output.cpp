@@ -15,6 +15,7 @@ struct MidiOutputs::Port
 {
     std::string name;
     libremidi::midi_out out;
+    bool own = false; // created by Modal, rather than one of the system's
 };
 
 MidiOutputs::MidiOutputs() = default;
@@ -40,7 +41,7 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
     const auto opened = opened_.load(std::memory_order_relaxed);
     for (std::size_t i = 0; i < opened; ++i)
     {
-        if (ports_[i]->name == result.portName)
+        if (!ports_[i]->own && ports_[i]->name == result.portName)
         {
             result.destination = core::DestinationId{static_cast<std::uint32_t>(i)};
             return result;
@@ -62,7 +63,53 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
         return result;
     }
     result.destination = core::DestinationId{static_cast<std::uint32_t>(opened)};
-    ports_[opened] = std::make_unique<Port>(Port{result.portName, std::move(out)});
+    ports_[opened] = std::make_unique<Port>(Port{result.portName, std::move(out), false});
+    opened_.store(opened + 1, std::memory_order_release);
+    return result;
+}
+
+OutputOpenResult MidiOutputs::openOwn(std::string_view name)
+{
+    OutputOpenResult result;
+    result.portName = name;
+    const auto opened = opened_.load(std::memory_order_relaxed);
+    for (std::size_t i = 0; i < opened; ++i)
+    {
+        if (ports_[i]->own && ports_[i]->name == result.portName)
+        {
+            result.destination = core::DestinationId{static_cast<std::uint32_t>(i)};
+            return result;
+        }
+    }
+
+    const auto api = detail::usableApi();
+    if (!api)
+    {
+        result.error = "MIDI isn't available on this system";
+        return result;
+    }
+    if (*api == libremidi::API::WINDOWS_MM)
+    {
+        result.error = "Windows can't give Modal ports of its own; a virtual cable such as "
+                       "loopMIDI does the job";
+        return result;
+    }
+    if (opened == ports_.size())
+    {
+        result.error = "can't create \"" + result.portName + "\": no more than " +
+                       std::to_string(ports_.size()) + " output ports can be open";
+        return result;
+    }
+    auto apiConfig = libremidi::midi_out_configuration_for(*api);
+    detail::nameClient(apiConfig);
+    libremidi::midi_out out{libremidi::output_configuration{}, std::move(apiConfig)};
+    if (const auto error = out.open_virtual_port(name); error != stdx::error{})
+    {
+        result.error = "can't create \"" + result.portName + "\": " + detail::errorText(error);
+        return result;
+    }
+    result.destination = core::DestinationId{static_cast<std::uint32_t>(opened)};
+    ports_[opened] = std::make_unique<Port>(Port{result.portName, std::move(out), true});
     opened_.store(opened + 1, std::memory_order_release);
     return result;
 }
