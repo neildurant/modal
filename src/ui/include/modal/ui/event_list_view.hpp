@@ -41,6 +41,7 @@ public:
     EventListView(const EventListView&) = delete;
     EventListView& operator=(const EventListView&) = delete;
 
+    std::string_view name() const override { return "the event list"; }
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
@@ -52,6 +53,7 @@ public:
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override;
+    void setCursor(const SongCursor& cursor) override;
     core::EditPlace place() const override;
     void restore(const core::EditPlace& place) override;
     void refresh() override;

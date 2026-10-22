@@ -263,6 +263,37 @@ void EventListView::showPlayhead(core::Tick playhead, bool cursorFollows)
     }
 }
 
+void EventListView::setCursor(const SongCursor& cursor)
+{
+    // The cursor's track (the conductor's list for none), at the row at its time; the row of
+    // a note there of its pitch, if there's one, so coming back from another view lands on the
+    // note it left.
+    std::size_t track = 0;
+    if (cursor.track)
+    {
+        const auto tracks = document_.song().tracks();
+        const auto it =
+            std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == *cursor.track; });
+        track = it != tracks.end() ? static_cast<std::size_t>(it - tracks.begin()) + 1 : track_;
+    }
+    showTrack(track, cursor.tick);
+    const auto rows = list_.rows();
+    for (auto r = row_; r < rows.size() && rows[r].tick == cursor.tick; ++r)
+    {
+        if (rows[r].kind != RowKind::Event)
+        {
+            continue;
+        }
+        const auto& data = document_.song().events(*list_.track())[rows[r].index].data;
+        if (const auto* note = std::get_if<core::Note>(&data); note && note->pitch == cursor.pitch)
+        {
+            row_ = r;
+            break;
+        }
+    }
+    follow();
+}
+
 void EventListView::stopPlayhead(std::optional<core::Tick> cursorTo)
 {
     playheadRow_.reset();

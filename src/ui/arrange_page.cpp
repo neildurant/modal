@@ -66,6 +66,44 @@ ArrangePage::ArrangePage(core::Song song)
 {
 }
 
+void ArrangePage::setSong(core::Song song)
+{
+    song_ = std::move(song);
+    end_ = song_.end();
+    track_ = song_.tracks().empty() ? 0 : std::min(track_, song_.tracks().size() - 1);
+    time_ = std::clamp<core::Tick>(time_, 0, std::max<core::Tick>(end_ - 1, 0));
+    follow();
+}
+
+void ArrangePage::setCursor(std::size_t track, core::Tick time)
+{
+    track_ = song_.tracks().empty() ? 0 : std::min(track, song_.tracks().size() - 1);
+    time_ = std::clamp<core::Tick>(time, 0, std::max<core::Tick>(end_ - 1, 0));
+    follow();
+}
+
+void ArrangePage::showTime(core::Tick time)
+{
+    const core::Tick column = columnTicks();
+    const core::Tick visible = viewColumns() * column;
+    if (time >= leftTick_ && time <= leftTick_ + visible / 3)
+    {
+        return;
+    }
+    const core::Tick endColumns = (end_ + column - 1) / column;
+    const core::Tick lastLeft = std::max<core::Tick>(endColumns - viewColumns(), 0) * column;
+    leftTick_ = std::clamp<core::Tick>(
+        std::max<core::Tick>(time - visible / 3, 0) / column * column, 0, lastLeft);
+}
+
+void ArrangePage::setView(std::size_t topTrack, core::Tick leftTick, std::size_t zoom)
+{
+    zoom_ = std::min(zoom, kZooms.size() - 1);
+    topTrack_ = topTrack;
+    leftTick_ = std::max<core::Tick>(leftTick, 0);
+    follow();
+}
+
 int ArrangePage::density(std::size_t notes, core::Tick length, core::Ppqn ppqn)
 {
     if (notes == 0 || length <= 0)
@@ -255,7 +293,7 @@ void ArrangePage::follow()
     leftTick_ = left;
 }
 
-void ArrangePage::addRegions(Frame& frame) const
+void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -551,6 +589,20 @@ void ArrangePage::addRegions(Frame& frame) const
         timeline.under.push_back({{scale.toX(end_), tracksTop, lineWidth, tracksBottom - tracksTop},
                                   Role::BarLine,
                                   255});
+    }
+    // The play-from marker, in the ruler's bar numbers' row, and the playhead, a line through
+    // the ruler and the tracks.
+    if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
+    {
+        timeline.text.push_back({scale.toX(*playFrom),
+                                 2 * cell_.height,
+                                 U"▶",
+                                 {Role::Accent, Role::Background, kPlain}});
+    }
+    if (playhead_ && *playhead_ >= leftTick_ && *playhead_ < right)
+    {
+        timeline.over.push_back(
+            {{scale.toX(*playhead_), 0, 2 * lineWidth, tracksBottom}, Role::Accent, 255});
     }
     frame.push_back(std::move(timeline));
 }

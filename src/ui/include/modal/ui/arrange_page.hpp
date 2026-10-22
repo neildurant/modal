@@ -10,17 +10,18 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace modal::ui
 {
 
-// The test view's arrangement page: a sketch of the arrangement (milestone 5), to try out
-// how it's drawn. A row for each track, with its number and name in text cells, then its
-// bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded by
-// how busy the bar is, with a gap before each while bars are wide enough, and a faint line
-// for a bar with no notes. Section starts and markers are faint lines across every track. The
-// ruler shows them by name, and the conductor's meters and bar numbers.
+// The arrangement's tracks and ruler, first sketched in milestone 3's test view and drawn by the
+// arrangement view (see ArrangeView). A row for each track, with its number and name in text cells,
+// then its bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded
+// by how busy the bar is, with a gap before each while bars are wide enough, and a faint line for a
+// bar with no notes. Section starts and markers are faint lines across every track. The ruler shows
+// them by name, and the conductor's meters and bar numbers.
 class ArrangePage
 {
 public:
@@ -36,6 +37,23 @@ public:
     static constexpr std::size_t kDefaultZoom = 2; // a quarter note to a column
 
     explicit ArrangePage(core::Song song);
+
+    // Shows the song as it is now, after a change, keeping the cursor's track and time as far
+    // as they still exist.
+    void setSong(core::Song song);
+
+    // Puts the cursor on a track (counting from 0) at a time, on the bar holding it, keeping
+    // it in view.
+    void setCursor(std::size_t track, core::Tick time);
+
+    // The playhead, drawn as a line through the ruler and tracks, or none; and keeping a time
+    // in view, a third of the way across once it's moving through, as the playhead is.
+    void setPlayhead(std::optional<core::Tick> playhead) { playhead_ = playhead; }
+    void showTime(core::Tick time);
+
+    // The view's state, for going back to where a change was made: the top track, the time at
+    // the left and the zoom.
+    void setView(std::size_t topTrack, core::Tick leftTick, std::size_t zoom);
 
     // Fits the page to the main area, scrolling if the cursor would be out of view.
     void resize(Rect main, CellSize cell);
@@ -69,7 +87,8 @@ public:
     // How many tracks' rows are fully in view.
     int viewTracks() const;
 
-    void addRegions(Frame& frame) const;
+    // The tracks and ruler, with the play-from marker in the ruler if there's one.
+    void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.
@@ -96,6 +115,7 @@ private:
     int viewColumns() const;
 
     core::Song song_;
+    std::optional<core::Tick> playhead_;
     core::Tick end_ = 0;
     std::size_t track_ = 0;
     core::Tick time_ = 0; // the cursor's place in time, kept as it moves between tracks

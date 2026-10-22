@@ -452,6 +452,7 @@ int main(int argc, char* argv[])
 
     ui::Workspace view{commands, document, config.keymap};
     view.setPlayer(&playback.player());
+    view.show(ui::ViewKind::Arrangement); // the home view
     view.setPortFinder(
         [&](std::string_view name)
         {

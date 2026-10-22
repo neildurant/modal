@@ -244,7 +244,8 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
 }
 
 // Hidden: writes the event list and the arrangement sketch to look at, to MODAL_SAMPLE_BMP
-// with "-events", "-events-light", "-playing", "-playing-light", "-marker", "-conductor",
+// with "-events", "-events-light", "-playing", "-playing-light", "-marker", "-arrangement",
+// "-conductor",
 // "-arrange" and "-arrange-out" (zoomed out) before its extension, or to sample.bmp and so on.
 TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
 {
@@ -289,6 +290,13 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
     }
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marker.bmp"));
+    view.run("view-arrangement", 0);
+    for (const char32_t key : std::u32string_view{U"jj8l"})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-arrangement.bmp"));
     view.setPlayer(nullptr);
     view.run("track-previous", 0);
     window->draw(view.frame(), *builtInTheme("dark"));

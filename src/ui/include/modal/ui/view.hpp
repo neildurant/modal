@@ -40,6 +40,15 @@ struct SongCursor
     friend bool operator==(const SongCursor&, const SongCursor&) = default;
 };
 
+// The views of the song (decided for milestone 5): the arrangement, the home view; the piano
+// roll, to come; and the event list.
+enum class ViewKind : std::uint8_t
+{
+    Arrangement,
+    PianoRoll,
+    EventList,
+};
+
 // What a view asks of the workspace that shows it.
 class ViewHost
 {
@@ -60,6 +69,9 @@ public:
 
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;
+
+    // Shows another view, at the cursor, as Enter on a bar in the arrangement does.
+    virtual void show(ViewKind kind) = 0;
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the
@@ -69,6 +81,9 @@ class View
 {
 public:
     virtual ~View() = default;
+
+    // Its name, for messages: "the event list".
+    virtual std::string_view name() const = 0;
 
     // The heights of the view's regions at the top of the window, in pixels: its bar, then
     // the inspector.
@@ -102,8 +117,9 @@ public:
     virtual std::string timeStatus(core::Tick tick) const = 0;
     virtual std::string position(core::Tick tick) const = 0;
 
-    // The shared cursor.
+    // The shared cursor, and putting it somewhere, as when coming from another view.
     virtual SongCursor cursor() const = 0;
+    virtual void setCursor(const SongCursor& cursor) = 0;
 
     // Where an edit is made, for undo; and going back there, after undo or redo.
     virtual core::EditPlace place() const = 0;

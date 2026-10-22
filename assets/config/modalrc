@@ -73,6 +73,16 @@ nmap <PageDown> scroll-page-down  "A page down"
 nmap <C-b>      scroll-page-up    "A page up"
 nmap <PageUp>   scroll-page-up    "A page up"
 nmap zz         scroll-centre     "Centre the cursor"
+nmap zi         zoom-in           "Zoom in"
+nmap zo         zoom-out          "Zoom out"
+nmap z0         zoom-reset        "Zoom as at the start"
+
+" Views: the arrangement, the piano roll and the event list, each at the cursor, and
+" Backspace back to the view before
+nmap ga         view-arrangement  "Arrangement"
+nmap gr         view-piano-roll   "Piano roll"
+nmap ge         view-events       "Event list"
+nmap <BS>       view-back         "Back"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.

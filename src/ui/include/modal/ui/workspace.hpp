@@ -4,6 +4,7 @@
 
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
+#include <modal/ui/arrange_view.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/event_list_view.hpp>
@@ -42,10 +43,10 @@ public:
     static Keymap defaultKeymap();
 
     // Shows the document's song, in the event list from track 1 (or the conductor's list, if
-    // there are no tracks). Gives the registry what runs the commands, which keys then run
-    // through it with the registry's others, such as the window's. The registry and the
-    // document outlive the workspace, which can't be copied or moved, since the registry runs
-    // its commands on it.
+    // there are no tracks), until another view is shown. Gives the registry what runs the commands,
+    // which keys then run through it with the registry's others, such as the window's. The registry
+    // and the document outlive the workspace, which can't be copied or moved, since the registry
+    // runs its commands on it.
     Workspace(CommandRegistry& registry, core::Document& document, Keymap keymap = defaultKeymap(),
               std::int64_t timeout = kDefaultTimeout);
     Workspace(const Workspace&) = delete;
@@ -54,6 +55,13 @@ public:
 
     EventListView& eventList() { return *eventList_; }
     const EventListView& eventList() const { return *eventList_; }
+    ArrangeView& arrangement() { return *arrange_; }
+    const ArrangeView& arrangement() const { return *arrange_; }
+
+    // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
+    // goes back to (decided for milestone 5).
+    void show(ViewKind kind) override;
+    ViewKind shown() const;
 
     // Fits the views to the window, scrolling if the cursor would be out of view.
     void resize(int width, int height, CellSize cell);
@@ -134,7 +142,12 @@ private:
     std::vector<core::Event>& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
 
-    View& view() const { return *eventList_; }
+    View& view() const { return *current_; }
+
+    // Shows a view at the cursor, remembering the one before for Backspace, or not when going
+    // back; and lays it out in the window.
+    void switchTo(View& view, bool remember);
+    void layOut();
 
     bool runAll(const std::vector<Action>& actions);
 
@@ -166,6 +179,9 @@ private:
     CommandRegistry& commands_;
     core::Document& document_;
     std::unique_ptr<EventListView> eventList_;
+    std::unique_ptr<ArrangeView> arrange_;
+    View* current_ = nullptr;
+    std::vector<View*> history_; // the views shown before, for Backspace
     Keymap keymap_;
     Keymap operatorKeymap_;
     KeyDispatcher keys_;

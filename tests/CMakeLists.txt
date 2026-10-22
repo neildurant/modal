@@ -34,6 +34,7 @@ add_executable(modal_tests
     platform/paths_test.cpp
     platform/thread_priority_test.cpp
     ui/arrange_page_test.cpp
+    ui/arrange_view_test.cpp
     ui/bar_lines_test.cpp
     ui/bar_test.cpp
     ui/block_glyphs_test.cpp

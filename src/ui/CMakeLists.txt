@@ -1,6 +1,7 @@
 # The UI's logic, with no SDL, so it can all be tested directly.
 add_library(modal_ui STATIC
     arrange_page.cpp
+    arrange_view.cpp
     bar.cpp
     bar_lines.cpp
     block_glyphs.cpp

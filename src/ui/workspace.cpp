@@ -58,6 +58,10 @@ constexpr std::array kSharedCommands{
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
+    CommandInfo{.name = "view-arrangement", .description = "Show the arrangement"},
+    CommandInfo{.name = "view-piano-roll", .description = "Show the piano roll"},
+    CommandInfo{.name = "view-events", .description = "Show the event list"},
+    CommandInfo{.name = "view-back", .description = "Go back to the view shown before"},
     atPrompt("command-line-run", "Run the command line"),
     atPrompt("command-line-cancel", "Close the command line"),
     atPrompt("command-line-backspace", "Delete the character before the cursor"),
@@ -129,9 +133,19 @@ std::span<const CommandInfo> Workspace::commands()
     static const std::vector<CommandInfo> all = []
     {
         std::vector<CommandInfo> result;
-        const auto list = EventListView::commands();
-        result.insert(result.end(), list.begin(), list.end());
-        result.insert(result.end(), kSharedCommands.begin(), kSharedCommands.end());
+        const auto add = [&](std::span<const CommandInfo> commands)
+        {
+            for (const auto& info : commands)
+            {
+                if (std::ranges::find(result, info.name, &CommandInfo::name) == result.end())
+                {
+                    result.push_back(info);
+                }
+            }
+        };
+        add(EventListView::commands());
+        add(ArrangeView::commands());
+        add(kSharedCommands);
         return result;
     }();
     return all;
@@ -154,6 +168,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     : commands_(registry)
     , document_(document)
     , eventList_(std::make_unique<EventListView>(document, static_cast<ViewHost&>(*this)))
+    , arrange_(std::make_unique<ArrangeView>(document, static_cast<ViewHost&>(*this)))
+    , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
 {
@@ -233,20 +249,76 @@ void Workspace::resize(int width, int height, CellSize cell)
     width_ = width;
     height_ = height;
     cell_ = cell;
+    layOut();
+}
+
+void Workspace::layOut()
+{
+    if (width_ == 0)
+    {
+        return;
+    }
     // The view's own bar and the inspector, each with half a line after it, then the view, and
     // the status line at the bottom.
-    layout_ = layoutWindow(width, height, cell_, view().topHeights(cell_), 1, cell_.height / 2);
+    layout_ = layoutWindow(width_, height_, cell_, view().topHeights(cell_), 1, cell_.height / 2);
     view().resize(layout_, width_, cell_);
 }
 
 void Workspace::refresh()
 {
-    view().refresh();
+    eventList_->refresh();
+    arrange_->refresh();
 }
 
 void Workspace::showSong()
 {
-    view().showSong();
+    eventList_->showSong();
+    arrange_->showSong();
+    history_.clear();
+    layOut();
+}
+
+ViewKind Workspace::shown() const
+{
+    return current_ == arrange_.get() ? ViewKind::Arrangement : ViewKind::EventList;
+}
+
+void Workspace::show(ViewKind kind)
+{
+    switch (kind)
+    {
+    case ViewKind::Arrangement:
+        switchTo(*arrange_, true);
+        break;
+    case ViewKind::EventList:
+        switchTo(*eventList_, true);
+        break;
+    case ViewKind::PianoRoll:
+        setMessage("The piano roll comes later in milestone 5", MessageKind::Information);
+        break;
+    }
+}
+
+void Workspace::switchTo(View& view, bool remember)
+{
+    if (&view == current_)
+    {
+        return;
+    }
+    const auto cursor = current_->cursor();
+    current_->stopPlayhead(std::nullopt);
+    if (remember)
+    {
+        history_.push_back(current_);
+    }
+    current_ = &view;
+    view.refresh();
+    layOut();
+    view.setCursor(cursor);
+    if (wasPlaying_)
+    {
+        showPlayhead();
+    }
 }
 
 bool Workspace::handle(const Key& key, std::int64_t now)
@@ -334,7 +406,14 @@ CommandResult Workspace::run(std::string_view command, int count)
 
 bool Workspace::runViewCommand(std::string_view command, int count)
 {
-    return view().run(command, count).value_or(false);
+    if (const auto changed = view().run(command, count))
+    {
+        return *changed;
+    }
+    const auto* info = commands_.find(command);
+    auto title = info != nullptr ? titleOf(*info) : std::string{command};
+    setMessage(title + " isn't in " + std::string{view().name()}, MessageKind::Information);
+    return true;
 }
 
 std::optional<bool> Workspace::runShared(std::string_view command, int count)
@@ -388,6 +467,25 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         mode_ = Mode::CommandLine;
         line_.open();
+        return true;
+    }
+    if (command == "view-arrangement" || command == "view-events" || command == "view-piano-roll")
+    {
+        show(command == "view-arrangement" ? ViewKind::Arrangement
+             : command == "view-events"    ? ViewKind::EventList
+                                           : ViewKind::PianoRoll);
+        return true;
+    }
+    if (command == "view-back")
+    {
+        if (history_.empty())
+        {
+            setMessage("No view to go back to", MessageKind::Information);
+            return true;
+        }
+        auto* back = history_.back();
+        history_.pop_back();
+        switchTo(*back, false);
         return true;
     }
     return std::nullopt;
