@@ -929,6 +929,31 @@ TEST_CASE("Alt with k, j, K and J move the piano roll's current note in pitch")
     CHECK(bassNote(r, 28));
 }
 
+TEST_CASE("Alt and Alt-Shift with the arrow keys move notes as with h, j, k and l")
+{
+    Rolling r;
+    const auto& t = r.t;
+    const auto arrow = [&](NamedKey key, Modifiers more = kNoModifiers)
+    { r.press(Key::of(key, kAlt | more)); };
+    r.type(U"8j"); // E1 at the start
+    arrow(NamedKey::Right);
+    CHECK(bassNote(r, 28)->first == t.sixteenth());
+    arrow(NamedKey::Left);
+    CHECK(bassNote(r, 28)->first == 0);
+    arrow(NamedKey::Right, kShift);
+    CHECK(bassNote(r, 28)->first > 0);
+    CHECK(bassNote(r, 28)->first < t.sixteenth());
+    arrow(NamedKey::Left, kShift);
+    CHECK(bassNote(r, 28)->first == 0);
+    arrow(NamedKey::Up);
+    CHECK(bassNote(r, 29));
+    arrow(NamedKey::Up, kShift);
+    CHECK(bassNote(r, 41));
+    arrow(NamedKey::Down, kShift);
+    arrow(NamedKey::Down);
+    CHECK(bassNote(r, 28));
+}
+
 TEST_CASE("= and - move the end of the piano roll's current note to the grid")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

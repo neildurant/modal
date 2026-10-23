@@ -123,8 +123,16 @@ nmap J          join              "Join with the next"
 
 " Moving notes in the piano roll: Alt-h and Alt-l to the grid steps either side, Alt-H and
 " Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j
-" a semitone, Alt-K and Alt-J an octave. = and - move its end to the grid steps either side,
-" + and _ a nudge.
+" a semitone, Alt-K and Alt-J an octave, or Alt and Alt-Shift with the arrow keys. = and -
+" move its end to the grid steps either side, + and _ a nudge.
+nmap <A-Left>   move-left         "Move earlier"
+nmap <A-Right>  move-right        "Move later"
+nmap <A-S-Left> move-left-fine    "Nudge earlier"
+nmap <A-S-Right> move-right-fine  "Nudge later"
+nmap <A-Up>     move-up           "Up a semitone"
+nmap <A-Down>   move-down         "Down a semitone"
+nmap <A-S-Up>   move-octave-up    "Up an octave"
+nmap <A-S-Down> move-octave-down  "Down an octave"
 nmap <A-S-h>    move-left-fine    "Nudge earlier"
 nmap <A-S-l>    move-right-fine   "Nudge later"
 nmap <A-{>      move-bar-previous "A bar earlier"

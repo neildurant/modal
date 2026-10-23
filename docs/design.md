@@ -171,7 +171,7 @@ The same motions move notes when combined with Alt:
 | `o` | Create a note at the cursor, with the track's default note (its length and velocity), without entering Insert mode |
 | `x` | Delete the note under the cursor |
 
-Counts apply: `3Alt-l` moves three grid steps later. Operators (`>ib`, `t}`, etc.) remain for larger ranges.
+Alt and Alt-Shift with the arrow keys do the same as with `h` `j` `k` `l` (as built). Counts apply: `3Alt-l` moves three grid steps later. Operators (`>ib`, `t}`, etc.) remain for larger ranges.
 
 **Editing notes, decided for milestone 5 (step 4c).**
 - **To the grid.** `Alt-h` / `Alt-l` move a note's start to the grid steps counted from each bar line, as `h` / `l` move the cursor, so a note off the grid lands on it at the first press: moving by a grid's distance while staying off it would make no sense. `=` / `-` move its end the same way, to the next or previous grid step, and `-` doesn't shorten a note below one grid step (a note already shorter isn't made shorter still).
