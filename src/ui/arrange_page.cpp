@@ -458,7 +458,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
     // Section starts and markers: faint lines under the text and bars, so as not to distract,
     // through the ruler and across the tracks. Markers are named up to the next line, cut
     // short with an ellipsis or left out if there's no room; sections are named on the strip.
-    // A section's start wins over a marker at the same tick.
+    // A section's start wins over a marker at the same tick. The play-from marker sits in the
+    // same row (decided October 2026, out of the bar numbers' way): a name stops short of it,
+    // or starts after it if it's at the name's start.
+    const std::optional<int> playX = playFrom && *playFrom >= leftTick_ && *playFrom < right
+                                         ? std::optional{scale.toX(*playFrom)}
+                                         : std::nullopt;
     std::vector<core::Marker> markers;
     for (std::size_t i = 0; i < song_.sections().size(); ++i)
     {
@@ -488,12 +493,22 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         {
             continue; // a section's start
         }
-        const int textX = x + 2 * lineWidth;
-        int room = timeline.bounds.width; // characters, to the next marker or past the edge
+        int textX = x + 2 * lineWidth;
+        // Characters, to the next marker or the play-from marker, or past the edge.
+        int roomEnd = textX + timeline.bounds.width * cell_.width;
         if (i + 1 < markers.size())
         {
-            room = (scale.toX(markers[i + 1].tick) - textX - lineWidth) / cell_.width;
+            roomEnd = scale.toX(markers[i + 1].tick) - lineWidth;
         }
+        if (playX && *playX < textX + cell_.width && *playX + cell_.width > x)
+        {
+            textX = *playX + cell_.width;
+        }
+        else if (playX && *playX >= textX)
+        {
+            roomEnd = std::min(roomEnd, *playX);
+        }
+        const int room = (roomEnd - textX) / cell_.width;
         auto name = decodeUtf8(markers[i].name);
         if (static_cast<int>(name.size()) > room)
         {
@@ -669,14 +684,11 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
                                   Role::BarLine,
                                   255});
     }
-    // The play-from marker, in the ruler's bar numbers' row, and the playhead, a line through
-    // the ruler and the tracks.
-    if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
+    // The play-from marker, in the markers' row, and the playhead, a line through the ruler and
+    // the tracks.
+    if (playX)
     {
-        timeline.text.push_back({scale.toX(*playFrom),
-                                 2 * cell_.height,
-                                 U"▶",
-                                 {Role::Accent, Role::Background, kPlain}});
+        timeline.text.push_back({*playX, 0, U"▶", {Role::Accent, Role::Background, kPlain}});
     }
     if (playhead_ && *playhead_ >= leftTick_ && *playhead_ < right)
     {

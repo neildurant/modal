@@ -418,6 +418,46 @@ TEST_CASE("a marker's line through the ruler breaks only where a label sits acro
     CHECK(rows == std::vector<int>{0}); // beside its name, but not through "4/4" or "1"
 }
 
+TEST_CASE("the play-from marker sits in the markers' row, which names give way to")
+{
+    // A marker halfway through bar 1, ten pixels in at a half note to a column.
+    core::Song song;
+    const auto id = song.addTrack("Piano");
+    song.updateEvents(id, [&](core::EventList& events)
+                      { events.insert({0, core::Note{60, 100, 16 * song.ppqn().quarter()}}); });
+    const auto half = core::NoteFraction{1, 2}.toTicks(song.ppqn());
+    song.setMarker(half, "Middle");
+    ArrangePage page{song};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.zoomBy(1);
+    const auto markersRow = [&](core::Tick playFrom)
+    {
+        Frame frame;
+        page.addRegions(frame, playFrom);
+        std::vector<std::pair<int, std::u32string>> runs;
+        for (const auto& run : frame[1].text)
+        {
+            if (run.y == 0)
+            {
+                runs.emplace_back(run.x, run.text);
+            }
+        }
+        std::ranges::sort(runs);
+        return runs;
+    };
+    using Runs = std::vector<std::pair<int, std::u32string>>;
+    CHECK(markersRow(0) == Runs{{0, U"▶"}, {12, U"Middle"}});
+    CHECK(markersRow(half) == Runs{{10, U"▶"}, {20, U"Middle"}}); // after it
+    CHECK(markersRow(8 * half) == Runs{{12, U"Middle"}, {80, U"▶"}});
+    CHECK(markersRow(6 * half) == Runs{{12, U"Mid…"}, {60, U"▶"}}); // cut short
+    Frame frame;
+    page.addRegions(frame, 2 * half);
+    for (const auto& number : rulerText(frame[1], 2)) // not among the bar numbers any more
+    {
+        CHECK(number != U"▶");
+    }
+}
+
 TEST_CASE("narrow bars lose their gaps")
 {
     auto page = page80x22();
