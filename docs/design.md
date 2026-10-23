@@ -163,13 +163,21 @@ The same motions move notes when combined with Alt:
 | --- | --- |
 | `Alt-k` / `Alt-j` | Move the current note (or selection) up / down one step (a semitone or a scale step, per scale lock) |
 | `Alt-K` / `Alt-J` | Move up / down an octave |
-| `Alt-l` / `Alt-h` | Move later / earlier by a grid step |
+| `Alt-l` / `Alt-h` | Move later / earlier to the next grid step |
+| `Alt-L` / `Alt-H` | Nudge later / earlier by the `nudge` setting (5 ms) |
 | `Alt-}` / `Alt-{` | Move later / earlier by a bar |
-| `=` / `-` | Lengthen / shorten the current note by a grid step |
+| `=` / `-` | Lengthen / shorten the current note to the next grid step |
+| `+` / `_` | Lengthen / shorten it by a nudge |
 | `o` | Create a note at the cursor, with the track's default note (its length and velocity), without entering Insert mode |
 | `x` | Delete the note under the cursor |
 
 Counts apply: `3Alt-l` moves three grid steps later. Operators (`>ib`, `t}`, etc.) remain for larger ranges.
+
+**Editing notes, decided for milestone 5 (step 4c).**
+- **To the grid.** `Alt-h` / `Alt-l` move a note's start to the grid steps counted from each bar line, as `h` / `l` move the cursor, so a note off the grid lands on it at the first press: moving by a grid's distance while staying off it would make no sense. `=` / `-` move its end the same way, to the next or previous grid step, and `-` doesn't shorten a note below one grid step (a note already shorter isn't made shorter still).
+- **Nudging.** For tweaking a played, unquantised part or a groove, `Alt-H` / `Alt-L` nudge a note earlier or later, and `+` / `_` lengthen or shorten it, by the `nudge` setting: milliseconds rather than ticks or a note fraction, since timing feel is heard in milliseconds at any tempo, as `chordwindow` is (5 ms by default, about the least a shift is felt; a tick is far too fine, half a millisecond at 960 PPQN and 120 BPM). Counts multiply it. The Shift keys are the fine forms of the grid keys beside them, so in the piano roll `+` is no longer another `=`. A nudge never shortens a note below one nudge.
+- **Collisions.** Moving, lengthening, adding with `o` or putting with `p` onto a note of the same pitch is refused, naming that note, as in the event list; `o` on a note says there's one there. Moving before the song's start fails, as motions do. Counts on `o` wait, since a run of notes needs its spacing thought about.
+- **Operators.** `x` and `dd` delete the current note, `yy` and `Y` yank it. `d` and `y` with a motion in time take the notes starting in that time at every pitch, as the arrangement's take its area; with a pitch motion (`dj`) they wait for Visual blocks (milestone 6). `p` puts the register at the cursor's time, at the notes' own pitches. Each edit is one undo step, and undo brings the cursor back to the note.
 
 **Grid**
 
@@ -199,7 +207,7 @@ An independent setting for the length of new notes, after Sequencer Plus Gold's 
 | `:len 1/8` / `:len grid` | Set the default length, or link it to the grid again |
 | `, l` + keys | Set it directly from the leader menu (milestone 6): `4` quarter, `8` eighth, `6` sixteenth, then `t` triplet or `.` dotted (e.g. `, l 8 t` = 1/8T) |
 
-`+` / `_` were to step the default length through the common lengths. They were dropped (decided for milestone 5): a length is better judged from a note you can see, and `+` steps the field under the cursor in the event list and lengthens the current note in the piano roll.
+`+` / `_` were to step the default length through the common lengths. They were dropped (decided for milestone 5): a length is better judged from a note you can see, and `+` steps the field under the cursor in the event list; in the piano roll it lengthens the current note by a nudge (see Moving and editing notes).
 
 **Text objects** (used after an operator, `i` = inner, `a` = around)
 
