@@ -383,3 +383,84 @@ TEST_CASE("the piano roll shows a song with no tracks")
     ws.handle(Key::of(NamedKey::Tab), 0);
     CHECK_FALSE(ws.frame().empty());
 }
+
+TEST_CASE("zh, zl and Ctrl-T change the track's grid, which h and l step by")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    CHECK(r.view().grid() == core::NoteFraction{1, 16});
+    r.type(U"zl");
+    CHECK(r.view().grid() == core::NoteFraction{1, 32});
+    r.type(U"2zh");
+    CHECK(r.view().grid() == core::NoteFraction{1, 8});
+    CHECK(contains(r.textOn(Role::Bar), U"1/8"));
+    r.press(Key::typed(U't', kCtrl));
+    CHECK(r.view().grid() == core::NoteFraction{1, 12});
+    CHECK(contains(r.textOn(Role::Bar), U"1/8t"));
+    r.type(U"l");
+    CHECK(r.view().time() == t.quarters(1) / 3);
+    r.press(Key::typed(U't', kCtrl));
+    CHECK(r.view().grid() == core::NoteFraction{1, 8});
+    r.type(U"9zh"); // no coarser than a whole note
+    CHECK(r.view().grid() == core::NoteFraction{1, 1});
+    r.type(U"9zl"); // nor finer than a 1/64
+    CHECK(r.view().grid() == core::NoteFraction{1, 64});
+    CHECK(r.document.modified());
+
+    // The changes one after another undo together.
+    r.type(U"u");
+    CHECK(r.view().grid() == core::NoteFraction{1, 16});
+    CHECK_FALSE(r.document.canUndo());
+
+    // Each track has its own.
+    r.type(U"zh");
+    r.type(U"gt");
+    CHECK(r.view().grid() == core::NoteFraction{1, 16});
+    r.type(U"gT");
+    CHECK(r.view().grid() == core::NoteFraction{1, 8});
+}
+
+TEST_CASE(", n takes the current note's length and velocity as the track's default note")
+{
+    Rolling r;
+    const auto& bass = [&]() -> const core::Track& { return *r.document.song().tracks()[0]; };
+    CHECK(contains(r.textOn(Role::Bar), U"grid v100"));
+    r.type(U",n"); // on no note
+    CHECK(r.ws.message() == "No note here to take as the default");
+    CHECK_FALSE(bass().noteLength);
+
+    r.type(U"8j"); // E1, an eighth note at velocity 96
+    r.type(U",n");
+    CHECK(bass().noteLength == core::NoteFraction{1, 8});
+    CHECK(bass().noteVelocity == 96);
+    CHECK(r.ws.message() == "Default note: 1/8, velocity 96");
+    CHECK(contains(r.textOn(Role::Bar), U"1/8 v96"));
+    r.type(U"u");
+    CHECK_FALSE(bass().noteLength);
+    CHECK(bass().noteVelocity == 100);
+}
+
+TEST_CASE(":grid and :len set the track's grid and default length")
+{
+    Rolling r;
+    const auto& bass = [&]() -> const core::Track& { return *r.document.song().tracks()[0]; };
+    const auto line = [&](std::string_view text) { return r.registry.runLine(text); };
+    CHECK(line("grid 1/8t") == CommandResult{true});
+    CHECK(bass().grid == core::NoteFraction{1, 12});
+    CHECK(line("grid") == CommandResult{false, "Grid 1/8t", false});
+    CHECK(line("grid 1/256") == CommandResult::error("The grid can be from 1/64 to 1/1"));
+    CHECK(line("grid long") ==
+          CommandResult::error("long isn't a note length, such as 1/16, 1/8. or 1/8t"));
+    CHECK(line("len 1/4.") == CommandResult{true});
+    CHECK(bass().noteLength == core::NoteFraction{3, 8});
+    CHECK(line("len") == CommandResult{false, "Default note 1/4. v100", false});
+    CHECK(line("len grid") == CommandResult{true});
+    CHECK_FALSE(bass().noteLength);
+    CHECK(bass().defaultLength() == core::NoteFraction{1, 12});
+
+    r.type(U"ge"); // not in the event list
+    line("grid 1/4");
+    CHECK(r.ws.message() == "Grid isn't in the event list");
+    CHECK(bass().grid == core::NoteFraction{1, 12});
+}

@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -33,7 +34,50 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-note-previous",
                 .description = "Note's start before, at any pitch",
                 .count = true},
+    CommandInfo{.name = "grid-coarser",
+                .description = "Make the track's grid coarser, {count} times",
+                .count = true},
+    CommandInfo{.name = "grid-finer",
+                .description = "Make the track's grid finer, {count} times",
+                .count = true},
+    CommandInfo{.name = "grid-triplets",
+                .description = "Turn triplets in the track's grid on or off"},
+    CommandInfo{.name = "note-default",
+                .description = "Take this note's length and velocity as the track's default note"},
+    CommandInfo{.name = "grid",
+                .description = "Set the track's grid, or show it with no length",
+                .usage = "[LENGTH]",
+                .keys = false},
+    CommandInfo{.name = "len",
+                .description = "Set the length of the track's default note, or grid to follow "
+                               "the grid; or show it with no length",
+                .usage = "[LENGTH|grid]",
+                .keys = false},
 };
+
+// The grid's limits, without triplets: from a 1/64 note to a whole note.
+constexpr core::NoteFraction kFinestGrid{1, 64};
+constexpr core::NoteFraction kCoarsestGrid{1, 1};
+
+bool isTriplet(core::NoteFraction grid)
+{
+    return grid.denominator() % 3 == 0;
+}
+
+// The grid without its triplets: 1/8t is 1/8.
+core::NoteFraction straight(core::NoteFraction grid)
+{
+    return isTriplet(grid) ? core::NoteFraction{grid.numerator() * 3, grid.denominator() * 2}
+                           : grid;
+}
+
+// The default note, as the view's bar shows it: its length, or grid while it follows the
+// grid, and its velocity.
+std::string noteText(const core::Track& track)
+{
+    return (track.noteLength ? core::toString(*track.noteLength) : std::string{"grid"}) + " v" +
+           std::to_string(track.noteVelocity);
+}
 
 constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row and column
 constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
@@ -108,9 +152,54 @@ core::Tick PianoRollView::lastTick() const
     return std::max<core::Tick>(document_.song().end() - 1, 0);
 }
 
+core::NoteFraction PianoRollView::grid() const
+{
+    const auto tracks = document_.song().tracks();
+    return tracks.empty() ? core::Track::kDefaultGrid
+                          : tracks[std::min(track_, tracks.size() - 1)]->grid;
+}
+
 core::Tick PianoRollView::gridTicks() const
 {
-    return std::max<core::Tick>(grid_.toTicks(document_.song().ppqn()), 1);
+    return std::max<core::Tick>(grid().toTicks(document_.song().ppqn()), 1);
+}
+
+std::string PianoRollView::trackName() const
+{
+    const auto tracks = document_.song().tracks();
+    if (tracks.empty())
+    {
+        return {};
+    }
+    const auto& track = *tracks[std::min(track_, tracks.size() - 1)];
+    return track.name.empty() ? "track " + std::to_string(track_ + 1) : track.name;
+}
+
+void PianoRollView::changeTrack(std::string title, std::string_view mergeKey,
+                                const std::function<void(core::Track&)>& change)
+{
+    const auto id = trackId();
+    if (!id)
+    {
+        return;
+    }
+    document_.edit(
+        std::move(title), place(), [&](core::Song& song) { song.updateTrack(*id, change); },
+        mergeKey);
+    refresh();
+}
+
+void PianoRollView::setGrid(core::NoteFraction grid)
+{
+    // Steps one after another undo together, on each track.
+    const auto id = trackId();
+    if (!id)
+    {
+        return;
+    }
+    changeTrack("Grid " + core::toString(grid) + " in " + trackName(),
+                "grid " + std::to_string(id->value),
+                [&](core::Track& track) { track.grid = grid; });
 }
 
 core::Tick PianoRollView::gridAfter(core::Tick tick) const
@@ -503,11 +592,108 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         pageSize_ = kDefaultPageSize;
     }
+    else if (command == "grid-coarser" || command == "grid-finer")
+    {
+        // Doubling or halving, keeping triplets, as far as the limits.
+        auto to = grid();
+        for (int i = 0; i < n; ++i)
+        {
+            const auto next = command == "grid-coarser"
+                                  ? core::NoteFraction{to.numerator() * 2, to.denominator()}
+                                  : core::NoteFraction{to.numerator(), to.denominator() * 2};
+            if (straight(next) > kCoarsestGrid || straight(next) < kFinestGrid)
+            {
+                break;
+            }
+            to = next;
+        }
+        if (to == grid())
+        {
+            return false;
+        }
+        setGrid(to);
+    }
+    else if (command == "grid-triplets")
+    {
+        setGrid(isTriplet(grid()) ? straight(grid()) : grid().triplet());
+    }
+    else if (command == "note-default")
+    {
+        // The current note's length and velocity, as the track's default note.
+        const auto index = currentNote();
+        if (!index)
+        {
+            host_.setMessage("No note here to take as the default", MessageKind::Warning);
+            return true;
+        }
+        const auto note = std::get<core::Note>(song.events(*trackId())[*index].data);
+        const auto length =
+            core::NoteFraction{std::max<core::Tick>(note.duration, 1), song.ppqn().whole()};
+        changeTrack("Default note " + core::toString(length) + " v" +
+                        std::to_string(note.velocity) + " in " + trackName(),
+                    {},
+                    [&](core::Track& track)
+                    {
+                        track.noteLength = length;
+                        track.noteVelocity = note.velocity;
+                    });
+        host_.setMessage("Default note: " + core::toString(length) + ", velocity " +
+                             std::to_string(note.velocity),
+                         MessageKind::Information);
+    }
     else
     {
         return std::nullopt;
     }
     return true;
+}
+
+std::optional<CommandResult> PianoRollView::runLine(std::string_view command,
+                                                    std::string_view arguments)
+{
+    if (command != "grid" && command != "len")
+    {
+        return std::nullopt;
+    }
+    const auto tracks = document_.song().tracks();
+    if (tracks.empty())
+    {
+        return CommandResult::error("There's no track");
+    }
+    const auto& track = *tracks[std::min(track_, tracks.size() - 1)];
+    if (arguments.empty())
+    {
+        return CommandResult{false,
+                             command == "grid" ? "Grid " + core::toString(track.grid)
+                                               : "Default note " + noteText(track),
+                             false};
+    }
+    if (command == "len" && arguments == "grid")
+    {
+        changeTrack("Default length grid in " + trackName(), {},
+                    [](core::Track& t) { t.noteLength.reset(); });
+        return CommandResult{true};
+    }
+    const auto length = core::parseNoteFraction(arguments);
+    if (!length)
+    {
+        return CommandResult::error(std::string{arguments} +
+                                    " isn't a note length, such as 1/16, 1/8. or 1/8t");
+    }
+    if (command == "grid")
+    {
+        if (straight(*length) > kCoarsestGrid || straight(*length) < kFinestGrid)
+        {
+            return CommandResult::error("The grid can be from 1/64 to 1/1");
+        }
+        setGrid(*length);
+    }
+    else
+    {
+        changeTrack("Default length " + core::toString(*length) + " in " + trackName(), {},
+                    [&](core::Track& t) { t.noteLength = *length; });
+    }
+    return CommandResult{true};
 }
 
 bool PianoRollView::operate(std::string_view /*op*/, std::string_view /*motion*/, int /*count*/)
@@ -619,11 +805,11 @@ void PianoRollView::addRegions(Frame& frame) const
         notes.under.push_back({{cursorX, 0, cursorWidth, notesHeight}, Role::Selection, kBand});
         lane.under.push_back({{cursorX, 0, cursorWidth, laneHeight}, Role::Selection, kBand});
     }
-    for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid_, cell_))
+    for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid(), cell_))
     {
         notes.under.push_back(line);
     }
-    for (const auto& line : meterLines(meter(), scale, 0, laneHeight, grid_, cell_))
+    for (const auto& line : meterLines(meter(), scale, 0, laneHeight, grid(), cell_))
     {
         if (line.role == Role::BarLine)
         {
@@ -725,7 +911,11 @@ void PianoRollView::addRegions(Frame& frame) const
          p.firstBar == p.lastBar ? std::to_string(p.firstBar)
                                  : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar));
     pair(top.right, "Page:", std::to_string(p.number) + "/" + std::to_string(p.count));
-    pair(top.right, "Grid:", core::toString(grid_));
+    pair(top.right, "Grid:", core::toString(grid()));
+    if (trackId())
+    {
+        pair(top.right, "Note:", noteText(*song.tracks()[track_]));
+    }
     top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
     auto bar = layoutBar(top, width_, cell_, BarSpacing::forCell(cell_));
     bar.bounds = layout_.top[0];

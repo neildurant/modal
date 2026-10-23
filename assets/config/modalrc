@@ -41,6 +41,17 @@ nmap K          octave-up                 "Up an octave"
 nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
 
+" The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
+" with Left and Right) make the grid coarser and finer, Ctrl-T turns triplets on and off, and
+" , n takes the current note's length and velocity as the default note, which o adds. :grid
+" and :len set them by length, such as 1/8 or 1/16t.
+nmap zh         grid-coarser              "Coarser grid"
+nmap z<Left>    grid-coarser              "Coarser grid"
+nmap zl         grid-finer                "Finer grid"
+nmap z<Right>   grid-finer                "Finer grid"
+nmap <C-t>      grid-triplets             "Triplets on or off"
+nmap ,n         note-default              "Default note from this one"
+
 " Changing events: Enter edits the field under the cursor, typing a value or a change such
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
 " with counts. d and y take a motion (d} up to where } goes, dj this event and the next),

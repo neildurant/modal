@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <span>
@@ -50,6 +51,8 @@ public:
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
+    std::optional<CommandResult> runLine(std::string_view command,
+                                         std::string_view arguments) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
     void addRegions(Frame& frame) const override;
     std::string cursorStatus() const override;
@@ -87,8 +90,8 @@ public:
     std::uint8_t pitch() const { return pitch_; }
     std::uint8_t topPitch() const { return topPitch_; }
     std::int64_t pageBars() const { return kPageSizes[pageSize_]; }
-    core::NoteFraction grid() const { return grid_; }
-    int noteRows() const; // the pitch rows fully in view
+    core::NoteFraction grid() const; // the track's
+    int noteRows() const;            // the pitch rows fully in view
 
     // The note the cursor is on, at its pitch from its start to before its end, as an index
     // into the track's events; or none. Of two, the one starting later.
@@ -119,6 +122,14 @@ private:
     std::vector<core::Tick> chordStarts() const;
     Inspection inspection() const;
 
+    // The track's name, or its number if it has none, for messages.
+    std::string trackName() const;
+    // Changes the track's settings as an undo step, merged with the step before if it has the
+    // same merge key (see core::Document::edit).
+    void changeTrack(std::string title, std::string_view mergeKey,
+                     const std::function<void(core::Track&)>& change);
+    void setGrid(core::NoteFraction grid);
+
     core::Document& document_;
     ViewHost& host_;
     std::size_t track_ = 0;
@@ -127,7 +138,6 @@ private:
     std::uint8_t topPitch_ = 72;
     std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated
     std::size_t pageSize_ = kDefaultPageSize;
-    core::NoteFraction grid_{1, 16};
     std::optional<core::Tick> playhead_;
     bool opened_ = false;                            // on a track yet, since the song was shown
     std::map<core::TrackId, std::uint8_t> pitches_;  // the pitch last used on each track
