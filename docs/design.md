@@ -179,7 +179,7 @@ Counts apply: `3Alt-l` moves three grid steps later. Operators (`>ib`, `t}`, etc
 
 | Key | Effect |
 | --- | --- |
-| `Ctrl-h` / `Ctrl-l` | Coarser / finer grid, through the straight values |
+| `zh` / `zl` (or `z` with Left / Right) | Coarser / finer grid, through the straight values |
 | `Ctrl-t` | Toggle triplet (1/8 ↔ 1/8T) |
 | `:grid …` | Set any grid exactly |
 
@@ -902,12 +902,12 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 **Milestone 5: piano roll and arrangement views**
 
 - [x] The shared cursor and selection model (decided for milestone 5): one cursor shown by each view, Backspace to go back, and the selection as an area; see Views.
-- [ ] Scale-lock toggle key. Proposed `, t s`, with the other toggles under `, t` (decided in milestone 4). `\` was considered, but it is the proposed key for repeating an `f` search backwards (since `,` is the leader).
-- [ ] Keys for grid size. `Ctrl-h` / `Ctrl-l` were proposed, but Ctrl with `hjkl` and the arrows now moves the cursor and scrolls with it, in every view (decided in milestone 3), so grid size needs other keys.
-- [ ] Velocity used by `o`: the last-used velocity, or a per-track default velocity setting?
+- [ ] Scale lock, its toggle key (`, t s` proposed) and the semitone motion that ignores it: moved to a later milestone (decided for milestone 5). A key and scale may change from bar to bar, so scale lock needs something like a key or chord track beside the conductor, to be designed first. Until then `k` / `j` move by semitones.
+- [x] Grid coarser / finer: `zh` / `zl`, and `z` with Left / Right (decided for milestone 5), in the `z` family with the zoom keys, since Ctrl with `hjkl` scrolls; `Ctrl-t` toggles triplets.
+- [ ] Velocity used by `o`: a per-track default note, after Sequencer Plus Gold (decided for milestone 5, in principle): a length and a velocity, saved with the track, which new notes take, changed with the same keys that change a note (proposed: on an empty spot, where there's no note to change, `=` / `-` and `Ctrl-A` / `Ctrl-X` change the default note, which the inspector shows there; no mode to enter). Deterministic, as drum programming needs, rather than copying the note before. To confirm the details.
 - [x] `zz` centres on the cursor in the views, as Vim's centres the line (October 2026), rather than the test view's `z` to centre and `zz` to reset the zoom; zoom reset needs another key.
-- [ ] The semitone motion that ignores scale lock: `Ctrl-k` / `Ctrl-j` scroll (decided in milestone 3), so it needs other keys.
-- [ ] Velocity step keys in the piano roll's note area (the event list has `+` / `-` and `Ctrl-A` / `Ctrl-X`), together with the default note length keys above.
+- [x] The semitone motion that ignores scale lock: waits with scale lock (above).
+- [x] Velocity step keys in the piano roll: `Ctrl-A` / `Ctrl-X` step the current note's velocity, with counts, as they step values in the event list and numbers in Vim (decided for milestone 5); `^` comes with milestone 6.
 - [x] The length of a new empty section from `i` / `a`: 4 bars, or the count (decided for milestone 5).
 - [ ] Section strip: keys for selecting several sections (with Visual mode, milestone 6).
 
