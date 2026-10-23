@@ -787,7 +787,7 @@ void ArrangeView::showPlayhead(core::Tick playhead, bool cursorFollows)
     {
         page_.setCursor(page_.track(), playhead);
     }
-    page_.showTime(playhead);
+    page_.showTime(playhead, true);
 }
 
 void ArrangeView::stopPlayhead(std::optional<core::Tick> cursorTo)

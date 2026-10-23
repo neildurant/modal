@@ -50,9 +50,12 @@ public:
     void setCursor(std::size_t track, core::Tick time);
 
     // The playhead, drawn as a line through the ruler and tracks, or none; and keeping a time
-    // in view, a third of the way across once it's moving through, as the playhead is.
+    // in view, a third of the way across once it's moving through, as the playhead is. The
+    // view starts at a column, or smoothly for the playhead, exactly a third of the way back,
+    // so the view glides under it rather than jumping a column at a time, which made the
+    // playhead jump back with it.
     void setPlayhead(std::optional<core::Tick> playhead) { playhead_ = playhead; }
-    void showTime(core::Tick time);
+    void showTime(core::Tick time, bool smooth = false);
 
     // The view's state, for going back to where a change was made: the top track, the time at
     // the left and the zoom.

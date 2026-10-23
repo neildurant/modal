@@ -458,6 +458,21 @@ TEST_CASE("the play-from marker sits in the markers' row, which names give way t
     }
 }
 
+TEST_CASE("the view glides under the playhead, which stays a third of the way across")
+{
+    auto page = page80x22(); // a half note to a column
+    const auto quarter = core::kPpqn.quarter();
+    page.showTime(60 * quarter, true);
+    const auto left = page.leftTick();
+    REQUIRE(left > 0);
+    // Moving on by less than a column, the view moves exactly as far, not a column at a time.
+    page.showTime(60 * quarter + quarter / 3, true);
+    CHECK(page.leftTick() == left + quarter / 3);
+    // Elsewhere, such as for the strip's cursor, the view starts at a column.
+    page.showTime(90 * quarter + quarter / 3);
+    CHECK(page.leftTick() % (2 * quarter) == 0);
+}
+
 TEST_CASE("narrow bars lose their gaps")
 {
     auto page = page80x22();

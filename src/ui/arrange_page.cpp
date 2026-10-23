@@ -86,7 +86,7 @@ void ArrangePage::setCursor(std::size_t track, core::Tick time)
     follow();
 }
 
-void ArrangePage::showTime(core::Tick time)
+void ArrangePage::showTime(core::Tick time, bool smooth)
 {
     const core::Tick column = columnTicks();
     const core::Tick visible = viewColumns() * column;
@@ -96,8 +96,8 @@ void ArrangePage::showTime(core::Tick time)
     }
     const core::Tick endColumns = (end_ + column - 1) / column;
     const core::Tick lastLeft = std::max<core::Tick>(endColumns - viewColumns(), 0) * column;
-    leftTick_ = std::clamp<core::Tick>(
-        std::max<core::Tick>(time - visible / 3, 0) / column * column, 0, lastLeft);
+    const auto left = std::max<core::Tick>(time - visible / 3, 0);
+    leftTick_ = std::clamp<core::Tick>(smooth ? left : left / column * column, 0, lastLeft);
 }
 
 void ArrangePage::setStripCursor(std::optional<std::size_t> section)
