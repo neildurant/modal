@@ -106,11 +106,12 @@ private:
     const core::MeterMap& meter() const;
     std::optional<core::TrackId> trackId() const;
     // Where the view would end, starting at a tick: as many bars on, at the same place in the
-    // bar. And where the section's page of whole bars holding a tick starts, pages restarting
-    // at each section.
+    // bar, or while it's scrolled, its length on. And where the section's page of whole bars
+    // holding a tick starts, pages restarting at each section.
     core::Tick viewEnd(core::Tick start) const;
     core::Tick pageStart(core::Tick tick) const;
-    // Turns the view by its own width until the cursor is in it, keeping its place in the bar.
+    // Turns the view by its own width until the cursor is in it, keeping its place in the bar,
+    // as many bars wide again.
     void turn();
     // Shows the section's page of whole bars holding the cursor, as when a track opens.
     void align();
@@ -150,6 +151,9 @@ private:
     std::size_t track_ = 0;
     core::Tick time_ = 0;
     core::Tick viewStart_ = 0;
+    // While scrolled in time, the view's length, kept so its scale stays put over bars of
+    // another length; until it turns or zooms, or a track opens, when it's whole bars again.
+    std::optional<core::Tick> viewLength_;
     std::uint8_t pitch_ = 60;
     std::uint8_t topPitch_ = 72;
     std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated

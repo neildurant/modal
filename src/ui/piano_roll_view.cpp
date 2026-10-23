@@ -230,6 +230,10 @@ core::Tick PianoRollView::gridBefore(core::Tick tick) const
 
 core::Tick PianoRollView::viewEnd(core::Tick start) const
 {
+    if (viewLength_)
+    {
+        return start + *viewLength_;
+    }
     const auto& m = meter();
     return std::max(sameInBar(m, start, pageBars(), offsetInBar(m, start)), start + 1);
 }
@@ -248,6 +252,7 @@ core::Tick PianoRollView::pageStart(core::Tick tick) const
 
 void PianoRollView::align()
 {
+    viewLength_.reset();
     viewStart_ = pageStart(time_);
 }
 
@@ -256,18 +261,20 @@ void PianoRollView::turn()
     const auto& m = meter();
     for (;;)
     {
-        if (time_ >= viewEnd(viewStart_))
+        const auto end = viewEnd(viewStart_);
+        if (time_ >= viewStart_ && time_ < end)
         {
-            viewStart_ = viewEnd(viewStart_);
+            return;
         }
-        else if (time_ < viewStart_)
+        viewLength_.reset();
+        if (time_ >= end)
         {
-            const auto back = sameInBar(m, viewStart_, -pageBars(), offsetInBar(m, viewStart_));
-            viewStart_ = back < viewStart_ ? back : 0; // not before bar 1
+            viewStart_ = end;
         }
         else
         {
-            return;
+            const auto back = sameInBar(m, viewStart_, -pageBars(), offsetInBar(m, viewStart_));
+            viewStart_ = back < viewStart_ ? back : 0; // not before bar 1
         }
     }
 }
@@ -279,6 +286,7 @@ void PianoRollView::zoomTo(std::size_t size)
     const auto& m = meter();
     const auto start = viewStart_;
     const auto width = viewEnd(start) - start;
+    viewLength_.reset();
     const auto bar = m.toBarBeatTick(time_).bar;
     const auto barStart = m.barStart(bar);
     const auto anchorBar = (time_ - barStart) * 2 < m.barStart(bar + 1) - barStart ? bar : bar + 1;
@@ -467,11 +475,16 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         moveToPitch(pitch_ - by);
     };
 
-    // Moves the cursor and the view together, so the cursor stays put on screen; at the song's
-    // start the view stops and the cursor goes on.
-    const auto scrollTo = [&](core::Tick to, core::Tick viewTo)
+    // Moves the cursor and the view together, so the cursor stays put on screen, the view
+    // keeping its length so its scale stays put too; at the song's start the view stops and
+    // the cursor goes on.
+    const auto scrollTo = [&](core::Tick to)
     {
-        viewStart_ = std::max<core::Tick>(viewTo, 0);
+        if (!viewLength_)
+        {
+            viewLength_ = viewEnd(viewStart_) - viewStart_;
+        }
+        viewStart_ = std::max<core::Tick>(viewStart_ + (to - time_), 0);
         moveTo(to);
     };
 
@@ -484,7 +497,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         }
         if (command == "cursor-left-scroll")
         {
-            scrollTo(tick, viewStart_ - (time_ - tick));
+            scrollTo(tick);
         }
         else
         {
@@ -500,7 +513,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         }
         if (command == "cursor-right-scroll")
         {
-            scrollTo(tick, viewStart_ + (tick - time_));
+            scrollTo(tick);
         }
         else
         {
@@ -509,7 +522,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     else if (command == "cursor-bar-next-scroll" || command == "cursor-bar-previous-scroll")
     {
-        // A bar on or back, the cursor and the view each keeping their place in the bar.
+        // A bar on or back, keeping the cursor's place in the bar, the view moving with it.
         const auto by = command == "cursor-bar-next-scroll" ? n : -n;
         const auto offset = barOffset_.value_or(offsetInBar(m, time_));
         const auto to = sameInBar(m, time_, by, offset);
@@ -518,9 +531,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         {
             return false;
         }
-        const auto viewBar = m.toBarBeatTick(viewStart_).bar;
-        scrollTo(to,
-                 viewBar + by < 1 ? 0 : sameInBar(m, viewStart_, by, offsetInBar(m, viewStart_)));
+        scrollTo(to);
     }
     else if (command == "cursor-beat-next")
     {
@@ -1111,8 +1122,10 @@ void PianoRollView::open(const SongCursor& cursor)
 
 core::EditPlace PianoRollView::place() const
 {
-    return {
-        trackId(), time_, {pitch_, topPitch_, static_cast<std::int64_t>(pageSize_), viewStart_}};
+    return {trackId(),
+            time_,
+            {pitch_, topPitch_, static_cast<std::int64_t>(pageSize_), viewStart_,
+             viewLength_.value_or(0)}};
 }
 
 void PianoRollView::restore(const core::EditPlace& place)
@@ -1120,13 +1133,14 @@ void PianoRollView::restore(const core::EditPlace& place)
     refresh();
     setCursor({.track = place.track, .tick = place.tick, .pitch = std::nullopt});
     // The view as it was, when the change was made in the piano roll.
-    if (place.view.size() == 4)
+    if (place.view.size() == 5)
     {
         pitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[0], 0, 127));
         topPitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[1], 0, 127));
         pageSize_ = static_cast<std::size_t>(std::clamp<std::int64_t>(
             place.view[2], 0, static_cast<std::int64_t>(kPageSizes.size()) - 1));
         viewStart_ = std::max<core::Tick>(place.view[3], 0);
+        viewLength_ = place.view[4] > 0 ? std::optional{place.view[4]} : std::nullopt;
         turn();
         follow();
     }
@@ -1145,6 +1159,7 @@ void PianoRollView::showSong()
     track_ = 0;
     time_ = 0;
     viewStart_ = 0;
+    viewLength_.reset();
     pitch_ = 60;
     topPitch_ = 72;
     barOffset_.reset();

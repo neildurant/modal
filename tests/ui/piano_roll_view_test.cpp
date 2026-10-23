@@ -255,10 +255,50 @@ TEST_CASE("Ctrl with h, l, { and } scroll the piano roll with the cursor")
     r.ws.run("cursor-bar-previous-scroll", 2);
     CHECK(r.view().time() == t.bar(4) - t.sixteenth());
     CHECK(r.view().page().start == t.bar(4) - t.sixteenth());
-    // At the start the view stops, and the cursor goes on.
+    // As far back as bar 1 goes, the view moving as the cursor does.
     r.ws.run("cursor-bar-previous-scroll", 5);
-    CHECK(r.view().page().start == 0);
     CHECK(r.view().time() == t.bar(1) + t.quarters(4) - t.sixteenth());
+    CHECK(r.view().page().start == r.view().time());
+    // At the start the view stops, and the cursor goes on.
+    r.type(U"4l");
+    r.ws.run("cursor-left-scroll", 16);
+    CHECK(r.view().page().start == 0);
+    CHECK(r.view().time() == 3 * t.sixteenth());
+}
+
+TEST_CASE("scrolling the piano roll in time keeps its scale over bars of another length")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    r.document.edit("3/4 from bar 7", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateMeter([&](core::MeterMap& meter)
+                                         { meter.set(t.bar(7), core::TimeSignature{3, 4}); });
+                    });
+    const auto& m = r.document.song().meter();
+    const auto length = [&] { return r.view().page().end - r.view().page().start; };
+    const auto across = [&] { return r.view().time() - r.view().page().start; };
+    r.type(U"5G"); // bars 5-8: two of 4/4, then two of 3/4
+    REQUIRE(r.view().page().start == t.bar(5));
+    REQUIRE(length() == t.quarters(14));
+    r.press(Key::typed(U'l', kCtrl));
+    r.press(Key::typed(U'}', kCtrl));
+    CHECK(r.view().time() == t.bar(6) + t.sixteenth());
+    CHECK(across() == 0); // still at the left edge
+    CHECK(length() == t.quarters(14));
+    r.ws.run("cursor-bar-next-scroll", 2); // into the 3/4 bars
+    CHECK(r.view().time() == m.barStart(8) + t.sixteenth());
+    CHECK(across() == 0); // still at the left edge
+    CHECK(length() == t.quarters(14));
+
+    // Turning goes on from the view's end, four bars wide again.
+    const auto end = r.view().page().end;
+    r.type(U"5}");
+    CHECK(r.view().time() == m.barStart(13) + t.sixteenth());
+    CHECK(r.view().page().start == end);
+    CHECK(length() == t.quarters(12));
 }
 
 TEST_CASE("zooming the piano roll keeps the bar line nearest the cursor in its place")
