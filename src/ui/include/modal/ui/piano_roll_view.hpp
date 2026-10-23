@@ -19,6 +19,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
@@ -96,6 +97,11 @@ public:
     // The note the cursor is on, at its pitch from its start to before its end, as an index
     // into the track's events; or none. Of two, the one starting later.
     std::optional<std::size_t> currentNote() const;
+
+    // The time the cursor covers, from its start to its end (decided October 2026): the
+    // current note's, or on an empty spot the default note's from the cursor, the note o would
+    // add, so it shows what you'd get.
+    std::pair<core::Tick, core::Tick> cursorSpan() const;
 
 private:
     const core::MeterMap& meter() const;

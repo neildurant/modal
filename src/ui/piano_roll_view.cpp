@@ -349,6 +349,21 @@ std::optional<std::size_t> PianoRollView::currentNote() const
     return found;
 }
 
+std::pair<core::Tick, core::Tick> PianoRollView::cursorSpan() const
+{
+    const auto& song = document_.song();
+    if (const auto index = currentNote())
+    {
+        const auto& event = song.events(*trackId())[*index];
+        const auto& note = std::get<core::Note>(event.data);
+        return {event.tick, event.tick + std::max<core::Tick>(note.duration, 1)};
+    }
+    const auto tracks = song.tracks();
+    const auto length =
+        tracks.empty() ? grid() : tracks[std::min(track_, tracks.size() - 1)]->defaultLength();
+    return {time_, time_ + std::max<core::Tick>(length.toTicks(song.ppqn()), 1)};
+}
+
 std::vector<core::Tick> PianoRollView::chordStarts() const
 {
     std::vector<core::Tick> starts;
@@ -790,12 +805,12 @@ void PianoRollView::addRegions(Frame& frame) const
             notes.under.push_back({{0, row * h, width, h}, Role::Panel, kBlackKeys});
         }
     }
-    // The crosshair: a faint band along the cursor's row, and down its grid step through the
-    // lane, under the notes.
+    // The crosshair: a faint band along the cursor's row, and down the time it covers through
+    // the lane, under the notes.
     const bool onPage = time_ >= p.start && time_ < p.end;
-    const int cursorX = scale.toX(time_);
-    const int cursorWidth =
-        std::max(scale.toX(std::min(gridAfter(time_), p.end)) - cursorX, 2 * lineWidth);
+    const auto [spanStart, spanEnd] = cursorSpan();
+    const int cursorX = scale.toX(std::max(spanStart, p.start));
+    const int cursorWidth = std::max(scale.toX(std::min(spanEnd, p.end)) - cursorX, 2 * lineWidth);
     if (shown(pitch_))
     {
         notes.under.push_back({{0, rowOf(pitch_) * h, width, h}, Role::Selection, kBand});

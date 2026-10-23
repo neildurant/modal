@@ -42,13 +42,14 @@ nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
 
 " The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
-" with Left and Right) make the grid coarser and finer, Ctrl-T turns triplets on and off, and
+" with Left and Right) make the grid finer and coarser, its steps narrower and wider as h and l
+" go left and right; Ctrl-T turns triplets on and off; and
 " , n takes the current note's length and velocity as the default note, which o adds. :grid
 " and :len set them by length, such as 1/8 or 1/16t.
-nmap zh         grid-coarser              "Coarser grid"
-nmap z<Left>    grid-coarser              "Coarser grid"
-nmap zl         grid-finer                "Finer grid"
-nmap z<Right>   grid-finer                "Finer grid"
+nmap zh         grid-finer                "Finer grid"
+nmap z<Left>    grid-finer                "Finer grid"
+nmap zl         grid-coarser              "Coarser grid"
+nmap z<Right>   grid-coarser              "Coarser grid"
 nmap <C-t>      grid-triplets             "Triplets on or off"
 nmap ,n         note-default              "Default note from this one"
 

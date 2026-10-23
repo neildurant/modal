@@ -384,15 +384,15 @@ TEST_CASE("the piano roll shows a song with no tracks")
     CHECK_FALSE(ws.frame().empty());
 }
 
-TEST_CASE("zh, zl and Ctrl-T change the track's grid, which h and l step by")
+TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
     const auto& t = r.t;
     CHECK(r.view().grid() == core::NoteFraction{1, 16});
-    r.type(U"zl");
+    r.type(U"zh");
     CHECK(r.view().grid() == core::NoteFraction{1, 32});
-    r.type(U"2zh");
+    r.type(U"2zl");
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
     CHECK(contains(r.textOn(Role::Bar), U"1/8"));
     r.press(Key::typed(U't', kCtrl));
@@ -402,9 +402,9 @@ TEST_CASE("zh, zl and Ctrl-T change the track's grid, which h and l step by")
     CHECK(r.view().time() == t.quarters(1) / 3);
     r.press(Key::typed(U't', kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
-    r.type(U"9zh"); // no coarser than a whole note
+    r.type(U"9zl"); // no coarser than a whole note
     CHECK(r.view().grid() == core::NoteFraction{1, 1});
-    r.type(U"9zl"); // nor finer than a 1/64
+    r.type(U"9zh"); // nor finer than a 1/64
     CHECK(r.view().grid() == core::NoteFraction{1, 64});
     CHECK(r.document.modified());
 
@@ -414,7 +414,7 @@ TEST_CASE("zh, zl and Ctrl-T change the track's grid, which h and l step by")
     CHECK_FALSE(r.document.canUndo());
 
     // Each track has its own.
-    r.type(U"zh");
+    r.type(U"zl");
     r.type(U"gt");
     CHECK(r.view().grid() == core::NoteFraction{1, 16});
     r.type(U"gT");
@@ -463,4 +463,35 @@ TEST_CASE(":grid and :len set the track's grid and default length")
     line("grid 1/4");
     CHECK(r.ws.message() == "Grid isn't in the event list");
     CHECK(bass().grid == core::NoteFraction{1, 12});
+}
+
+TEST_CASE("the piano roll's cursor covers the current note, or the default note it would add")
+{
+    Rolling r;
+    const auto& t = r.t;
+    r.type(U"8j"); // E1, an eighth note at the start
+    CHECK(r.view().cursorSpan() == std::pair{core::Tick{0}, t.quarters(1) / 2});
+    r.type(U"l"); // inside it still
+    CHECK(r.view().cursorSpan() == std::pair{core::Tick{0}, t.quarters(1) / 2});
+    r.type(U"l"); // past it: the default note, the grid's length
+    CHECK(r.view().cursorSpan() == std::pair{t.quarters(1) / 2, t.quarters(1) / 2 + t.sixteenth()});
+    r.registry.runLine("len 1/2");
+    CHECK(r.view().cursorSpan() == std::pair{t.quarters(1) / 2, t.quarters(1) / 2 + t.quarters(2)});
+}
+
+TEST_CASE("the piano roll draws at any window size, even none")
+{
+    Rolling r;
+    r.type(U"8j");
+    for (const auto& [width, height] : {std::pair{0, 0}, std::pair{1, 1}, std::pair{50, 30},
+                                        std::pair{120 * kCell.width, 3 * kCell.height},
+                                        std::pair{3 * kCell.width, 30 * kCell.height},
+                                        std::pair{120 * kCell.width, 30 * kCell.height}})
+    {
+        r.ws.resize(width, height, kCell);
+        CHECK_FALSE(r.ws.frame().empty());
+        r.type(U"kjlhG");
+        r.press(Key::of(NamedKey::Tab));
+        CHECK_FALSE(r.ws.frame().empty());
+    }
 }
