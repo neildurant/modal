@@ -890,6 +890,38 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return put();
     }
+    else if (command == "number-increase" || command == "number-decrease")
+    {
+        // The current note's velocity, by 1 a press; steps one after another on a note undo
+        // together, as the grid's do.
+        const auto index = noteHere("step");
+        if (!index)
+        {
+            return true;
+        }
+        const auto id = *trackId();
+        auto event = song.events(id)[*index];
+        auto& note = std::get<core::Note>(event.data);
+        const auto to = static_cast<std::uint8_t>(
+            std::clamp(note.velocity + (command == "number-increase" ? n : -n), 1, 127));
+        if (to == note.velocity)
+        {
+            return false;
+        }
+        const auto key = "velocity " + std::to_string(id.value) + " " + std::to_string(event.tick) +
+                         " " + std::to_string(note.pitch);
+        const auto title = "Velocity " + std::to_string(to) + " for " +
+                           core::pitchName(note.pitch) + " in " + trackName();
+        note.velocity = to;
+        editEvents(
+            title,
+            [&](core::EventList& events)
+            {
+                events.erase(*index);
+                events.insert(event);
+            },
+            key);
+    }
     else if (command == "note-default")
     {
         // The current note's length and velocity, as the track's default note.

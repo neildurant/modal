@@ -112,6 +112,10 @@ constexpr std::array kCommands{
                 .description = "Add a note at the cursor's time, typing its pitch"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
+    counted("number-increase",
+            "Step the field under the cursor up, or the note's velocity in the piano roll"),
+    counted("number-decrease",
+            "Step the field under the cursor down, or the note's velocity in the piano roll"),
     counted("event-delete", "Delete this event, or {count} events from it"),
     CommandInfo{.name = "register-put",
                 .description = "Put the yanked or deleted events, the first at the cursor's time"},
@@ -572,9 +576,10 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     {
         return addNote();
     }
-    else if (command == "field-increase" || command == "field-decrease")
+    else if (command == "field-increase" || command == "field-decrease" ||
+             command == "number-increase" || command == "number-decrease")
     {
-        return stepFieldBy(command == "field-increase" ? n : -n);
+        return stepFieldBy(command.ends_with("-increase") ? n : -n);
     }
     else
     {

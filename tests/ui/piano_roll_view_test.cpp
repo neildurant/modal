@@ -813,3 +813,28 @@ TEST_CASE("d and y with a motion in the piano roll take the notes starting in th
     r.type(U"dj");
     CHECK(r.ws.message() == "Deleting and yanking across pitches comes with Visual mode");
 }
+
+TEST_CASE("Ctrl-A and Ctrl-X step the piano roll's current note's velocity, undoing together")
+{
+    Rolling r;
+    const auto velocity = [&]
+    {
+        const auto& song = r.document.song();
+        return std::get<core::Note>(
+                   song.events(song.tracks()[0]->id())[*r.view().currentNote()].data)
+            .velocity;
+    };
+    r.press(Key::typed(U'a', kCtrl));
+    CHECK(r.ws.message() == "No note here to step");
+    r.type(U"8j"); // E1, at 96
+    r.press(Key::typed(U'a', kCtrl));
+    CHECK(velocity() == 97);
+    r.type(U"10");
+    r.press(Key::typed(U'x', kCtrl));
+    CHECK(velocity() == 87);
+    r.type(U"200");
+    r.press(Key::typed(U'a', kCtrl));
+    CHECK(velocity() == 127);
+    r.type(U"u");
+    CHECK(velocity() == 96);
+}

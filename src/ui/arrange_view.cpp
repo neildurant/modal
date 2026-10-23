@@ -485,9 +485,10 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(section);
         return true;
     }
-    if (command == "field-increase" || command == "field-decrease")
+    if (command == "field-increase" || command == "field-decrease" ||
+        command == "number-increase" || command == "number-decrease")
     {
-        const auto bars = command == "field-increase" ? n : -n;
+        const auto bars = command.ends_with("-increase") ? n : -n;
         bool changed = false;
         edit((bars > 0 ? "Lengthen " : "Shorten ") + name(section) + " by " +
                  (n == 1 ? std::string{"a bar"} : std::to_string(n) + " bars"),
