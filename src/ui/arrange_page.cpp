@@ -72,6 +72,10 @@ void ArrangePage::setSong(core::Song song)
     end_ = song_.end();
     track_ = song_.tracks().empty() ? 0 : std::min(track_, song_.tracks().size() - 1);
     time_ = std::clamp<core::Tick>(time_, 0, std::max<core::Tick>(end_ - 1, 0));
+    if (stripCursor_)
+    {
+        stripCursor_ = std::min(*stripCursor_, song_.sections().size() - 1);
+    }
     follow();
 }
 
@@ -94,6 +98,17 @@ void ArrangePage::showTime(core::Tick time)
     const core::Tick lastLeft = std::max<core::Tick>(endColumns - viewColumns(), 0) * column;
     leftTick_ = std::clamp<core::Tick>(
         std::max<core::Tick>(time - visible / 3, 0) / column * column, 0, lastLeft);
+}
+
+void ArrangePage::setStripCursor(std::optional<std::size_t> section)
+{
+    stripCursor_ = section;
+    if (section)
+    {
+        stripCursor_ = std::min(*section, song_.sections().size() - 1);
+        time_ = song_.sectionStart(*stripCursor_);
+        showTime(time_);
+    }
 }
 
 void ArrangePage::setView(std::size_t topTrack, core::Tick leftTick, std::size_t zoom)
@@ -302,7 +317,9 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
     // The track headers, in text cells.
     CellGrid headers{columns, rows};
     headers.write(1, 0, song_.title, {Role::Accent, Role::Background, kBold});
-    headers.write(0, kRulerRows - 1, "Trk Name", kDim);
+    headers.write(0, kRulerRows - 2, "Trk Name", kDim);
+    headers.write(0, kStripRow, "Sections",
+                  stripCursor_ ? Style{Role::CursorText, Role::Cursor, kBold} : kDim);
     for (int row = 0; row < rows; ++row)
     {
         headers.set(kHeaderColumns - 1, row, {U'│', kDim});
@@ -369,7 +386,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
         timeline.under.push_back(
             {{x0, tracksTop, x1 - x0, tracksBottom - tracksTop}, Role::Selection, 255});
-        if (track_ >= topTrack_ && track_ < topTrack_ + static_cast<std::size_t>(shownTracks))
+        if (!stripCursor_ && track_ >= topTrack_ &&
+            track_ < topTrack_ + static_cast<std::size_t>(shownTracks))
         {
             const int y = tracksTop + static_cast<int>(track_ - topTrack_) * cell_.height;
             const int side = std::max(gap, 1);
@@ -435,16 +453,16 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         }
     }
 
-    // The ruler: section starts and markers by name, the conductor's meters, and its bars,
-    // numbered where there's room for the numbers.
+    // The ruler: markers by name, the conductor's meters, and its bars, numbered where there's
+    // room for the numbers; then the section strip.
     // Section starts and markers: faint lines under the text and bars, so as not to distract,
-    // through the ruler and across the tracks; named up to the next, cut short with an
-    // ellipsis or left out if there's no room. A section's name wins over a marker's at the
-    // same tick.
+    // through the ruler and across the tracks. Markers are named up to the next line, cut
+    // short with an ellipsis or left out if there's no room; sections are named on the strip.
+    // A section's start wins over a marker at the same tick.
     std::vector<core::Marker> markers;
     for (std::size_t i = 0; i < song_.sections().size(); ++i)
     {
-        markers.push_back({song_.sectionStart(i), song_.sections()[i]->name()});
+        markers.push_back({song_.sectionStart(i), {}}); // named on the strip
     }
     for (const auto& marker : song_.markers())
     {
@@ -466,6 +484,10 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         markerLines.push_back(x);
         timeline.under.push_back(
             {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Marker, kFaint});
+        if (markers[i].name.empty())
+        {
+            continue; // a section's start
+        }
         const int textX = x + 2 * lineWidth;
         int room = timeline.bounds.width; // characters, to the next marker or past the edge
         if (i + 1 < markers.size())
@@ -566,7 +588,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
     // row sits across a line, so the line never runs through text.
     for (const int x : markerLines)
     {
-        for (int row = 0; row < kRulerRows; ++row)
+        for (int row = 0; row < kStripRow; ++row)
         {
             const int y = row * cell_.height;
             const bool covered =
@@ -580,6 +602,63 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
             if (!covered)
             {
                 timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, kFaint});
+            }
+        }
+    }
+    // The section strip: each section a block across its span, neighbours in two shades, named
+    // as far as there's room; the cursor's section boxed when the cursor is on the strip.
+    {
+        const int y = kStripRow * cell_.height;
+        const int stripInset = std::max(cell_.height / 10, 1);
+        for (std::size_t i = 0; i < song_.sections().size(); ++i)
+        {
+            const core::Tick start = song_.sectionStart(i);
+            const core::Tick finish = song_.sectionStart(i + 1);
+            if (finish <= leftTick_ || start >= right)
+            {
+                continue;
+            }
+            const int x0 = std::max(scale.toX(start), 0) + gap;
+            const int x1 = scale.toX(std::min(finish, right));
+            if (x1 <= x0)
+            {
+                continue;
+            }
+            timeline.under.push_back({{x0, y + stripInset, x1 - x0, cell_.height - 2 * stripInset},
+                                      i % 2 == 0 ? Role::Panel : Role::Bar,
+                                      255});
+            const int room = (x1 - x0 - 2 * lineWidth) / cell_.width;
+            auto name = decodeUtf8(song_.sections()[i]->name());
+            if (static_cast<int>(name.size()) > room)
+            {
+                if (room < kMinSegmentCharacters + 1)
+                {
+                    name.clear();
+                }
+                else
+                {
+                    name.resize(static_cast<std::size_t>(room - 1));
+                    name += U'…';
+                }
+            }
+            if (!name.empty())
+            {
+                const bool cursor = stripCursor_ == i;
+                timeline.text.push_back(
+                    {x0 + lineWidth,
+                     y,
+                     std::move(name),
+                     {Role::Text, i % 2 == 0 ? Role::Panel : Role::Bar, cursor ? kBold : kPlain}});
+            }
+            if (stripCursor_ == i)
+            {
+                const int edge = std::max(cell_.height / 10, 1);
+                const int side = std::max(gap, 1);
+                timeline.over.push_back({{x0, y, x1 - x0, edge}, Role::Cursor, 255});
+                timeline.over.push_back(
+                    {{x0, y + cell_.height - edge, x1 - x0, edge}, Role::Cursor, 255});
+                timeline.over.push_back({{x0, y, side, cell_.height}, Role::Cursor, 255});
+                timeline.over.push_back({{x1 - side, y, side, cell_.height}, Role::Cursor, 255});
             }
         }
     }

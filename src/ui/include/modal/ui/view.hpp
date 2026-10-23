@@ -5,6 +5,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/event.hpp>
 #include <modal/core/player.hpp>
+#include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
 #include <modal/ui/command_line.hpp>
@@ -14,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -51,15 +53,17 @@ enum class ViewKind : std::uint8_t
 };
 
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
-// deleted, an area's events, a list for each of its tracks from the top down, their ticks from
-// the area's start.
+// deleted. Either an area's events, a list for each of its tracks from the top down, their
+// ticks from the area's start; or whole sections, from the section strip.
 struct EventRegister
 {
     std::vector<std::vector<core::Event>> tracks;
+    std::vector<std::shared_ptr<const core::Section>> sections;
 
     bool empty() const
     {
-        return std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
+        return sections.empty() &&
+               std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
     }
 };
 
@@ -85,6 +89,12 @@ public:
 
     // Shows another view, at the cursor, as Enter on a bar in the arrangement does.
     virtual void show(ViewKind kind) = 0;
+
+    // Opens the : prompt with a line in it to edit, as naming a new section does.
+    virtual void openPrompt(std::string line) = 0;
+
+    // Puts the play-from marker at a time and plays from there, as Enter on a section does.
+    virtual void playFrom(core::Tick tick) = 0;
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the

@@ -140,6 +140,8 @@ public:
 
 private:
     void startTyping() override { mode_ = Mode::CommandLine; }
+    void openPrompt(std::string line) override;
+    void playFrom(core::Tick tick) override;
     void stopTyping() override { mode_ = Mode::Normal; }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
@@ -176,8 +178,9 @@ private:
     CommandResult port(std::string_view name);
 
     // :section NAME starts a new section at the bar line of the cursor's bar, in the view's
-    // own bars.
+    // own bars; :section-rename NAME renames the section at the cursor.
     CommandResult section(std::string_view name);
+    CommandResult renameSection(std::string_view name);
 
     Region promptRegion() const;
     Region statusRegion() const;

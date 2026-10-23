@@ -637,6 +637,7 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     const auto& events = document_.song().events(id);
     const auto first = events[indices.front()].tick;
     auto& reg = host_.eventRegister();
+    reg = EventRegister{};
     reg.tracks.assign(1, {});
     for (const auto i : indices)
     {
@@ -679,6 +680,12 @@ bool EventListView::put()
     if (host_.eventRegister().empty())
     {
         setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    if (!host_.eventRegister().sections.empty())
+    {
+        setMessage("The register holds sections: put them on the section strip",
+                   MessageKind::Warning);
         return true;
     }
     const auto at = list_.rows()[row_].tick;

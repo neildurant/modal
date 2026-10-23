@@ -60,6 +60,13 @@ constexpr std::array kSharedCommands{
                                "section it's in; named Section and a number if no name is given",
                 .usage = "[NAME]",
                 .keys = false},
+    CommandInfo{.name = "section-rename",
+                .description = "Rename the section at the cursor",
+                .usage = "NAME",
+                .keys = false},
+    CommandInfo{.name = "yank-line",
+                .description = "Yank this event, bar or section, or {count} of them, as yy does",
+                .count = true},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
@@ -191,6 +198,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "section")
                          {
                              return section(call.arguments);
+                         }
+                         if (name == "section-rename")
+                         {
+                             return renameSection(call.arguments);
                          }
                          if (auto result = view().runLine(name, call.arguments))
                          {
@@ -485,6 +496,10 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         line_.open();
         return true;
     }
+    if (command == "yank-line")
+    {
+        return view().operate("operator-yank", "operator-line", count);
+    }
     if (command == "view-arrangement" || command == "view-events" || command == "view-piano-roll")
     {
         show(command == "view-arrangement" ? ViewKind::Arrangement
@@ -739,6 +754,41 @@ CommandResult Workspace::section(std::string_view name)
                              true};
     }
     return {true, named + " starts at " + at, false};
+}
+
+CommandResult Workspace::renameSection(std::string_view name)
+{
+    const auto first = name.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
+    {
+        return CommandResult::error("section-rename needs a name");
+    }
+    name = name.substr(first, name.find_last_not_of(" \t") - first + 1);
+    const auto index = document_.song().sectionAt(view().cursor().tick);
+    const auto old = document_.song().sections()[index]->name();
+    document_.edit("Rename " + old + " to " + std::string{name}, view().place(),
+                   [&](core::Song& song) { song.renameSection(index, std::string{name}); });
+    refresh();
+    // As renamed, numbered if another section had the name.
+    return {true, "Renamed " + old + " to " + document_.song().sections()[index]->name(), false};
+}
+
+void Workspace::openPrompt(std::string line)
+{
+    mode_ = Mode::CommandLine;
+    line_.open(decodeUtf8(line));
+}
+
+void Workspace::playFrom(core::Tick tick)
+{
+    if (player_ == nullptr)
+    {
+        setMessage("Nothing to play to", MessageKind::Warning);
+        return;
+    }
+    player_->setMarker(tick);
+    player_->play();
+    showPlayhead();
 }
 
 Frame Workspace::frame() const

@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -371,4 +372,185 @@ TEST_CASE("events yanked in the event list are put in the arrangement at the cur
     a.type(U"ga");
     a.type(U"4lp"); // bar 5
     CHECK(ticksOf(a.document, 0).back() == 4 * kBar);
+}
+
+namespace
+{
+
+// Eight bars of 4/4 in sections A (bars 1-2), B (3-5) and C (6-8), and Bass with a note
+// starting each bar; the : prompt runs lines through the registry, as the program's does.
+struct Strip : Arranging
+{
+    Strip()
+        : Arranging{song()}
+    {
+        ws.setLineHandler(
+            [this](const std::string& line)
+            {
+                const auto result = registry.runLine(line);
+                ws.setMessage(result.message,
+                              result.warning ? MessageKind::Warning : MessageKind::Information);
+            });
+    }
+
+    static core::Song song()
+    {
+        core::Song song{core::kPpqn};
+        const auto bass = song.addTrack("Bass");
+        song.updateEvents(
+            bass,
+            [](core::EventList& events)
+            {
+                for (int i = 0; i < 8; ++i)
+                {
+                    events.insert(
+                        {i * kBar, core::Note{static_cast<std::uint8_t>(40 + i), 100, kQuarter}});
+                }
+            });
+        song.renameSection(0, "A");
+        song.splitSection(2 * kBar, "B");
+        song.splitSection(5 * kBar, "C");
+        return song;
+    }
+
+    std::vector<std::string> names() const
+    {
+        std::vector<std::string> result;
+        for (const auto& section : document.song().sections())
+        {
+            result.push_back(section->name());
+        }
+        return result;
+    }
+
+    std::optional<std::size_t> strip() const { return page().stripCursor(); }
+};
+
+} // namespace
+
+TEST_CASE("k from the first track, or gs, goes onto the section strip, and j back")
+{
+    Strip s;
+    s.type(U"3l"); // bar 4, in B
+    s.type(U"k");
+    REQUIRE(s.strip() == 1u);
+    std::u32string inspector;
+    const auto frame = s.ws.frame();
+    for (const auto& run : frame[frame.size() - 2].text)
+    {
+        inspector += run.text + U" ";
+    }
+    CHECK(contains(inspector, U"Section"));
+    CHECK(contains(inspector, U"3–5"));
+
+    // Back on the same section, the cursor goes back to where it was.
+    s.type(U"j");
+    CHECK_FALSE(s.strip());
+    CHECK(s.page().bar() == 4);
+
+    // From a section moved to, to its start.
+    s.type(U"gsl");
+    CHECK(s.strip() == 2u);
+    s.type(U"j");
+    CHECK(s.page().bar() == 6);
+    s.type(U"gs0");
+    CHECK(s.strip() == 0u);
+    s.type(U"$");
+    CHECK(s.strip() == 2u);
+    s.type(U"2gg");
+    CHECK(s.strip() == 1u);
+}
+
+TEST_CASE("sections are deleted, yanked and put like lines")
+{
+    Strip s;
+    s.type(U"gsl"); // B
+    s.type(U"x");
+    CHECK(s.names() == std::vector<std::string>{"A", "C"});
+    CHECK(s.strip() == 1u); // on what followed
+    s.type(U"u");
+    CHECK(s.ws.message() == "Undid: Delete section B");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+
+    // Yank B, put it after C, and a copy before A.
+    s.type(U"yy");
+    CHECK(s.ws.message() == "B yanked");
+    s.type(U"$p");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B 2"});
+    CHECK(s.strip() == 3u);
+    s.type(U"0P");
+    CHECK(s.names() == std::vector<std::string>{"B 3", "A", "B", "C", "B 2"});
+
+    // d with a motion: this section and the next.
+    s.type(U"d2l");
+    CHECK(s.names() == std::vector<std::string>{"B", "C", "B 2"});
+    // A song keeps at least one section.
+    s.type(U"d$");
+    CHECK(s.ws.message() == "A song keeps at least one section");
+    CHECK(s.names().size() == 3);
+
+    // Sections don't go on tracks, nor bars on the strip.
+    s.type(U"jp");
+    CHECK(s.ws.message() == "The register holds sections: put them on the section strip");
+    s.type(U"yy");
+    s.type(U"gsp");
+    CHECK(s.ws.message() == "The register holds bars of tracks: put them on the tracks");
+}
+
+TEST_CASE("Alt-h and Alt-l move a section, J joins, and + and - resize")
+{
+    Strip s;
+    s.type(U"gs");
+    s.press(Key::typed(U'l', kAlt));
+    CHECK(s.names() == std::vector<std::string>{"B", "A", "C"});
+    CHECK(s.strip() == 1u); // with it
+    s.press(Key::typed(U'h', kAlt));
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+
+    s.type(U"J");
+    CHECK(s.names() == std::vector<std::string>{"A", "C"});
+    CHECK(s.document.song().sectionStart(1) == 5 * kBar);
+    s.type(U"$J");
+    CHECK(s.ws.message() == "C is the last section, with none after to join");
+
+    s.type(U"0+");
+    CHECK(s.document.song().sectionStart(1) == 6 * kBar);
+    s.type(U"6-"); // can't go below a bar
+    CHECK(s.ws.message() == "A can't be shorter than a bar");
+}
+
+TEST_CASE("i and a insert a new section, which the prompt then names, as c renames one")
+{
+    Strip s;
+    s.type(U"gsl"); // B
+    s.type(U"a");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "Section 1", "C"});
+    CHECK(s.document.song().sectionStart(3) == 9 * kBar); // four bars
+    REQUIRE(s.ws.mode() == Mode::CommandLine);
+    CHECK(s.ws.commandLine().text() == U"section-rename Section 1");
+    for (int i = 0; i < 9; ++i) // over the name given
+    {
+        s.press(Key::of(NamedKey::Backspace));
+    }
+    s.type(U"Bridge");
+    s.press(Key::of(NamedKey::Enter));
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "Bridge", "C"});
+    CHECK(s.ws.message() == "Renamed Section 1 to Bridge");
+
+    s.type(U"2i"); // two bars, before it; the numbering starts again with no Section N left
+    CHECK(s.names()[2] == "Section 1");
+    CHECK(s.document.song().sectionStart(3) - s.document.song().sectionStart(2) == 2 * kBar);
+    s.press(Key::of(NamedKey::Escape)); // keeps the name
+
+    s.type(U"c");
+    CHECK(s.ws.commandLine().text() == U"section-rename Section 1");
+    s.press(Key::of(NamedKey::Escape));
+}
+
+TEST_CASE("Enter on a section plays from its start")
+{
+    Strip s;
+    s.type(U"gsl");
+    s.press(Key::of(NamedKey::Enter));
+    CHECK(s.ws.message() == "Nothing to play to"); // there's no player here
 }

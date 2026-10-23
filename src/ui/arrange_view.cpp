@@ -19,6 +19,23 @@ namespace
 {
 
 constexpr std::array kCommands{
+    CommandInfo{.name = "section-strip", .description = "Go to the section strip"},
+    CommandInfo{.name = "register-put-before",
+                .description = "Put the yanked or deleted sections before this one"},
+    CommandInfo{.name = "move-left",
+                .description = "Move this section earlier, {count} places",
+                .count = true},
+    CommandInfo{.name = "move-right",
+                .description = "Move this section later, {count} places",
+                .count = true},
+    CommandInfo{.name = "join", .description = "Join this section with the next"},
+    CommandInfo{.name = "insert-before",
+                .description = "Insert a new section before this one, of {count} bars (4)",
+                .count = true},
+    CommandInfo{.name = "insert-after",
+                .description = "Insert a new section after this one, of {count} bars (4)",
+                .count = true},
+    CommandInfo{.name = "change", .description = "Rename this section"},
     CommandInfo{.name = "zoom-in", .description = "Zoom in, by {count} steps", .count = true},
     CommandInfo{.name = "zoom-out", .description = "Zoom out, by {count} steps", .count = true},
     CommandInfo{.name = "zoom-reset", .description = "Go back to the zoom the view starts at"},
@@ -74,6 +91,16 @@ std::optional<core::TrackId> ArrangeView::trackId() const
 
 std::optional<bool> ArrangeView::run(std::string_view command, int count)
 {
+    if (const auto section = page_.stripCursor())
+    {
+        return runOnStrip(*section, command, count);
+    }
+    if (command == "section-strip" ||
+        ((command == "cursor-up" || command == "track-previous") && page_.track() == 0))
+    {
+        enterStrip();
+        return true;
+    }
     const int n = std::max(count, 1);
     const auto& song = document_.song();
     const auto moveTo = [&](core::Tick tick) { page_.setCursor(page_.track(), tick); };
@@ -181,6 +208,10 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
 
 bool ArrangeView::operate(std::string_view op, std::string_view motion, int count)
 {
+    if (const auto section = page_.stripCursor())
+    {
+        return operateOnStrip(*section, op, motion, count);
+    }
     if (document_.song().tracks().empty())
     {
         return false;
@@ -314,6 +345,12 @@ bool ArrangeView::put()
         host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
+    if (!reg.sections.empty())
+    {
+        host_.setMessage("The register holds sections: put them on the section strip",
+                         MessageKind::Warning);
+        return true;
+    }
     if (document_.song().tracks().empty())
     {
         return false;
@@ -342,8 +379,258 @@ void ArrangeView::edit(std::string title, const std::function<void(core::Song&)>
     refresh();
 }
 
+void ArrangeView::enterStrip()
+{
+    returnTrack_ = page_.track();
+    returnTime_ = page_.time();
+    returnSection_ = document_.song().sectionAt(returnTime_);
+    page_.setStripCursor(returnSection_);
+}
+
+void ArrangeView::leaveStrip()
+{
+    // Back to the track the cursor came from: where it was, if it's on the same section, or
+    // else the start of the section it's on now.
+    const auto section = page_.stripCursor().value_or(returnSection_);
+    page_.setStripCursor(std::nullopt);
+    page_.setCursor(returnTrack_, section == returnSection_
+                                      ? returnTime_
+                                      : document_.song().sectionStart(section));
+}
+
+std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_view command,
+                                            int count)
+{
+    const int n = std::max(count, 1);
+    auto& song = document_.song();
+    const auto last = song.sections().size() - 1;
+    const auto go = [&](std::int64_t to)
+    {
+        page_.setStripCursor(static_cast<std::size_t>(
+            std::clamp<std::int64_t>(to, 0, static_cast<std::int64_t>(last))));
+        return true;
+    };
+    const auto name = [&](std::size_t i) { return song.sections()[i]->name(); };
+    if (command == "cursor-left" || command == "cursor-right")
+    {
+        return go(static_cast<std::int64_t>(section) + (command == "cursor-left" ? -n : n));
+    }
+    if (command == "cursor-first" || command == "go-first")
+    {
+        return go(count > 0 && command == "go-first" ? count - 1 : 0);
+    }
+    if (command == "cursor-last" || command == "go-last")
+    {
+        return go(count > 0 && command == "go-last" ? count - 1 : static_cast<std::int64_t>(last));
+    }
+    if (command == "cursor-down" || command == "track-next")
+    {
+        leaveStrip();
+        return true;
+    }
+    if (command == "cursor-up" || command == "track-previous" || command == "section-strip")
+    {
+        return false; // on the strip already
+    }
+    if (command == "zoom-in" || command == "zoom-out")
+    {
+        page_.zoomBy(command == "zoom-in" ? -n : n);
+        return true;
+    }
+    if (command == "zoom-reset")
+    {
+        page_.resetZoom();
+        return true;
+    }
+    if (command == "event-delete")
+    {
+        return operateOnStrip(section, "operator-delete", "operator-line", count);
+    }
+    if (command == "register-put" || command == "register-put-before")
+    {
+        return putSections(section, command == "register-put-before");
+    }
+    if (command == "move-left" || command == "move-right")
+    {
+        const auto by = command == "move-left" ? -n : n;
+        std::size_t to = section;
+        edit("Move " + name(section) + (by < 0 ? " earlier" : " later"),
+             [&](core::Song& s) { to = s.moveSection(section, by); });
+        page_.setStripCursor(to);
+        return true;
+    }
+    if (command == "join")
+    {
+        if (section == last)
+        {
+            host_.setMessage(name(section) + " is the last section, with none after to join",
+                             MessageKind::Warning);
+            return true;
+        }
+        // As Vim's J: a count joins that many sections into one.
+        const int joins = std::min(std::max(n - 1, 1), static_cast<int>(last - section));
+        edit("Join " + name(section) + " with " + name(section + 1) +
+                 (joins > 1 ? " and the next " + std::to_string(joins - 1) : ""),
+             [&](core::Song& s)
+             {
+                 for (int i = 0; i < joins; ++i)
+                 {
+                     s.joinSections(section);
+                 }
+             });
+        page_.setStripCursor(section);
+        return true;
+    }
+    if (command == "field-increase" || command == "field-decrease")
+    {
+        const auto bars = command == "field-increase" ? n : -n;
+        bool changed = false;
+        edit((bars > 0 ? "Lengthen " : "Shorten ") + name(section) + " by " +
+                 (n == 1 ? std::string{"a bar"} : std::to_string(n) + " bars"),
+             [&](core::Song& s) { changed = s.resizeSection(section, bars); });
+        if (!changed)
+        {
+            host_.setMessage(name(section) + " can't be shorter than a bar", MessageKind::Warning);
+        }
+        page_.setStripCursor(section);
+        return true;
+    }
+    if (command == "insert-before" || command == "insert-after")
+    {
+        // A new section of 4 bars, or the count, named for now and then to be named.
+        const auto at = command == "insert-before" ? section : section + 1;
+        const auto newName = song.newSectionName();
+        edit("Insert " + newName,
+             [&](core::Song& s) { s.insertEmptySection(at, newName, count > 0 ? count : 4); });
+        page_.setStripCursor(at);
+        host_.openPrompt("section-rename " + newName);
+        return true;
+    }
+    if (command == "change")
+    {
+        host_.openPrompt("section-rename " + name(section));
+        return true;
+    }
+    if (command == "field-edit")
+    {
+        host_.playFrom(song.sectionStart(section));
+        return true;
+    }
+    return std::nullopt;
+}
+
+bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::string_view motion,
+                                 int count)
+{
+    // Sections behave like lines (decided October 2026): dd and x this one, or as many as the
+    // count; motions across sections up to where they land, or with G, gg and $ including it.
+    const auto& song = document_.song();
+    const auto last = song.sections().size() - 1;
+    std::size_t first = section;
+    std::size_t lastTaken = section;
+    if (motion == "operator-line")
+    {
+        lastTaken = std::min(section + static_cast<std::size_t>(std::max(count, 1)) - 1, last);
+    }
+    else
+    {
+        run(motion, count);
+        const auto landed = page_.stripCursor().value_or(section);
+        page_.setStripCursor(section);
+        const bool inclusive =
+            motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+        if (landed > section)
+        {
+            lastTaken = inclusive ? landed : landed - 1;
+        }
+        else if (landed < section)
+        {
+            first = landed;
+            lastTaken = inclusive ? section : section - 1;
+        }
+        else if (!inclusive)
+        {
+            return false;
+        }
+    }
+    const auto taking = lastTaken - first + 1;
+    const auto what =
+        taking == 1 ? song.sections()[first]->name()
+                    : std::to_string(taking) + " sections from " + song.sections()[first]->name();
+    auto& reg = host_.eventRegister();
+    EventRegister taken;
+    for (auto i = first; i <= lastTaken; ++i)
+    {
+        taken.sections.push_back(song.sections()[i]);
+    }
+    reg = std::move(taken);
+    if (op == "operator-yank")
+    {
+        host_.setMessage(what + " yanked", MessageKind::Information);
+        return true;
+    }
+    if (taking > last)
+    {
+        host_.setMessage("A song keeps at least one section", MessageKind::Warning);
+        return true;
+    }
+    edit("Delete " + (taking == 1 ? "section " : std::string{}) + what,
+         [&](core::Song& s) { s.removeSections(first, taking); });
+    page_.setStripCursor(std::min(first, document_.song().sections().size() - 1));
+    return true;
+}
+
+bool ArrangeView::putSections(std::size_t section, bool before)
+{
+    const auto& reg = host_.eventRegister();
+    if (reg.empty())
+    {
+        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    if (reg.sections.empty())
+    {
+        host_.setMessage("The register holds bars of tracks: put them on the tracks",
+                         MessageKind::Warning);
+        return true;
+    }
+    const auto at = before ? section : section + 1;
+    const auto what = reg.sections.size() == 1 ? reg.sections.front()->name()
+                                               : std::to_string(reg.sections.size()) + " sections";
+    const auto& song = document_.song();
+    edit("Put " + what + (before ? " before " : " after ") + song.sections()[section]->name(),
+         [&](core::Song& s) { s.insertSections(at, reg.sections); });
+    page_.setStripCursor(at);
+    return true;
+}
+
+Inspection ArrangeView::sectionInspection(std::size_t section) const
+{
+    const auto& song = document_.song();
+    const auto& m = song.meter();
+    const auto start = song.sectionStart(section);
+    const auto end = song.sectionStart(section + 1);
+    const auto first = m.toBarBeatTick(start).bar;
+    const auto last = m.toBarBeatTick(end - 1).bar;
+    const auto bars = last - first + 1;
+    Inspection result{.kind = "Section", .fields = {}};
+    result.fields.push_back({"Position", positionText(m, start)});
+    result.fields.push_back({"Time", songTime(song.tempo().toTime(start))});
+    result.fields.push_back({"Section", song.sections()[section]->name()});
+    result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
+    result.fields.push_back(
+        {"Length", std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") +
+                       songTime(song.tempo().toTime(end) - song.tempo().toTime(start))});
+    result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
+    return result;
+}
+
 Inspection ArrangeView::inspection() const
 {
+    if (const auto section = page_.stripCursor())
+    {
+        return sectionInspection(*section);
+    }
     // The cursor's bar: where it is, its meter, how many notes start in it, and its section.
     const auto& song = document_.song();
     const auto& m = meter();
@@ -395,12 +682,24 @@ std::string ArrangeView::timeStatus(core::Tick tick) const
 
 std::string ArrangeView::cursorStatus() const
 {
+    if (const auto section = page_.stripCursor())
+    {
+        return timeStatus(document_.song().sectionStart(*section));
+    }
     return timeStatus(meter().barStart(meter().toBarBeatTick(page_.time()).bar));
 }
 
 SongCursor ArrangeView::cursor() const
 {
     SongCursor cursor{.track = trackId(), .tick = page_.time(), .pitch = 60};
+    if (const auto section = page_.stripCursor())
+    {
+        // On the strip, the section's start, on the track the cursor came from.
+        const auto tracks = document_.song().tracks();
+        cursor.track =
+            returnTrack_ < tracks.size() ? std::optional{tracks[returnTrack_]->id()} : cursor.track;
+        cursor.tick = document_.song().sectionStart(*section);
+    }
     if (cursor.track)
     {
         if (const auto it = pitches_.find(*cursor.track); it != pitches_.end())
@@ -414,6 +713,7 @@ SongCursor ArrangeView::cursor() const
 void ArrangeView::setCursor(const SongCursor& cursor)
 {
     // From the conductor's list, the track the arrangement was last on.
+    page_.setStripCursor(std::nullopt);
     auto track = page_.track();
     if (cursor.track)
     {
@@ -431,22 +731,29 @@ void ArrangeView::setCursor(const SongCursor& cursor)
 
 core::EditPlace ArrangeView::place() const
 {
+    const auto strip = page_.stripCursor();
     return {trackId(),
             page_.time(),
             {static_cast<std::int64_t>(page_.topTrack()), page_.leftTick(),
-             static_cast<std::int64_t>(page_.zoom())}};
+             static_cast<std::int64_t>(page_.zoom()),
+             strip ? static_cast<std::int64_t>(*strip) : -1}};
 }
 
 void ArrangeView::restore(const core::EditPlace& place)
 {
     refresh();
     setCursor({.track = place.track, .tick = place.tick, .pitch = cursor().pitch});
-    // The view as it was, when the change was made in the arrangement.
-    if (place.view.size() == 3)
+    // The view as it was, when the change was made in the arrangement, on the strip if it was.
+    if (place.view.size() == 4)
     {
         page_.setView(static_cast<std::size_t>(std::max<std::int64_t>(place.view[0], 0)),
                       place.view[1],
                       static_cast<std::size_t>(std::max<std::int64_t>(place.view[2], 0)));
+        if (place.view[3] >= 0)
+        {
+            enterStrip();
+            page_.setStripCursor(static_cast<std::size_t>(place.view[3]));
+        }
     }
 }
 
@@ -465,7 +772,11 @@ void ArrangeView::showSong()
 void ArrangeView::showPlayhead(core::Tick playhead, bool cursorFollows)
 {
     page_.setPlayhead(playhead);
-    if (cursorFollows)
+    if (cursorFollows && page_.stripCursor())
+    {
+        page_.setStripCursor(document_.song().sectionAt(playhead));
+    }
+    else if (cursorFollows)
     {
         page_.setCursor(page_.track(), playhead);
     }
@@ -475,6 +786,14 @@ void ArrangeView::showPlayhead(core::Tick playhead, bool cursorFollows)
 void ArrangeView::stopPlayhead(std::optional<core::Tick> cursorTo)
 {
     page_.setPlayhead(std::nullopt);
+    if (page_.stripCursor())
+    {
+        if (cursorTo)
+        {
+            page_.setStripCursor(document_.song().sectionAt(*cursorTo));
+        }
+        return;
+    }
     page_.setCursor(page_.track(), cursorTo.value_or(page_.time()));
 }
 

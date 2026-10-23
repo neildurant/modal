@@ -276,10 +276,13 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
     // the bridge 50 after that; the second chorus is out of view.
     CHECK(lines == std::vector<int>{0, 160, 265, 515});
 
+    // The sections are named on the strip, not in the ruler's top row, where only markers
+    // are.
     int names = 0;
     for (const auto& run : timeline.text)
     {
-        names += run.y == 0 && run.style.foreground == Role::Marker ? 1 : 0;
+        CHECK_FALSE((run.y == 0 && run.style.foreground == Role::Marker));
+        names += run.y == ArrangePage::kStripRow * kCell.height ? 1 : 0;
     }
     CHECK(names == 4);
 }
@@ -303,15 +306,17 @@ std::vector<std::u32string> rulerText(const Region& timeline, int row)
 
 } // namespace
 
-TEST_CASE("marker names are cut short at the next marker, or left out if there's no room")
+TEST_CASE("section names are cut short to their sections, or left out if there's no room")
 {
     auto page = page80x22();
     type(page, U"-", 2); // eight quarter notes to a column
     Frame frame;
     page.addRegions(frame);
     // The intro, verse and bridge have room for fewer than three characters and an
-    // ellipsis; the choruses have room for four; the last marker runs on.
-    CHECK(rulerText(frame[1], 0) == std::vector<std::u32string>{U"Chor…", U"Chor…", U"Outro"});
+    // ellipsis; the first chorus, twelve bars, has room for its whole name, and the second
+    // for four characters; the outro starts too near the edge for any.
+    CHECK(rulerText(frame[1], ArrangePage::kStripRow) ==
+          std::vector<std::u32string>{U"Chorus", U"Chor…"});
 }
 
 TEST_CASE("bars are numbered from bar 1 and each marker, every so many bars")

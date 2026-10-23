@@ -70,6 +70,16 @@ private:
     bool operateOn(std::string_view op, const Area& area);
     bool put();
 
+    // The section strip: going onto it and back, its commands and operators, and what the
+    // inspector shows of the section under the cursor.
+    void enterStrip();
+    void leaveStrip();
+    std::optional<bool> runOnStrip(std::size_t section, std::string_view command, int count);
+    bool operateOnStrip(std::size_t section, std::string_view op, std::string_view motion,
+                        int count);
+    bool putSections(std::size_t section, bool before);
+    Inspection sectionInspection(std::size_t section) const;
+
     // Changes the song as one undo step, made where the cursor is, and shows the change.
     void edit(std::string title, const std::function<void(core::Song&)>& change);
 
@@ -85,6 +95,10 @@ private:
     ViewHost& host_;
     ArrangePage page_;
     std::map<core::TrackId, std::uint8_t> pitches_; // the pitch last used on each track
+    // Where the cursor was on the tracks before the strip, to go back to.
+    std::size_t returnTrack_ = 0;
+    core::Tick returnTime_ = 0;
+    std::size_t returnSection_ = 0;
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;

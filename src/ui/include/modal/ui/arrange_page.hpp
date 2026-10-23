@@ -25,7 +25,10 @@ namespace modal::ui
 class ArrangePage
 {
 public:
-    static constexpr int kRulerRows = 3;
+    // The rows above the tracks: markers' names, the conductor's meters, bar numbers, and the
+    // section strip.
+    static constexpr int kRulerRows = 4;
+    static constexpr int kStripRow = 3;
     static constexpr int kHeaderColumns = 20; // the track's number and name, and a line
     static constexpr int kNameColumns = 14;
 
@@ -54,6 +57,11 @@ public:
     // The view's state, for going back to where a change was made: the top track, the time at
     // the left and the zoom.
     void setView(std::size_t topTrack, core::Tick leftTick, std::size_t zoom);
+
+    // The cursor on the section strip, on a section (counting from 0) rather than a bar of a
+    // track; or none, back on the tracks. The view keeps the section in view.
+    void setStripCursor(std::optional<std::size_t> section);
+    std::optional<std::size_t> stripCursor() const { return stripCursor_; }
 
     // Fits the page to the main area, scrolling if the cursor would be out of view.
     void resize(Rect main, CellSize cell);
@@ -116,6 +124,7 @@ private:
 
     core::Song song_;
     std::optional<core::Tick> playhead_;
+    std::optional<std::size_t> stripCursor_;
     core::Tick end_ = 0;
     std::size_t track_ = 0;
     core::Tick time_ = 0; // the cursor's place in time, kept as it moves between tracks

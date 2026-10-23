@@ -41,6 +41,7 @@ nmap [m         cursor-marker-previous    "Marker before"
 " time, and u and Ctrl-R undo and redo
 nmap <CR>       field-edit        "Edit this field"
 nmap +          field-increase    "Step up"
+nmap =          field-increase    "Step up"
 nmap <C-a>      field-increase    "Step up"
 nmap -          field-decrease    "Step down"
 nmap <C-x>      field-decrease    "Step down"
@@ -48,6 +49,8 @@ nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
 nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
+nmap P          register-put-before "Put before"
+nmap Y          yank-line         "Yank this"
 nmap o          note-add          "Add a note"
 nmap u          undo              "Undo"
 nmap <C-r>      redo              "Redo"
@@ -83,6 +86,18 @@ nmap ga         view-arrangement  "Arrangement"
 nmap gr         view-piano-roll   "Piano roll"
 nmap ge         view-events       "Event list"
 nmap <BS>       view-back         "Back"
+
+" The section strip, above the arrangement's tracks: gs goes to it (or k from the first
+" track), j back. There, h and l go between sections, x, d, y, Y, p and P delete, yank and
+" put them, Alt-h and Alt-l move one, J joins it with the next, + and - lengthen and shorten
+" it by a bar, i and a insert a new one, c renames it, and Enter plays from it.
+nmap gs         section-strip     "Section strip"
+nmap <A-h>      move-left         "Move earlier"
+nmap <A-l>      move-right        "Move later"
+nmap J          join              "Join with the next"
+nmap i          insert-before     "Insert before"
+nmap a          insert-after      "Insert after"
+nmap c          change            "Rename"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
