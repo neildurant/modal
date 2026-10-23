@@ -35,7 +35,8 @@ constexpr std::array kCommands{
                 .count = true},
 };
 
-constexpr std::uint8_t kBand = 80; // the opacity of the crosshair's row and column
+constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row and column
+constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -551,22 +552,28 @@ void PianoRollView::addRegions(Frame& frame) const
     const auto rowOf = [&](int pitch) { return topPitch_ - pitch; };
     const auto shown = [&](int pitch) { return pitch <= topPitch_ && rowOf(pitch) < rows; };
 
-    // The keyboard: each row's note name, the black keys' rows shaded, the C's bold and the
-    // cursor's pitch highlighted.
+    // The keyboard: each row's note name, the black keys' rows shaded faintly, the C's bold
+    // and the cursor's pitch highlighted.
     CellGrid keys{kKeyColumns, rows};
     for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
     {
         const int pitch = topPitch_ - row;
-        const Role background = isBlackKey(pitch) ? Role::Panel : Role::Background;
-        keys.fill(0, row, kKeyColumns, 1, {U' ', {Role::Text, background, kPlain}});
         const auto name = core::pitchName(static_cast<std::uint8_t>(pitch));
         const Style style = pitch == pitch_   ? Style{Role::CursorText, Role::Cursor, kBold}
-                            : pitch % 12 == 0 ? Style{Role::Text, background, kBold}
-                                              : Style{Role::Dim, background, kPlain};
+                            : pitch % 12 == 0 ? Style{Role::Text, Role::Background, kBold}
+                                              : Style{Role::Dim, Role::Background, kPlain};
         keys.write(kKeyColumns - 1 - static_cast<int>(name.size()), row, name, style);
     }
-    frame.push_back(
-        gridRegion(keys, {main.x, main.y, keyWidth, notesHeight}, cell_, Role::Background));
+    auto keyboard =
+        gridRegion(keys, {main.x, main.y, keyWidth, notesHeight}, cell_, Role::Background);
+    for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
+    {
+        if (isBlackKey(topPitch_ - row) && topPitch_ - row != pitch_)
+        {
+            keyboard.under.push_back({{0, row * h, keyWidth, h}, Role::Panel, kBlackKeys});
+        }
+    }
+    frame.push_back(std::move(keyboard));
     Region laneName{.bounds = {main.x, main.y + notesHeight, keyWidth, laneHeight},
                     .background = Role::Background,
                     .text = {{cell_.width,
@@ -594,7 +601,7 @@ void PianoRollView::addRegions(Frame& frame) const
     {
         if (isBlackKey(topPitch_ - row))
         {
-            notes.under.push_back({{0, row * h, width, h}, Role::Panel, 255});
+            notes.under.push_back({{0, row * h, width, h}, Role::Panel, kBlackKeys});
         }
     }
     // The crosshair: a faint band along the cursor's row, and down its grid step through the
