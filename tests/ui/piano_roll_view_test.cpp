@@ -636,7 +636,7 @@ TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
 }
 
-TEST_CASE(", n takes the current note's length and velocity as the track's default note")
+TEST_CASE("the default note key takes the current note's length and velocity, as , n")
 {
     Rolling r;
     const auto& bass = [&]() -> const core::Track& { return *r.document.song().tracks()[0]; };
