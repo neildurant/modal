@@ -237,33 +237,20 @@ TEST_CASE("time motions go to the event at or after where they land, in the trac
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
-    type(v.ws, U"4j");
-    type(v.ws, U"w"); // the beat after is 1:2:000; the next event, the cc
-    CHECK(v.view.row() == 5);
-    type(v.ws, U"w");
-    CHECK(v.view.row() == 6);
-    type(v.ws, U"gg4j2w");
-    CHECK(v.view.row() == 6); // a count of beats, then the event at or after
-    type(v.ws, U"}");         // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
+    type(v.ws, U"6j}"); // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
     CHECK(v.view.row() == 9);
     type(v.ws, U"gg}");
     CHECK(v.view.row() == 7); // a bar on from 1:1:000, the verse's section row
 
-    // Going back keeps going until it's somewhere earlier: from the note at 2:1:000, a beat
-    // back is 1:4:000, whose event at or after is no earlier, so another beat, and another.
-    type(v.ws, U"j");
-    REQUIRE(v.view.row() == 8);
-    type(v.ws, U"b");
-    CHECK(v.view.row() == 6);
-    type(v.ws, U"G[[");
+    type(v.ws, U"G[b");
     CHECK(v.view.row() == 7); // the bar line before the end is 2:1:000
-    type(v.ws, U"[[");
+    type(v.ws, U"[b");
     CHECK(v.view.row() == 0);
-    type(v.ws, U"]]");
+    type(v.ws, U"]b");
     CHECK(v.view.row() == 7);
     type(v.ws, U"{");
     CHECK(v.view.row() == 0);
-    type(v.ws, U"b");
+    type(v.ws, U"[b");
     CHECK(v.view.row() == 0); // nowhere earlier to go
 }
 

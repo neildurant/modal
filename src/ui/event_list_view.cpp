@@ -81,8 +81,6 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-last",
                 .description = "Move to the last field, or the last bar",
                 .motion = true},
-    motion("cursor-beat-next", "Move to the event at or after the next beat"),
-    motion("cursor-beat-previous", "Move to the event at or after the beat before"),
     motion("cursor-bar-next", "Move to the event at or after the same place a bar on"),
     motion("cursor-bar-previous", "Move to the event at or after the same place a bar back"),
     motion("cursor-bar-line-next", "Move to the event at or after the next bar line"),
@@ -422,15 +420,6 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     if (command == "cursor-down" || command == "cursor-up")
     {
         moveRows(command == "cursor-down" ? n : -n);
-    }
-    else if (command == "cursor-beat-next")
-    {
-        land(beatAfter(meter, tick, n), true, {});
-    }
-    else if (command == "cursor-beat-previous")
-    {
-        land(beatBefore(meter, tick, n), false,
-             [&](core::Tick t) { return beatBefore(meter, t, 1); });
     }
     else if (keepsBarOffset)
     {

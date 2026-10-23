@@ -25,24 +25,6 @@ core::MeterMap mixed(core::Ppqn ppqn)
 
 } // namespace
 
-TEST_CASE("beats on and back, counting the beat a tick is in when going back")
-{
-    const auto ppqn = MODAL_ANY_PPQN();
-    const auto q = ppqn.quarter();
-    const auto e = q / 2;
-    const auto meter = mixed(ppqn);
-
-    CHECK(beatAfter(meter, 0, 1) == q);
-    CHECK(beatAfter(meter, q / 3, 1) == q);
-    CHECK(beatAfter(meter, 0, 3) == 3 * q);
-    CHECK(beatAfter(meter, 7 * q, 2) == 8 * q + e); // into the 7/8, whose beats are eighths
-
-    CHECK(beatBefore(meter, q, 1) == 0);
-    CHECK(beatBefore(meter, q + 1, 1) == q);
-    CHECK(beatBefore(meter, 8 * q + e, 2) == 7 * q);
-    CHECK(beatBefore(meter, 0, 1) == 0);
-}
-
 TEST_CASE("bar lines on and back, counting the bar a tick is in when going back")
 {
     const auto ppqn = MODAL_ANY_PPQN();

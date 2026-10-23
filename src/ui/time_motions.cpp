@@ -8,25 +8,6 @@
 namespace modal::ui
 {
 
-core::Tick beatAfter(const core::MeterMap& meter, core::Tick tick, std::int64_t count)
-{
-    for (std::int64_t i = 0; i < count; ++i)
-    {
-        tick = meter.beatAtOrAfter(tick + 1);
-    }
-    return tick;
-}
-
-core::Tick beatBefore(const core::MeterMap& meter, core::Tick tick, std::int64_t count)
-{
-    for (std::int64_t i = 0; i < count && tick > 0; ++i)
-    {
-        const auto position = meter.toBarBeatTick(tick - 1);
-        tick = *meter.toTick({position.bar, position.beat, 0});
-    }
-    return tick;
-}
-
 core::Tick barLineAfter(const core::MeterMap& meter, core::Tick tick, std::int64_t count)
 {
     for (std::int64_t i = 0; i < count; ++i)

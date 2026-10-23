@@ -17,12 +17,7 @@ namespace modal::ui
 // Where the time motions go from a tick, in a track's bars, a count of times (at least 1).
 // None goes before tick 0.
 
-// The beat a count of beats on (w), or back (b): back from mid-beat, the start of that beat
-// counts as the first.
-core::Tick beatAfter(const core::MeterMap& meter, core::Tick tick, std::int64_t count);
-core::Tick beatBefore(const core::MeterMap& meter, core::Tick tick, std::int64_t count);
-
-// The bar line a count of bars on (]]), or back ([[): back from mid-bar, the start of that
+// The bar line a count of bars on (]b), or back ([b): back from mid-bar, the start of that
 // bar counts as the first.
 core::Tick barLineAfter(const core::MeterMap& meter, core::Tick tick, std::int64_t count);
 core::Tick barLineBefore(const core::MeterMap& meter, core::Tick tick, std::int64_t count);

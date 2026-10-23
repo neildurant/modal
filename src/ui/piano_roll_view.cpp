@@ -793,14 +793,6 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         }
         scrollTo(to);
     }
-    else if (command == "cursor-beat-next")
-    {
-        return go(beatAfter(m, time_, n));
-    }
-    else if (command == "cursor-beat-previous")
-    {
-        moveTo(beatBefore(m, time_, n));
-    }
     else if (keepsBarOffset)
     {
         const auto offset = barOffset_.value_or(offsetInBar(m, time_));

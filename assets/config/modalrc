@@ -18,15 +18,13 @@ nmap <End>      cursor-last       "Last field"
 nmap gg         go-first          "First event, or bar {count}"
 nmap G          go-last           "End, or bar {count}"
 
-" Moving in time, to the event at or after where each lands, in the track's bars: a beat, the
-" same place a bar on, a bar line, a chord (events starting within chordwindow of each
-" other), a section's start, a marker
-nmap w          cursor-beat-next          "Next beat"
-nmap b          cursor-beat-previous      "Beat before"
+" Moving in time, to the event at or after where each lands, in the track's bars: the same
+" place a bar on, a bar line, a chord (events starting within chordwindow of each other), a
+" section's start, a marker
 nmap }          cursor-bar-next           "Same place, next bar"
 nmap {          cursor-bar-previous       "Same place, bar before"
-nmap ]]         cursor-bar-line-next      "Next bar line"
-nmap [[         cursor-bar-line-previous  "Bar line before"
+nmap ]b         cursor-bar-line-next      "Next bar line"
+nmap [b         cursor-bar-line-previous  "Bar line before"
 nmap )          cursor-chord-next         "Next chord"
 nmap (          cursor-chord-previous     "Chord before"
 nmap ]s         cursor-section-next       "Next section"

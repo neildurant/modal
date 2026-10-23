@@ -156,7 +156,7 @@ TEST_CASE("Enter on a bar in the arrangement opens it in the piano roll, at its 
     CHECK(contains(r.textOn(Role::Bar), U"Verse"));
 }
 
-TEST_CASE("the piano roll's time motions go by the grid, beats and bars")
+TEST_CASE("the piano roll's time motions go by the grid and bars")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
@@ -167,7 +167,7 @@ TEST_CASE("the piano roll's time motions go by the grid, beats and bars")
     CHECK(r.view().time() == 5 * t.sixteenth());
     r.type(U"h");
     CHECK(r.view().time() == t.quarters(1));
-    r.type(U"w");
+    r.type(U"4l");
     CHECK(r.view().time() == t.quarters(2));
     r.type(U"$");
     CHECK(r.view().time() == t.bar(2) - t.sixteenth());
@@ -175,7 +175,7 @@ TEST_CASE("the piano roll's time motions go by the grid, beats and bars")
     CHECK(r.view().time() == 0);
     r.type(U"}l");
     CHECK(r.view().time() == t.bar(2) + t.sixteenth());
-    r.type(U"]]");
+    r.type(U"]b");
     CHECK(r.view().time() == t.bar(3));
     r.type(U"G");
     CHECK(r.view().time() == t.bar(13) - t.sixteenth());
@@ -219,7 +219,7 @@ TEST_CASE("zz centres the piano roll on the cursor in time, and turning keeps th
 {
     Rolling r;
     const auto& t = r.t;
-    r.type(U"5Gw"); // bar 5, beat 2
+    r.type(U"5G4l"); // bar 5, beat 2
     r.type(U"zz");
     CHECK(r.view().page().start == t.bar(3) + t.quarters(1));
     CHECK(r.view().page().end == t.bar(7) + t.quarters(1));
@@ -327,14 +327,14 @@ TEST_CASE("zooming the piano roll keeps the cursor in its place on screen")
     CHECK(r.view().page().start == t.bar(7));
 
     // Off the bar lines too, zooming out and back in comes back to the same view.
-    r.type(U"3w"); // beat 4, three quarters of sixteen across
+    r.type(U"12l"); // beat 4, three quarters of sixteen across
     r.type(U"zo");
     CHECK(r.view().page().start == t.bar(7) - t.quarters(3));
     r.type(U"zozizi");
     CHECK(r.view().page().start == t.bar(7));
 
     // Near the start the view stops at bar 1; and the cursor always stays in view.
-    r.type(U"gg2wzo");
+    r.type(U"gg8lzo");
     CHECK(r.view().page().start == 0);
     CHECK(r.view().time() == t.quarters(2));
     r.type(U"G4zi");
@@ -410,7 +410,7 @@ TEST_CASE("the piano roll's ruler names the sections and markers and numbers the
     CHECK(lines[0] > lines[1]);
 
     // Scrolled into the Verse, its name stays at the left edge.
-    r.type(U"5Gw");
+    r.type(U"5G4l");
     r.press(Key::typed(U'l', kCtrl));
     const auto top = rulerRow(r, 0);
     REQUIRE(!top.empty());
@@ -422,7 +422,7 @@ TEST_CASE("the piano roll's ruler names the sections and markers and numbers the
 TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")
 {
     Rolling r;
-    r.type(U"5Gwzz");
+    r.type(U"5G4lzz");
     const auto scrolled = r.view().page().start;
     r.type(U"gagr");
     CHECK(r.view().page().start == scrolled);

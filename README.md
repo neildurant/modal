@@ -49,7 +49,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `j` `k`, `h` `l`, arrow keys | Move between events and fields, with counts such as `12j` |
 | `0` `$`, Home End | First and last field |
 | `gg` `G` | First event and the end; with a count, that bar |
-| `w` `b`, `}` `{`, `]]` `[[` | The event at or after the next or previous beat, the same place a bar on or back, or a bar line |
+| `}` `{`, `]b` `[b` | The event at or after the same place a bar on or back, or a bar line |
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d}` up to where `}` goes |
