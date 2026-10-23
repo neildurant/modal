@@ -274,6 +274,7 @@ Both are needed, so both are operators. Uppercase means "and shift the timeline"
 - **Ripple works on spans of time,** not single notes: `D}`, `Dib`, or a Visual time range. On a single note, especially one in a chord, closing a gap has no clear meaning, so `x` deletes the note and leaves its time.
 - **An insert that would overflow the section** never pushes notes into the next section silently. The status line asks (yes / no) whether to grow the section by whole bars, on every track, to make room; the new bars on other tracks are empty. Declining cancels the insert.
 - Each ripple, including any growth of the section it causes, is one undo step.
+- **As planned for milestone 5 (October 2026).** `D` is an operator over a motion in time in the arrangement and the piano roll; `DD` is the cursor's bar in the arrangement (`3DD` three bars), as `dd` is, and in the piano roll, where `dd` is a note, it says `D` takes a span of time. `P` on a track inserts the register at the cursor, its length being the span it was taken from (bars in the arrangement, the motion's span in the piano roll, or from a single note its start to its end), so `yy` of a bar then `P` makes room for exactly a bar. Since they edit time, `D` and `P` in the piano roll take all the track's events, controllers too, not only notes as `d` and `y` do there, so what moves stays together. A range running past the section's end stops at it. The event list has no `D` or `P` (it's for tweaking events, not time). When `P` would push events past the section's end, the status line asks whether to lengthen the section by the whole bars needed, `y` for yes and anything else for no.
 
 **Sections**
 
@@ -911,9 +912,9 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Ripple is section-local (October 2026); see How far ripple reaches.
 - [x] The command registry is built early in milestone 4 (October 2026); see Architecture.
 - [x] SMF export writes section starts as marker meta events and bookmarks as cue point events, so import can tell them apart (decided in milestone 4; see Markers and cue points).
-- [ ] Whether import offers to turn a file's markers into sections by default, or only on request (milestone 5, with the section strip).
-- [ ] Notes sustaining past a section's end when sections are reordered: kept whole (the default), or an option to cut them at the section's end?
-- [ ] For `D` within a section: leave the silence at the section's end (the default), or an option to fill it by looping or repeating the section's last bar?
+- [x] Import keeps a file's markers as markers (decided October 2026); a command will turn a single marker into a section start, rather than an import option or a question when a file has markers.
+- [x] Notes sustaining past a section's end when sections are reordered are kept whole (decided October 2026), with no option to cut them.
+- [x] `D` within a section leaves the silence at the section's end (decided October 2026); filling it by looping the last bar was dropped as of doubtful use.
 
 **Milestone 5: piano roll and arrangement views**
 
