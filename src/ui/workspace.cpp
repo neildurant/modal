@@ -72,6 +72,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
+    CommandInfo{.name = "grid-advance-toggle",
+                .description = "Turn gridadvance on or off: whether O moves on by the grid step "
+                               "or the note's length"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
     CommandInfo{.name = "view-arrangement", .description = "Show the arrangement"},
     CommandInfo{.name = "view-piano-roll", .description = "Show the piano roll"},
@@ -531,6 +534,22 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         }
         setMessage(rewind_ ? "Rewind on: the play-from marker stays put"
                            : "Rewind off: the play-from marker moves to where playback stops",
+                   MessageKind::Information);
+        return true;
+    }
+    if (command == "grid-advance-toggle")
+    {
+        // Through the setting too, as rewind's is.
+        if (lineHandler_)
+        {
+            lineHandler_("set gridadvance!");
+        }
+        else
+        {
+            pianoRoll().setGridAdvance(!pianoRoll().gridAdvance());
+        }
+        setMessage(pianoRoll().gridAdvance() ? "O moves on by the grid step"
+                                             : "O moves on by the note's length",
                    MessageKind::Information);
         return true;
     }

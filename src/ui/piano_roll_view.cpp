@@ -51,6 +51,9 @@ constexpr std::array kCommands{
                 .description = "Turn triplets in the track's grid on or off"},
     CommandInfo{.name = "note-default",
                 .description = "Take this note's length and velocity as the track's default note"},
+    CommandInfo{.name = "note-add-advance",
+                .description = "Add {count} notes one after another, moving on past each",
+                .count = true},
     CommandInfo{.name = "move-up",
                 .description = "Move this note up a semitone, {count} times",
                 .count = true},
@@ -259,10 +262,11 @@ std::optional<std::size_t> PianoRollView::noteHere(std::string_view what) const
     return index;
 }
 
-bool PianoRollView::addNote()
+bool PianoRollView::addNote(int count, bool advance)
 {
     // The track's default note at the cursor, unless there's a note there or it would run into
-    // one; a count waits, since a run of notes needs its spacing thought about.
+    // one. o takes no count; O adds one after another, each where the last ends, or with
+    // gridadvance at the next grid step, as far as the song's end or a note in the way.
     const auto id = trackId();
     if (!id)
     {
@@ -275,16 +279,33 @@ bool PianoRollView::addNote()
     }
     const auto& song = document_.song();
     const auto& track = *song.tracks()[track_];
-    const core::Event note{
-        time_, core::Note{pitch_, track.noteVelocity,
-                          std::max<core::Tick>(track.defaultLength().toTicks(song.ppqn()), 1)}};
-    if (auto why = overlap(song.events(*id), std::nullopt, note, meter()))
+    const auto length = std::max<core::Tick>(track.defaultLength().toTicks(song.ppqn()), 1);
+    const int n = advance ? std::max(count, 1) : 1;
+    auto events = song.events(*id);
+    auto tick = time_;
+    int added = 0;
+    for (; added < n && tick <= lastTick(); ++added)
     {
-        host_.setMessage(std::move(*why), MessageKind::Warning);
+        const core::Event note{tick, core::Note{pitch_, track.noteVelocity, length}};
+        if (auto why = overlap(events, std::nullopt, note, meter()))
+        {
+            host_.setMessage(std::move(*why), MessageKind::Warning);
+            break;
+        }
+        events.insert(note);
+        tick = gridAdvance_ ? gridAfter(tick) : tick + length;
+    }
+    if (added == 0)
+    {
         return true;
     }
-    editEvents("Add " + core::pitchName(pitch_) + " in " + trackName(),
-               [&](core::EventList& events) { events.insert(note); });
+    editEvents("Add " + (added == 1 ? core::pitchName(pitch_) : std::to_string(added) + " notes") +
+                   " in " + trackName(),
+               [&](core::EventList& list) { list = events; });
+    if (advance)
+    {
+        moveTo(tick);
+    }
     return true;
 }
 
@@ -948,9 +969,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         setGrid(isTriplet(grid()) ? straight(grid()) : grid().triplet());
     }
-    else if (command == "note-add")
+    else if (command == "note-add" || command == "note-add-advance")
     {
-        return addNote();
+        return addNote(count, command == "note-add-advance");
     }
     else if (command == "event-delete")
     {

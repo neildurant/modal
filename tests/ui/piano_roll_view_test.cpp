@@ -1025,3 +1025,38 @@ TEST_CASE("Alt-H and Alt-L nudge the piano roll's current note, + and _ its end,
     alt(U'l');
     CHECK(bassNote(r, 36)->first == at + 1);
 }
+
+TEST_CASE("O adds notes one after another, moving on by the note's length or the grid step")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto before = bassNotes(r).size();
+    r.registry.runLine("len 1/8");
+    r.type(U"kO"); // C#2 at the start, the cursor after it
+    CHECK(bassNote(r, 37)->first == 0);
+    CHECK(r.view().time() == t.quarters(1) / 2);
+    r.type(U"3O");
+    CHECK(bassNotes(r).size() == before + 4);
+    CHECK(r.view().time() == t.quarters(2));
+    r.type(U"u"); // the three as one step
+    CHECK(bassNotes(r).size() == before + 1);
+
+    // By the grid step, the notes overlapping a little: another pitch each time.
+    r.type(U",ta");
+    CHECK(r.ws.message() == "O moves on by the grid step");
+    r.type(U"5GkO");
+    CHECK(r.view().time() == t.bar(5) + t.sixteenth());
+    r.type(U"kO");
+    CHECK(bassNote(r, 39, t.bar(5))->first == t.bar(5) + t.sixteenth());
+    // At the same pitch, the cursor is still on the last, which is in the way.
+    r.type(U"3O");
+    CHECK(r.ws.message() == "There's a note here already");
+    CHECK(bassNotes(r).size() == before + 3);
+    r.type(U",ta");
+    CHECK(r.ws.message() == "O moves on by the note's length");
+
+    // o stays put.
+    r.type(U"ggjjo");
+    CHECK(r.view().time() == 0);
+}

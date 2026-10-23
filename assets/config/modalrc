@@ -72,6 +72,7 @@ nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"
 nmap Y          yank-line         "Yank this"
 nmap o          note-add          "Add a note"
+nmap O          note-add-advance  "Add a note and move on"
 nmap u          undo              "Undo"
 nmap <C-r>      redo              "Redo"
 
@@ -121,6 +122,9 @@ nmap <A-h>      move-left         "Move earlier"
 nmap <A-l>      move-right        "Move later"
 nmap J          join              "Join with the next"
 
+" Adding notes in the piano roll: o adds the track's default note at the cursor, and O adds
+" it and moves on, past its end, or with gridadvance (, t a) to the next grid step; 8O adds
+" eight one after another.
 " Moving notes in the piano roll: Alt-h and Alt-l to the grid steps either side, Alt-H and
 " Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j
 " a semitone, Alt-K and Alt-J an octave, or Alt and Alt-Shift with the arrow keys. = and -
@@ -184,5 +188,6 @@ nmap <Space>    play-toggle       "Play or stop"
 nmap <C-Space>  play-cursor       "Play from the cursor"
 nmap m<Space>   marker-set        "Play from here"
 nmap ,t<Space>  rewind-toggle     "Rewind on or off"
+nmap ,ta        grid-advance-toggle "O by grid step or note length"
 nmap <C-.>      panic             "Panic"
 cmap <C-.>      panic             "Panic"

@@ -51,6 +51,10 @@ public:
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
     // How far Alt-H and Alt-L nudge a note, and + and _ lengthen and shorten it (nudge).
     void setNudge(std::chrono::milliseconds nudge) { nudge_ = nudge; }
+    // Whether O moves the cursor on by the grid step rather than the note's length
+    // (gridadvance).
+    void setGridAdvance(bool grid) { gridAdvance_ = grid; }
+    bool gridAdvance() const { return gridAdvance_; }
 
     std::string_view name() const override { return "the piano roll"; }
     std::vector<int> topHeights(CellSize cell) const override;
@@ -157,10 +161,11 @@ private:
     // The note the cursor is on, or a message saying there's none to do something to.
     std::optional<std::size_t> noteHere(std::string_view what) const;
 
-    // Adds the default note at the cursor; deletes or yanks notes, as indices into the track's
-    // events, into the register with their ticks from a time; and puts the register at the
-    // cursor's time.
-    bool addNote();
+    // Adds the default note at the cursor, or with advancing (O) as many as the count says one
+    // after another, the cursor moving on past each; deletes or yanks notes, as indices into
+    // the track's events, into the register with their ticks from a time; and puts the
+    // register at the cursor's time.
+    bool addNote(int count, bool advance);
     bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from);
     bool put();
     // Changes the current note, the cursor going with it, unless it would go before the song's
@@ -189,6 +194,7 @@ private:
     std::map<core::TrackId, std::size_t> pageSizes_; // and the page size
     std::chrono::milliseconds chordWindow_{30};
     std::chrono::milliseconds nudge_{5};
+    bool gridAdvance_ = false;
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;

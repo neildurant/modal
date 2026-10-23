@@ -88,6 +88,10 @@ Settings::Settings()
                   "How far apart, in milliseconds, events can start and still be one chord, "
                   "as a chord's notes played a little apart are",
                   std::int64_t{30}, 0, 1000),
+          setting("gridadvance",
+                  "Whether O in the piano roll moves the cursor on by the grid step (on) or by "
+                  "the note's length (off)",
+                  false),
           setting("nudge",
                   "How far, in milliseconds, a nudge moves a note in the piano roll, or "
                   "lengthens or shortens it",
