@@ -243,11 +243,11 @@ TEST_CASE("a sample of the built-in font", "[.sample]")
     CHECK(window->saveFrame(path != nullptr ? path : "font-sample.bmp"));
 }
 
-// Hidden: writes the event list and the arrangement sketch to look at, to MODAL_SAMPLE_BMP
-// with "-events", "-events-light", "-playing", "-playing-light", "-marker", "-arrangement",
-// "-conductor",
+// Hidden: writes the event list, the arrangement, the piano roll and the arrangement sketch
+// to look at, to MODAL_SAMPLE_BMP with "-events", "-events-light", "-playing",
+// "-playing-light", "-marker", "-arrangement", "-conductor", "-piano", "-piano-light",
 // "-arrange" and "-arrange-out" (zoomed out) before its extension, or to sample.bmp and so on.
-TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
+TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.sample]")
 {
     auto window = offscreen(1000, 600);
     const char* path = std::getenv("MODAL_SAMPLE_BMP");
@@ -301,6 +301,13 @@ TEST_CASE("a sample of the event list and the arrangement sketch", "[.sample]")
     view.run("track-previous", 0);
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-conductor.bmp"));
+    view.run("view-piano-roll", 0);
+    view.handle(Key::of(NamedKey::Tab), 0); // onto a note
+    view.handle(Key::of(NamedKey::Tab), 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-piano.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-piano-light.bmp"));
 
     const auto layout =
         layoutWindow(window->pixelWidth(), window->pixelHeight(), window->cellSize(), 1, 1);

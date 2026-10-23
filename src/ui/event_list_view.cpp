@@ -301,7 +301,7 @@ const core::MeterMap& EventListView::cursorMeter() const
 SongCursor EventListView::cursor() const
 {
     const auto& r = list_.rows()[row_];
-    SongCursor cursor{.track = list_.track(), .tick = r.tick, .pitch = 60};
+    SongCursor cursor{.track = list_.track(), .tick = r.tick, .pitch = std::nullopt};
     if (r.kind == RowKind::Event)
     {
         if (const auto* note =

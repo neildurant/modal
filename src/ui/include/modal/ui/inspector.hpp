@@ -2,10 +2,15 @@
 
 #pragma once
 
+#include <modal/core/event.hpp>
+#include <modal/core/meter_map.hpp>
+#include <modal/core/song.hpp>
+#include <modal/core/tick.hpp>
 #include <modal/ui/event_list.hpp>
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -34,6 +39,14 @@ struct Inspection
 };
 
 Inspection inspect(const EventList& list, std::size_t row);
+
+// A note's fields after its position and time: its pitch, velocity, length, end and release,
+// as the event list's inspector and the piano roll's show them.
+void addNoteFields(Inspection& inspection, const core::Song& song, const core::MeterMap& meter,
+                   core::Tick tick, const core::Note& note);
+
+// A pitch as its name and number: E1 (28).
+std::string pitchText(std::uint8_t pitch);
 
 // A time from the song's start, as minutes, seconds and milliseconds, 1:02.250, with hours
 // before them once there are any, 1:00:02.250.

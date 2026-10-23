@@ -305,6 +305,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
     view.eventList().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
+    view.pianoRoll().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())

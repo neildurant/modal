@@ -34,6 +34,13 @@ nmap [s         cursor-section-previous   "Section before"
 nmap ]m         cursor-marker-next        "Next marker"
 nmap [m         cursor-marker-previous    "Marker before"
 
+" The piano roll: k and j move a semitone, K and J an octave (J joins sections on the
+" section strip), and Tab and Shift-Tab go to the next note's start at any pitch and the one
+" before, notes starting together low to high
+nmap K          octave-up                 "Up an octave"
+nmap <Tab>      cursor-note-next          "Next note"
+nmap <S-Tab>    cursor-note-previous      "Note before"
+
 " Changing events: Enter edits the field under the cursor, typing a value or a change such
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
 " with counts. d and y take a motion (d} up to where } goes, dj this event and the next),

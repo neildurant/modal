@@ -192,16 +192,15 @@ TEST_CASE("coming back to the event list lands on the note it left")
     CHECK(list.row() == second);
 }
 
-TEST_CASE("Enter on a bar opens it, in the event list until the piano roll comes")
+TEST_CASE("Enter on a bar opens it in the piano roll")
 {
     Arranging a;
     a.type(U"2j3l");
     const auto tick = a.page().time();
     a.press(Key::of(NamedKey::Enter));
-    REQUIRE(a.ws.shown() == ViewKind::EventList);
-    CHECK(a.ws.eventList().track() == 3);
-    const auto& list = a.ws.eventList();
-    CHECK(list.list().rows()[list.row()].tick >= tick);
+    REQUIRE(a.ws.shown() == ViewKind::PianoRoll);
+    CHECK(a.ws.pianoRoll().track() == 2);
+    CHECK(a.ws.pianoRoll().time() == tick);
 }
 
 TEST_CASE("a command a view doesn't have says so")
@@ -209,8 +208,6 @@ TEST_CASE("a command a view doesn't have says so")
     Arranging a;
     a.type(U"+");
     CHECK(a.ws.message() == "Field increase isn't in the arrangement");
-    a.type(U"gr");
-    CHECK(a.ws.message() == "The piano roll comes later in milestone 5");
     a.type(U"ge");
     a.type(U"zi");
     CHECK(a.ws.message() == "Zoom in isn't in the event list");

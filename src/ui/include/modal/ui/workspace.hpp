@@ -12,6 +12,7 @@
 #include <modal/ui/key.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
+#include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/view.hpp>
 
 #include <cstddef>
@@ -57,6 +58,8 @@ public:
     const EventListView& eventList() const { return *eventList_; }
     ArrangeView& arrangement() { return *arrange_; }
     const ArrangeView& arrangement() const { return *arrange_; }
+    PianoRollView& pianoRoll() { return *pianoRoll_; }
+    const PianoRollView& pianoRoll() const { return *pianoRoll_; }
 
     // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
     // goes back to (decided for milestone 5).
@@ -189,6 +192,7 @@ private:
     core::Document& document_;
     std::unique_ptr<EventListView> eventList_;
     std::unique_ptr<ArrangeView> arrange_;
+    std::unique_ptr<PianoRollView> pianoRoll_;
     View* current_ = nullptr;
     std::vector<View*> history_; // the views shown before, for Backspace
     Keymap keymap_;

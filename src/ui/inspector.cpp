@@ -16,11 +16,6 @@ namespace modal::ui
 namespace
 {
 
-std::string pitchText(std::uint8_t pitch)
-{
-    return core::pitchName(pitch) + " (" + std::to_string(pitch) + ")";
-}
-
 std::string padded(std::int64_t value, std::size_t digits)
 {
     auto text = std::to_string(value);
@@ -92,6 +87,24 @@ std::string songTime(std::chrono::nanoseconds time)
                      : std::to_string(minutes) + ":" + rest;
 }
 
+std::string pitchText(std::uint8_t pitch)
+{
+    return core::pitchName(pitch) + " (" + std::to_string(pitch) + ")";
+}
+
+void addNoteFields(Inspection& inspection, const core::Song& song, const core::MeterMap& meter,
+                   core::Tick tick, const core::Note& note)
+{
+    inspection.kind = "Note";
+    const auto add = [&](std::string heading, std::string value)
+    { inspection.fields.push_back({std::move(heading), std::move(value)}); };
+    add("Pitch", pitchText(note.pitch));
+    add("Velocity", std::to_string(note.velocity));
+    add("Length", lengthText(note.duration, song.ppqn(), meter.signatureAt(tick)));
+    add("Ends", positionText(meter, tick + note.duration));
+    add("Release", std::to_string(note.releaseVelocity));
+}
+
 Inspection inspect(const EventList& list, std::size_t row)
 {
     const auto& song = list.song();
@@ -156,13 +169,7 @@ Inspection inspect(const EventList& list, std::size_t row)
             using T = std::decay_t<decltype(data)>;
             if constexpr (std::is_same_v<T, core::Note>)
             {
-                result.kind = "Note";
-                add("Pitch", pitchText(data.pitch));
-                add("Velocity", std::to_string(data.velocity));
-                add("Length",
-                    lengthText(data.duration, song.ppqn(), meter.signatureAt(event.tick)));
-                add("Ends", positionText(meter, event.tick + data.duration));
-                add("Release", std::to_string(data.releaseVelocity));
+                addNoteFields(result, song, meter, event.tick, data);
             }
             else if constexpr (std::is_same_v<T, core::ControlChange>)
             {

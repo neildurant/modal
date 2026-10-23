@@ -24,6 +24,7 @@ add_library(modal_ui STATIC
     style.cpp
     event_edit.cpp
     event_list_view.cpp
+    piano_roll_view.cpp
     themes.cpp
     time_motions.cpp
     view_parts.cpp

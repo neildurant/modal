@@ -158,6 +158,7 @@ std::span<const CommandInfo> Workspace::commands()
         };
         add(EventListView::commands());
         add(ArrangeView::commands());
+        add(PianoRollView::commands());
         add(kSharedCommands);
         return result;
     }();
@@ -182,6 +183,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , document_(document)
     , eventList_(std::make_unique<EventListView>(document, static_cast<ViewHost&>(*this)))
     , arrange_(std::make_unique<ArrangeView>(document, static_cast<ViewHost&>(*this)))
+    , pianoRoll_(std::make_unique<PianoRollView>(document, static_cast<ViewHost&>(*this)))
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
@@ -295,19 +297,23 @@ void Workspace::refresh()
 {
     eventList_->refresh();
     arrange_->refresh();
+    pianoRoll_->refresh();
 }
 
 void Workspace::showSong()
 {
     eventList_->showSong();
     arrange_->showSong();
+    pianoRoll_->showSong();
     history_.clear();
     layOut();
 }
 
 ViewKind Workspace::shown() const
 {
-    return current_ == arrange_.get() ? ViewKind::Arrangement : ViewKind::EventList;
+    return current_ == arrange_.get()     ? ViewKind::Arrangement
+           : current_ == pianoRoll_.get() ? ViewKind::PianoRoll
+                                          : ViewKind::EventList;
 }
 
 void Workspace::show(ViewKind kind)
@@ -321,7 +327,7 @@ void Workspace::show(ViewKind kind)
         switchTo(*eventList_, true);
         break;
     case ViewKind::PianoRoll:
-        setMessage("The piano roll comes later in milestone 5", MessageKind::Information);
+        switchTo(*pianoRoll_, true);
         break;
     }
 }

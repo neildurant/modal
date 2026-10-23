@@ -195,9 +195,10 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     }
     else if (command == "field-edit")
     {
-        // Enter opens the bar to edit: in the piano roll, when it comes; until then, in the
-        // event list.
-        host_.show(ViewKind::EventList);
+        // Enter opens the bar in the piano roll, the cursor at its start.
+        const auto& m = meter();
+        page_.setCursor(page_.track(), m.barStart(m.toBarBeatTick(page_.time()).bar));
+        host_.show(ViewKind::PianoRoll);
     }
     else
     {
@@ -691,7 +692,7 @@ std::string ArrangeView::cursorStatus() const
 
 SongCursor ArrangeView::cursor() const
 {
-    SongCursor cursor{.track = trackId(), .tick = page_.time(), .pitch = 60};
+    SongCursor cursor{.track = trackId(), .tick = page_.time(), .pitch = std::nullopt};
     if (const auto section = page_.stripCursor())
     {
         // On the strip, the section's start, on the track the cursor came from.
@@ -723,7 +724,10 @@ void ArrangeView::setCursor(const SongCursor& cursor)
         if (it != tracks.end())
         {
             track = static_cast<std::size_t>(it - tracks.begin());
-            pitches_[*cursor.track] = cursor.pitch;
+            if (cursor.pitch)
+            {
+                pitches_[*cursor.track] = *cursor.pitch;
+            }
         }
     }
     page_.setCursor(track, cursor.tick);

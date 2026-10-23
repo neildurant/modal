@@ -33,18 +33,20 @@ enum class MessageKind : std::uint8_t
 
 // The cursor the views share (decided for milestone 5): a track (none for the conductor), a
 // time and a pitch. Each view shows it its own way: the arrangement as the bar holding the
-// time, the piano roll as a crosshair, the event list as the row at the time.
+// time, the piano roll as a crosshair, the event list as the row at the time. The pitch is
+// none until there's one to keep, from a note or the piano roll, so the piano roll can start
+// at the middle of a track's notes.
 struct SongCursor
 {
     std::optional<core::TrackId> track;
     core::Tick tick = 0;
-    std::uint8_t pitch = 60;
+    std::optional<std::uint8_t> pitch;
 
     friend bool operator==(const SongCursor&, const SongCursor&) = default;
 };
 
 // The views of the song (decided for milestone 5): the arrangement, the home view; the piano
-// roll, to come; and the event list.
+// roll; and the event list.
 enum class ViewKind : std::uint8_t
 {
     Arrangement,
