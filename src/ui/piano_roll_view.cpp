@@ -310,7 +310,7 @@ bool PianoRollView::addNote(int count, bool advance)
 }
 
 bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t>& notes,
-                              core::Tick from)
+                              core::Tick from, core::Tick span)
 {
     const auto id = *trackId();
     const auto& events = document_.song().events(id);
@@ -323,6 +323,7 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
         event.tick -= from;
         taken.push_back(std::move(event));
     }
+    reg.span = span;
     const auto what = notes.size() == 1
                           ? core::pitchName(std::get<core::Note>(events[notes.front()].data).pitch)
                           : std::to_string(notes.size()) + " notes";
@@ -347,7 +348,7 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
     return true;
 }
 
-bool PianoRollView::put()
+bool PianoRollView::put(bool insert)
 {
     const auto& reg = host_.eventRegister();
     if (reg.empty())
@@ -362,7 +363,9 @@ bool PianoRollView::put()
         return true;
     }
     // At the cursor's time, at the notes' own pitches, onto this track and those after it for
-    // a register of several; refused where a note would run into one of its pitch there.
+    // a register of several; over what's there, refused where a note would run into one of its
+    // pitch, or with P inserted, moving what's after it in the section later, asking first if
+    // the section must grow.
     const auto& song = document_.song();
     const auto tracks = song.tracks();
     std::size_t total = 0;
@@ -372,9 +375,10 @@ bool PianoRollView::put()
         for (auto event : reg.tracks[i])
         {
             event.tick += time_;
-            if (auto why = overlap(song.events(id), std::nullopt, event, song.meter(id)))
+            const auto why = overlap(song.events(id), std::nullopt, event, song.meter(id));
+            if (why && !insert)
             {
-                host_.setMessage(std::move(*why), MessageKind::Warning);
+                host_.setMessage(*why, MessageKind::Warning);
                 return true;
             }
             ++total;
@@ -382,9 +386,38 @@ bool PianoRollView::put()
     }
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
-    document_.edit("Put " + eventCount(total) + " in " + where, place(),
-                   [&](core::Song& s) { putRegister(s, reg, track_, time_); });
-    refresh();
+    if (!insert)
+    {
+        document_.edit("Put " + eventCount(total) + " in " + where, place(),
+                       [&](core::Song& s) { putRegister(s, reg, track_, time_); });
+        refresh();
+        return true;
+    }
+    const auto bars = barsToInsert(song, reg, track_, time_);
+    const auto section = song.sectionAt(time_);
+    const auto title = "Insert " + eventCount(total) + " in " + where;
+    const auto insertIt = [this, reg, bars, section, title, at = time_, track = track_]
+    {
+        document_.edit(title, place(),
+                       [&](core::Song& s)
+                       {
+                           if (bars > 0)
+                           {
+                               s.resizeSection(section, bars);
+                           }
+                           rippleInsert(s, reg, track, at);
+                       });
+        refresh();
+    };
+    if (bars == 0)
+    {
+        insertIt();
+        return true;
+    }
+    host_.ask("Lengthen " + song.sections()[section]->name() + " by " +
+                  (bars == 1 ? std::string{"a bar"} : std::to_string(bars) + " bars") +
+                  " to make room?",
+              insertIt);
     return true;
 }
 
@@ -977,9 +1010,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return operate("operator-delete", "operator-line", count);
     }
-    else if (command == "register-put")
+    else if (command == "register-put" || command == "register-put-before")
     {
-        return put();
+        return put(command == "register-put-before");
     }
     else if (command == "move-left" || command == "move-right")
     {
@@ -1201,12 +1234,19 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     if (motion == "operator-line")
     {
         // dd, yy, x: the current note (a count waits, as o's does).
+        if (op == "operator-delete-ripple")
+        {
+            host_.setMessage("D takes a span of time, such as D} or D$", MessageKind::Warning);
+            return true;
+        }
         const auto index = noteHere(op == "operator-yank" ? "yank" : "delete");
         if (!index)
         {
             return true;
         }
-        return operateOn(op, {*index}, document_.song().events(*id)[*index].tick);
+        const auto& event = document_.song().events(*id)[*index];
+        return operateOn(op, {*index}, event.tick,
+                         std::max<core::Tick>(std::get<core::Note>(event.data).duration, 1));
     }
     if (motion == "cursor-up" || motion == "cursor-down" || motion == "octave-up" ||
         motion == "join")
@@ -1246,6 +1286,21 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return false;
     }
+    if (op == "operator-delete-ripple")
+    {
+        // All the track's events, not only notes, since time is taken out, as far as the
+        // section's end.
+        const auto& song = document_.song();
+        const auto& m = meter();
+        const auto end = std::min(to, sectionEndAt(song, from));
+        document_.edit("Delete " + positionText(m, from) + " to " + positionText(m, end) + " in " +
+                           trackName() + ", closing the gap",
+                       place(), [&](core::Song& s)
+                       { host_.eventRegister() = rippleDelete(s, track_, track_, from, end); });
+        refresh();
+        moveTo(from);
+        return true;
+    }
     std::vector<std::size_t> notes;
     const auto& events = document_.song().events(*id);
     for (std::size_t i = 0; i < events.size(); ++i)
@@ -1255,7 +1310,7 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
             notes.push_back(i);
         }
     }
-    return operateOn(op, notes, from);
+    return operateOn(op, notes, from, to - from);
 }
 
 Inspection PianoRollView::inspection() const

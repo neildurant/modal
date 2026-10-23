@@ -166,8 +166,9 @@ private:
     // the track's events, into the register with their ticks from a time; and puts the
     // register at the cursor's time.
     bool addNote(int count, bool advance);
-    bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from);
-    bool put();
+    bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from,
+                   core::Tick span);
+    bool put(bool insert);
     // Changes the current note, the cursor going with it, unless it would go before the song's
     // start or past its last tick, or run into another note of its pitch. The change says
     // whether it can be made, giving its own message if not.

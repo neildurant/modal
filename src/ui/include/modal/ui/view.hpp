@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -65,11 +66,13 @@ enum class ViewKind : std::uint8_t
 
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
 // deleted. Either an area's events, a list for each of its tracks from the top down, their
-// ticks from the area's start; or whole sections, from the section strip.
+// ticks from the area's start, and the area's length, which P makes room for (0 if it has
+// none, as from the event list's rows); or whole sections, from the section strip.
 struct EventRegister
 {
     std::vector<std::vector<core::Event>> tracks;
     std::vector<std::shared_ptr<const core::Section>> sections;
+    core::Tick span = 0;
 
     bool empty() const
     {
@@ -105,6 +108,10 @@ public:
 
     // Opens the : prompt with a line in it to edit, as naming a new section does.
     virtual void openPrompt(std::string line) = 0;
+
+    // Asks a question in the status line, running yes if the next key is y; any other key
+    // says no.
+    virtual void ask(std::string question, std::function<void()> yes) = 0;
 
     // Puts the play-from marker at a time and plays from there, as Enter on a section does.
     virtual void playFrom(core::Tick tick) = 0;

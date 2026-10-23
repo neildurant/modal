@@ -31,6 +31,10 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "operator-delete",
                 .description = "Delete the events a motion goes over (d}), or dd this event",
                 .count = true},
+    CommandInfo{.name = "operator-delete-ripple",
+                .description = "Delete the time a motion goes over and close the gap (D}), or "
+                               "DD this bar",
+                .count = true},
     CommandInfo{.name = "operator-yank",
                 .description = "Yank the events a motion goes over (y}), or yy this event",
                 .count = true},
@@ -243,8 +247,9 @@ void Workspace::buildOperatorKeymap()
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
         const auto* info = commands_.find(binding.command);
-        const bool again =
-            binding.command == "operator-delete" || binding.command == "operator-yank";
+        const bool again = binding.command == "operator-delete" ||
+                           binding.command == "operator-delete-ripple" ||
+                           binding.command == "operator-yank";
         const bool wanted = again || binding.command == "cancel" || (info && info->motion);
         if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
         {
@@ -266,7 +271,9 @@ std::string Workspace::pending() const
     if (operator_)
     {
         text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
-               (operator_->name == "operator-delete" ? "d" : "y");
+               (operator_->name == "operator-delete"          ? "d"
+                : operator_->name == "operator-delete-ripple" ? "D"
+                                                              : "y");
     }
     return text + keys_.pending();
 }
@@ -382,6 +389,20 @@ bool Workspace::handle(const Key& key, std::int64_t now)
 {
     lastTime_ = now;
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
+    // A question asked takes the next key as its answer: y for yes, any other for no.
+    if (auto yes = std::exchange(yes_, nullptr))
+    {
+        if (key.named == NamedKey::None && key.character == U'y' &&
+            (key.modifiers & (kCtrl | kAlt)) == 0)
+        {
+            yes();
+        }
+        else
+        {
+            setMessage("Nothing done", MessageKind::Information);
+        }
+        return true;
+    }
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
         (key.modifiers & (kCtrl | kAlt)) == 0)
@@ -491,7 +512,8 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         return runCommandLine(command);
     }
-    if (command == "operator-delete" || command == "operator-yank")
+    if (command == "operator-delete" || command == "operator-delete-ripple" ||
+        command == "operator-yank")
     {
         operator_ = PendingOperator{std::string{command}, count};
         mode_ = Mode::OperatorPending;
@@ -850,6 +872,12 @@ void Workspace::openPrompt(std::string line)
 {
     mode_ = Mode::CommandLine;
     line_.open(decodeUtf8(line));
+}
+
+void Workspace::ask(std::string question, std::function<void()> yes)
+{
+    setMessage(std::move(question) + " (y/n)", MessageKind::Warning);
+    yes_ = std::move(yes);
 }
 
 void Workspace::playFrom(core::Tick tick)

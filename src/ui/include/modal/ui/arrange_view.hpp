@@ -68,7 +68,9 @@ private:
 
     // Deletes or yanks the events starting in an area; puts the register at the cursor's bar.
     bool operateOn(std::string_view op, const Area& area);
-    bool put();
+    // Puts the register at the start of the cursor's bar, over what's there, or with insert
+    // moving what's after it in the section later (P), asking first if the section must grow.
+    bool put(bool insert);
 
     // The section strip: going onto it and back, its commands and operators, and what the
     // inspector shows of the section under the cursor.
@@ -82,6 +84,9 @@ private:
 
     // Changes the song as one undo step, made where the cursor is, and shows the change.
     void edit(std::string title, const std::function<void(core::Song&)>& change);
+    // Inserts the register at a time onto a track and those after it, as P does.
+    void insertRegister(const EventRegister& reg, std::size_t track, core::Tick at,
+                        const std::string& title);
 
     // An area's bars, in the cursor's track's bars, and its tracks, as words: "bars 3–4 of Bass".
     std::string describe(const Area& area) const;

@@ -1060,3 +1060,50 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     r.type(U"ggjjo");
     CHECK(r.view().time() == 0);
 }
+
+TEST_CASE("D in the piano roll takes time out of the track, controllers too, and P puts it in")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto& song = r.document.song();
+    const auto id = song.tracks()[0]->id();
+    r.document.edit("CC", {},
+                    [&](core::Song& s)
+                    {
+                        s.updateEvents(id, [&](core::EventList& events)
+                                       { events.insert({t.bar(4), core::ControlChange{1, 64}}); });
+                    });
+    const auto ccAt = [&]
+    {
+        for (const auto& event : song.events(id).all())
+        {
+            if (std::holds_alternative<core::ControlChange>(event.data))
+            {
+                return event.tick;
+            }
+        }
+        return core::Tick{-1};
+    };
+
+    r.type(U"3GD}"); // bar 3, empty: what's after it in the Verse moves up a bar
+    CHECK(ccAt() == t.bar(3));
+    CHECK(bassNote(r, 36)->first == t.bar(4) + 7);
+    CHECK(bassNote(r, 33)->first == t.bar(11));
+    CHECK(bassNote(r, 45)->first == t.bar(2)); // before it, in Section 1
+    r.type(U"u");
+    CHECK(ccAt() == t.bar(4));
+    r.type(U"DD");
+    CHECK(r.ws.message() == "D takes a span of time, such as D} or D$");
+
+    // The C2 yanked, then inserted where it is: it and what follows move on by its length.
+    r.type(U"5G");
+    r.press(Key::of(NamedKey::Tab));
+    r.type(U"yyP");
+    CHECK(bassNote(r, 36)->first == t.bar(5) + 7);
+    CHECK(bassNote(r, 36, t.bar(5) + 8)->first == t.bar(5) + 7 + t.sixteenth());
+    CHECK(bassNote(r, 33)->first == t.bar(12) + t.sixteenth());
+
+    r.type(U"geD}");
+    CHECK(r.ws.message() == "D isn't in the event list, which is for events rather than time");
+}

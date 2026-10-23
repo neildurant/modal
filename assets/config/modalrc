@@ -57,7 +57,9 @@ nmap ,n         note-default              "Default note from this one"
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
 " with counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity. d and y take a motion (d} up to where } goes, dj this event and the next),
 " or dd and yy this event; x deletes it, p puts what was yanked or deleted at the cursor's
-" time, and u and Ctrl-R undo and redo
+" time, and u and Ctrl-R undo and redo. In the arrangement and the piano roll, D deletes time
+" and closes the gap (D}, or DD this bar in the arrangement) and P inserts what was yanked,
+" moving the rest of the section later; ripple stops at the section's end.
 nmap <CR>       field-edit        "Edit this field"
 nmap +          field-increase-fine "Step up"
 nmap =          field-increase    "Step up"
@@ -67,6 +69,7 @@ nmap _          field-decrease-fine "Step down"
 nmap <C-x>      number-decrease   "Step down"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
+nmap D          operator-delete-ripple "Delete and close the gap"
 nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"

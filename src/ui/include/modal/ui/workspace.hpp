@@ -145,6 +145,7 @@ public:
 private:
     void startTyping() override { mode_ = Mode::CommandLine; }
     void openPrompt(std::string line) override;
+    void ask(std::string question, std::function<void()> yes) override;
     void playFrom(core::Tick tick) override;
     void stopTyping() override { mode_ = Mode::Normal; }
     EventRegister& eventRegister() override { return register_; }
@@ -201,10 +202,11 @@ private:
     KeyDispatcher keys_;
     struct PendingOperator
     {
-        std::string name; // operator-delete or operator-yank
+        std::string name; // operator-delete, operator-delete-ripple or operator-yank
         int count;
     };
     std::optional<PendingOperator> operator_;
+    std::function<void()> yes_; // what a question asked runs, if the answer is y
     EventRegister register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;

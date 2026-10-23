@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace modal::ui
@@ -154,6 +155,120 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
                           { events = core::merged(events, std::move(added)); });
     }
     return put;
+}
+
+core::Tick sectionEndAt(const core::Song& song, core::Tick tick)
+{
+    return song.sectionStart(song.sectionAt(tick) + 1);
+}
+
+EventRegister rippleDelete(core::Song& song, std::size_t first, std::size_t last, core::Tick from,
+                           core::Tick to)
+{
+    EventRegister removed;
+    const auto end = sectionEndAt(song, from);
+    to = std::min(to, end);
+    removed.span = std::max<core::Tick>(to - from, 0);
+    const auto tracks = song.tracks();
+    for (auto i = first; i <= last && i < tracks.size(); ++i)
+    {
+        auto& taken = removed.tracks.emplace_back();
+        song.updateEvents(tracks[i]->id(),
+                          [&](core::EventList& events)
+                          {
+                              core::EventList kept;
+                              for (auto event : events.all())
+                              {
+                                  if (event.tick >= from && event.tick < to)
+                                  {
+                                      event.tick -= from;
+                                      taken.push_back(std::move(event));
+                                      continue;
+                                  }
+                                  if (event.tick >= to && event.tick < end)
+                                  {
+                                      event.tick -= to - from;
+                                  }
+                                  kept.insert(std::move(event));
+                              }
+                              events = std::move(kept);
+                          });
+    }
+    return removed;
+}
+
+core::Tick registerSpan(const EventRegister& reg)
+{
+    if (reg.span > 0)
+    {
+        return reg.span;
+    }
+    core::Tick span = 0;
+    for (const auto& events : reg.tracks)
+    {
+        for (const auto& event : events)
+        {
+            const auto* note = std::get_if<core::Note>(&event.data);
+            span =
+                std::max(span, event.tick + (note ? std::max<core::Tick>(note->duration, 1) : 1));
+        }
+    }
+    return span;
+}
+
+std::int64_t barsToInsert(const core::Song& song, const EventRegister& reg, std::size_t firstTrack,
+                          core::Tick at)
+{
+    // The latest start once inserted: the events moved on, and the register's own.
+    const auto end = sectionEndAt(song, at);
+    const auto span = registerSpan(reg);
+    const auto tracks = song.tracks();
+    core::Tick latest = -1;
+    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    {
+        for (const auto& event : reg.tracks[i])
+        {
+            latest = std::max(latest, at + event.tick);
+        }
+        for (const auto& event : song.events(tracks[firstTrack + i]->id()).startingIn(at, end))
+        {
+            latest = std::max(latest, event.tick + span);
+        }
+    }
+    // A bar at a time, in the meter the section ends in, until it reaches.
+    const auto section = song.sectionAt(at);
+    auto longer = song;
+    std::int64_t bars = 0;
+    while (longer.sectionStart(section + 1) <= latest && longer.resizeSection(section, 1))
+    {
+        ++bars;
+    }
+    return bars;
+}
+
+Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at)
+{
+    const auto end = sectionEndAt(song, at);
+    const auto span = registerSpan(reg);
+    const auto tracks = song.tracks();
+    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    {
+        song.updateEvents(tracks[firstTrack + i]->id(),
+                          [&](core::EventList& events)
+                          {
+                              core::EventList moved;
+                              for (auto event : events.all())
+                              {
+                                  if (event.tick >= at && event.tick < end)
+                                  {
+                                      event.tick += span;
+                                  }
+                                  moved.insert(std::move(event));
+                              }
+                              events = std::move(moved);
+                          });
+    }
+    return putRegister(song, reg, firstTrack, at);
 }
 
 std::string eventCount(std::size_t events)

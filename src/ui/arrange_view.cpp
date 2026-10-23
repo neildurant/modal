@@ -188,9 +188,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*to);
     }
-    else if (command == "register-put")
+    else if (command == "register-put" || command == "register-put-before")
     {
-        return put();
+        return put(command == "register-put-before");
     }
     else if (command == "event-delete")
     {
@@ -288,10 +288,17 @@ std::string ArrangeView::describe(const Area& area) const
     return bars + " of " + which;
 }
 
-bool ArrangeView::operateOn(std::string_view op, const Area& area)
+bool ArrangeView::operateOn(std::string_view op, const Area& given)
 {
-    // The events starting in the area, as the register's, their ticks from its start.
+    // The events starting in the area, as the register's, their ticks from its start; with D,
+    // as far as the section's end, where ripple stops.
     const auto& song = document_.song();
+    auto area = given;
+    const bool ripple = op == "operator-delete-ripple";
+    if (ripple)
+    {
+        area.to = std::min(area.to, sectionEndAt(song, area.from));
+    }
     const auto tracks = song.tracks();
     EventRegister taken;
     std::size_t total = 0;
@@ -305,8 +312,16 @@ bool ArrangeView::operateOn(std::string_view op, const Area& area)
         }
         total += events.size();
     }
+    taken.span = area.to - area.from;
     host_.eventRegister() = taken;
     auto what = describe(area);
+    if (ripple)
+    {
+        edit("Delete " + what + ", closing the gap",
+             [&](core::Song& s) { rippleDelete(s, area.top, area.bottom, area.from, area.to); });
+        page_.setCursor(area.top, area.from);
+        return true;
+    }
     if (op == "operator-yank")
     {
         what[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(what[0])));
@@ -341,7 +356,7 @@ bool ArrangeView::operateOn(std::string_view op, const Area& area)
     return true;
 }
 
-bool ArrangeView::put()
+bool ArrangeView::put(bool insert)
 {
     const auto& reg = host_.eventRegister();
     if (reg.empty())
@@ -371,10 +386,45 @@ bool ArrangeView::put()
     const auto tracks = document_.song().tracks();
     const auto name =
         tracks[track]->name.empty() ? "track " + std::to_string(track + 1) : tracks[track]->name;
-    edit("Put " + eventCount(total) + " in " + name +
-             (reg.tracks.size() > 1 ? " and the tracks after it" : ""),
-         [&](core::Song& song) { putRegister(song, reg, track, at); });
+    const auto where = name + (reg.tracks.size() > 1 ? " and the tracks after it" : "");
+    if (!insert)
+    {
+        edit("Put " + eventCount(total) + " in " + where,
+             [&](core::Song& song) { putRegister(song, reg, track, at); });
+        return true;
+    }
+    insertRegister(reg, track, at, "Insert " + eventCount(total) + " in " + where);
     return true;
+}
+
+void ArrangeView::insertRegister(const EventRegister& reg, std::size_t track, core::Tick at,
+                                 const std::string& title)
+{
+    // Asking first, if the section must grow to make room, by whole bars on every track.
+    const auto& song = document_.song();
+    const auto bars = barsToInsert(song, reg, track, at);
+    const auto section = song.sectionAt(at);
+    const auto insert = [this, reg, track, at, bars, section, title]
+    {
+        edit(title,
+             [&](core::Song& s)
+             {
+                 if (bars > 0)
+                 {
+                     s.resizeSection(section, bars);
+                 }
+                 rippleInsert(s, reg, track, at);
+             });
+    };
+    if (bars == 0)
+    {
+        insert();
+        return;
+    }
+    host_.ask("Lengthen " + song.sections()[section]->name() + " by " +
+                  (bars == 1 ? std::string{"a bar"} : std::to_string(bars) + " bars") +
+                  " to make room?",
+              insert);
 }
 
 void ArrangeView::edit(std::string title, const std::function<void(core::Song&)>& change)

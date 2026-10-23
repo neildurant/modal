@@ -597,6 +597,12 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
 
 bool EventListView::operate(std::string_view op, std::string_view motion, int count)
 {
+    if (op == "operator-delete-ripple")
+    {
+        setMessage("D isn't in the event list, which is for events rather than time",
+                   MessageKind::Information);
+        return true;
+    }
     if (motion == "operator-line")
     {
         return operateRows(op, row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1);

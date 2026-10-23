@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 using namespace modal;
@@ -550,4 +551,102 @@ TEST_CASE("Enter on a section plays from its start")
     s.type(U"gsl");
     s.press(Key::of(NamedKey::Enter));
     CHECK(s.ws.message() == "Nothing to play to"); // there's no player here
+}
+
+namespace
+{
+
+// Eight bars of 4/4 in two sections, Section 1 of bars 1–4 and B of bars 5–8, with a note on
+// each bar's start on the first track, pitch 60 plus the bar's number, and one on the second
+// track's first bar.
+core::Song barNotes()
+{
+    core::Song song{core::kPpqn};
+    const auto first = song.addTrack("One");
+    const auto second = song.addTrack("Two");
+    const auto bar = [&](std::int64_t n) { return song.meter().barStart(n); };
+    song.updateEvents(first,
+                      [&](core::EventList& events)
+                      {
+                          for (std::int64_t n = 1; n <= 8; ++n)
+                          {
+                              events.insert({bar(n), core::Note{static_cast<std::uint8_t>(60 + n),
+                                                                100, core::kPpqn.quarter()}});
+                          }
+                      });
+    song.updateEvents(second, [&](core::EventList& events)
+                      { events.insert({0, core::Note{40, 100, core::kPpqn.quarter()}}); });
+    song.splitSection(bar(5), "B");
+    return song;
+}
+
+// The bar each note of a track starts in, as bar and pitch.
+std::vector<std::pair<std::int64_t, int>> notesByBar(const Arranging& a, std::size_t track)
+{
+    std::vector<std::pair<std::int64_t, int>> notes;
+    const auto& song = a.document.song();
+    for (const auto& event : song.events(song.tracks()[track]->id()).all())
+    {
+        if (const auto* note = std::get_if<core::Note>(&event.data))
+        {
+            notes.emplace_back(song.meter().toBarBeatTick(event.tick).bar, note->pitch);
+        }
+    }
+    return notes;
+}
+
+using BarNotes = std::vector<std::pair<std::int64_t, int>>;
+
+} // namespace
+
+TEST_CASE("D deletes bars and closes the gap, as far as the section's end")
+{
+    Arranging a{barNotes()};
+    const auto before = notesByBar(a, 0);
+    a.type(U"lDl"); // bar 2: bars 3 and 4 move up, bar 4 left silent
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 61}, {2, 63}, {3, 64}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
+    CHECK(notesByBar(a, 1) == BarNotes{{1, 40}});
+    CHECK(a.ws.registerEvents().size() == 1);
+    CHECK(a.ws.registerArea().span == a.document.song().meter().barStart(2));
+    a.type(U"u");
+    CHECK(notesByBar(a, 0) == before);
+
+    a.type(U"lDG"); // from bar 3, stopping at the section's end
+    CHECK(notesByBar(a, 0) == BarNotes{{1, 61}, {2, 62}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
+    a.type(U"u");
+    a.type(U"ggDD");
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 62}, {2, 63}, {3, 64}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
+    CHECK(a.document.song().sectionStart(1) == a.document.song().meter().barStart(5));
+}
+
+TEST_CASE("P inserts what was yanked, moving the rest of the section later, asking to grow it")
+{
+    Arranging a{barNotes()};
+    const auto& song = a.document.song();
+    const auto before = notesByBar(a, 0);
+    a.type(U"yylP"); // bar 1's note into bar 2: bar 4's would go past the section's end
+    CHECK(a.ws.message() == "Lengthen Section 1 by a bar to make room? (y/n)");
+    a.type(U"n");
+    CHECK(a.ws.message() == "Nothing done");
+    CHECK(notesByBar(a, 0) == before);
+
+    a.type(U"Py");
+    CHECK(
+        notesByBar(a, 0) ==
+        BarNotes{{1, 61}, {2, 61}, {3, 62}, {4, 63}, {5, 64}, {6, 65}, {7, 66}, {8, 67}, {9, 68}});
+    CHECK(song.sectionStart(1) == song.meter().barStart(6));
+    CHECK(notesByBar(a, 1) == BarNotes{{1, 40}});
+    a.type(U"u"); // the growing and the insert as one step
+    CHECK(notesByBar(a, 0) == before);
+    CHECK(song.sectionStart(1) == song.meter().barStart(5));
+
+    // With room at the section's end, no question; an empty bar inserts silence.
+    a.type(U"gg3lyy"); // bar 4
+    a.type(U"x");      // now empty
+    a.type(U"ggyyP");
+    CHECK(a.ws.message().empty());
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 61}, {2, 61}, {3, 62}, {4, 63}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
 }
