@@ -621,7 +621,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         }
     }
     // The section strip: each section a block across its span, neighbours in two shades, named
-    // as far as there's room; the cursor's section boxed when the cursor is on the strip.
+    // as far as there's room, in the colour of the sections' lines; the cursor's section boxed when
+    // the cursor is on the strip.
     {
         const int y = kStripRow * cell_.height;
         const int stripInset = std::max(cell_.height / 10, 1);
@@ -658,11 +659,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
             }
             if (!name.empty())
             {
-                const bool cursor = stripCursor_ == i;
-                timeline.text.push_back({x0 + lineWidth,
-                                         y,
-                                         std::move(name),
-                                         {Role::Text, Role::Background, cursor ? kBold : kPlain}});
+                timeline.text.push_back(
+                    {x0 + lineWidth, y, std::move(name), {Role::Marker, Role::Background, kBold}});
             }
             if (stripCursor_ == i)
             {
