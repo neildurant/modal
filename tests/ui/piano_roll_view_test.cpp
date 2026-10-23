@@ -301,38 +301,43 @@ TEST_CASE("scrolling the piano roll in time keeps its scale over bars of another
     CHECK(length() == t.quarters(12));
 }
 
-TEST_CASE("zooming the piano roll keeps the bar line nearest the cursor in its place")
+TEST_CASE("zooming the piano roll keeps the cursor in its place on screen")
 {
-    Rolling r;
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
     r.type(U"5G"); // bars 5-8 in view
-    r.type(U"2}"); // the start of bar 7, the third
-    r.type(U"zo"); // eight bars: bar 7 the fifth
+    r.type(U"2}"); // the start of bar 7, halfway across
+    r.type(U"zo"); // eight bars, bar 7 still halfway
     CHECK(r.view().pageBars() == 8);
     CHECK(r.view().page().firstBar == 3);
     CHECK(r.view().page().lastBar == 10);
-    r.type(U"zi"); // back
+    r.type(U"zi");
     CHECK(r.view().page().firstBar == 5);
-    r.type(U"zi"); // two bars: bar 7 the second
+    r.type(U"zi"); // two bars
     CHECK(r.view().page().firstBar == 6);
     CHECK(r.view().page().lastBar == 7);
+
+    // z0 goes back to whole bars, the section's page holding the cursor.
     r.type(U"z0");
     CHECK(r.view().pageBars() == 4);
-    CHECK(r.view().page().firstBar == 5);
+    CHECK(r.view().page().start == t.bar(7));
 
-    // Near the start it shifts as little as it must; and the cursor stays in view.
-    r.type(U"3G"); // bar 3, in the view of bars 1-4 after turning back
+    // Off the bar lines too, zooming out and back in comes back to the same view.
+    r.type(U"3w"); // beat 4, three quarters of sixteen across
     r.type(U"zo");
-    CHECK(r.view().page().firstBar == 1);
-    r.type(U"G"); // bar 12's last grid step: the nearest bar line is 13's
-    r.type(U"4zi");
+    CHECK(r.view().page().start == t.bar(7) - t.quarters(3));
+    r.type(U"zozizi");
+    CHECK(r.view().page().start == t.bar(7));
+
+    // Near the start the view stops at bar 1; and the cursor always stays in view.
+    r.type(U"gg2wzo");
+    CHECK(r.view().page().start == 0);
+    CHECK(r.view().time() == t.quarters(2));
+    r.type(U"G4zi");
     CHECK(r.view().pageBars() == 1);
-    CHECK(r.view().page().firstBar == 12);
-
-    // From a view off the bar lines, whole bars again.
-    r.type(U"z0wzz");
-    REQUIRE(r.view().page().start != r.t.bar(r.view().page().firstBar));
-    r.type(U"zo");
-    CHECK(r.view().page().start == r.t.bar(r.view().page().firstBar));
+    CHECK(r.view().time() >= r.view().page().start);
+    CHECK(r.view().time() < r.view().page().end);
 }
 
 TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")

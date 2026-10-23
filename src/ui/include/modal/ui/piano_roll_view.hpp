@@ -115,7 +115,7 @@ private:
     void turn();
     // Shows the section's page of whole bars holding the cursor, as when a track opens.
     void align();
-    // Zooms to a page size, anchoring the view on the bar line nearest the cursor.
+    // Zooms to a page size, keeping the cursor's place on screen.
     void zoomTo(std::size_t size);
     core::Tick gridTicks() const;
     // The grid steps, counted from each bar line: the next after a tick, and the last before.

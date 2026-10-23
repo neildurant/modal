@@ -281,22 +281,22 @@ void PianoRollView::turn()
 
 void PianoRollView::zoomTo(std::size_t size)
 {
-    // The bar line nearest the cursor, and how far across the view it is, in bars of the new
-    // size, which it keeps as near as it can; with the cursor in view.
-    const auto& m = meter();
-    const auto start = viewStart_;
-    const auto width = viewEnd(start) - start;
+    // The cursor kept at the same place across the view, so zooming back returns to the same
+    // view; as far as the view can't start before bar 1.
+    const auto across = time_ - viewStart_;
+    const auto width = viewEnd(viewStart_) - viewStart_;
     viewLength_.reset();
-    const auto bar = m.toBarBeatTick(time_).bar;
-    const auto barStart = m.barStart(bar);
-    const auto anchorBar = (time_ - barStart) * 2 < m.barStart(bar + 1) - barStart ? bar : bar + 1;
-    const auto across = std::clamp<core::Tick>(m.barStart(anchorBar) - start, 0, width);
     pageSize_ = size;
-    const auto bars = pageBars();
-    const auto before = (2 * bars * across + width) / (2 * width); // rounded
-    auto first = std::max<std::int64_t>(anchorBar - before, 1);
-    first = std::clamp(first, bar - bars + 1, bar);
-    viewStart_ = m.barStart(std::max<std::int64_t>(first, 1));
+    // The new view's length depends on where it starts, over bars of different lengths; a
+    // few rounds settle it.
+    auto start = time_;
+    for (int round = 0; round < 3; ++round)
+    {
+        const auto length = viewEnd(start) - start;
+        start = std::max<core::Tick>(time_ - across * length / width, 0);
+    }
+    viewStart_ = start;
+    turn();
 }
 
 PianoRollView::Page PianoRollView::page() const
@@ -713,7 +713,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     else if (command == "zoom-reset")
     {
-        zoomTo(kDefaultPageSize);
+        // The default number of bars, as whole bars, the page holding the cursor.
+        pageSize_ = kDefaultPageSize;
+        align();
     }
     else if (command == "grid-coarser" || command == "grid-finer")
     {
