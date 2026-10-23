@@ -776,18 +776,21 @@ void ArrangeView::showSong()
     pitches_.clear();
 }
 
-void ArrangeView::showPlayhead(core::Tick playhead, bool cursorFollows)
+void ArrangeView::showPlayhead(core::Tick playhead, Follow follow)
 {
     page_.setPlayhead(playhead);
-    if (cursorFollows && page_.stripCursor())
+    if (follow == Follow::Cursor && page_.stripCursor())
     {
         page_.setStripCursor(document_.song().sectionAt(playhead));
     }
-    else if (cursorFollows)
+    else if (follow == Follow::Cursor)
     {
         page_.setCursor(page_.track(), playhead);
     }
-    page_.showTime(playhead, true);
+    if (follow != Follow::None)
+    {
+        page_.showTime(playhead, true);
+    }
 }
 
 void ArrangeView::stopPlayhead(std::optional<core::Tick> cursorTo)

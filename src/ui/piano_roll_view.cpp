@@ -1339,16 +1339,16 @@ void PianoRollView::showSong()
     pageSizes_.clear();
 }
 
-void PianoRollView::showPlayhead(core::Tick playhead, bool cursorFollows)
+void PianoRollView::showPlayhead(core::Tick playhead, Follow follow)
 {
     // The pages turn with the playhead, and following, the cursor goes with it too; if not,
     // the view comes back to the cursor when playback stops.
     playhead_ = playhead;
-    if (cursorFollows)
+    if (follow == Follow::Cursor)
     {
         moveTo(playhead);
     }
-    else
+    else if (follow == Follow::View)
     {
         turn(playhead);
     }

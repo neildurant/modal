@@ -180,6 +180,32 @@ TEST_CASE("m Space puts the marker at the cursor, and Ctrl-Space plays from ther
     CHECK(p.view.playheadRow() == 10);
 }
 
+TEST_CASE("moving the cursor while playing lets go of the playhead, until zf or playing again")
+{
+    Playing p;
+    p.type(U" ");
+    p.runFor(11s);
+    REQUIRE(p.view.top() > 0); // scrolled with the playhead
+    p.type(U"gg");
+    CHECK(p.view.top() == 0);
+    p.runFor(2s);
+    CHECK(p.view.top() == 0); // staying with the cursor
+    p.type(U"zf");
+    CHECK(p.view.top() > 0);
+
+    // Stopping goes back to the cursor, even without rewind, once moved away.
+    p.type(U"gg");
+    p.ws.setRewind(false);
+    p.type(U" ");
+    p.runFor(1ms);
+    CHECK(p.view.row() == 0);
+
+    // Playing again follows again.
+    p.type(U" ");
+    p.runFor(11s);
+    CHECK(p.view.top() > 0);
+}
+
 TEST_CASE("the piano roll shows the play-from marker in its ruler")
 {
     Playing p;

@@ -50,6 +50,8 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
     CommandInfo{.name = "panic",
                 .description = "Stop, and send All Notes Off and Reset All Controllers"},
+    CommandInfo{.name = "playhead-follow",
+                .description = "Follow the playhead again, after moving away from it"},
     CommandInfo{.name = "port",
                 .description = "Set the track's output port, by its name or part of it; or "
                                "with no name, show it and list the ports",
@@ -458,8 +460,19 @@ CommandResult Workspace::run(std::string_view command, int count)
 
 bool Workspace::runViewCommand(std::string_view command, int count)
 {
+    const auto cursor = view().cursor();
     if (const auto changed = view().run(command, count))
     {
+        // Moving the cursor or scrolling while playing lets go of the playhead (decided
+        // October 2026, as in most sequencers): the view stays with the cursor, until
+        // playback starts again or playhead-follow. A motion that leaves the cursor where it
+        // is still brings the view back to it.
+        const bool moves = command.starts_with("cursor-") || command.starts_with("scroll-") ||
+                           command.starts_with("go-");
+        if (wasPlaying_ && (moves || view().cursor() != cursor))
+        {
+            following_ = false;
+        }
         return *changed;
     }
     const auto* info = commands_.find(command);
@@ -498,6 +511,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         command == "panic")
     {
         return transport(command);
+    }
+    if (command == "playhead-follow")
+    {
+        following_ = true;
+        showPlayhead();
+        return true;
     }
     if (command == "rewind-toggle")
     {
@@ -629,6 +648,7 @@ bool Workspace::transport(std::string_view command)
         if (command == "play-cursor")
         {
             player_->play();
+            following_ = true;
         }
     }
     else
@@ -660,16 +680,25 @@ void Workspace::setRewind(bool rewind)
 void Workspace::showPlayhead()
 {
     const bool playing = player_ != nullptr && player_->playing();
+    if (playing && !wasPlaying_)
+    {
+        following_ = true;
+    }
     if (playing)
     {
         // Until the engine starts, the playhead is at the marker, where it will start.
-        view().showPlayhead(player_->position().value_or(player_->marker()), !rewind_);
+        view().showPlayhead(player_->position().value_or(player_->marker()),
+                            !following_ ? Follow::None
+                            : rewind_   ? Follow::View
+                                        : Follow::Cursor);
     }
     else if (wasPlaying_)
     {
-        // Stopped: with rewind, back to the cursor; otherwise the cursor goes with the marker
-        // to where playback stopped, once the engine says where.
-        view().stopPlayhead(rewind_ ? std::nullopt : std::optional{player_->marker()});
+        // Stopped: with rewind, or once moved away from the playhead, back to the cursor;
+        // otherwise the cursor goes with the marker to where playback stopped, once the
+        // engine says where.
+        view().stopPlayhead(rewind_ || !following_ ? std::nullopt
+                                                   : std::optional{player_->marker()});
     }
     wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
 }
@@ -813,6 +842,7 @@ void Workspace::playFrom(core::Tick tick)
     }
     player_->setMarker(tick);
     player_->play();
+    following_ = true;
     showPlayhead();
 }
 

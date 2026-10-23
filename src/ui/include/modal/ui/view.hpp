@@ -45,6 +45,15 @@ struct SongCursor
     friend bool operator==(const SongCursor&, const SongCursor&) = default;
 };
 
+// How a view goes with the playhead while playing: not at all, once the view's been moved
+// away from it; its view only, the cursor staying put (with rewind); or the cursor too.
+enum class Follow
+{
+    None,
+    View,
+    Cursor,
+};
+
 // The views of the song (decided for milestone 5): the arrangement, the home view; the piano
 // roll; and the event list.
 enum class ViewKind : std::uint8_t
@@ -164,9 +173,9 @@ public:
     virtual void refresh() = 0;
     virtual void showSong() = 0;
 
-    // The playhead while playing, with the cursor following it if asked; then its end, the
-    // cursor going to a time if one is given.
-    virtual void showPlayhead(core::Tick playhead, bool cursorFollows) = 0;
+    // The playhead while playing, the view and the cursor following it as asked; then its end,
+    // the cursor going to a time if one is given.
+    virtual void showPlayhead(core::Tick playhead, Follow follow) = 0;
     virtual void stopPlayhead(std::optional<core::Tick> cursorTo) = 0;
 
     // Typing in place, as the event list's field editing does, once the view has called

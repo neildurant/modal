@@ -233,13 +233,17 @@ std::size_t EventListView::rowAtOrBefore(core::Tick tick) const
     return after > 0 ? after - 1 : 0;
 }
 
-void EventListView::showPlayhead(core::Tick playhead, bool cursorFollows)
+void EventListView::showPlayhead(core::Tick playhead, Follow follow)
 {
     const auto row = rowAtOrBefore(playhead);
     playheadRow_ = row;
-    if (cursorFollows)
+    if (follow == Follow::Cursor)
     {
         row_ = row;
+    }
+    if (follow == Follow::None)
+    {
+        return;
     }
     // The playhead moves down to a third of the way down the view, and then the list
     // scrolls under it, so what's coming next shows, until the list's end comes into view.

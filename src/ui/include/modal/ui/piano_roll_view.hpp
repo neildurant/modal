@@ -69,7 +69,7 @@ public:
     void restore(const core::EditPlace& place) override;
     void refresh() override;
     void showSong() override;
-    void showPlayhead(core::Tick playhead, bool cursorFollows) override;
+    void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
 
     // What's in view (see Piano roll pages in the design): where it starts and ends in time,

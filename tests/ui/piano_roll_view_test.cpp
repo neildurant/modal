@@ -563,7 +563,7 @@ TEST_CASE("gt and gT go between the tracks in the piano roll, each keeping its p
 TEST_CASE("the piano roll follows the playhead from page to page")
 {
     Rolling r;
-    r.ws.pianoRoll().showPlayhead(r.t.bar(8), true);
+    r.ws.pianoRoll().showPlayhead(r.t.bar(8), Follow::Cursor);
     CHECK(r.view().page().firstBar == 5);
     r.ws.pianoRoll().stopPlayhead(r.t.bar(1));
     CHECK(r.view().time() == 0);
@@ -571,9 +571,11 @@ TEST_CASE("the piano roll follows the playhead from page to page")
 
     // Not following, the pages turn with the playhead, the cursor staying where it is, and
     // come back to it when playback stops.
-    r.ws.pianoRoll().showPlayhead(r.t.bar(4), false);
+    r.ws.pianoRoll().showPlayhead(r.t.bar(4), Follow::View);
     CHECK(r.view().page().firstBar == 1);
-    r.ws.pianoRoll().showPlayhead(r.t.bar(6), false);
+    r.ws.pianoRoll().showPlayhead(r.t.bar(6), Follow::View);
+    r.ws.pianoRoll().showPlayhead(r.t.bar(10), Follow::None); // moved away from it
+    CHECK(r.view().page().firstBar == 5);
     CHECK(r.view().page().firstBar == 5);
     CHECK(r.view().time() == 0);
     r.ws.pianoRoll().stopPlayhead(std::nullopt);

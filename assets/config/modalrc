@@ -102,6 +102,7 @@ nmap zz         scroll-centre     "Centre the cursor"
 nmap zi         zoom-in           "Zoom in"
 nmap zo         zoom-out          "Zoom out"
 nmap z0         zoom-reset        "Zoom as at the start"
+nmap zf         playhead-follow   "Follow the playhead again"
 
 " Views: the arrangement, the piano roll and the event list, each at the cursor, and
 " Backspace back to the view before

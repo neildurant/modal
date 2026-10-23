@@ -51,7 +51,7 @@ public:
     void restore(const core::EditPlace& place) override;
     void refresh() override;
     void showSong() override;
-    void showPlayhead(core::Tick playhead, bool cursorFollows) override;
+    void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
 
     const ArrangePage& page() const { return page_; }

@@ -219,6 +219,7 @@ private:
     core::Player* player_ = nullptr;
     bool rewind_ = true;
     bool wasPlaying_ = false;   // or stopping, until the player knows where it stopped
+    bool following_ = true;     // the views following the playhead, until moved away from it
     std::int64_t lastTime_ = 0; // of the last key or wake-up
 };
 
