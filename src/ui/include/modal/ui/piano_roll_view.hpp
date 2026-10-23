@@ -112,9 +112,9 @@ private:
     // holding a tick starts, pages restarting at each section.
     core::Tick viewEnd(core::Tick start) const;
     core::Tick pageStart(core::Tick tick) const;
-    // Turns the view by its own width until the cursor is in it, keeping its place in the bar,
-    // as many bars wide again.
-    void turn();
+    // Turns the view by its own width until a time, the cursor's or the playhead's, is in it,
+    // keeping its place in the bar, as many bars wide again.
+    void turn(core::Tick tick);
     // Shows the section's page of whole bars holding the cursor, as when a track opens.
     void align();
     // Zooms to a page size, keeping the cursor's place on screen.

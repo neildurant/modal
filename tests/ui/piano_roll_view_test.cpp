@@ -565,10 +565,19 @@ TEST_CASE("the piano roll follows the playhead from page to page")
     Rolling r;
     r.ws.pianoRoll().showPlayhead(r.t.bar(8), true);
     CHECK(r.view().page().firstBar == 5);
-    r.ws.pianoRoll().showPlayhead(r.t.bar(9), false); // not following: the page stays
-    CHECK(r.view().page().firstBar == 5);
     r.ws.pianoRoll().stopPlayhead(r.t.bar(1));
     CHECK(r.view().time() == 0);
+    CHECK(r.view().page().firstBar == 1);
+
+    // Not following, the pages turn with the playhead, the cursor staying where it is, and
+    // come back to it when playback stops.
+    r.ws.pianoRoll().showPlayhead(r.t.bar(4), false);
+    CHECK(r.view().page().firstBar == 1);
+    r.ws.pianoRoll().showPlayhead(r.t.bar(6), false);
+    CHECK(r.view().page().firstBar == 5);
+    CHECK(r.view().time() == 0);
+    r.ws.pianoRoll().stopPlayhead(std::nullopt);
+    CHECK(r.view().page().firstBar == 1);
 }
 
 TEST_CASE("the piano roll shows a song with no tracks")

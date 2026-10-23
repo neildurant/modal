@@ -257,18 +257,18 @@ void PianoRollView::align()
     viewStart_ = pageStart(time_);
 }
 
-void PianoRollView::turn()
+void PianoRollView::turn(core::Tick tick)
 {
     const auto& m = meter();
     for (;;)
     {
         const auto end = viewEnd(viewStart_);
-        if (time_ >= viewStart_ && time_ < end)
+        if (tick >= viewStart_ && tick < end)
         {
             return;
         }
         viewLength_.reset();
-        if (time_ >= end)
+        if (tick >= end)
         {
             viewStart_ = end;
         }
@@ -297,7 +297,7 @@ void PianoRollView::zoomTo(std::size_t size)
         start = std::max<core::Tick>(time_ - across * length / width, 0);
     }
     viewStart_ = start;
-    turn();
+    turn(time_);
 }
 
 PianoRollView::Page PianoRollView::page() const
@@ -357,7 +357,7 @@ std::uint8_t PianoRollView::middlePitch() const
 void PianoRollView::moveTo(core::Tick tick)
 {
     time_ = std::clamp<core::Tick>(tick, 0, lastTick());
-    turn();
+    turn(time_);
 }
 
 void PianoRollView::moveToPitch(int pitch)
@@ -604,7 +604,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         // In time and in pitch.
         viewStart_ = std::max<core::Tick>(time_ - (viewEnd(viewStart_) - viewStart_) / 2, 0);
-        turn();
+        turn(time_);
         centre();
     }
     else if (command == "cursor-note-next" || command == "cursor-note-previous")
@@ -1310,7 +1310,7 @@ void PianoRollView::restore(const core::EditPlace& place)
             place.view[2], 0, static_cast<std::int64_t>(kPageSizes.size()) - 1));
         viewStart_ = std::max<core::Tick>(place.view[3], 0);
         viewLength_ = place.view[4] > 0 ? std::optional{place.view[4]} : std::nullopt;
-        turn();
+        turn(time_);
         follow();
     }
 }
@@ -1341,21 +1341,23 @@ void PianoRollView::showSong()
 
 void PianoRollView::showPlayhead(core::Tick playhead, bool cursorFollows)
 {
-    // Following, the cursor goes with the playhead, and the pages turn with it.
+    // The pages turn with the playhead, and following, the cursor goes with it too; if not,
+    // the view comes back to the cursor when playback stops.
     playhead_ = playhead;
     if (cursorFollows)
     {
         moveTo(playhead);
+    }
+    else
+    {
+        turn(playhead);
     }
 }
 
 void PianoRollView::stopPlayhead(std::optional<core::Tick> cursorTo)
 {
     playhead_.reset();
-    if (cursorTo)
-    {
-        moveTo(*cursorTo);
-    }
+    moveTo(cursorTo.value_or(time_));
 }
 
 } // namespace modal::ui
