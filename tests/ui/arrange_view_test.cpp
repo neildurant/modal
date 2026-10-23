@@ -305,15 +305,24 @@ TEST_CASE("operators take bars across to where a motion goes, or tracks down")
         CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, 2 * kBar, 3 * kBar + kQuarter});
         CHECK(a.page().bar() == 2); // at the area's start
     }
-    SECTION("dG and d$: to the end, the last bar too")
+    SECTION("dG: to the end, the last bar too")
     {
-        for (const auto* keys : {U"dG", U"d$"})
+        Arranging a{operatorSong()};
+        a.type(U"2ldG");
+        CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, kBar + 2 * kQuarter});
+    }
+    SECTION("keys that only move aren't ranges, and say what is")
+    {
+        Arranging a{operatorSong()};
+        const auto before = ticksOf(a.document, 0);
+        for (const auto* keys : {U"d$", U"d}", U"y0", U"d)"})
         {
-            Arranging a{operatorSong()};
-            a.type(U"2l");
             a.type(keys);
-            CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, kBar + 2 * kQuarter});
+            CHECK(a.ws.message().ends_with("only moves the cursor; for a range, use ]b or ]s"));
+            CHECK(ticksOf(a.document, 0) == before);
         }
+        a.type(U"d}");
+        CHECK(a.ws.message() == "} only moves the cursor; for a range, use ]b or ]s");
     }
     SECTION("dgg: from the first bar, this one too")
     {
@@ -483,7 +492,7 @@ TEST_CASE("sections are deleted, yanked and put like lines")
     s.type(U"d2l");
     CHECK(s.names() == std::vector<std::string>{"B", "C", "B 2"});
     // A song keeps at least one section.
-    s.type(U"d$");
+    s.type(U"dG");
     CHECK(s.ws.message() == "A song keeps at least one section");
     CHECK(s.names().size() == 3);
 

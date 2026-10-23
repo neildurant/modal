@@ -53,10 +53,10 @@ nmap ,n         note-default              "Default note from this one"
 
 " Changing events: Enter edits the field under the cursor, typing a value or a change such
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
-" with counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity. d and y take a motion (d} up to where } goes, dj this event and the next),
+" with counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity. d and y take a motion (d]b up to the next bar line, dj this event and the next),
 " or dd and yy this event; x deletes it, p puts what was yanked or deleted at the cursor's
 " time, and u and Ctrl-R undo and redo. In the arrangement and the piano roll, D deletes time
-" and closes the gap (D}, or DD this bar in the arrangement) and P inserts what was yanked,
+" and closes the gap (D]b, or DD this bar in the arrangement) and P inserts what was yanked,
 " moving the rest of the section later; ripple stops at the section's end.
 nmap <CR>       field-edit        "Edit this field"
 nmap +          field-increase-fine "Step up"

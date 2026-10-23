@@ -3,6 +3,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/key_notation.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -26,17 +27,24 @@ constexpr CommandInfo atPrompt(std::string_view name, std::string_view descripti
     return {.name = name, .description = description, .modes = modeBit(Mode::CommandLine)};
 }
 
+// Motions that only move the cursor, rather than landing on a boundary they name, so aren't
+// ranges after an operator (see Ranges, objects and putting in the design): a bar's length on,
+// the end of whatever the view's row is, and notes and chords, which objects take.
+constexpr std::array<std::string_view, 8> kMovesOnly{
+    "cursor-bar-next",  "cursor-bar-previous",  "cursor-first",      "cursor-last",
+    "cursor-note-next", "cursor-note-previous", "cursor-chord-next", "cursor-chord-previous"};
+
 // The commands every view shares, which the workspace runs itself.
 constexpr std::array kSharedCommands{
     CommandInfo{.name = "operator-delete",
-                .description = "Delete the events a motion goes over (d}), or dd this event",
+                .description = "Delete the events a motion goes over (d]b), or dd this event",
                 .count = true},
     CommandInfo{.name = "operator-delete-ripple",
-                .description = "Delete the time a motion goes over and close the gap (D}), or "
+                .description = "Delete the time a motion goes over and close the gap (D]b), or "
                                "DD this bar",
                 .count = true},
     CommandInfo{.name = "operator-yank",
-                .description = "Yank the events a motion goes over (y}), or yy this event",
+                .description = "Yank the events a motion goes over (y]b), or yy this event",
                 .count = true},
     CommandInfo{.name = "operator-line",
                 .description = "After an operator, this event, or {count} events from it",
@@ -625,8 +633,32 @@ bool Workspace::runOperator(std::string_view command, int count)
         {
             return false;
         }
+        if (std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
+        {
+            setMessage(keysOf(command) + " only moves the cursor; for a range, use " +
+                           keysOf("cursor-bar-line-next") + " or " + keysOf("cursor-section-next"),
+                       MessageKind::Information);
+            return true;
+        }
     }
     return view().operate(op.name, command, total);
+}
+
+std::string Workspace::keysOf(std::string_view command) const
+{
+    std::string shortest;
+    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+    {
+        if (binding.command == command)
+        {
+            auto text = formatKeys(keys);
+            if (shortest.empty() || text.size() < shortest.size())
+            {
+                shortest = std::move(text);
+            }
+        }
+    }
+    return shortest.empty() ? std::string{command} : shortest;
 }
 
 bool Workspace::undoOrRedo(bool undo)

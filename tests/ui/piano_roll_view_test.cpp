@@ -796,7 +796,7 @@ TEST_CASE("d and y with a motion in the piano roll take the notes starting in th
     Rolling r{ppqn};
     const auto& t = r.t;
     const auto before = bassNotes(r);
-    r.type(U"d}"); // bar 1, at every pitch, but not the A2 at bar 2's start
+    r.type(U"d]b"); // bar 1, at every pitch, but not the A2 at bar 2's start
     CHECK(bassNotes(r) ==
           std::vector<std::pair<core::Tick, int>>(before.begin() + 2, before.end()));
     r.type(U"u");
@@ -805,7 +805,7 @@ TEST_CASE("d and y with a motion in the piano roll take the notes starting in th
     r.type(U"5GdG"); // from bar 5 to the end, the last grid step too
     CHECK(bassNotes(r) ==
           std::vector<std::pair<core::Tick, int>>(before.begin(), before.begin() + 3));
-    r.type(U"uggy}");
+    r.type(U"uggy]b");
     CHECK(r.ws.message() == "2 notes yanked");
     r.type(U"3G}p"); // a bar later at the same pitches
     CHECK(bassNotes(r).size() == before.size() + 2);
@@ -1086,7 +1086,7 @@ TEST_CASE("D in the piano roll takes time out of the track, controllers too, and
         return core::Tick{-1};
     };
 
-    r.type(U"3GD}"); // bar 3, empty: what's after it in the Verse moves up a bar
+    r.type(U"3GD]b"); // bar 3, empty: what's after it in the Verse moves up a bar
     CHECK(ccAt() == t.bar(3));
     CHECK(bassNote(r, 36)->first == t.bar(4) + 7);
     CHECK(bassNote(r, 33)->first == t.bar(11));
@@ -1094,7 +1094,7 @@ TEST_CASE("D in the piano roll takes time out of the track, controllers too, and
     r.type(U"u");
     CHECK(ccAt() == t.bar(4));
     r.type(U"DD");
-    CHECK(r.ws.message() == "D takes a span of time, such as D} or D$");
+    CHECK(r.ws.message() == "D takes a span of time, such as D]b or D]s");
 
     // The C2 yanked, then inserted where it is: it and what follows move on by its length.
     r.type(U"5G");
@@ -1104,6 +1104,6 @@ TEST_CASE("D in the piano roll takes time out of the track, controllers too, and
     CHECK(bassNote(r, 36, t.bar(5) + 8)->first == t.bar(5) + 7 + t.sixteenth());
     CHECK(bassNote(r, 33)->first == t.bar(12) + t.sixteenth());
 
-    r.type(U"geD}");
+    r.type(U"geD]b");
     CHECK(r.ws.message() == "D isn't in the event list, which is for events rather than time");
 }

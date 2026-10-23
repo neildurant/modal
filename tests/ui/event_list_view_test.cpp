@@ -356,12 +356,12 @@ TEST_CASE("d and y take a motion: whole rows for j, k, gg and G, up to the row f
     CHECK(events().size() == 2);
     type(v.ws, U"u");
 
-    type(v.ws, U"gg4jd}"); // from the note up to the verse's section row: the note and the cc
+    type(v.ws, U"gg4jd]b"); // from the note up to the verse's section row: the note and the cc
     CHECK(events().size() == 2);
     CHECK(events()[0].tick == 0); // the program is left
     type(v.ws, U"u");
 
-    type(v.ws, U"Gkd{"); // back from the verse's note to 1:1:000: every event before it
+    type(v.ws, U"Gkd[b"); // back from the verse's note to 1:1:000: every event before it
     CHECK(events().size() == 1);
     CHECK(events()[0].tick == 4 * q);
     type(v.ws, U"u");
@@ -371,7 +371,7 @@ TEST_CASE("d and y take a motion: whole rows for j, k, gg and G, up to the row f
     CHECK(events().size() == 1);
     type(v.ws, U"u");
 
-    type(v.ws, U"gg4jy}");
+    type(v.ws, U"gg4jy]b");
     CHECK(v.ws.message() == "2 events yanked");
     CHECK(events().size() == 4);
     CHECK(v.ws.registerEvents().size() == 2);

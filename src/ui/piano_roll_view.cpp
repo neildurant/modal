@@ -1228,7 +1228,7 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         // dd, yy, x: the current note (a count waits, as o's does).
         if (op == "operator-delete-ripple")
         {
-            host_.setMessage("D takes a span of time, such as D} or D$", MessageKind::Warning);
+            host_.setMessage("D takes a span of time, such as D]b or D]s", MessageKind::Warning);
             return true;
         }
         const auto index = noteHere(op == "operator-yank" ? "yank" : "delete");

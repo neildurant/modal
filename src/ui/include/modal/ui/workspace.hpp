@@ -172,6 +172,8 @@ private:
 
     // Runs a motion or the operator's own key after an operator, then the operator.
     bool runOperator(std::string_view command, int count);
+    // The shortest keys bound to a command in Normal mode, as typed, or its name if none are.
+    std::string keysOf(std::string_view command) const;
 
     bool undoOrRedo(bool undo);
 

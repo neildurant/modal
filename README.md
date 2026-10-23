@@ -52,7 +52,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `}` `{`, `]b` `[b` | The event at or after the same place a bar on or back, or a bar line |
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
-| `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d}` up to where `}` goes |
+| `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line |
 | `x`, `p` | Delete this event; put what was yanked or deleted at the cursor's time |
 | Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
 | `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
