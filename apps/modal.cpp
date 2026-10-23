@@ -7,6 +7,7 @@
 #include <modal/core/player.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/core/version.hpp>
 #include <modal/platform/clock.hpp>
 #include <modal/platform/midi_output.hpp>
 #include <modal/platform/midi_ports.hpp>
@@ -27,6 +28,8 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <future>
@@ -41,6 +44,60 @@
 
 namespace
 {
+
+// Where a crash is written down, if there's a config directory.
+std::optional<std::filesystem::path> crashLog;
+
+std::string twoDigits(unsigned value)
+{
+    return (value < 10 ? "0" : "") + std::to_string(value);
+}
+
+// The time now, in UTC: 2026-10-23 09:41:07.
+std::string utcNow()
+{
+    const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+    const auto day = std::chrono::floor<std::chrono::days>(now);
+    const std::chrono::year_month_day date{day};
+    const std::chrono::hh_mm_ss time{now - day};
+    return std::to_string(static_cast<int>(date.year())) + "-" +
+           twoDigits(static_cast<unsigned>(date.month())) + "-" +
+           twoDigits(static_cast<unsigned>(date.day())) + " " +
+           twoDigits(static_cast<unsigned>(time.hours().count())) + ":" +
+           twoDigits(static_cast<unsigned>(time.minutes().count())) + ":" +
+           twoDigits(static_cast<unsigned>(time.seconds().count()));
+}
+
+// What std::terminate runs, as for an exception nothing caught: says what it was, on stderr
+// and at the end of crash.log in the config directory, so a crash leaves a clue, then aborts
+// as it would have.
+[[noreturn]] void logCrash() noexcept
+{
+    std::string what = "terminate called with no exception";
+    if (const auto exception = std::current_exception())
+    {
+        try
+        {
+            std::rethrow_exception(exception);
+        }
+        catch (const std::exception& e)
+        {
+            what = std::string{"uncaught exception: "} + e.what();
+        }
+        catch (...)
+        {
+            what = "uncaught exception of an unknown type";
+        }
+    }
+    const auto line = utcNow() + " UTC  modal " + std::string{modal::core::version()} + ": " + what;
+    std::fprintf(stderr, "%s\n", line.c_str());
+    if (crashLog)
+    {
+        std::ofstream file{*crashLog, std::ios::app};
+        file << line << "\n";
+    }
+    std::abort();
+}
 
 using namespace modal;
 
@@ -386,6 +443,11 @@ int main(int argc, char* argv[])
     commands.add(ui::fileCommands());
     ui::Config config;
     const auto configDirectory = platform::configDirectory();
+    if (configDirectory)
+    {
+        crashLog = *configDirectory / "crash.log";
+    }
+    std::set_terminate(logCrash);
     ui::ConfigReader reader{config, commands, configDirectory};
     ui::runStartupFiles(reader, configDirectory);
     std::string message;

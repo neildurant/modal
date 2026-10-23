@@ -11,6 +11,8 @@ Modal is configured with a plain-text command file, `modalrc`, in the style of a
 
 At startup Modal runs its built-in command file (the default key bindings), then `modalrc` in the config directory, if there is one. Your own themes go in `themes/` in the same directory.
 
+If Modal ever stops on an error it didn't expect, it adds a line saying what it was to `crash.log` in the same directory, with the time and Modal's version. Including that line in a bug report helps find the cause.
+
 To start a `modalrc`, have Modal write one with everything in it: at the `:` prompt, `:write-config modalrc` writes it straight into the config directory (`:write-config!` to overwrite one that's there), or from a terminal:
 
 ```
