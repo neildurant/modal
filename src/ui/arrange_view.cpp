@@ -194,7 +194,7 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     }
     else if (command == "event-delete")
     {
-        return operate("operator-delete", "operator-line", count); // x: the cursor's bar
+        return operate("operator-delete", "object-note", count);
     }
     else if (command == "field-edit")
     {
@@ -228,11 +228,17 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     const auto end = [&](std::int64_t b)
     { return std::min(m.barStart(b + 1), document_.song().end()); };
     Area area{track, track, m.barStart(bar), end(bar)};
-    if (motion == "operator-line")
+    if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")
     {
-        // dd, x: the cursor's bar, and as many after it as the count says less one.
+        // dd, ib, ab: the cursor's bar, and as many after it as the count says less one.
         area.to = end(bar + std::max(count, 1) - 1);
-        return operateOn(op, area);
+        return operateOn(op, area, motion == "object-bar");
+    }
+    if (motion == "object-note")
+    {
+        host_.setMessage("There's no single note here; dd takes this bar's events",
+                         MessageKind::Information);
+        return true;
     }
 
     // Where the motion goes, without moving the cursor or the view.
@@ -252,9 +258,9 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
         area.bottom = std::max(track, landedTrack);
         return operateOn(op, area);
     }
-    // Across bars: up to the bar landed on, as Vim's character motions go, or with G, gg and $
+    // Across bars: up to the bar landed on, as Vim's character motions go, or with G and gg
     // the bar landed on too, as its line motions do.
-    const bool inclusive = motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+    const bool inclusive = motion == "go-first" || motion == "go-last";
     const auto landed = m.toBarBeatTick(landedTime).bar;
     if (landed > bar)
     {
@@ -274,11 +280,7 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
 
 std::string ArrangeView::describe(const Area& area) const
 {
-    const auto& m = meter();
-    const auto first = m.toBarBeatTick(area.from).bar;
-    const auto last = m.toBarBeatTick(area.to - 1).bar;
-    const auto bars = first == last ? "bar " + std::to_string(first)
-                                    : "bars " + std::to_string(first) + "–" + std::to_string(last);
+    const auto bars = barsText(meter(), area.from, area.to);
     const auto tracks = document_.song().tracks();
     const auto name = [&](std::size_t i)
     { return tracks[i]->name.empty() ? "track " + std::to_string(i + 1) : tracks[i]->name; };
@@ -288,31 +290,25 @@ std::string ArrangeView::describe(const Area& area) const
     return bars + " of " + which;
 }
 
-bool ArrangeView::operateOn(std::string_view op, const Area& given)
+bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time)
 {
-    // The events starting in the area, as the register's, their ticks from its start; with D,
-    // as far as the section's end, where ripple stops.
+    // The events starting in the area, as the register's, their ticks from its start, taken as
+    // bars; deleting time, as far as the section's end, where ripple stops.
     const auto& song = document_.song();
     auto area = given;
-    const bool ripple = op == "operator-delete-ripple";
+    const bool ripple = time && op == "operator-delete";
     if (ripple)
     {
         area.to = std::min(area.to, sectionEndAt(song, area.from));
     }
     const auto tracks = song.tracks();
-    EventRegister taken;
+    auto taken = takeEvents(song, area.top, area.bottom, area.from, area.to);
+    taken.bars = true;
     std::size_t total = 0;
-    for (auto i = area.top; i <= area.bottom; ++i)
+    for (const auto& events : taken.tracks)
     {
-        auto& events = taken.tracks.emplace_back();
-        for (auto event : song.events(tracks[i]->id()).startingIn(area.from, area.to))
-        {
-            event.tick -= area.from;
-            events.push_back(std::move(event));
-        }
         total += events.size();
     }
-    taken.span = area.to - area.from;
     host_.eventRegister() = taken;
     auto what = describe(area);
     if (ripple)
@@ -496,9 +492,11 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.resetZoom();
         return true;
     }
-    if (command == "event-delete")
+    if (command == "event-delete" || command == "yank-this")
     {
-        return operateOnStrip(section, "operator-delete", "operator-line", count);
+        return operateOnStrip(section,
+                              command == "event-delete" ? "operator-delete" : "operator-yank",
+                              "this-section", count);
     }
     if (command == "register-put" || command == "register-put-before")
     {
@@ -577,13 +575,21 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
 bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::string_view motion,
                                  int count)
 {
-    // Sections behave like lines (decided October 2026): dd and x this one, or as many as the
-    // count; motions across sections up to where they land, or with G, gg and $ including it.
+    // Sections behave like lines (decided October 2026): x and Y this one, or as many as the
+    // count; motions across sections up to where they land, or with G and gg including it. dd,
+    // yy and the objects, which are bars and notes, aren't on the strip.
+    if (motion == "operator-line" || motion.starts_with("object-"))
+    {
+        host_.setMessage("The strip holds sections, not bars or notes: x deletes this section "
+                         "and Y yanks it",
+                         MessageKind::Information);
+        return true;
+    }
     const auto& song = document_.song();
     const auto last = song.sections().size() - 1;
     std::size_t first = section;
     std::size_t lastTaken = section;
-    if (motion == "operator-line")
+    if (motion == "this-section")
     {
         lastTaken = std::min(section + static_cast<std::size_t>(std::max(count, 1)) - 1, last);
     }
@@ -592,8 +598,7 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
         run(motion, count);
         const auto landed = page_.stripCursor().value_or(section);
         page_.setStripCursor(section);
-        const bool inclusive =
-            motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+        const bool inclusive = motion == "go-first" || motion == "go-last";
         if (landed > section)
         {
             lastTaken = inclusive ? landed : landed - 1;

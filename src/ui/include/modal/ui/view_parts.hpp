@@ -67,6 +67,14 @@ std::int64_t barsToInsert(const core::Song& song, const EventRegister& reg, std:
 // its span, on the tracks it goes onto, then puts it there as putRegister does.
 Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at);
 
+// The events starting in a span of time on tracks (counting from 0, first to last), as a
+// register holds them, their ticks from its start, with its length.
+EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t last,
+                         core::Tick from, core::Tick to);
+
+// The bars a span of time covers, as words in a meter: "bar 3", "bars 3–5".
+std::string barsText(const core::MeterMap& meter, core::Tick from, core::Tick to);
+
 // How many events, as words: "1 event", "3 events".
 std::string eventCount(std::size_t events);
 

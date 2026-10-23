@@ -766,13 +766,13 @@ TEST_CASE("o adds the track's default note at the piano roll's cursor, and x del
     CHECK(bassNotes(r).size() == before.size() + 1);
 }
 
-TEST_CASE("dd and yy take the piano roll's current note, which p puts at the cursor's time")
+TEST_CASE("x and Y take the piano roll's current note, which p puts at the cursor's time")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
     const auto& t = r.t;
     const auto before = bassNotes(r);
-    r.type(U"8jyy"); // E1 at the start
+    r.type(U"8jY"); // E1 at the start
     CHECK(r.ws.message() == "E1 yanked");
     r.type(U"8k}p"); // at C2, a bar on: the E1 at its own pitch
     auto expected = before;
@@ -782,12 +782,33 @@ TEST_CASE("dd and yy take the piano roll's current note, which p puts at the cur
     r.type(U"p");
     CHECK(r.ws.message().starts_with("Would overlap the E1 at 2:1"));
 
-    r.type(U"8jdd");
+    r.type(U"8jx");
     CHECK(bassNotes(r) == before);
-    r.type(U"dd");
+    r.type(U"din"); // as x
     CHECK(r.ws.message() == "No note here to delete");
     r.type(U"ggp"); // the deleted E1 back at the start overlaps the one there
     CHECK(r.ws.message().starts_with("Would overlap the E1 at 1:1"));
+}
+
+TEST_CASE("dd and yy take the bar's notes in the piano roll, which p puts from a bar's start")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto before = bassNotes(r);
+    r.type(U"8ldd"); // from mid-bar, bar 1's two notes
+    CHECK(bassNotes(r) ==
+          std::vector<std::pair<core::Tick, int>>(before.begin() + 2, before.end()));
+    r.type(U"u");
+    r.type(U"gg8ldib"); // ib is the same
+    CHECK(bassNotes(r).size() == before.size() - 2);
+    r.type(U"u");
+
+    r.type(U"yy");
+    CHECK(r.ws.message() == "2 notes yanked");
+    r.type(U"3G8lp"); // from mid-bar 3, at its start
+    CHECK(std::ranges::count(bassNotes(r), std::pair<core::Tick, int>{t.bar(3), 28}) == 1);
+    CHECK(std::ranges::count(bassNotes(r), std::pair<core::Tick, int>{t.bar(3), 31}) == 1);
 }
 
 TEST_CASE("d and y with a motion in the piano roll take the notes starting in that time")
@@ -1061,7 +1082,7 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     CHECK(r.view().time() == 0);
 }
 
-TEST_CASE("D in the piano roll takes time out of the track, controllers too, and P puts it in")
+TEST_CASE("dab in the piano roll takes a bar out of the track, controllers too, and P puts it in")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
@@ -1086,24 +1107,35 @@ TEST_CASE("D in the piano roll takes time out of the track, controllers too, and
         return core::Tick{-1};
     };
 
-    r.type(U"3GD]b"); // bar 3, empty: what's after it in the Verse moves up a bar
+    r.type(U"3G8ldab"); // bar 3, empty: what's after it in the Verse moves up a bar
     CHECK(ccAt() == t.bar(3));
     CHECK(bassNote(r, 36)->first == t.bar(4) + 7);
     CHECK(bassNote(r, 33)->first == t.bar(11));
     CHECK(bassNote(r, 45)->first == t.bar(2)); // before it, in Section 1
+    CHECK(r.ws.registerArea().span == t.bar(2));
     r.type(U"u");
     CHECK(ccAt() == t.bar(4));
-    r.type(U"DD");
-    CHECK(r.ws.message() == "D takes a span of time, such as D]b or D]s");
+
+    // Bar 5 yanked as time, then put in before bar 4 from mid-bar: the rest of the Verse moves
+    // on a bar, the A1 past its end, so it asks to grow.
+    r.type(U"5Gyab4G8lP");
+    CHECK(r.ws.message() == "Lengthen Verse by a bar to make room? (y/n)");
+    r.type(U"y");
+    CHECK(bassNote(r, 36)->first == t.bar(4) + 7);
+    CHECK(bassNote(r, 36, t.bar(4) + 8)->first == t.bar(6) + 7);
+    CHECK(ccAt() == t.bar(5));
+    CHECK(bassNote(r, 33)->first == t.bar(13));
+    r.type(U"u");
+    CHECK(bassNote(r, 33)->first == t.bar(12));
 
     // The C2 yanked, then inserted where it is: it and what follows move on by its length.
     r.type(U"5G");
     r.press(Key::of(NamedKey::Tab));
-    r.type(U"yyP");
+    r.type(U"YP");
     CHECK(bassNote(r, 36)->first == t.bar(5) + 7);
     CHECK(bassNote(r, 36, t.bar(5) + 8)->first == t.bar(5) + 7 + t.sixteenth());
     CHECK(bassNote(r, 33)->first == t.bar(12) + t.sixteenth());
 
-    r.type(U"geD]b");
-    CHECK(r.ws.message() == "D isn't in the event list, which is for events rather than time");
+    r.type(U"gedab");
+    CHECK(r.ws.message() == "ab isn't in the event list, which is for events rather than time");
 }

@@ -169,6 +169,10 @@ private:
     bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from,
                    core::Tick span);
     bool put(bool insert);
+    // The track's notes starting in a span of time, by index.
+    std::vector<std::size_t> notesIn(core::Tick from, core::Tick to) const;
+    // Deletes or yanks the cursor's bar and those after it, its notes or as time (ab).
+    bool operateOnBars(std::string_view op, int count, bool time);
     // Changes the current note, the cursor going with it, unless it would go before the song's
     // start or past its last tick, or run into another note of its pitch. The change says
     // whether it can be made, giving its own message if not.

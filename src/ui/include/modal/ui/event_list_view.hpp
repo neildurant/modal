@@ -102,7 +102,10 @@ private:
     std::vector<std::size_t> chordStarts() const;
 
     // Deletes or yanks the track's own events among some rows, which may be in either order.
-    bool operateRows(std::string_view op, std::size_t from, std::size_t to);
+    // Deletes or yanks the track's events among rows; with a bar's start, taken as bars, their
+    // ticks from it, and the bars' length.
+    bool operateRows(std::string_view op, std::size_t from, std::size_t to,
+                     std::optional<core::Tick> bar = std::nullopt, core::Tick span = 0);
     bool put();
 
     // Starts editing the field under the cursor in place, with its value in it; then sets it

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -362,19 +363,21 @@ bool PianoRollView::put(bool insert)
                          MessageKind::Warning);
         return true;
     }
-    // At the cursor's time, at the notes' own pitches, onto this track and those after it for
-    // a register of several; over what's there, refused where a note would run into one of its
-    // pitch, or with P inserted, moving what's after it in the section later, asking first if
-    // the section must grow.
+    // At the cursor's time, or taken as bars at the start of the cursor's bar, at the notes'
+    // own pitches, onto this track and those after it for a register of several; over what's
+    // there, refused where a note would run into one of its pitch, or with P inserted, moving
+    // what's after it in the section later, asking first if the section must grow.
     const auto& song = document_.song();
     const auto tracks = song.tracks();
+    const auto& m = meter();
+    const auto at = reg.bars ? m.barStart(m.toBarBeatTick(time_).bar) : time_;
     std::size_t total = 0;
     for (std::size_t i = 0; i < reg.tracks.size() && track_ + i < tracks.size(); ++i)
     {
         const auto id = tracks[track_ + i]->id();
         for (auto event : reg.tracks[i])
         {
-            event.tick += time_;
+            event.tick += at;
             const auto why = overlap(song.events(id), std::nullopt, event, song.meter(id));
             if (why && !insert)
             {
@@ -389,14 +392,14 @@ bool PianoRollView::put(bool insert)
     if (!insert)
     {
         document_.edit("Put " + eventCount(total) + " in " + where, place(),
-                       [&](core::Song& s) { putRegister(s, reg, track_, time_); });
+                       [&](core::Song& s) { putRegister(s, reg, track_, at); });
         refresh();
         return true;
     }
-    const auto bars = barsToInsert(song, reg, track_, time_);
-    const auto section = song.sectionAt(time_);
+    const auto bars = barsToInsert(song, reg, track_, at);
+    const auto section = song.sectionAt(at);
     const auto title = "Insert " + eventCount(total) + " in " + where;
-    const auto insertIt = [this, reg, bars, section, title, at = time_, track = track_]
+    const auto insertIt = [this, reg, bars, section, title, at, track = track_]
     {
         document_.edit(title, place(),
                        [&](core::Song& s)
@@ -1000,7 +1003,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     else if (command == "event-delete")
     {
-        return operate("operator-delete", "operator-line", count);
+        return operate("operator-delete", "object-note", count);
     }
     else if (command == "register-put" || command == "register-put-before")
     {
@@ -1223,14 +1226,13 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return false;
     }
-    if (motion == "operator-line")
+    if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")
     {
-        // dd, yy, x: the current note (a count waits, as o's does).
-        if (op == "operator-delete-ripple")
-        {
-            host_.setMessage("D takes a span of time, such as D]b or D]s", MessageKind::Warning);
-            return true;
-        }
+        return operateOnBars(op, count, motion == "object-bar");
+    }
+    if (motion == "object-note")
+    {
+        // in, x, Y: the current note (a count waits, as o's does).
         const auto index = noteHere(op == "operator-yank" ? "yank" : "delete");
         if (!index)
         {
@@ -1266,8 +1268,8 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         return false;
     }
     // The notes starting from the cursor up to where it lands, at every pitch, as Vim's
-    // character motions go; with G, gg and $, the grid step landed on too.
-    const bool inclusive = motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+    // character motions go; with G and gg, the grid step landed on too.
+    const bool inclusive = motion == "go-first" || motion == "go-last";
     const auto from = std::min(time, landed);
     auto to = std::max(time, landed);
     if (inclusive)
@@ -1278,23 +1280,13 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return false;
     }
-    if (op == "operator-delete-ripple")
-    {
-        // All the track's events, not only notes, since time is taken out, as far as the
-        // section's end.
-        const auto& song = document_.song();
-        const auto& m = meter();
-        const auto end = std::min(to, sectionEndAt(song, from));
-        document_.edit("Delete " + positionText(m, from) + " to " + positionText(m, end) + " in " +
-                           trackName() + ", closing the gap",
-                       place(), [&](core::Song& s)
-                       { host_.eventRegister() = rippleDelete(s, track_, track_, from, end); });
-        refresh();
-        moveTo(from);
-        return true;
-    }
+    return operateOn(op, notesIn(from, to), from, to - from);
+}
+
+std::vector<std::size_t> PianoRollView::notesIn(core::Tick from, core::Tick to) const
+{
     std::vector<std::size_t> notes;
-    const auto& events = document_.song().events(*id);
+    const auto& events = document_.song().events(*trackId());
     for (std::size_t i = 0; i < events.size(); ++i)
     {
         if (events[i].isNote() && events[i].tick >= from && events[i].tick < to)
@@ -1302,7 +1294,47 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
             notes.push_back(i);
         }
     }
-    return operateOn(op, notes, from, to - from);
+    return notes;
+}
+
+bool PianoRollView::operateOnBars(std::string_view op, int count, bool time)
+{
+    // The cursor's bar and as many after it as the count says less one: its notes, or as time
+    // (ab) all the track's events there, controllers too, since what moves stays together;
+    // deleted, the gap closes as far as the section's end. Taken as bars either way.
+    const auto& song = document_.song();
+    const auto& m = meter();
+    const auto bar = m.toBarBeatTick(time_).bar;
+    const auto from = m.barStart(bar);
+    auto to = std::min(m.barStart(bar + std::max(count, 1)), song.end());
+    if (!time)
+    {
+        const bool done = operateOn(op, notesIn(from, to), from, to - from);
+        host_.eventRegister().bars = true;
+        return done;
+    }
+    if (op == "operator-yank")
+    {
+        host_.eventRegister() = takeEvents(song, track_, track_, from, to);
+        host_.eventRegister().bars = true;
+        auto what = barsText(m, from, to);
+        what[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(what[0])));
+        host_.setMessage(what + " yanked (" +
+                             eventCount(host_.eventRegister().tracks.front().size()) + ")",
+                         MessageKind::Information);
+        return true;
+    }
+    to = std::min(to, sectionEndAt(song, from));
+    document_.edit("Delete " + barsText(m, from, to) + " in " + trackName() + ", closing the gap",
+                   place(),
+                   [&](core::Song& s)
+                   {
+                       host_.eventRegister() = rippleDelete(s, track_, track_, from, to);
+                       host_.eventRegister().bars = true;
+                   });
+    refresh();
+    moveTo(from);
+    return true;
 }
 
 Inspection PianoRollView::inspection() const

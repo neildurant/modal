@@ -66,8 +66,9 @@ private:
         core::Tick to;
     };
 
-    // Deletes or yanks the events starting in an area; puts the register at the cursor's bar.
-    bool operateOn(std::string_view op, const Area& area);
+    // Deletes or yanks the events starting in an area, or with time, as ab does, deletes the
+    // area's time too, closing the gap up to the section's end.
+    bool operateOn(std::string_view op, const Area& area, bool time = false);
     // Puts the register at the start of the cursor's bar, over what's there, or with insert
     // moving what's after it in the section later (P), asking first if the section must grow.
     bool put(bool insert);

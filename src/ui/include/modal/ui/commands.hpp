@@ -38,7 +38,8 @@ struct CommandInfo
     bool bang = false;             // takes a !, as write-config! does
     bool config = false;           // can be used in a config file
     bool keys = true;              // can be bound to keys
-    bool motion = false;           // moves the cursor, so an operator can take it (d})
+    bool motion = false;           // moves the cursor, so an operator can take it (d]b)
+    bool object = false;           // a text object, which only an operator takes (dib)
 };
 
 // A command's title: the one given, or else its name as words, cursor-left as "Cursor left".

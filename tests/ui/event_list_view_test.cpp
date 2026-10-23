@@ -309,7 +309,7 @@ TEST_CASE("section and marker motions go to their rows")
     CHECK(v.view.row() == 6); // none after: it stays
 }
 
-TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back where it was")
+TEST_CASE("x deletes the event under the cursor, and u brings it back where it was")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
@@ -318,7 +318,7 @@ TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back wh
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
     REQUIRE(events().size() == 4);
 
-    type(v.ws, U"4jdd"); // the note at 1:1:000
+    type(v.ws, U"4jx"); // the note at 1:1:000
     CHECK(events().size() == 3);
     CHECK(v.view.row() == 4); // on what followed, the cc
     CHECK(v.ws.registerEvents().size() == 1);
@@ -341,9 +341,38 @@ TEST_CASE("dd deletes the event under the cursor, x too, and u brings it back wh
     type(v.ws, U"u");
 
     // On a row that isn't the track's, there's nothing to delete.
-    type(v.ws, U"ggdd");
+    type(v.ws, U"ggx");
     CHECK(events().size() == 4);
     CHECK_FALSE(v.document.modified());
+}
+
+TEST_CASE("dd and yy take the cursor's bar's events, which p puts from the start of a bar")
+{
+    // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
+    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    Viewing v;
+    const auto events = [&]
+    { return v.document.song().events(v.document.song().tracks()[0]->id()); };
+    type(v.ws, U"5jdd"); // from the cc, bar 1: the program, the note and the cc
+    CHECK(events().size() == 1);
+    CHECK(v.ws.registerEvents().size() == 3);
+    CHECK(v.ws.message().empty());
+    type(v.ws, U"u");
+    CHECK(v.ws.message() == "Undid: Delete 3 events in Bass");
+    type(v.ws, U"gg5jdib"); // ib is the same
+    CHECK(events().size() == 1);
+    type(v.ws, U"u");
+
+    // Yanked from the cc's row, they go from bar 2's start, the cc as far into it as it was.
+    type(v.ws, U"gg5jyy");
+    CHECK(v.ws.message() == "3 events yanked");
+    type(v.ws, U"gg8jp");
+    REQUIRE(events().size() == 7);
+    CHECK(events()[6].tick == 4 * q + q + 240);
+    CHECK(std::holds_alternative<core::ControlChange>(events()[6].data));
+
+    type(v.ws, U"dab");
+    CHECK(v.ws.message() == "ab isn't in the event list, which is for events rather than time");
 }
 
 TEST_CASE("d and y take a motion: whole rows for j, k, gg and G, up to the row for the others")
@@ -386,15 +415,15 @@ TEST_CASE("p puts the events at the cursor's time, never overlapping notes")
     type(v.ws, U"p");
     CHECK(v.ws.message() == "Nothing yanked or deleted to put");
 
-    type(v.ws, U"4jyy"); // the E1 at 1:1:000
-    type(v.ws, U"4jp");  // at 2:1:000, beside the F1 there
+    type(v.ws, U"4jY"); // the E1 at 1:1:000
+    type(v.ws, U"4jp"); // at 2:1:000, beside the F1 there
     CHECK(events().size() == 5);
     CHECK(events()[4].tick == 4 * q);
     CHECK(std::get<core::Note>(events()[4].data).pitch == 28);
 
     // The F1 put where an F1 starts replaces it, rather than doubling it.
     type(v.ws, U"u");
-    type(v.ws, U"Gkyyp");
+    type(v.ws, U"GkYp");
     CHECK(events().size() == 4);
 }
 
@@ -466,11 +495,11 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{4, 4});
 
     // A section's own tempo and meter, and the section, can't be deleted; a marker can.
-    type(v.ws, U"gg3dd");
+    type(v.ws, U"gg3x");
     CHECK(v.ws.message().starts_with("Every section keeps its tempo and meter at its start"));
     type(v.ws, U"gg]m");
     REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Marker);
-    type(v.ws, U"dd");
+    type(v.ws, U"x");
     CHECK(song().markers().empty());
 
     // A tempo change inside a section can.
@@ -487,7 +516,7 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
     type(v.ws, U"0");
     enter(v.ws);
     CHECK(v.ws.message() == "Moving the conductor's changes comes later");
-    type(v.ws, U"yy");
+    type(v.ws, U"Y");
     CHECK(v.ws.message() == "Only a track's events can be yanked");
     type(v.ws, U"p");
     CHECK(v.ws.message() == "Only a track's events can be put");

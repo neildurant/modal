@@ -204,7 +204,7 @@ private:
     KeyDispatcher keys_;
     struct PendingOperator
     {
-        std::string name; // operator-delete, operator-delete-ripple or operator-yank
+        std::string name; // operator-delete or operator-yank
         int count;
     };
     std::optional<PendingOperator> operator_;

@@ -318,11 +318,13 @@ TEST_CASE("operators take bars across to where a motion goes, or tracks down")
         for (const auto* keys : {U"d$", U"d}", U"y0", U"d)"})
         {
             a.type(keys);
-            CHECK(a.ws.message().ends_with("only moves the cursor; for a range, use ]b or ]s"));
+            CHECK(a.ws.message().ends_with(
+                "only moves the cursor; for a range, use ]b or ]s, or an object such as ib"));
             CHECK(ticksOf(a.document, 0) == before);
         }
         a.type(U"d}");
-        CHECK(a.ws.message() == "} only moves the cursor; for a range, use ]b or ]s");
+        CHECK(a.ws.message() ==
+              "} only moves the cursor; for a range, use ]b or ]s, or an object such as ib");
     }
     SECTION("dgg: from the first bar, this one too")
     {
@@ -355,14 +357,21 @@ TEST_CASE("y yanks an area of several tracks, and p puts it at the cursor's bar"
     CHECK(a.ws.message() == "Undid: Put 2 events in Bass and the tracks after it");
 }
 
-TEST_CASE("x deletes the cursor's bar, saying when there's nothing in it")
+TEST_CASE("dd deletes the cursor's bar, saying when there's nothing in it; x and Y want a note")
 {
     Arranging a{operatorSong()};
     a.type(U"6l"); // bar 7, empty
-    a.type(U"x");
+    a.type(U"dd");
     CHECK(a.ws.message() == "Nothing to delete in bar 7 of Bass");
-    a.type(U"gg3x");
+    for (const auto* keys : {U"x", U"Y", U"din"})
+    {
+        a.type(keys);
+        CHECK(a.ws.message() == "There's no single note here; dd takes this bar's events");
+    }
+    a.type(U"gg3dd");
     CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{3 * kBar + kQuarter});
+    a.type(U"u2dib"); // ib is the same
+    CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{2 * kBar, 3 * kBar + kQuarter});
 }
 
 TEST_CASE("events yanked in the event list are put in the arrangement at the cursor's bar")
@@ -479,8 +488,17 @@ TEST_CASE("sections are deleted, yanked and put like lines")
     CHECK(s.ws.message() == "Undid: Delete section B");
     CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
 
+    // dd, yy and the objects are bars and notes, which the strip doesn't hold.
+    for (const auto* keys : {U"dd", U"yy", U"dib", U"yab", U"din"})
+    {
+        s.type(keys);
+        CHECK(s.ws.message() == "The strip holds sections, not bars or notes: x deletes this "
+                                "section and Y yanks it");
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+    }
+
     // Yank B, put it after C, and a copy before A.
-    s.type(U"yy");
+    s.type(U"Y");
     CHECK(s.ws.message() == "B yanked");
     s.type(U"$p");
     CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B 2"});
@@ -608,11 +626,15 @@ using BarNotes = std::vector<std::pair<std::int64_t, int>>;
 
 } // namespace
 
-TEST_CASE("D deletes bars and closes the gap, as far as the section's end")
+TEST_CASE("dab deletes bars and closes the gap, as far as the section's end; dib leaves it")
 {
     Arranging a{barNotes()};
     const auto before = notesByBar(a, 0);
-    a.type(U"lDl"); // bar 2: bars 3 and 4 move up, bar 4 left silent
+    a.type(U"ldib"); // bar 2's notes, leaving the bar
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 61}, {3, 63}, {4, 64}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
+    a.type(U"u");
+    a.type(U"dab"); // bar 2: bars 3 and 4 move up, bar 4 left silent
     CHECK(notesByBar(a, 0) ==
           BarNotes{{1, 61}, {2, 63}, {3, 64}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
     CHECK(notesByBar(a, 1) == BarNotes{{1, 40}});
@@ -621,10 +643,10 @@ TEST_CASE("D deletes bars and closes the gap, as far as the section's end")
     a.type(U"u");
     CHECK(notesByBar(a, 0) == before);
 
-    a.type(U"lDG"); // from bar 3, stopping at the section's end
+    a.type(U"l5dab"); // from bar 3, stopping at the section's end
     CHECK(notesByBar(a, 0) == BarNotes{{1, 61}, {2, 62}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
     a.type(U"u");
-    a.type(U"ggDD");
+    a.type(U"ggdab");
     CHECK(notesByBar(a, 0) ==
           BarNotes{{1, 62}, {2, 63}, {3, 64}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
     CHECK(a.document.song().sectionStart(1) == a.document.song().meter().barStart(5));
@@ -653,7 +675,7 @@ TEST_CASE("P inserts what was yanked, moving the rest of the section later, aski
 
     // With room at the section's end, no question; an empty bar inserts silence.
     a.type(U"gg3lyy"); // bar 4
-    a.type(U"x");      // now empty
+    a.type(U"dd");     // now empty
     a.type(U"ggyyP");
     CHECK(a.ws.message().empty());
     CHECK(notesByBar(a, 0) ==

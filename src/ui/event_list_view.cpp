@@ -557,7 +557,7 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     }
     else if (command == "event-delete")
     {
-        return operateRows("operator-delete", row_, row_ + static_cast<std::size_t>(n) - 1);
+        return operate("operator-delete", "object-note", count);
     }
     else if (command == "register-put")
     {
@@ -586,15 +586,36 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
 
 bool EventListView::operate(std::string_view op, std::string_view motion, int count)
 {
-    if (op == "operator-delete-ripple")
+    if (motion == "object-bar")
     {
-        setMessage("D isn't in the event list, which is for events rather than time",
+        setMessage("ab isn't in the event list, which is for events rather than time",
                    MessageKind::Information);
         return true;
     }
-    if (motion == "operator-line")
+    if (motion == "object-note")
     {
+        // in, x, Y: the event under the cursor, or as many from it as the count says.
         return operateRows(op, row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1);
+    }
+    if (motion == "operator-line" || motion == "object-bar-contents")
+    {
+        // dd, ib: the rows of the cursor's bar and as many after it as the count says less one,
+        // taken as bars.
+        const auto& meter = list_.meter();
+        const auto bar = meter.toBarBeatTick(list_.rows()[row_].tick).bar;
+        const auto from = meter.barStart(bar);
+        const auto to = meter.barStart(bar + std::max(count, 1));
+        const auto first = list_.rowAt(from);
+        auto last = first;
+        while (last + 1 < list_.rows().size() && list_.rows()[last + 1].tick < to)
+        {
+            ++last;
+        }
+        if (list_.rows()[first].tick >= to)
+        {
+            return false;
+        }
+        return operateRows(op, first, last, from, to - from);
     }
     const auto from = row_;
     run(motion, count);
@@ -614,7 +635,8 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
     }
     return to > from ? operateRows(op, from, to - 1) : operateRows(op, to, from - 1);
 }
-bool EventListView::operateRows(std::string_view op, std::size_t from, std::size_t to)
+bool EventListView::operateRows(std::string_view op, std::size_t from, std::size_t to,
+                                std::optional<core::Tick> bar, core::Tick span)
 {
     if (track_ == 0)
     {
@@ -645,9 +667,11 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     }
     const auto id = *list_.track();
     const auto& events = document_.song().events(id);
-    const auto first = events[indices.front()].tick;
+    const auto first = bar.value_or(events[indices.front()].tick);
     auto& reg = host_.eventRegister();
     reg = EventRegister{};
+    reg.bars = bar.has_value();
+    reg.span = span;
     reg.tracks.assign(1, {});
     for (const auto i : indices)
     {
@@ -698,8 +722,11 @@ bool EventListView::put()
                    MessageKind::Warning);
         return true;
     }
-    const auto at = list_.rows()[row_].tick;
+    // At the cursor's time, or taken as bars at the start of the cursor's bar.
     const auto& reg = host_.eventRegister();
+    const auto& meter = list_.meter();
+    const auto tick = list_.rows()[row_].tick;
+    const auto at = reg.bars ? meter.barStart(meter.toBarBeatTick(tick).bar) : tick;
     std::size_t total = 0;
     for (const auto& events : reg.tracks)
     {

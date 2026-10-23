@@ -73,6 +73,9 @@ struct EventRegister
     std::vector<std::vector<core::Event>> tracks;
     std::vector<std::shared_ptr<const core::Section>> sections;
     core::Tick span = 0;
+    // Taken as bars (ib, ab, dd, or the arrangement's bars), its ticks from a bar line, so it's
+    // put at the start of the cursor's bar rather than at the cursor (decided October 2026).
+    bool bars = false;
 
     bool empty() const
     {

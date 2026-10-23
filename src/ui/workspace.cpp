@@ -37,19 +37,34 @@ constexpr std::array<std::string_view, 8> kMovesOnly{
 // The commands every view shares, which the workspace runs itself.
 constexpr std::array kSharedCommands{
     CommandInfo{.name = "operator-delete",
-                .description = "Delete the events a motion goes over (d]b), or dd this event",
-                .count = true},
-    CommandInfo{.name = "operator-delete-ripple",
-                .description = "Delete the time a motion goes over and close the gap (D]b), or "
-                               "DD this bar",
+                .description = "Delete the events a motion or object takes (d]b, dib), or dd "
+                               "this bar's",
                 .count = true},
     CommandInfo{.name = "operator-yank",
-                .description = "Yank the events a motion goes over (y]b), or yy this event",
+                .description = "Yank the events a motion or object takes (y]b, yib), or yy "
+                               "this bar's",
                 .count = true},
     CommandInfo{.name = "operator-line",
-                .description = "After an operator, this event, or {count} events from it",
+                .description = "After an operator, this bar's events, or {count} bars' from it",
                 .modes = modeBit(Mode::OperatorPending),
                 .count = true},
+    CommandInfo{.name = "object-bar-contents",
+                .description = "After an operator, this bar's events (ib), or {count} bars' "
+                               "from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
+    CommandInfo{.name = "object-bar",
+                .description = "After an operator, this bar as time (ab), which d takes out, "
+                               "closing the gap; or {count} bars from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
+    CommandInfo{.name = "object-note",
+                .description = "After an operator, the note or event under the cursor (in)",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
     CommandInfo{
         .name = "undo", .description = "Undo the last change, or {count} changes", .count = true},
     CommandInfo{.name = "redo",
@@ -78,8 +93,9 @@ constexpr std::array kSharedCommands{
                 .description = "Rename the section at the cursor",
                 .usage = "NAME",
                 .keys = false},
-    CommandInfo{.name = "yank-line",
-                .description = "Yank this event, bar or section, or {count} of them, as yy does",
+    CommandInfo{.name = "yank-this",
+                .description = "Yank the note or event under the cursor, as yin does, or the "
+                               "section on the section strip",
                 .count = true},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
@@ -255,9 +271,8 @@ void Workspace::buildOperatorKeymap()
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
         const auto* info = commands_.find(binding.command);
-        const bool again = binding.command == "operator-delete" ||
-                           binding.command == "operator-delete-ripple" ||
-                           binding.command == "operator-yank";
+        const bool again =
+            binding.command == "operator-delete" || binding.command == "operator-yank";
         const bool wanted = again || binding.command == "cancel" || (info && info->motion);
         if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
         {
@@ -279,9 +294,7 @@ std::string Workspace::pending() const
     if (operator_)
     {
         text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
-               (operator_->name == "operator-delete"          ? "d"
-                : operator_->name == "operator-delete-ripple" ? "D"
-                                                              : "y");
+               (operator_->name == "operator-delete" ? "d" : "y");
     }
     return text + keys_.pending();
 }
@@ -520,8 +533,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         return runCommandLine(command);
     }
-    if (command == "operator-delete" || command == "operator-delete-ripple" ||
-        command == "operator-yank")
+    if (command == "operator-delete" || command == "operator-yank")
     {
         operator_ = PendingOperator{std::string{command}, count};
         mode_ = Mode::OperatorPending;
@@ -589,9 +601,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         line_.open();
         return true;
     }
-    if (command == "yank-line")
+    if (command == "yank-this")
     {
-        return view().operate("operator-yank", "operator-line", count);
+        // The section strip yanks its section; everywhere else it's yin.
+        if (const auto done = view().run(command, count))
+        {
+            return *done;
+        }
+        return view().operate("operator-yank", "object-note", count);
     }
     if (command == "view-arrangement" || command == "view-events" || command == "view-piano-roll")
     {
@@ -629,14 +646,15 @@ bool Workspace::runOperator(std::string_view command, int count)
     if (command != "operator-line")
     {
         const auto* info = commands_.find(command);
-        if (info == nullptr || !info->motion)
+        if (info == nullptr || !(info->motion || info->object))
         {
             return false;
         }
         if (std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
         {
             setMessage(keysOf(command) + " only moves the cursor; for a range, use " +
-                           keysOf("cursor-bar-line-next") + " or " + keysOf("cursor-section-next"),
+                           keysOf("cursor-bar-line-next") + " or " + keysOf("cursor-section-next") +
+                           ", or an object such as ib",
                        MessageKind::Information);
             return true;
         }

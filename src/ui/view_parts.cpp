@@ -197,6 +197,32 @@ EventRegister rippleDelete(core::Song& song, std::size_t first, std::size_t last
     return removed;
 }
 
+EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t last,
+                         core::Tick from, core::Tick to)
+{
+    EventRegister taken;
+    const auto tracks = song.tracks();
+    for (auto i = first; i <= last && i < tracks.size(); ++i)
+    {
+        auto& events = taken.tracks.emplace_back();
+        for (auto event : song.events(tracks[i]->id()).startingIn(from, to))
+        {
+            event.tick -= from;
+            events.push_back(std::move(event));
+        }
+    }
+    taken.span = to - from;
+    return taken;
+}
+
+std::string barsText(const core::MeterMap& meter, core::Tick from, core::Tick to)
+{
+    const auto first = meter.toBarBeatTick(from).bar;
+    const auto last = meter.toBarBeatTick(std::max(to - 1, from)).bar;
+    return first == last ? "bar " + std::to_string(first)
+                         : "bars " + std::to_string(first) + "–" + std::to_string(last);
+}
+
 core::Tick registerSpan(const EventRegister& reg)
 {
     if (reg.span > 0)
