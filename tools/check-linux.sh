@@ -37,8 +37,9 @@ for preset in "${presets[@]}"; do
         continue
     fi
     rm -f "$log"
-    # ThreadSanitizer can't map its memory with the address randomisation recent kernels use;
-    # setarch -R turns it off for the tests alone, with no sudo and nothing system-wide.
+    # ThreadSanitizer's runtime clashes with the address randomisation recent kernels use:
+    # clang 18 and later restart the tests with it off, older ones fail to start. setarch -R
+    # turns it off for the tests alone, avoiding both, with no sudo and nothing system-wide.
     runner=()
     if [[ "$preset" == *tsan* ]] && command -v setarch > /dev/null; then
         runner=(setarch -R)
