@@ -13,6 +13,8 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
+#include <vector>
 
 using namespace modal;
 using namespace modal::ui;
@@ -709,4 +711,105 @@ TEST_CASE("the piano roll draws at any window size, even none")
         r.press(Key::of(NamedKey::Tab));
         CHECK_FALSE(r.ws.frame().empty());
     }
+}
+
+namespace
+{
+
+// The bass's notes, as tick and pitch, in order.
+std::vector<std::pair<core::Tick, int>> bassNotes(const Rolling& r)
+{
+    std::vector<std::pair<core::Tick, int>> notes;
+    const auto& song = r.document.song();
+    for (const auto& event : song.events(song.tracks()[0]->id()).all())
+    {
+        if (const auto* note = std::get_if<core::Note>(&event.data))
+        {
+            notes.emplace_back(event.tick, note->pitch);
+        }
+    }
+    std::ranges::sort(notes);
+    return notes;
+}
+
+} // namespace
+
+TEST_CASE("o adds the track's default note at the piano roll's cursor, and x deletes it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto& song = r.document.song();
+    const auto before = bassNotes(r);
+    r.type(U"o"); // C2 at the start
+    const auto index = r.view().currentNote();
+    REQUIRE(index);
+    const auto& event = song.events(song.tracks()[0]->id())[*index];
+    CHECK(event.tick == 0);
+    CHECK(std::get<core::Note>(event.data) == core::Note{36, 100, t.sixteenth()});
+    r.type(U"o");
+    CHECK(r.ws.message() == "There's a note here already");
+
+    // Not into another of its pitch: the C2 just after bar 5's start.
+    r.type(U"5Go");
+    CHECK(r.ws.message().starts_with("Would run into the C2 at 5:1"));
+    CHECK(bassNotes(r).size() == before.size() + 1);
+
+    r.type(U"ggx");
+    CHECK(bassNotes(r) == before);
+    r.type(U"x");
+    CHECK(r.ws.message() == "No note here to delete");
+    r.type(U"u"); // back, with the cursor on it
+    CHECK(r.view().currentNote());
+    CHECK(r.view().time() == 0);
+    CHECK(bassNotes(r).size() == before.size() + 1);
+}
+
+TEST_CASE("dd and yy take the piano roll's current note, which p puts at the cursor's time")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto before = bassNotes(r);
+    r.type(U"8jyy"); // E1 at the start
+    CHECK(r.ws.message() == "E1 yanked");
+    r.type(U"8k}p"); // at C2, a bar on: the E1 at its own pitch
+    auto expected = before;
+    expected.emplace_back(t.bar(2), 28);
+    std::ranges::sort(expected);
+    CHECK(bassNotes(r) == expected);
+    r.type(U"p");
+    CHECK(r.ws.message().starts_with("Would overlap the E1 at 2:1"));
+
+    r.type(U"8jdd");
+    CHECK(bassNotes(r) == before);
+    r.type(U"dd");
+    CHECK(r.ws.message() == "No note here to delete");
+    r.type(U"ggp"); // the deleted E1 back at the start overlaps the one there
+    CHECK(r.ws.message().starts_with("Would overlap the E1 at 1:1"));
+}
+
+TEST_CASE("d and y with a motion in the piano roll take the notes starting in that time")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto before = bassNotes(r);
+    r.type(U"d}"); // bar 1, at every pitch, but not the A2 at bar 2's start
+    CHECK(bassNotes(r) ==
+          std::vector<std::pair<core::Tick, int>>(before.begin() + 2, before.end()));
+    r.type(U"u");
+    CHECK(bassNotes(r) == before);
+
+    r.type(U"5GdG"); // from bar 5 to the end, the last grid step too
+    CHECK(bassNotes(r) ==
+          std::vector<std::pair<core::Tick, int>>(before.begin(), before.begin() + 3));
+    r.type(U"uggy}");
+    CHECK(r.ws.message() == "2 notes yanked");
+    r.type(U"3G}p"); // a bar later at the same pitches
+    CHECK(bassNotes(r).size() == before.size() + 2);
+    CHECK(std::ranges::count(bassNotes(r), std::pair<core::Tick, int>{t.bar(4), 31}) == 1);
+
+    r.type(U"dj");
+    CHECK(r.ws.message() == "Deleting and yanking across pitches comes with Visual mode");
 }

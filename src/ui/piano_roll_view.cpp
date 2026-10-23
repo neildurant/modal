@@ -4,6 +4,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/time_motions.hpp>
@@ -207,6 +208,139 @@ void PianoRollView::setGrid(core::NoteFraction grid)
     changeTrack("Grid " + core::toString(grid) + " in " + trackName(),
                 "grid " + std::to_string(id->value),
                 [&](core::Track& track) { track.grid = grid; });
+}
+
+void PianoRollView::editEvents(std::string title,
+                               const std::function<void(core::EventList&)>& change,
+                               std::string_view mergeKey)
+{
+    const auto id = trackId();
+    if (!id)
+    {
+        return;
+    }
+    document_.edit(
+        std::move(title), place(), [&](core::Song& song) { song.updateEvents(*id, change); },
+        mergeKey);
+    refresh();
+}
+
+std::optional<std::size_t> PianoRollView::noteHere(std::string_view what) const
+{
+    const auto index = currentNote();
+    if (!index)
+    {
+        host_.setMessage("No note here to " + std::string{what}, MessageKind::Warning);
+    }
+    return index;
+}
+
+bool PianoRollView::addNote()
+{
+    // The track's default note at the cursor, unless there's a note there or it would run into
+    // one; a count waits, since a run of notes needs its spacing thought about.
+    const auto id = trackId();
+    if (!id)
+    {
+        return false;
+    }
+    if (currentNote())
+    {
+        host_.setMessage("There's a note here already", MessageKind::Warning);
+        return true;
+    }
+    const auto& song = document_.song();
+    const auto& track = *song.tracks()[track_];
+    const core::Event note{
+        time_, core::Note{pitch_, track.noteVelocity,
+                          std::max<core::Tick>(track.defaultLength().toTicks(song.ppqn()), 1)}};
+    if (auto why = overlap(song.events(*id), std::nullopt, note, meter()))
+    {
+        host_.setMessage(std::move(*why), MessageKind::Warning);
+        return true;
+    }
+    editEvents("Add " + core::pitchName(pitch_) + " in " + trackName(),
+               [&](core::EventList& events) { events.insert(note); });
+    return true;
+}
+
+bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t>& notes,
+                              core::Tick from)
+{
+    const auto id = *trackId();
+    const auto& events = document_.song().events(id);
+    auto& reg = host_.eventRegister();
+    reg = EventRegister{};
+    auto& taken = reg.tracks.emplace_back();
+    for (const auto i : notes)
+    {
+        auto event = events[i];
+        event.tick -= from;
+        taken.push_back(std::move(event));
+    }
+    const auto what = notes.size() == 1
+                          ? core::pitchName(std::get<core::Note>(events[notes.front()].data).pitch)
+                          : std::to_string(notes.size()) + " notes";
+    if (op == "operator-yank")
+    {
+        host_.setMessage(what + " yanked", MessageKind::Information);
+        return true;
+    }
+    if (notes.empty())
+    {
+        host_.setMessage("No notes there to delete", MessageKind::Information);
+        return true;
+    }
+    editEvents("Delete " + what + " in " + trackName(),
+               [&](core::EventList& list)
+               {
+                   for (auto it = notes.rbegin(); it != notes.rend(); ++it)
+                   {
+                       list.erase(*it);
+                   }
+               });
+    return true;
+}
+
+bool PianoRollView::put()
+{
+    const auto& reg = host_.eventRegister();
+    if (reg.empty())
+    {
+        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    if (!reg.sections.empty())
+    {
+        host_.setMessage("The register holds sections: put them on the section strip",
+                         MessageKind::Warning);
+        return true;
+    }
+    // At the cursor's time, at the notes' own pitches, onto this track and those after it for
+    // a register of several; refused where a note would run into one of its pitch there.
+    const auto& song = document_.song();
+    const auto tracks = song.tracks();
+    std::size_t total = 0;
+    for (std::size_t i = 0; i < reg.tracks.size() && track_ + i < tracks.size(); ++i)
+    {
+        const auto id = tracks[track_ + i]->id();
+        for (auto event : reg.tracks[i])
+        {
+            event.tick += time_;
+            if (auto why = overlap(song.events(id), std::nullopt, event, song.meter(id)))
+            {
+                host_.setMessage(std::move(*why), MessageKind::Warning);
+                return true;
+            }
+            ++total;
+        }
+    }
+    const auto where =
+        reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
+    document_.edit("Put " + eventCount(total) + " in " + where, place(),
+                   [&](core::Song& s) { putRegister(s, reg, track_, time_); });
+    refresh();
+    return true;
 }
 
 core::Tick PianoRollView::gridAfter(core::Tick tick) const
@@ -744,6 +878,18 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         setGrid(isTriplet(grid()) ? straight(grid()) : grid().triplet());
     }
+    else if (command == "note-add")
+    {
+        return addNote();
+    }
+    else if (command == "event-delete")
+    {
+        return operate("operator-delete", "operator-line", count);
+    }
+    else if (command == "register-put")
+    {
+        return put();
+    }
     else if (command == "note-default")
     {
         // The current note's length and velocity, as the track's default note.
@@ -823,10 +969,71 @@ std::optional<CommandResult> PianoRollView::runLine(std::string_view command,
     return CommandResult{true};
 }
 
-bool PianoRollView::operate(std::string_view /*op*/, std::string_view /*motion*/, int /*count*/)
+bool PianoRollView::operate(std::string_view op, std::string_view motion, int count)
 {
-    host_.setMessage("Editing notes in the piano roll comes next", MessageKind::Information);
-    return false;
+    const auto id = trackId();
+    if (!id)
+    {
+        return false;
+    }
+    if (motion == "operator-line")
+    {
+        // dd, yy, x: the current note (a count waits, as o's does).
+        const auto index = noteHere(op == "operator-yank" ? "yank" : "delete");
+        if (!index)
+        {
+            return true;
+        }
+        return operateOn(op, {*index}, document_.song().events(*id)[*index].tick);
+    }
+    if (motion == "cursor-up" || motion == "cursor-down" || motion == "octave-up" ||
+        motion == "join")
+    {
+        host_.setMessage("Deleting and yanking across pitches comes with Visual mode",
+                         MessageKind::Information);
+        return true;
+    }
+
+    // Where the motion goes in time, without moving the cursor or the view.
+    const auto time = time_;
+    const auto pitch = pitch_;
+    const auto top = topPitch_;
+    const auto start = viewStart_;
+    const auto length = viewLength_;
+    const auto moved = run(motion, count);
+    const auto landed = time_;
+    time_ = time;
+    pitch_ = pitch;
+    topPitch_ = top;
+    viewStart_ = start;
+    viewLength_ = length;
+    if (!moved || !*moved)
+    {
+        return false;
+    }
+    // The notes starting from the cursor up to where it lands, at every pitch, as Vim's
+    // character motions go; with G, gg and $, the grid step landed on too.
+    const bool inclusive = motion == "go-first" || motion == "go-last" || motion == "cursor-last";
+    const auto from = std::min(time, landed);
+    auto to = std::max(time, landed);
+    if (inclusive)
+    {
+        to = gridAfter(to);
+    }
+    if (from == to)
+    {
+        return false;
+    }
+    std::vector<std::size_t> notes;
+    const auto& events = document_.song().events(*id);
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (events[i].isNote() && events[i].tick >= from && events[i].tick < to)
+        {
+            notes.push_back(i);
+        }
+    }
+    return operateOn(op, notes, from);
 }
 
 Inspection PianoRollView::inspection() const

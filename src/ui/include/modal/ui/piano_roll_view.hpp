@@ -149,6 +149,18 @@ private:
     void changeTrack(std::string title, std::string_view mergeKey,
                      const std::function<void(core::Track&)>& change);
     void setGrid(core::NoteFraction grid);
+    // Changes the track's events as an undo step, merged as changeTrack's are.
+    void editEvents(std::string title, const std::function<void(core::EventList&)>& change,
+                    std::string_view mergeKey = {});
+    // The note the cursor is on, or a message saying there's none to do something to.
+    std::optional<std::size_t> noteHere(std::string_view what) const;
+
+    // Adds the default note at the cursor; deletes or yanks notes, as indices into the track's
+    // events, into the register with their ticks from a time; and puts the register at the
+    // cursor's time.
+    bool addNote();
+    bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from);
+    bool put();
 
     core::Document& document_;
     ViewHost& host_;
