@@ -130,16 +130,12 @@ TEST_CASE("the piano roll opens on the track at the cursor, centred on its notes
     // Centred: as many rows above the cursor's pitch as below, give or take one.
     const int above = r.view().topPitch() - r.view().pitch();
     CHECK(std::abs(above - r.view().noteRows() / 2) <= 1);
-    CHECK(r.view().page() == PianoRollView::Page{.firstBar = 1,
-                                                 .lastBar = 2,
-                                                 .start = 0,
-                                                 .end = r.t.bar(3),
-                                                 .section = 0,
-                                                 .number = 1,
-                                                 .count = 1});
+    // Four bars, from the section's first, running on into the next section.
+    CHECK(r.view().page() ==
+          PianoRollView::Page{
+              .firstBar = 1, .lastBar = 4, .start = 0, .end = r.t.bar(5), .section = 0});
     CHECK(contains(r.textOn(Role::Bar), U"Bass"));
-    CHECK(contains(r.textOn(Role::Bar), U"1–2"));
-    CHECK(contains(r.textOn(Role::Bar), U"1/1"));
+    CHECK(contains(r.textOn(Role::Bar), U"1–4"));
     CHECK(contains(r.status(), U"1:1:000  C2"));
 }
 
@@ -152,10 +148,8 @@ TEST_CASE("Enter on a bar in the arrangement opens it in the piano roll, at its 
     r.press(Key::of(NamedKey::Enter));
     REQUIRE(r.ws.shown() == ViewKind::PianoRoll);
     CHECK(r.view().time() == r.t.bar(5));
-    CHECK(r.view().page().firstBar == 3);
+    CHECK(r.view().page().firstBar == 3); // pages restart at the section
     CHECK(r.view().page().lastBar == 6);
-    CHECK(r.view().page().number == 1);
-    CHECK(r.view().page().count == 3);
     CHECK(contains(r.textOn(Role::Bar), U"Verse"));
 }
 
@@ -203,29 +197,118 @@ TEST_CASE("the piano roll's time motions go by the grid, beats and bars")
     CHECK(r.view().time() == t.bar(5));
 }
 
-TEST_CASE("the piano roll turns its pages as the cursor moves, and zooms by bars to a page")
+TEST_CASE("the piano roll turns by its width as the cursor moves past an edge")
 {
     Rolling r;
-    r.type(U"}}");
+    const auto& t = r.t;
+    r.type(U"3}"); // bar 4, still in view
+    CHECK(r.view().page().start == 0);
+    r.type(U"}");
+    CHECK(r.view().page().start == t.bar(5));
+    CHECK(r.view().page().end == t.bar(9));
+    r.type(U"G"); // the song's last grid step, in bar 12
+    CHECK(r.view().page().start == t.bar(9));
+    r.type(U"gg");
+    CHECK(r.view().page().start == 0);
+}
+
+TEST_CASE("zz centres the piano roll on the cursor in time, and turning keeps the view's place")
+{
+    Rolling r;
+    const auto& t = r.t;
+    r.type(U"5Gw"); // bar 5, beat 2
+    r.type(U"zz");
+    CHECK(r.view().page().start == t.bar(3) + t.quarters(1));
+    CHECK(r.view().page().end == t.bar(7) + t.quarters(1));
     CHECK(r.view().page().firstBar == 3);
-    CHECK(r.view().page().lastBar == 6);
-    r.type(U"4}");
-    CHECK(r.view().page().firstBar == 7);
-    CHECK(r.view().page().number == 2);
-    r.type(U"zo");
+    CHECK(r.view().page().lastBar == 7);
+    CHECK(contains(r.textOn(Role::Bar), U"3–7"));
+    r.type(U"2}"); // past the right edge: on by four bars, still at beat 2
+    CHECK(r.view().page().start == t.bar(7) + t.quarters(1));
+    r.type(U"3{"); // back past the left edge
+    CHECK(r.view().page().start == t.bar(3) + t.quarters(1));
+
+    // Near the end, the view may run past the song's end; never before its start.
+    r.type(U"Gzz");
+    CHECK(r.view().page().end > r.document.song().end());
+    r.type(U"ggzz");
+    CHECK(r.view().page().start == 0);
+}
+
+TEST_CASE("Ctrl with h, l, { and } scroll the piano roll with the cursor")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    r.type(U"5G"); // bar 5: the view is bars 5-8
+    REQUIRE(r.view().page().start == t.bar(5));
+    r.press(Key::typed(U'l', kCtrl));
+    CHECK(r.view().time() == t.bar(5) + t.sixteenth());
+    CHECK(r.view().page().start == t.bar(5) + t.sixteenth());
+    r.press(Key::typed(U'h', kCtrl));
+    r.press(Key::typed(U'h', kCtrl));
+    CHECK(r.view().time() == t.bar(5) - t.sixteenth());
+    CHECK(r.view().page().start == t.bar(5) - t.sixteenth());
+    r.press(Key::typed(U'}', kCtrl));
+    CHECK(r.view().time() == t.bar(6) - t.sixteenth());
+    CHECK(r.view().page().start == t.bar(6) - t.sixteenth());
+    r.ws.run("cursor-bar-previous-scroll", 2);
+    CHECK(r.view().time() == t.bar(4) - t.sixteenth());
+    CHECK(r.view().page().start == t.bar(4) - t.sixteenth());
+    // At the start the view stops, and the cursor goes on.
+    r.ws.run("cursor-bar-previous-scroll", 5);
+    CHECK(r.view().page().start == 0);
+    CHECK(r.view().time() == t.bar(1) + t.quarters(4) - t.sixteenth());
+}
+
+TEST_CASE("zooming the piano roll keeps the bar line nearest the cursor in its place")
+{
+    Rolling r;
+    r.type(U"5G"); // bars 5-8 in view
+    r.type(U"2}"); // the start of bar 7, the third
+    r.type(U"zo"); // eight bars: bar 7 the fifth
     CHECK(r.view().pageBars() == 8);
     CHECK(r.view().page().firstBar == 3);
     CHECK(r.view().page().lastBar == 10);
-    r.type(U"zizi");
-    CHECK(r.view().pageBars() == 2);
-    CHECK(r.view().page().firstBar == 7);
-    CHECK(r.view().page().count == 5);
+    r.type(U"zi"); // back
+    CHECK(r.view().page().firstBar == 5);
+    r.type(U"zi"); // two bars: bar 7 the second
+    CHECK(r.view().page().firstBar == 6);
+    CHECK(r.view().page().lastBar == 7);
     r.type(U"z0");
     CHECK(r.view().pageBars() == 4);
-    r.type(U"G"); // the section's last page is cut short
-    CHECK(r.view().page().firstBar == 11);
-    CHECK(r.view().page().lastBar == 12);
-    CHECK(r.view().page().end == r.t.bar(13));
+    CHECK(r.view().page().firstBar == 5);
+
+    // Near the start it shifts as little as it must; and the cursor stays in view.
+    r.type(U"3G"); // bar 3, in the view of bars 1-4 after turning back
+    r.type(U"zo");
+    CHECK(r.view().page().firstBar == 1);
+    r.type(U"G"); // bar 12's last grid step: the nearest bar line is 13's
+    r.type(U"4zi");
+    CHECK(r.view().pageBars() == 1);
+    CHECK(r.view().page().firstBar == 12);
+
+    // From a view off the bar lines, whole bars again.
+    r.type(U"z0wzz");
+    REQUIRE(r.view().page().start != r.t.bar(r.view().page().firstBar));
+    r.type(U"zo");
+    CHECK(r.view().page().start == r.t.bar(r.view().page().firstBar));
+}
+
+TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")
+{
+    Rolling r;
+    r.type(U"5Gwzz");
+    const auto scrolled = r.view().page().start;
+    r.type(U"gagr");
+    CHECK(r.view().page().start == scrolled);
+    r.type(U"ga");
+    r.press(Key::of(NamedKey::Enter));
+    CHECK(r.view().page().start == r.t.bar(3)); // the Verse's page holding bar 5
+    // Coming back to a time outside the view starts again from whole bars too.
+    r.type(U"zz");
+    r.type(U"ga2Ggr");
+    CHECK(r.view().page().start == 0);
 }
 
 TEST_CASE("the piano roll's cursor moves by semitones and octaves, keeping its pitch in view")
@@ -360,9 +443,9 @@ TEST_CASE("the piano roll follows the playhead from page to page")
 {
     Rolling r;
     r.ws.pianoRoll().showPlayhead(r.t.bar(8), true);
-    CHECK(r.view().page().firstBar == 7);
+    CHECK(r.view().page().firstBar == 5);
     r.ws.pianoRoll().showPlayhead(r.t.bar(9), false); // not following: the page stays
-    CHECK(r.view().page().firstBar == 7);
+    CHECK(r.view().page().firstBar == 5);
     r.ws.pianoRoll().stopPlayhead(r.t.bar(1));
     CHECK(r.view().time() == 0);
 }

@@ -34,6 +34,12 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-note-previous",
                 .description = "Note's start before, at any pitch",
                 .count = true},
+    CommandInfo{.name = "cursor-bar-next-scroll",
+                .description = "Same place, next bar, scrolling, {count} times",
+                .count = true},
+    CommandInfo{.name = "cursor-bar-previous-scroll",
+                .description = "Same place, bar before, scrolling, {count} times",
+                .count = true},
     CommandInfo{.name = "grid-coarser",
                 .description = "Make the track's grid coarser, {count} times",
                 .count = true},
@@ -222,31 +228,78 @@ core::Tick PianoRollView::gridBefore(core::Tick tick) const
     return start + (tick - 1 - start) / gridTicks() * gridTicks();
 }
 
-PianoRollView::Page PianoRollView::pageAt(core::Tick tick) const
+core::Tick PianoRollView::viewEnd(core::Tick start) const
+{
+    const auto& m = meter();
+    return std::max(sameInBar(m, start, pageBars(), offsetInBar(m, start)), start + 1);
+}
+
+core::Tick PianoRollView::pageStart(core::Tick tick) const
 {
     // Pages of whole bars, counted from the section's first bar, in the track's bars.
     const auto& song = document_.song();
     const auto& m = meter();
-    Page page;
-    page.section = song.sectionAt(tick);
-    const auto sectionStart = song.sectionStart(page.section);
-    const auto sectionEnd = song.sectionStart(page.section + 1);
+    const auto section = song.sectionAt(tick);
+    const auto sectionStart = song.sectionStart(section);
     const auto first = m.toBarBeatTick(sectionStart).bar;
-    const auto last = m.toBarBeatTick(std::max(sectionEnd - 1, sectionStart)).bar;
-    const auto size = pageBars();
-    const auto bar = std::clamp(m.toBarBeatTick(tick).bar, first, last);
-    page.number = (bar - first) / size + 1;
-    page.count = (last - first) / size + 1;
-    page.firstBar = first + (page.number - 1) * size;
-    page.lastBar = std::min(page.firstBar + size - 1, last);
-    page.start = std::max(m.barStart(page.firstBar), sectionStart);
-    page.end = std::max(std::min(m.barStart(page.lastBar + 1), sectionEnd), page.start + 1);
-    return page;
+    const auto bar = std::max(m.toBarBeatTick(tick).bar, first);
+    return std::max(m.barStart(first + (bar - first) / pageBars() * pageBars()), sectionStart);
+}
+
+void PianoRollView::align()
+{
+    viewStart_ = pageStart(time_);
+}
+
+void PianoRollView::turn()
+{
+    const auto& m = meter();
+    for (;;)
+    {
+        if (time_ >= viewEnd(viewStart_))
+        {
+            viewStart_ = viewEnd(viewStart_);
+        }
+        else if (time_ < viewStart_)
+        {
+            const auto back = sameInBar(m, viewStart_, -pageBars(), offsetInBar(m, viewStart_));
+            viewStart_ = back < viewStart_ ? back : 0; // not before bar 1
+        }
+        else
+        {
+            return;
+        }
+    }
+}
+
+void PianoRollView::zoomTo(std::size_t size)
+{
+    // The bar line nearest the cursor, and how far across the view it is, in bars of the new
+    // size, which it keeps as near as it can; with the cursor in view.
+    const auto& m = meter();
+    const auto start = viewStart_;
+    const auto width = viewEnd(start) - start;
+    const auto bar = m.toBarBeatTick(time_).bar;
+    const auto barStart = m.barStart(bar);
+    const auto anchorBar = (time_ - barStart) * 2 < m.barStart(bar + 1) - barStart ? bar : bar + 1;
+    const auto across = std::clamp<core::Tick>(m.barStart(anchorBar) - start, 0, width);
+    pageSize_ = size;
+    const auto bars = pageBars();
+    const auto before = (2 * bars * across + width) / (2 * width); // rounded
+    auto first = std::max<std::int64_t>(anchorBar - before, 1);
+    first = std::clamp(first, bar - bars + 1, bar);
+    viewStart_ = m.barStart(std::max<std::int64_t>(first, 1));
 }
 
 PianoRollView::Page PianoRollView::page() const
 {
-    return pageAt(time_);
+    const auto& m = meter();
+    const auto end = viewEnd(viewStart_);
+    return {.firstBar = m.toBarBeatTick(viewStart_).bar,
+            .lastBar = m.toBarBeatTick(end - 1).bar,
+            .start = viewStart_,
+            .end = end,
+            .section = document_.song().sectionAt(time_)};
 }
 
 int PianoRollView::noteRows() const
@@ -294,6 +347,7 @@ std::uint8_t PianoRollView::middlePitch() const
 void PianoRollView::moveTo(core::Tick tick)
 {
     time_ = std::clamp<core::Tick>(tick, 0, lastTick());
+    turn();
 }
 
 void PianoRollView::moveToPitch(int pitch)
@@ -387,7 +441,9 @@ std::vector<core::Tick> PianoRollView::chordStarts() const
 
 std::optional<bool> PianoRollView::run(std::string_view command, int count)
 {
-    const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous";
+    const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous" ||
+                                command == "cursor-bar-next-scroll" ||
+                                command == "cursor-bar-previous-scroll";
     if (!keepsBarOffset)
     {
         barOffset_.reset();
@@ -411,6 +467,14 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         moveToPitch(pitch_ - by);
     };
 
+    // Moves the cursor and the view together, so the cursor stays put on screen; at the song's
+    // start the view stops and the cursor goes on.
+    const auto scrollTo = [&](core::Tick to, core::Tick viewTo)
+    {
+        viewStart_ = std::max<core::Tick>(viewTo, 0);
+        moveTo(to);
+    };
+
     if (command == "cursor-left" || command == "cursor-left-scroll")
     {
         auto tick = time_;
@@ -418,7 +482,14 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         {
             tick = gridBefore(tick);
         }
-        moveTo(tick);
+        if (command == "cursor-left-scroll")
+        {
+            scrollTo(tick, viewStart_ - (time_ - tick));
+        }
+        else
+        {
+            moveTo(tick);
+        }
     }
     else if (command == "cursor-right" || command == "cursor-right-scroll")
     {
@@ -427,7 +498,29 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         {
             tick = gridAfter(tick);
         }
-        moveTo(tick);
+        if (command == "cursor-right-scroll")
+        {
+            scrollTo(tick, viewStart_ + (tick - time_));
+        }
+        else
+        {
+            moveTo(tick);
+        }
+    }
+    else if (command == "cursor-bar-next-scroll" || command == "cursor-bar-previous-scroll")
+    {
+        // A bar on or back, the cursor and the view each keeping their place in the bar.
+        const auto by = command == "cursor-bar-next-scroll" ? n : -n;
+        const auto offset = barOffset_.value_or(offsetInBar(m, time_));
+        const auto to = sameInBar(m, time_, by, offset);
+        barOffset_ = offset;
+        if (to > lastTick())
+        {
+            return false;
+        }
+        const auto viewBar = m.toBarBeatTick(viewStart_).bar;
+        scrollTo(to,
+                 viewBar + by < 1 ? 0 : sameInBar(m, viewStart_, by, offsetInBar(m, viewStart_)));
     }
     else if (command == "cursor-beat-next")
     {
@@ -496,6 +589,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     else if (command == "scroll-centre")
     {
+        // In time and in pitch.
+        viewStart_ = std::max<core::Tick>(time_ - (viewEnd(viewStart_) - viewStart_) / 2, 0);
+        turn();
         centre();
     }
     else if (command == "cursor-note-next" || command == "cursor-note-previous")
@@ -595,17 +691,18 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                         : command == "track-next" ? (track_ + steps) % tracks
                                                   : (track_ + tracks - steps) % tracks;
         showTrack(to, std::nullopt);
+        align();
     }
     else if (command == "zoom-in" || command == "zoom-out")
     {
-        // Fewer bars to a page, or more; the new page is the one holding the cursor.
+        // Fewer bars in view, or more.
         const auto last = static_cast<int>(kPageSizes.size()) - 1;
-        pageSize_ = static_cast<std::size_t>(
-            std::clamp(static_cast<int>(pageSize_) + (command == "zoom-in" ? -n : n), 0, last));
+        zoomTo(static_cast<std::size_t>(
+            std::clamp(static_cast<int>(pageSize_) + (command == "zoom-in" ? -n : n), 0, last)));
     }
     else if (command == "zoom-reset")
     {
-        pageSize_ = kDefaultPageSize;
+        zoomTo(kDefaultPageSize);
     }
     else if (command == "grid-coarser" || command == "grid-finer")
     {
@@ -832,6 +929,15 @@ void PianoRollView::addRegions(Frame& frame) const
         }
     }
     lane.under.push_back({{0, 0, width, lineWidth}, Role::BarLine, 255});
+    // Past the song's end, shaded, and its end marked.
+    if (song.end() < p.end)
+    {
+        const int x = scale.toX(song.end());
+        notes.under.push_back({{x, 0, width - x, notesHeight}, Role::Bar, 160});
+        lane.under.push_back({{x, 0, width - x, laneHeight}, Role::Bar, 160});
+        notes.under.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::BarLine, 255});
+        lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::BarLine, 255});
+    }
 
     // Each note at its exact place: brighter the louder, with a solid start so repeated notes
     // read apart, and a pixel's gap before the next; the current note in the accent colour.
@@ -925,7 +1031,6 @@ void PianoRollView::addRegions(Frame& frame) const
     pair(top.right, "Bars:",
          p.firstBar == p.lastBar ? std::to_string(p.firstBar)
                                  : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar));
-    pair(top.right, "Page:", std::to_string(p.number) + "/" + std::to_string(p.count));
     pair(top.right, "Grid:", core::toString(grid()));
     if (trackId())
     {
@@ -979,7 +1084,11 @@ void PianoRollView::setCursor(const SongCursor& cursor)
             track = static_cast<std::size_t>(it - tracks.begin());
         }
     }
-    if (!opened_ || track != track_)
+    // Coming to a time outside the view, or to another track, whole bars again, as a track
+    // opens; otherwise the view stays as it was left.
+    const auto tick = std::clamp<core::Tick>(cursor.tick, 0, lastTick());
+    const bool fresh = !opened_ || track != track_;
+    if (fresh)
     {
         showTrack(track, cursor.pitch);
     }
@@ -987,12 +1096,23 @@ void PianoRollView::setCursor(const SongCursor& cursor)
     {
         moveToPitch(*cursor.pitch);
     }
-    moveTo(cursor.tick);
+    time_ = tick;
+    if (fresh || tick < viewStart_ || tick >= viewEnd(viewStart_))
+    {
+        align();
+    }
+}
+
+void PianoRollView::open(const SongCursor& cursor)
+{
+    setCursor(cursor);
+    align();
 }
 
 core::EditPlace PianoRollView::place() const
 {
-    return {trackId(), time_, {pitch_, topPitch_, static_cast<std::int64_t>(pageSize_)}};
+    return {
+        trackId(), time_, {pitch_, topPitch_, static_cast<std::int64_t>(pageSize_), viewStart_}};
 }
 
 void PianoRollView::restore(const core::EditPlace& place)
@@ -1000,12 +1120,14 @@ void PianoRollView::restore(const core::EditPlace& place)
     refresh();
     setCursor({.track = place.track, .tick = place.tick, .pitch = std::nullopt});
     // The view as it was, when the change was made in the piano roll.
-    if (place.view.size() == 3)
+    if (place.view.size() == 4)
     {
         pitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[0], 0, 127));
         topPitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[1], 0, 127));
         pageSize_ = static_cast<std::size_t>(std::clamp<std::int64_t>(
             place.view[2], 0, static_cast<std::int64_t>(kPageSizes.size()) - 1));
+        viewStart_ = std::max<core::Tick>(place.view[3], 0);
+        turn();
         follow();
     }
 }
@@ -1022,6 +1144,7 @@ void PianoRollView::showSong()
 {
     track_ = 0;
     time_ = 0;
+    viewStart_ = 0;
     pitch_ = 60;
     topPitch_ = 72;
     barOffset_.reset();

@@ -117,9 +117,12 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         const bool up = command == "cursor-up" || command == "track-previous";
         page_.moveTracks(up ? -n : n);
     }
-    else if (command == "cursor-left-scroll" || command == "cursor-right-scroll")
+    else if (command == "cursor-left-scroll" || command == "cursor-right-scroll" ||
+             command == "cursor-bar-previous-scroll" || command == "cursor-bar-next-scroll")
     {
-        page_.scrollBars(command == "cursor-left-scroll" ? -n : n);
+        const bool back =
+            command == "cursor-left-scroll" || command == "cursor-bar-previous-scroll";
+        page_.scrollBars(back ? -n : n);
     }
     else if (command == "cursor-down-scroll" || command == "cursor-up-scroll")
     {
@@ -198,7 +201,7 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         // Enter opens the bar in the piano roll, the cursor at its start.
         const auto& m = meter();
         page_.setCursor(page_.track(), m.barStart(m.toBarBeatTick(page_.time()).bar));
-        host_.show(ViewKind::PianoRoll);
+        host_.open(ViewKind::PianoRoll);
     }
     else
     {

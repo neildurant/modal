@@ -332,10 +332,22 @@ void Workspace::show(ViewKind kind)
     }
 }
 
-void Workspace::switchTo(View& view, bool remember)
+void Workspace::open(ViewKind kind)
+{
+    switchTo(kind == ViewKind::Arrangement ? static_cast<View&>(*arrange_)
+             : kind == ViewKind::PianoRoll ? static_cast<View&>(*pianoRoll_)
+                                           : static_cast<View&>(*eventList_),
+             true, true);
+}
+
+void Workspace::switchTo(View& view, bool remember, bool fresh)
 {
     if (&view == current_)
     {
+        if (fresh)
+        {
+            view.open(view.cursor());
+        }
         return;
     }
     const auto cursor = current_->cursor();
@@ -347,7 +359,14 @@ void Workspace::switchTo(View& view, bool remember)
     current_ = &view;
     view.refresh();
     layOut();
-    view.setCursor(cursor);
+    if (fresh)
+    {
+        view.open(cursor);
+    }
+    else
+    {
+        view.setCursor(cursor);
+    }
     if (wasPlaying_)
     {
         showPlayhead();

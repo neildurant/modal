@@ -64,6 +64,7 @@ public:
     // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
     // goes back to (decided for milestone 5).
     void show(ViewKind kind) override;
+    void open(ViewKind kind) override;
     ViewKind shown() const;
 
     // Fits the views to the window, scrolling if the cursor would be out of view.
@@ -153,7 +154,7 @@ private:
 
     // Shows a view at the cursor, remembering the one before for Backspace, or not when going
     // back; and lays it out in the window.
-    void switchTo(View& view, bool remember);
+    void switchTo(View& view, bool remember, bool fresh = false);
     void layOut();
 
     bool runAll(const std::vector<Action>& actions);

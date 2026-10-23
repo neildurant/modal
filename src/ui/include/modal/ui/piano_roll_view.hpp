@@ -61,6 +61,7 @@ public:
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override;
     void setCursor(const SongCursor& cursor) override;
+    void open(const SongCursor& cursor) override;
     const core::MeterMap& cursorMeter() const override { return meter(); }
     core::EditPlace place() const override;
     void restore(const core::EditPlace& place) override;
@@ -69,9 +70,9 @@ public:
     void showPlayhead(core::Tick playhead, bool cursorFollows) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
 
-    // A page of bars: its first and last, in the track's bars, where it starts and ends in
-    // time, and which of its section's pages it is. Pages start again at each section
-    // (decided October 2026), so the last of a section's may be shorter.
+    // What's in view (see Piano roll pages in the design): where it starts and ends in time,
+    // a whole number of bars from wherever it starts; the first and last bars it shows, in the
+    // track's bars, partial ones included; and the section the cursor is in.
     struct Page
     {
         std::int64_t firstBar = 1;
@@ -79,12 +80,10 @@ public:
         core::Tick start = 0;
         core::Tick end = 0;
         std::size_t section = 0;
-        std::int64_t number = 1; // within the section, counting from 1
-        std::int64_t count = 1;  // in the section
 
         friend bool operator==(const Page&, const Page&) = default;
     };
-    Page page() const; // the one shown
+    Page page() const;
 
     std::size_t track() const { return track_; } // counting from 0
     core::Tick time() const { return time_; }
@@ -106,7 +105,17 @@ public:
 private:
     const core::MeterMap& meter() const;
     std::optional<core::TrackId> trackId() const;
-    Page pageAt(core::Tick tick) const;
+    // Where the view would end, starting at a tick: as many bars on, at the same place in the
+    // bar. And where the section's page of whole bars holding a tick starts, pages restarting
+    // at each section.
+    core::Tick viewEnd(core::Tick start) const;
+    core::Tick pageStart(core::Tick tick) const;
+    // Turns the view by its own width until the cursor is in it, keeping its place in the bar.
+    void turn();
+    // Shows the section's page of whole bars holding the cursor, as when a track opens.
+    void align();
+    // Zooms to a page size, anchoring the view on the bar line nearest the cursor.
+    void zoomTo(std::size_t size);
     core::Tick gridTicks() const;
     // The grid steps, counted from each bar line: the next after a tick, and the last before.
     core::Tick gridAfter(core::Tick tick) const;
@@ -140,6 +149,7 @@ private:
     ViewHost& host_;
     std::size_t track_ = 0;
     core::Tick time_ = 0;
+    core::Tick viewStart_ = 0;
     std::uint8_t pitch_ = 60;
     std::uint8_t topPitch_ = 72;
     std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated

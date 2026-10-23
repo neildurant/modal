@@ -89,8 +89,10 @@ public:
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;
 
-    // Shows another view, at the cursor, as Enter on a bar in the arrangement does.
+    // Shows another view at the cursor; or opens it afresh there, as Enter on a bar in the
+    // arrangement does (see View::open).
     virtual void show(ViewKind kind) = 0;
+    virtual void open(ViewKind kind) = 0;
 
     // Opens the : prompt with a line in it to edit, as naming a new section does.
     virtual void openPrompt(std::string line) = 0;
@@ -145,6 +147,10 @@ public:
     // The shared cursor, and putting it somewhere, as when coming from another view.
     virtual SongCursor cursor() const = 0;
     virtual void setCursor(const SongCursor& cursor) = 0;
+
+    // Opens the view afresh at the cursor, as Enter on a bar in the arrangement opens the piano
+    // roll: the same as setCursor, unless the view keeps a scroll it should start again from.
+    virtual void open(const SongCursor& cursor) { setCursor(cursor); }
 
     // The meter the cursor's time is counted in, in the view's own bars: its track's, or the
     // conductor's in its list.
