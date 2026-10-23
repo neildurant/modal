@@ -54,7 +54,11 @@ Song everything(Ppqn ppqn)
                          track.arm = true;
                          track.thru = false;
                          track.chaseNotes = false;
+                         track.grid = NoteFraction{1, 8}.triplet();
+                         track.noteLength = NoteFraction{437, 3840}; // not a common length
+                         track.noteVelocity = 90;
                      });
+    song.updateTrack(lead, [](Track& track) { track.noteLength = NoteFraction{1, 4}; });
 
     song.updateMeter([&](MeterMap& meter) { meter.set(8 * q, {3, 4}); });
     song.updateMeter(lead, [](MeterMap& meter) { meter = MeterMap{meter.ppqn(), {7, 8}}; });
@@ -246,6 +250,9 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + "track 1 \"Again\" ch=1\n", "line 4", "already a track 1"},
         {header + "track 2 \"T\" ch=17\n", "line 4", "channel"},
         {header + "track 2 \"T\" colour=red\n", "line 4", "unknown track setting"},
+        {header + "track 2 \"T\" grid=1/0\n", "line 4", "grid should be a note length"},
+        {header + "track 2 \"T\" len=long\n", "line 4", "len should be a note length"},
+        {header + "track 2 \"T\" vel=0\n", "line 4", "vel should be a velocity"},
         {header + "section \"A\"\n", "line 4", "bars=N"},
         {header + "section \"A\" bars=1\n  tempo 1:1:0 120\n", "line 5", "meter comes before"},
         {header + "section \"A\" bars=1\n  meter 1:1:0 4/4\n", "line 4", "no tempo"},

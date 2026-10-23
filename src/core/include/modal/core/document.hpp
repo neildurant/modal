@@ -13,6 +13,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace modal::core
@@ -66,6 +67,13 @@ public:
     // Changes a copy of the song and keeps it, as one undo step, unless the change left the
     // song as it was. Returns whether it changed the song.
     bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change);
+
+    // The same, merged into the step before if that was made with the same merge key, is the
+    // latest, and hasn't been saved since, so changes made one after another, such as stepping
+    // a track's grid, undo together (decided for milestone 5). The step takes the new title;
+    // if the changes have left the song as it was before it, the step goes.
+    bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change,
+              std::string_view mergeKey);
 
     // Makes the edits until the matching end one undo step, with this title and place, as a
     // recording pass, a macro or a repeat with . will. Groups can nest; the outermost counts.
@@ -123,6 +131,7 @@ private:
     std::size_t undoLevels_ = kDefaultUndoLevels;
     int groupDepth_ = 0;
     std::optional<EditStep> group_; // the step being grouped
+    std::string mergeKey_;          // the latest step's, while it can be merged into
     Listener listener_;
 };
 

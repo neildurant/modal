@@ -3,12 +3,14 @@
 #pragma once
 
 #include <modal/core/event.hpp>
+#include <modal/core/note_fraction.hpp>
 #include <modal/core/tick.hpp>
 
 #include <chrono>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -67,6 +69,8 @@ public:
     static constexpr int kMaxTranspose = 127; // semitones either way
     static constexpr int kMaxVelocityOffset = 127;
     static constexpr std::chrono::milliseconds kMaxTimeOffset{1000};
+    static constexpr NoteFraction kDefaultGrid{1, 16};
+    static constexpr std::uint8_t kDefaultVelocity = 100;
 
     explicit Track(TrackId id);
 
@@ -85,6 +89,14 @@ public:
     int transpose = 0;
     int velocityOffset = 0;
     std::chrono::milliseconds timeOffset{0}; // negative sends early
+
+    // For editing (decided for milestone 5): the piano roll's grid, and the default note new
+    // notes take, after Sequencer Plus Gold. The default length follows the grid until set.
+    NoteFraction grid = kDefaultGrid;
+    std::optional<NoteFraction> noteLength;
+    std::uint8_t noteVelocity = kDefaultVelocity;
+
+    NoteFraction defaultLength() const { return noteLength.value_or(grid); }
 
     // Whether channel and the playback settings are in range.
     bool hasValidSettings() const;

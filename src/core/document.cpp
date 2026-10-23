@@ -27,11 +27,18 @@ void Document::replace(Song song, std::optional<std::filesystem::path> file,
     savedId_ = states_.front().id;
     groupDepth_ = 0;
     group_.reset();
+    mergeKey_.clear();
     changed();
 }
 
 bool Document::edit(std::string title, const EditPlace& place,
                     const std::function<void(Song&)>& change)
+{
+    return edit(std::move(title), place, change, {});
+}
+
+bool Document::edit(std::string title, const EditPlace& place,
+                    const std::function<void(Song&)>& change, std::string_view mergeKey)
 {
     Song edited = song_;
     change(edited);
@@ -40,9 +47,26 @@ bool Document::edit(std::string title, const EditPlace& place,
         return false;
     }
     song_ = std::move(edited);
-    if (groupDepth_ == 0)
+    const bool merging = !mergeKey.empty() && mergeKey == mergeKey_ && groupDepth_ == 0 &&
+                         current_ > 0 && !canRedo() && states_[current_].id != savedId_;
+    if (merging && Song{states_[current_ - 1].parts} == song_)
+    {
+        // Back where the step started: no step.
+        states_.pop_back();
+        --current_;
+        mergeKey_.clear();
+    }
+    else if (merging)
+    {
+        auto& state = states_[current_];
+        state.parts = song_.parts();
+        state.id = nextId_++;
+        state.step->title = std::move(title);
+    }
+    else if (groupDepth_ == 0)
     {
         record({std::move(title), place, std::chrono::system_clock::now()});
+        mergeKey_ = mergeKey;
     }
     changed();
     return true;
@@ -63,6 +87,7 @@ void Document::endGroup()
     {
         return;
     }
+    mergeKey_.clear();
     // Edits that undid each other make no step.
     if (!(Song{states_[current_].parts} == song_))
     {
@@ -78,6 +103,7 @@ std::optional<EditStep> Document::undo()
         return std::nullopt;
     }
     auto step = *states_[current_].step;
+    mergeKey_.clear();
     restore(current_ - 1);
     return step;
 }
@@ -88,6 +114,7 @@ std::optional<EditStep> Document::redo()
     {
         return std::nullopt;
     }
+    mergeKey_.clear();
     restore(current_ + 1);
     return *states_[current_].step;
 }

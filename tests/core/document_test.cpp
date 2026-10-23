@@ -6,7 +6,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace modal::core;
@@ -245,4 +247,61 @@ TEST_CASE("the listener hears every change to the song")
     e.document.redo();
     e.document.edit("Nothing", {}, [](Song&) {});
     CHECK(heard == std::vector<std::size_t>{1, 2, 1, 2});
+}
+
+TEST_CASE("edits made one after another with the same merge key are one step")
+{
+    Edited e;
+    const auto setGrid = [&](std::int64_t denominator, std::string_view key)
+    {
+        return e.document.edit(
+            "Grid 1/" + std::to_string(denominator) + " in Bass", {}, [&](Song& song)
+            { song.updateTrack(e.bass(), [&](Track& track) { track.grid = {1, denominator}; }); },
+            key);
+    };
+    const auto grid = [&] { return e.document.song().tracks()[0]->grid; };
+
+    REQUIRE(e.addNote(0));
+    CHECK(setGrid(8, "grid"));
+    CHECK(setGrid(4, "grid"));
+    CHECK(setGrid(2, "grid"));
+    CHECK(grid() == NoteFraction{1, 2});
+    const auto undone = e.document.undo();
+    REQUIRE(undone);
+    CHECK(undone->title == "Grid 1/2 in Bass");
+    CHECK(grid() == Track::kDefaultGrid);
+    CHECK(e.notes() == 1); // the note's step is the one before
+    REQUIRE(e.document.redo());
+    CHECK(grid() == NoteFraction{1, 2});
+
+    // After undo or redo, another edit, or a different key, a new step starts.
+    CHECK(setGrid(4, "grid"));
+    e.document.undo();
+    CHECK(grid() == NoteFraction{1, 2});
+    CHECK(setGrid(4, "grid"));
+    CHECK(setGrid(8, "other"));
+    e.document.undo();
+    CHECK(grid() == NoteFraction{1, 4});
+
+    // Changes back to where the step started leave no step.
+    e.document.undo();
+    e.document.undo();
+    REQUIRE(grid() == Track::kDefaultGrid);
+    REQUIRE(e.document.undo()); // the note
+    REQUIRE(e.document.redo());
+    CHECK(setGrid(8, "grid"));
+    CHECK(setGrid(16, "grid"));
+    CHECK(grid() == Track::kDefaultGrid);
+    CHECK_FALSE(e.document.canRedo());
+    CHECK(e.document.undo()->title == "Add a note in Bass");
+
+    // Nor do they merge into a step that has been saved.
+    e.document.redo();
+    CHECK(setGrid(8, "grid"));
+    e.document.markSaved();
+    CHECK(setGrid(4, "grid"));
+    CHECK(e.document.modified());
+    e.document.undo();
+    CHECK(grid() == NoteFraction{1, 8});
+    CHECK_FALSE(e.document.modified());
 }

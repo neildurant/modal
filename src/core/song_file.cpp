@@ -733,6 +733,31 @@ bool Reader::readTrack(std::span<const Token> tokens)
             (name == "transpose" ? track.transpose : track.velocityOffset) =
                 static_cast<int>(*amount);
         }
+        else if (value && (name == "grid" || name == "len"))
+        {
+            const auto fraction = parseNoteFraction(*value);
+            if (!fraction)
+            {
+                return fail(std::string{name} + " should be a note length, such as 1/16");
+            }
+            if (name == "grid")
+            {
+                track.grid = *fraction;
+            }
+            else
+            {
+                track.noteLength = *fraction;
+            }
+        }
+        else if (value && name == "vel")
+        {
+            const auto velocity = parseInteger(*value, 1, 127);
+            if (!velocity)
+            {
+                return fail("vel should be a velocity from 1 to 127");
+            }
+            track.noteVelocity = static_cast<std::uint8_t>(*velocity);
+        }
         else if (value && name == "offset")
         {
             const auto amount = signedValue(Track::kMaxTimeOffset.count(), "ms");
@@ -1436,6 +1461,18 @@ std::string writeSong(const Song& song)
         if (track->timeOffset.count() != 0)
         {
             text += " offset=" + signedText(track->timeOffset.count()) + "ms";
+        }
+        if (track->grid != Track::kDefaultGrid)
+        {
+            text += " grid=" + toString(track->grid);
+        }
+        if (track->noteLength)
+        {
+            text += " len=" + toString(*track->noteLength);
+        }
+        if (track->noteVelocity != Track::kDefaultVelocity)
+        {
+            text += " vel=" + std::to_string(track->noteVelocity);
         }
         line(0, text);
     }
