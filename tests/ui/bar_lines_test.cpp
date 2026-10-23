@@ -145,3 +145,31 @@ TEST_CASE("lines and the space they need grow with the cell, to keep their propo
     CHECK(positions(large, Role::BarLine).size() == 4);
     CHECK(large[0].rect.width == 4);
 }
+
+TEST_CASE("a grid coarser than a beat is drawn as itself, without the beats between")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    CAPTURE(ppqn.value);
+    const core::MeterMap meters{ppqn, {4, 4}};
+    // Two bars at 100 pixels to a quarter note.
+    const TimeScale scale{
+        .start = 0, .length = core::NoteFraction{2, 1}.toTicks(ppqn), .x = 0, .width = 800};
+    const auto lines = [&](core::NoteFraction grid)
+    { return meterLines(meters, scale, 0, 10, grid, CellSize{10, 20}); };
+
+    const auto half = lines({1, 2});
+    CHECK(positions(half, Role::BarLine) == std::vector<int>{0, 400});
+    CHECK(positions(half, Role::BeatLine) == std::vector<int>{200, 600});
+    CHECK(positions(half, Role::GridLine).empty());
+    const auto whole = lines({1, 1});
+    CHECK(positions(whole, Role::BeatLine).empty());
+    CHECK(positions(whole, Role::GridLine).empty());
+    const auto halfTriplets = lines({1, 3});
+    CHECK(positions(halfTriplets, Role::BeatLine) == std::vector<int>{133, 266, 533, 666});
+
+    // In 3/8, a quarter-note grid's steps from each bar line, not its eighth-note beats.
+    const core::MeterMap eighths{ppqn, {3, 8}};
+    const auto quarters = meterLines(eighths, scale, 0, 10, {1, 4}, CellSize{10, 20});
+    CHECK(positions(quarters, Role::BarLine) == std::vector<int>{0, 150, 300, 450, 600, 750});
+    CHECK(positions(quarters, Role::BeatLine) == std::vector<int>{100, 250, 400, 550, 700});
+}

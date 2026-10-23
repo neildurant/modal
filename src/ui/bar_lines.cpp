@@ -45,7 +45,10 @@ std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& sca
         const core::Tick barEnd = std::min(meters.barStart(bar + 1), end);
         const core::Tick beatTicks = std::max<core::Tick>(
             meters.signatureAt(barStart).beatLength().toTicks(meters.ppqn()), 1);
-        const bool drawBeats = spaced(beatTicks);
+        // A grid coarser than a beat is drawn as itself, its steps as beat lines and the beats
+        // between them left out, so a grid of 1/2 or 1/1 doesn't look like one of 1/4.
+        const bool coarse = gridTicks > beatTicks;
+        const bool drawBeats = !coarse && spaced(beatTicks);
 
         if (barStart >= scale.start)
         {
@@ -65,7 +68,7 @@ std::vector<Shape> meterLines(const core::MeterMap& meters, const TimeScale& sca
             }
             if (tick >= scale.start)
             {
-                line(tick, tick == beat ? Role::BeatLine : Role::GridLine, 1);
+                line(tick, tick == beat || coarse ? Role::BeatLine : Role::GridLine, 1);
             }
             if (tick == beat)
             {
