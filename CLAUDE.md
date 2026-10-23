@@ -56,7 +56,7 @@ tests/          unit tests
 
 Requires `VCPKG_ROOT` pointing at a vcpkg clone (for example `C:\vcpkg` on Windows, or `/opt/vcpkg` on Linux). On Linux, also Ninja, autotools (`autoconf autoconf-archive automake libtool`, which vcpkg needs to build ALSA) the ALSA runtime (`libasound2t64`), which libremidi loads at run time, and the X11 and Wayland development packages vcpkg needs to build SDL3 (`pkg-config libx11-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev`). MIDI on Linux needs `/dev/snd/seq`, which WSL lacks.
 
-Configure presets: `linux-gcc`, `linux-clang`, `linux-clang-asan` (ASan + UBSan, Debug only), `linux-clang-tsan` (ThreadSanitizer, Debug only), `windows-msvc`. Build and test presets append `-debug` or `-release` (except the sanitizer presets). Build trees go in `build/<preset>`. ThreadSanitizer needs `sudo sysctl vm.mmap_rnd_bits=28` on recent kernels (including WSL), or it fails to start.
+Configure presets: `linux-gcc`, `linux-clang`, `linux-clang-asan` (ASan + UBSan, Debug only), `linux-clang-tsan` (ThreadSanitizer, Debug only), `windows-msvc`. Build and test presets append `-debug` or `-release` (except the sanitizer presets). Build trees go in `build/<preset>`. ThreadSanitizer can fail to start on recent kernels (including WSL) because of address randomisation; `tools/check-linux.sh` runs it under `setarch -R`, which turns that off for the tests alone, or `sudo sysctl vm.mmap_rnd_bits=28` does it until reboot.
 
 ```
 cmake --preset linux-gcc

@@ -37,9 +37,15 @@ for preset in "${presets[@]}"; do
         continue
     fi
     rm -f "$log"
-    results="$(ctest --preset "$preset" 2>&1)"
+    # ThreadSanitizer can't map its memory with the address randomisation recent kernels use;
+    # setarch -R turns it off for the tests alone, with no sudo and nothing system-wide.
+    runner=()
+    if [[ "$preset" == *tsan* ]] && command -v setarch > /dev/null; then
+        runner=(setarch -R)
+    fi
+    results="$("${runner[@]}" ctest --preset "$preset" 2>&1)"
     grep -E "tests passed|tests failed|\*\*\*Failed" <<< "$results"
     if grep -q "unexpected memory mapping" <<< "$results"; then
-        echo "ThreadSanitizer can't start: run 'sudo sysctl vm.mmap_rnd_bits=28' and try again"
+        echo "ThreadSanitizer can't start: try 'sudo sysctl vm.mmap_rnd_bits=28' (until reboot)"
     fi
 done

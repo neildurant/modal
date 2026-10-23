@@ -60,5 +60,4 @@ done
 
 echo
 echo "Set up. tools/check-linux.sh builds and tests every preset."
-echo "If ThreadSanitizer won't start, check-linux.sh says to run"
-echo "'sudo sysctl vm.mmap_rnd_bits=28' first."
+echo "check-linux.sh runs ThreadSanitizer under 'setarch -R', so it needs no system setting."
