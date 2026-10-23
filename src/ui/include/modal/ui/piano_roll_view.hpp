@@ -49,6 +49,8 @@ public:
 
     // How far apart notes can start and still be one chord, for ( and ) (chordwindow).
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
+    // How far Alt-H and Alt-L nudge a note, and + and _ lengthen and shorten it (nudge).
+    void setNudge(std::chrono::milliseconds nudge) { nudge_ = nudge; }
 
     std::string_view name() const override { return "the piano roll"; }
     std::vector<int> topHeights(CellSize cell) const override;
@@ -161,6 +163,13 @@ private:
     bool addNote();
     bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from);
     bool put();
+    // Changes the current note, the cursor going with it, unless it would go before the song's
+    // start or past its last tick, or run into another note of its pitch. The change says
+    // whether it can be made, giving its own message if not.
+    bool changeNote(std::string_view verb, const std::function<bool(core::Event&)>& change);
+    // A time a number of nudges on, or back if negative: at least a tick each way, however
+    // short the nudge is at the tempo there.
+    core::Tick nudged(core::Tick tick, int nudges) const;
 
     core::Document& document_;
     ViewHost& host_;
@@ -179,6 +188,7 @@ private:
     std::map<core::TrackId, std::uint8_t> pitches_;  // the pitch last used on each track
     std::map<core::TrackId, std::size_t> pageSizes_; // and the page size
     std::chrono::milliseconds chordWindow_{30};
+    std::chrono::milliseconds nudge_{5};
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;

@@ -88,6 +88,10 @@ Settings::Settings()
                   "How far apart, in milliseconds, events can start and still be one chord, "
                   "as a chord's notes played a little apart are",
                   std::int64_t{30}, 0, 1000),
+          setting("nudge",
+                  "How far, in milliseconds, a nudge moves a note in the piano roll, or "
+                  "lengthens or shortens it",
+                  std::int64_t{5}, 1, 1000),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
           setting("ownports",

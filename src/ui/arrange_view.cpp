@@ -23,10 +23,10 @@ constexpr std::array kCommands{
     CommandInfo{.name = "register-put-before",
                 .description = "Put the yanked or deleted sections before this one"},
     CommandInfo{.name = "move-left",
-                .description = "Move this section earlier, {count} places",
+                .description = "Move this section or note earlier, {count} places or steps",
                 .count = true},
     CommandInfo{.name = "move-right",
-                .description = "Move this section later, {count} places",
+                .description = "Move this section or note later, {count} places or steps",
                 .count = true},
     CommandInfo{.name = "join", .description = "Join this section with the next"},
     CommandInfo{.name = "insert-before",
@@ -485,10 +485,10 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(section);
         return true;
     }
-    if (command == "field-increase" || command == "field-decrease" ||
+    if (command.starts_with("field-increase") || command.starts_with("field-decrease") ||
         command == "number-increase" || command == "number-decrease")
     {
-        const auto bars = command.ends_with("-increase") ? n : -n;
+        const auto bars = command.find("-increase") != std::string_view::npos ? n : -n;
         bool changed = false;
         edit((bars > 0 ? "Lengthen " : "Shorten ") + name(section) + " by " +
                  (n == 1 ? std::string{"a bar"} : std::to_string(n) + " bars"),

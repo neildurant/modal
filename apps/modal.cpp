@@ -363,6 +363,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.setTimeout(settings.integer("timeoutlen"));
     view.eventList().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.pianoRoll().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
+    view.pianoRoll().setNudge(std::chrono::milliseconds{settings.integer("nudge")});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())

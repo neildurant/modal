@@ -51,6 +51,30 @@ constexpr std::array kCommands{
                 .description = "Turn triplets in the track's grid on or off"},
     CommandInfo{.name = "note-default",
                 .description = "Take this note's length and velocity as the track's default note"},
+    CommandInfo{.name = "move-up",
+                .description = "Move this note up a semitone, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-down",
+                .description = "Move this note down a semitone, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-octave-up",
+                .description = "Move this note up an octave, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-octave-down",
+                .description = "Move this note down an octave, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-bar-next",
+                .description = "Move this note a bar later, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-bar-previous",
+                .description = "Move this note a bar earlier, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-right-fine",
+                .description = "Nudge this note later, {count} times",
+                .count = true},
+    CommandInfo{.name = "move-left-fine",
+                .description = "Nudge this note earlier, {count} times",
+                .count = true},
     CommandInfo{.name = "grid",
                 .description = "Set the track's grid, or show it with no length",
                 .usage = "[LENGTH]",
@@ -341,6 +365,52 @@ bool PianoRollView::put()
                    [&](core::Song& s) { putRegister(s, reg, track_, time_); });
     refresh();
     return true;
+}
+
+bool PianoRollView::changeNote(std::string_view verb,
+                               const std::function<bool(core::Event&)>& change)
+{
+    const auto index = noteHere(verb == "Move" || verb == "Nudge" ? "move" : "change");
+    if (!index)
+    {
+        return true;
+    }
+    const auto id = *trackId();
+    const auto& song = document_.song();
+    const auto old = song.events(id)[*index];
+    auto changed = old;
+    if (!change(changed) || changed == old || changed.tick < 0 || changed.tick > lastTick())
+    {
+        return true;
+    }
+    if (auto why = overlap(song.events(id), *index, changed, meter()))
+    {
+        host_.setMessage(std::move(*why), MessageKind::Warning);
+        return true;
+    }
+    const auto pitch = std::get<core::Note>(changed.data).pitch;
+    editEvents(std::string{verb} + " " + core::pitchName(std::get<core::Note>(old.data).pitch) +
+                   " in " + trackName(),
+               [&](core::EventList& events)
+               {
+                   events.erase(*index);
+                   events.insert(changed);
+               });
+    // The cursor at the same place in the note.
+    moveTo(time_ + changed.tick - old.tick);
+    moveToPitch(pitch);
+    return true;
+}
+
+core::Tick PianoRollView::nudged(core::Tick tick, int nudges) const
+{
+    const auto& tempo = document_.song().tempo();
+    const auto to = tempo.toTickExtended(tempo.toTime(tick) + nudge_ * nudges);
+    if (nudges > 0)
+    {
+        return std::max(to, tick + 1);
+    }
+    return nudges < 0 ? std::min(to, tick - 1) : tick;
 }
 
 core::Tick PianoRollView::gridAfter(core::Tick tick) const
@@ -889,6 +959,105 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     else if (command == "register-put")
     {
         return put();
+    }
+    else if (command == "move-left" || command == "move-right")
+    {
+        // To the grid steps either side, counted from each bar line, as h and l go.
+        return changeNote("Move",
+                          [&](core::Event& event)
+                          {
+                              for (int i = 0; i < n; ++i)
+                              {
+                                  event.tick = command == "move-left" ? gridBefore(event.tick)
+                                                                      : gridAfter(event.tick);
+                              }
+                              return true;
+                          });
+    }
+    else if (command == "move-left-fine" || command == "move-right-fine")
+    {
+        return changeNote("Nudge",
+                          [&](core::Event& event)
+                          {
+                              event.tick = std::max<core::Tick>(
+                                  nudged(event.tick, command == "move-left-fine" ? -n : n), 0);
+                              return true;
+                          });
+    }
+    else if (command == "move-bar-next" || command == "move-bar-previous")
+    {
+        // A bar on or back, at the same place in the bar.
+        return changeNote("Move",
+                          [&](core::Event& event)
+                          {
+                              event.tick =
+                                  sameInBar(m, event.tick, command == "move-bar-next" ? n : -n,
+                                            offsetInBar(m, event.tick));
+                              return true;
+                          });
+    }
+    else if (command.starts_with("move-up") || command.starts_with("move-down") ||
+             command.starts_with("move-octave-"))
+    {
+        const auto step = command.starts_with("move-octave-") ? 12 : 1;
+        const auto by = command.ends_with("up") ? n * step : -n * step;
+        return changeNote("Move",
+                          [&](core::Event& event)
+                          {
+                              auto& note = std::get<core::Note>(event.data);
+                              const auto to = note.pitch + by;
+                              if (to < 0 || to > 127)
+                              {
+                                  return false;
+                              }
+                              note.pitch = static_cast<std::uint8_t>(to);
+                              return true;
+                          });
+    }
+    else if (command == "field-increase" || command == "field-decrease")
+    {
+        // The end to the grid steps either side, never shorter than a grid step.
+        const bool longer = command == "field-increase";
+        return changeNote(longer ? "Lengthen" : "Shorten",
+                          [&](core::Event& event)
+                          {
+                              auto& note = std::get<core::Note>(event.data);
+                              auto end = event.tick + note.duration;
+                              for (int i = 0; i < n; ++i)
+                              {
+                                  end = longer ? gridAfter(end) : gridBefore(end);
+                              }
+                              end = std::max(end, event.tick + gridTicks());
+                              if (!longer && end >= event.tick + note.duration)
+                              {
+                                  host_.setMessage("A note can't be shortened below a grid step",
+                                                   MessageKind::Warning);
+                                  return false;
+                              }
+                              note.duration = end - event.tick;
+                              return true;
+                          });
+    }
+    else if (command == "field-increase-fine" || command == "field-decrease-fine")
+    {
+        // The end a nudge on or back, never shorter than a nudge.
+        const bool longer = command == "field-increase-fine";
+        return changeNote(longer ? "Lengthen" : "Shorten",
+                          [&](core::Event& event)
+                          {
+                              auto& note = std::get<core::Note>(event.data);
+                              const auto end =
+                                  std::max(nudged(event.tick + note.duration, longer ? n : -n),
+                                           nudged(event.tick, 1));
+                              if (!longer && end >= event.tick + note.duration)
+                              {
+                                  host_.setMessage("A note can't be shortened below a nudge",
+                                                   MessageKind::Warning);
+                                  return false;
+                              }
+                              note.duration = end - event.tick;
+                              return true;
+                          });
     }
     else if (command == "number-increase" || command == "number-decrease")
     {

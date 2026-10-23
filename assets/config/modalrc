@@ -59,10 +59,11 @@ nmap ,n         note-default              "Default note from this one"
 " or dd and yy this event; x deletes it, p puts what was yanked or deleted at the cursor's
 " time, and u and Ctrl-R undo and redo
 nmap <CR>       field-edit        "Edit this field"
-nmap +          field-increase    "Step up"
+nmap +          field-increase-fine "Step up"
 nmap =          field-increase    "Step up"
 nmap <C-a>      number-increase   "Step up"
 nmap -          field-decrease    "Step down"
+nmap _          field-decrease-fine "Step down"
 nmap <C-x>      number-decrease   "Step down"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
@@ -119,6 +120,21 @@ nmap gs         section-strip     "Section strip"
 nmap <A-h>      move-left         "Move earlier"
 nmap <A-l>      move-right        "Move later"
 nmap J          join              "Join with the next"
+
+" Moving notes in the piano roll: Alt-h and Alt-l to the grid steps either side, Alt-H and
+" Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j
+" a semitone, Alt-K and Alt-J an octave. = and - move its end to the grid steps either side,
+" + and _ a nudge.
+nmap <A-S-h>    move-left-fine    "Nudge earlier"
+nmap <A-S-l>    move-right-fine   "Nudge later"
+nmap <A-{>      move-bar-previous "A bar earlier"
+nmap <A-S-[>    move-bar-previous "A bar earlier"
+nmap <A-}>      move-bar-next     "A bar later"
+nmap <A-S-]>    move-bar-next     "A bar later"
+nmap <A-k>      move-up           "Up a semitone"
+nmap <A-j>      move-down         "Down a semitone"
+nmap <A-S-k>    move-octave-up    "Up an octave"
+nmap <A-S-j>    move-octave-down  "Down an octave"
 nmap i          insert-before     "Insert before"
 nmap a          insert-after      "Insert after"
 nmap c          change            "Rename"

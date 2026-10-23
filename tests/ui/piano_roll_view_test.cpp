@@ -8,6 +8,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -837,4 +838,165 @@ TEST_CASE("Ctrl-A and Ctrl-X step the piano roll's current note's velocity, undo
     CHECK(velocity() == 127);
     r.type(U"u");
     CHECK(velocity() == 96);
+}
+
+namespace
+{
+
+// The bass's note at a pitch nearest after a tick, as its tick and length; or none.
+std::optional<std::pair<core::Tick, core::Tick>> bassNote(const Rolling& r, int pitch,
+                                                          core::Tick from = 0)
+{
+    const auto& song = r.document.song();
+    for (const auto& event : song.events(song.tracks()[0]->id()).all())
+    {
+        const auto* note = std::get_if<core::Note>(&event.data);
+        if (note != nullptr && note->pitch == pitch && event.tick >= from)
+        {
+            return std::pair{event.tick, note->duration};
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+TEST_CASE("Alt with h and l moves the piano roll's current note to the grid, the cursor with it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto bar5 = t.bar(5);
+    const auto alt = [&](char32_t key) { r.press(Key::typed(key, kAlt)); };
+    r.type(U"5G");
+    r.press(Key::of(NamedKey::Tab)); // the C2 just after bar 5's start, off the grid
+    CHECK(r.view().time() == bar5 + 7);
+    alt(U'l'); // onto the grid, the next step
+    CHECK(bassNote(r, 36)->first == bar5 + t.sixteenth());
+    CHECK(r.view().time() == bar5 + t.sixteenth());
+    CHECK(r.view().currentNote());
+    alt(U'h');
+    alt(U'h'); // over the bar line
+    CHECK(bassNote(r, 36)->first == bar5 - t.sixteenth());
+    r.type(U"3");
+    alt(U'l');
+    CHECK(bassNote(r, 36)->first == bar5 + 2 * t.sixteenth());
+    r.type(U"u");
+    CHECK(bassNote(r, 36)->first == bar5 - t.sixteenth());
+    CHECK(r.view().time() == bar5 - t.sixteenth());
+
+    // A bar on and back, at the same place in the bar; not past the song's end.
+    alt(U'}');
+    CHECK(bassNote(r, 36)->first == t.bar(6) - t.sixteenth());
+    r.type(U"2");
+    alt(U'{');
+    CHECK(bassNote(r, 36)->first == t.bar(4) - t.sixteenth());
+    r.type(U"20");
+    alt(U'}');
+    CHECK(bassNote(r, 36)->first == t.bar(4) - t.sixteenth());
+
+    // Nothing to move on an empty spot, and not before the start.
+    r.type(U"l");
+    alt(U'l');
+    CHECK(r.ws.message() == "No note here to move");
+    r.type(U"gg");
+    r.type(U"8j"); // E1 at the start
+    alt(U'h');
+    CHECK(bassNote(r, 28)->first == 0);
+}
+
+TEST_CASE("Alt with k, j, K and J move the piano roll's current note in pitch")
+{
+    Rolling r;
+    const auto alt = [&](char32_t key, Modifiers more = kNoModifiers)
+    { r.press(Key::typed(key, kAlt | more)); };
+    r.type(U"8j"); // E1 at the start
+    alt(U'k');
+    CHECK(bassNote(r, 29));
+    CHECK(r.view().pitch() == 29);
+    r.type(U"2");
+    alt(U'k'); // onto the G1 there
+    CHECK(r.ws.message().starts_with("Would overlap the G1 at 1:1"));
+    CHECK(bassNote(r, 29));
+    alt(U'k', kShift);
+    CHECK(bassNote(r, 41));
+    CHECK(r.view().pitch() == 41);
+    alt(U'j', kShift);
+    alt(U'j');
+    CHECK(bassNote(r, 28));
+    r.type(U"200");
+    alt(U'j'); // below the lowest pitch
+    CHECK(bassNote(r, 28));
+}
+
+TEST_CASE("= and - move the end of the piano roll's current note to the grid")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto bar5 = t.bar(5);
+    r.type(U"5G");
+    r.press(Key::of(NamedKey::Tab)); // C2 at 7 ticks in, a sixteenth long
+    r.type(U"=");
+    CHECK(bassNote(r, 36)->second == 2 * t.sixteenth() - 7);
+    r.type(U"2=");
+    CHECK(bassNote(r, 36)->second == 4 * t.sixteenth() - 7);
+    r.type(U"5-"); // no shorter than a grid step
+    CHECK(bassNote(r, 36)->second == t.sixteenth());
+    r.type(U"-");
+    CHECK(r.ws.message() == "A note can't be shortened below a grid step");
+    CHECK(bassNote(r, 36)->second == t.sixteenth());
+    CHECK(bassNote(r, 36)->first == bar5 + 7);
+
+    // Not into the next note of its pitch.
+    r.type(U"gg");
+    r.type(U"8j");
+    r.type(U"o"); // a second E1 after the first, which then can't reach it
+    r.type(U"8l");
+    r.type(U"o");
+    r.type(U"8h");
+    r.type(U"8=");
+    CHECK(r.ws.message().starts_with("Would run into the E1 at 1:"));
+}
+
+TEST_CASE("Alt-H and Alt-L nudge the piano roll's current note, + and _ its end, by the nudge")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto& tempo = r.document.song().tempo();
+    r.ws.pianoRoll().setNudge(std::chrono::milliseconds{50}); // a tenth of a quarter at 120 BPM
+    const auto nudge = t.quarters(1) / 10;
+    const auto alt = [&](char32_t key) { r.press(Key::typed(key, kAlt | kShift)); };
+    r.type(U"5G");
+    r.press(Key::of(NamedKey::Tab));
+    const auto start = t.bar(5) + 7;
+    alt(U'l');
+    CHECK(bassNote(r, 36)->first ==
+          tempo.toTick(tempo.toTime(start) + std::chrono::milliseconds{50}));
+    CHECK(bassNote(r, 36)->first - start >= nudge);
+    CHECK(r.view().currentNote());
+    r.type(U"2");
+    alt(U'h');
+    const auto back = bassNote(r, 36)->first;
+    CHECK(back < start);
+    CHECK(start - back <= nudge + 2); // rounding to whole ticks
+
+    const auto length = bassNote(r, 36)->second;
+    r.type(U"+");
+    CHECK(bassNote(r, 36)->second > length);
+    r.type(U"_");
+    r.type(U"_");
+    CHECK(bassNote(r, 36)->second < length);
+    r.type(U"20_"); // no shorter than a nudge
+    CHECK(bassNote(r, 36)->second >= nudge);
+    CHECK(bassNote(r, 36)->second <= nudge + 1);
+    r.type(U"_");
+    CHECK(r.ws.message() == "A note can't be shortened below a nudge");
+
+    // A nudge is at least a tick, however short.
+    r.ws.pianoRoll().setNudge(std::chrono::milliseconds{0});
+    const auto at = bassNote(r, 36)->first;
+    alt(U'l');
+    CHECK(bassNote(r, 36)->first == at + 1);
 }

@@ -206,7 +206,7 @@ TEST_CASE("Enter on a bar opens it in the piano roll")
 TEST_CASE("a command a view doesn't have says so")
 {
     Arranging a;
-    a.type(U"+");
+    a.type(U"=");
     CHECK(a.ws.message() == "Field increase isn't in the arrangement");
     a.type(U"ge");
     a.type(U"zi");
