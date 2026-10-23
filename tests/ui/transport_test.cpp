@@ -180,6 +180,22 @@ TEST_CASE("m Space puts the marker at the cursor, and Ctrl-Space plays from ther
     CHECK(p.view.playheadRow() == 10);
 }
 
+TEST_CASE("the piano roll shows the play-from marker in its ruler")
+{
+    Playing p;
+    p.type(U"gr}m ");
+    bool shown = false;
+    const auto frame = p.ws.frame();
+    for (const auto& region : frame)
+    {
+        for (const auto& run : region.text)
+        {
+            shown = shown || (run.text == U"\u25B6" && region.bounds.y > 0);
+        }
+    }
+    CHECK(shown);
+}
+
 TEST_CASE("near the list's end, the playhead goes on down the view")
 {
     Playing p;

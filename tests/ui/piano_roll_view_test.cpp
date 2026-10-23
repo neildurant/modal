@@ -340,6 +340,82 @@ TEST_CASE("zooming the piano roll keeps the cursor in its place on screen")
     CHECK(r.view().time() < r.view().page().end);
 }
 
+namespace
+{
+
+// The runs on a row of the ruler above the notes, as x and text, in order.
+std::vector<std::pair<int, std::u32string>> rulerRow(const Rolling& r, int row)
+{
+    const auto frame = r.ws.frame();
+    std::vector<std::pair<int, std::u32string>> runs;
+    for (const auto& region : frame)
+    {
+        if (region.bounds.height == PianoRollView::kRulerRows * kCell.height && region.bounds.x > 0)
+        {
+            for (const auto& run : region.text)
+            {
+                if (run.y == row * kCell.height)
+                {
+                    runs.emplace_back(region.bounds.x + run.x, run.text);
+                }
+            }
+        }
+    }
+    std::ranges::sort(runs);
+    return runs;
+}
+
+std::vector<std::u32string> texts(const std::vector<std::pair<int, std::u32string>>& runs)
+{
+    std::vector<std::u32string> result;
+    for (const auto& run : runs)
+    {
+        result.push_back(run.second);
+    }
+    return result;
+}
+
+} // namespace
+
+TEST_CASE("the piano roll's ruler names the sections and markers and numbers the bars")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    r.document.edit("Marker", {}, [&](core::Song& song) { song.setMarker(t.bar(4), "Fill"); });
+    using Texts = std::vector<std::u32string>;
+    // Bars 1-4: Section 1, then the Verse from bar 3, with the marker in it.
+    CHECK(texts(rulerRow(r, 0)) == Texts{U"Section 1", U"Verse", U"Fill"});
+    CHECK(texts(rulerRow(r, 1)) == Texts{U"1", U"2", U"3", U"4"});
+    // The section's start a line down through the notes, stronger than the marker's.
+    std::vector<std::uint8_t> lines;
+    const auto frame = r.ws.frame();
+    for (const auto& region : frame)
+    {
+        if (region.bounds.y > 0 && region.bounds.height > 10 * kCell.height)
+        {
+            for (const auto& shape : region.under)
+            {
+                if (shape.role == Role::Marker)
+                {
+                    lines.push_back(shape.alpha);
+                }
+            }
+        }
+    }
+    REQUIRE(lines.size() == 2);
+    CHECK(lines[0] > lines[1]);
+
+    // Scrolled into the Verse, its name stays at the left edge.
+    r.type(U"5Gw");
+    r.press(Key::typed(U'l', kCtrl));
+    const auto top = rulerRow(r, 0);
+    REQUIRE(!top.empty());
+    CHECK(top.front().second == U"Verse");
+    CHECK(top.front().first < (PianoRollView::kKeyColumns + 1) * kCell.width);
+    CHECK(texts(rulerRow(r, 1)) == Texts{U"6", U"7", U"8", U"9"});
+}
+
 TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")
 {
     Rolling r;

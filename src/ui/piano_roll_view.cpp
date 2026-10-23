@@ -87,6 +87,7 @@ std::string noteText(const core::Track& track)
 
 constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row and column
 constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
+constexpr std::uint8_t kFaint = 96;     // and of markers' lines, as in the arrangement
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -312,7 +313,8 @@ PianoRollView::Page PianoRollView::page() const
 
 int PianoRollView::noteRows() const
 {
-    return std::max((layout_.main.height - kLaneRows * cell_.height) / cell_.height, 1);
+    return std::max((layout_.main.height - (kRulerRows + kLaneRows) * cell_.height) / cell_.height,
+                    1);
 }
 
 void PianoRollView::follow()
@@ -848,14 +850,148 @@ Inspection PianoRollView::inspection() const
     return result;
 }
 
+void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& p) const
+{
+    const auto& song = document_.song();
+    const auto& m = meter();
+    const int h = cell_.height;
+    const int lineWidth = hairline(cell_);
+    const int width = ruler.bounds.width;
+    const auto inView = [&](core::Tick tick) { return tick >= p.start && tick < p.end; };
+
+    // The top row: each section a block across its span, neighbours in two shades as on the
+    // arrangement's strip, named from where it shows, so the name of a section begun before
+    // the view stays at the left edge. Then the markers by name, and the play-from marker. A
+    // name stops short of the next, or of the play-from marker, or starts after the latter if
+    // it's at the name's start.
+    const int inset = std::max(h / 10, 1);
+    const auto shade = [&](std::size_t section)
+    { return section % 2 == 0 ? Role::Panel : Role::Bar; };
+    struct Name
+    {
+        int x = 0;     // its line
+        int right = 0; // as far as it can run: its section's end, for a section's name
+        std::u32string text;
+        Style style;
+    };
+    std::vector<Name> names;
+    for (std::size_t i = 0; i < song.sections().size(); ++i)
+    {
+        const auto start = song.sectionStart(i);
+        const auto finish = song.sectionStart(i + 1);
+        if (finish <= p.start || start >= p.end)
+        {
+            continue;
+        }
+        const int x0 = start > p.start ? scale.toX(start) + lineWidth : 0;
+        const int x1 = scale.toX(std::min(finish, p.end));
+        if (x1 <= x0)
+        {
+            continue;
+        }
+        ruler.under.push_back({{x0, inset, x1 - x0, h - 2 * inset}, shade(i), 255});
+        names.push_back({x0 - lineWidth,
+                         x1,
+                         decodeUtf8(song.sections()[i]->name()),
+                         {Role::Text, shade(i), kPlain}});
+    }
+    for (const auto& marker : song.markers())
+    {
+        const auto section = song.sectionAt(marker.tick);
+        if (inView(marker.tick) && marker.tick != song.sectionStart(section))
+        {
+            names.push_back({scale.toX(marker.tick),
+                             width,
+                             decodeUtf8(marker.name),
+                             {Role::Marker, shade(section), kBold}});
+        }
+    }
+    std::ranges::stable_sort(names, {}, &Name::x);
+    const auto* player = host_.player();
+    const std::optional<int> playX = player != nullptr && inView(player->marker())
+                                         ? std::optional{scale.toX(player->marker())}
+                                         : std::nullopt;
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        auto& name = names[i];
+        int textX = name.x + 2 * lineWidth;
+        int right = name.right;
+        if (i + 1 < names.size())
+        {
+            right = std::min(right, names[i + 1].x);
+        }
+        if (playX && *playX < textX + cell_.width && *playX + cell_.width > name.x)
+        {
+            textX = *playX + cell_.width;
+        }
+        else if (playX && *playX >= textX)
+        {
+            right = std::min(right, *playX);
+        }
+        const int room = (right - textX) / cell_.width;
+        if (static_cast<int>(name.text.size()) > room)
+        {
+            if (room < kMinSegmentCharacters + 1)
+            {
+                continue;
+            }
+            name.text.resize(static_cast<std::size_t>(room - 1));
+            name.text += U'\u2026';
+        }
+        ruler.text.push_back({textX, 0, std::move(name.text), name.style});
+    }
+    if (playX)
+    {
+        ruler.text.push_back({*playX,
+                              0,
+                              U"\u25B6",
+                              {Role::Accent, shade(song.sectionAt(player->marker())), kPlain}});
+    }
+
+    // The second row: the bars, in the track's bars, numbered at their lines, every so many
+    // bars from each section's first, as few as fit the widest number and a space into the
+    // shortest bar in view.
+    core::Tick shortest = p.end - p.start;
+    for (auto bar = p.firstBar; bar <= p.lastBar; ++bar)
+    {
+        shortest = std::min(shortest, m.barStart(bar + 1) - m.barStart(bar));
+    }
+    const auto label = static_cast<core::Tick>(std::to_string(p.lastBar).size() + 1) * cell_.width;
+    std::int64_t every = 1;
+    while (every < 1024 && every * shortest * width < label * (p.end - p.start))
+    {
+        every *= 2;
+    }
+    int next = 0; // where the next number can start, clear of the last
+    for (auto bar = p.firstBar; bar <= p.lastBar; ++bar)
+    {
+        const auto start = m.barStart(bar);
+        const auto first = m.toBarBeatTick(song.sectionStart(song.sectionAt(start))).bar;
+        if (!inView(start) || (bar - first) % every != 0)
+        {
+            continue;
+        }
+        const int x = scale.toX(start) + 2 * lineWidth;
+        if (x < next)
+        {
+            continue;
+        }
+        auto text = decodeUtf8(std::to_string(bar));
+        next = x + static_cast<int>(text.size() + 1) * cell_.width;
+        ruler.text.push_back({x, h, std::move(text), {Role::Dim, Role::Background, kPlain}});
+    }
+}
+
 void PianoRollView::addRegions(Frame& frame) const
 {
     const auto& song = document_.song();
     const auto& main = layout_.main;
     const int h = cell_.height;
     const int keyWidth = kKeyColumns * cell_.width;
+    const int rulerHeight = kRulerRows * h;
     const int laneHeight = kLaneRows * h;
-    const int notesHeight = std::max(main.height - laneHeight, 0);
+    const int notesTop = main.y + rulerHeight;
+    const int notesHeight = std::max(main.height - rulerHeight - laneHeight, 0);
     const int width = std::max(main.width - keyWidth, 0);
     const int rows = (notesHeight + h - 1) / h; // the last perhaps only partly shown
     const int lineWidth = hairline(cell_);
@@ -876,7 +1012,7 @@ void PianoRollView::addRegions(Frame& frame) const
         keys.write(kKeyColumns - 1 - static_cast<int>(name.size()), row, name, style);
     }
     auto keyboard =
-        gridRegion(keys, {main.x, main.y, keyWidth, notesHeight}, cell_, Role::Background);
+        gridRegion(keys, {main.x, notesTop, keyWidth, notesHeight}, cell_, Role::Background);
     for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
     {
         if (isBlackKey(topPitch_ - row) && topPitch_ - row != pitch_)
@@ -885,7 +1021,7 @@ void PianoRollView::addRegions(Frame& frame) const
         }
     }
     frame.push_back(std::move(keyboard));
-    Region laneName{.bounds = {main.x, main.y + notesHeight, keyWidth, laneHeight},
+    Region laneName{.bounds = {main.x, notesTop + notesHeight, keyWidth, laneHeight},
                     .background = Role::Background,
                     .text = {{cell_.width,
                               (laneHeight - h) / 2,
@@ -897,12 +1033,12 @@ void PianoRollView::addRegions(Frame& frame) const
 
     // The notes, the page's bars stretched to the width, under the lines of the track's
     // meter at the grid.
-    Region notes{.bounds = {main.x + keyWidth, main.y, width, notesHeight},
+    Region notes{.bounds = {main.x + keyWidth, notesTop, width, notesHeight},
                  .background = Role::Background,
                  .text = {},
                  .under = {},
                  .over = {}};
-    Region lane{.bounds = {main.x + keyWidth, main.y + notesHeight, width, laneHeight},
+    Region lane{.bounds = {main.x + keyWidth, notesTop + notesHeight, width, laneHeight},
                 .background = Role::Background,
                 .text = {},
                 .under = {},
@@ -950,6 +1086,26 @@ void PianoRollView::addRegions(Frame& frame) const
         lane.under.push_back({{x, 0, width - x, laneHeight}, Role::Bar, 160});
         notes.under.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::BarLine, 255});
         lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::BarLine, 255});
+    }
+    // Where each section starts, a line down through the notes and the lane, stronger than a
+    // bar line, so a view running on into the next section shows where; and each marker, a
+    // faint one.
+    const auto boundary = [&](core::Tick tick, std::uint8_t alpha)
+    {
+        if (tick >= p.start && tick < p.end)
+        {
+            const int x = scale.toX(tick);
+            notes.under.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::Marker, alpha});
+            lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::Marker, alpha});
+        }
+    };
+    for (std::size_t i = 1; i < song.sections().size(); ++i)
+    {
+        boundary(song.sectionStart(i), 255);
+    }
+    for (const auto& marker : song.markers())
+    {
+        boundary(marker.tick, kFaint);
     }
 
     // Each note at its exact place: brighter the louder, with a solid start so repeated notes
@@ -1011,14 +1167,27 @@ void PianoRollView::addRegions(Frame& frame) const
         notes.over.push_back({{cursorX, y, side, h}, Role::Cursor, 255});
         notes.over.push_back({{cursorX + cursorWidth - side, y, side, h}, Role::Cursor, 255});
     }
+    Region ruler{.bounds = {main.x + keyWidth, main.y, width, rulerHeight},
+                 .background = Role::Background,
+                 .text = {},
+                 .under = {},
+                 .over = {}};
+    addRuler(ruler, scale, p);
     if (playhead_ && *playhead_ >= p.start && *playhead_ < p.end)
     {
         const int x = scale.toX(*playhead_);
         notes.over.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::Accent, 255});
         lane.over.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::Accent, 255});
+        ruler.over.push_back({{x, 0, 2 * lineWidth, rulerHeight}, Role::Accent, 255});
     }
     frame.push_back(std::move(notes));
     frame.push_back(std::move(lane));
+    frame.push_back(Region{.bounds = {main.x, main.y, keyWidth, rulerHeight},
+                           .background = Role::Background,
+                           .text = {},
+                           .under = {},
+                           .over = {}});
+    frame.push_back(std::move(ruler));
 
     // The view's bar: the track, then the page, its section and bars, and the grid.
     const Style label{Role::Dim, Role::Bar, kPlain};

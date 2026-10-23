@@ -5,6 +5,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/track.hpp>
+#include <modal/ui/bar_lines.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/view.hpp>
@@ -40,6 +41,7 @@ public:
     static constexpr std::size_t kDefaultPageSize = 2; // four bars
 
     static constexpr int kKeyColumns = 5; // the keyboard's note names, and a space
+    static constexpr int kRulerRows = 2;  // the sections, markers and bar numbers, above
     static constexpr int kLaneRows = 3;   // the velocity lane
 
     // The document and the host outlive the view.
@@ -137,6 +139,8 @@ private:
     // Where ( and ) go: the start of each chord of the track's notes.
     std::vector<core::Tick> chordStarts() const;
     Inspection inspection() const;
+    // The ruler above the notes: the sections, markers and play-from marker, then the bars.
+    void addRuler(Region& ruler, const TimeScale& scale, const Page& page) const;
 
     // The track's name, or its number if it has none, for messages.
     std::string trackName() const;
