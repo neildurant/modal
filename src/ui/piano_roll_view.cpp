@@ -860,10 +860,11 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     const auto inView = [&](core::Tick tick) { return tick >= p.start && tick < p.end; };
 
     // The top row: each section a block across its span, neighbours in two shades as on the
-    // arrangement's strip, named from where it shows, so the name of a section begun before
-    // the view stays at the left edge. Then the markers by name, and the play-from marker. A
-    // name stops short of the next, or of the play-from marker, or starts after the latter if
-    // it's at the name's start.
+    // arrangement's strip, named in the colour of its line from where it shows, so the name of a
+    // section begun before the view stays at the left edge. Then the markers by name, and the
+    // play-from marker. A name stops short of the next, or of the play-from marker, or starts after
+    // the latter if it's at the name's start. The names are drawn straight on the blocks, without a
+    // background of their own, which would stand taller than the block.
     const int inset = std::max(h / 10, 1);
     const auto shade = [&](std::size_t section)
     { return section % 2 == 0 ? Role::Panel : Role::Bar; };
@@ -893,7 +894,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         names.push_back({x0 - lineWidth,
                          x1,
                          decodeUtf8(song.sections()[i]->name()),
-                         {Role::Text, shade(i), kPlain}});
+                         {Role::Marker, Role::Background, kBold}});
     }
     for (const auto& marker : song.markers())
     {
@@ -903,7 +904,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
             names.push_back({scale.toX(marker.tick),
                              width,
                              decodeUtf8(marker.name),
-                             {Role::Marker, shade(section), kBold}});
+                             {Role::Marker, Role::Background, kPlain}});
         }
     }
     std::ranges::stable_sort(names, {}, &Name::x);
@@ -942,10 +943,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     }
     if (playX)
     {
-        ruler.text.push_back({*playX,
-                              0,
-                              U"\u25B6",
-                              {Role::Accent, shade(song.sectionAt(player->marker())), kPlain}});
+        ruler.text.push_back({*playX, 0, U"\u25B6", {Role::Accent, Role::Background, kPlain}});
     }
 
     // The second row: the bars, in the track's bars, numbered at their lines, every so many

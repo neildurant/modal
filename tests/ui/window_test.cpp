@@ -308,6 +308,17 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     CHECK(window->saveFrame(base + "-piano.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-piano-light.bmp"));
+    // Eight bars about the Verse's start, with the play-from marker in view.
+    view.setPlayer(&player);
+    for (const char32_t key : std::u32string_view{U"8Gzzm zo"})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-piano-sections.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-piano-sections-light.bmp"));
+    view.setPlayer(nullptr);
 
     const auto layout =
         layoutWindow(window->pixelWidth(), window->pixelHeight(), window->cellSize(), 1, 1);

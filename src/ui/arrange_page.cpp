@@ -659,11 +659,10 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
             if (!name.empty())
             {
                 const bool cursor = stripCursor_ == i;
-                timeline.text.push_back(
-                    {x0 + lineWidth,
-                     y,
-                     std::move(name),
-                     {Role::Text, i % 2 == 0 ? Role::Panel : Role::Bar, cursor ? kBold : kPlain}});
+                timeline.text.push_back({x0 + lineWidth,
+                                         y,
+                                         std::move(name),
+                                         {Role::Text, Role::Background, cursor ? kBold : kPlain}});
             }
             if (stripCursor_ == i)
             {
