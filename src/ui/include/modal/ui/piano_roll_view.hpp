@@ -8,6 +8,7 @@
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/view.hpp>
 
 #include <array>
@@ -77,6 +78,11 @@ public:
     void showSong() override;
     void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
+    // Editing the inspector's fields, with e.
+    bool typing() const override { return editor_.active(); }
+    const InspectorEditor& inspectorEditor() const { return editor_; }
+    void type(char32_t character) override { editor_.type(character); }
+    std::optional<bool> runTyping(std::string_view command) override;
 
     // What's in view (see Piano roll pages in the design): where it starts and ends in time,
     // a whole number of bars from wherever it starts; the first and last bars it shows, in the
@@ -169,6 +175,8 @@ private:
     bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from,
                    core::Tick span);
     bool put(bool insert);
+    // Makes the current note what an inspector field set it to, or says why it can't be.
+    std::optional<std::string> setNote(const std::string& heading, const core::Event& changed);
     // The track's notes starting in a span of time, by index.
     std::vector<std::size_t> notesIn(core::Tick from, core::Tick to) const;
     // Deletes or yanks the cursor's bar and those after it, its notes or as time (ab).
@@ -200,6 +208,7 @@ private:
     std::chrono::milliseconds chordWindow_{30};
     std::chrono::milliseconds nudge_{5};
     bool gridAdvance_ = false;
+    InspectorEditor editor_;
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;

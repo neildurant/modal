@@ -121,6 +121,9 @@ constexpr std::array kCommands{
     counted("number-decrease",
             "Step the field under the cursor down, or the note's velocity in the piano roll"),
     counted("event-delete", "Delete this event, or {count} events from it"),
+    CommandInfo{.name = "inspector-edit",
+                .description = "Edit the fields in the inspector: Tab and Shift-Tab go between "
+                               "them, Enter sets one and Escape leaves it"},
     CommandInfo{.name = "register-put",
                 .description = "Put the yanked or deleted events, the first at the cursor's time"},
 };

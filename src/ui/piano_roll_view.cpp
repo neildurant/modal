@@ -424,6 +424,85 @@ bool PianoRollView::put(bool insert)
     return true;
 }
 
+std::optional<bool> PianoRollView::runTyping(std::string_view command)
+{
+    // The current note's fields in the inspector, with e.
+    const auto& m = meter();
+    const auto noteNow = [this]() -> std::optional<core::Event>
+    {
+        const auto index = currentNote();
+        return index ? std::optional{document_.song().events(*trackId())[*index]} : std::nullopt;
+    };
+    const auto set = [&](const std::string& heading,
+                         const EditResult& result) -> std::optional<std::string>
+    {
+        if (const auto* why = std::get_if<std::string>(&result))
+        {
+            return *why;
+        }
+        return setNote(heading, std::get<core::Event>(result));
+    };
+    InspectorEditor::Hooks hooks{
+        .inspection = [this] { return inspection(); },
+        .set = [&](const std::string& heading,
+                   const std::string& text) -> std::optional<std::string>
+        {
+            const auto note = noteNow();
+            if (!note)
+            {
+                return "No note here to edit";
+            }
+            return set(heading, setInspectorField(*note, heading, text, m));
+        },
+        .step = [&](const std::string& heading, int steps) -> std::optional<std::string>
+        {
+            const auto note = noteNow();
+            if (!note)
+            {
+                return std::nullopt;
+            }
+            const auto result = stepInspectorField(*note, heading, steps, m);
+            return std::holds_alternative<std::string>(result) ? std::nullopt
+                                                               : set(heading, result);
+        }};
+    return editor_.run(command, host_, hooks);
+}
+
+std::optional<std::string> PianoRollView::setNote(const std::string& heading,
+                                                  const core::Event& changed)
+{
+    // The current note made what an inspector field says, unless it would run into another of
+    // its pitch or past the song's end; the cursor stays on it.
+    const auto index = currentNote();
+    const auto id = *trackId();
+    const auto& song = document_.song();
+    const auto old = song.events(id)[*index];
+    if (changed == old)
+    {
+        return std::nullopt;
+    }
+    if (changed.tick > lastTick())
+    {
+        return "That's past the song's end";
+    }
+    if (auto why = overlap(song.events(id), *index, changed, meter()))
+    {
+        return why;
+    }
+    auto field = heading == "Ends" ? std::string{"end"} : heading;
+    field[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(field[0])));
+    editEvents("Set " + field + " of " + core::pitchName(std::get<core::Note>(old.data).pitch) +
+                   " in " + trackName(),
+               [&](core::EventList& events)
+               {
+                   events.erase(*index);
+                   events.insert(changed);
+               });
+    moveTo(time_ + changed.tick - old.tick);
+    moveToPitch(std::get<core::Note>(changed.data).pitch);
+    return std::nullopt;
+}
+
 bool PianoRollView::changeNote(std::string_view verb,
                                const std::function<bool(core::Event&)>& change)
 {
@@ -1009,6 +1088,17 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return put(command == "register-put-before");
     }
+    else if (command == "inspector-edit")
+    {
+        if (!noteHere("edit"))
+        {
+            return true;
+        }
+        if (editor_.open(inspection()))
+        {
+            host_.startTyping();
+        }
+    }
     else if (command == "move-left" || command == "move-right")
     {
         // To the grid steps either side, counted from each bar line, as h and l go.
@@ -1347,13 +1437,16 @@ Inspection PianoRollView::inspection() const
     {
         const auto& event = song.events(*trackId())[*index];
         result.fields.push_back({"Position", positionText(m, event.tick)});
-        result.fields.push_back({"Time", songTime(song.tempo().toTime(event.tick))});
+        result.fields.push_back(
+            {.heading = "Time", .value = songTime(song.tempo().toTime(event.tick)), .aside = true});
         addNoteFields(result, song, m, event.tick, std::get<core::Note>(event.data));
+        markEditable(result);
         return result;
     }
     result.kind = "No note";
     result.fields.push_back({"Position", positionText(m, time_)});
-    result.fields.push_back({"Time", songTime(song.tempo().toTime(time_))});
+    result.fields.push_back(
+        {.heading = "Time", .value = songTime(song.tempo().toTime(time_)), .aside = true});
     result.fields.push_back({"Pitch", pitchText(pitch_)});
     return result;
 }
@@ -1730,7 +1823,8 @@ void PianoRollView::addRegions(Frame& frame) const
     frame.push_back(std::move(bar));
 
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
-                                    static_cast<int>(positionText(meter(), lastTick()).size())));
+                                    static_cast<int>(positionText(meter(), lastTick()).size()),
+                                    &editor_));
 }
 
 std::string PianoRollView::position(core::Tick tick) const

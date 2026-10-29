@@ -17,11 +17,16 @@
 namespace modal::ui
 {
 
-// One of the inspector's fields: a heading, shown above its value.
+// One of the inspector's fields: a heading, shown above its value; whether e can edit it, and
+// the text editing starts from if it isn't the value up to any " (" after it; and whether it's
+// set aside at the right, its value dim, as the time is, which follows from the position.
 struct InspectorField
 {
     std::string heading;
     std::string value;
+    bool editable = false;
+    std::string editText = {};
+    bool aside = false;
 
     friend bool operator==(const InspectorField&, const InspectorField&) = default;
 };
@@ -44,6 +49,10 @@ Inspection inspect(const EventList& list, std::size_t row);
 // as the event list's inspector and the piano roll's show them.
 void addNoteFields(Inspection& inspection, const core::Song& song, const core::MeterMap& meter,
                    core::Tick tick, const core::Note& note);
+
+// Marks the fields of an event that e can edit: those an event list column holds, and a
+// note's end (see setInspectorField).
+void markEditable(Inspection& inspection);
 
 // A pitch as its name and number: E1 (28).
 std::string pitchText(std::uint8_t pitch);

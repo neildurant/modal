@@ -35,6 +35,20 @@ using EditResult = std::variant<core::Event, std::string>;
 EditResult setField(const core::Event& event, Column field, std::string_view text,
                     const core::MeterMap& meter);
 
+// The event list column an inspector field shows, by its heading: Position, Pitch,
+// Controller and Program (Data), Velocity, Value, Bend and Pressure (Value), Length and
+// Release.
+std::optional<Column> inspectorColumn(std::string_view heading);
+
+// Sets an inspector field of an event from text typed into it, as setField sets a column's,
+// or a note's end ("Ends"), a position or a change of one, which sets its length to reach it.
+EditResult setInspectorField(const core::Event& event, std::string_view heading,
+                             std::string_view text, const core::MeterMap& meter);
+
+// Steps an inspector field, as stepField does a column, a note's end as its length.
+EditResult stepInspectorField(const core::Event& event, std::string_view heading, int steps,
+                              const core::MeterMap& meter);
+
 // Steps a field a number of times, up or down (+ and -): a value or release by 1, a pitch by a
 // semitone, a position by a beat of the meter where the event is, a length by a 1/16 note,
 // each kept within its range. Text and SysEx can't be stepped.

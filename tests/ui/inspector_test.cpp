@@ -66,13 +66,14 @@ TEST_CASE("the inspector shows every property of an event, with what the row can
 
     const auto note = of(list, RowKind::Event, 1); // the CC is first at its tick
     CHECK(note.kind == "Note");
-    CHECK(note.fields == std::vector<InspectorField>{{"Position", "1:2:000"},
-                                                     {"Time", "0:00.500"},
-                                                     {"Pitch", "E1 (28)"},
-                                                     {"Velocity", "96"},
-                                                     {"Length", "0:0:480 (1/8)"},
-                                                     {"Ends", "1:2:480"},
-                                                     {"Release", "40"}});
+    CHECK(note.fields ==
+          std::vector<InspectorField>{{"Position", "1:2:000"},
+                                      {.heading = "Time", .value = "0:00.500", .aside = true},
+                                      {"Pitch", "E1 (28)"},
+                                      {"Velocity", "96"},
+                                      {"Length", "0:0:480 (1/8)"},
+                                      {"Ends", "1:2:480"},
+                                      {"Release", "40"}});
 
     const auto cc = of(list, RowKind::Event, 0);
     CHECK(cc.kind == "CC");
@@ -95,11 +96,12 @@ TEST_CASE("on a row that isn't an event, the inspector says what the row is")
 
     const auto section = of(list, RowKind::Section, 1);
     CHECK(section.kind == "Section");
-    CHECK(section.fields == std::vector<InspectorField>{{"Position", "2:1:000"},
-                                                        {"Time", "0:02.000"},
-                                                        {"Section", "Verse"},
-                                                        {"Bars", "2–2"},
-                                                        {"Length", "1 bar, 0:02.000"}});
+    CHECK(section.fields ==
+          std::vector<InspectorField>{{"Position", "2:1:000"},
+                                      {.heading = "Time", .value = "0:02.000", .aside = true},
+                                      {"Section", "Verse"},
+                                      {"Bars", "2–2"},
+                                      {"Length", "1 bar, 0:02.000"}});
     const auto tempo = of(list, RowKind::Tempo);
     CHECK(tempo.fields[2] == InspectorField{"Tempo", "120 BPM"});
     CHECK(tempo.fields[3] == InspectorField{"Per quarter", "500 ms"});

@@ -7,6 +7,7 @@
 #include <modal/core/tick.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/view.hpp>
 
 #include <cstddef>
@@ -25,9 +26,10 @@ int inspectorHeight(CellSize cell);
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.
 // Each column is as wide as its longest value can be, so the columns stay put as the cursor
 // moves, a position or end as wide as positionWidth; a value that doesn't fit is cut short,
-// and those after it left out.
+// and those after it left out. Fields set aside (the time) go at the right, their values dim.
+// With an editor, the field it's on is boxed, showing what's typed and the cursor.
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
-                       int positionWidth);
+                       int positionWidth, const InspectorEditor* editor = nullptr);
 
 // The bar naming a track, its channel and port (track 0 is the conductor), and the section
 // holding a time with its bars in a meter, each value after its label.

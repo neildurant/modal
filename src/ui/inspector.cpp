@@ -2,6 +2,7 @@
 
 #include <modal/core/controllers.hpp>
 #include <modal/core/pitch.hpp>
+#include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/inspector.hpp>
 
@@ -105,6 +106,14 @@ void addNoteFields(Inspection& inspection, const core::Song& song, const core::M
     add("Release", std::to_string(note.releaseVelocity));
 }
 
+void markEditable(Inspection& inspection)
+{
+    for (auto& field : inspection.fields)
+    {
+        field.editable = field.heading == "Ends" || inspectorColumn(field.heading).has_value();
+    }
+}
+
 Inspection inspect(const EventList& list, std::size_t row)
 {
     const auto& song = list.song();
@@ -116,7 +125,8 @@ Inspection inspect(const EventList& list, std::size_t row)
     { fields.push_back({std::move(heading), std::move(value)}); };
 
     add("Position", positionText(meter, r.tick));
-    add("Time", songTime(song.tempo().toTime(r.tick)));
+    fields.push_back(
+        {.heading = "Time", .value = songTime(song.tempo().toTime(r.tick)), .aside = true});
 
     switch (r.kind)
     {

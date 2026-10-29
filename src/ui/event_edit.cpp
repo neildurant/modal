@@ -6,6 +6,7 @@
 #include <modal/ui/event_text.hpp>
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <system_error>
@@ -448,6 +449,72 @@ std::optional<std::string> overlap(const core::EventList& events, std::optional<
         }
     }
     return std::nullopt;
+}
+
+std::optional<Column> inspectorColumn(std::string_view heading)
+{
+    constexpr std::array<std::pair<std::string_view, Column>, 10> kColumns{{
+        {"Position", Column::Position},
+        {"Pitch", Column::Data},
+        {"Controller", Column::Data},
+        {"Program", Column::Data},
+        {"Velocity", Column::Value},
+        {"Value", Column::Value},
+        {"Bend", Column::Value},
+        {"Pressure", Column::Value},
+        {"Length", Column::Length},
+        {"Release", Column::Release},
+    }};
+    const auto it =
+        std::ranges::find(kColumns, heading, &std::pair<std::string_view, Column>::first);
+    return it == kColumns.end() ? std::nullopt : std::optional{it->second};
+}
+
+EditResult setInspectorField(const core::Event& event, std::string_view heading,
+                             std::string_view text, const core::MeterMap& meter)
+{
+    if (heading == "Ends")
+    {
+        // The end as a position: where it's typed to, the length following.
+        const auto* note = std::get_if<core::Note>(&event.data);
+        if (note == nullptr)
+        {
+            return std::string{"Only a note has an end to set"};
+        }
+        auto end = event;
+        end.tick += note->duration;
+        const auto moved = setField(end, Column::Position, text, meter);
+        if (const auto* why = std::get_if<std::string>(&moved))
+        {
+            return *why;
+        }
+        const auto tick = std::get<core::Event>(moved).tick;
+        if (tick <= event.tick)
+        {
+            return std::string{"A note has to end after it starts"};
+        }
+        auto changed = event;
+        std::get<core::Note>(changed.data).duration = tick - event.tick;
+        return changed;
+    }
+    const auto column = inspectorColumn(heading);
+    if (!column)
+    {
+        return std::string{heading} + " can't be edited";
+    }
+    return setField(event, *column, text, meter);
+}
+
+EditResult stepInspectorField(const core::Event& event, std::string_view heading, int steps,
+                              const core::MeterMap& meter)
+{
+    const auto column =
+        heading == "Ends" ? std::optional{Column::Length} : inspectorColumn(heading);
+    if (!column)
+    {
+        return std::string{heading} + " can't be stepped";
+    }
+    return stepField(event, *column, steps, meter);
 }
 
 } // namespace modal::ui

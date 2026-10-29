@@ -130,6 +130,8 @@ constexpr std::array kSharedCommands{
     atPrompt("command-line-start", "Move the cursor to the start"),
     atPrompt("command-line-end", "Move the cursor to the end"),
     atPrompt("command-line-clear", "Clear the command line"),
+    atPrompt("command-line-next", "Set the field and go to the next, in the inspector"),
+    atPrompt("command-line-previous", "Set the field and go to the one before, in the inspector"),
     atPrompt("command-line-older", "Recall the line run before"),
     atPrompt("command-line-newer", "Recall the line run after"),
 };

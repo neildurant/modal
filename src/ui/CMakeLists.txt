@@ -14,6 +14,7 @@ add_library(modal_ui STATIC
     event_text.cpp
     file_commands.cpp
     inspector.cpp
+    inspector_edit.cpp
     frame.cpp
     key_notation.cpp
     keymap.cpp

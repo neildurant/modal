@@ -1139,3 +1139,83 @@ TEST_CASE("dab in the piano roll takes a bar out of the track, controllers too, 
     r.type(U"gedab");
     CHECK(r.ws.message() == "ab isn't in the event list, which is for events rather than time");
 }
+
+TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab going round")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    const auto& editor = r.view().inspectorEditor();
+    const auto tab = [&] { r.press(Key::of(NamedKey::Tab)); };
+    r.type(U"e");
+    CHECK(r.ws.message() == "No note here to edit");
+    CHECK_FALSE(editor.active());
+
+    r.type(U"8je"); // the E1 at the start, on its position first
+    REQUIRE(editor.active());
+    CHECK(editor.heading() == "Position");
+    CHECK(editor.line().text().starts_with(U"1:1:0"));
+    r.type(U"2:1");
+    tab(); // moved to bar 2, the cursor with it
+    CHECK(bassNote(r, 28)->first == t.bar(2));
+    CHECK(r.view().time() == t.bar(2));
+    CHECK(editor.heading() == "Pitch");
+    CHECK(editor.line().text() == U"E1");
+    r.type(U"A2"); // onto the A2 there
+    tab();
+    CHECK(r.ws.message().starts_with("Would overlap the A2 at 2:1"));
+    CHECK(editor.heading() == "Pitch"); // to put right
+    r.press(Key::of(NamedKey::Backspace));
+    r.press(Key::of(NamedKey::Backspace));
+    r.type(U"F1");
+    tab();
+    CHECK(bassNote(r, 29)->first == t.bar(2));
+    CHECK(editor.heading() == "Velocity");
+    r.type(U"+10");
+    r.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(editor.active());
+    REQUIRE(r.view().currentNote());
+    const auto velocity = [&]
+    {
+        const auto& song = r.document.song();
+        return std::get<core::Note>(
+                   song.events(song.tracks()[0]->id())[*r.view().currentNote()].data)
+            .velocity;
+    };
+    CHECK(velocity() == 106);
+    r.type(U"u");
+    CHECK(r.ws.message() == "Undid: Set velocity of F1 in Bass");
+    CHECK(velocity() == 96);
+
+    // Again on the field last edited; Up steps it straight away; Escape leaves the rest.
+    r.type(U"e");
+    CHECK(editor.heading() == "Velocity");
+    r.press(Key::of(NamedKey::Up));
+    CHECK(velocity() == 97);
+    CHECK(editor.line().text() == U"97");
+    r.type(U"50");
+    r.press(Key::of(NamedKey::Escape));
+    CHECK(velocity() == 97);
+
+    // Its end, which sets its length; round from the first field to the last.
+    r.type(U"e");
+    tab();
+    tab();
+    CHECK(editor.heading() == "Ends");
+    r.type(U"2:2");
+    tab();
+    CHECK(bassNote(r, 29)->second == t.quarters(1));
+    CHECK(editor.heading() == "Release");
+    tab();
+    CHECK(editor.heading() == "Position");
+    r.press(Key::of(NamedKey::Tab, kShift));
+    CHECK(editor.heading() == "Release");
+    r.press(Key::of(NamedKey::Escape));
+    r.type(U"e"); // where it was left, the release
+    CHECK(editor.heading() == "Release");
+    r.press(Key::of(NamedKey::Tab, kShift));
+    CHECK(editor.heading() == "Ends");
+    r.type(U"1:4");
+    tab();
+    CHECK(r.ws.message() == "A note has to end after it starts");
+}

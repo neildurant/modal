@@ -675,7 +675,8 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     const auto bars = last - first + 1;
     Inspection result{.kind = "Section", .fields = {}};
     result.fields.push_back({"Position", positionText(m, start)});
-    result.fields.push_back({"Time", songTime(song.tempo().toTime(start))});
+    result.fields.push_back(
+        {.heading = "Time", .value = songTime(song.tempo().toTime(start)), .aside = true});
     result.fields.push_back({"Section", song.sections()[section]->name()});
     result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
     result.fields.push_back(
@@ -700,7 +701,8 @@ Inspection ArrangeView::inspection() const
     const auto last = m.toBarBeatTick(std::max<core::Tick>(song.end() - 1, 0)).bar;
     Inspection result{.kind = "Bar", .fields = {}};
     result.fields.push_back({"Position", positionText(m, start)});
-    result.fields.push_back({"Time", songTime(song.tempo().toTime(start))});
+    result.fields.push_back(
+        {.heading = "Time", .value = songTime(song.tempo().toTime(start)), .aside = true});
     result.fields.push_back({"Bar", std::to_string(bar) + " of " + std::to_string(last)});
     result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     if (const auto id = trackId())

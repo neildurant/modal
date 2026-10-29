@@ -28,7 +28,7 @@ int inspectorHeight(CellSize cell)
 }
 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
-                       int positionWidth)
+                       int positionWidth, const InspectorEditor* editor)
 {
     // On a panel of its own: the kind of row, then headings above their values. Each column
     // is as wide as its longest value can be, so the columns stay put as the cursor moves;
@@ -70,12 +70,47 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
 
     const int top = cell.height / 4;
     region.text.push_back({x(0), top, decodeUtf8(inspection.kind), kind});
+
+    // The fields set aside, from the right edge in.
+    int right = columns;
+    for (auto it = inspection.fields.rbegin(); it != inspection.fields.rend(); ++it)
+    {
+        if (!it->aside)
+        {
+            continue;
+        }
+        const auto title = decodeUtf8(it->heading);
+        const auto text = decodeUtf8(it->value);
+        const int wide = std::max(
+            {static_cast<int>(title.size()), static_cast<int>(text.size()), widthOf(it->heading)});
+        if (right - wide < widthOf("Kind") + 3)
+        {
+            break;
+        }
+        right -= wide;
+        region.text.push_back({x(right), top, title, heading});
+        region.text.push_back({x(right), top + cell.height, text, heading});
+        right -= 3;
+    }
+
+    const Style editing{Role::Text, Role::Selection, kPlain};
+    const Style cursor{Role::CursorText, Role::Cursor, kPlain};
     int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
+        if (field.aside)
+        {
+            continue;
+        }
         auto title = decodeUtf8(field.heading);
         auto text = decodeUtf8(field.value);
-        const int room = columns - at;
+        const bool edited =
+            editor != nullptr && editor->active() && editor->heading() == field.heading;
+        if (edited)
+        {
+            text = editor->line().text();
+        }
+        const int room = std::min(columns, right) - at;
         if (room < kMinSegmentCharacters + 1)
         {
             break;
@@ -89,12 +124,31 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
             }
         };
         cut(title);
-        cut(text);
         region.text.push_back({x(at), top, title, heading});
-        region.text.push_back({x(at), top + cell.height, text, value});
-        at += std::max({static_cast<int>(title.size()), static_cast<int>(text.size()),
-                        widthOf(field.heading)}) +
-              3;
+        const int wide =
+            std::max({static_cast<int>(title.size()),
+                      static_cast<int>(text.size()) + (edited ? 1 : 0), widthOf(field.heading)});
+        if (edited)
+        {
+            // In a box as wide as the column, what's typed and its cursor; longer text scrolls
+            // to keep the cursor in it, as in the event list's cells.
+            const auto box = static_cast<std::size_t>(std::max(std::min(wide, room), 2));
+            const auto typed = editor->line().cursor();
+            const std::size_t first = typed + 1 > box ? typed + 1 - box : 0;
+            auto visible = text.substr(first, box);
+            visible.resize(box, U' ');
+            region.text.push_back({x(at), top + cell.height, visible, editing});
+            const auto c = static_cast<int>(typed - first);
+            region.text.push_back({x(at + c), top + cell.height,
+                                   std::u32string(1, typed < text.size() ? text[typed] : U' '),
+                                   cursor});
+        }
+        else
+        {
+            cut(text);
+            region.text.push_back({x(at), top + cell.height, text, value});
+        }
+        at += wide + 3;
     }
     return region;
 }
