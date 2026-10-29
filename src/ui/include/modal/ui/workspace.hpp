@@ -145,7 +145,8 @@ public:
 private:
     void startTyping() override { mode_ = Mode::CommandLine; }
     void openPrompt(std::string line) override;
-    void ask(std::string question, std::function<void()> yes) override;
+    void ask(std::string question, std::function<void()> yes, std::function<void()> no = {},
+             std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;
     void stopTyping() override { mode_ = Mode::Normal; }
     EventRegister& eventRegister() override { return register_; }
@@ -190,6 +191,9 @@ private:
     // Bars on every track, at the cursor's bar in the conductor's bars.
     CommandResult barDelete(int count);
     CommandResult barInsert(std::string_view arguments);
+    // Markers made section starts, the one at or before the cursor, or all of them.
+    CommandResult markerToSection();
+    CommandResult markerToSectionAll();
     CommandResult renameSection(std::string_view name);
 
     Region promptRegion() const;
@@ -211,7 +215,27 @@ private:
         int count;
     };
     std::optional<PendingOperator> operator_;
-    std::function<void()> yes_; // what a question asked runs, if the answer is y
+    // A question asked: what it runs for y, for another key, and for Escape.
+    struct Question
+    {
+        std::function<void()> yes;
+        std::function<void()> no;
+        std::function<void()> stop;
+    };
+    std::optional<Question> question_;
+    // :marker-to-section-all, going through the markers, asking about those off a bar line.
+    struct MarkerRun
+    {
+        SongCursor from; // where the cursor goes back to
+        std::size_t next = 0;
+        std::vector<std::pair<core::Tick, std::string>> starts; // a section's start, its name
+        std::vector<core::Tick> markers;                        // the markers turned
+        int atStarts = 0;
+        int sharing = 0;
+        int declined = 0;
+    };
+    void runMarkers(std::shared_ptr<MarkerRun> run);
+    void finishMarkers(const MarkerRun& run);
     EventRegister register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;

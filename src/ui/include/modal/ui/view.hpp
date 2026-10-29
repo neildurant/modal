@@ -112,9 +112,11 @@ public:
     // Opens the : prompt with a line in it to edit, as naming a new section does.
     virtual void openPrompt(std::string line) = 0;
 
-    // Asks a question in the status line, running yes if the next key is y; any other key
-    // says no.
-    virtual void ask(std::string question, std::function<void()> yes) = 0;
+    // Asks a question in the status line, running yes if the next key is y and no for any
+    // other, or for Escape stop, if there's one, which stops a run of questions; with nothing
+    // to run, it says nothing was done.
+    virtual void ask(std::string question, std::function<void()> yes, std::function<void()> no = {},
+                     std::function<void()> stop = {}) = 0;
 
     // Puts the play-from marker at a time and plays from there, as Enter on a section does.
     virtual void playFrom(core::Tick tick) = 0;

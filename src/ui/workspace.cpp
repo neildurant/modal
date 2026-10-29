@@ -102,6 +102,14 @@ constexpr std::array kSharedCommands{
                                "track, in the meter there or one given (2 3/4)",
                 .usage = "[N] [METER]",
                 .keys = false},
+    CommandInfo{.name = "marker-to-section",
+                .description = "Start a section at the marker at or before the cursor, named "
+                               "after it, at the bar line of its bar; the marker goes",
+                .keys = false},
+    CommandInfo{.name = "marker-to-section-all",
+                .description = "Start a section at every marker, asking about those off a bar "
+                               "line, as one undo step",
+                .keys = false},
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor",
                 .usage = "NAME",
@@ -248,6 +256,14 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "section")
                          {
                              return section(call.arguments);
+                         }
+                         if (name == "marker-to-section")
+                         {
+                             return markerToSection();
+                         }
+                         if (name == "marker-to-section-all")
+                         {
+                             return markerToSectionAll();
                          }
                          if (name == "bar-delete")
                          {
@@ -433,13 +449,23 @@ bool Workspace::handle(const Key& key, std::int64_t now)
 {
     lastTime_ = now;
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
-    // A question asked takes the next key as its answer: y for yes, any other for no.
-    if (auto yes = std::exchange(yes_, nullptr))
+    // A question asked takes the next key as its answer: y for yes, Escape to stop a run of
+    // them, any other for no.
+    if (auto question = std::exchange(question_, std::nullopt))
     {
+        const bool escape = key.named == NamedKey::Escape;
         if (key.named == NamedKey::None && key.character == U'y' &&
             (key.modifiers & (kCtrl | kAlt)) == 0)
         {
-            yes();
+            question->yes();
+        }
+        else if (escape && question->stop)
+        {
+            question->stop();
+        }
+        else if (!escape && question->no)
+        {
+            question->no();
         }
         else
         {
@@ -935,6 +961,168 @@ std::string trackNameOf(const core::Song& song, core::TrackId id)
 
 } // namespace
 
+CommandResult Workspace::markerToSection()
+{
+    // The marker at or before the cursor, its section starting at the bar line of its bar in
+    // the conductor's bars, asking first unless the cursor is on it and it's on a bar line.
+    const auto& song = document_.song();
+    const auto& meter = song.meter();
+    const auto tick = view().cursor().tick;
+    const auto markers = song.markers();
+    const auto after = std::ranges::upper_bound(markers, tick, {}, &core::Marker::tick);
+    if (after == markers.begin())
+    {
+        return CommandResult::error("There's no marker at or before the cursor");
+    }
+    const auto marker = *std::prev(after);
+    const auto start = meter.barStart(meter.toBarBeatTick(marker.tick).bar);
+    const auto section = song.sectionAt(start);
+    if (song.sectionStart(section) == start)
+    {
+        return CommandResult::error(marker.name + " is at the start of " +
+                                    song.sections()[section]->name() +
+                                    ", so there's no section to start");
+    }
+    const auto at = positionText(meter, start);
+    const auto make = [this, marker, start, at]
+    {
+        std::optional<core::Song::Split> split;
+        document_.edit("Start section " + marker.name + " at " + at + ", from its marker",
+                       view().place(),
+                       [&](core::Song& s)
+                       {
+                           split = s.splitSection(start, marker.name);
+                           s.removeMarker(marker.tick);
+                       });
+        refresh();
+        const auto& named = document_.song().sections()[split->index]->name();
+        setMessage(named + " starts at " + at + ", from its marker", MessageKind::Information);
+    };
+    if (marker.tick == tick && marker.tick == start)
+    {
+        make();
+        return {true, {}, false};
+    }
+    ask(marker.tick == start ? "Start a section from the marker " + marker.name + " at " + at + "?"
+                             : "Start a section at " + at + " from the marker " + marker.name +
+                                   " at " + positionText(meter, marker.tick) + "?",
+        make);
+    return {true, {}, false};
+}
+
+CommandResult Workspace::markerToSectionAll()
+{
+    if (document_.song().markers().empty())
+    {
+        return CommandResult::error("There are no markers to turn into sections");
+    }
+    auto run = std::make_shared<MarkerRun>();
+    run->from = view().cursor();
+    runMarkers(run);
+    return {true, {}, false};
+}
+
+void Workspace::runMarkers(std::shared_ptr<MarkerRun> run)
+{
+    // On through the markers from where the run is: those on a bar line taken, those whose bar
+    // already starts a section (or another marker's) passed over, and for each of the others
+    // the cursor going to it and a question, after which the run goes on.
+    const auto& song = document_.song();
+    const auto& meter = song.meter();
+    const auto markers = song.markers();
+    for (; run->next < markers.size(); ++run->next)
+    {
+        const auto marker = markers[run->next];
+        const auto start = meter.barStart(meter.toBarBeatTick(marker.tick).bar);
+        if (song.sectionStart(song.sectionAt(start)) == start)
+        {
+            ++run->atStarts;
+            continue;
+        }
+        if (std::ranges::find(run->starts, start, &std::pair<core::Tick, std::string>::first) !=
+            run->starts.end())
+        {
+            ++run->sharing;
+            continue;
+        }
+        const auto take = [run, marker, start]
+        {
+            run->starts.emplace_back(start, marker.name);
+            run->markers.push_back(marker.tick);
+        };
+        if (marker.tick == start)
+        {
+            take();
+            continue;
+        }
+        auto cursor = view().cursor();
+        cursor.tick = marker.tick;
+        view().setCursor(cursor);
+        ++run->next;
+        ask(
+            "Start a section at " + positionText(meter, start) + " from the marker " + marker.name +
+                " at " + positionText(meter, marker.tick) + "?",
+            [this, run, take]
+            {
+                take();
+                runMarkers(run);
+            },
+            [this, run]
+            {
+                ++run->declined;
+                runMarkers(run);
+            },
+            [this, run]
+            {
+                view().setCursor(run->from);
+                setMessage("Nothing done", MessageKind::Information);
+            });
+        return;
+    }
+    finishMarkers(*run);
+}
+
+void Workspace::finishMarkers(const MarkerRun& run)
+{
+    // Every section started at once, as one undo step, the cursor back where it was.
+    view().setCursor(run.from);
+    std::string left;
+    const auto add = [&](int n, const std::string& one, const std::string& many)
+    {
+        if (n > 0)
+        {
+            left += "; " + (n == 1 ? "1 was " + one : std::to_string(n) + " were " + many);
+        }
+    };
+    add(run.atStarts, "at a section's start", "at sections' starts");
+    add(run.sharing, "in a bar with another", "in bars with others");
+    add(run.declined, "left as it was", "left as they were");
+    if (run.starts.empty())
+    {
+        setMessage("No markers turned into sections" + left, MessageKind::Information);
+        return;
+    }
+    const auto turned = run.starts.size();
+    document_.edit("Turn " + std::to_string(turned) + (turned == 1 ? " marker" : " markers") +
+                       " into sections",
+                   view().place(),
+                   [&](core::Song& s)
+                   {
+                       for (const auto& [start, name] : run.starts)
+                       {
+                           s.splitSection(start, name);
+                       }
+                       for (const auto tick : run.markers)
+                       {
+                           s.removeMarker(tick);
+                       }
+                   });
+    refresh();
+    setMessage("Turned " + std::to_string(turned) +
+                   (turned == 1 ? " marker into a section" : " markers into sections") + left,
+               MessageKind::Information);
+}
+
 CommandResult Workspace::barDelete(int count)
 {
     // Done on a copy first, which says whether it can be, as one undo step.
@@ -1056,10 +1244,12 @@ void Workspace::openPrompt(std::string line)
     line_.open(decodeUtf8(line));
 }
 
-void Workspace::ask(std::string question, std::function<void()> yes)
+void Workspace::ask(std::string question, std::function<void()> yes, std::function<void()> no,
+                    std::function<void()> stop)
 {
-    setMessage(std::move(question) + " (y/n)", MessageKind::Warning);
-    yes_ = std::move(yes);
+    setMessage(std::move(question) + (stop ? " (y/n, Escape stops)" : " (y/n)"),
+               MessageKind::Warning);
+    question_ = Question{std::move(yes), std::move(no), std::move(stop)};
 }
 
 void Workspace::playFrom(core::Tick tick)
