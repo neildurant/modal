@@ -570,6 +570,10 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     {
         return openField();
     }
+    else if (command == "inspector-edit")
+    {
+        return editInspector();
+    }
     else if (command == "note-add")
     {
         return addNote();
@@ -1224,6 +1228,11 @@ std::string EventListView::trackName() const
 
 void EventListView::type(char32_t character)
 {
+    if (editor_.active())
+    {
+        editor_.type(character);
+        return;
+    }
     if (std::exchange(field_->fresh, false))
     {
         fieldLine_.clear(); // typing replaces the value, as in a spreadsheet
@@ -1233,6 +1242,33 @@ void EventListView::type(char32_t character)
 
 std::optional<bool> EventListView::runTyping(std::string_view command)
 {
+    if (editor_.active())
+    {
+        // The cursor's event, as the inspector's fields set it, following it as it moves.
+        const auto set = [this](const std::string& heading,
+                                const EditResult& result) -> std::optional<std::string>
+        {
+            if (const auto* why = std::get_if<std::string>(&result))
+            {
+                return *why;
+            }
+            const auto column = heading == "Ends" ? Column::Length : *inspectorColumn(heading);
+            return replaceEvent(row_, std::get<core::Event>(result), column);
+        };
+        const auto event = [this]
+        { return document_.song().events(*list_.track())[list_.rows()[row_].index]; };
+        InspectorEditor::Hooks hooks{
+            .inspection = [this] { return inspection(); },
+            .set = [&](const std::string& heading, const std::string& text)
+            { return set(heading, setInspectorField(event(), heading, text, list_.meter())); },
+            .step = [&](const std::string& heading, int steps) -> std::optional<std::string>
+            {
+                const auto result = stepInspectorField(event(), heading, steps, list_.meter());
+                return std::holds_alternative<std::string>(result) ? std::nullopt
+                                                                   : set(heading, result);
+            }};
+        return editor_.run(command, host_, hooks);
+    }
     if (command == "command-line-run")
     {
         return finishField();
@@ -1396,11 +1432,34 @@ Region EventListView::listRegion() const
     return ui::gridRegion(grid, main, cell_, Role::Background);
 }
 
+Inspection EventListView::inspection() const
+{
+    // A track's own event's fields can be edited; the conductor's are edited in their rows.
+    auto result = inspect(list_, row_);
+    const auto& row = list_.rows()[row_];
+    if (track_ != 0 && row.kind == RowKind::Event)
+    {
+        markEditable(result);
+    }
+    return result;
+}
+
+bool EventListView::editInspector()
+{
+    if (!editor_.open(inspection()))
+    {
+        setMessage("Nothing to edit here", MessageKind::Information);
+        return true;
+    }
+    host_.startTyping();
+    return true;
+}
+
 Region EventListView::inspectorRegion() const
 {
     const int position =
         static_cast<int>(list_.text(list_.rows().size() - 1)[Column::Position].size());
-    return ui::inspectorRegion(inspect(list_, row_), layout_.top[1], width_, cell_, position);
+    return ui::inspectorRegion(inspection(), layout_.top[1], width_, cell_, position, &editor_);
 }
 
 Region EventListView::barRegion() const

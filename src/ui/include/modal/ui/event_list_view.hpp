@@ -7,6 +7,7 @@
 #include <modal/ui/commands.hpp>
 #include <modal/ui/event_list.hpp>
 #include <modal/ui/frame.hpp>
+#include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/layout.hpp>
 #include <modal/ui/view.hpp>
 
@@ -59,7 +60,8 @@ public:
     void showSong() override;
     void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
-    bool typing() const override { return field_.has_value(); }
+    bool typing() const override { return field_.has_value() || editor_.active(); }
+    const InspectorEditor& inspectorEditor() const { return editor_; }
     void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
 
@@ -111,6 +113,9 @@ private:
     // Starts editing the field under the cursor in place, with its value in it; then sets it
     // from what's typed, or steps it.
     bool openField();
+    // The inspector, with e: what it shows of the cursor's row, and editing it.
+    Inspection inspection() const;
+    bool editInspector();
     bool addNote(); // o: a note at the cursor's time, editing its pitch first
     bool finishField();
     bool stepFieldBy(int steps);
@@ -157,6 +162,7 @@ private:
     };
     std::optional<FieldPrompt> field_;
     CommandLine fieldLine_;
+    InspectorEditor editor_; // the inspector's fields, with e
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;
