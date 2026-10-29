@@ -10,10 +10,11 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 2. **Recording:** with metronome, count-in and pre-roll (from the command line, for now).
 3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt.
 4. **The event list,** the first real view. Songs made of sections, opened, saved and exported in a plain-text format or as MIDI files, with undo; Vim-style motions and operators; editing events in place; an inspector; and playback from a play-from marker.
+5. **The arrangement and the piano roll.** The arrangement as the home view, with its section strip; the piano roll, for writing and editing notes; one cursor shared by the views; and an editing grammar of ranges and objects, with bars taken out and put in across the tracks.
 
 ![The event list, playing](docs/screenshot.png)
 
-Next come the piano roll and arrangement views (milestone 5), then Visual mode, transforms, search and the command palette across all three views (milestone 6). The plan for the rest is in [docs/design.md](docs/design.md).
+Next comes the full grammar across all three views (milestone 6): the leader key and its hint menu first, then Visual mode, the other operators and transforms, search and the command palette. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
@@ -36,9 +37,36 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 ### The arrangement
 
-Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the event list. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow).
+Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the piano roll. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow).
+
+On every track at once: `:bar-delete` deletes the cursor's bar (`:bar-delete 2` two), keeping it in the register as a section, and `:bar-insert` puts an empty bar in before it (`:bar-insert 2 3/4` two bars of 3/4). `:marker-to-section` starts a section at the marker at or before the cursor, named after it, and `:marker-to-section-all` does it for every marker, as for an imported MIDI file whose markers mark its structure.
 
 Above the tracks is the section strip: `gs` (or `k` from the first track) goes to it, and `j` back. There `h` `l` go between sections; `x` and `Y` delete and yank a section, `d` and `y` with `h` `l` or `gg` `G` several, and `p` and `P` put them after or before; `Alt-h` `Alt-l` move one; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert a new one; `c` renames it; `e` edits its name and length in the inspector; and Enter plays from it. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
+
+### The piano roll
+
+`gr`, or Enter on a bar in the arrangement, opens the cursor's track in the piano roll: pages of whole bars, under a ruler of sections, markers and bar numbers, with the note names down the left and the velocities in a lane below. The cursor is a time and a pitch, and the note it's on is shown in the inspector above.
+
+| Keys | What they do |
+|------|--------------|
+| `h` `l`, `k` `j`, `K` `J` | A grid step later or earlier, a semitone up or down, an octave up or down |
+| `Tab` `Shift-Tab`, `)` `(` | The next or previous note, at any pitch, or chord |
+| `]b` `[b`, `}` `{`, `0` `$` | The next or previous bar line, the same place a bar on or back, the bar's start or last step |
+| `gg` `G`, `]s` `[s`, `]m` `[m` | The song's start and end (`5G` bar 5), sections, markers |
+| `zh` `zl`, `Ctrl-T` | A finer or coarser grid, triplets on or off (`:grid 1/16` sets it) |
+| `zi` `zo` `z0`, `zz` | Fewer or more bars to a page, or back to the page size it opens at; centre the cursor |
+| `o`, `O` | Add the track's default note at the cursor; or add it and move on to its end (`8O` eight in a row) |
+| `, n`, `:len 1/8` | Take this note's length and velocity as the track's default note, or set its length |
+| `x` `Y` | Delete or yank this note |
+| `d` `y` with a range | The notes starting from the cursor to `]b` the next bar line, `]s` the next section, `G` the end |
+| `dd` `yy`, `dib` `yib` | This bar's notes, `3dd` three bars' |
+| `dab` `yab` | This bar as time, controllers too: `dab` takes it out, moving the rest of the section up |
+| `p`, `P` | Put what was yanked over what's there, or put it in, moving the rest of the section later; bars go to the start of the cursor's bar |
+| `Alt-h` `Alt-l`, `Alt-k` `Alt-j` | Move the note a grid step, or a semitone (`Alt-K` `Alt-J` an octave, `Alt-{` `Alt-}` a bar) |
+| `Alt-H` `Alt-L`, `=` `-`, `+` `_` | Nudge it by 5 ms (`set nudge`); lengthen or shorten it to the grid, or by a nudge |
+| `Ctrl-A` `Ctrl-X` | Step its velocity, with counts |
+| `e` | Edit its fields in the inspector: Tab and Shift-Tab go between them, Up and Down step one, Enter sets it and Escape leaves it |
+| `gt` `gT` | The next or previous track |
 
 ### The event list
 
