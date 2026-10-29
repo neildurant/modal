@@ -61,6 +61,7 @@ source more-keys
 
 - `set NAME=VALUE ...` sets settings. Several can go on one line. A setting that's on or off can also be set as in Vim: `set rewind` turns it on, `set norewind` off, and `set rewind!` the other way.
 - `nmap KEYS COMMAND ["HINT"]` binds keys in Normal mode to a command, with an optional hint. `vmap`, `imap`, `omap` and `cmap` do the same for Visual, Insert, operator-pending and command-line mode (for later milestones). `nunmap KEYS` (and `vunmap` and so on) removes a binding.
+- `ngroup KEYS "TITLE"` gives keys that start longer bindings a title for the hint menu, such as `ngroup <leader>t "Toggles"`; `vgroup` and the rest are for the other modes.
 - `highlight ROLE #rrggbb` sets the colour of a theme role.
 - `source FILE` runs another command file, found relative to the file running it.
 
@@ -68,9 +69,11 @@ Arguments are separated by spaces. As in a shell, double quotes keep spaces in a
 
 ### Keys
 
-Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`); `<` is written `<lt>` and space `<Space>`. Other keys go in angle brackets: `<Esc>`, `<Tab>`, `<CR>`, `<BS>`, `<Del>`, `<Insert>`, `<Up>`, `<Down>`, `<Left>`, `<Right>`, `<Home>`, `<End>`, `<PageUp>`, `<PageDown>`, `<F1>` to `<F12>`, and the keypad's `<kPlus>`, `<kMinus>` and `<k0>` to `<k9>`, which arrive only with Ctrl or Alt (otherwise the keypad types its characters). Modifiers come first: `C-` for Ctrl, `A-` (or `M-`) for Alt, `S-` for Shift, as in `<C-d>`, `<S-Tab>` and `<C-S-d>`. With Ctrl or Alt, a letter is the same in either case, so Ctrl-Shift-d is written `<C-S-d>`. A sequence of keys is written one after another: `gg`, `<C-w>j`.
+Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`); `<` is written `<lt>` and space `<Space>`. Other keys go in angle brackets: `<Esc>`, `<Tab>`, `<CR>`, `<BS>`, `<Del>`, `<Insert>`, `<Up>`, `<Down>`, `<Left>`, `<Right>`, `<Home>`, `<End>`, `<PageUp>`, `<PageDown>`, `<F1>` to `<F12>`, and the keypad's `<kPlus>`, `<kMinus>` and `<k0>` to `<k9>`, which arrive only with Ctrl or Alt (otherwise the keypad types its characters). Modifiers come first: `C-` for Ctrl, `A-` (or `M-`) for Alt, `S-` for Shift, as in `<C-d>`, `<S-Tab>` and `<C-S-d>`. With Ctrl or Alt, a letter is the same in either case, so Ctrl-Shift-d is written `<C-S-d>`. A sequence of keys is written one after another: `gg`, `<C-w>j`. `<leader>` is the leader key, comma unless the `leader` setting names another: `nmap <leader>n note-default`. It's matched to the setting as you type, so changing `leader` moves every leader binding, the built-in ones too.
 
 When a sequence is bound as well as a longer one starting with it (such as `z` and `zz`), Modal waits up to `timeoutlen` milliseconds for the next key before running the shorter.
+
+After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the status line: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists the ranges and objects with what each would take in the view you're in. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
 
 ## Text size
 
@@ -85,6 +88,9 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 | `fontsize`   | `12`    | The font size in points (4 to 72), before the display's own scaling |
 | `minsize`    | `120x30` | The smallest the window can be made, in cells |
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
+| `leader` | `,` | The leader key, which `<leader>` stands for in key bindings: one key, such as `,` or `<Space>` |
+| `hints` | `on` | Whether the hint menu shows, after a pause, the keys that can follow those typed |
+| `hintdelay` | `400` | How long to wait, in milliseconds, before the hint menu shows (0 to 10000; 0 shows it at once) |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
 | `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, t a` turns it on and off |
 | `nudge` | `5` | How far, in milliseconds, `Alt-H` / `Alt-L` nudge a note in the piano roll and `+` / `_` lengthen or shorten it (1 to 1000) |

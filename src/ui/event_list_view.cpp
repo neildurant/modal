@@ -1441,6 +1441,37 @@ Region EventListView::listRegion() const
     return ui::gridRegion(grid, main, cell_, Role::Background);
 }
 
+std::optional<std::string> EventListView::describeRange(std::string_view /*op*/,
+                                                        std::string_view motion) const
+{
+    // Rows of events; the event list has no time to take out.
+    if (motion == "operator-line" || motion == "object-bar-contents")
+    {
+        return "this bar's events";
+    }
+    if (motion == "object-note")
+    {
+        return "this event";
+    }
+    if (motion == "cursor-down")
+    {
+        return "this event and the next";
+    }
+    if (motion == "cursor-up")
+    {
+        return "this event and the one before";
+    }
+    if (motion == "go-last")
+    {
+        return "to the end";
+    }
+    if (motion == "go-first")
+    {
+        return "from the start";
+    }
+    return describeTimeRange(motion);
+}
+
 Region EventListView::inspectorRegion() const
 {
     const int position =

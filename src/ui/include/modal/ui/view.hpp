@@ -156,6 +156,14 @@ public:
     // operator-line over the cursor's place and as many after it as the count says.
     virtual bool operate(std::string_view op, std::string_view motion, int count) = 0;
 
+    // What an operator would take over a range or object here, for the hint menu after it
+    // ("this bar's notes"), or nothing if it takes nothing over it in this view.
+    virtual std::optional<std::string> describeRange(std::string_view /*op*/,
+                                                     std::string_view /*motion*/) const
+    {
+        return std::nullopt;
+    }
+
     // Its area, its bar and the inspector, in that order.
     virtual void addRegions(Frame& frame) const = 0;
 

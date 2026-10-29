@@ -41,6 +41,8 @@ public:
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
+    std::optional<std::string> describeRange(std::string_view op,
+                                             std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;

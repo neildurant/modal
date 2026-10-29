@@ -1219,3 +1219,52 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     tab();
     CHECK(r.ws.message() == "A note has to end after it starts");
 }
+
+TEST_CASE("after an operator the hint menu lists its ranges and objects, with what each takes")
+{
+    Rolling r;
+    r.ws.setHints(true, 0);
+    const auto title = [&](std::string_view keys) -> std::string
+    {
+        for (const auto& hint : r.ws.hints().value_or(std::vector<Workspace::Hint>{}))
+        {
+            if (hint.keys == keys)
+            {
+                return hint.title;
+            }
+        }
+        return "(none)";
+    };
+    r.type(U"d");
+    REQUIRE(r.ws.hints());
+    CHECK(r.ws.hints()->front() == Workspace::Hint{"d", "this bar's notes", false});
+    CHECK(title("ib") == "this bar's notes");
+    CHECK(title("ab") == "this bar, closing the gap");
+    CHECK(title("in") == "this note");
+    CHECK(title("]b") == "to the next bar line");
+    CHECK(title("l") == "to the next grid step");
+    CHECK(title("G") == "to the end of the song");
+    for (const auto* moves : {"}", "$", "0", "<Tab>", ")", "y", "j"})
+    {
+        CAPTURE(moves);
+        CHECK(title(moves) == "(none)");
+    }
+    r.press(Key::of(NamedKey::Escape));
+    CHECK_FALSE(r.ws.hints());
+    r.type(U"y");
+    CHECK(title("yy") == "(none)");
+    CHECK(title("y") == "this bar's notes");
+    CHECK(title("ab") == "this bar as time, controllers too");
+    r.press(Key::of(NamedKey::Escape));
+
+    // Each view its own: the event list has no time to take out; the strip takes sections.
+    r.type(U"ged");
+    CHECK(title("ab") == "(none)");
+    CHECK(title("in") == "this event");
+    CHECK(title("j") == "this event and the next");
+    r.press(Key::of(NamedKey::Escape));
+    r.type(U"gagsd");
+    CHECK(title("l") == "this section");
+    CHECK(title("d") == "(none)");
+    CHECK(title("ib") == "(none)");
+}

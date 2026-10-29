@@ -78,6 +78,10 @@ EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t 
 // The bars a span of time covers, as words in a meter: "bar 3", "bars 3–5".
 std::string barsText(const core::MeterMap& meter, core::Tick from, core::Tick to);
 
+// What the ranges to boundaries in time take, the same in each view, for the hint menu: "to
+// the next bar line", "from the section's start", "to the end of the song".
+std::optional<std::string> describeTimeRange(std::string_view motion);
+
 // How many events, as words: "1 event", "3 events".
 std::string eventCount(std::size_t events);
 

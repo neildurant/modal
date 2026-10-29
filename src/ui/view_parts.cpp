@@ -353,6 +353,23 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
     return putRegister(song, reg, firstTrack, at);
 }
 
+std::optional<std::string> describeTimeRange(std::string_view motion)
+{
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 8> kRanges{{
+        {"cursor-bar-line-next", "to the next bar line"},
+        {"cursor-bar-line-previous", "from the bar line before"},
+        {"cursor-section-next", "to the next section"},
+        {"cursor-section-previous", "from the section's start"},
+        {"cursor-marker-next", "to the next marker"},
+        {"cursor-marker-previous", "from the marker before"},
+        {"go-last", "to the end of the song"},
+        {"go-first", "from the start of the song"},
+    }};
+    const auto it =
+        std::ranges::find(kRanges, motion, &std::pair<std::string_view, std::string_view>::first);
+    return it == kRanges.end() ? std::nullopt : std::optional{std::string{it->second}};
+}
+
 std::string eventCount(std::size_t events)
 {
     return events == 1 ? std::string{"1 event"} : std::to_string(events) + " events";

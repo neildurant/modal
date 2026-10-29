@@ -509,8 +509,9 @@ bool Workspace::handle(const Key& key, std::int64_t now)
 
 void Workspace::noteWaiting(std::int64_t now)
 {
-    // Keys waiting for more start the wait for the hint menu, or show it at once with no delay.
-    if (keys_.keys().empty())
+    // Keys waiting for more, or an operator waiting for its range, start the wait for the hint
+    // menu, or show it at once with no delay.
+    if (keys_.keys().empty() && !operator_)
     {
         waitingSince_.reset();
         hintsShown_ = false;
@@ -525,9 +526,14 @@ void Workspace::noteWaiting(std::int64_t now)
 
 std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
 {
-    if (!hintsOn_ || !hintsShown_ || keys_.keys().empty())
+    if (!hintsOn_ || !hintsShown_ || (keys_.keys().empty() && !operator_))
     {
         return std::nullopt;
+    }
+    if (keys_.keys().empty())
+    {
+        auto hints = operatorHints();
+        return hints.empty() ? std::nullopt : std::optional{std::move(hints)};
     }
     const auto mode = keys_.mode();
     const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
@@ -587,6 +593,62 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
     return hints;
 }
 
+std::vector<Workspace::Hint> Workspace::operatorHints() const
+{
+    // After an operator, the ranges and objects it can take, as whole keys (]b, ib), with what
+    // each would take in this view: the cursor's bar first, then the objects, then the ranges.
+    // Keys that only move the cursor aren't ranges, so aren't shown.
+    std::vector<std::pair<int, Hint>> ranked;
+    std::vector<std::string> seen; // the commands, as ranked has them
+    for (const auto& [sequence, binding] : operatorKeymap_.bindings(Mode::OperatorPending))
+    {
+        const auto& command = binding.command;
+        const auto* info = commands_.find(command);
+        const bool line = command == "operator-line";
+        if (sequence.size() > 2 || info == nullptr || !(line || info->motion || info->object) ||
+            std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
+        {
+            continue;
+        }
+        if (line && formatKeys(sequence) != keysOf(operator_->name))
+        {
+            continue; // dd after d, yy after y
+        }
+        auto text = view().describeRange(operator_->name, command);
+        if (!text)
+        {
+            continue;
+        }
+        std::vector<Key> keys;
+        std::ranges::transform(sequence, std::back_inserter(keys),
+                               [this](const Key& k) { return keys_.typed(k); });
+        auto written = formatKeys(keys);
+        // A command bound to several keys, l and <Right>, shown once by the shortest.
+        if (const auto at = std::ranges::find(seen, command); at != seen.end())
+        {
+            auto& shown = ranked[static_cast<std::size_t>(at - seen.begin())].second.keys;
+            if (written.size() < shown.size())
+            {
+                shown = std::move(written);
+            }
+            continue;
+        }
+        seen.push_back(command);
+        ranked.emplace_back(
+            line           ? 0
+            : info->object ? 1
+                           : 2,
+            Hint{.keys = std::move(written), .title = std::move(*text), .group = false});
+    }
+    std::ranges::stable_sort(ranked, {}, &std::pair<int, Hint>::first);
+    std::vector<Hint> hints;
+    for (auto& [rank, hint] : ranked)
+    {
+        hints.push_back(std::move(hint));
+    }
+    return hints;
+}
+
 Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 {
     // On a panel above the status line: the keys typed and their group's title, then each key
@@ -628,7 +690,19 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
     const auto mode = keys_.mode();
     const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
     auto heading = pending();
-    if (const auto title = keymap.groupTitle(mode, keys_.keys()); !title.empty())
+    if (keys_.keys().empty() && operator_)
+    {
+        // After an operator: its key's hint, Delete or Yank.
+        for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+        {
+            if (binding.command == operator_->name && !binding.hint.empty())
+            {
+                heading += "  " + binding.hint;
+                break;
+            }
+        }
+    }
+    else if (const auto title = keymap.groupTitle(mode, keys_.keys()); !title.empty())
     {
         heading += "  " + title;
     }

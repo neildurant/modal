@@ -773,6 +773,61 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     return result;
 }
 
+std::optional<std::string> ArrangeView::describeRange(std::string_view op,
+                                                      std::string_view motion) const
+{
+    if (page_.stripCursor())
+    {
+        // Sections, as lines; dd, yy and the objects aren't on the strip.
+        if (motion == "cursor-right")
+        {
+            return "this section";
+        }
+        if (motion == "cursor-left")
+        {
+            return "the section before";
+        }
+        if (motion == "go-last")
+        {
+            return "to the last section";
+        }
+        if (motion == "go-first")
+        {
+            return "from the first section";
+        }
+        return std::nullopt;
+    }
+    if (motion == "operator-line" || motion == "object-bar-contents")
+    {
+        return "this bar's events";
+    }
+    if (motion == "object-bar")
+    {
+        return op == "operator-delete" ? "this bar, closing the gap" : "this bar as time";
+    }
+    if (motion == "cursor-right")
+    {
+        return "this bar";
+    }
+    if (motion == "cursor-left")
+    {
+        return "the bar before";
+    }
+    if (motion == "cursor-down")
+    {
+        return "this bar here and on the track below";
+    }
+    if (motion == "cursor-up")
+    {
+        return "this bar here and on the track above";
+    }
+    if (motion == "object-note")
+    {
+        return std::nullopt;
+    }
+    return describeTimeRange(motion);
+}
+
 Inspection ArrangeView::inspection() const
 {
     if (const auto section = page_.stripCursor())

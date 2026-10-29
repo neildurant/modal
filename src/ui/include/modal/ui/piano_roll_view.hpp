@@ -64,6 +64,8 @@ public:
     std::optional<CommandResult> runLine(std::string_view command,
                                          std::string_view arguments) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
+    std::optional<std::string> describeRange(std::string_view op,
+                                             std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;

@@ -276,6 +276,7 @@ private:
     bool hintsShown_ = false;
     void noteWaiting(std::int64_t now);
     std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
+    std::vector<Hint> operatorHints() const;
     Region hintRegion(const std::vector<Hint>& hints) const;
 };
 

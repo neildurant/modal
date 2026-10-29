@@ -1427,6 +1427,34 @@ bool PianoRollView::operateOnBars(std::string_view op, int count, bool time)
     return true;
 }
 
+std::optional<std::string> PianoRollView::describeRange(std::string_view op,
+                                                        std::string_view motion) const
+{
+    // The notes a range takes, at every pitch; a bar as time takes every event there.
+    if (motion == "operator-line" || motion == "object-bar-contents")
+    {
+        return "this bar's notes";
+    }
+    if (motion == "object-bar")
+    {
+        return op == "operator-delete" ? "this bar, closing the gap"
+                                       : "this bar as time, controllers too";
+    }
+    if (motion == "object-note")
+    {
+        return "this note";
+    }
+    if (motion == "cursor-right")
+    {
+        return "to the next grid step";
+    }
+    if (motion == "cursor-left")
+    {
+        return "from the grid step before";
+    }
+    return describeTimeRange(motion);
+}
+
 Inspection PianoRollView::inspection() const
 {
     // The current note, or on an empty spot the cursor's position and pitch.
