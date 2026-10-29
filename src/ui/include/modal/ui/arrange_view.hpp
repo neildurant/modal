@@ -7,6 +7,7 @@
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/view.hpp>
 
 #include <cstdint>
@@ -53,6 +54,11 @@ public:
     void showSong() override;
     void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
+    // Editing the section's fields in the inspector, with e on the strip.
+    bool typing() const override { return editor_.active(); }
+    void type(char32_t character) override { editor_.type(character); }
+    std::optional<bool> runTyping(std::string_view command) override;
+    const InspectorEditor& inspectorEditor() const { return editor_; }
 
     const ArrangePage& page() const { return page_; }
 
@@ -96,6 +102,9 @@ private:
     const core::MeterMap& meter() const;
     std::optional<core::TrackId> trackId() const;
     Inspection inspection() const;
+    // Sets the section's name or length from the inspector, or says why it can't.
+    std::optional<std::string> setSectionField(std::size_t section, const std::string& heading,
+                                               const std::string& text);
 
     core::Document& document_;
     ViewHost& host_;
@@ -108,6 +117,7 @@ private:
     int width_ = 0;
     CellSize cell_{1, 1};
     WindowLayout layout_;
+    InspectorEditor editor_;
 };
 
 } // namespace modal::ui

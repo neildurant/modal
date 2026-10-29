@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
+#include <cstdlib>
 #include <string>
 #include <variant>
 
@@ -195,6 +197,12 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     else if (command == "event-delete")
     {
         return operate("operator-delete", "object-note", count);
+    }
+    else if (command == "inspector-edit")
+    {
+        host_.setMessage("Nothing to edit in a bar here; e edits a note in the piano roll, or a "
+                         "section on the section strip",
+                         MessageKind::Information);
     }
     else if (command == "field-edit")
     {
@@ -423,6 +431,71 @@ void ArrangeView::insertRegister(const EventRegister& reg, std::size_t track, co
               insert);
 }
 
+std::optional<bool> ArrangeView::runTyping(std::string_view command)
+{
+    const auto section = page_.stripCursor().value_or(0);
+    InspectorEditor::Hooks hooks{
+        .inspection = [this] { return inspection(); },
+        .set = [&](const std::string& heading, const std::string& text)
+        { return setSectionField(section, heading, text); },
+        .step = [&](const std::string& heading, int steps) -> std::optional<std::string>
+        {
+            if (heading != "Length")
+            {
+                return std::nullopt;
+            }
+            return setSectionField(section, heading,
+                                   (steps < 0 ? "-" : "+") + std::to_string(std::abs(steps)));
+        }};
+    return editor_.run(command, host_, hooks);
+}
+
+std::optional<std::string> ArrangeView::setSectionField(std::size_t section,
+                                                        const std::string& heading,
+                                                        const std::string& text)
+{
+    // The name, made unique as renaming does; or the length, as a number of bars or a change of
+    // one, at least a bar, shortening deleting what starts in the bars that go, as - does.
+    const auto& song = document_.song();
+    const auto name = song.sections()[section]->name();
+    if (heading == "Section")
+    {
+        if (text.empty())
+        {
+            return "A section needs a name";
+        }
+        if (text != name)
+        {
+            edit("Rename " + name + " to " + text,
+                 [&](core::Song& s) { s.renameSection(section, text); });
+        }
+        return std::nullopt;
+    }
+    const auto& m = song.meter();
+    const auto bars = m.toBarBeatTick(song.sectionStart(section + 1) - 1).bar -
+                      m.toBarBeatTick(song.sectionStart(section)).bar + 1;
+    const bool change = !text.empty() && (text[0] == '+' || text[0] == '-');
+    std::int64_t number = 0;
+    const auto* first = text.data() + (change && text[0] == '+' ? 1 : 0);
+    const auto [ptr, ec] = std::from_chars(first, text.data() + text.size(), number);
+    if (text.empty() || ec != std::errc{} || ptr != text.data() + text.size())
+    {
+        return "A length is a number of bars, such as 8, or a change such as +2";
+    }
+    const auto wanted = change ? bars + number : number;
+    if (wanted < 1)
+    {
+        return "A section is at least a bar long";
+    }
+    if (wanted != bars)
+    {
+        edit((wanted > bars ? "Lengthen " : "Shorten ") + name + " to " + std::to_string(wanted) +
+                 (wanted == 1 ? " bar" : " bars"),
+             [&](core::Song& s) { s.resizeSection(section, wanted - bars); });
+    }
+    return std::nullopt;
+}
+
 void ArrangeView::edit(std::string title, const std::function<void(core::Song&)>& change)
 {
     document_.edit(std::move(title), place(), change);
@@ -490,6 +563,14 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     if (command == "zoom-reset")
     {
         page_.resetZoom();
+        return true;
+    }
+    if (command == "inspector-edit")
+    {
+        if (editor_.open(inspection()))
+        {
+            host_.startTyping();
+        }
         return true;
     }
     if (command == "event-delete" || command == "yank-this")
@@ -677,11 +758,17 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     result.fields.push_back({"Position", positionText(m, start)});
     result.fields.push_back(
         {.heading = "Time", .value = songTime(song.tempo().toTime(start)), .aside = true});
-    result.fields.push_back({"Section", song.sections()[section]->name()});
+    result.fields.push_back({.heading = "Section",
+                             .value = song.sections()[section]->name(),
+                             .editable = true,
+                             .editText = song.sections()[section]->name()});
     result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
     result.fields.push_back(
-        {"Length", std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") +
-                       songTime(song.tempo().toTime(end) - song.tempo().toTime(start))});
+        {.heading = "Length",
+         .value = std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") +
+                  songTime(song.tempo().toTime(end) - song.tempo().toTime(start)),
+         .editable = true,
+         .editText = std::to_string(bars)});
     result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     return result;
 }
@@ -727,7 +814,8 @@ void ArrangeView::addRegions(Frame& frame) const
                                    width_, cell_));
     const auto last = std::max<core::Tick>(document_.song().end() - 1, 0);
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
-                                    static_cast<int>(positionText(meter(), last).size())));
+                                    static_cast<int>(positionText(meter(), last).size()),
+                                    &editor_));
 }
 
 std::string ArrangeView::position(core::Tick tick) const

@@ -751,3 +751,36 @@ TEST_CASE("bars on every track are refused where a track's own bars wouldn't lin
     CHECK(a.document.song() == before);
     CHECK_FALSE(a.document.modified());
 }
+
+TEST_CASE("e edits the section's name and length in the inspector on the strip")
+{
+    Strip s;
+    const auto& song = s.document.song();
+    const auto& editor = s.ws.arrangement().inspectorEditor();
+    s.type(U"e"); // on a track
+    CHECK(s.ws.message() == "Nothing to edit in a bar here; e edits a note in the piano roll, "
+                            "or a section on the section strip");
+    CHECK_FALSE(editor.active());
+
+    s.type(U"gsle"); // B, three bars
+    REQUIRE(editor.active());
+    CHECK(editor.heading() == "Section");
+    CHECK(editor.line().text() == U"B");
+    s.type(U"Bridge");
+    s.press(Key::of(NamedKey::Tab));
+    CHECK(s.names() == std::vector<std::string>{"A", "Bridge", "C"});
+    CHECK(editor.heading() == "Length");
+    CHECK(editor.line().text() == U"3");
+    s.press(Key::of(NamedKey::Up)); // a bar longer, straight away
+    CHECK(song.sectionStart(2) == 6 * kBar);
+    s.type(U"x");
+    s.press(Key::of(NamedKey::Enter));
+    CHECK(s.ws.message() == "A length is a number of bars, such as 8, or a change such as +2");
+    s.press(Key::of(NamedKey::Backspace));
+    s.type(U"-3");
+    s.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(editor.active());
+    CHECK(song.sectionStart(2) == 3 * kBar);
+    s.type(U"u");
+    CHECK(s.ws.message() == "Undid: Shorten Bridge to 1 bar");
+}

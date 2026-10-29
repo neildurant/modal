@@ -38,7 +38,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the event list. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow).
 
-Above the tracks is the section strip: `gs` (or `k` from the first track) goes to it, and `j` back. There `h` `l` go between sections; `x` and `Y` delete and yank a section, `d` and `y` with `h` `l` or `gg` `G` several, and `p` and `P` put them after or before; `Alt-h` `Alt-l` move one; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert a new one; `c` renames it; and Enter plays from it. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
+Above the tracks is the section strip: `gs` (or `k` from the first track) goes to it, and `j` back. There `h` `l` go between sections; `x` and `Y` delete and yank a section, `d` and `y` with `h` `l` or `gg` `G` several, and `p` and `P` put them after or before; `Alt-h` `Alt-l` move one; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert a new one; `c` renames it; `e` edits its name and length in the inspector; and Enter plays from it. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
 
 ### The event list
 
@@ -55,6 +55,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
 | `x` `Y`, `p` | Delete or yank this event; put what was yanked or deleted at the cursor's time, or bars at the start of the cursor's bar |
 | Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
+| `e` | Edit the event's fields in the inspector: Tab and Shift-Tab go between them, Enter sets one and Escape leaves it |
 | `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
 | `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
