@@ -36,7 +36,7 @@ constexpr std::array<Section, kSections> kSongSections{{
     {"Chorus", 12, {4, 4}},
     {nullptr, 1, {2, 4}},
     {"Bridge", 8, {3, 4}},
-    {"Chorus", 12, {4, 4}},
+    {"Chorus 2", 12, {4, 4}},
     {"Outro", 6, {5, 4}},
 }};
 

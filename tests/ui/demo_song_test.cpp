@@ -31,8 +31,8 @@ TEST_CASE("the demo song has sections in several meters, on most tracks")
 
     // Six sections, the first chorus ending in the extra bar; the second chorus is numbered.
     REQUIRE(song.sections().size() == 6);
-    const std::array<std::string, 6> names{"Intro",  "Verse",      "Chorus",
-                                           "Bridge", "Chorus (2)", "Outro"};
+    const std::array<std::string, 6> names{"Intro",  "Verse",    "Chorus",
+                                           "Bridge", "Chorus 2", "Outro"};
     for (std::size_t i = 0; i < names.size(); ++i)
     {
         CHECK(song.sections()[i]->name() == names[i]);
