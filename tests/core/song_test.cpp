@@ -328,8 +328,8 @@ TEST_CASE("splitting a section")
         song.splitSection(6 * bar, "Chorus");
         REQUIRE(song.sections().size() == 4);
         CHECK(song.sections()[1]->name() == "Chorus");
-        CHECK(song.sections()[2]->name() == "Chorus 2");
-        CHECK(song.sections()[3]->name() == "Chorus 3");
+        CHECK(song.sections()[2]->name() == "Chorus (2)");
+        CHECK(song.sections()[3]->name() == "Chorus (3)");
     }
 
     SECTION("renaming")
@@ -340,7 +340,7 @@ TEST_CASE("splitting a section")
         CHECK(song.renameSection(0, "Intro")); // its own name isn't taken
         CHECK(song.sections()[0]->name() == "Intro");
         CHECK(song.renameSection(0, "Verse"));
-        CHECK(song.sections()[0]->name() == "Verse 2");
+        CHECK(song.sections()[0]->name() == "Verse (2)");
         CHECK_FALSE(song.renameSection(2, "None"));
     }
 
@@ -374,7 +374,7 @@ TEST_CASE("markers")
     song.setMarker(2 * bar, "Verse");
     song.setMarker(9 * bar, "Verse");
     CHECK(song.markers()[0] == Marker{2 * bar, "Verse"});
-    CHECK(song.markers()[2] == Marker{9 * bar, "Verse 2"});
+    CHECK(song.markers()[2] == Marker{9 * bar, "Verse (2)"});
 
     CHECK(song.removeMarker(8 * bar));
     CHECK_FALSE(song.removeMarker(8 * bar));

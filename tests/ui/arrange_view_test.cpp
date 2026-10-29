@@ -501,14 +501,14 @@ TEST_CASE("sections are deleted, yanked and put like lines")
     s.type(U"Y");
     CHECK(s.ws.message() == "B yanked");
     s.type(U"$p");
-    CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B 2"});
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B (2)"});
     CHECK(s.strip() == 3u);
     s.type(U"0P");
-    CHECK(s.names() == std::vector<std::string>{"B 3", "A", "B", "C", "B 2"});
+    CHECK(s.names() == std::vector<std::string>{"B (3)", "A", "B", "C", "B (2)"});
 
     // d with a motion: this section and the next.
     s.type(U"d2l");
-    CHECK(s.names() == std::vector<std::string>{"B", "C", "B 2"});
+    CHECK(s.names() == std::vector<std::string>{"B", "C", "B (2)"});
     // A song keeps at least one section.
     s.type(U"dG");
     CHECK(s.ws.message() == "A song keeps at least one section");
@@ -698,14 +698,16 @@ TEST_CASE(":bar-delete takes bars out of every track, keeping them in the regist
     CHECK(song.sectionStart(1) == song.meter().barStart(4));
     CHECK(song.sections().size() == 2);
     REQUIRE(a.ws.registerArea().sections.size() == 1);
-    CHECK(a.ws.registerArea().sections[0]->name() == "Section 1");
+    CHECK(a.ws.registerArea().sections[0]->name() == "From Section 1");
 
     // Put back as a section of its own, from the strip.
     a.type(U"gs$p");
     REQUIRE(song.sections().size() == 3);
-    CHECK(song.sections()[2]->name() == "Section 1 2");
+    CHECK(song.sections()[2]->name() == "From Section 1");
     CHECK(notesByBar(a, 0).back() == std::pair<std::int64_t, int>{8, 62});
-    a.type(U"uu");
+    a.type(U"p"); // another copy, numbered
+    CHECK(song.sections()[3]->name() == "From Section 1 (2)");
+    a.type(U"uuu");
     CHECK(notesByBar(a, 0) == before);
     CHECK(a.ws.message() == "Undid: Delete bar 2 on every track");
 

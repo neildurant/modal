@@ -95,10 +95,10 @@ TEST_CASE("inserted copies of sections keep what's in them, numbered if their na
     Sections s{MODAL_ANY_PPQN()};
     const std::vector chorus{s.song.sections()[1]};
     CHECK(s.song.insertSections(3, chorus));
-    CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B 2"});
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C", "B (2)"});
     CHECK(s.pitches() == std::vector<int>{40, 41, 42, 43, 44, 45, 46, 47, 42, 43, 44});
     CHECK(s.song.insertSections(0, chorus));
-    CHECK(s.names().front() == "B 3");
+    CHECK(s.names().front() == "B (3)");
     CHECK(s.pitches().front() == 42);
 }
 
@@ -177,9 +177,9 @@ TEST_CASE("removing bars on every track closes up after them, each section stayi
         CHECK(s.pitches() == std::vector<int>{40, 41, 42, 44, 45, 46, 47});
         CHECK(s.song.sectionStart(2) == 4 * bar);
         CHECK(s.song.end() == 7 * bar);
-        // What went, as a section named as the one it came from.
+        // What went, as a section named after the one it came from.
         REQUIRE(edit.removed.size() == 1);
-        CHECK(edit.removed[0]->name() == "B");
+        CHECK(edit.removed[0]->name() == "From B");
         CHECK(edit.removed[0]->length() == bar);
         REQUIRE(edit.removed[0]->content(s.track) != nullptr);
         CHECK(std::get<Note>(edit.removed[0]->content(s.track)->events[0].data).pitch == 43);
@@ -198,8 +198,8 @@ TEST_CASE("removing bars on every track closes up after them, each section stayi
         CHECK(s.pitches() == std::vector<int>{40, 41, 42, 43, 46, 47});
         CHECK(s.song.sectionStart(2) == 4 * bar);
         REQUIRE(edit.removed.size() == 2);
-        CHECK(edit.removed[0]->name() == "B");
-        CHECK(edit.removed[1]->name() == "C");
+        CHECK(edit.removed[0]->name() == "From B");
+        CHECK(edit.removed[1]->name() == "From C");
         CHECK(s.song.removeBars(0, 2).done); // all of A
         CHECK(s.names() == std::vector<std::string>{"B", "C"});
     }

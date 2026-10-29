@@ -79,6 +79,13 @@ Tick endOf(const Event& event)
     return event.tick + (note ? std::max(note->duration, Tick{1}) : Tick{1});
 }
 
+// A name made unique by a number after it, in brackets, as Windows numbers copies of a file
+// (decided October 2026): the second with it is "Chorus (2)".
+std::string numbered(const std::string& name, int n)
+{
+    return name + " (" + std::to_string(n) + ")";
+}
+
 Tempo tempoAt(std::span<const TempoChange> changes, Tick tick)
 {
     const auto it = std::ranges::upper_bound(changes, tick, {}, &TempoChange::tick);
@@ -540,7 +547,7 @@ bool Song::joinSections(std::size_t index)
              std::ranges::find(joined->markers_, name, &Marker::name) != joined->markers_.end();
              ++n)
         {
-            name = marker.name + " " + std::to_string(n);
+            name = numbered(marker.name, n);
         }
         joined->markers_.push_back({at + marker.tick, std::move(name)});
     }
@@ -619,7 +626,7 @@ Song::BarsEdit Song::removeBars(Tick from, std::int64_t count)
     for (std::size_t i = 0; i < cuts; ++i)
     {
         auto piece = std::make_shared<Section>(*edited.sections_[firstCut + i]);
-        piece->name_ = sections_[sectionAt(edited.starts_[firstCut + i])]->name_;
+        piece->name_ = "From " + sections_[sectionAt(edited.starts_[firstCut + i])]->name_;
         result.removed.push_back(std::move(piece));
     }
     edited.removeSections(firstCut, cuts);
@@ -884,7 +891,7 @@ void Song::setMarker(Tick tick, std::string name)
                                         { return marker.name == unique && marker.tick != at; });
          ++n)
     {
-        unique = name + " " + std::to_string(n);
+        unique = numbered(name, n);
     }
 
     const auto it = std::ranges::lower_bound(markers, at, {}, &Marker::tick);
@@ -1073,7 +1080,7 @@ std::string Song::uniqueSectionName(std::string name, std::optional<std::size_t>
     std::string unique = name;
     for (int n = 2; taken(unique); ++n)
     {
-        unique = name + " " + std::to_string(n);
+        unique = numbered(name, n);
     }
     return unique;
 }

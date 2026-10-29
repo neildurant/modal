@@ -211,8 +211,8 @@ public:
 
     // Removes bars of the conductor's, as far as the song's end, with everything starting in
     // them: tempo and meter changes, markers, and every track's events and meter, what's after
-    // closing up. What went comes back as sections, named as those it was taken from. Not done
-    // if it would leave no bars, the tick isn't a bar line, or a track's own bars don't line
+    // closing up. What went comes back as sections, named "From" and those it was taken from. Not
+    // done if it would leave no bars, the tick isn't a bar line, or a track's own bars don't line
     // up with them.
     BarsEdit removeBars(Tick from, std::int64_t count);
 
