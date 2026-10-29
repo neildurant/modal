@@ -199,6 +199,29 @@ public:
     // in the other part. Returns whether there was one after to join.
     bool joinSections(std::size_t index);
 
+    // Bars on every track (decided October 2026), from a bar line of the conductor's, as
+    // :bar-delete and :bar-insert make them, each section staying one section. What an edit
+    // did, or why it couldn't, leaving the song as it was.
+    struct BarsEdit
+    {
+        bool done = false;
+        std::optional<TrackId> misaligned; // a track with a meter of its own whose bars it cuts
+        std::vector<std::shared_ptr<const Section>> removed; // what removeBars took out
+    };
+
+    // Removes bars of the conductor's, as far as the song's end, with everything starting in
+    // them: tempo and meter changes, markers, and every track's events and meter, what's after
+    // closing up. What went comes back as sections, named as those it was taken from. Not done
+    // if it would leave no bars, the tick isn't a bar line, or a track's own bars don't line
+    // up with them.
+    BarsEdit removeBars(Tick from, std::int64_t count);
+
+    // Inserts empty bars before a bar line of the conductor's, in the section there, in a meter
+    // given or the one there and at the tempo there, the meter after them going on as before.
+    // A track with a meter of its own keeps it through them, so they must be whole bars of it.
+    BarsEdit insertBars(Tick at, std::int64_t count,
+                        std::optional<TimeSignature> signature = std::nullopt);
+
     // Sets the last section to the fewest whole bars, at least one, that hold everything in
     // it, including the ends of notes.
     void fitToContent();

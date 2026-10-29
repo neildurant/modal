@@ -163,3 +163,162 @@ TEST_CASE("joining a section with the next makes one of both, with everything wh
     CHECK(s.song.meter(lead).signatureAt(2 * bar) == TimeSignature{3, 4});
     CHECK_FALSE(s.song.joinSections(1)); // the last has none after it
 }
+
+TEST_CASE("removing bars on every track closes up after them, each section staying one")
+{
+    Sections s{MODAL_ANY_PPQN()};
+    const auto bar = s.bar;
+
+    SECTION("inside a section, which is joined up again")
+    {
+        const auto edit = s.song.removeBars(3 * bar, 1); // bar 4, in B
+        CHECK(edit.done);
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+        CHECK(s.pitches() == std::vector<int>{40, 41, 42, 44, 45, 46, 47});
+        CHECK(s.song.sectionStart(2) == 4 * bar);
+        CHECK(s.song.end() == 7 * bar);
+        // What went, as a section named as the one it came from.
+        REQUIRE(edit.removed.size() == 1);
+        CHECK(edit.removed[0]->name() == "B");
+        CHECK(edit.removed[0]->length() == bar);
+        REQUIRE(edit.removed[0]->content(s.track) != nullptr);
+        CHECK(std::get<Note>(edit.removed[0]->content(s.track)->events[0].data).pitch == 43);
+    }
+    SECTION("at a section's start, which keeps its name")
+    {
+        CHECK(s.song.removeBars(2 * bar, 2).done); // bars 3 and 4, B's first two
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+        CHECK(s.pitches() == std::vector<int>{40, 41, 44, 45, 46, 47});
+        CHECK(s.song.sectionStart(2) == 3 * bar);
+    }
+    SECTION("across sections, and whole ones")
+    {
+        const auto edit = s.song.removeBars(4 * bar, 2); // B's last bar and C's first
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+        CHECK(s.pitches() == std::vector<int>{40, 41, 42, 43, 46, 47});
+        CHECK(s.song.sectionStart(2) == 4 * bar);
+        REQUIRE(edit.removed.size() == 2);
+        CHECK(edit.removed[0]->name() == "B");
+        CHECK(edit.removed[1]->name() == "C");
+        CHECK(s.song.removeBars(0, 2).done); // all of A
+        CHECK(s.names() == std::vector<std::string>{"B", "C"});
+    }
+    SECTION("as far as the song's end, but never all of it, and only from a bar line")
+    {
+        CHECK(s.song.removeBars(7 * bar, 5).done);
+        CHECK(s.song.end() == 7 * bar);
+        const auto before = s.song;
+        CHECK_FALSE(s.song.removeBars(0, 7).done);
+        CHECK_FALSE(s.song.removeBars(bar / 2, 1).done);
+        CHECK_FALSE(s.song.removeBars(0, 0).done);
+        CHECK(s.song == before);
+    }
+}
+
+TEST_CASE("removing bars takes the tempo and meter changes and markers in them")
+{
+    Sections s{MODAL_ANY_PPQN()};
+    const auto bar = s.bar;
+    const auto q = bar / 4;
+    s.song.updateTempo(
+        [&](TempoMap& tempo)
+        {
+            tempo.set(3 * bar + q, Tempo{400'000}); // in bar 4
+            tempo.set(4 * bar, Tempo{450'000});     // bar 5's start
+        });
+    s.song.setMarker(3 * bar, "gone");
+    s.song.setMarker(4 * bar + q, "kept");
+    s.song.removeBars(3 * bar, 1);
+    const auto changes = s.song.tempo().changes();
+    REQUIRE(changes.size() == 2);
+    CHECK(changes[1].tick == 3 * bar);
+    CHECK(changes[1].tempo == Tempo{450'000});
+    REQUIRE(s.song.markers().size() == 1);
+    CHECK(s.song.markers()[0].name == "kept");
+    CHECK(s.song.markers()[0].tick == 3 * bar + q);
+
+    // A bar of 3/4 taken out, the meter after it goes on: here A's last bar, left a 1/4
+    // remainder by the change.
+    s.song.updateMeter(
+        [&](MeterMap& meter)
+        {
+            meter.set(bar, TimeSignature{3, 4});
+            meter.set(bar + 3 * q, TimeSignature{4, 4});
+        });
+    const auto end = s.song.end();
+    CHECK(s.song.removeBars(bar, 1).done);
+    CHECK(s.song.end() == end - 3 * q);
+    CHECK(s.song.meter().signatureAt(bar) != TimeSignature{3, 4});
+    CHECK(s.song.sectionStart(1) == bar + q);
+}
+
+TEST_CASE("bars on every track have to line up with the bars of tracks with their own meter")
+{
+    Sections s{MODAL_ANY_PPQN()};
+    const auto bar = s.bar;
+    const auto q = bar / 4;
+    const auto lead = s.song.addTrack("Lead");
+    // In B, from bar 3, the lead is in 3/4, whose bars meet the conductor's every three bars.
+    s.song.updateMeter(lead, [&](MeterMap& meter) { meter.set(2 * bar, TimeSignature{3, 4}); });
+    const auto before = s.song;
+
+    auto edit = s.song.removeBars(2 * bar, 1);
+    CHECK_FALSE(edit.done);
+    CHECK(edit.misaligned == lead);
+    CHECK(s.song == before);
+    edit = s.song.insertBars(3 * bar, 1);
+    CHECK_FALSE(edit.done);
+    CHECK(edit.misaligned == lead);
+    CHECK(s.song == before);
+
+    // Three bars of 4/4 are four of 3/4, so they go in, the lead keeping its 3/4 through them.
+    CHECK(s.song.insertBars(2 * bar, 3).done);
+    CHECK(s.song.meter(lead).signatureAt(2 * bar) == TimeSignature{3, 4});
+    CHECK(s.song.meter(lead).signatureAt(5 * bar + q) == TimeSignature{3, 4});
+    CHECK(s.song.removeBars(2 * bar, 3).done);
+    CHECK(s.song == before);
+
+    // A meter that lines up, 2/4 under 4/4, never stands in the way.
+    s.song.updateMeter(lead, [&](MeterMap& meter) { meter.set(2 * bar, TimeSignature{2, 4}); });
+    CHECK(s.song.removeBars(3 * bar, 1).done);
+}
+
+TEST_CASE("inserting empty bars on every track moves what's after them on, in the section there")
+{
+    Sections s{MODAL_ANY_PPQN()};
+    const auto bar = s.bar;
+    const auto q = bar / 4;
+
+    SECTION("inside a section")
+    {
+        CHECK(s.song.insertBars(3 * bar, 2).done); // before bar 4, in B
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+        CHECK(s.pitches() == std::vector<int>{40, 41, 42, 43, 44, 45, 46, 47});
+        CHECK(s.song.events(s.track)[3].tick == 5 * bar);
+        CHECK(s.song.sectionStart(2) == 7 * bar);
+        CHECK(s.song.end() == 10 * bar);
+    }
+    SECTION("at a section's start, into that section")
+    {
+        CHECK(s.song.insertBars(2 * bar, 1).done);
+        CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+        CHECK(s.song.sectionStart(1) == 2 * bar);
+        CHECK(s.song.sectionStart(2) == 6 * bar);
+        CHECK(s.song.events(s.track)[2].tick == 3 * bar);
+    }
+    SECTION("in a meter given, the meter after going on as before")
+    {
+        CHECK(s.song.insertBars(3 * bar, 1, TimeSignature{3, 4}).done);
+        CHECK(s.song.meter().signatureAt(3 * bar) == TimeSignature{3, 4});
+        CHECK(s.song.meter().signatureAt(3 * bar + 3 * q) == TimeSignature{4, 4});
+        CHECK(s.song.events(s.track)[3].tick == 3 * bar + 3 * q);
+    }
+    SECTION("only before a bar line in the song")
+    {
+        const auto before = s.song;
+        CHECK_FALSE(s.song.insertBars(q, 1).done);
+        CHECK_FALSE(s.song.insertBars(s.song.end(), 1).done);
+        CHECK_FALSE(s.song.insertBars(0, 0).done);
+        CHECK(s.song == before);
+    }
+}

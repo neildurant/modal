@@ -585,6 +585,119 @@ bool Song::joinSections(std::size_t index)
     return true;
 }
 
+Song::BarsEdit Song::removeBars(Tick from, std::int64_t count)
+{
+    BarsEdit result;
+    if (count < 1 || from < 0 || from >= end() || !onBarLine(meter_, from))
+    {
+        return result;
+    }
+    const Tick to = std::min(meter_.barStart(meter_.toBarBeatTick(from).bar + count), end());
+    if (from == 0 && to == end())
+    {
+        return result; // a song keeps a bar
+    }
+    // The bars cut out as sections of their own, then removed, and the section they were cut
+    // from joined up again.
+    const auto first = sectionAt(from);
+    const auto last = sectionAt(to - 1);
+    Song edited = *this;
+    for (const Tick tick : {from, to})
+    {
+        if (tick < edited.end() && edited.starts_[edited.sectionAt(tick)] != tick)
+        {
+            const auto split = edited.splitSection(tick, sections_[sectionAt(tick)]->name_);
+            if (!split || !split->tracks.empty())
+            {
+                result.misaligned = split ? std::optional{split->tracks.front()} : std::nullopt;
+                return result;
+            }
+        }
+    }
+    const auto firstCut = edited.sectionAt(from);
+    const auto cuts = edited.sectionAt(to - 1) - firstCut + 1;
+    for (std::size_t i = 0; i < cuts; ++i)
+    {
+        auto piece = std::make_shared<Section>(*edited.sections_[firstCut + i]);
+        piece->name_ = sections_[sectionAt(edited.starts_[firstCut + i])]->name_;
+        result.removed.push_back(std::move(piece));
+    }
+    edited.removeSections(firstCut, cuts);
+    const bool before = starts_[first] < from;
+    const bool after = to < starts_[last] + sections_[last]->length_;
+    if (before && after && first == last)
+    {
+        edited.joinSections(firstCut - 1);
+    }
+    else if (after)
+    {
+        // What's left of the last section, under its own name again.
+        auto rest = std::make_shared<Section>(*edited.sections_[firstCut]);
+        rest->name_ = sections_[last]->name_;
+        rest->colour_ = sections_[last]->colour_;
+        edited.replaceSection(firstCut, std::move(rest));
+    }
+    *this = std::move(edited);
+    result.done = true;
+    return result;
+}
+
+Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeSignature> signature)
+{
+    BarsEdit result;
+    if (count < 1 || at < 0 || at >= end() || !onBarLine(meter_, at))
+    {
+        return result;
+    }
+    const auto index = sectionAt(at);
+    const Section& old = *sections_[index];
+    const Tick offset = at - starts_[index];
+    const MeterMap meter{ppqn(), signature.value_or(old.meter_.signatureAt(offset))};
+    auto added = std::make_shared<Section>(old.name_, meter.barStart(count + 1), meter,
+                                           tempoAt(old.tempo_, offset));
+    for (const auto& [id, content] : old.content_)
+    {
+        if (content->meter)
+        {
+            const MeterMap own{ppqn(), content->meter->signatureAt(offset)};
+            if (!onBarLine(own, added->length_))
+            {
+                result.misaligned = id;
+                return result;
+            }
+            added->content_.emplace(
+                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}}));
+        }
+    }
+    Song edited = *this;
+    if (offset > 0)
+    {
+        const auto split = edited.splitSection(at, old.name_);
+        if (!split || !split->tracks.empty())
+        {
+            result.misaligned = split ? std::optional{split->tracks.front()} : std::nullopt;
+            return result;
+        }
+    }
+    const auto place = offset > 0 ? index + 1 : index;
+    edited.sections_.insert(edited.sections_.begin() + static_cast<std::ptrdiff_t>(place),
+                            std::move(added));
+    edited.rebuildAll();
+    edited.joinSections(index);
+    if (offset > 0)
+    {
+        edited.joinSections(index);
+    }
+    // Under the section's own name and colour, which the bars went into.
+    auto joined = std::make_shared<Section>(*edited.sections_[index]);
+    joined->name_ = old.name_;
+    joined->colour_ = old.colour_;
+    edited.replaceSection(index, std::move(joined));
+    *this = std::move(edited);
+    result.done = true;
+    return result;
+}
+
 bool Song::renameSection(std::size_t index, std::string name)
 {
     if (index >= sections_.size())
