@@ -146,7 +146,9 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         else
         {
             cut(text);
-            region.text.push_back({x(at), top + cell.height, text, value});
+            // Bright where e can edit it, dim where it can't (decided October 2026).
+            region.text.push_back(
+                {x(at), top + cell.height, text, field.editable ? value : heading});
         }
         at += wide + 3;
     }
