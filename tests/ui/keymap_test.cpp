@@ -176,3 +176,28 @@ TEST_CASE("digits are a count only in the modes with counts, not in Insert or th
     CHECK(type(dispatcher, keymap, "2", 0, Mode::Insert) == Actions{});
     CHECK(dispatcher.pending().empty());
 }
+
+TEST_CASE("the leader setting's key stands for <leader> in bindings, in the modes with keys")
+{
+    Keymap keymap;
+    REQUIRE(keymap.bind(Mode::Normal, "<leader>ta", {"toggle", ""}).empty());
+    REQUIRE(keymap.bind(Mode::CommandLine, ",", {"comma", ""}).empty());
+    CHECK(formatKeys(std::get<std::vector<Key>>(parseKeys("<Leader>ta"))) == "<leader>ta");
+    KeyDispatcher dispatcher;
+    CHECK(type(dispatcher, keymap, ",ta") == std::vector<Action>{{"toggle", 0}});
+    dispatcher.setLeader(Key::typed(U'\\'));
+    CHECK(type(dispatcher, keymap, ",ta").empty());
+    CHECK(type(dispatcher, keymap, "\\ta") == std::vector<Action>{{"toggle", 0}});
+    dispatcher.setLeader(Key::typed(U','));
+    CHECK(type(dispatcher, keymap, ",", 0, Mode::CommandLine) == std::vector<Action>{{"comma", 0}});
+}
+
+TEST_CASE("keys that start longer bindings can have a title, for the hint menu")
+{
+    Keymap keymap;
+    const auto keys = std::get<std::vector<Key>>(parseKeys("<leader>t"));
+    keymap.group(Mode::Normal, keys, "Toggles");
+    CHECK(keymap.groupTitle(Mode::Normal, keys) == "Toggles");
+    CHECK(keymap.groupTitle(Mode::Visual, keys).empty());
+    CHECK(keymap.groups(Mode::Normal).size() == 1);
+}

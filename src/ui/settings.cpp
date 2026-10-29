@@ -84,6 +84,18 @@ Settings::Settings()
                   "How long to wait, in milliseconds, after keys that are a binding and also "
                   "start a longer one, before running the shorter",
                   kDefaultTimeout, 0, 10000),
+          setting("leader",
+                  "The leader key, which <leader> stands for in key bindings: one key, such as , "
+                  "or <Space>",
+                  std::string{","}),
+          setting("hints",
+                  "Whether the hint menu shows, after a pause, the keys that can follow those "
+                  "typed",
+                  true),
+          setting("hintdelay",
+                  "How long to wait, in milliseconds, after keys that start longer bindings, "
+                  "before the hint menu shows what can follow",
+                  std::int64_t{400}, 0, 10000),
           setting("chordwindow",
                   "How far apart, in milliseconds, events can start and still be one chord, "
                   "as a chord's notes played a little apart are",

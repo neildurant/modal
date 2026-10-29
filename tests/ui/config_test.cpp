@@ -112,6 +112,17 @@ TEST_CASE("map commands unbind keys too")
     CHECK(reader.errors() == std::vector<ConfigError>{{"modalrc", 3, "no binding of J"}});
 }
 
+TEST_CASE("group commands give keys that start longer bindings a title")
+{
+    Config config;
+    ConfigReader reader{config, kRegistry};
+    reader.runText("ngroup <leader>t \"Toggles\"\nngroup g\nngroup <Nope> x\n", "modalrc", {});
+    CHECK(config.keymap.groupTitle(
+              Mode::Normal, std::vector{Key::of(NamedKey::Leader), Key::typed(U't')}) == "Toggles");
+    REQUIRE(reader.errors().size() == 2);
+    CHECK(reader.errors()[0].message == "ngroup needs KEYS \"TITLE\"");
+}
+
 TEST_CASE("a command that fails is reported with its line, and the rest still run")
 {
     Config config;
@@ -308,7 +319,8 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
         const auto end = text.find('\n', start);
         auto line = text.substr(start, end - start);
         start = end + 1;
-        for (const auto* command : {"\"set ", "\"nmap ", "\"omap ", "\"cmap ", "\"highlight "})
+        for (const auto* command :
+             {"\"set ", "\"nmap ", "\"omap ", "\"cmap ", "\"ngroup ", "\"highlight "})
         {
             if (line.starts_with(command))
             {

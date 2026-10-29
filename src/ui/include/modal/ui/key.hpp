@@ -50,6 +50,9 @@ enum class NamedKey : std::uint8_t
     Keypad7,
     Keypad8,
     Keypad9,
+    // The leader key in bindings, <leader>, standing for the key the leader setting names, so
+    // bindings follow it when it changes (decided October 2026).
+    Leader,
 };
 
 // Modifier keys held with a key, which combine.

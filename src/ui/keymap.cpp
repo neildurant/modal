@@ -54,6 +54,24 @@ std::vector<std::pair<std::vector<Key>, Binding>> Keymap::bindings(Mode mode) co
     return {bindings.begin(), bindings.end()};
 }
 
+void Keymap::group(Mode mode, std::vector<Key> keys, std::string title)
+{
+    groups_[static_cast<std::size_t>(mode)].insert_or_assign(std::move(keys), std::move(title));
+}
+
+std::string Keymap::groupTitle(Mode mode, std::span<const Key> keys) const
+{
+    const auto& groups = groups_[static_cast<std::size_t>(mode)];
+    const auto it = groups.find(std::vector<Key>{keys.begin(), keys.end()});
+    return it == groups.end() ? std::string{} : it->second;
+}
+
+std::vector<std::pair<std::vector<Key>, std::string>> Keymap::groups(Mode mode) const
+{
+    const auto& groups = groups_[static_cast<std::size_t>(mode)];
+    return {groups.begin(), groups.end()};
+}
+
 Keymap::Match Keymap::match(Mode mode, std::span<const Key> keys) const
 {
     const auto& bindings = modes_[static_cast<std::size_t>(mode)];
@@ -83,9 +101,13 @@ void KeyDispatcher::clear()
     deadline_.reset();
 }
 
-std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Key& key,
+std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Key& typed,
                                        std::int64_t now)
 {
+    // The leader setting's key is <leader> in bindings, where keys are mapped to commands.
+    const bool leads =
+        mode == Mode::Normal || mode == Mode::Visual || mode == Mode::OperatorPending;
+    const auto key = leads && typed == leader_ ? Key::of(NamedKey::Leader) : typed;
     if (key == Key::of(NamedKey::Escape) && (count_ > 0 || !keys_.empty()))
     {
         clear();
@@ -135,7 +157,7 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
         actions.push_back({binding->command, count_});
     }
     clear();
-    auto more = this->key(keymap, mode, key, now);
+    auto more = this->key(keymap, mode, typed, now);
     actions.insert(actions.end(), more.begin(), more.end());
     return actions;
 }

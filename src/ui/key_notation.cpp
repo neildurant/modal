@@ -21,7 +21,8 @@ struct KeyName
 };
 
 // The names keys are written with, first, then other names read for them.
-constexpr std::array<KeyName, 43> kKeyNames{{
+constexpr std::array<KeyName, 44> kKeyNames{{
+    {"leader", NamedKey::Leader},
     {"Esc", NamedKey::Escape},
     {"Tab", NamedKey::Tab},
     {"CR", NamedKey::Enter},

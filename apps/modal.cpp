@@ -17,6 +17,7 @@
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/key.hpp>
+#include <modal/ui/key_notation.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -361,6 +362,19 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
+    {
+        // One key, which <leader> in the bindings stands for.
+        const auto leader = ui::parseKeys(settings.text("leader"));
+        const auto* keys = std::get_if<std::vector<ui::Key>>(&leader);
+        if (keys != nullptr && keys->size() == 1 && keys->front().named != ui::NamedKey::Leader)
+        {
+            view.setLeader(keys->front());
+        }
+        else if (error.empty())
+        {
+            error = "leader is one key, such as , or <Space>";
+        }
+    }
     view.eventList().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.pianoRoll().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.pianoRoll().setNudge(std::chrono::milliseconds{settings.integer("nudge")});

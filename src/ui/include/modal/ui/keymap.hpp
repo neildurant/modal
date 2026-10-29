@@ -62,6 +62,12 @@ public:
     // A mode's bindings, in the order of their keys.
     std::vector<std::pair<std::vector<Key>, Binding>> bindings(Mode mode) const;
 
+    // A title for keys that start longer bindings, which the hint menu shows for them
+    // ("Toggles" for <leader>t), and a mode's titles, in the order of their keys.
+    void group(Mode mode, std::vector<Key> keys, std::string title);
+    std::string groupTitle(Mode mode, std::span<const Key> keys) const;
+    std::vector<std::pair<std::vector<Key>, std::string>> groups(Mode mode) const;
+
     friend bool operator==(const Keymap&, const Keymap&) = default;
 
 private:
@@ -70,8 +76,10 @@ private:
         bool operator()(const std::vector<Key>& a, const std::vector<Key>& b) const;
     };
     using Bindings = std::map<std::vector<Key>, Binding, KeysLess>;
+    using Groups = std::map<std::vector<Key>, std::string, KeysLess>;
 
     std::array<Bindings, kModeCount> modes_;
+    std::array<Groups, kModeCount> groups_;
 };
 
 // A command to run, with the count typed before its keys, or 0 if none was.
@@ -111,6 +119,10 @@ public:
 
     void setTimeout(std::int64_t timeout) { timeout_ = timeout; }
 
+    // The key that stands for <leader> in bindings, in Normal, Visual and operator-pending
+    // mode: comma at first.
+    void setLeader(const Key& leader) { leader_ = leader; }
+
     // The count and keys typed so far, for the status line, such as "3g"; empty if none.
     std::string pending() const;
 
@@ -118,6 +130,7 @@ private:
     void clear();
 
     std::int64_t timeout_;
+    Key leader_ = Key::typed(U',');
     Mode mode_ = Mode::Normal; // the mode the waiting keys were typed in
     int count_ = 0;
     std::vector<Key> keys_;

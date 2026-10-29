@@ -84,6 +84,7 @@ public:
 
 private:
     std::string map(std::string_view command, const std::vector<std::string>& arguments);
+    std::string group(std::string_view command, const std::vector<std::string>& arguments);
     std::string source(const std::vector<std::string>& arguments,
                        const std::filesystem::path& directory);
     std::string useTheme(std::string name, const std::string& previous);

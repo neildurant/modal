@@ -175,7 +175,7 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
     // A map command's keys are taken as they are, since " is a key.
     const auto rest = line.substr(static_cast<std::size_t>(first - line.begin()));
     const auto commandName = rest.substr(0, rest.find_first_of(" \t"));
-    const bool mapping = commandName.ends_with("map");
+    const bool mapping = commandName.ends_with("map") || commandName.ends_with("group");
     auto split = ui::split(line, mapping ? 2 : 1);
     if (auto* error = std::get_if<std::string>(&split))
     {
@@ -233,6 +233,10 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
     {
         return map(command, arguments);
     }
+    if (command.size() == 6 && command.substr(1) == "group")
+    {
+        return group(command, arguments);
+    }
     if (commands_.find(command) != nullptr)
     {
         return command + " can't be used in a config file";
@@ -278,6 +282,26 @@ std::string ConfigReader::map(std::string_view command, const std::vector<std::s
     }
     config_.keymap.bind(it->mode, std::move(sequence),
                         {arguments[1], arguments.size() > 2 ? arguments[2] : std::string{}});
+    return {};
+}
+
+std::string ConfigReader::group(std::string_view command, const std::vector<std::string>& arguments)
+{
+    const auto it = std::ranges::find(kMapModes, command.front(), &MapCommand::prefix);
+    if (it == kMapModes.end())
+    {
+        return "unknown command \"" + std::string{command} + "\"";
+    }
+    if (arguments.size() != 2)
+    {
+        return std::string{command} + " needs KEYS \"TITLE\"";
+    }
+    auto keys = parseKeys(arguments[0]);
+    if (auto* error = std::get_if<std::string>(&keys))
+    {
+        return std::move(*error);
+    }
+    config_.keymap.group(it->mode, std::move(std::get<std::vector<Key>>(keys)), arguments[1]);
     return {};
 }
 
@@ -347,6 +371,16 @@ constexpr std::array kConfigCommands{
     configCommand("imap", "Bind keys to a command in Insert mode", kMapUsage),
     configCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage),
     configCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage),
+    configCommand("ngroup",
+                  "Give keys that start longer bindings a title in the hint menu, in "
+                  "Normal mode",
+                  "KEYS \"TITLE\""),
+    configCommand("vgroup", "Give keys a title in the hint menu, in Visual mode", "KEYS \"TITLE\""),
+    configCommand("igroup", "Give keys a title in the hint menu, in Insert mode", "KEYS \"TITLE\""),
+    configCommand("ogroup", "Give keys a title in the hint menu, in operator-pending mode",
+                  "KEYS \"TITLE\""),
+    configCommand("cgroup", "Give keys a title in the hint menu, in command-line mode",
+                  "KEYS \"TITLE\""),
     configCommand("nunmap", "Unbind keys in Normal mode", "KEYS"),
     configCommand("vunmap", "Unbind keys in Visual mode", "KEYS"),
     configCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
@@ -484,6 +518,15 @@ std::string keymapChanges(const Keymap& keymap, const Keymap& defaults)
                 text += std::string(1, prefix) + "unmap " + formatKeys(binding.first) + "\n";
             }
         }
+        const auto titles = defaults.groups(mode);
+        for (const auto& [keys, title] : keymap.groups(mode))
+        {
+            if (std::ranges::find(titles, std::pair{keys, title}) == titles.end())
+            {
+                text += std::string(1, prefix) + "group " + formatKeys(keys) + " " +
+                        quotedIfNeeded(title, true) + "\n";
+            }
+        }
     }
     return text;
 }
@@ -512,8 +555,9 @@ std::string configText(const Config& config, const CommandRegistry& commands,
 
     text +=
         "\" Key bindings: nmap KEYS COMMAND \"HINT\" binds keys in Normal mode, and nunmap KEYS\n"
-        "\" unbinds them; vmap, imap, omap and cmap are for the other modes. The built-in "
-        "ones:\n\n";
+        "\" unbinds them; vmap, imap, omap and cmap are for the other modes. <leader> is the key\n"
+        "\" the leader setting names. ngroup KEYS \"TITLE\" gives keys that start longer ones a\n"
+        "\" title in the hint menu. The built-in ones:\n\n";
     text += commentedOut(builtInModalrc());
     Config defaults;
     ConfigReader reader{defaults, commands};

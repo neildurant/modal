@@ -122,6 +122,7 @@ public:
 
     void setKeymap(Keymap keymap);
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
+    void setLeader(const Key& leader) { keys_.setLeader(leader); }
 
     // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
     // prompt, or while a view takes typing, as when editing a field in place.

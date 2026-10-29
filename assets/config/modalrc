@@ -49,7 +49,7 @@ nmap z<Left>    grid-finer                "Finer grid"
 nmap zl         grid-coarser              "Coarser grid"
 nmap z<Right>   grid-coarser              "Coarser grid"
 nmap <C-t>      grid-triplets             "Triplets on or off"
-nmap ,n         note-default              "Default note from this one"
+nmap <leader>n  note-default              "Default note from this one"
 
 " Changing events: Enter edits the field under the cursor, typing a value or a change such
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
@@ -164,6 +164,20 @@ nmap c          change            "Rename"
 " leaves, Escape leaves it; Up and Down step it.
 nmap e          inspector-edit    "Edit in the inspector"
 
+" The leader key, comma unless the leader setting names another, starts the commands used now
+" and then. After a pause, the hint menu shows what can follow it, as it does after any keys
+" that start longer bindings; ngroup gives such keys their title there. <leader><leader> is
+" kept free, for a command used often enough to earn it.
+ngroup <leader>  "Leader"
+ngroup <leader>v "Views"
+nmap <leader>va  view-arrangement  "Arrangement"
+nmap <leader>vp  view-piano-roll   "Piano roll"
+nmap <leader>ve  view-events       "Event list"
+ngroup g         "Go"
+ngroup z         "View"
+ngroup ]         "Next"
+ngroup [         "Before"
+
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
 nmap <C-=>      font-bigger       "Bigger text"
@@ -202,7 +216,8 @@ nmap <Esc>      cancel            "Cancel"
 nmap <Space>    play-toggle       "Play or stop"
 nmap <C-Space>  play-cursor       "Play from the cursor"
 nmap m<Space>   marker-set        "Play from here"
-nmap ,t<Space>  rewind-toggle     "Rewind on or off"
-nmap ,ta        grid-advance-toggle "O by grid step or note length"
+ngroup <leader>t "Toggles"
+nmap <leader>t<Space> rewind-toggle "Rewind on or off"
+nmap <leader>ta  grid-advance-toggle "O by grid step or note length"
 nmap <C-.>      panic             "Panic"
 cmap <C-.>      panic             "Panic"

@@ -19,7 +19,8 @@ namespace modal::ui
 // <Esc>, <Tab>, <CR> (or <Enter>, <Return>), <BS>, <Del>, <Insert>, <Up>, <Down>, <Left>,
 // <Right>, <Home>, <End>, <PageUp>, <PageDown>, <F1> to <F12>, the keypad's <kPlus>,
 // <kMinus> and <k0> to <k9> (which arrive only with Ctrl or Alt), <C-d>, <C-S-d>, <S-Tab>,
-// <A-x>. Names and modifiers are read in any case; with Ctrl or Alt a letter is read in
+// <A-x>, and <leader> for the leader key, whichever key the leader setting names. Names and
+// modifiers are read in any case; with Ctrl or Alt a letter is read in
 // either case too, since <C-D> is Ctrl-d as in Vim, and Ctrl-Shift-d is written <C-S-d>.
 // <S-a> is read as A, the character it types.
 
