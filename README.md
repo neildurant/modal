@@ -55,7 +55,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
 | `x` `Y`, `p` | Delete or yank this event; put what was yanked or deleted at the cursor's time, or bars at the start of the cursor's bar |
 | Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
-| `e` | Edit the event's fields in the inspector: Tab and Shift-Tab go between them, Enter sets one and Escape leaves it |
+| `e`, Tab Shift-Tab, Up Down | `e` edits the field as Enter does; while editing, Tab and Shift-Tab set it and go along the row, and Up and Down step it |
 | `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
 | `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |

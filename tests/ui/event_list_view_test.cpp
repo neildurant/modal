@@ -976,38 +976,34 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     CHECK(v.document.song().sectionStart(1) == 2 * q);
 }
 
-TEST_CASE("e edits the event's fields in the inspector, going on to the next with Tab")
+TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on along the row")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
-    const auto& editor = v.view.inspectorEditor();
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
-    type(v.ws, U"e");
-    CHECK(v.ws.message() == "Nothing to edit here");
-    CHECK_FALSE(editor.active());
-
-    type(v.ws, U"4je");
-    REQUIRE(editor.active());
-    CHECK(editor.heading() == "Position");
-    v.ws.handle(Key::of(NamedKey::Tab), 0);
-    CHECK(editor.heading() == "Pitch");
+    const auto note = [&] { return std::get<core::Note>(events()[1].data); };
+    type(v.ws, U"4je"); // the note's position
+    REQUIRE(v.view.editingField());
+    CHECK(v.view.field() == Column::Position);
+    v.ws.handle(Key::of(NamedKey::Tab), 0); // past its type, to its pitch
+    CHECK(v.view.field() == Column::Data);
+    CHECK(v.view.fieldLine().text() == U"E1");
     type(v.ws, U"F1");
-    enter(v.ws);
-    CHECK_FALSE(editor.active());
-    CHECK(std::get<core::Note>(events()[1].data).pitch == 29);
-    CHECK(v.view.row() == 4); // still on it
+    v.ws.handle(Key::of(NamedKey::Tab), 0);
+    CHECK(note().pitch == 29);
+    CHECK(v.view.field() == Column::Value);
+    v.ws.handle(Key::of(NamedKey::Up), 0); // a step, straight away
+    CHECK(note().velocity == 97);
+    CHECK(v.view.fieldLine().text() == U"97");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK_FALSE(v.view.editingField());
 
-    // On the cc, which has no pitch, the first field; then its value.
-    type(v.ws, U"je");
-    CHECK(editor.heading() == "Position");
+    // Round from the first field to the last.
+    type(v.ws, U"0e");
+    v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    CHECK(v.view.field() == Column::Release);
     v.ws.handle(Key::of(NamedKey::Tab), 0);
-    v.ws.handle(Key::of(NamedKey::Tab), 0);
-    CHECK(editor.heading() == "Value");
-    type(v.ws, U"70");
-    enter(v.ws);
-    CHECK(std::get<core::ControlChange>(events()[2].data).value == 70);
-    type(v.ws, U"u");
-    CHECK(v.ws.message() == "Undid: Set value in Bass");
+    CHECK(v.view.field() == Column::Position);
 }

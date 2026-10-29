@@ -157,10 +157,11 @@ nmap i          insert-before     "Insert before"
 nmap a          insert-after      "Insert after"
 nmap c          change            "Rename"
 
-" The inspector: e edits the fields of the note or event under the cursor, or the section on
-" the section strip, starting on the one last edited. Tab and Shift-Tab set the field and go
-" to the next or the one before, round from the last to the first; Enter sets it and leaves,
-" Escape leaves it; Up and Down step it.
+" The inspector: e edits the fields of the note under the cursor in the piano roll, or the
+" section on the section strip, starting on the one it was last on; in the event list it
+" edits the field under the cursor in place, as Enter does. Tab and Shift-Tab set the field
+" and go to the next or the one before, round from the last to the first; Enter sets it and
+" leaves, Escape leaves it; Up and Down step it.
 nmap e          inspector-edit    "Edit in the inspector"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
