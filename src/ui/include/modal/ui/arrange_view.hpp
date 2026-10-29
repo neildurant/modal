@@ -61,6 +61,7 @@ public:
     void type(char32_t character) override { editor_.type(character); }
     std::optional<bool> runTyping(std::string_view command) override;
     const InspectorEditor& inspectorEditor() const { return editor_; }
+    bool onStrip() const { return page_.stripCursor().has_value(); }
 
     const ArrangePage& page() const { return page_; }
 

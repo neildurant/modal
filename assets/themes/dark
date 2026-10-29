@@ -27,3 +27,5 @@ highlight density-1    #3a4d2e
 highlight density-2    #5b7d3f
 highlight density-3    #7fab55
 highlight density-4    #b4e07c
+highlight hint-key     #9ece6a
+highlight hint-group   #bb9af7

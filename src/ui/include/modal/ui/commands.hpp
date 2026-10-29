@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
@@ -40,7 +41,34 @@ struct CommandInfo
     bool keys = true;              // can be bound to keys
     bool motion = false;           // moves the cursor, so an operator can take it (d]b)
     bool object = false;           // a text object, which only an operator takes (dib)
+    std::uint8_t where = 0;        // where it does something, as whereBit makes it; 0 everywhere
 };
+
+// Where a command does something, for the hint menu and the palette to offer only what works
+// there (decided October 2026): each view, the arrangement's section strip apart from its tracks.
+enum class Where : std::uint8_t
+{
+    Tracks, // the arrangement's tracks
+    Strip,  // its section strip
+    PianoRoll,
+    EventList,
+};
+
+constexpr std::uint8_t whereBit(Where where)
+{
+    return static_cast<std::uint8_t>(1U << static_cast<unsigned>(where));
+}
+
+// Places together, as a command's where.
+constexpr std::uint8_t onlyIn(std::initializer_list<Where> places)
+{
+    std::uint8_t bits = 0;
+    for (const auto place : places)
+    {
+        bits = static_cast<std::uint8_t>(bits | whereBit(place));
+    }
+    return bits;
+}
 
 // A command's title: the one given, or else its name as words, cursor-left as "Cursor left".
 std::string titleOf(const CommandInfo& info);

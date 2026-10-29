@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cctype>
 #include <charconv>
+#include <tuple>
 #include <utility>
 
 namespace modal::ui
@@ -216,6 +217,72 @@ std::span<const CommandInfo> Workspace::commands()
         add(ArrangeView::commands());
         add(PianoRollView::commands());
         add(kSharedCommands);
+        // Where the views' commands do something, kept here beside each other, since a view
+        // runs commands others describe; a test runs each binding offered in each place.
+        using enum Where;
+        const std::array<std::pair<std::string_view, std::uint8_t>, 48> where{{
+            {"change", onlyIn({Strip})},
+            {"insert-before", onlyIn({Strip})},
+            {"insert-after", onlyIn({Strip})},
+            {"section-strip", onlyIn({Tracks, Strip})},
+            {"join", onlyIn({Strip, PianoRoll})},
+            {"move-left", onlyIn({Strip, PianoRoll})},
+            {"move-right", onlyIn({Strip, PianoRoll})},
+            {"register-put-before", onlyIn({Tracks, Strip, PianoRoll})},
+            {"zoom-in", onlyIn({Tracks, Strip, PianoRoll})},
+            {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
+            {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},
+            {"field-edit", onlyIn({Tracks, Strip, EventList})},
+            {"field-increase", onlyIn({Strip, PianoRoll, EventList})},
+            {"field-decrease", onlyIn({Strip, PianoRoll, EventList})},
+            {"field-increase-fine", onlyIn({Strip, PianoRoll, EventList})},
+            {"field-decrease-fine", onlyIn({Strip, PianoRoll, EventList})},
+            {"number-increase", onlyIn({Strip, PianoRoll, EventList})},
+            {"number-decrease", onlyIn({Strip, PianoRoll, EventList})},
+            {"note-add", onlyIn({PianoRoll, EventList})},
+            {"cursor-chord-next", onlyIn({PianoRoll, EventList})},
+            {"cursor-chord-previous", onlyIn({PianoRoll, EventList})},
+            {"cursor-bar-next-scroll", onlyIn({Tracks, PianoRoll})},
+            {"cursor-bar-previous-scroll", onlyIn({Tracks, PianoRoll})},
+            {"cursor-bar-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-bar-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-bar-line-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-bar-line-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-section-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-section-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-marker-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-marker-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-left-scroll", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-right-scroll", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-up-scroll", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-down-scroll", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-centre", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-half-down", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-half-up", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-page-down", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-page-up", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-note-next", onlyIn({PianoRoll})},
+            {"cursor-note-previous", onlyIn({PianoRoll})},
+            {"octave-up", onlyIn({PianoRoll})},
+            {"note-add-advance", onlyIn({PianoRoll})},
+            {"note-default", onlyIn({PianoRoll})},
+            {"grid-finer", onlyIn({PianoRoll})},
+            {"grid-coarser", onlyIn({PianoRoll})},
+            {"grid-triplets", onlyIn({PianoRoll})},
+        }};
+        for (auto& info : result)
+        {
+            if (const auto it = std::ranges::find(
+                    where, info.name, &std::pair<std::string_view, std::uint8_t>::first);
+                it != where.end())
+            {
+                info.where = it->second;
+            }
+            else if (info.name.starts_with("move-"))
+            {
+                info.where = onlyIn({PianoRoll}); // the Alt keys move notes
+            }
+        }
         return result;
     }();
     return all;
@@ -545,6 +612,51 @@ std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
     return hints;
 }
 
+namespace
+{
+
+// The hint menu's order (decided October 2026, after Doom Emacs's): named keys first (<CR>,
+// <Space>, <Tab>), then other characters, then letters, ignoring case, so t and T come together,
+// t first.
+auto hintOrder(const std::string& keys)
+{
+    const auto text = decodeUtf8(keys);
+    const bool named = text.size() > 1 && text.front() == U'<';
+    const char32_t first = text.empty() ? 0 : text.front();
+    const bool letter = (first >= U'a' && first <= U'z') || (first >= U'A' && first <= U'Z');
+    std::u32string folded = text;
+    for (auto& c : folded)
+    {
+        if (c >= U'A' && c <= U'Z')
+        {
+            c = c - U'A' + U'a';
+        }
+    }
+    return std::tuple{named ? 0 : letter ? 2 : 1, folded, text != folded};
+}
+
+} // namespace
+
+Where Workspace::where() const
+{
+    switch (shown())
+    {
+    case ViewKind::Arrangement:
+        return arrange_->onStrip() ? Where::Strip : Where::Tracks;
+    case ViewKind::PianoRoll:
+        return Where::PianoRoll;
+    case ViewKind::EventList:
+        break;
+    }
+    return Where::EventList;
+}
+
+bool Workspace::offered(std::string_view command) const
+{
+    const auto* info = commands_.find(command);
+    return info == nullptr || info->where == 0 || (info->where & whereBit(where())) != 0;
+}
+
 std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mode,
                                                    std::span<const Key> keys) const
 {
@@ -555,7 +667,8 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
     for (const auto& [sequence, binding] : keymap.bindings(mode))
     {
         if (sequence.size() <= keys.size() ||
-            !std::ranges::equal(keys, std::span{sequence}.first(keys.size())))
+            !std::ranges::equal(keys, std::span{sequence}.first(keys.size())) ||
+            !offered(binding.command))
         {
             continue;
         }
@@ -579,7 +692,16 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
                 hint.title.replace(at, 7, "N");
             }
         }
-        if (keymap.match(mode, next).longer)
+        // Keys that start longer bindings, some of which work here.
+        const auto more = std::ranges::any_of(
+            keymap.bindings(mode),
+            [&](const auto& other)
+            {
+                return other.first.size() > next.size() &&
+                       std::ranges::equal(next, std::span{other.first}.first(next.size())) &&
+                       offered(other.second.command);
+            });
+        if (more)
         {
             hint.group = true;
             const auto title = keymap.groupTitle(mode, next);
@@ -590,6 +712,7 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
         }
         hints.push_back(std::move(hint));
     }
+    std::ranges::stable_sort(hints, {}, [](const Hint& h) { return hintOrder(h.keys); });
     return hints;
 }
 
@@ -640,7 +763,8 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
                            : 2,
             Hint{.keys = std::move(written), .title = std::move(*text), .group = false});
     }
-    std::ranges::stable_sort(ranked, {}, &std::pair<int, Hint>::first);
+    std::ranges::stable_sort(ranked, {}, [](const std::pair<int, Hint>& r)
+                             { return std::tuple{r.first, hintOrder(r.second.keys)}; });
     std::vector<Hint> hints;
     for (auto& [rank, hint] : ranked)
     {
@@ -651,29 +775,50 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
 
 Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 {
-    // On a panel above the status line: the keys typed and their group's title, then each key
-    // that can follow and its title, in columns down and then across, groups in the accent
-    // colour with a + before them, as many rows as it takes, up to the main area's height.
+    // On a panel above the status line, after Doom Emacs's (decided October 2026): the keys
+    // typed and their group's title, then each key that can follow, right-aligned in its
+    // column, a colon, and its title, groups marked + in a colour of their own. Columns go down
+    // six rows and then across, each as wide as what's in it, so the menu gathers at the left;
+    // with more than fit across, it takes more rows, up to the main area's height.
     const int margin = BarSpacing::forCell(cell_).margin;
-    const int columns = std::max((width_ - 2 * margin) / cell_.width, 1);
-    std::size_t keyWidth = 1;
-    std::size_t entryWidth = 1;
-    for (const auto& hint : hints)
-    {
-        keyWidth = std::max(keyWidth, decodeUtf8(hint.keys).size());
-    }
-    for (const auto& hint : hints)
-    {
-        entryWidth = std::max(entryWidth,
-                              keyWidth + 2 + decodeUtf8(hint.title).size() + (hint.group ? 1 : 0));
-    }
-    const int width = static_cast<int>(entryWidth) + 4;
-    const int across = std::max(columns / width, 1);
+    const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
     const int most = std::max(layout_.main.height / cell_.height - 2, 1);
-    const int rows =
-        std::min(static_cast<int>((hints.size() + static_cast<std::size_t>(across) - 1) /
-                                  static_cast<std::size_t>(across)),
-                 most);
+    const auto count = static_cast<int>(hints.size());
+    struct Column
+    {
+        int keys = 0;
+        int width = 0;
+    };
+    const auto layOut = [&](int rows)
+    {
+        std::vector<Column> columns;
+        for (int i = 0; i < count; ++i)
+        {
+            if (i % rows == 0)
+            {
+                columns.emplace_back();
+            }
+            const auto& hint = hints[static_cast<std::size_t>(i)];
+            auto& column = columns.back();
+            column.keys = std::max(column.keys, static_cast<int>(decodeUtf8(hint.keys).size()));
+            column.width = std::max(column.width, static_cast<int>(decodeUtf8(hint.title).size()) +
+                                                      (hint.group ? 1 : 0));
+        }
+        int total = 0;
+        for (auto& column : columns)
+        {
+            column.width += column.keys + 3; // " : "
+            total += column.width + 4;
+        }
+        return std::pair{columns, total - 4};
+    };
+    int rows = std::min(std::max(count, 1), std::min(6, most));
+    auto [columns, total] = layOut(rows);
+    while (total > room && rows < std::min(count, most))
+    {
+        std::tie(columns, total) = layOut(++rows);
+    }
+
     const int pad = cell_.height / 4;
     const int height = (rows + 1) * cell_.height + 2 * pad;
     const auto& status = layout_.bottom[0];
@@ -682,9 +827,10 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
                   .text = {},
                   .under = {},
                   .over = {}};
-    const Style keyStyle{Role::Accent, Role::Panel, kBold};
+    const Style keyStyle{Role::HintKey, Role::Panel, kPlain};
+    const Style colonStyle{Role::Dim, Role::Panel, kPlain};
     const Style titleStyle{Role::Text, Role::Panel, kPlain};
-    const Style groupStyle{Role::Accent, Role::Panel, kPlain};
+    const Style groupStyle{Role::HintGroup, Role::Panel, kPlain};
     const Style headingStyle{Role::Dim, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell_.width; };
     const auto mode = keys_.mode();
@@ -707,21 +853,32 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
         heading += "  " + title;
     }
     region.text.push_back({x(0), pad, decodeUtf8(heading), headingStyle});
-    for (std::size_t i = 0; i < hints.size(); ++i)
+    int left = 0;
+    for (std::size_t c = 0; c < columns.size(); ++c)
     {
-        const int row = static_cast<int>(i) % rows;
-        const int column = static_cast<int>(i) / rows;
-        if (column >= across)
+        const auto& column = columns[c];
+        if (left + column.width > room && c > 0)
         {
-            break;
+            break; // more than fit, even so
         }
-        const auto& hint = hints[i];
-        const int at = column * width;
-        const int y = pad + (row + 1) * cell_.height;
-        region.text.push_back({x(at), y, decodeUtf8(hint.keys), keyStyle});
-        region.text.push_back({x(at + static_cast<int>(keyWidth) + 2), y,
-                               decodeUtf8((hint.group ? "+" : "") + hint.title),
-                               hint.group ? groupStyle : titleStyle});
+        for (int row = 0; row < rows; ++row)
+        {
+            const auto i = c * static_cast<std::size_t>(rows) + static_cast<std::size_t>(row);
+            if (i >= hints.size())
+            {
+                break;
+            }
+            const auto& hint = hints[i];
+            const auto keys = decodeUtf8(hint.keys);
+            const int y = pad + (row + 1) * cell_.height;
+            region.text.push_back(
+                {x(left + column.keys - static_cast<int>(keys.size())), y, keys, keyStyle});
+            region.text.push_back({x(left + column.keys), y, U" : ", colonStyle});
+            region.text.push_back({x(left + column.keys + 3), y,
+                                   decodeUtf8((hint.group ? "+" : "") + hint.title),
+                                   hint.group ? groupStyle : titleStyle});
+        }
+        left += column.width + 4;
     }
     return region;
 }
@@ -753,7 +910,7 @@ bool Workspace::wake(std::int64_t now)
         hintsShown_ = true;
         changed = changed || hints().has_value();
     }
-    if (keys_.keys().empty())
+    if (keys_.keys().empty() && !operator_)
     {
         waitingSince_.reset();
         hintsShown_ = false;

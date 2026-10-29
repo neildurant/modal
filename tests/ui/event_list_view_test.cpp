@@ -1040,7 +1040,7 @@ TEST_CASE("the hint menu shows what can follow keys that start longer bindings, 
     v.ws.wake(2400);
     CHECK(find("t") == Workspace::Hint{"t", "Toggles", true});
     CHECK(find("v") == Workspace::Hint{"v", "Views", true});
-    CHECK(find("n") == Workspace::Hint{"n", "Default note from this one", false});
+    CHECK_FALSE(find("n")); // the default note is the piano roll's
     v.ws.handle(Key::typed(U't'), 2500);
     CHECK(find("<Space>") == Workspace::Hint{"<Space>", "Rewind on or off", false});
     v.ws.handle(Key::of(NamedKey::Escape), 2600);

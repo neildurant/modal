@@ -120,5 +120,6 @@ The roles are:
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `marker` | notes, and markers |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |
+| `hint-key`, `hint-group` | a key in the hint menu, and a group of keys that leads to more |
 
 `:write-config` lists the colours of every role in the theme you've chosen.

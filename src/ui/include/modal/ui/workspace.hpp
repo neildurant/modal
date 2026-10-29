@@ -141,6 +141,11 @@ public:
     // What the hint menu shows now, if it's showing.
     std::optional<std::vector<Hint>> hints() const;
 
+    // Where the cursor is, and whether a command does something there, so the hint menu
+    // offers it.
+    Where where() const;
+    bool offered(std::string_view command) const;
+
     // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
     // prompt, or while a view takes typing, as when editing a field in place.
     Mode mode() const { return mode_; }

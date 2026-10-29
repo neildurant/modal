@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/ui/key_notation.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -1267,4 +1268,66 @@ TEST_CASE("after an operator the hint menu lists its ranges and objects, with wh
     CHECK(title("l") == "this section");
     CHECK(title("d") == "(none)");
     CHECK(title("ib") == "(none)");
+}
+
+TEST_CASE("the hint menu offers only the commands that do something where the cursor is")
+{
+    // Every binding offered in each place, run there afresh, does something there rather than
+    // saying it isn't in the view; and gs, say, isn't offered in the piano roll.
+    const std::array<std::pair<std::u32string_view, Where>, 4> places{{
+        {U"", Where::PianoRoll},
+        {U"ga", Where::Tracks},
+        {U"gags", Where::Strip},
+        {U"ge", Where::EventList},
+    }};
+    const auto keymap = Workspace::defaultKeymap();
+    for (const auto& [to, where] : places)
+    {
+        Rolling place;
+        place.type(to);
+        REQUIRE(place.ws.where() == where);
+        for (const auto& [keys, binding] : keymap.bindings(Mode::Normal))
+        {
+            if (!place.ws.offered(binding.command))
+            {
+                continue;
+            }
+            Rolling r;
+            r.type(to);
+            for (const auto& key : keys)
+            {
+                r.press(key.named == NamedKey::Leader ? Key::typed(U',') : key);
+            }
+            CAPTURE(static_cast<int>(where), binding.command, formatKeys(keys));
+            CHECK(r.ws.message().find(" isn't in ") == std::string::npos);
+        }
+    }
+    Rolling r;
+    CHECK_FALSE(r.ws.offered("section-strip"));
+    r.type(U"ga");
+    CHECK(r.ws.offered("section-strip"));
+}
+
+TEST_CASE("the hint menu shows after an operator once it has waited, its keys ignoring case")
+{
+    Rolling r;
+    r.ws.setHints(true, 400);
+    r.ws.handle(Key::typed(U'd'), 1000);
+    CHECK_FALSE(r.ws.hints());
+    CHECK(r.ws.wake(1400));
+    REQUIRE(r.ws.hints());
+    CHECK(r.ws.hints()->front().keys == "d");
+    r.ws.handle(Key::of(NamedKey::Escape), 1500);
+
+    // After g, its keys in order, t and T together; gs, for the arrangement, isn't offered.
+    r.ws.handle(Key::typed(U'g'), 2000);
+    r.ws.wake(2400);
+    const auto shown = r.ws.hints();
+    REQUIRE(shown);
+    std::vector<std::string> keys;
+    for (const auto& hint : *shown)
+    {
+        keys.push_back(hint.keys);
+    }
+    CHECK(keys == std::vector<std::string>{"a", "e", "g", "r", "t", "T"});
 }
