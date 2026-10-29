@@ -1007,3 +1007,52 @@ TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on alo
     v.ws.handle(Key::of(NamedKey::Tab), 0);
     CHECK(v.view.field() == Column::Position);
 }
+
+TEST_CASE("the hint menu shows what can follow keys that start longer bindings, after a pause")
+{
+    Viewing v;
+    v.ws.setHints(true, 400);
+    const auto find = [&](std::string_view keys) -> std::optional<Workspace::Hint>
+    {
+        for (const auto& hint : v.ws.hints().value_or(std::vector<Workspace::Hint>{}))
+        {
+            if (hint.keys == keys)
+            {
+                return hint;
+            }
+        }
+        return std::nullopt;
+    };
+    v.ws.handle(Key::typed(U'g'), 1000);
+    CHECK_FALSE(v.ws.hints());
+    CHECK(v.ws.deadline() == 1400);
+    CHECK(v.ws.wake(1400));
+    REQUIRE(v.ws.hints());
+    CHECK(find("a") == Workspace::Hint{"a", "Arrangement", false});
+    CHECK(find("g") == Workspace::Hint{"g", "First event, or bar N", false});
+    const auto frame = v.ws.frame();
+    CHECK(std::ranges::any_of(frame, [](const Region& r) { return r.background == Role::Panel; }));
+    v.ws.handle(Key::typed(U'g'), 1500); // gg, and the menu goes
+    CHECK_FALSE(v.ws.hints());
+
+    // The leader's, groups with their titles; going on into a group keeps it showing.
+    v.ws.handle(Key::typed(U','), 2000);
+    v.ws.wake(2400);
+    CHECK(find("t") == Workspace::Hint{"t", "Toggles", true});
+    CHECK(find("v") == Workspace::Hint{"v", "Views", true});
+    CHECK(find("n") == Workspace::Hint{"n", "Default note from this one", false});
+    v.ws.handle(Key::typed(U't'), 2500);
+    CHECK(find("<Space>") == Workspace::Hint{"<Space>", "Rewind on or off", false});
+    v.ws.handle(Key::of(NamedKey::Escape), 2600);
+    CHECK_FALSE(v.ws.hints());
+
+    // Off, or straight away.
+    v.ws.setHints(false, 400);
+    v.ws.handle(Key::typed(U'g'), 3000);
+    v.ws.wake(3500);
+    CHECK_FALSE(v.ws.hints());
+    v.ws.handle(Key::of(NamedKey::Escape), 3600);
+    v.ws.setHints(true, 0);
+    v.ws.handle(Key::typed(U'g'), 4000);
+    CHECK(v.ws.hints());
+}

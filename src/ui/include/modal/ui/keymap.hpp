@@ -126,6 +126,14 @@ public:
     // The count and keys typed so far, for the status line, such as "3g"; empty if none.
     std::string pending() const;
 
+    // The keys waiting, as the bindings have them (<leader> for the leader key), and the mode
+    // they were typed in.
+    std::span<const Key> keys() const { return keys_; }
+    Mode mode() const { return mode_; }
+
+    // A key in bindings as it's typed: the leader key for <leader>.
+    Key typed(const Key& key) const { return key.named == NamedKey::Leader ? leader_ : key; }
+
 private:
     void clear();
 

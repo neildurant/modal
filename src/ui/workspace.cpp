@@ -502,12 +502,164 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         operator_.reset();
         mode_ = Mode::Normal;
     }
-    return changed || hadMessage || pending() != before;
+    const bool hinted = hints().has_value();
+    noteWaiting(now);
+    return changed || hadMessage || pending() != before || hinted != hints().has_value();
+}
+
+void Workspace::noteWaiting(std::int64_t now)
+{
+    // Keys waiting for more start the wait for the hint menu, or show it at once with no delay.
+    if (keys_.keys().empty())
+    {
+        waitingSince_.reset();
+        hintsShown_ = false;
+        return;
+    }
+    if (!waitingSince_ || !hintsShown_)
+    {
+        waitingSince_ = now;
+        hintsShown_ = hintDelay_ == 0;
+    }
+}
+
+std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
+{
+    if (!hintsOn_ || !hintsShown_ || keys_.keys().empty())
+    {
+        return std::nullopt;
+    }
+    const auto mode = keys_.mode();
+    const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    auto hints = hintsAfter(keymap, mode, keys_.keys());
+    if (hints.empty())
+    {
+        return std::nullopt;
+    }
+    return hints;
+}
+
+std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mode,
+                                                   std::span<const Key> keys) const
+{
+    // Each key that can come next, once, in the keymap's order: the title of its binding, or
+    // if it starts longer ones, of its group.
+    std::vector<Hint> hints;
+    std::vector<Key> previous;
+    for (const auto& [sequence, binding] : keymap.bindings(mode))
+    {
+        if (sequence.size() <= keys.size() ||
+            !std::ranges::equal(keys, std::span{sequence}.first(keys.size())))
+        {
+            continue;
+        }
+        const std::vector<Key> next{
+            sequence.begin(), sequence.begin() + static_cast<std::ptrdiff_t>(keys.size()) + 1};
+        if (next == previous)
+        {
+            continue;
+        }
+        previous = next;
+        Hint hint{.keys = formatKey(keys_.typed(next.back())), .title = {}, .group = false};
+        if (sequence.size() == next.size())
+        {
+            const auto* info = commands_.find(binding.command);
+            hint.title = !binding.hint.empty() ? binding.hint
+                         : info != nullptr     ? titleOf(*info)
+                                               : binding.command;
+            // A count, which the menu can't take, as N: "bar N".
+            if (const auto at = hint.title.find("{count}"); at != std::string::npos)
+            {
+                hint.title.replace(at, 7, "N");
+            }
+        }
+        if (keymap.match(mode, next).longer)
+        {
+            hint.group = true;
+            const auto title = keymap.groupTitle(mode, next);
+            if (hint.title.empty())
+            {
+                hint.title = title.empty() ? std::string{"…"} : title;
+            }
+        }
+        hints.push_back(std::move(hint));
+    }
+    return hints;
+}
+
+Region Workspace::hintRegion(const std::vector<Hint>& hints) const
+{
+    // On a panel above the status line: the keys typed and their group's title, then each key
+    // that can follow and its title, in columns down and then across, groups in the accent
+    // colour with a + before them, as many rows as it takes, up to the main area's height.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int columns = std::max((width_ - 2 * margin) / cell_.width, 1);
+    std::size_t keyWidth = 1;
+    std::size_t entryWidth = 1;
+    for (const auto& hint : hints)
+    {
+        keyWidth = std::max(keyWidth, decodeUtf8(hint.keys).size());
+    }
+    for (const auto& hint : hints)
+    {
+        entryWidth = std::max(entryWidth,
+                              keyWidth + 2 + decodeUtf8(hint.title).size() + (hint.group ? 1 : 0));
+    }
+    const int width = static_cast<int>(entryWidth) + 4;
+    const int across = std::max(columns / width, 1);
+    const int most = std::max(layout_.main.height / cell_.height - 2, 1);
+    const int rows =
+        std::min(static_cast<int>((hints.size() + static_cast<std::size_t>(across) - 1) /
+                                  static_cast<std::size_t>(across)),
+                 most);
+    const int pad = cell_.height / 4;
+    const int height = (rows + 1) * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    const Style keyStyle{Role::Accent, Role::Panel, kBold};
+    const Style titleStyle{Role::Text, Role::Panel, kPlain};
+    const Style groupStyle{Role::Accent, Role::Panel, kPlain};
+    const Style headingStyle{Role::Dim, Role::Panel, kPlain};
+    const auto x = [&](int column) { return margin + column * cell_.width; };
+    const auto mode = keys_.mode();
+    const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    auto heading = pending();
+    if (const auto title = keymap.groupTitle(mode, keys_.keys()); !title.empty())
+    {
+        heading += "  " + title;
+    }
+    region.text.push_back({x(0), pad, decodeUtf8(heading), headingStyle});
+    for (std::size_t i = 0; i < hints.size(); ++i)
+    {
+        const int row = static_cast<int>(i) % rows;
+        const int column = static_cast<int>(i) / rows;
+        if (column >= across)
+        {
+            break;
+        }
+        const auto& hint = hints[i];
+        const int at = column * width;
+        const int y = pad + (row + 1) * cell_.height;
+        region.text.push_back({x(at), y, decodeUtf8(hint.keys), keyStyle});
+        region.text.push_back({x(at + static_cast<int>(keyWidth) + 2), y,
+                               decodeUtf8((hint.group ? "+" : "") + hint.title),
+                               hint.group ? groupStyle : titleStyle});
+    }
+    return region;
 }
 
 std::optional<std::int64_t> Workspace::deadline() const
 {
     auto deadline = keys_.deadline();
+    if (hintsOn_ && waitingSince_ && !hintsShown_)
+    {
+        const auto shown = *waitingSince_ + hintDelay_;
+        deadline = deadline ? std::min(*deadline, shown) : shown;
+    }
     if (wasPlaying_)
     {
         const auto frame = lastTime_ + kFrameInterval;
@@ -522,6 +674,16 @@ bool Workspace::wake(std::int64_t now)
     const auto before = keys_.pending();
     const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
     bool changed = runAll(keys_.timeout(keymap, now));
+    if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
+    {
+        hintsShown_ = true;
+        changed = changed || hints().has_value();
+    }
+    if (keys_.keys().empty())
+    {
+        waitingSince_.reset();
+        hintsShown_ = false;
+    }
     if (wasPlaying_)
     {
         player_->poll();
@@ -1269,6 +1431,10 @@ Frame Workspace::frame() const
 {
     Frame frame;
     view().addRegions(frame);
+    if (const auto shown = hints())
+    {
+        frame.push_back(hintRegion(*shown));
+    }
     frame.push_back(mode_ == Mode::CommandLine && !view().typing() ? promptRegion()
                                                                    : statusRegion());
     return frame;

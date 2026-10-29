@@ -362,6 +362,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     const auto minimum = settings.cells("minsize");
     window.setMinimumCells(minimum.columns, minimum.rows);
     view.setTimeout(settings.integer("timeoutlen"));
+    view.setHints(settings.flag("hints"), settings.integer("hintdelay"));
     {
         // One key, which <leader> in the bindings stands for.
         const auto leader = ui::parseKeys(settings.text("leader"));

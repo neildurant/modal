@@ -124,6 +124,23 @@ public:
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
     void setLeader(const Key& leader) { keys_.setLeader(leader); }
 
+    // The hint menu (decided October 2026): after keys that start longer bindings, once
+    // they've waited hintdelay, what can follow them, with each one's title. Off with hints off.
+    void setHints(bool on, std::int64_t delay)
+    {
+        hintsOn_ = on;
+        hintDelay_ = delay;
+    }
+    struct Hint
+    {
+        std::string keys;   // the next key, as typed
+        std::string title;  // the binding's hint or command's title, or a group's title
+        bool group = false; // it starts longer bindings, so leads to more hints
+        friend bool operator==(const Hint&, const Hint&) = default;
+    };
+    // What the hint menu shows now, if it's showing.
+    std::optional<std::vector<Hint>> hints() const;
+
     // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
     // prompt, or while a view takes typing, as when editing a field in place.
     Mode mode() const { return mode_; }
@@ -253,6 +270,13 @@ private:
     bool wasPlaying_ = false;   // or stopping, until the player knows where it stopped
     bool following_ = true;     // the views following the playhead, until moved away from it
     std::int64_t lastTime_ = 0; // of the last key or wake-up
+    bool hintsOn_ = true;
+    std::int64_t hintDelay_ = 400;
+    std::optional<std::int64_t> waitingSince_; // when keys started longer bindings
+    bool hintsShown_ = false;
+    void noteWaiting(std::int64_t now);
+    std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
+    Region hintRegion(const std::vector<Hint>& hints) const;
 };
 
 } // namespace modal::ui

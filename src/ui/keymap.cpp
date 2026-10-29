@@ -4,6 +4,7 @@
 #include <modal/ui/keymap.hpp>
 
 #include <algorithm>
+#include <iterator>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -179,7 +180,10 @@ std::vector<Action> KeyDispatcher::timeout(const Keymap& keymap, std::int64_t no
 
 std::string KeyDispatcher::pending() const
 {
-    return (count_ > 0 ? std::to_string(count_) : std::string{}) + formatKeys(keys_);
+    std::vector<Key> keys;
+    std::ranges::transform(keys_, std::back_inserter(keys),
+                           [this](const Key& k) { return typed(k); });
+    return (count_ > 0 ? std::to_string(count_) : std::string{}) + formatKeys(keys);
 }
 
 } // namespace modal::ui
