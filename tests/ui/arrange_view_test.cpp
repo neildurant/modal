@@ -681,3 +681,71 @@ TEST_CASE("P inserts what was yanked, moving the rest of the section later, aski
     CHECK(notesByBar(a, 0) ==
           BarNotes{{1, 61}, {2, 61}, {3, 62}, {4, 63}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
 }
+
+TEST_CASE(":bar-delete takes bars out of every track, keeping them in the register as a section")
+{
+    Arranging a{barNotes()};
+    const auto& song = a.document.song();
+    const auto before = notesByBar(a, 0);
+    a.type(U"l"); // bar 2
+    CHECK(a.registry.runLine("bar-delete") ==
+          CommandResult{true,
+                        "Deleted bar 2 on every track; p on the section strip puts them back as a "
+                        "section",
+                        false});
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 61}, {2, 63}, {3, 64}, {4, 65}, {5, 66}, {6, 67}, {7, 68}});
+    CHECK(song.sectionStart(1) == song.meter().barStart(4));
+    CHECK(song.sections().size() == 2);
+    REQUIRE(a.ws.registerArea().sections.size() == 1);
+    CHECK(a.ws.registerArea().sections[0]->name() == "Section 1");
+
+    // Put back as a section of its own, from the strip.
+    a.type(U"gs$p");
+    REQUIRE(song.sections().size() == 3);
+    CHECK(song.sections()[2]->name() == "Section 1 2");
+    CHECK(notesByBar(a, 0).back() == std::pair<std::int64_t, int>{8, 62});
+    a.type(U"uu");
+    CHECK(notesByBar(a, 0) == before);
+    CHECK(a.ws.message() == "Undid: Delete bar 2 on every track");
+
+    a.type(U"jgg");
+    CHECK(a.registry.runLine("bar-delete 2").message.starts_with("Deleted bars 1–2"));
+    CHECK(notesByBar(a, 1).empty());
+}
+
+TEST_CASE(":bar-insert puts empty bars in on every track, in a meter given or the one there")
+{
+    Arranging a{barNotes()};
+    const auto& song = a.document.song();
+    a.type(U"l"); // bar 2
+    CHECK(a.registry.runLine("bar-insert") == CommandResult{true, {}, false});
+    CHECK(notesByBar(a, 0) ==
+          BarNotes{{1, 61}, {3, 62}, {4, 63}, {5, 64}, {6, 65}, {7, 66}, {8, 67}, {9, 68}});
+    CHECK(song.sectionStart(1) == song.meter().barStart(6));
+    a.type(U"u");
+    CHECK(a.ws.message() == "Undid: Insert a bar before bar 2 on every track");
+
+    CHECK_FALSE(a.registry.runLine("bar-insert 3/4 2").warning);
+    CHECK(song.meter().signatureAt(song.meter().barStart(2)) == core::TimeSignature{3, 4});
+    CHECK(song.meter().signatureAt(song.meter().barStart(4)) == core::TimeSignature{4, 4});
+    CHECK(notesByBar(a, 0)[1] == std::pair<std::int64_t, int>{4, 62});
+    CHECK(a.registry.runLine("bar-insert 3/5").message ==
+          "bar-insert takes a number of bars and a meter, such as 2 3/4");
+}
+
+TEST_CASE("bars on every track are refused where a track's own bars wouldn't line up")
+{
+    auto threeFour = barNotes();
+    threeFour.updateMeter(threeFour.tracks()[1]->id(),
+                          [](core::MeterMap& meter) { meter.set(0, core::TimeSignature{3, 4}); });
+    Arranging a{std::move(threeFour)};
+    const auto before = a.document.song();
+    a.type(U"l"); // bar 2, a beat into Two's second bar
+    CHECK(a.registry.runLine("bar-insert").message ==
+          "Two's bars don't line up with a bar; put them in on each track instead");
+    CHECK(a.registry.runLine("bar-delete").message ==
+          "Two's bars don't line up with bar 2; delete them on each track instead");
+    CHECK(a.document.song() == before);
+    CHECK_FALSE(a.document.modified());
+}

@@ -954,34 +954,6 @@ bool EventListView::stepFieldBy(int steps)
     return true;
 }
 
-namespace
-{
-
-std::optional<core::TimeSignature> signatureOf(std::string_view text, core::Ppqn ppqn)
-{
-    const auto slash = text.find('/');
-    if (slash == std::string_view::npos)
-    {
-        return std::nullopt;
-    }
-    int numerator = 0;
-    int denominator = 0;
-    const auto top = text.substr(0, slash);
-    const auto bottom = text.substr(slash + 1);
-    const auto a = std::from_chars(top.data(), top.data() + top.size(), numerator);
-    const auto b = std::from_chars(bottom.data(), bottom.data() + bottom.size(), denominator);
-    const core::TimeSignature signature{numerator, denominator};
-    if (a.ec != std::errc{} || a.ptr != top.data() + top.size() || b.ec != std::errc{} ||
-        b.ptr != bottom.data() + bottom.size() || !signature.isValid() ||
-        !signature.beatLength().isExact(ppqn))
-    {
-        return std::nullopt;
-    }
-    return signature;
-}
-
-} // namespace
-
 std::optional<std::string> EventListView::setConductor(std::size_t row, std::string_view text)
 {
     const auto& r = list_.rows()[row];

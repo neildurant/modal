@@ -2,8 +2,10 @@
 
 #include <modal/ui/bar.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
+#include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -11,6 +13,7 @@
 #include <array>
 #include <cassert>
 #include <cctype>
+#include <charconv>
 #include <utility>
 
 namespace modal::ui
@@ -88,6 +91,16 @@ constexpr std::array kSharedCommands{
                 .description = "Start a new section at the cursor's bar line, splitting the "
                                "section it's in; named Section and a number if no name is given",
                 .usage = "[NAME]",
+                .keys = false},
+    CommandInfo{.name = "bar-delete",
+                .description = "Delete the cursor's bar, or {count} bars from it, on every track, "
+                               "closing up; they go in the register as a section",
+                .count = true,
+                .keys = false},
+    CommandInfo{.name = "bar-insert",
+                .description = "Insert an empty bar, or N, before the cursor's bar on every "
+                               "track, in the meter there or one given (2 3/4)",
+                .usage = "[N] [METER]",
                 .keys = false},
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor",
@@ -233,6 +246,14 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "section")
                          {
                              return section(call.arguments);
+                         }
+                         if (name == "bar-delete")
+                         {
+                             return barDelete(call.count);
+                         }
+                         if (name == "bar-insert")
+                         {
+                             return barInsert(call.arguments);
                          }
                          if (name == "section-rename")
                          {
@@ -899,6 +920,115 @@ CommandResult Workspace::section(std::string_view name)
                              true};
     }
     return {true, named + " starts at " + at, false};
+}
+
+namespace
+{
+
+std::string trackNameOf(const core::Song& song, core::TrackId id)
+{
+    const auto* track = song.track(id);
+    return track == nullptr || track->name.empty() ? std::string{"A track"} : track->name;
+}
+
+} // namespace
+
+CommandResult Workspace::barDelete(int count)
+{
+    // Done on a copy first, which says whether it can be, as one undo step.
+    const auto& song = document_.song();
+    const auto& meter = song.meter();
+    const auto bar = meter.toBarBeatTick(view().cursor().tick).bar;
+    const auto from = meter.barStart(bar);
+    if (from >= song.end())
+    {
+        return CommandResult::error("There are no bars after the song's end to delete");
+    }
+    const auto n = std::max(count, 1);
+    const auto bars = barsText(meter, from, std::min(meter.barStart(bar + n), song.end()));
+    auto edited = song;
+    const auto edit = edited.removeBars(from, n);
+    if (!edit.done)
+    {
+        if (edit.misaligned)
+        {
+            return CommandResult::error(trackNameOf(song, *edit.misaligned) +
+                                        "'s bars don't line up with " + bars +
+                                        "; delete them on each track instead");
+        }
+        return CommandResult::error("A song keeps at least one bar");
+    }
+    document_.edit("Delete " + bars + " on every track", view().place(),
+                   [&](core::Song& s) { s = edited; });
+    register_ = EventRegister{};
+    register_.sections = edit.removed;
+    refresh();
+    return {true,
+            "Deleted " + bars +
+                " on every track; p on the section strip puts them back as a section",
+            false};
+}
+
+CommandResult Workspace::barInsert(std::string_view arguments)
+{
+    // A number of bars and a meter, either or both, in either order.
+    const auto& song = document_.song();
+    std::int64_t n = 1;
+    std::optional<core::TimeSignature> signature;
+    std::size_t at = 0;
+    while (true)
+    {
+        const auto start = arguments.find_first_not_of(" \t", at);
+        if (start == std::string_view::npos)
+        {
+            break;
+        }
+        const auto stop = std::min(arguments.find_first_of(" \t", start), arguments.size());
+        const auto word = arguments.substr(start, stop - start);
+        at = stop;
+        std::int64_t number = 0;
+        const auto [ptr, ec] = std::from_chars(word.data(), word.data() + word.size(), number);
+        if (ec == std::errc{} && ptr == word.data() + word.size() && number > 0)
+        {
+            n = number;
+        }
+        else if (const auto meter = signatureOf(word, song.ppqn()))
+        {
+            signature = meter;
+        }
+        else
+        {
+            return CommandResult::error(
+                "bar-insert takes a number of bars and a meter, such as 2 3/4");
+        }
+    }
+    const auto& meter = song.meter();
+    const auto bar = meter.toBarBeatTick(view().cursor().tick).bar;
+    const auto from = meter.barStart(bar);
+    if (from >= song.end())
+    {
+        return CommandResult::error("Bars go in before a bar of the song");
+    }
+    const auto what = (n == 1 ? std::string{"a bar"} : std::to_string(n) + " bars") +
+                      (signature ? " of " + std::to_string(signature->numerator) + "/" +
+                                       std::to_string(signature->denominator)
+                                 : std::string{});
+    auto edited = song;
+    const auto edit = edited.insertBars(from, n, signature);
+    if (!edit.done)
+    {
+        if (edit.misaligned)
+        {
+            return CommandResult::error(trackNameOf(song, *edit.misaligned) +
+                                        "'s bars don't line up with " + what +
+                                        "; put them in on each track instead");
+        }
+        return CommandResult::error("Can't insert " + what + " here");
+    }
+    document_.edit("Insert " + what + " before bar " + std::to_string(bar) + " on every track",
+                   view().place(), [&](core::Song& s) { s = edited; });
+    refresh();
+    return {true, {}, false};
 }
 
 CommandResult Workspace::renameSection(std::string_view name)

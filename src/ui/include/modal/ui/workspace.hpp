@@ -187,6 +187,9 @@ private:
     // :section NAME starts a new section at the bar line of the cursor's bar, in the view's
     // own bars; :section-rename NAME renames the section at the cursor.
     CommandResult section(std::string_view name);
+    // Bars on every track, at the cursor's bar in the conductor's bars.
+    CommandResult barDelete(int count);
+    CommandResult barInsert(std::string_view arguments);
     CommandResult renameSection(std::string_view name);
 
     Region promptRegion() const;

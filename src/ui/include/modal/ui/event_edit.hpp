@@ -16,6 +16,9 @@
 namespace modal::ui
 {
 
+// A meter typed as 3/4 or 6/8, if it is one that can be used at the song's resolution.
+std::optional<core::TimeSignature> signatureOf(std::string_view text, core::Ppqn ppqn);
+
 // An event changed, or why it can't be.
 using EditResult = std::variant<core::Event, std::string>;
 
