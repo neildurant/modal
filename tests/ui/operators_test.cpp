@@ -253,6 +253,9 @@ TEST_CASE("after > the hint menu lists its ranges, but not ab, which is ib to it
     CHECK(title("ab") == "(none)");
     CHECK(title("]b") == "to the next bar line");
     o.press(NamedKey::Escape);
+    o.type(U"<"); // shown as typed, not as <lt>
+    CHECK(o.ws.hints()->front() == Workspace::Hint{"<", "this bar's notes", false});
+    o.press(NamedKey::Escape);
     o.type(U"tab"); // still taken, as ib
     CHECK(o.notes().front().first == o.q / 4);
 }

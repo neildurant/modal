@@ -1368,6 +1368,7 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
     // What the step keys do here, each once; and one key for bigger text, the others unlisted.
     CHECK(has("Changing events", {"=", "Lengthen to the grid", false}));
     CHECK(has("Changing events", {"<C-a>", "Velocity up", false}));
+    CHECK(has("Changing events", {"<", "Transpose down", false})); // not as <lt>
     CHECK(has("Text size", {"<C-+>", "Bigger text", false}));
     CHECK(
         std::ranges::none_of(groups, [](const auto& g) { return g.title == "The section strip"; }));

@@ -447,12 +447,8 @@ std::string Workspace::pending() const
     std::string text;
     if (operator_)
     {
-        auto keys = keysOf(operator_->name);
-        if (keys == "<lt>")
-        {
-            keys = "<";
-        }
-        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) + keys;
+        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
+               keysOf(operator_->name);
     }
     return text + keys_.pending();
 }
@@ -712,11 +708,15 @@ auto hintOrder(const std::string& keys)
 }
 
 // A key as the hint menu shows it: an arrow without modifiers as the arrow itself, so h and
-// Left read together as h/←; the others in notation.
+// Left read together as h/←, and < as itself; the others in notation.
 std::string hintKey(const Key& key)
 {
     if (key.modifiers == kNoModifiers)
     {
+        if (key.named == NamedKey::None && key.character == U'<')
+        {
+            return "<";
+        }
         switch (key.named)
         {
         case NamedKey::Left:
@@ -882,7 +882,7 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
         {
             continue;
         }
-        if (line && formatKeys(sequence) != keysOf(operator_->name))
+        if (line && shownKeys(sequence) != keysOf(operator_->name))
         {
             continue; // dd after d, yy after y
         }
@@ -891,11 +891,7 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
         {
             continue;
         }
-        std::string written;
-        for (const auto& k : sequence)
-        {
-            written += hintKey(keys_.typed(k));
-        }
+        auto written = shownKeys(sequence);
         // A command bound to several keys, shown once with them all, as l/→.
         if (const auto at = std::ranges::find(seen, command); at != seen.end())
         {
@@ -954,11 +950,7 @@ std::vector<Workspace::KeyGroup> Workspace::keyList() const
             {
                 continue;
             }
-            std::string written;
-            for (const auto& k : sequence)
-            {
-                written += hintKey(keys_.typed(k));
-            }
+            const auto written = shownKeys(sequence);
             const auto placed = [&]
             {
                 for (auto& [title, items] : groups)
@@ -1517,6 +1509,16 @@ bool Workspace::runOperator(std::string_view command, int count)
     return view().operate(op.name, command, total);
 }
 
+std::string Workspace::shownKeys(const std::vector<Key>& keys) const
+{
+    std::string text;
+    for (const auto& key : keys)
+    {
+        text += hintKey(keys_.typed(key));
+    }
+    return text;
+}
+
 std::string Workspace::keysOf(std::string_view command) const
 {
     std::string shortest;
@@ -1524,7 +1526,7 @@ std::string Workspace::keysOf(std::string_view command) const
     {
         if (binding.command == command)
         {
-            auto text = formatKeys(keys);
+            auto text = shownKeys(keys);
             if (shortest.empty() || text.size() < shortest.size())
             {
                 shortest = std::move(text);

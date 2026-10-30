@@ -249,6 +249,8 @@ private:
     bool changeEvents(std::string title, const OperatorTarget& target, const EventsChange& change);
     // The shortest keys bound to a command in Normal mode, as typed, or its name if none are.
     std::string keysOf(std::string_view command) const;
+    // Keys as shown in the hint menu and messages: the leader as typed, < as itself.
+    std::string shownKeys(const std::vector<Key>& keys) const;
 
     bool undoOrRedo(bool undo);
 
