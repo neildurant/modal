@@ -2372,6 +2372,10 @@ Frame Workspace::frame() const
     {
         frame.push_back(hintRegion(*shown));
     }
+    if (const auto lines = messageLines(); !lines.empty())
+    {
+        frame.push_back(messageRegion(lines));
+    }
     frame.push_back(mode_ == Mode::CommandLine && !view().typing() ? promptRegion()
                                                                    : statusRegion());
     return frame;
@@ -2402,6 +2406,77 @@ Region Workspace::promptRegion() const
 }
 
 Region Workspace::statusRegion() const
+{
+    auto region = layoutBar(statusBar(), width_, cell_, BarSpacing::forCell(cell_));
+    region.bounds = layout_.bottom[0];
+    return region;
+}
+
+std::vector<std::string> Workspace::messageLines() const
+{
+    // Whether the status line holds it, with what's beside it; if not, its words in lines as
+    // wide as the window.
+    if (message_.empty())
+    {
+        return {};
+    }
+    const auto bar = statusBar();
+    const auto spacing = BarSpacing::forCell(cell_);
+    const int columns = std::max((width_ - 2 * spacing.margin) / cell_.width, 1);
+    int used = (spacing.gap + cell_.width - 1) / cell_.width;
+    for (const auto* side : {&bar.left, &bar.right})
+    {
+        for (const auto& segment : *side)
+        {
+            used += static_cast<int>(decodeUtf8(segment.text).size());
+        }
+    }
+    if (used <= columns)
+    {
+        return {};
+    }
+    std::vector<std::string> lines(1);
+    std::size_t length = 0;
+    for (std::size_t at = 0; at < message_.size();)
+    {
+        const auto space = message_.find(' ', at);
+        const auto word =
+            message_.substr(at, space == std::string::npos ? std::string::npos : space - at);
+        const auto wide = decodeUtf8(word).size();
+        if (length > 0 && length + 1 + wide > static_cast<std::size_t>(columns))
+        {
+            lines.emplace_back();
+            length = 0;
+        }
+        lines.back() += (length > 0 ? " " : "") + word;
+        length += (length > 0 ? 1 : 0) + wide;
+        at = space == std::string::npos ? message_.size() : space + 1;
+    }
+    return lines;
+}
+
+Region Workspace::messageRegion(const std::vector<std::string>& lines) const
+{
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int pad = cell_.height / 4;
+    const int height = static_cast<int>(lines.size()) * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    const Style style{messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message,
+                      Role::Panel, kPlain};
+    for (std::size_t i = 0; i < lines.size(); ++i)
+    {
+        region.text.push_back(
+            {margin, pad + static_cast<int>(i) * cell_.height, decodeUtf8(lines[i]), style});
+    }
+    return region;
+}
+
+Bar Workspace::statusBar() const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
@@ -2437,10 +2512,7 @@ Region Workspace::statusRegion() const
                       : imported ? utf8Text(imported->filename()) + " (imported)"
                                  : std::string{"No file"};
     bottom.right.push_back({name + (document_.modified() ? " [+]" : ""), kBarText});
-
-    auto region = layoutBar(bottom, width_, cell_, BarSpacing::forCell(cell_));
-    region.bounds = layout_.bottom[0];
-    return region;
+    return bottom;
 }
 
 } // namespace modal::ui

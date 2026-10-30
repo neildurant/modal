@@ -1172,3 +1172,34 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
                                                              { return run.text == U"◀"; });
                               }));
 }
+
+TEST_CASE("a message too long for the status line is shown whole above it until the next key")
+{
+    Viewing v;
+    v.ws.resize(60 * kCell.width, 24 * kCell.height, kCell);
+    const auto panel = [&]() -> std::u32string
+    {
+        std::u32string text;
+        for (const auto& region : v.ws.frame())
+        {
+            if (region.background == Role::Panel && region.bounds.y > 12 * kCell.height)
+            {
+                for (const auto& run : region.text)
+                {
+                    text += run.text + U"|";
+                }
+            }
+        }
+        return text;
+    };
+    v.ws.setMessage("Short", MessageKind::Information);
+    CHECK(panel().empty());
+    v.ws.setMessage("Bass's bars don't line up with bar 2; delete them on each track instead, "
+                    "or give the bass the conductor's meter first",
+                    MessageKind::Warning);
+    const auto shown = panel();
+    CHECK(shown.find(U"conductor's meter first|") != std::u32string::npos);
+    CHECK(std::ranges::count(shown, U'|') >= 2); // wrapped onto lines
+    v.ws.handle(Key::typed(U'j'), 0);
+    CHECK(panel().empty());
+}

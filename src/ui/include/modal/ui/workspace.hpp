@@ -5,6 +5,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
 #include <modal/ui/arrange_view.hpp>
+#include <modal/ui/bar.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/event_list_view.hpp>
@@ -247,6 +248,11 @@ private:
 
     Region promptRegion() const;
     Region statusRegion() const;
+    Bar statusBar() const;
+    // A message too long for the status line, shown whole, wrapped, in a panel above it until
+    // the next key (decided October 2026); its lines, none if it fits.
+    std::vector<std::string> messageLines() const;
+    Region messageRegion(const std::vector<std::string>& lines) const;
 
     CommandRegistry& commands_;
     core::Document& document_;
