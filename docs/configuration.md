@@ -27,6 +27,8 @@ If a command fails, the first error shows in the status line until you press a k
 
 `:` opens a prompt in the bottom bar, as in Vim, where any of the commands below can be typed, and Enter runs them. They take effect at once: a new theme, font size or key binding applies straight away. Escape closes the prompt, Up and Down recall the lines run before (for the session), and Backspace, Delete, the arrow keys, Home, End and `Ctrl-U` edit the line.
 
+Tab completes the word under the cursor: a command's name, or its argument, such as a setting and its value (`set theme=<Tab>`), a theme colour's role, an output port, a file or folder, a section, a meter or a note length. The first Tab completes as far as the matches agree, listing them above the prompt; Tab after that goes round them and Shift-Tab back. One match is completed with a space after it, ready for the next word. A word matches a name it starts, or else the start of a word in it, so `strip<Tab>` gives `section-strip`.
+
 As well as the commands below, the prompt takes:
 
 - `set NAME?` shows a setting's value, such as `fontsize=12`. Several can be asked for at once.

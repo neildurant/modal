@@ -4,6 +4,8 @@
 
 #include <modal/ui/keymap.hpp>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -26,6 +28,23 @@ constexpr ModeSet modeBit(Mode mode)
 // What a command is: its name, what it does, and how it's called. Every action is described
 // once like this, in the registry, so the keymap, the : line, --write-config's list of
 // commands, and later completion, the hint menu and the palette all draw on one list.
+// The kinds of things a command's arguments are, for completion at the : prompt; each has one
+// source of its choices (decided October 2026).
+enum class Choices : std::uint8_t
+{
+    None,
+    Command,    // a command's name or alias
+    Setting,    // a setting's name, or NAME=VALUE with its values
+    Role,       // a theme role
+    Port,       // an output port
+    File,       // a file or folder, from the current directory
+    ConfigFile, // a file or folder in the config directory
+    Section,    // a section's name
+    Meter,      // a time signature, such as 3/4
+    Length,     // a note length, such as 1/8 or 1/16t
+};
+inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Length) + 1;
+
 struct CommandInfo
 {
     std::string_view name = {};        // lower case with hyphens, by what it acts on: cursor-left
@@ -42,6 +61,9 @@ struct CommandInfo
     bool motion = false;           // moves the cursor, so an operator can take it (d]b)
     bool object = false;           // a text object, which only an operator takes (dib)
     std::uint8_t where = 0;        // where it does something, as whereBit makes it; 0 everywhere
+    // The kinds of its arguments, for completion: the first, second and third, the third for
+    // any after it too, as set takes settings one after another.
+    std::array<Choices, 3> choices = {};
 };
 
 // Where a command does something, for the hint menu and the palette to offer only what works

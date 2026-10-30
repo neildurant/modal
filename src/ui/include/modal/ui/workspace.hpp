@@ -116,6 +116,20 @@ public:
     using PortFinder = std::function<PortLookup(std::string_view name)>;
     void setPortFinder(PortFinder finder) { portFinder_ = std::move(finder); }
 
+    // Where completion at the : prompt finds the choices of a kind of argument, from the word
+    // typed so far (the workspace has those of commands, sections, roles, meters, lengths and
+    // ports; the program the settings' and files'), and the choices it shows, while there are
+    // several, with the one chosen.
+    using ChoiceSource = std::function<std::vector<std::string>(std::string_view word)>;
+    void setChoices(Choices kind, ChoiceSource source);
+    std::vector<std::string> choices(Choices kind, std::string_view word) const;
+    struct Completions
+    {
+        std::vector<std::string> matches;
+        std::optional<std::size_t> chosen;
+    };
+    std::optional<Completions> completions() const;
+
     // What runs a line entered at the : prompt, such as the program's command runner.
     using LineHandler = std::function<void(const std::string& line)>;
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
@@ -294,6 +308,19 @@ private:
     std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
     std::vector<Hint> operatorHints() const;
     std::optional<int> keysPage_; // the list of keys' page, while it shows
+    std::array<ChoiceSource, kChoicesCount> sources_;
+    // Completing at the prompt: the matches, the one chosen as Tab goes round them, where the
+    // word they replace starts, and the line as completion left it, to know it's going on.
+    struct Completing
+    {
+        std::vector<std::string> matches;
+        std::optional<std::size_t> chosen;
+        std::size_t start = 0;
+        std::u32string line;
+    };
+    std::optional<Completing> completing_;
+    bool complete(int by);
+    Region completionRegion(const Completions& shown) const;
     // The list of keys laid out in pages of columns, each a run of lines: a group's title, or
     // a key and its title.
     struct KeyLine

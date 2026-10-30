@@ -82,12 +82,14 @@ constexpr std::array kCommands{
     CommandInfo{.name = "grid",
                 .description = "Set the track's grid, or show it with no length",
                 .usage = "[LENGTH]",
-                .keys = false},
+                .keys = false,
+                .choices = {Choices::Length}},
     CommandInfo{.name = "len",
                 .description = "Set the length of the track's default note, or grid to follow "
                                "the grid; or show it with no length",
                 .usage = "[LENGTH|grid]",
-                .keys = false},
+                .keys = false,
+                .choices = {Choices::Length}},
 };
 
 // The grid's limits, without triplets: from a 1/64 note to a whole note.

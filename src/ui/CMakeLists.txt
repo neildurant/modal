@@ -8,6 +8,7 @@ add_library(modal_ui STATIC
     cell_grid.cpp
     command_line.cpp
     commands.cpp
+    completion.cpp
     config.cpp
     demo_song.cpp
     event_list.cpp

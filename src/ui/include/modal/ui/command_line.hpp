@@ -32,6 +32,8 @@ public:
     void start();
     void end();
     void clear();
+    // Replaces the text from one place to another with other text, the cursor after it.
+    void replace(std::size_t from, std::size_t to, std::u32string_view text);
 
     // Recalls the line run before the one shown, or after it, returning to the line being
     // typed after the newest. False if there's none further.

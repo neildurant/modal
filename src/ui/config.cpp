@@ -374,22 +374,30 @@ namespace
 {
 
 constexpr CommandInfo configCommand(std::string_view name, std::string_view description,
-                                    std::string_view usage)
+                                    std::string_view usage, std::array<Choices, 3> choices = {})
 {
-    return {
-        .name = name, .description = description, .usage = usage, .config = true, .keys = false};
+    return {.name = name,
+            .description = description,
+            .usage = usage,
+            .config = true,
+            .keys = false,
+            .choices = choices};
 }
+
+constexpr std::array<Choices, 3> kMapChoices{Choices::None, Choices::Command, Choices::None};
 
 constexpr std::string_view kMapUsage = "KEYS COMMAND [\"HINT\"]";
 
 constexpr std::array kConfigCommands{
-    configCommand("set", "Set settings; set NAME? shows one", "NAME=VALUE..."),
-    configCommand("highlight", "Set a theme role's colour", "ROLE #rrggbb"),
-    configCommand("nmap", "Bind keys to a command in Normal mode", kMapUsage),
-    configCommand("vmap", "Bind keys to a command in Visual mode", kMapUsage),
-    configCommand("imap", "Bind keys to a command in Insert mode", kMapUsage),
-    configCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage),
-    configCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage),
+    configCommand("set", "Set settings; set NAME? shows one", "NAME=VALUE...",
+                  {Choices::Setting, Choices::Setting, Choices::Setting}),
+    configCommand("highlight", "Set a theme role's colour", "ROLE #rrggbb", {Choices::Role}),
+    configCommand("nmap", "Bind keys to a command in Normal mode", kMapUsage, kMapChoices),
+    configCommand("vmap", "Bind keys to a command in Visual mode", kMapUsage, kMapChoices),
+    configCommand("imap", "Bind keys to a command in Insert mode", kMapUsage, kMapChoices),
+    configCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage,
+                  kMapChoices),
+    configCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage, kMapChoices),
     configCommand("ngroup",
                   "Give keys that start longer bindings a title in the hint menu, in "
                   "Normal mode",
@@ -406,7 +414,8 @@ constexpr std::array kConfigCommands{
     configCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
     configCommand("ounmap", "Unbind keys in operator-pending mode", "KEYS"),
     configCommand("cunmap", "Unbind keys in command-line mode", "KEYS"),
-    configCommand("source", "Run a command file; at the : prompt, modalrc again if none", "FILE"),
+    configCommand("source", "Run a command file; at the : prompt, modalrc again if none", "FILE",
+                  {Choices::ConfigFile}),
 };
 
 } // namespace

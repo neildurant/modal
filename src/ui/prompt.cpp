@@ -20,7 +20,8 @@ constexpr std::array<CommandInfo, 1> kPromptCommands{{
      .description = "Write the config to a file, to start a modalrc from; ! overwrites it",
      .usage = "FILE",
      .bang = true,
-     .keys = false},
+     .keys = false,
+     .choices = {Choices::ConfigFile}},
 }};
 
 std::vector<std::string_view> words(std::string_view line)

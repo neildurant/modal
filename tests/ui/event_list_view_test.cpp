@@ -1056,3 +1056,59 @@ TEST_CASE("the hint menu shows what can follow keys that start longer bindings, 
     v.ws.handle(Key::typed(U'g'), 4000);
     CHECK(v.ws.hints());
 }
+
+TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree, then round them")
+{
+    Viewing v;
+    const auto line = [&] { return encodeUtf8(v.ws.commandLine().text()); };
+    const auto tab = [&] { v.ws.handle(Key::of(NamedKey::Tab), 0); };
+    type(v.ws, U":ba");
+    tab();
+    CHECK(line() == "bar-");
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->matches == std::vector<std::string>{"bar-delete", "bar-insert"});
+    CHECK_FALSE(v.ws.completions()->chosen);
+    tab();
+    CHECK(line() == "bar-delete");
+    CHECK(v.ws.completions()->chosen == 0u);
+    tab();
+    CHECK(line() == "bar-insert");
+    v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    CHECK(line() == "bar-delete");
+    type(v.ws, U" "); // typing goes on from there
+    CHECK_FALSE(v.ws.completions());
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+
+    // One match, with a space after it; the start of a word in a name.
+    type(v.ws, U":strip");
+    tab();
+    CHECK(line() == "section-strip ");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+
+    // An argument, by the kind the command says it is (the config commands, as the program
+    // adds them).
+    v.registry.add(configCommands());
+    type(v.ws, U":highlight hint-k");
+    tab();
+    CHECK(line() == "highlight hint-key ");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U":section-rename V");
+    tab();
+    CHECK(line() == "section-rename Verse ");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+
+    // A source the program gives, as for settings; NAME= goes on without a space.
+    v.ws.setChoices(Choices::Setting,
+                    [](std::string_view word)
+                    {
+                        return std::string_view{word}.find('=') == std::string_view::npos
+                                   ? std::vector<std::string>{"theme=", "timeoutlen="}
+                                   : std::vector<std::string>{"theme=dark", "theme=light"};
+                    });
+    type(v.ws, U":set th");
+    tab();
+    CHECK(line() == "set theme=");
+    type(v.ws, U"l");
+    tab();
+    CHECK(line() == "set theme=light ");
+}

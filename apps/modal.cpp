@@ -13,6 +13,7 @@
 #include <modal/platform/midi_ports.hpp>
 #include <modal/platform/paths.hpp>
 #include <modal/platform/thread_priority.hpp>
+#include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/file_commands.hpp>
@@ -20,6 +21,7 @@
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
+#include <modal/ui/themes.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -38,6 +40,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <variant>
@@ -556,6 +559,39 @@ int main(int argc, char* argv[])
             }
             return lookup;
         });
+    // The choices completion offers for settings and files; the workspace has the rest.
+    view.setChoices(ui::Choices::Setting,
+                    [&](std::string_view word)
+                    {
+                        std::vector<std::string> themes;
+                        for (const auto name : ui::builtInThemeNames())
+                        {
+                            themes.emplace_back(name);
+                        }
+                        if (configDirectory)
+                        {
+                            for (auto& file : ui::fileChoices(*configDirectory / "themes", ""))
+                            {
+                                if (!file.ends_with('/'))
+                                {
+                                    themes.push_back(std::move(file));
+                                }
+                            }
+                        }
+                        return ui::settingChoices(settings, word, themes);
+                    });
+    view.setChoices(ui::Choices::File,
+                    [](std::string_view word)
+                    {
+                        std::error_code error;
+                        return ui::fileChoices(std::filesystem::current_path(error), word);
+                    });
+    view.setChoices(ui::Choices::ConfigFile,
+                    [&](std::string_view word)
+                    {
+                        return configDirectory ? ui::fileChoices(*configDirectory, word)
+                                               : std::vector<std::string>{};
+                    });
     if (auto error = apply(settings, window, view, document, playback); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());

@@ -3,6 +3,7 @@
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/frame.hpp>
 
+#include <algorithm>
 #include <utility>
 
 namespace modal::ui
@@ -115,6 +116,14 @@ std::string CommandLine::take()
     }
     recalled_ = history_.size();
     return encodeUtf8(line);
+}
+
+void CommandLine::replace(std::size_t from, std::size_t to, std::u32string_view text)
+{
+    from = std::min(from, text_.size());
+    to = std::clamp(to, from, text_.size());
+    text_.replace(from, to - from, text);
+    cursor_ = from + text.size();
 }
 
 } // namespace modal::ui

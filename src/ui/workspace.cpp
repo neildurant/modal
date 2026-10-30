@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/ui/bar.hpp>
+#include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
@@ -87,7 +88,8 @@ constexpr std::array kSharedCommands{
                 .description = "Set the track's output port, by its name or part of it; or "
                                "with no name, show it and list the ports",
                 .usage = "[NAME]",
-                .keys = false},
+                .keys = false,
+                .choices = {Choices::Port}},
     CommandInfo{.name = "section",
                 .description = "Start a new section at the cursor's bar line, splitting the "
                                "section it's in; named Section and a number if no name is given",
@@ -102,7 +104,8 @@ constexpr std::array kSharedCommands{
                 .description = "Insert an empty bar, or N, before the cursor's bar on every "
                                "track, in the meter there or one given (2 3/4)",
                 .usage = "[N] [METER]",
-                .keys = false},
+                .keys = false,
+                .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
     CommandInfo{.name = "marker-to-section",
                 .description = "Start a section at the marker at or before the cursor, named "
                                "after it, at the bar line of its bar; the marker goes",
@@ -114,7 +117,8 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor",
                 .usage = "NAME",
-                .keys = false},
+                .keys = false,
+                .choices = {Choices::Section}},
     CommandInfo{.name = "yank-this",
                 .description = "Yank the note or event under the cursor, as yin does, or the "
                                "section on the section strip",
@@ -1475,6 +1479,11 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         return view().runTyping(command);
     }
+    if (command == "command-line-next" || command == "command-line-previous")
+    {
+        return complete(command == "command-line-next" ? 1 : -1);
+    }
+    completing_.reset();
     if (command == "command-line-run")
     {
         mode_ = Mode::Normal;
@@ -1492,6 +1501,212 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         return true;
     }
     return editLine(line_, command);
+}
+
+void Workspace::setChoices(Choices kind, ChoiceSource source)
+{
+    sources_[static_cast<std::size_t>(kind)] = std::move(source);
+}
+
+std::vector<std::string> Workspace::choices(Choices kind, std::string_view word) const
+{
+    const auto& song = document_.song();
+    std::vector<std::string> found;
+    switch (kind)
+    {
+    case Choices::Command:
+        // The names and aliases of the commands the prompt runs: not those only for the
+        // prompt's own keys or after an operator.
+        for (const auto& info : commands_.all())
+        {
+            if (info.modes != 0 && (info.modes & modeBit(Mode::Normal)) == 0)
+            {
+                continue;
+            }
+            found.emplace_back(info.name);
+            for (std::size_t at = 0; at < info.aliases.size();)
+            {
+                const auto end = std::min(info.aliases.find(' ', at), info.aliases.size());
+                if (end > at)
+                {
+                    found.emplace_back(info.aliases.substr(at, end - at));
+                }
+                at = end + 1;
+            }
+        }
+        std::ranges::sort(found);
+        return found;
+    case Choices::Section:
+        for (const auto& section : song.sections())
+        {
+            found.push_back(section->name());
+        }
+        return found;
+    case Choices::Role:
+        for (std::size_t i = 0; i < kRoleCount; ++i)
+        {
+            found.emplace_back(roleName(static_cast<Role>(i)));
+        }
+        return found;
+    case Choices::Meter:
+        return {"2/4", "3/4", "4/4", "5/4", "6/4", "3/8", "5/8", "6/8", "7/8", "9/8", "12/8"};
+    case Choices::Length:
+        return {"1/1",  "1/2",  "1/4",  "1/8",  "1/16",  "1/32", "1/2.",
+                "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
+    case Choices::Port:
+        if (portFinder_)
+        {
+            return portFinder_("").ports;
+        }
+        return {};
+    default:
+        break;
+    }
+    if (const auto& source = sources_[static_cast<std::size_t>(kind)])
+    {
+        return source(word);
+    }
+    return {};
+}
+
+std::optional<Workspace::Completions> Workspace::completions() const
+{
+    if (mode_ != Mode::CommandLine || view().typing() || !completing_ ||
+        completing_->line != line_.text() || completing_->matches.size() < 2)
+    {
+        return std::nullopt;
+    }
+    return Completions{completing_->matches, completing_->chosen};
+}
+
+bool Workspace::complete(int by)
+{
+    // As zsh does (decided October 2026): Tab completes the word as far as its matches agree,
+    // and then goes round them, Shift-Tab back; one match is completed with a space after it,
+    // unless it goes on (set theme=, a folder/).
+    const auto replaceWord = [this](std::size_t start, const std::string& with)
+    { line_.replace(start, line_.cursor(), decodeUtf8(with)); };
+    if (completing_ && completing_->line == line_.text() && completing_->matches.size() > 1)
+    {
+        const auto count = completing_->matches.size();
+        auto& chosen = completing_->chosen;
+        chosen = !chosen  ? (by > 0 ? 0 : count - 1)
+                 : by > 0 ? (*chosen + 1) % count
+                          : (*chosen + count - 1) % count;
+        replaceWord(completing_->start, completing_->matches[*chosen]);
+        completing_->line = line_.text();
+        return true;
+    }
+    completing_.reset();
+    const auto& text = line_.text();
+    const auto word = wordAt(text, line_.cursor());
+    const auto typed = encodeUtf8(text.substr(word.start, line_.cursor() - word.start));
+    auto kind = Choices::Command;
+    if (word.index > 0)
+    {
+        const auto first = wordAt(text, 0);
+        auto name = encodeUtf8(text.substr(first.start, first.end - first.start));
+        if (name.size() > 1 && name.ends_with('!'))
+        {
+            name.pop_back();
+        }
+        const auto* info = commands_.find(name);
+        kind = info == nullptr ? Choices::None
+                               : info->choices[std::min<std::size_t>(word.index - 1, 2)];
+    }
+    if (kind == Choices::None)
+    {
+        return true;
+    }
+    const auto all = choices(kind, typed);
+    const auto found = matching(all, typed);
+    if (found.empty())
+    {
+        return true;
+    }
+    if (found.size() == 1)
+    {
+        const auto& only = found.front();
+        replaceWord(word.start, only + (only.ends_with('=') || only.ends_with('/') ? "" : " "));
+        return true;
+    }
+    const auto shared = sharedStart(found);
+    if (decodeUtf8(shared).size() > decodeUtf8(typed).size() &&
+        matching(std::span{&shared, 1}, typed).size() == 1)
+    {
+        replaceWord(word.start, shared);
+        completing_ = Completing{found, std::nullopt, word.start, line_.text()};
+        return true;
+    }
+    completing_ = Completing{found, std::nullopt, word.start, line_.text()};
+    return complete(by);
+}
+
+Region Workspace::completionRegion(const Completions& shown) const
+{
+    // Above the prompt, as the hint menu is: the matches down six rows and then across, each
+    // column as wide as what's in it, the one chosen in the cursor's colours.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
+    const auto count = static_cast<int>(shown.matches.size());
+    const int most = std::max(layout_.main.height / cell_.height - 1, 1);
+    int rows = std::min(count, std::min(6, most));
+    const auto widths = [&](int r)
+    {
+        std::vector<int> columns;
+        for (int i = 0; i < count; ++i)
+        {
+            if (i % r == 0)
+            {
+                columns.push_back(0);
+            }
+            columns.back() = std::max(
+                columns.back(),
+                static_cast<int>(decodeUtf8(shown.matches[static_cast<std::size_t>(i)]).size()));
+        }
+        int total = 0;
+        for (const auto w : columns)
+        {
+            total += w + 3;
+        }
+        return std::pair{columns, total};
+    };
+    auto [columns, total] = widths(rows);
+    while (total > room && rows < std::min(count, most))
+    {
+        std::tie(columns, total) = widths(++rows);
+    }
+    const int pad = cell_.height / 4;
+    const int height = rows * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    const Style plain{Role::Text, Role::Panel, kPlain};
+    const Style chosen{Role::CursorText, Role::Cursor, kPlain};
+    int left = 0;
+    for (std::size_t c = 0; c < columns.size(); ++c)
+    {
+        if (left + columns[c] > room && c > 0)
+        {
+            break;
+        }
+        for (int row = 0; row < rows; ++row)
+        {
+            const auto i = c * static_cast<std::size_t>(rows) + static_cast<std::size_t>(row);
+            if (i >= shown.matches.size())
+            {
+                break;
+            }
+            region.text.push_back({margin + left * cell_.width, pad + row * cell_.height,
+                                   decodeUtf8(shown.matches[i]),
+                                   shown.chosen == i ? chosen : plain});
+        }
+        left += columns[c] + 3;
+    }
+    return region;
 }
 
 bool Workspace::transport(std::string_view command)
@@ -1995,6 +2210,10 @@ Frame Workspace::frame() const
     if (keysPage_)
     {
         frame.push_back(keysRegion());
+    }
+    if (const auto shown = completions())
+    {
+        frame.push_back(completionRegion(*shown));
     }
     if (const auto shown = hints())
     {
