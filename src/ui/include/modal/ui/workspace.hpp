@@ -17,11 +17,13 @@
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/view.hpp>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <random>
 #include <span>
 #include <string>
 #include <string_view>
@@ -107,6 +109,14 @@ public:
     // cursor stays where it was; otherwise the marker moves to where playback stops, and the
     // cursor follows the playhead there.
     void setRewind(bool rewind);
+
+    // How far ~ moves notes at most, either way: in time (humanizetime) and in velocity
+    // (humanizevel).
+    void setHumanize(std::chrono::milliseconds time, int velocity)
+    {
+        humanizeTime_ = time;
+        humanizeVelocity_ = velocity;
+    }
     bool rewind() const { return rewind_; }
 
     // What a port name given to :port refers to: the output port's full name, or else the
@@ -297,6 +307,9 @@ private:
     void askFor(std::string label, std::function<void(const std::string&)> answer);
     std::string answerLabel_;
     std::function<void(const std::string&)> answer_;
+    std::chrono::milliseconds humanizeTime_{10};
+    int humanizeVelocity_ = 8;
+    std::mt19937_64 random_{std::random_device{}()};
     // :marker-to-section-all, going through the markers, asking about those off a bar line.
     struct MarkerRun
     {

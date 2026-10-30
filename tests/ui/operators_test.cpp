@@ -7,7 +7,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <map>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -310,4 +313,44 @@ TEST_CASE("^ asks how to change the velocity: a value, a change or a percentage"
     o.type(U":");
     CHECK(prompt().starts_with(U":"));
     o.press(NamedKey::Escape);
+}
+
+TEST_CASE(
+    "humanising with ~ moves notes a little at random in time and velocity, up to the settings")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.ws.setHumanize(std::chrono::milliseconds{20}, 5);
+    // Each note's start and velocity, by its pitch, since the chord's two may change places.
+    const auto byPitch = [&]
+    {
+        std::map<int, std::pair<core::Tick, int>> found;
+        const auto notes = o.notes();
+        const auto velocities = o.velocities();
+        for (std::size_t i = 0; i < notes.size(); ++i)
+        {
+            found[notes[i].second] = {notes[i].first, velocities[i]};
+        }
+        return found;
+    };
+    const auto before = byPitch();
+    o.type(U"gr~2ib"); // the first two bars' notes, at 120 a minute: 20 ms is q/25
+    const auto after = byPitch();
+    REQUIRE(after.size() == before.size());
+    for (const int pitch : {31, 28, 45})
+    {
+        CAPTURE(pitch);
+        REQUIRE(after.contains(pitch));
+        CHECK(std::abs(after.at(pitch).first - before.at(pitch).first) <= q / 25 + 1);
+        CHECK(std::abs(after.at(pitch).second - before.at(pitch).second) <= 5);
+    }
+    CHECK(after.at(36) == before.at(36)); // the C2 in bar 5 is outside it
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Humanise 3 notes in Bass");
+
+    // With nothing to change by, nothing changes.
+    o.ws.setHumanize(std::chrono::milliseconds{0}, 0);
+    o.type(U"~~");
+    CHECK(o.ws.message() == "Nothing changed in 2 notes in Bass");
 }

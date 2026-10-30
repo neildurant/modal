@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
+#include <random>
 #include <string>
 #include <utility>
 #include <variant>
@@ -71,10 +73,10 @@ std::string times(int count, std::string_view one, std::string_view many)
 
 bool isOperator(std::string_view command)
 {
-    constexpr std::array<std::string_view, 8> kOperators{
+    constexpr std::array<std::string_view, 9> kOperators{
         "operator-delete",         "operator-yank",        "operator-transpose-up",
         "operator-transpose-down", "operator-shift-later", "operator-shift-earlier",
-        "operator-quantize",       "operator-velocity"};
+        "operator-quantize",       "operator-velocity",    "operator-humanize"};
     return std::ranges::find(kOperators, command) != kOperators.end();
 }
 
@@ -138,6 +140,21 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
                                 { return core::changeVelocity(events, part.events, c); });
                });
         return true;
+    }
+    if (op == "operator-humanize")
+    {
+        // Up to humanizetime either way at each note's own tempo.
+        const auto& tempo = song.tempo();
+        const auto most = [&](core::Tick tick)
+        { return tempo.toTickExtended(tempo.toTime(tick) + humanizeTime_) - tick; };
+        const auto random = [this](std::int64_t low, std::int64_t high)
+        { return std::uniform_int_distribution<std::int64_t>{low, high}(random_); };
+        return changeEvents("Humanise " + target->what, *target,
+                            [&](const core::EventList& events, const auto& part)
+                            {
+                                return core::humanize(events, part.events, most, humanizeVelocity_,
+                                                      song.end(), random);
+                            });
     }
     if (op == "operator-quantize")
     {

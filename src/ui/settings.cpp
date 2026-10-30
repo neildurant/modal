@@ -108,6 +108,11 @@ Settings::Settings()
                   "How far, in milliseconds, a nudge moves a note in the piano roll, or "
                   "lengthens or shortens it",
                   std::int64_t{5}, 1, 1000),
+          setting("humanizetime",
+                  "How far, in milliseconds, ~ moves a note in time at most, either way",
+                  std::int64_t{10}, 0, 1000),
+          setting("humanizevel", "How far ~ changes a note's velocity at most, either way",
+                  std::int64_t{8}, 0, 127),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
           setting("ownports",

@@ -383,6 +383,8 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.pianoRoll().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.pianoRoll().setNudge(std::chrono::milliseconds{settings.integer("nudge")});
     view.pianoRoll().setGridAdvance(settings.flag("gridadvance"));
+    view.setHumanize(std::chrono::milliseconds{settings.integer("humanizetime")},
+                     static_cast<int>(settings.integer("humanizevel")));
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())

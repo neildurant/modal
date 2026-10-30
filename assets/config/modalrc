@@ -70,7 +70,9 @@ nmap <leader>n  default-note-set          "Default note from this one"
 " The other operators take the same ranges and objects, a count before them saying how far:
 " > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
 " the grid step (in the piano roll, its notes), q quantises notes' starts to the grid, asking
-" whether the pedals go with them, and ^ sets or changes velocity, asking how (80, +10, 80%).
+" whether the pedals go with them, ^ sets or changes velocity, asking how (80, +10, 80%), and
+" ~ humanises notes, moving each a little at random in time and velocity (humanizetime and
+" humanizevel say how far).
 " Doubled (>>, qq), they take this bar.
 keysection "Changing events"
 nmap <CR>       field-edit        "Edit this field"
@@ -88,6 +90,7 @@ nmap t          operator-shift-later "Move later"
 nmap T          operator-shift-earlier "Move earlier"
 nmap q          operator-quantize "Quantise"
 nmap ^          operator-velocity "Velocity"
+nmap ~          operator-humanize "Humanise"
 nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"

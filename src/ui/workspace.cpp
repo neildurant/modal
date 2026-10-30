@@ -75,6 +75,11 @@ constexpr std::array kSharedCommands{
                                "asking how: a value (80), a change (+10, -10) or a percentage "
                                "(80%); ^^ this bar's",
                 .count = true},
+    CommandInfo{.name = "operator-humanize",
+                .description = "Humanise the notes a range or object takes: move each a little "
+                               "at random in time and velocity, by up to humanizetime and "
+                               "humanizevel; ~~ this bar's",
+                .count = true},
     CommandInfo{.name = "operator-line",
                 .description = "After an operator, this bar's events, or {count} bars' from it",
                 .modes = modeBit(Mode::OperatorPending),
@@ -255,7 +260,8 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 56> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 57> where{{
+            {"operator-humanize", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-velocity", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-transpose-up", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-transpose-down", onlyIn({Tracks, PianoRoll, EventList})},
