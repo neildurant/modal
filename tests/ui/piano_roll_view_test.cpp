@@ -680,7 +680,7 @@ TEST_CASE(":grid and :len set the track's grid and default length")
 
     r.type(U"ge"); // not in the event list
     line("grid 1/4");
-    CHECK(r.ws.message() == "Grid isn't in the event list");
+    CHECK(r.ws.message() == "Grid is for the piano roll");
     CHECK(bass().grid == core::NoteFraction{1, 12});
 }
 
@@ -1273,7 +1273,7 @@ TEST_CASE("after an operator the hint menu lists its ranges and objects, with wh
 TEST_CASE("the hint menu offers only the commands that do something where the cursor is")
 {
     // Every binding offered in each place, run there afresh, does something there rather than
-    // saying it isn't in the view; and gs, say, isn't offered in the piano roll.
+    // saying it's for somewhere else; and gs, say, isn't offered in the piano roll.
     const std::array<std::pair<std::u32string_view, Where>, 4> places{{
         {U"", Where::PianoRoll},
         {U"ga", Where::Tracks},
@@ -1299,7 +1299,8 @@ TEST_CASE("the hint menu offers only the commands that do something where the cu
                 r.press(key.named == NamedKey::Leader ? Key::typed(U',') : key);
             }
             CAPTURE(static_cast<int>(where), binding.command, formatKeys(keys));
-            CHECK(r.ws.message().find(" isn't in ") == std::string::npos);
+            CHECK(r.ws.message().find(" is for ") == std::string::npos);
+            CHECK(r.ws.message().find(" does nothing here") == std::string::npos);
         }
     }
     Rolling r;

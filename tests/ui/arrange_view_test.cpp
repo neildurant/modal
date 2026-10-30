@@ -208,10 +208,12 @@ TEST_CASE("a command a view doesn't have says so")
 {
     Arranging a;
     a.type(U"=");
-    CHECK(a.ws.message() == "Field increase isn't in the arrangement");
+    CHECK(a.ws.message() ==
+          "Field increase is for the section strip, the piano roll and the event list");
     a.type(U"ge");
     a.type(U"zi");
-    CHECK(a.ws.message() == "Zoom in isn't in the event list");
+    CHECK(a.ws.message() ==
+          "Zoom in is for the arrangement's tracks, the section strip and the piano roll");
 }
 
 TEST_CASE(":section starts a section at the cursor's bar in the arrangement too")

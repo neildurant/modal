@@ -227,7 +227,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 48> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 50> where{{
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
@@ -276,6 +276,8 @@ std::span<const CommandInfo> Workspace::commands()
             {"grid-finer", onlyIn({PianoRoll})},
             {"grid-coarser", onlyIn({PianoRoll})},
             {"grid-triplets", onlyIn({PianoRoll})},
+            {"grid", onlyIn({PianoRoll})},
+            {"len", onlyIn({PianoRoll})},
         }};
         for (auto& info : result)
         {
@@ -1291,9 +1293,31 @@ bool Workspace::runViewCommand(std::string_view command, int count)
         }
         return *changed;
     }
+    // Where it does something instead, rather than where it doesn't, which reads as if it
+    // were missing: "Note default is for the piano roll".
     const auto* info = commands_.find(command);
     auto title = info != nullptr ? titleOf(*info) : std::string{command};
-    setMessage(title + " isn't in " + std::string{view().name()}, MessageKind::Information);
+    std::vector<std::string> places;
+    constexpr std::array<std::pair<Where, std::string_view>, 4> kPlaces{{
+        {Where::Tracks, "the arrangement's tracks"},
+        {Where::Strip, "the section strip"},
+        {Where::PianoRoll, "the piano roll"},
+        {Where::EventList, "the event list"},
+    }};
+    for (const auto& [place, name] : kPlaces)
+    {
+        if (info != nullptr && (info->where & whereBit(place)) != 0)
+        {
+            places.emplace_back(name);
+        }
+    }
+    std::string text;
+    for (std::size_t i = 0; i < places.size(); ++i)
+    {
+        text += (i == 0 ? "" : i + 1 == places.size() ? " and " : ", ") + places[i];
+    }
+    setMessage(places.empty() ? title + " does nothing here" : title + " is for " + text,
+               MessageKind::Information);
     return true;
 }
 
@@ -1483,6 +1507,11 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         return complete(command == "command-line-next" ? 1 : -1);
     }
+    // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do.
+    if (completions() && (command == "command-line-newer" || command == "command-line-older"))
+    {
+        return complete(command == "command-line-newer" ? 1 : -1);
+    }
     completing_.reset();
     if (command == "command-line-run")
     {
@@ -1519,7 +1548,8 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         // prompt's own keys or after an operator.
         for (const auto& info : commands_.all())
         {
-            if (info.modes != 0 && (info.modes & modeBit(Mode::Normal)) == 0)
+            if ((info.modes != 0 && (info.modes & modeBit(Mode::Normal)) == 0) ||
+                !offered(info.name))
             {
                 continue;
             }
@@ -1549,7 +1579,8 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         }
         return found;
     case Choices::Meter:
-        return {"2/4", "3/4", "4/4", "5/4", "6/4", "3/8", "5/8", "6/8", "7/8", "9/8", "12/8"};
+        return {"2/4", "3/4", "4/4", "5/4", "6/4",  "7/4", "3/8",
+                "5/8", "6/8", "7/8", "9/8", "11/8", "12/8"};
     case Choices::Length:
         return {"1/1",  "1/2",  "1/4",  "1/8",  "1/16",  "1/32", "1/2.",
                 "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
@@ -1611,8 +1642,10 @@ bool Workspace::complete(int by)
             name.pop_back();
         }
         const auto* info = commands_.find(name);
-        kind = info == nullptr ? Choices::None
-                               : info->choices[std::min<std::size_t>(word.index - 1, 2)];
+        // Not for a command that does nothing here.
+        kind = info == nullptr || !offered(info->name)
+                   ? Choices::None
+                   : info->choices[std::min<std::size_t>(word.index - 1, 2)];
     }
     if (kind == Choices::None)
     {

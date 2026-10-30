@@ -1075,14 +1075,22 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     CHECK(line() == "bar-insert");
     v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
     CHECK(line() == "bar-delete");
+    v.ws.handle(Key::of(NamedKey::Down), 0); // Down and Up go round them too
+    CHECK(line() == "bar-insert");
+    v.ws.handle(Key::of(NamedKey::Up), 0);
+    CHECK(line() == "bar-delete");
     type(v.ws, U" "); // typing goes on from there
     CHECK_FALSE(v.ws.completions());
     v.ws.handle(Key::of(NamedKey::Escape), 0);
 
     // One match, with a space after it; the start of a word in a name.
-    type(v.ws, U":strip");
+    type(v.ws, U":chan");
     tab();
-    CHECK(line() == "section-strip ");
+    CHECK(line() == "chan"); // only what does something here: change is the strip's
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U":grid 1/");
+    tab();
+    CHECK(line() == "grid 1/"); // and nor are its arguments, the grid being the piano roll's
     v.ws.handle(Key::of(NamedKey::Escape), 0);
 
     // An argument, by the kind the command says it is (the config commands, as the program
