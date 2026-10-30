@@ -148,6 +148,8 @@ constexpr std::array kSharedCommands{
     atPrompt("command-line-clear", "Clear the command line"),
     atPrompt("command-line-next", "Set the field and go to the next, in the inspector"),
     atPrompt("command-line-previous", "Set the field and go to the one before, in the inspector"),
+    atPrompt("command-line-page-down", "A screen on in the matches of completion"),
+    atPrompt("command-line-page-up", "A screen back in the matches of completion"),
     atPrompt("command-line-older", "Recall the line run before"),
     atPrompt("command-line-newer", "Recall the line run after"),
 };
@@ -582,7 +584,12 @@ bool Workspace::handle(const Key& key, std::int64_t now)
             }
             else
             {
+                const bool listed = completions().has_value();
                 line_.insert(key.character);
+                if (listed)
+                {
+                    refilter(); // the matches follow what's typed
+                }
             }
             return true;
         }
@@ -1507,10 +1514,32 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         return complete(command == "command-line-next" ? 1 : -1);
     }
-    // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do.
-    if (completions() && (command == "command-line-newer" || command == "command-line-older"))
+    // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do; Left and
+    // Right go across the columns, and Page Down and Up a screen of them.
+    if (const auto shown = completions())
     {
-        return complete(command == "command-line-newer" ? 1 : -1);
+        if (command == "command-line-newer" || command == "command-line-older")
+        {
+            return complete(command == "command-line-newer" ? 1 : -1);
+        }
+        const auto columns = matchColumns(shown->matches);
+        const auto rows = static_cast<std::ptrdiff_t>(columns.rows);
+        if (command == "command-line-right" || command == "command-line-left")
+        {
+            return chooseMatch(command == "command-line-right" ? rows : -rows);
+        }
+        if (command == "command-line-page-down" || command == "command-line-page-up")
+        {
+            const auto page =
+                rows * static_cast<std::ptrdiff_t>(columnsShown(columns, shown->scroll));
+            return chooseMatch(command == "command-line-page-down" ? page : -page);
+        }
+        if (command == "command-line-backspace" || command == "command-line-delete")
+        {
+            const auto edited = editLine(line_, command);
+            refilter();
+            return edited;
+        }
     }
     completing_.reset();
     if (command == "command-line-run")
@@ -1607,7 +1636,31 @@ std::optional<Workspace::Completions> Workspace::completions() const
     {
         return std::nullopt;
     }
-    return Completions{completing_->matches, completing_->chosen};
+    return Completions{completing_->matches, completing_->chosen, completing_->scroll};
+}
+
+Workspace::CompletingWord Workspace::completingWord() const
+{
+    const auto& text = line_.text();
+    const auto word = wordAt(text, line_.cursor());
+    CompletingWord result{word.start,
+                          encodeUtf8(text.substr(word.start, line_.cursor() - word.start)),
+                          Choices::Command};
+    if (word.index > 0)
+    {
+        const auto first = wordAt(text, 0);
+        auto name = encodeUtf8(text.substr(first.start, first.end - first.start));
+        if (name.size() > 1 && name.ends_with('!'))
+        {
+            name.pop_back();
+        }
+        const auto* info = commands_.find(name);
+        // Not for a command that does nothing here.
+        result.kind = info == nullptr || !offered(info->name)
+                          ? Choices::None
+                          : info->choices[std::min<std::size_t>(word.index - 1, 2)];
+    }
+    return result;
 }
 
 bool Workspace::complete(int by)
@@ -1620,39 +1673,20 @@ bool Workspace::complete(int by)
     if (completing_ && completing_->line == line_.text() && completing_->matches.size() > 1)
     {
         const auto count = completing_->matches.size();
-        auto& chosen = completing_->chosen;
-        chosen = !chosen  ? (by > 0 ? 0 : count - 1)
-                 : by > 0 ? (*chosen + 1) % count
-                          : (*chosen + count - 1) % count;
-        replaceWord(completing_->start, completing_->matches[*chosen]);
-        completing_->line = line_.text();
+        const auto& chosen = completing_->chosen;
+        const auto to = !chosen  ? (by > 0 ? 0 : count - 1)
+                        : by > 0 ? (*chosen + 1) % count
+                                 : (*chosen + count - 1) % count;
+        chooseIndex(to);
         return true;
     }
     completing_.reset();
-    const auto& text = line_.text();
-    const auto word = wordAt(text, line_.cursor());
-    const auto typed = encodeUtf8(text.substr(word.start, line_.cursor() - word.start));
-    auto kind = Choices::Command;
-    if (word.index > 0)
-    {
-        const auto first = wordAt(text, 0);
-        auto name = encodeUtf8(text.substr(first.start, first.end - first.start));
-        if (name.size() > 1 && name.ends_with('!'))
-        {
-            name.pop_back();
-        }
-        const auto* info = commands_.find(name);
-        // Not for a command that does nothing here.
-        kind = info == nullptr || !offered(info->name)
-                   ? Choices::None
-                   : info->choices[std::min<std::size_t>(word.index - 1, 2)];
-    }
-    if (kind == Choices::None)
+    const auto word = completingWord();
+    if (word.kind == Choices::None)
     {
         return true;
     }
-    const auto all = choices(kind, typed);
-    const auto found = matching(all, typed);
+    const auto found = matching(choices(word.kind, word.typed), word.typed);
     if (found.empty())
     {
         return true;
@@ -1664,53 +1698,131 @@ bool Workspace::complete(int by)
         return true;
     }
     const auto shared = sharedStart(found);
-    if (decodeUtf8(shared).size() > decodeUtf8(typed).size() &&
-        matching(std::span{&shared, 1}, typed).size() == 1)
+    if (decodeUtf8(shared).size() > decodeUtf8(word.typed).size() &&
+        matching(std::span{&shared, 1}, word.typed).size() == 1)
     {
         replaceWord(word.start, shared);
-        completing_ = Completing{found, std::nullopt, word.start, line_.text()};
+        completing_ = Completing{found, std::nullopt, word.start, line_.text(), 0};
         return true;
     }
-    completing_ = Completing{found, std::nullopt, word.start, line_.text()};
+    completing_ = Completing{found, std::nullopt, word.start, line_.text(), 0};
     return complete(by);
+}
+
+bool Workspace::chooseMatch(std::ptrdiff_t by)
+{
+    // From the one chosen, or with none yet from before the first (or after the last).
+    const auto& c = *completing_;
+    const auto count = static_cast<std::ptrdiff_t>(c.matches.size());
+    const auto from = c.chosen ? static_cast<std::ptrdiff_t>(*c.chosen) : (by > 0 ? -1 : count);
+    chooseIndex(static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(from + by, 0, count - 1)));
+    return true;
+}
+
+void Workspace::chooseIndex(std::size_t to)
+{
+    // The line takes the match, and the columns shown move to keep it in view.
+    auto& c = *completing_;
+    c.chosen = to;
+    line_.replace(c.start, line_.cursor(), decodeUtf8(c.matches[to]));
+    c.line = line_.text();
+    const auto columns = matchColumns(c.matches);
+    const auto column = to / static_cast<std::size_t>(columns.rows);
+    if (column < c.scroll)
+    {
+        c.scroll = column;
+    }
+    while (column >= c.scroll + columnsShown(columns, c.scroll))
+    {
+        ++c.scroll;
+    }
+}
+
+void Workspace::refilter()
+{
+    // The word's matches as it's typed, none chosen; gone when the word ends or none match.
+    const auto& text = line_.text();
+    const auto at = line_.cursor();
+    const auto word = completingWord();
+    const bool ended = at > 0 && (text[at - 1] == U' ' || text[at - 1] == U'\t');
+    auto found = ended || word.kind == Choices::None
+                     ? std::vector<std::string>{}
+                     : matching(choices(word.kind, word.typed), word.typed);
+    if (found.empty())
+    {
+        completing_.reset();
+        return;
+    }
+    completing_ = Completing{std::move(found), std::nullopt, word.start, text, 0};
+}
+
+Workspace::MatchColumns Workspace::matchColumns(const std::vector<std::string>& matches) const
+{
+    // Six rows down and then across, as the hint menu is; more rows while they don't fit
+    // across, up to the main area's height, and then they scroll.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    MatchColumns columns;
+    columns.room = std::max((width_ - 2 * margin) / cell_.width, 1);
+    const auto count = static_cast<int>(matches.size());
+    const int most = std::max(layout_.main.height / cell_.height - 1, 1);
+    const auto lay = [&](int rows)
+    {
+        std::vector<int> widths;
+        int total = 0;
+        for (int i = 0; i < count; ++i)
+        {
+            if (i % rows == 0)
+            {
+                widths.push_back(0);
+            }
+            widths.back() =
+                std::max(widths.back(),
+                         static_cast<int>(decodeUtf8(matches[static_cast<std::size_t>(i)]).size()));
+        }
+        for (const auto w : widths)
+        {
+            total += w + 3;
+        }
+        return std::pair{widths, total};
+    };
+    columns.rows = std::max(std::min(count, std::min(6, most)), 1);
+    auto [widths, total] = lay(columns.rows);
+    while (total > columns.room && columns.rows < std::min(count, most))
+    {
+        std::tie(widths, total) = lay(++columns.rows);
+    }
+    columns.widths = std::move(widths);
+    return columns;
+}
+
+std::size_t Workspace::columnsShown(const MatchColumns& columns, std::size_t first) const
+{
+    // As many as fit, leaving room for the markers of more either side; at least one.
+    int used = first > 0 ? 2 : 0;
+    std::size_t shown = 0;
+    for (auto c = first; c < columns.widths.size(); ++c)
+    {
+        const bool last = c + 1 == columns.widths.size();
+        if (used + columns.widths[c] + (last ? 0 : 2) > columns.room && shown > 0)
+        {
+            break;
+        }
+        used += columns.widths[c] + 3;
+        ++shown;
+    }
+    return std::max<std::size_t>(shown, 1);
 }
 
 Region Workspace::completionRegion(const Completions& shown) const
 {
-    // Above the prompt, as the hint menu is: the matches down six rows and then across, each
-    // column as wide as what's in it, the one chosen in the cursor's colours.
+    // Above the prompt, as the hint menu is: the matches down and then across, each column as
+    // wide as what's in it, the one chosen in the cursor's colours; with more than fit across,
+    // those in view, a ◀ or ▶ at the side with more.
     const int margin = BarSpacing::forCell(cell_).margin;
-    const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
-    const auto count = static_cast<int>(shown.matches.size());
-    const int most = std::max(layout_.main.height / cell_.height - 1, 1);
-    int rows = std::min(count, std::min(6, most));
-    const auto widths = [&](int r)
-    {
-        std::vector<int> columns;
-        for (int i = 0; i < count; ++i)
-        {
-            if (i % r == 0)
-            {
-                columns.push_back(0);
-            }
-            columns.back() = std::max(
-                columns.back(),
-                static_cast<int>(decodeUtf8(shown.matches[static_cast<std::size_t>(i)]).size()));
-        }
-        int total = 0;
-        for (const auto w : columns)
-        {
-            total += w + 3;
-        }
-        return std::pair{columns, total};
-    };
-    auto [columns, total] = widths(rows);
-    while (total > room && rows < std::min(count, most))
-    {
-        std::tie(columns, total) = widths(++rows);
-    }
+    const auto columns = matchColumns(shown.matches);
+    const auto count = columnsShown(columns, shown.scroll);
     const int pad = cell_.height / 4;
-    const int height = rows * cell_.height + 2 * pad;
+    const int height = columns.rows * cell_.height + 2 * pad;
     const auto& status = layout_.bottom[0];
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
@@ -1719,16 +1831,20 @@ Region Workspace::completionRegion(const Completions& shown) const
                   .over = {}};
     const Style plain{Role::Text, Role::Panel, kPlain};
     const Style chosen{Role::CursorText, Role::Cursor, kPlain};
+    const Style more{Role::Dim, Role::Panel, kPlain};
     int left = 0;
-    for (std::size_t c = 0; c < columns.size(); ++c)
+    if (shown.scroll > 0)
     {
-        if (left + columns[c] > room && c > 0)
+        region.text.push_back({margin, pad, U"◀", more});
+        left = 2;
+    }
+    const auto end = std::min(shown.scroll + count, columns.widths.size());
+    for (auto c = shown.scroll; c < end; ++c)
+    {
+        for (int row = 0; row < columns.rows; ++row)
         {
-            break;
-        }
-        for (int row = 0; row < rows; ++row)
-        {
-            const auto i = c * static_cast<std::size_t>(rows) + static_cast<std::size_t>(row);
+            const auto i =
+                c * static_cast<std::size_t>(columns.rows) + static_cast<std::size_t>(row);
             if (i >= shown.matches.size())
             {
                 break;
@@ -1737,7 +1853,11 @@ Region Workspace::completionRegion(const Completions& shown) const
                                    decodeUtf8(shown.matches[i]),
                                    shown.chosen == i ? chosen : plain});
         }
-        left += columns[c] + 3;
+        left += columns.widths[c] + 3;
+    }
+    if (end < columns.widths.size())
+    {
+        region.text.push_back({margin + (columns.room - 1) * cell_.width, pad, U"▶", more});
     }
     return region;
 }

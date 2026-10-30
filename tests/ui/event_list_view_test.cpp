@@ -1120,3 +1120,55 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     tab();
     CHECK(line() == "set theme=light ");
 }
+
+TEST_CASE("the matches of completion follow what's typed, and the arrows and pages go round them")
+{
+    Viewing v;
+    const auto line = [&] { return encodeUtf8(v.ws.commandLine().text()); };
+    const auto press = [&](NamedKey key) { v.ws.handle(Key::of(key), 0); };
+
+    // Left and Right go across the columns, six rows down, stopping at the ends.
+    type(v.ws, U":bar-insert ");
+    press(NamedKey::Tab);
+    CHECK(line() == "bar-insert 2/4");
+    press(NamedKey::Right);
+    CHECK(line() == "bar-insert 3/8"); // the next column's first
+    press(NamedKey::Left);
+    press(NamedKey::Left);
+    CHECK(line() == "bar-insert 2/4");
+    press(NamedKey::Escape);
+
+    // Typing and deleting while they show narrows and widens them, none chosen.
+    type(v.ws, U":ba");
+    press(NamedKey::Tab); // bar-, as far as they agree
+    REQUIRE(v.ws.completions());
+    press(NamedKey::Backspace);
+    REQUIRE(v.ws.completions());
+    CHECK(line() == "bar");
+    CHECK(v.ws.completions()->matches == std::vector<std::string>{"bar-delete", "bar-insert"});
+    type(v.ws, U"-i"); // one left: the list goes, and Tab completes it
+    CHECK_FALSE(v.ws.completions());
+    press(NamedKey::Tab);
+    CHECK(line() == "bar-insert ");
+    press(NamedKey::Escape);
+
+    // In a small window the columns scroll to keep the one chosen in view.
+    v.ws.resize(60 * kCell.width, 12 * kCell.height, kCell);
+    type(v.ws, U":");
+    press(NamedKey::Tab);
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->scroll == 0u);
+    for (int i = 0; i < 4; ++i)
+    {
+        press(NamedKey::PageDown);
+    }
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->scroll > 0u);
+    const auto shown = v.ws.frame();
+    CHECK(std::ranges::any_of(shown,
+                              [](const Region& r)
+                              {
+                                  return std::ranges::any_of(r.text, [](const TextRun& run)
+                                                             { return run.text == U"◀"; });
+                              }));
+}

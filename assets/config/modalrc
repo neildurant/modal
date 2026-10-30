@@ -224,6 +224,8 @@ cmap <Up>       command-line-older      "Older line"
 cmap <Down>     command-line-newer      "Newer line"
 cmap <Tab>      command-line-next       "Next field"
 cmap <S-Tab>    command-line-previous   "Field before"
+cmap <PageDown> command-line-page-down  "A screen on"
+cmap <PageUp>   command-line-page-up    "A screen back"
 
 nmap <Esc>      cancel            "Cancel"
 

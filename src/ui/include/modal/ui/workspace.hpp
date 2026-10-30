@@ -127,6 +127,7 @@ public:
     {
         std::vector<std::string> matches;
         std::optional<std::size_t> chosen;
+        std::size_t scroll = 0;
     };
     std::optional<Completions> completions() const;
 
@@ -317,9 +318,35 @@ private:
         std::optional<std::size_t> chosen;
         std::size_t start = 0;
         std::u32string line;
+        std::size_t scroll = 0; // the first column shown, when they don't all fit across
     };
     std::optional<Completing> completing_;
+    // The word at the prompt's cursor to complete: where it starts, what's typed of it, and
+    // the kind of thing it is, None if nothing completes there.
+    struct CompletingWord
+    {
+        std::size_t start = 0;
+        std::string typed;
+        Choices kind = Choices::None;
+    };
+    CompletingWord completingWord() const;
     bool complete(int by);
+    // Chooses the match some places on or back, as the arrow keys and Page Down and Up do,
+    // stopping at the ends.
+    bool chooseMatch(std::ptrdiff_t by);
+    void chooseIndex(std::size_t to);
+    // After the line is edited while the matches show, they're the matches of the word now.
+    void refilter();
+    // The matches in columns: how many rows, each column's width, and how many fit across from
+    // the first shown.
+    struct MatchColumns
+    {
+        int rows = 1;
+        std::vector<int> widths;
+        int room = 1;
+    };
+    MatchColumns matchColumns(const std::vector<std::string>& matches) const;
+    std::size_t columnsShown(const MatchColumns& columns, std::size_t first) const;
     Region completionRegion(const Completions& shown) const;
     // The list of keys laid out in pages of columns, each a run of lines: a group's title, or
     // a key and its title.
