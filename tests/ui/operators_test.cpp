@@ -80,6 +80,19 @@ struct Operating
         }
         return found;
     }
+    std::vector<int> velocities() const
+    {
+        std::vector<int> found;
+        const auto& song = document.song();
+        for (const auto& event : song.events(song.tracks()[0]->id()).all())
+        {
+            if (const auto* note = std::get_if<core::Note>(&event.data))
+            {
+                found.push_back(note->velocity);
+            }
+        }
+        return found;
+    }
     std::vector<core::Tick> pedals() const
     {
         std::vector<core::Tick> found;
@@ -239,4 +252,62 @@ TEST_CASE("after > the hint menu lists its ranges, but not ab, which is ib to it
     o.press(NamedKey::Escape);
     o.type(U"tab"); // still taken, as ib
     CHECK(o.notes().front().first == o.q / 4);
+}
+
+TEST_CASE("^ asks how to change the velocity: a value, a change or a percentage")
+{
+    Operating o;
+    const auto prompt = [&]
+    {
+        // The bottom line's text.
+        const auto frame = o.ws.frame();
+        const auto* bottom = &frame.front();
+        for (const auto& region : frame)
+        {
+            if (region.bounds.y > bottom->bounds.y)
+            {
+                bottom = &region;
+            }
+        }
+        std::u32string text;
+        for (const auto& run : bottom->text)
+        {
+            text += run.text;
+        }
+        return text;
+    };
+    o.type(U"gr^^"); // bar 1's chord, G1 at 80 and E1 at 96
+    REQUIRE(o.ws.mode() == Mode::CommandLine);
+    CHECK(prompt().starts_with(U"Velocity of 2 notes in Bass (80, +10, 80%): "));
+    o.type(U"+10");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector{90, 106, 50, 100, 70});
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Change the velocity of 2 notes in Bass by +10");
+    o.type(U"^^50%");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector{40, 48, 50, 100, 70});
+    o.type(U"ga^ib120"); // in the arrangement, the bar's events
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector{120, 120, 50, 100, 70});
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Set the velocity of bar 1 of Bass to 120");
+    o.type(U"u");
+
+    // Not a velocity: said so, and nothing changed; Escape leaves it; Tab doesn't complete.
+    o.type(U"^^200");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message() ==
+          "Not a velocity: 200; type a value (80), a change (+10, -10) or a percentage (80%)");
+    o.type(U"^^8");
+    o.press(NamedKey::Tab);
+    CHECK(o.ws.commandLine().text() == U"8");
+    o.press(NamedKey::Escape);
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.velocities() == std::vector{80, 96, 50, 100, 70});
+
+    // The : prompt afterwards is the command line again.
+    o.type(U":");
+    CHECK(prompt().starts_with(U":"));
+    o.press(NamedKey::Escape);
 }

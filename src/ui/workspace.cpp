@@ -70,6 +70,11 @@ constexpr std::array kSharedCommands{
                 .description = "Quantise the starts of the notes a range or object takes to the "
                                "grid (qib); qq this bar's",
                 .count = true},
+    CommandInfo{.name = "operator-velocity",
+                .description = "Set or change the velocity of the notes a range or object takes, "
+                               "asking how: a value (80), a change (+10, -10) or a percentage "
+                               "(80%); ^^ this bar's",
+                .count = true},
     CommandInfo{.name = "operator-line",
                 .description = "After an operator, this bar's events, or {count} bars' from it",
                 .modes = modeBit(Mode::OperatorPending),
@@ -250,7 +255,8 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 55> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 56> where{{
+            {"operator-velocity", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-transpose-up", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-transpose-down", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-shift-later", onlyIn({Tracks, PianoRoll, EventList})},
@@ -1430,6 +1436,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         mode_ = Mode::CommandLine;
         line_.open();
+        answer_ = {};
         return true;
     }
     if (command == "keys-show")
@@ -1547,7 +1554,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     }
     if (command == "command-line-next" || command == "command-line-previous")
     {
-        return complete(command == "command-line-next" ? 1 : -1);
+        return !answer_ && complete(command == "command-line-next" ? 1 : -1);
     }
     // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do; Left and
     // Right go across the columns, and Page Down and Up a screen of them.
@@ -1577,6 +1584,18 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         }
     }
     completing_.reset();
+    if (command == "command-line-run" && answer_)
+    {
+        // An answer to a question, kept out of the : prompt's history.
+        mode_ = Mode::Normal;
+        const auto text = encodeUtf8(line_.text());
+        line_.clear();
+        if (const auto answer = std::exchange(answer_, {}); !text.empty())
+        {
+            answer(text);
+        }
+        return true;
+    }
     if (command == "command-line-run")
     {
         mode_ = Mode::Normal;
@@ -1591,6 +1610,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         (command == "command-line-backspace" && line_.text().empty())) // as in Vim
     {
         mode_ = Mode::Normal;
+        answer_ = {};
         return true;
     }
     return editLine(line_, command);
@@ -2366,6 +2386,7 @@ CommandResult Workspace::renameSection(std::string_view name)
 
 void Workspace::openPrompt(std::string line)
 {
+    answer_ = {};
     mode_ = Mode::CommandLine;
     line_.open(decodeUtf8(line));
 }
@@ -2376,6 +2397,14 @@ void Workspace::ask(std::string question, std::function<void()> yes, std::functi
     setMessage(std::move(question) + (stop ? " (y/n, Escape stops)" : " (y/n)"),
                MessageKind::Warning);
     question_ = Question{std::move(yes), std::move(no), std::move(stop)};
+}
+
+void Workspace::askFor(std::string label, std::function<void(const std::string&)> answer)
+{
+    mode_ = Mode::CommandLine;
+    line_.open();
+    answerLabel_ = std::move(label);
+    answer_ = std::move(answer);
 }
 
 void Workspace::playFrom(core::Tick tick)
@@ -2422,20 +2451,25 @@ Region Workspace::promptRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto& text = line_.text();
     const auto cursor = line_.cursor();
-    const auto room =
-        static_cast<std::size_t>(std::max((width_ - 2 * margin) / cell_.width - 2, 1));
+    const auto room = static_cast<std::size_t>(
+        std::max((width_ - 2 * margin) / cell_.width - 1 -
+                     (answer_ ? static_cast<int>(decodeUtf8(answerLabel_).size()) : 1),
+                 1));
     const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
     Region region{
         .bounds = layout_.bottom[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
     const auto x = [&](std::size_t column)
     { return margin + static_cast<int>(column) * cell_.width; };
-    region.text.push_back({x(0), 0, U":", kBarText});
-    region.text.push_back({x(1), 0, text.substr(first, cursor - first), kBarText});
+    // Or a question's label, for its answer.
+    const auto label = answer_ ? decodeUtf8(answerLabel_) : std::u32string{U":"};
+    const auto lead = label.size();
+    region.text.push_back({x(0), 0, label, kBarText});
+    region.text.push_back({x(lead), 0, text.substr(first, cursor - first), kBarText});
     const char32_t under = cursor < text.size() ? text[cursor] : U' ';
-    region.text.push_back({x(1 + cursor - first), 0, std::u32string(1, under), kCursor});
+    region.text.push_back({x(lead + cursor - first), 0, std::u32string(1, under), kCursor});
     if (cursor + 1 < text.size())
     {
-        region.text.push_back({x(2 + cursor - first), 0, text.substr(cursor + 1), kBarText});
+        region.text.push_back({x(lead + 1 + cursor - first), 0, text.substr(cursor + 1), kBarText});
     }
     return region;
 }

@@ -71,10 +71,10 @@ std::string times(int count, std::string_view one, std::string_view many)
 
 bool isOperator(std::string_view command)
 {
-    constexpr std::array<std::string_view, 7> kOperators{
+    constexpr std::array<std::string_view, 8> kOperators{
         "operator-delete",         "operator-yank",        "operator-transpose-up",
         "operator-transpose-down", "operator-shift-later", "operator-shift-earlier",
-        "operator-quantize"};
+        "operator-quantize",       "operator-velocity"};
     return std::ranges::find(kOperators, command) != kOperators.end();
 }
 
@@ -110,6 +110,34 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
                 return core::shift(events, part.events, (later ? amount : -amount) * step,
                                    song.end(), target->notesOnly);
             });
+    }
+    if (op == "operator-velocity")
+    {
+        askFor("Velocity of " + target->what + " (80, +10, 80%): ",
+               [this, target = *target](const std::string& text)
+               {
+                   const auto change = core::parseVelocityChange(text);
+                   if (!change)
+                   {
+                       setMessage("Not a velocity: " + text +
+                                      "; type a value (80), a change (+10, -10) or a "
+                                      "percentage (80%)",
+                                  MessageKind::Warning);
+                       return;
+                   }
+                   using enum core::VelocityChange::Kind;
+                   const auto amount = std::to_string(change->amount);
+                   const auto title =
+                       change->kind == Set ? "Set the velocity of " + target.what + " to " + amount
+                       : change->kind == Add
+                           ? "Change the velocity of " + target.what + " by " +
+                                 (change->amount > 0 ? "+" : "") + amount
+                           : "Scale the velocity of " + target.what + " to " + amount + "%";
+                   changeEvents(title, target,
+                                [c = *change](const core::EventList& events, const auto& part)
+                                { return core::changeVelocity(events, part.events, c); });
+               });
+        return true;
     }
     if (op == "operator-quantize")
     {

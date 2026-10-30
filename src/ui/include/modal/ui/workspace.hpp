@@ -292,6 +292,11 @@ private:
         std::function<void()> stop;
     };
     std::optional<Question> question_;
+    // A question answered at the prompt, such as ^'s velocity: its label, shown in place of
+    // the :, and what runs with the line typed.
+    void askFor(std::string label, std::function<void(const std::string&)> answer);
+    std::string answerLabel_;
+    std::function<void(const std::string&)> answer_;
     // :marker-to-section-all, going through the markers, asking about those off a bar line.
     struct MarkerRun
     {
