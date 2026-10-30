@@ -1214,6 +1214,11 @@ TEST_CASE("a message too long for the status line is shown whole above it until 
     const auto shown = panel();
     CHECK(shown.find(U"conductor's meter first|") != std::u32string::npos);
     CHECK(std::ranges::count(shown, U'|') >= 2); // wrapped onto lines
+    // And only there, not cut short on the status line as well.
+    for (const auto& run : v.ws.frame().back().text)
+    {
+        CHECK(run.text.find(U"Bass's bars") == std::u32string::npos);
+    }
     v.ws.handle(Key::typed(U'j'), 0);
     CHECK(panel().empty());
 }

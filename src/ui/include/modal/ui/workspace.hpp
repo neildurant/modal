@@ -272,7 +272,8 @@ private:
 
     Region promptRegion() const;
     Region statusRegion() const;
-    Bar statusBar() const;
+    // The status line, without the message when it is shown above it instead.
+    Bar statusBar(bool withMessage = true) const;
     // A message too long for the status line, shown whole, wrapped, in a panel above it until
     // the next key (decided October 2026); its lines, none if it fits.
     std::vector<std::string> messageLines() const;

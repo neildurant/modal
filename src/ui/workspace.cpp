@@ -2482,7 +2482,9 @@ Region Workspace::promptRegion() const
 
 Region Workspace::statusRegion() const
 {
-    auto region = layoutBar(statusBar(), width_, cell_, BarSpacing::forCell(cell_));
+    // A message too long for it is shown above it alone, not cut short here as well.
+    auto region =
+        layoutBar(statusBar(messageLines().empty()), width_, cell_, BarSpacing::forCell(cell_));
     region.bounds = layout_.bottom[0];
     return region;
 }
@@ -2551,12 +2553,12 @@ Region Workspace::messageRegion(const std::vector<std::string>& lines) const
     return region;
 }
 
-Bar Workspace::statusBar() const
+Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
     bottom.left = {{view().typing() ? " EDIT " : " NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
-    if (!message_.empty())
+    if (withMessage && !message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
         bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
