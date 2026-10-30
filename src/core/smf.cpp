@@ -151,6 +151,19 @@ std::string text(std::span<const std::uint8_t> bytes)
     return {bytes.begin(), bytes.end()};
 }
 
+// A track's or marker's name, without the spaces or NULs some files pad names with.
+std::string name(std::span<const std::uint8_t> bytes)
+{
+    auto named = text(bytes);
+    const auto padding = std::string_view{" \0", 2};
+    const auto first = named.find_first_not_of(padding);
+    if (first == std::string::npos)
+    {
+        return {};
+    }
+    return named.substr(first, named.find_last_not_of(padding) - first + 1);
+}
+
 std::optional<MetaText::Kind> textKind(std::uint8_t type)
 {
     switch (type)
@@ -312,11 +325,11 @@ void parseTrack(std::span<const std::uint8_t> data, int number, ParsedFile& file
             }
             else if (*type == 0x03 && track.name.empty())
             {
-                track.name = text(*bytes);
+                track.name = name(*bytes);
             }
             else if (*type == 0x06)
             {
-                file.markers.push_back({tick, text(*bytes)});
+                file.markers.push_back({tick, name(*bytes)});
             }
             else if (*type == 0x2F)
             {

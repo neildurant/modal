@@ -227,16 +227,19 @@ TEST_CASE("type 1 files: conductor track, tempo, meter and markers")
 
     SmfTrack conductor;
     conductor.text(0, 0x03, "My Song")
-        .tempo(0, 600'000)             // 100 BPM
-        .timeSignature(0, 4, 2)        // 4/4
-        .text(4 * bar, 0x06, "Chorus") // marker at bar 5
-        .timeSignature(0, 3, 2)        // 3/4 from bar 5
-        .tempo(0, 500'000)             // 120 BPM
+        .tempo(0, 600'000)               // 100 BPM
+        .timeSignature(0, 4, 2)          // 4/4
+        .text(4 * bar, 0x06, "Chorus  ") // marker at bar 5
+        .timeSignature(0, 3, 2)          // 3/4 from bar 5
+        .tempo(0, 500'000)               // 120 BPM
         .end();
     SmfTrack bass;
-    bass.text(0, 0x03, "Bass").event(0, {0x92, 40, 100}).event(division, {0x82, 40, 0}).end();
+    bass.text(0, 0x03, "Bass     ").event(0, {0x92, 40, 100}).event(division, {0x82, 40, 0}).end();
     SmfTrack keys;
-    keys.text(0, 0x03, "Keys").event(0, {0x93, 60, 100}).event(division, {0x83, 60, 0}).end();
+    keys.text(0, 0x03, std::string{" Keys\0\0", 7})
+        .event(0, {0x93, 60, 100})
+        .event(division, {0x83, 60, 0})
+        .end();
 
     const auto song = importOk(makeSmf(1, division, {conductor, bass, keys}));
     INFO("division " << division);
@@ -245,7 +248,7 @@ TEST_CASE("type 1 files: conductor track, tempo, meter and markers")
     REQUIRE(song.tracks().size() == 2); // the conductor track has nothing for a track of its own
     CHECK(song.tracks()[0]->name == "Bass");
     CHECK(song.tracks()[0]->channel == 3);
-    CHECK(song.tracks()[1]->name == "Keys");
+    CHECK(song.tracks()[1]->name == "Keys"); // without the padding some files have
 
     const Tick bar5 = 4 * kPpqn.whole();
     REQUIRE(song.tempo().changes().size() == 2);
