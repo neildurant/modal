@@ -28,6 +28,7 @@ add_executable(modal_tests
     core/thru_test.cpp
     core/timing_stats_test.cpp
     core/track_test.cpp
+    core/transforms_test.cpp
     core/version_test.cpp
     platform/clock_test.cpp
     platform/midi_io_test.cpp

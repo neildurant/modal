@@ -21,6 +21,7 @@ add_library(modal_core STATIC
     tempo_map.cpp
     thru.cpp
     track.cpp
+    transforms.cpp
     version.cpp
 )
 add_library(modal::core ALIAS modal_core)
