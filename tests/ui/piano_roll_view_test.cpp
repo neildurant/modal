@@ -1304,9 +1304,9 @@ TEST_CASE("the hint menu offers only the commands that do something where the cu
         }
     }
     Rolling r;
-    CHECK_FALSE(r.ws.offered("section-strip"));
+    CHECK_FALSE(r.ws.offered("go-section-strip"));
     r.type(U"ga");
-    CHECK(r.ws.offered("section-strip"));
+    CHECK(r.ws.offered("go-section-strip"));
 }
 
 TEST_CASE("the hint menu shows after an operator once it has waited, its keys ignoring case")

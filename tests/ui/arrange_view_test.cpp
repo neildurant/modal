@@ -216,13 +216,13 @@ TEST_CASE("a command a view doesn't have says so")
           "Zoom in is for the arrangement's tracks, the section strip and the piano roll");
 }
 
-TEST_CASE(":section starts a section at the cursor's bar in the arrangement too")
+TEST_CASE(":section-split starts a section at the cursor's bar in the arrangement too")
 {
     core::Song song{core::kPpqn}; // one section of eight bars of 4/4
     song.addTrack("Bass");
     Arranging a{std::move(song)};
     a.type(U"2l"); // bar 3
-    CHECK(a.registry.runLine("section Chorus") ==
+    CHECK(a.registry.runLine("section-split Chorus") ==
           CommandResult{true, "Chorus starts at 3:1:000", false});
     REQUIRE(a.document.song().sections().size() == 2);
     CHECK(a.document.song().sections()[1]->name() == "Chorus");

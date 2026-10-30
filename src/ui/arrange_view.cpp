@@ -21,7 +21,7 @@ namespace
 {
 
 constexpr std::array kCommands{
-    CommandInfo{.name = "section-strip", .description = "Go to the section strip"},
+    CommandInfo{.name = "go-section-strip", .description = "Go to the section strip"},
     CommandInfo{.name = "register-put-before",
                 .description = "Put the yanked or deleted sections before this one"},
     CommandInfo{.name = "move-left",
@@ -97,7 +97,7 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     {
         return runOnStrip(*section, command, count);
     }
-    if (command == "section-strip" ||
+    if (command == "go-section-strip" ||
         ((command == "cursor-up" || command == "track-previous") && page_.track() == 0))
     {
         enterStrip();
@@ -551,7 +551,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         leaveStrip();
         return true;
     }
-    if (command == "cursor-up" || command == "track-previous" || command == "section-strip")
+    if (command == "cursor-up" || command == "track-previous" || command == "go-section-strip")
     {
         return false; // on the strip already
     }

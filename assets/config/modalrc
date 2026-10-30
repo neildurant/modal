@@ -54,7 +54,7 @@ nmap z<Left>    grid-finer                "Finer grid"
 nmap zl         grid-coarser              "Coarser grid"
 nmap z<Right>   grid-coarser              "Coarser grid"
 nmap <C-t>      grid-triplets             "Triplets on or off"
-nmap <leader>n  note-default              "Default note from this one"
+nmap <leader>n  default-note-set          "Default note from this one"
 
 " Changing events: Enter edits the field under the cursor, typing a value or a change such
 " as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
@@ -135,7 +135,7 @@ nmap <BS>       view-back         "Back"
 " put them, Alt-h and Alt-l move one, J joins it with the next, + and - lengthen and shorten
 " it by a bar, i and a insert a new one, c renames it, and Enter plays from it.
 keysection "The section strip"
-nmap gs         section-strip     "Section strip"
+nmap gs         go-section-strip  "Section strip"
 nmap <A-h>      move-left         "Move earlier"
 nmap <A-l>      move-right        "Move later"
 nmap J          join              "Join with the next"

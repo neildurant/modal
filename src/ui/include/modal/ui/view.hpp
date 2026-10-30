@@ -145,7 +145,7 @@ public:
     virtual std::optional<bool> run(std::string_view command, int count) = 0;
 
     // Runs one of the view's own commands that take arguments from the : line, such as
-    // :section NAME, or nothing if it has no such command.
+    // :section-split NAME, or nothing if it has no such command.
     virtual std::optional<CommandResult> runLine(std::string_view /*command*/,
                                                  std::string_view /*arguments*/)
     {

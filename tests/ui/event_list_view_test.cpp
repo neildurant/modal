@@ -913,7 +913,7 @@ TEST_CASE(":port without MIDI says so")
     CHECK(result.message == "There are no MIDI ports here");
 }
 
-TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
+TEST_CASE(":section-split starts a new section at the bar line of the cursor's bar")
 {
     core::Song song{core::kPpqn}; // one section of eight bars of 4/4
     const auto bass = song.addTrack("Bass");
@@ -936,11 +936,11 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     };
 
     // At the first section's start there's nothing to split.
-    CHECK(v.registry.runLine("section Intro") ==
+    CHECK(v.registry.runLine("section-split Intro") ==
           CommandResult::error("Section 1 starts at 1:1:000 already"));
 
     type(v.ws, U"G"); // the end
-    CHECK(v.registry.runLine("section Outro").warning);
+    CHECK(v.registry.runLine("section-split Outro").warning);
 
     // On the bass's note in bar 3, the section starts at 3:1:000.
     type(v.ws, U"gg");
@@ -948,7 +948,7 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     {
         type(v.ws, U"j");
     }
-    CHECK(v.registry.runLine("section Chorus") ==
+    CHECK(v.registry.runLine("section-split Chorus") ==
           CommandResult{true, "Chorus starts at 3:1:000", false});
     CHECK(names() == std::vector<std::string>{"Section 1", "Chorus"});
     CHECK(v.document.song().sectionStart(1) == 2 * 4 * q);
@@ -956,7 +956,7 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     // Without a name, Section and a number; one named again gets a number of its own.
     type(v.ws, U"u");
     CHECK(names() == std::vector<std::string>{"Section 1"});
-    CHECK(v.registry.runLine("section").message == "Section 2 starts at 3:1:000");
+    CHECK(v.registry.runLine("section-split").message == "Section 2 starts at 3:1:000");
     CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
 
     // From the lead, in 2/4, its second bar starts in the middle of the conductor's first,
@@ -968,7 +968,7 @@ TEST_CASE(":section starts a new section at the bar line of the cursor's bar")
     {
         type(v.ws, U"j");
     }
-    const auto result = v.registry.runLine("section Bridge");
+    const auto result = v.registry.runLine("section-split Bridge");
     CHECK(result.warning);
     CHECK(result.message ==
           "Bridge starts at 2:1:000; this cuts a bar short in the conductor and the tracks "

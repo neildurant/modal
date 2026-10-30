@@ -90,7 +90,7 @@ constexpr std::array kSharedCommands{
                 .usage = "[NAME]",
                 .keys = false,
                 .choices = {Choices::Port}},
-    CommandInfo{.name = "section",
+    CommandInfo{.name = "section-split",
                 .description = "Start a new section at the cursor's bar line, splitting the "
                                "section it's in; named Section and a number if no name is given",
                 .usage = "[NAME]",
@@ -231,7 +231,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
-            {"section-strip", onlyIn({Tracks, Strip})},
+            {"go-section-strip", onlyIn({Tracks, Strip})},
             {"join", onlyIn({Strip, PianoRoll})},
             {"move-left", onlyIn({Strip, PianoRoll})},
             {"move-right", onlyIn({Strip, PianoRoll})},
@@ -272,7 +272,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-note-previous", onlyIn({PianoRoll})},
             {"octave-up", onlyIn({PianoRoll})},
             {"note-add-advance", onlyIn({PianoRoll})},
-            {"note-default", onlyIn({PianoRoll})},
+            {"default-note-set", onlyIn({PianoRoll})},
             {"grid-finer", onlyIn({PianoRoll})},
             {"grid-coarser", onlyIn({PianoRoll})},
             {"grid-triplets", onlyIn({PianoRoll})},
@@ -329,7 +329,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return port(call.arguments);
                          }
-                         if (name == "section")
+                         if (name == "section-split")
                          {
                              return section(call.arguments);
                          }

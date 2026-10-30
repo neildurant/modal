@@ -17,12 +17,12 @@ using Strings = std::vector<std::string>;
 
 TEST_CASE("completion matches the start of a choice, or else the start of a word in it")
 {
-    const Strings commands{"bar-delete", "bar-insert", "event-delete", "section-strip", "set"};
+    const Strings commands{"bar-delete", "bar-insert", "event-delete", "go-section-strip", "set"};
     CHECK(matching(commands, "ba") == Strings{"bar-delete", "bar-insert"});
     CHECK(matching(commands, "BA") == Strings{"bar-delete", "bar-insert"});
     CHECK(matching(commands, "del") == Strings{"bar-delete", "event-delete"});
-    CHECK(matching(commands, "strip") == Strings{"section-strip"});
-    CHECK(matching(commands, "s") == Strings{"section-strip", "set"}); // starts first
+    CHECK(matching(commands, "strip") == Strings{"go-section-strip"});
+    CHECK(matching(commands, "s") == Strings{"set"}); // a start before any word's
     CHECK(matching(commands, "zz").empty());
     CHECK(matching(commands, "") == commands);
 }

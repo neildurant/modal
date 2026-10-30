@@ -50,7 +50,7 @@ constexpr std::array kCommands{
                 .count = true},
     CommandInfo{.name = "grid-triplets",
                 .description = "Turn triplets in the track's grid on or off"},
-    CommandInfo{.name = "note-default",
+    CommandInfo{.name = "default-note-set",
                 .description = "Take this note's length and velocity as the track's default note"},
     CommandInfo{.name = "note-add-advance",
                 .description = "Add {count} notes one after another, moving on past each",
@@ -1232,7 +1232,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
             },
             key);
     }
-    else if (command == "note-default")
+    else if (command == "default-note-set")
     {
         // The current note's length and velocity, as the track's default note.
         const auto index = currentNote();

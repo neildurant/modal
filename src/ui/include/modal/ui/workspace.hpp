@@ -233,7 +233,7 @@ private:
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
 
-    // :section NAME starts a new section at the bar line of the cursor's bar, in the view's
+    // :section-split NAME starts a new section at the bar line of the cursor's bar, in the view's
     // own bars; :section-rename NAME renames the section at the cursor.
     CommandResult section(std::string_view name);
     // Bars on every track, at the cursor's bar in the conductor's bars.
