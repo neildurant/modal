@@ -1243,7 +1243,7 @@ TEST_CASE("after an operator the hint menu lists its ranges and objects, with wh
     CHECK(title("ab") == "this bar, closing the gap");
     CHECK(title("in") == "this note");
     CHECK(title("]b") == "to the next bar line");
-    CHECK(title("l") == "to the next grid step");
+    CHECK(title("l/→") == "to the next grid step"); // the arrow too
     CHECK(title("G") == "to the end of the song");
     for (const auto* moves : {"}", "$", "0", "<Tab>", ")", "y", "j"})
     {
@@ -1262,10 +1262,10 @@ TEST_CASE("after an operator the hint menu lists its ranges and objects, with wh
     r.type(U"ged");
     CHECK(title("ab") == "(none)");
     CHECK(title("in") == "this event");
-    CHECK(title("j") == "this event and the next");
+    CHECK(title("j/↓") == "this event and the next");
     r.press(Key::of(NamedKey::Escape));
     r.type(U"gagsd");
-    CHECK(title("l") == "this section");
+    CHECK(title("l/→") == "this section");
     CHECK(title("d") == "(none)");
     CHECK(title("ib") == "(none)");
 }
@@ -1330,4 +1330,15 @@ TEST_CASE("the hint menu shows after an operator once it has waited, its keys ig
         keys.push_back(hint.keys);
     }
     CHECK(keys == std::vector<std::string>{"a", "e", "g", "r", "t", "T"});
+}
+
+TEST_CASE("keys bound to one command show together in the hint menu, arrows as arrows")
+{
+    Rolling r;
+    r.ws.setHints(true, 0);
+    r.type(U"z");
+    const auto shown = r.ws.hints();
+    REQUIRE(shown);
+    CHECK(std::ranges::count(*shown, Workspace::Hint{"h/←", "Finer grid", false}) == 1);
+    CHECK(std::ranges::count(*shown, Workspace::Hint{"l/→", "Coarser grid", false}) == 1);
 }

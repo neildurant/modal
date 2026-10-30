@@ -635,6 +635,49 @@ auto hintOrder(const std::string& keys)
     return std::tuple{named ? 0 : letter ? 2 : 1, folded, text != folded};
 }
 
+// A key as the hint menu shows it: an arrow without modifiers as the arrow itself, so h and
+// Left read together as h/←; the others in notation.
+std::string hintKey(const Key& key)
+{
+    if (key.modifiers == kNoModifiers)
+    {
+        switch (key.named)
+        {
+        case NamedKey::Left:
+            return "←";
+        case NamedKey::Right:
+            return "→";
+        case NamedKey::Up:
+            return "↑";
+        case NamedKey::Down:
+            return "↓";
+        default:
+            break;
+        }
+    }
+    return formatKey(key);
+}
+
+// The keys of one command, its other keys after the first, as h/←: characters before named
+// keys, which sort first on their own.
+void addKeys(std::vector<std::string>& keys, std::string more)
+{
+    keys.push_back(std::move(more));
+    std::ranges::stable_sort(
+        keys, {}, [](const std::string& k)
+        { return k.starts_with("<") || k == "←" || k == "→" || k == "↑" || k == "↓"; });
+}
+
+std::string joined(const std::vector<std::string>& keys)
+{
+    std::string text;
+    for (const auto& k : keys)
+    {
+        text += (text.empty() ? "" : "/") + k;
+    }
+    return text;
+}
+
 } // namespace
 
 Where Workspace::where() const
@@ -660,9 +703,11 @@ bool Workspace::offered(std::string_view command) const
 std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mode,
                                                    std::span<const Key> keys) const
 {
-    // Each key that can come next, once, in the keymap's order: the title of its binding, or
-    // if it starts longer ones, of its group.
+    // Each key that can come next, once, with the title of its binding, or if it starts longer
+    // ones, of its group; keys bound to one command together, as h/←.
     std::vector<Hint> hints;
+    std::vector<std::vector<std::string>> keysOf; // each hint's keys
+    std::vector<std::string> commands;            // and its command, if it's one
     std::vector<Key> previous;
     for (const auto& [sequence, binding] : keymap.bindings(mode))
     {
@@ -679,7 +724,8 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
             continue;
         }
         previous = next;
-        Hint hint{.keys = formatKey(keys_.typed(next.back())), .title = {}, .group = false};
+        const auto key = hintKey(keys_.typed(next.back()));
+        Hint hint{.keys = key, .title = {}, .group = false};
         if (sequence.size() == next.size())
         {
             const auto* info = commands_.find(binding.command);
@@ -710,7 +756,21 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
                 hint.title = title.empty() ? std::string{"…"} : title;
             }
         }
+        const auto command =
+            !hint.group && sequence.size() == next.size() ? binding.command : std::string{};
+        if (const auto same = std::ranges::find(commands, command);
+            !command.empty() && same != commands.end())
+        {
+            addKeys(keysOf[static_cast<std::size_t>(same - commands.begin())], key);
+            continue;
+        }
         hints.push_back(std::move(hint));
+        keysOf.push_back({key});
+        commands.push_back(command);
+    }
+    for (std::size_t i = 0; i < hints.size(); ++i)
+    {
+        hints[i].keys = joined(keysOf[i]);
     }
     std::ranges::stable_sort(hints, {}, [](const Hint& h) { return hintOrder(h.keys); });
     return hints;
@@ -722,7 +782,8 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
     // each would take in this view: the cursor's bar first, then the objects, then the ranges.
     // Keys that only move the cursor aren't ranges, so aren't shown.
     std::vector<std::pair<int, Hint>> ranked;
-    std::vector<std::string> seen; // the commands, as ranked has them
+    std::vector<std::string> seen;                      // the commands, as ranked has them
+    std::vector<std::vector<std::string>> alternatives; // and their keys
     for (const auto& [sequence, binding] : operatorKeymap_.bindings(Mode::OperatorPending))
     {
         const auto& command = binding.command;
@@ -742,26 +803,28 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
         {
             continue;
         }
-        std::vector<Key> keys;
-        std::ranges::transform(sequence, std::back_inserter(keys),
-                               [this](const Key& k) { return keys_.typed(k); });
-        auto written = formatKeys(keys);
-        // A command bound to several keys, l and <Right>, shown once by the shortest.
+        std::string written;
+        for (const auto& k : sequence)
+        {
+            written += hintKey(keys_.typed(k));
+        }
+        // A command bound to several keys, shown once with them all, as l/→.
         if (const auto at = std::ranges::find(seen, command); at != seen.end())
         {
-            auto& shown = ranked[static_cast<std::size_t>(at - seen.begin())].second.keys;
-            if (written.size() < shown.size())
-            {
-                shown = std::move(written);
-            }
+            addKeys(alternatives[static_cast<std::size_t>(at - seen.begin())], std::move(written));
             continue;
         }
         seen.push_back(command);
+        alternatives.push_back({written});
         ranked.emplace_back(
             line           ? 0
             : info->object ? 1
                            : 2,
             Hint{.keys = std::move(written), .title = std::move(*text), .group = false});
+    }
+    for (std::size_t i = 0; i < ranked.size(); ++i)
+    {
+        ranked[i].second.keys = joined(alternatives[i]);
     }
     std::ranges::stable_sort(ranked, {}, [](const std::pair<int, Hint>& r)
                              { return std::tuple{r.first, hintOrder(r.second.keys)}; });
