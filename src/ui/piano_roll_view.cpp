@@ -1427,6 +1427,29 @@ bool PianoRollView::operateOnBars(std::string_view op, int count, bool time)
     return true;
 }
 
+std::optional<std::pair<std::string, std::string>>
+PianoRollView::relabel(std::string_view command) const
+{
+    // J's join is down an octave here, and the step keys change the current note.
+    constexpr std::array<std::array<std::string_view, 3>, 7> kHere{{
+        {"join", "Pitch in the piano roll", "Down an octave"},
+        {"field-increase", "", "Lengthen to the grid"},
+        {"field-decrease", "", "Shorten to the grid"},
+        {"field-increase-fine", "", "Lengthen by a nudge"},
+        {"field-decrease-fine", "", "Shorten by a nudge"},
+        {"number-increase", "", "Velocity up"},
+        {"number-decrease", "", "Velocity down"},
+    }};
+    for (const auto& [name, group, title] : kHere)
+    {
+        if (name == command)
+        {
+            return std::pair{std::string{group}, std::string{title}};
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> PianoRollView::describeRange(std::string_view op,
                                                         std::string_view motion) const
 {

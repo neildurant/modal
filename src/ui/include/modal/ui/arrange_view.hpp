@@ -43,6 +43,8 @@ public:
     bool operate(std::string_view op, std::string_view motion, int count) override;
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
+    std::optional<std::pair<std::string, std::string>>
+    relabel(std::string_view command) const override;
     void addRegions(Frame& frame) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;

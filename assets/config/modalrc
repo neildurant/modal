@@ -195,16 +195,17 @@ ngroup ]         "Next"
 ngroup [         "Before"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
-" most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
+" most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too. Those without a hint aren't listed
+" in the list of keys (, ?) beside the one with it.
 keysection "Text size"
-nmap <C-=>      font-bigger       "Bigger text"
-nmap <C-S-=>    font-bigger       "Bigger text"
+nmap <C-=>      font-bigger
+nmap <C-S-=>    font-bigger
 nmap <C-+>      font-bigger       "Bigger text"
-nmap <C-kPlus>  font-bigger       "Bigger text"
+nmap <C-kPlus>  font-bigger
 nmap <C-->      font-smaller      "Smaller text"
-nmap <C-kMinus> font-smaller      "Smaller text"
+nmap <C-kMinus> font-smaller
 nmap <C-0>      font-reset        "Text size from the config"
-nmap <C-k0>     font-reset        "Text size from the config"
+nmap <C-k0>     font-reset
 
 " The command line: : opens it, and in it these keys edit, run and recall lines. Other
 " characters are typed.

@@ -1364,6 +1364,10 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
     CHECK(has("The leader", {",?", "The keys here", false}));
     CHECK(has("Moving notes", {"<A-h>/<A-Left>", "Move earlier", false}));
     CHECK(has("Pitch in the piano roll", {"J", "Down an octave", false}));
+    // What the step keys do here, each once; and one key for bigger text, the others unlisted.
+    CHECK(has("Changing events", {"=", "Lengthen to the grid", false}));
+    CHECK(has("Changing events", {"<C-a>", "Velocity up", false}));
+    CHECK(has("Text size", {"<C-+>", "Bigger text", false}));
     CHECK(
         std::ranges::none_of(groups, [](const auto& g) { return g.title == "The section strip"; }));
     const auto frame = r.ws.frame();
@@ -1386,4 +1390,11 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
                                [](const auto& g) { return g.title == "Pitch in the piano roll"; }));
     r.press(Key::of(NamedKey::Escape));
     CHECK_FALSE(r.ws.showingKeys());
+
+    // In the event list, the keys that step a field do the same, so show as one.
+    r.type(U"ge,?");
+    const auto list = r.ws.keyList();
+    const auto changing = std::ranges::find(list, "Changing events", &Workspace::KeyGroup::title);
+    REQUIRE(changing != list.end());
+    CHECK(std::ranges::count(changing->keys, Workspace::Hint{"+/=/<C-a>", "Step up", false}) == 1);
 }

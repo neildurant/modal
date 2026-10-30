@@ -872,78 +872,104 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
 
 std::vector<Workspace::KeyGroup> Workspace::keyList() const
 {
-    // Normal mode's bindings that do something here, and the objects after an operator, each
-    // command once under its section with all its keys, the sections in modalrc's order.
-    std::vector<KeyGroup> groups;
-    std::vector<std::vector<std::vector<std::string>>> keys; // each group's keys of each
-    std::vector<std::vector<std::string>> commands;          // and their commands
-    const auto add = [&](const std::vector<Key>& sequence, const Binding& binding)
+    // Normal mode's bindings that do something here, and the objects after an operator, under
+    // their sections, the sections in modalrc's order. A command shows once, with all its keys,
+    // in the group its first binding is in, and commands doing the same here (= and + and
+    // Ctrl-A stepping a field) together; a binding without a hint isn't listed beside one of its
+    // command with one, as the keypad's and other keyboards' keys for bigger text aren't.
+    struct Item
     {
-        if (!offered(binding.command) || binding.command == "cancel")
-        {
-            return;
-        }
-        const auto relabelled = view().relabel(binding.command);
-        const auto title = relabelled                ? relabelled->first
-                           : binding.section.empty() ? std::string{"Other keys"}
-                                                     : binding.section;
-        std::string written;
-        for (const auto& k : sequence)
-        {
-            written += hintKey(keys_.typed(k));
-        }
-        // A command once, with all its keys, in the group its first binding is in.
-        for (std::size_t g = 0; g < groups.size(); ++g)
-        {
-            if (const auto same = std::ranges::find(commands[g], binding.command);
-                same != commands[g].end())
-            {
-                addKeys(keys[g][static_cast<std::size_t>(same - commands[g].begin())],
-                        std::move(written));
-                return;
-            }
-        }
-        auto group = std::ranges::find(groups, title, &KeyGroup::title);
-        if (group == groups.end())
-        {
-            groups.push_back({title, {}});
-            keys.emplace_back();
-            commands.emplace_back();
-            group = std::prev(groups.end());
-        }
-        const auto g = static_cast<std::size_t>(group - groups.begin());
-        const auto* info = commands_.find(binding.command);
-        auto name = relabelled              ? relabelled->second
-                    : !binding.hint.empty() ? binding.hint
-                    : info != nullptr       ? titleOf(*info)
-                                            : binding.command;
-        if (const auto at = name.find("{count}"); at != std::string::npos)
-        {
-            name.replace(at, 7, "N");
-        }
-        group->keys.push_back({.keys = {}, .title = std::move(name), .group = false});
-        keys[g].push_back({written});
-        commands[g].push_back(binding.command);
+        std::string title;
+        std::vector<std::string> keys;
+        std::vector<std::string> commands;
     };
+    std::vector<std::pair<std::string, std::vector<Item>>> groups;
     for (const auto mode : {Mode::Normal, Mode::OperatorPending})
     {
-        for (const auto& [sequence, binding] : keymap_.bindings(mode))
+        const auto bindings = keymap_.bindings(mode);
+        const auto hinted = [&](const std::string& command)
         {
-            add(sequence, binding);
+            return std::ranges::any_of(
+                bindings, [&](const auto& b)
+                { return b.second.command == command && !b.second.hint.empty(); });
+        };
+        for (const auto& [sequence, binding] : bindings)
+        {
+            if (!offered(binding.command) || binding.command == "cancel" ||
+                (binding.hint.empty() && hinted(binding.command)))
+            {
+                continue;
+            }
+            std::string written;
+            for (const auto& k : sequence)
+            {
+                written += hintKey(keys_.typed(k));
+            }
+            const auto placed = [&]
+            {
+                for (auto& [title, items] : groups)
+                {
+                    for (auto& item : items)
+                    {
+                        if (std::ranges::find(item.commands, binding.command) !=
+                            item.commands.end())
+                        {
+                            addKeys(item.keys, written);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+            if (placed())
+            {
+                continue;
+            }
+            const auto relabelled = view().relabel(binding.command);
+            const auto section = relabelled && !relabelled->first.empty() ? relabelled->first
+                                 : binding.section.empty() ? std::string{"Other keys"}
+                                                           : binding.section;
+            const auto* info = commands_.find(binding.command);
+            auto name = relabelled              ? relabelled->second
+                        : !binding.hint.empty() ? binding.hint
+                        : info != nullptr       ? titleOf(*info)
+                                                : binding.command;
+            if (const auto at = name.find("{count}"); at != std::string::npos)
+            {
+                name.replace(at, 7, "N");
+            }
+            auto group = std::ranges::find(groups, section,
+                                           &std::pair<std::string, std::vector<Item>>::first);
+            if (group == groups.end())
+            {
+                groups.emplace_back(section, std::vector<Item>{});
+                group = std::prev(groups.end());
+            }
+            auto& items = group->second;
+            if (const auto same = std::ranges::find(items, name, &Item::title); same != items.end())
+            {
+                addKeys(same->keys, written);
+                same->commands.push_back(binding.command);
+                continue;
+            }
+            items.push_back({std::move(name), {written}, {binding.command}});
         }
     }
-    for (std::size_t g = 0; g < groups.size(); ++g)
+    std::vector<KeyGroup> result;
+    for (auto& [title, items] : groups)
     {
-        for (std::size_t i = 0; i < groups[g].keys.size(); ++i)
+        KeyGroup group{title, {}};
+        for (auto& item : items)
         {
-            groups[g].keys[i].keys = joined(keys[g][i]);
+            group.keys.push_back(
+                {.keys = joined(item.keys), .title = std::move(item.title), .group = false});
         }
-        std::ranges::stable_sort(groups[g].keys, {},
-                                 [](const Hint& h) { return hintOrder(h.keys); });
+        std::ranges::stable_sort(group.keys, {}, [](const Hint& h) { return hintOrder(h.keys); });
+        result.push_back(std::move(group));
     }
     // In the order modalrc's sections come in, those it has none for last.
     const auto& order = keymap_.sections();
-    std::ranges::stable_sort(groups, {},
+    std::ranges::stable_sort(result, {},
                              [&](const KeyGroup& group)
                              {
                                  const auto at = std::ranges::find(order, group.title);
@@ -951,7 +977,7 @@ std::vector<Workspace::KeyGroup> Workspace::keyList() const
                                             ? order.size()
                                             : static_cast<std::size_t>(at - order.begin());
                              });
-    return groups;
+    return result;
 }
 
 std::vector<std::vector<Workspace::KeyColumn>>

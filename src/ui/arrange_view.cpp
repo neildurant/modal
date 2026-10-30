@@ -773,6 +773,27 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     return result;
 }
 
+std::optional<std::pair<std::string, std::string>>
+ArrangeView::relabel(std::string_view command) const
+{
+    // On the strip, the step keys lengthen and shorten the section.
+    if (!page_.stripCursor())
+    {
+        return std::nullopt;
+    }
+    if (command == "field-increase" || command == "field-increase-fine" ||
+        command == "number-increase")
+    {
+        return std::pair{std::string{}, std::string{"A bar longer"}};
+    }
+    if (command == "field-decrease" || command == "field-decrease-fine" ||
+        command == "number-decrease")
+    {
+        return std::pair{std::string{}, std::string{"A bar shorter"}};
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> ArrangeView::describeRange(std::string_view op,
                                                       std::string_view motion) const
 {

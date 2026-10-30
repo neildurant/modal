@@ -76,7 +76,7 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 
 After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the status line: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists the ranges and objects with what each would take in the view you're in. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
 
-`, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Changing events and so on), each command once with all its keys. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
+`, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Changing events and so on), each command once with all its keys. A binding without a hint isn't listed beside one of the same command that has one, so giving only one of several keys a hint lists that one. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
 
 ## Text size
 
