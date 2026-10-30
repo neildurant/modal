@@ -1666,8 +1666,8 @@ Workspace::CompletingWord Workspace::completingWord() const
 bool Workspace::complete(int by)
 {
     // As zsh does (decided October 2026): Tab completes the word as far as its matches agree,
-    // and then goes round them, Shift-Tab back; one match is completed with a space after it,
-    // unless it goes on (set theme=, a folder/).
+    // showing them, and then goes round them, Shift-Tab back; one match is completed with a space
+    // after it, unless it goes on (set theme=, a folder/).
     const auto replaceWord = [this](std::size_t start, const std::string& with)
     { line_.replace(start, line_.cursor(), decodeUtf8(with)); };
     if (completing_ && completing_->line == line_.text() && completing_->matches.size() > 1)
@@ -1697,16 +1697,16 @@ bool Workspace::complete(int by)
         replaceWord(word.start, only + (only.ends_with('=') || only.ends_with('/') ? "" : " "));
         return true;
     }
+    // With several, the first Tab only shows them, none chosen, so typing can narrow them (: Tab
+    // lists every command); the next goes round them.
     const auto shared = sharedStart(found);
     if (decodeUtf8(shared).size() > decodeUtf8(word.typed).size() &&
         matching(std::span{&shared, 1}, word.typed).size() == 1)
     {
         replaceWord(word.start, shared);
-        completing_ = Completing{found, std::nullopt, word.start, line_.text(), 0};
-        return true;
     }
     completing_ = Completing{found, std::nullopt, word.start, line_.text(), 0};
-    return complete(by);
+    return true;
 }
 
 bool Workspace::chooseMatch(std::ptrdiff_t by)

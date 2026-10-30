@@ -1129,6 +1129,8 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
 
     // Left and Right go across the columns, six rows down, stopping at the ends.
     type(v.ws, U":bar-insert ");
+    press(NamedKey::Tab); // shown, none chosen
+    CHECK(line() == "bar-insert ");
     press(NamedKey::Tab);
     CHECK(line() == "bar-insert 2/4");
     press(NamedKey::Right);
@@ -1150,6 +1152,18 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     CHECK_FALSE(v.ws.completions());
     press(NamedKey::Tab);
     CHECK(line() == "bar-insert ");
+    press(NamedKey::Escape);
+
+    // Tab on nothing shows every command, none chosen, and typing narrows them.
+    type(v.ws, U":");
+    press(NamedKey::Tab);
+    REQUIRE(v.ws.completions());
+    CHECK(line().empty());
+    CHECK_FALSE(v.ws.completions()->chosen);
+    CHECK(v.ws.completions()->matches.size() > 10);
+    type(v.ws, U"bar-");
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->matches == std::vector<std::string>{"bar-delete", "bar-insert"});
     press(NamedKey::Escape);
 
     // In a small window the columns scroll to keep the one chosen in view.
