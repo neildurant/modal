@@ -232,6 +232,8 @@ private:
     // milestone 6); and changing the events each track's part of it takes, as one undo step,
     // or saying why it can't be.
     bool transform(std::string_view op, int amount, std::string_view motion, int count);
+    // Quantises the notes' starts, and the pedals with them if asked.
+    bool quantize(const OperatorTarget& target, bool pedals);
     using EventsChange =
         std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)>;
     bool changeEvents(std::string title, const OperatorTarget& target, const EventsChange& change);

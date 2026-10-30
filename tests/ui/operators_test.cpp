@@ -169,14 +169,25 @@ TEST_CASE("q quantises notes' starts to the grid, and the event list and arrange
 {
     Operating o;
     const auto q = o.q;
-    o.type(U"4l"); // bar 5, in the arrangement
+    o.type(U"4l"); // bar 5, in the arrangement, with the sustain pedal down after the C2
     o.type(U"qq");
+    CHECK(o.ws.message() == "Move the pedalling with its notes? (y/n)");
+    o.type(U"n"); // only the notes
     CHECK(o.notes()[3] == std::pair{16 * q, 36});
-    CHECK(o.pedals() == std::vector{16 * q + q / 8}); // only the notes
+    CHECK(o.pedals() == std::vector{16 * q + q / 8});
     o.type(U"u");
     CHECK(o.ws.message() == "Undid: Quantise bar 5 of Bass");
+    o.type(U"qqy"); // the pedal too, as far from the note as it was
+    CHECK(o.notes()[3] == std::pair{16 * q, 36});
+    CHECK(o.pedals() == std::vector{16 * q + q / 16});
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Quantise bar 5 of Bass, with its pedalling");
     o.type(U"qq");
-    o.type(U"qq");
+    o.press(NamedKey::Escape);
+    CHECK(o.ws.message() == "Nothing done");
+    CHECK(o.notes()[3] == std::pair{16 * q + q / 16, 36});
+    o.type(U"qqn");
+    o.type(U"qqn");
     CHECK(o.ws.message() == "Nothing changed in bar 5 of Bass");
     o.type(U"u");
 

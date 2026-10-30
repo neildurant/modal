@@ -113,22 +113,39 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     }
     if (op == "operator-quantize")
     {
-        return changeEvents("Quantise " + target->what, *target,
-                            [&](const core::EventList& events, const auto& part)
-                            {
-                                const auto& meter = song.meter(part.track);
-                                const auto step = std::max<core::Tick>(
-                                    song.track(part.track)->grid.toTicks(song.ppqn()), 1);
-                                const auto nearest = [&](core::Tick tick)
-                                {
-                                    // Not onto the song's end, where nothing can start.
-                                    const auto to = core::nearestGridLine(meter, tick, step);
-                                    return to < song.end() ? to : tick;
-                                };
-                                return core::quantize(events, part.events, nearest, false);
-                            });
+        // With pedals there, asking whether they go with their notes (decided October 2026).
+        const bool pedalled =
+            std::ranges::any_of(target->parts, [&](const OperatorTarget::Part& part)
+                                { return core::hasPedals(song.events(part.track), part.events); });
+        if (!pedalled)
+        {
+            return quantize(*target, false);
+        }
+        ask(
+            "Move the pedalling with its notes?", [this, target = *target]
+            { quantize(target, true); }, [this, target = *target] { quantize(target, false); });
+        return true;
     }
     return false;
+}
+
+bool Workspace::quantize(const OperatorTarget& target, bool pedals)
+{
+    const auto& song = document_.song();
+    return changeEvents("Quantise " + target.what + (pedals ? ", with its pedalling" : ""), target,
+                        [&](const core::EventList& events, const auto& part)
+                        {
+                            const auto& meter = song.meter(part.track);
+                            const auto step = std::max<core::Tick>(
+                                song.track(part.track)->grid.toTicks(song.ppqn()), 1);
+                            const auto nearest = [&](core::Tick tick)
+                            {
+                                // Not onto the song's end, where nothing can start.
+                                const auto to = core::nearestGridLine(meter, tick, step);
+                                return to < song.end() ? to : tick;
+                            };
+                            return core::quantize(events, part.events, nearest, pedals);
+                        });
 }
 
 bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
