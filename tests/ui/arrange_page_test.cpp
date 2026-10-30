@@ -289,6 +289,18 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
         names += run.y == ArrangePage::kStripRow * kCell.height ? 1 : 0;
     }
     CHECK(names == 4);
+
+    // The lines go on through the strip, over its blocks.
+    const int strip = ArrangePage::kStripRow * kCell.height;
+    const auto block = std::ranges::find_if(timeline.under, [&](const Shape& shape)
+                                            { return shape.role == Role::Panel; });
+    REQUIRE(block != timeline.under.end());
+    for (const int x : lines)
+    {
+        CHECK(std::any_of(
+            block, timeline.under.end(), [&](const Shape& shape)
+            { return shape.role == Role::Marker && shape.rect.x == x && shape.rect.y == strip; }));
+    }
 }
 
 namespace

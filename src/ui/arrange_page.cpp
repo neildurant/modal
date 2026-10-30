@@ -609,27 +609,6 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
             numbers.add(x, text, {});
         }
     }
-    // The markers' lines through the ruler, a row at a time, broken only where a label of the
-    // row sits across a line, so the line never runs through text.
-    for (const int x : markerLines)
-    {
-        for (int row = 0; row < kStripRow; ++row)
-        {
-            const int y = row * cell_.height;
-            const bool covered =
-                std::ranges::any_of(timeline.text,
-                                    [&](const TextRun& run)
-                                    {
-                                        const int right =
-                                            run.x + static_cast<int>(run.text.size()) * cell_.width;
-                                        return run.y == y && run.x < x + lineWidth && right > x;
-                                    });
-            if (!covered)
-            {
-                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, kFaint});
-            }
-        }
-    }
     // The section strip: each section a block across its span, neighbours in two shades, named
     // as far as there's room, in the colour of the sections' lines; the cursor's section boxed when
     // the cursor is on the strip.
@@ -681,6 +660,28 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
                     {{x0, y + cell_.height - edge, x1 - x0, edge}, Role::Cursor, 255});
                 timeline.over.push_back({{x0, y, side, cell_.height}, Role::Cursor, 255});
                 timeline.over.push_back({{x1 - side, y, side, cell_.height}, Role::Cursor, 255});
+            }
+        }
+    }
+    // The markers' lines through the ruler and the section strip, over its blocks, a row at a
+    // time, broken only where a label of the row sits across a line, so the line never runs
+    // through text.
+    for (const int x : markerLines)
+    {
+        for (int row = 0; row <= kStripRow; ++row)
+        {
+            const int y = row * cell_.height;
+            const bool covered =
+                std::ranges::any_of(timeline.text,
+                                    [&](const TextRun& run)
+                                    {
+                                        const int right =
+                                            run.x + static_cast<int>(run.text.size()) * cell_.width;
+                                        return run.y == y && run.x < x + lineWidth && right > x;
+                                    });
+            if (!covered)
+            {
+                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, kFaint});
             }
         }
     }
