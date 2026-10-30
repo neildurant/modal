@@ -37,7 +37,7 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 ### The arrangement
 
-Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the piano roll. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow).
+Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, `zi` `zo` `z0` zoom, and Enter opens the bar in the piano roll. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow). The other operators take bars too: `>>` transposes this bar up a semitone, `t]s` moves the rest of the section on by a grid step, controllers too, and `qj` quantises this bar on this track and the next.
 
 On every track at once: `:bar-delete` deletes the cursor's bar (`:bar-delete 2` two), keeping it in the register as a section, and `:bar-insert` puts an empty bar in before it (`:bar-insert 2 3/4` two bars of 3/4). `:marker-to-section` starts a section at the marker at or before the cursor, named after it, and `:marker-to-section-all` does it for every marker, as for an imported MIDI file whose markers mark its structure.
 
@@ -61,6 +61,9 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `d` `y` with a range | The notes starting from the cursor to `]b` the next bar line, `]s` the next section, `G` the end |
 | `dd` `yy`, `dib` `yib` | This bar's notes, `3dd` three bars' |
 | `dab` `yab` | This bar as time, controllers too: `dab` takes it out, moving the rest of the section up |
+| `>` `<` with a range, `>>` | Transpose the notes up or down a semitone: `>>` this bar's, `3>ib` three semitones, `>3ib` three bars |
+| `t` `T`, `q` | Move the notes later or earlier by the grid step (`tt` this bar's); quantise their starts to the grid, asking whether the pedals go with them |
+| `^`, `~` | Set or change velocity, asking how (`80`, `+10`, `80%`); humanise, moving notes a little at random in time and velocity |
 | `p`, `P` | Put what was yanked over what's there, or put it in, moving the rest of the section later; bars go to the start of the cursor's bar |
 | `Alt-h` `Alt-l`, `Alt-k` `Alt-j` | Move the note a grid step, or a semitone (`Alt-K` `Alt-J` an octave, `Alt-{` `Alt-}` a bar) |
 | `Alt-H` `Alt-L`, `=` `-`, `+` `_` | Nudge it by 5 ms (`set nudge`); lengthen or shorten it to the grid, or by a nudge |
@@ -81,6 +84,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
+| `>` `<`, `t` `T`, `q`, `^`, `~` | Transpose, move by the grid step, quantise, change velocity and humanise the events a motion takes, as in the piano roll (`>j` this event and the next) |
 | `x` `Y`, `p` | Delete or yank this event; put what was yanked or deleted at the cursor's time, or bars at the start of the cursor's bar |
 | Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
 | `e`, Tab Shift-Tab, Up Down | `e` edits the field as Enter does; while editing, Tab and Shift-Tab set it and go along the row, and Up and Down step it |

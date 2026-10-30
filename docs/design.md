@@ -223,18 +223,29 @@ An independent setting for the length of new notes, after Sequencer Plus Gold's 
 | --- | --- |
 | `d` / `y` | Delete / yank |
 | `p` / `P` | Put over what's there / put in, moving what's after it later |
-| `>` / `<` | Transpose up / down a semitone (count = semitones) |
-| `q` | Quantise to the current grid |
+| `>` / `<` | Transpose up / down a semitone (a count before the operator = semitones) |
+| `q` | Quantise notes' starts to the current grid |
 | `^` | Set or scale velocity (prompts for a value, a change or a %: `^ib 80`, `^ic +10`, `^ib 80%`) |
 | `!` | Transform: opens the transform hint menu for the range (see MIDI transforms) |
-| `t` | Shift in time by the grid step |
+| `t` / `T` | Shift later / earlier by the grid step |
 | `~` | Humanise (small random time and velocity changes) |
-| `c` | Change channel or destination track |
+| `c` | Change: delete the range and start Insert mode there (milestone 8) |
 
 Examples: `d2]b` deletes from the cursor to the second bar line on, `>ib` transposes this bar up a semitone, `5.` repeats the last change five times.
 
 - **The velocity operator is `^` (decided October 2026),** an upside-down `v` and the marcato accent sign, since `v` is Visual mode. Vim's `^` (first non-blank) has no use in Modal. `%` is kept for something else.
 - **`!` is the general transform operator (decided October 2026),** with an imperative feel: `!` and a motion open the transform menu for that range. Velocity, the most common transform, keeps its own key.
+- **The other operators, as built in milestone 6 (decided October 2026).** `>` `<` `t` `T` `q` `^` `~` take the same ranges and objects as `d` and `y`, in every view, and each change is one undo step:
+  - **Counts.** A count before the operator is how far (`3>ib` up three semitones, `2t]b` two grid steps), and one after it the range's (`>3ib` three bars up one), rather than the two multiplying as they do for `d` and `y`. Doubled (`>>`, `qq`, `^^`, `tt`, `~~`), an operator takes the cursor's bar, as `dd` does. To them `ab` is `ib`, since they don't take time out, so the hint menu leaves it out.
+  - **`T` shifts earlier,** paired with `t` as `P` is with `p`.
+  - **What each acts on.** Transposing, velocity, quantising and humanising change notes only, in every view, since quantising a controller's fade would wreck it. Shifting moves every event in the range in the arrangement and the event list, so pedalling and controllers stay with their notes; in the piano roll, which shows only notes, it moves the notes. The grid is each track's own.
+  - **Refused, whole.** A change that would take a note past G9 or below C-1, an event before the song's start or past its end, or a note onto another of its pitch, is refused, naming the note, rather than made in part. Where a change moves times (shifting, quantising, humanising), a note run into the next of its pitch ends where that one starts instead, as played legato and then quantised notes need, since a key can't be replayed while it's held; two at the same start are still refused.
+  - **Quantising** moves notes' starts fully onto the grid, keeping their lengths. Strength, swing and quantising ends or lengths alone (as Sequencer Plus Gold had) are for `:quantize`, with the MIDI transforms.
+  - **Pedalling follows quantised notes, if wanted.** When the range has sustain, sostenuto or soft pedal events (CC 64, 66, 67), `q` asks "Move the pedalling with its notes? (y/n)". With `y`, each pedal event moves as far as the latest note at or before it moved, a chord's notes moving as one, so a pedal pressed just after a chord stays just after it, and a lift just before the next chord stays with the chord it ends; one before any note in the range stays put. If a pedal would move past the next of its pedal, the change is refused, saying where. A setting could answer the question in advance later (`quantizepedal`), if asking proves tiresome.
+  - **`^`** asks at the prompt, its label in place of the `:` ("Velocity of 2 notes in Bass (80, +10, 80%): "), for a value from 1 to 127, a change (`+10`, `-10`) or a percentage (`80%`), velocities kept between 1 and 127. The answer stays out of the `:` prompt's history, and Tab doesn't complete it.
+  - **`~`** moves each note's start by up to `humanizetime` (10 ms) either way, at its own tempo, and its velocity by up to `humanizevel` (8) either way.
+  - **Not on the section strip** for now: its sections' contents across every track are for the objects `is` and `as`.
+  - **`c` is kept for change,** as in Vim: delete the range and start Insert mode (step entry) there, when Insert mode comes in milestone 8 (`cib` to play a new part into this bar). Changing a channel is the track's (`:channel`, the inspector); moving a range to another track is `d` and `p` for now, perhaps later a command with no key, `:move-to TRACK`.
 
 **Ranges, objects and putting (decided October 2026, in milestone 5).** Every range an operator takes says what it is: either from the cursor to a boundary its key names, or an object, a whole thing at the cursor named by its letter. Where they differ, this replaces the notes on operators in the event list (milestone 4), the arrangement, the piano roll and the section strip, which say what was built at the time.
 
