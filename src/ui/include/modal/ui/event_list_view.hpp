@@ -46,6 +46,7 @@ public:
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
+    std::optional<OperatorTarget> target(std::string_view motion, int count) override;
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
@@ -102,6 +103,17 @@ private:
     // The rows starting chords: events starting together, within the chord window of the
     // first of them; in the conductor's list, its rows.
     std::vector<std::size_t> chordStarts() const;
+
+    // The rows a range or object takes from the cursor, in either order; taken as bars, with
+    // the bars' start and length.
+    struct Rows
+    {
+        std::size_t from;
+        std::size_t to;
+        std::optional<core::Tick> bar = std::nullopt;
+        core::Tick span = 0;
+    };
+    std::optional<Rows> rowsFor(std::string_view motion, int count);
 
     // Deletes or yanks the track's own events among some rows, which may be in either order.
     // Deletes or yanks the track's events among rows; with a bar's start, taken as bars, their

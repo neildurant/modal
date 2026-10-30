@@ -597,10 +597,57 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
                    MessageKind::Information);
         return true;
     }
+    const auto rows = rowsFor(motion, count);
+    return rows && operateRows(op, rows->from, rows->to, rows->bar, rows->span);
+}
+
+std::optional<OperatorTarget> EventListView::target(std::string_view motion, int count)
+{
+    // The track's events among the rows a range or object takes.
+    if (track_ == 0)
+    {
+        setMessage("The conductor's tempo and meter changes aren't changed this way",
+                   MessageKind::Information);
+        return std::nullopt;
+    }
+    if (motion == "object-bar")
+    {
+        setMessage("ab isn't in the event list, which is for events rather than time",
+                   MessageKind::Information);
+        return std::nullopt;
+    }
+    const auto rows = rowsFor(motion, count);
+    if (!rows)
+    {
+        return std::nullopt;
+    }
+    const auto id = *list_.track();
+    OperatorTarget result{.parts = {{id, {}}}, .what = {}, .notesOnly = false};
+    auto& taken = result.parts.front().events;
+    const auto last = std::min(std::max(rows->from, rows->to), list_.rows().size() - 1);
+    for (auto r = std::min(rows->from, rows->to); r <= last; ++r)
+    {
+        if (list_.rows()[r].kind == RowKind::Event)
+        {
+            taken.push_back(list_.rows()[r].index);
+        }
+    }
+    if (taken.empty())
+    {
+        setMessage("None of " + trackName() + "'s own events there", MessageKind::Information);
+        return std::nullopt;
+    }
+    std::ranges::sort(taken);
+    result.what = eventCount(taken.size()) + " in " + trackName();
+    return result;
+}
+
+std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motion, int count)
+{
     if (motion == "object-note")
     {
         // in, x, Y: the event under the cursor, or as many from it as the count says.
-        return operateRows(op, row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1);
+        return Rows{row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1};
     }
     if (motion == "operator-line" || motion == "object-bar-contents")
     {
@@ -618,9 +665,9 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
         }
         if (list_.rows()[first].tick >= to)
         {
-            return false;
+            return std::nullopt;
         }
-        return operateRows(op, first, last, from, to - from);
+        return Rows{first, last, from, to - from};
     }
     const auto from = row_;
     run(motion, count);
@@ -632,13 +679,13 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
                        motion == "go-last";
     if (whole)
     {
-        return operateRows(op, from, to);
+        return Rows{from, to};
     }
     if (to == from)
     {
-        return false;
+        return std::nullopt;
     }
-    return to > from ? operateRows(op, from, to - 1) : operateRows(op, to, from - 1);
+    return to > from ? Rows{from, to - 1} : Rows{to, from - 1};
 }
 bool EventListView::operateRows(std::string_view op, std::size_t from, std::size_t to,
                                 std::optional<core::Tick> bar, core::Tick span)

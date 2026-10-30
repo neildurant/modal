@@ -84,6 +84,24 @@ struct EventRegister
     }
 };
 
+// What an operator other than d and y takes over a range or object (decided for milestone 6):
+// on each track, the events it takes, by index among the track's events, in order; what they
+// are, for messages and undo ("4 notes in Bass", "bar 3 of Bass"); and whether only notes are
+// to be moved in time, as in the piano roll, which shows only notes, while elsewhere what
+// moves in time moves together, controllers too.
+struct OperatorTarget
+{
+    struct Part
+    {
+        core::TrackId track;
+        std::vector<std::size_t> events;
+    };
+
+    std::vector<Part> parts;
+    std::string what;
+    bool notesOnly = false;
+};
+
 // What a view asks of the workspace that shows it.
 class ViewHost
 {
@@ -155,6 +173,13 @@ public:
     // Runs an operator (operator-delete or operator-yank) over where a motion goes, or with
     // operator-line over the cursor's place and as many after it as the count says.
     virtual bool operate(std::string_view op, std::string_view motion, int count) = 0;
+
+    // What an operator other than d and y takes over a range or object here, or nothing if it
+    // takes nothing, having said why where it's not plain.
+    virtual std::optional<OperatorTarget> target(std::string_view /*motion*/, int /*count*/)
+    {
+        return std::nullopt;
+    }
 
     // A command's group and title in the list of keys here, where it does something else than
     // its binding's hint says, as the piano roll reads J's join as down an octave and = as

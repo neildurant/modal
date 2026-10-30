@@ -64,6 +64,7 @@ public:
     std::optional<CommandResult> runLine(std::string_view command,
                                          std::string_view arguments) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
+    std::optional<OperatorTarget> target(std::string_view motion, int count) override;
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     std::optional<std::pair<std::string, std::string>>
@@ -183,6 +184,10 @@ private:
     std::optional<std::string> setNote(const std::string& heading, const core::Event& changed);
     // The track's notes starting in a span of time, by index.
     std::vector<std::size_t> notesIn(core::Tick from, core::Tick to) const;
+    // Where a range goes in time from the cursor, or nothing if it goes nowhere; and whether a
+    // motion goes across pitches, which isn't a range yet, saying so if it does.
+    std::optional<std::pair<core::Tick, core::Tick>> timeSpan(std::string_view motion, int count);
+    bool acrossPitches(std::string_view motion) const;
     // Deletes or yanks the cursor's bar and those after it, its notes or as time (ab).
     bool operateOnBars(std::string_view op, int count, bool time);
     // Changes the current note, the cursor going with it, unless it would go before the song's

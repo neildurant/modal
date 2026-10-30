@@ -49,6 +49,27 @@ constexpr std::array kSharedCommands{
                 .description = "Yank the events a motion or object takes (y]b, yib), or yy "
                                "this bar's",
                 .count = true},
+    CommandInfo{.name = "operator-transpose-up",
+                .description = "Transpose the notes a range or object takes up a semitone (>ib), "
+                               "or {count} semitones (3>ib); >> this bar's",
+                .count = true},
+    CommandInfo{.name = "operator-transpose-down",
+                .description = "Transpose the notes a range or object takes down a semitone "
+                               "(<ib), or {count} semitones; << this bar's",
+                .count = true},
+    CommandInfo{.name = "operator-shift-later",
+                .description = "Move the events a range or object takes later by the grid step "
+                               "(t]b), or {count} steps; tt this bar's. In the piano roll, its "
+                               "notes",
+                .count = true},
+    CommandInfo{.name = "operator-shift-earlier",
+                .description = "Move the events a range or object takes earlier by the grid "
+                               "step (T]b), or {count} steps; TT this bar's",
+                .count = true},
+    CommandInfo{.name = "operator-quantize",
+                .description = "Quantise the starts of the notes a range or object takes to the "
+                               "grid (qib); qq this bar's",
+                .count = true},
     CommandInfo{.name = "operator-line",
                 .description = "After an operator, this bar's events, or {count} bars' from it",
                 .modes = modeBit(Mode::OperatorPending),
@@ -229,7 +250,12 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 50> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 55> where{{
+            {"operator-transpose-up", onlyIn({Tracks, PianoRoll, EventList})},
+            {"operator-transpose-down", onlyIn({Tracks, PianoRoll, EventList})},
+            {"operator-shift-later", onlyIn({Tracks, PianoRoll, EventList})},
+            {"operator-shift-earlier", onlyIn({Tracks, PianoRoll, EventList})},
+            {"operator-quantize", onlyIn({Tracks, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
@@ -388,8 +414,7 @@ void Workspace::buildOperatorKeymap()
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
         const auto* info = commands_.find(binding.command);
-        const bool again =
-            binding.command == "operator-delete" || binding.command == "operator-yank";
+        const bool again = isOperator(binding.command);
         const bool wanted = again || binding.command == "cancel" || (info && info->motion);
         if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
         {
@@ -410,8 +435,12 @@ std::string Workspace::pending() const
     std::string text;
     if (operator_)
     {
-        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
-               (operator_->name == "operator-delete" ? "d" : "y");
+        auto keys = keysOf(operator_->name);
+        if (keys == "<lt>")
+        {
+            keys = "<";
+        }
+        text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) + keys;
     }
     return text + keys_.pending();
 }
@@ -1335,7 +1364,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         return runCommandLine(command);
     }
-    if (command == "operator-delete" || command == "operator-yank")
+    if (isOperator(command))
     {
         operator_ = PendingOperator{std::string{command}, count};
         mode_ = Mode::OperatorPending;
@@ -1448,8 +1477,6 @@ bool Workspace::runOperator(std::string_view command, int count)
     {
         return true;
     }
-    // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
-    const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
     if (command != "operator-line")
     {
         const auto* info = commands_.find(command);
@@ -1466,6 +1493,14 @@ bool Workspace::runOperator(std::string_view command, int count)
             return true;
         }
     }
+    if (op.name != "operator-delete" && op.name != "operator-yank")
+    {
+        // The count before the operator is how far (3>ib, up three semitones), the one after
+        // it the range's (>3ib, three bars up one).
+        return transform(op.name, std::max(op.count, 1), command, count);
+    }
+    // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
+    const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
     return view().operate(op.name, command, total);
 }
 

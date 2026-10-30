@@ -4,6 +4,7 @@
 
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
+#include <modal/core/transforms.hpp>
 #include <modal/ui/arrange_view.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/command_line.hpp>
@@ -28,6 +29,9 @@
 
 namespace modal::ui
 {
+
+// Whether a command is an operator, waiting for a range or object: d, y, > and the others.
+bool isOperator(std::string_view command);
 
 // The window's contents: the views of the song, one shown at a time, with what they share
 // (decided for milestone 5). The workspace handles keys through the keymap, with counts and
@@ -223,6 +227,14 @@ private:
 
     // Runs a motion or the operator's own key after an operator, then the operator.
     bool runOperator(std::string_view command, int count);
+    // The operators other than d and y, over what a range or object takes in the view shown,
+    // by an amount (semitones, grid steps) the count before the operator gives (decided for
+    // milestone 6); and changing the events each track's part of it takes, as one undo step,
+    // or saying why it can't be.
+    bool transform(std::string_view op, int amount, std::string_view motion, int count);
+    using EventsChange =
+        std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)>;
+    bool changeEvents(std::string title, const OperatorTarget& target, const EventsChange& change);
     // The shortest keys bound to a command in Normal mode, as typed, or its name if none are.
     std::string keysOf(std::string_view command) const;
 
@@ -266,7 +278,7 @@ private:
     KeyDispatcher keys_;
     struct PendingOperator
     {
-        std::string name; // operator-delete or operator-yank
+        std::string name; // operator-delete, operator-yank, operator-quantize and so on
         int count;
     };
     std::optional<PendingOperator> operator_;

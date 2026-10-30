@@ -228,6 +228,66 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     {
         return false;
     }
+    if (motion == "object-note")
+    {
+        host_.setMessage("There's no single note here; dd takes this bar's events",
+                         MessageKind::Information);
+        return true;
+    }
+    const auto area = areaFor(motion, count);
+    return area && operateOn(op, *area, motion == "object-bar");
+}
+
+std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int count)
+{
+    // The events starting in the area, controllers too, on each of its tracks.
+    if (page_.stripCursor())
+    {
+        host_.setMessage("The section strip is for sections; change their events on the tracks",
+                         MessageKind::Information);
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    if (song.tracks().empty())
+    {
+        return std::nullopt;
+    }
+    if (motion == "object-note")
+    {
+        host_.setMessage("There's no single note here; ib takes this bar's events",
+                         MessageKind::Information);
+        return std::nullopt;
+    }
+    const auto area = areaFor(motion, count);
+    if (!area)
+    {
+        return std::nullopt;
+    }
+    OperatorTarget result{.parts = {}, .what = describe(*area), .notesOnly = false};
+    bool any = false;
+    for (auto i = area->top; i <= area->bottom; ++i)
+    {
+        const auto id = song.tracks()[i]->id();
+        const auto& events = song.events(id);
+        const auto inside = events.startingIn(area->from, area->to);
+        auto& part = result.parts.emplace_back(OperatorTarget::Part{id, {}});
+        const auto first = static_cast<std::size_t>(inside.data() - events.all().data());
+        for (std::size_t k = 0; k < inside.size(); ++k)
+        {
+            part.events.push_back(first + k);
+        }
+        any = any || !inside.empty();
+    }
+    if (!any)
+    {
+        host_.setMessage("Nothing there in " + result.what, MessageKind::Information);
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, int count)
+{
     // The cursor's bar, and its end, cut short by the song's.
     const auto& m = meter();
     const auto track = page_.track();
@@ -240,13 +300,7 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     {
         // dd, ib, ab: the cursor's bar, and as many after it as the count says less one.
         area.to = end(bar + std::max(count, 1) - 1);
-        return operateOn(op, area, motion == "object-bar");
-    }
-    if (motion == "object-note")
-    {
-        host_.setMessage("There's no single note here; dd takes this bar's events",
-                         MessageKind::Information);
-        return true;
+        return area;
     }
 
     // Where the motion goes, without moving the cursor or the view.
@@ -264,7 +318,7 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
         // Across tracks: the cursor's bar on each, as Vim's line motions take whole lines.
         area.top = std::min(track, landedTrack);
         area.bottom = std::max(track, landedTrack);
-        return operateOn(op, area);
+        return area;
     }
     // Across bars: up to the bar landed on, as Vim's character motions go, or with G and gg
     // the bar landed on too, as its line motions do.
@@ -281,9 +335,9 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     }
     else if (!inclusive)
     {
-        return false;
+        return std::nullopt;
     }
-    return area.from < area.to && operateOn(op, area);
+    return area.from < area.to ? std::optional{area} : std::nullopt;
 }
 
 std::string ArrangeView::describe(const Area& area) const
@@ -799,7 +853,11 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
 {
     if (page_.stripCursor())
     {
-        // Sections, as lines; dd, yy and the objects aren't on the strip.
+        // Sections, as lines, for d and y; dd, yy and the objects aren't on the strip.
+        if (op != "operator-delete" && op != "operator-yank")
+        {
+            return std::nullopt;
+        }
         if (motion == "cursor-right")
         {
             return "this section";
@@ -824,6 +882,11 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
     }
     if (motion == "object-bar")
     {
+        // As time only for d and y; to the others it's ib.
+        if (op != "operator-delete" && op != "operator-yank")
+        {
+            return std::nullopt;
+        }
         return op == "operator-delete" ? "this bar, closing the gap" : "this bar as time";
     }
     if (motion == "cursor-right")

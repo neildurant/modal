@@ -1334,14 +1334,29 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         return operateOn(op, {*index}, event.tick,
                          std::max<core::Tick>(std::get<core::Note>(event.data).duration, 1));
     }
-    if (motion == "cursor-up" || motion == "cursor-down" || motion == "octave-up" ||
-        motion == "join")
+    if (acrossPitches(motion))
     {
-        host_.setMessage("Deleting and yanking across pitches comes with Visual mode",
-                         MessageKind::Information);
         return true;
     }
+    const auto span = timeSpan(motion, count);
+    return span && operateOn(op, notesIn(span->first, span->second), span->first,
+                             span->second - span->first);
+}
 
+bool PianoRollView::acrossPitches(std::string_view motion) const
+{
+    const bool across = motion == "cursor-up" || motion == "cursor-down" || motion == "octave-up" ||
+                        motion == "join";
+    if (across)
+    {
+        host_.setMessage("Ranges across pitches come with Visual mode", MessageKind::Information);
+    }
+    return across;
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::timeSpan(std::string_view motion,
+                                                                         int count)
+{
     // Where the motion goes in time, without moving the cursor or the view.
     const auto time = time_;
     const auto pitch = pitch_;
@@ -1357,10 +1372,10 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     viewLength_ = length;
     if (!moved || !*moved)
     {
-        return false;
+        return std::nullopt;
     }
-    // The notes starting from the cursor up to where it lands, at every pitch, as Vim's
-    // character motions go; with G and gg, the grid step landed on too.
+    // From the cursor up to where it lands, as Vim's character motions go; with G and gg, the
+    // grid step landed on too.
     const bool inclusive = motion == "go-first" || motion == "go-last";
     const auto from = std::min(time, landed);
     auto to = std::max(time, landed);
@@ -1370,9 +1385,75 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     }
     if (from == to)
     {
-        return false;
+        return std::nullopt;
     }
-    return operateOn(op, notesIn(from, to), from, to - from);
+    return std::pair{from, to};
+}
+
+std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int count)
+{
+    // The notes a range or object takes, at every pitch, and with them the controllers there,
+    // which follow quantised notes as pedals do; only the notes move otherwise.
+    const auto id = trackId();
+    if (!id || acrossPitches(motion))
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& events = song.events(*id);
+    OperatorTarget result{.parts = {{*id, {}}}, .what = {}, .notesOnly = true};
+    auto& taken = result.parts.front().events;
+    if (motion == "object-note")
+    {
+        const auto index = noteHere("change");
+        if (!index)
+        {
+            return std::nullopt;
+        }
+        taken.push_back(*index);
+        result.what =
+            core::pitchName(std::get<core::Note>(events[*index].data).pitch) + " in " + trackName();
+        return result;
+    }
+    std::optional<std::pair<core::Tick, core::Tick>> span;
+    if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")
+    {
+        const auto& m = meter();
+        const auto bar = m.toBarBeatTick(time_).bar;
+        span =
+            std::pair{m.barStart(bar), std::min(m.barStart(bar + std::max(count, 1)), song.end())};
+    }
+    else
+    {
+        span = timeSpan(motion, count);
+    }
+    if (!span)
+    {
+        return std::nullopt;
+    }
+    std::size_t notes = 0;
+    std::optional<std::size_t> only;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (events[i].tick >= span->first && events[i].tick < span->second)
+        {
+            taken.push_back(i);
+            if (events[i].isNote())
+            {
+                ++notes;
+                only = i;
+            }
+        }
+    }
+    if (notes == 0)
+    {
+        host_.setMessage("No notes there", MessageKind::Information);
+        return std::nullopt;
+    }
+    result.what = (notes == 1 ? core::pitchName(std::get<core::Note>(events[*only].data).pitch)
+                              : std::to_string(notes) + " notes") +
+                  " in " + trackName();
+    return result;
 }
 
 std::vector<std::size_t> PianoRollView::notesIn(core::Tick from, core::Tick to) const
@@ -1462,6 +1543,11 @@ std::optional<std::string> PianoRollView::describeRange(std::string_view op,
     }
     if (motion == "object-bar")
     {
+        // As time only for d and y; to the others it's ib.
+        if (op != "operator-delete" && op != "operator-yank")
+        {
+            return std::nullopt;
+        }
         return op == "operator-delete" ? "this bar, closing the gap"
                                        : "this bar as time, controllers too";
     }

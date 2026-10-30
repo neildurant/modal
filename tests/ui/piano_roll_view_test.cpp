@@ -834,7 +834,7 @@ TEST_CASE("d and y with a motion in the piano roll take the notes starting in th
     CHECK(std::ranges::count(bassNotes(r), std::pair<core::Tick, int>{t.bar(4), 31}) == 1);
 
     r.type(U"dj");
-    CHECK(r.ws.message() == "Deleting and yanking across pitches comes with Visual mode");
+    CHECK(r.ws.message() == "Ranges across pitches come with Visual mode");
 }
 
 TEST_CASE("Ctrl-A and Ctrl-X step the piano roll's current note's velocity, undoing together")

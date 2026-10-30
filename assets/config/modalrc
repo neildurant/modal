@@ -66,6 +66,11 @@ nmap <leader>n  default-note-set          "Default note from this one"
 " event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
 " cursor's bar. u and Ctrl-R undo and redo.
+"
+" The other operators take the same ranges and objects, a count before them saying how far:
+" > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
+" the grid step (in the piano roll, its notes), and q quantises notes' starts to the grid.
+" Doubled (>>, qq), they take this bar.
 keysection "Changing events"
 nmap <CR>       field-edit        "Edit this field"
 nmap +          field-increase-fine "Step up"
@@ -76,6 +81,11 @@ nmap _          field-decrease-fine "Step down"
 nmap <C-x>      number-decrease   "Step down"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
+nmap >          operator-transpose-up "Transpose up"
+nmap <lt>       operator-transpose-down "Transpose down"
+nmap t          operator-shift-later "Move later"
+nmap T          operator-shift-earlier "Move earlier"
+nmap q          operator-quantize "Quantise"
 nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"

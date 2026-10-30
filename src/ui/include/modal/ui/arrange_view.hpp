@@ -41,6 +41,7 @@ public:
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
+    std::optional<OperatorTarget> target(std::string_view motion, int count) override;
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     std::optional<std::pair<std::string, std::string>>
@@ -77,6 +78,8 @@ private:
         core::Tick to;
     };
 
+    // The area a range or object takes from the cursor, or nothing if it takes none.
+    std::optional<Area> areaFor(std::string_view motion, int count);
     // Deletes or yanks the events starting in an area, or with time, as ab does, deletes the
     // area's time too, closing the gap up to the section's end.
     bool operateOn(std::string_view op, const Area& area, bool time = false);
