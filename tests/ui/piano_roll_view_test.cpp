@@ -270,6 +270,30 @@ TEST_CASE("Ctrl with h, l, { and } scroll the piano roll with the cursor")
     CHECK(r.view().time() == 3 * t.sixteenth());
 }
 
+TEST_CASE("Ctrl-Shift-l and Ctrl-Shift-h scroll the piano roll by a page")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    r.type(U"5Gl"); // bar 5 and a step: the view is bars 5-8
+    REQUIRE(r.view().page().start == t.bar(5));
+    const auto across = [&] { return r.view().time() - r.view().page().start; };
+    r.press(Key::typed(U'l', kCtrl | kShift));
+    CHECK(r.view().time() == t.bar(9) + t.sixteenth());
+    CHECK(r.view().page().start == t.bar(9));
+    // Past the last step, only as far as it, the view moving as far.
+    r.press(Key::of(NamedKey::Right, kCtrl | kShift));
+    CHECK(r.view().time() < t.bar(13) + t.sixteenth());
+    CHECK(r.view().time() > t.bar(9) + t.sixteenth());
+    CHECK(across() == t.sixteenth());
+    r.press(Key::typed(U'h', kCtrl | kShift));
+    CHECK(across() == t.sixteenth());
+    // At the start the view stops, and the cursor goes on.
+    r.ws.run("scroll-page-left", 3);
+    CHECK(r.view().page().start == 0);
+    CHECK(r.view().time() == 0);
+}
+
 TEST_CASE("scrolling the piano roll in time keeps its scale over bars of another length")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

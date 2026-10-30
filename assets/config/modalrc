@@ -111,7 +111,8 @@ nmap gt         track-next        "Next track, or track {count}"
 nmap gT         track-previous    "Track before"
 
 " Scrolling. Ctrl with a direction moves the cursor and scrolls with it, so it stays in
-" place on screen, until the view can't scroll further.
+" place on screen, until the view can't scroll further; in the arrangement and the piano roll,
+" Ctrl-Shift with h and l or the arrows does it by a page, the view's width.
 keysection "Scrolling"
 nmap <C-h>      cursor-left-scroll  "Left, scrolling"
 nmap <C-Left>   cursor-left-scroll  "Left, scrolling"
@@ -125,6 +126,10 @@ nmap <C-{>      cursor-bar-previous-scroll "Same place, bar before, scrolling"
 nmap <C-S-[>    cursor-bar-previous-scroll "Same place, bar before, scrolling"
 nmap <C-}>      cursor-bar-next-scroll "Same place, next bar, scrolling"
 nmap <C-S-]>    cursor-bar-next-scroll "Same place, next bar, scrolling"
+nmap <C-S-h>    scroll-page-left  "A page earlier, scrolling"
+nmap <C-S-Left> scroll-page-left  "A page earlier, scrolling"
+nmap <C-S-l>    scroll-page-right "A page later, scrolling"
+nmap <C-S-Right> scroll-page-right "A page later, scrolling"
 nmap <C-d>      scroll-half-down  "Half a page down"
 nmap <C-u>      scroll-half-up    "Half a page up"
 nmap <C-f>      scroll-page-down  "A page down"

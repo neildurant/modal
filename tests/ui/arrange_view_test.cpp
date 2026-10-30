@@ -117,6 +117,31 @@ TEST_CASE("the arrangement's cursor is a bar of a track, moved by bars and track
     CHECK(contains(inspector, U"1 of"));
 }
 
+TEST_CASE("Ctrl-Shift-l and Ctrl-Shift-h scroll the arrangement by a page of bars")
+{
+    Arranging a;
+    const auto bars = a.page().barsInView();
+    REQUIRE(bars > 1);
+    a.type(U"3l");
+    const auto onScreen = [&] { return a.page().time() - a.page().leftTick(); };
+    const auto before = onScreen();
+    a.press(Key::typed(U'l', kCtrl | kShift));
+    CHECK(a.page().bar() == 4 + bars);
+    CHECK(onScreen() == before);
+    a.press(Key::of(NamedKey::Left, kCtrl | kShift));
+    CHECK(a.page().bar() == 4);
+    CHECK(a.page().leftTick() == 0);
+    // At the start the view stops, and the cursor goes on.
+    a.press(Key::typed(U'h', kCtrl | kShift));
+    CHECK(a.page().bar() == 1);
+
+    // Not on the section strip.
+    a.type(U"gs");
+    a.press(Key::typed(U'l', kCtrl | kShift));
+    CHECK(a.ws.message() == "Paging is for the tracks' bars: j goes back to them");
+    CHECK(a.page().stripCursor() == 0);
+}
+
 TEST_CASE("zi, zo and z0 zoom the arrangement")
 {
     Arranging a;

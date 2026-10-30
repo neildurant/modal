@@ -126,6 +126,10 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
             command == "cursor-left-scroll" || command == "cursor-bar-previous-scroll";
         page_.scrollBars(back ? -n : n);
     }
+    else if (command == "scroll-page-left" || command == "scroll-page-right")
+    {
+        page_.scrollBars(page_.barsInView() * (command == "scroll-page-left" ? -n : n));
+    }
     else if (command == "cursor-down-scroll" || command == "cursor-up-scroll")
     {
         page_.scrollTracks(command == "cursor-down-scroll" ? n : -n);
@@ -702,6 +706,12 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     if (command == "field-edit")
     {
         host_.playFrom(song.sectionStart(section));
+        return true;
+    }
+    if (command == "scroll-page-left" || command == "scroll-page-right")
+    {
+        host_.setMessage("Paging is for the tracks' bars: j goes back to them",
+                         MessageKind::Information);
         return true;
     }
     return std::nullopt;

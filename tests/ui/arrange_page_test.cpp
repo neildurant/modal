@@ -518,6 +518,22 @@ TEST_CASE("centring puts the cursor's bar and track in the middle of the view")
     CHECK(page.leftTick() == 0); // no further left than the start
 }
 
+TEST_CASE("a page of the arrangement is as many of the cursor's track's bars as are wholly in view")
+{
+    auto page = page80x22(); // 120 quarter notes in view
+    const auto song = demoSong();
+    const auto right = 120 * core::kPpqn.quarter();
+    for (const std::size_t track : {std::size_t{0}, std::size_t{6}}) // 4/4 and 7/8; 3/4
+    {
+        const auto& meter = song.meter(song.tracks()[track]->id());
+        page.setCursor(track, 0);
+        const auto bars = page.barsInView();
+        INFO("track " << track);
+        CHECK(meter.barStart(bars + 1) <= right); // the last of them ends in view
+        CHECK(meter.barStart(bars + 2) > right);  // the next doesn't
+    }
+}
+
 TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
 {
     auto page = page80x22();

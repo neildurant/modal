@@ -250,6 +250,22 @@ void ArrangePage::scrollBars(std::int64_t by)
     follow();
 }
 
+std::int64_t ArrangePage::barsInView() const
+{
+    if (song_.tracks().empty())
+    {
+        return 1;
+    }
+    const auto& meter = meterOf(currentTrack());
+    const core::Tick right = leftTick_ + viewColumns() * columnTicks();
+    std::int64_t bars = 0;
+    for (auto bar = meter.toBarBeatTick(leftTick_).bar; meter.barStart(bar + 1) <= right; ++bar)
+    {
+        bars += meter.barStart(bar) >= leftTick_ ? 1 : 0;
+    }
+    return std::max<std::int64_t>(bars, 1);
+}
+
 void ArrangePage::centre()
 {
     if (song_.tracks().empty())

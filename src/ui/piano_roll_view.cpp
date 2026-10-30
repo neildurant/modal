@@ -42,6 +42,12 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-bar-previous-scroll",
                 .description = "Same place, bar before, scrolling, {count} times",
                 .count = true},
+    CommandInfo{.name = "scroll-page-left",
+                .description = "A page earlier, scrolling, {count} times",
+                .count = true},
+    CommandInfo{.name = "scroll-page-right",
+                .description = "A page later, scrolling, {count} times",
+                .count = true},
     CommandInfo{.name = "grid-coarser",
                 .description = "Make the track's grid coarser, {count} times",
                 .count = true},
@@ -927,6 +933,14 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     else if (command == "cursor-up-scroll" || command == "cursor-down-scroll")
     {
         scroll(command == "cursor-down-scroll" ? n : -n);
+    }
+    else if (command == "scroll-page-left" || command == "scroll-page-right")
+    {
+        // By the view's length, as turning the page does, the cursor staying put on screen;
+        // no further than the song's start or the last step.
+        const auto length = viewEnd(viewStart_) - viewStart_;
+        const auto by = length * (command == "scroll-page-left" ? -n : n);
+        scrollTo(std::clamp<core::Tick>(time_ + by, 0, std::max(lastTick(), time_)));
     }
     else if (command.starts_with("scroll-half-") || command.starts_with("scroll-page-"))
     {

@@ -260,7 +260,9 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 57> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 59> where{{
+            {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
+            {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-velocity", onlyIn({Tracks, PianoRoll, EventList})},
             {"operator-transpose-up", onlyIn({Tracks, PianoRoll, EventList})},

@@ -85,6 +85,9 @@ public:
     // start or end of the song the view stops and the cursor moves on. The view can then
     // start anywhere, not only at a column.
     void scrollBars(std::int64_t by);
+    // How many of the current track's bars are fully in view, at least one: how far a page
+    // scrolls.
+    std::int64_t barsInView() const;
 
     // Zooms out by some steps, or in if negative, as far as the zooms go; or back to the
     // default.
