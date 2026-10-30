@@ -93,7 +93,8 @@ private:
     const CommandRegistry& commands_;
     std::optional<std::filesystem::path> configDirectory_;
     std::vector<ConfigError> errors_;
-    int depth_ = 0; // of files sourcing others, which stops at a limit
+    int depth_ = 0;       // of files sourcing others, which stops at a limit
+    std::string section_; // keysection's, for the bindings after it in the file
 };
 
 // A command file of every setting, key binding and colour, with what each does, to start a

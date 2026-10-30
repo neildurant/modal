@@ -62,6 +62,7 @@ source more-keys
 - `set NAME=VALUE ...` sets settings. Several can go on one line. A setting that's on or off can also be set as in Vim: `set rewind` turns it on, `set norewind` off, and `set rewind!` the other way.
 - `nmap KEYS COMMAND ["HINT"]` binds keys in Normal mode to a command, with an optional hint. `vmap`, `imap`, `omap` and `cmap` do the same for Visual, Insert, operator-pending and command-line mode (for later milestones). `nunmap KEYS` (and `vunmap` and so on) removes a binding.
 - `ngroup KEYS "TITLE"` gives keys that start longer bindings a title for the hint menu, such as `ngroup <leader>t "Toggles"`; `vgroup` and the rest are for the other modes.
+- `keysection "TITLE"` starts a group of keys in the list of keys (`, ?`): the bindings after it in the same file are listed under it.
 - `highlight ROLE #rrggbb` sets the colour of a theme role.
 - `source FILE` runs another command file, found relative to the file running it.
 
@@ -74,6 +75,8 @@ Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`);
 When a sequence is bound as well as a longer one starting with it (such as `z` and `zz`), Modal waits up to `timeoutlen` milliseconds for the next key before running the shorter.
 
 After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the status line: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists the ranges and objects with what each would take in the view you're in. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
+
+`, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Changing events and so on), each command once with all its keys. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
 
 ## Text size
 

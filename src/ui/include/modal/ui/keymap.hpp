@@ -30,11 +30,13 @@ enum class Mode : std::uint8_t
 
 inline constexpr std::size_t kModeCount = static_cast<std::size_t>(Mode::CommandLine) + 1;
 
-// What a sequence of keys does: a command, by name, and a short label for hints.
+// What a sequence of keys does: a command, by name, a short label for hints, and the group of
+// keys it's listed under in the list of keys (, ?), as keysection names it in a command file.
 struct Binding
 {
     std::string command;
     std::string hint;
+    std::string section = {};
 
     friend bool operator==(const Binding&, const Binding&) = default;
 };
@@ -68,6 +70,9 @@ public:
     std::string groupTitle(Mode mode, std::span<const Key> keys) const;
     std::vector<std::pair<std::vector<Key>, std::string>> groups(Mode mode) const;
 
+    // The bindings' sections, in the order they were first bound in.
+    const std::vector<std::string>& sections() const { return sections_; }
+
     friend bool operator==(const Keymap&, const Keymap&) = default;
 
 private:
@@ -80,6 +85,7 @@ private:
 
     std::array<Bindings, kModeCount> modes_;
     std::array<Groups, kModeCount> groups_;
+    std::vector<std::string> sections_;
 };
 
 // A command to run, with the count typed before its keys, or 0 if none was.

@@ -147,6 +147,15 @@ void ConfigReader::runFile(const std::filesystem::path& file)
 void ConfigReader::runText(std::string_view text, std::string_view source,
                            const std::filesystem::path& directory)
 {
+    // A file's keysection holds for its own bindings, not those of a file it sources or the one
+    // sourcing it.
+    const auto outer = std::exchange(section_, std::string{});
+    struct Restore
+    {
+        std::string& section;
+        std::string outer;
+        ~Restore() { section = std::move(outer); }
+    } restore{section_, outer};
     int number = 0;
     while (!text.empty())
     {
@@ -225,6 +234,15 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
     {
         return source(arguments, directory);
     }
+    if (command == "keysection")
+    {
+        if (arguments.size() != 1)
+        {
+            return "keysection needs \"TITLE\"";
+        }
+        section_ = arguments[0];
+        return {};
+    }
     if (command == "highlight")
     {
         return highlight(config_.theme, arguments);
@@ -280,8 +298,9 @@ std::string ConfigReader::map(std::string_view command, const std::vector<std::s
     {
         return arguments[1] + " can't be bound to keys";
     }
-    config_.keymap.bind(it->mode, std::move(sequence),
-                        {arguments[1], arguments.size() > 2 ? arguments[2] : std::string{}});
+    config_.keymap.bind(
+        it->mode, std::move(sequence),
+        {arguments[1], arguments.size() > 2 ? arguments[2] : std::string{}, section_});
     return {};
 }
 
@@ -381,6 +400,7 @@ constexpr std::array kConfigCommands{
                   "KEYS \"TITLE\""),
     configCommand("cgroup", "Give keys a title in the hint menu, in command-line mode",
                   "KEYS \"TITLE\""),
+    configCommand("keysection", "Start a group of keys for the list of keys (, ?)", "\"TITLE\""),
     configCommand("nunmap", "Unbind keys in Normal mode", "KEYS"),
     configCommand("vunmap", "Unbind keys in Visual mode", "KEYS"),
     configCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),

@@ -41,6 +41,10 @@ std::string Keymap::bind(Mode mode, std::string_view keys, Binding binding)
 
 void Keymap::bind(Mode mode, std::vector<Key> keys, Binding binding)
 {
+    if (std::ranges::find(sections_, binding.section) == sections_.end())
+    {
+        sections_.push_back(binding.section);
+    }
     modes_[static_cast<std::size_t>(mode)].insert_or_assign(std::move(keys), std::move(binding));
 }
 

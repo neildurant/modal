@@ -1342,3 +1342,48 @@ TEST_CASE("keys bound to one command show together in the hint menu, arrows as a
     CHECK(std::ranges::count(*shown, Workspace::Hint{"h/←", "Finer grid", false}) == 1);
     CHECK(std::ranges::count(*shown, Workspace::Hint{"l/→", "Coarser grid", false}) == 1);
 }
+
+TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc's groups")
+{
+    Rolling r;
+    const auto before = bassNotes(r);
+    r.type(U",?");
+    REQUIRE(r.ws.showingKeys());
+    const auto groups = r.ws.keyList();
+    REQUIRE(!groups.empty());
+    CHECK(groups.front().title == "Moving the cursor");
+    const auto has = [&](std::string_view group, const Workspace::Hint& key)
+    {
+        const auto it = std::ranges::find(groups, group, &Workspace::KeyGroup::title);
+        return it != groups.end() && std::ranges::find(it->keys, key) != it->keys.end();
+    };
+    CHECK(has("Moving the cursor", {"j/↓", "Down", false}));
+    CHECK(has("Moving the cursor", {"G", "End, or bar N", false}));
+    CHECK(has("Pitch in the piano roll", {"K", "Up an octave", false}));
+    CHECK(has("After an operator", {"ib", "This bar's events", false}));
+    CHECK(has("The leader", {",?", "The keys here", false}));
+    CHECK(has("Moving notes", {"<A-h>/<A-Left>", "Move earlier", false}));
+    CHECK(has("Pitch in the piano roll", {"J", "Down an octave", false}));
+    CHECK(
+        std::ranges::none_of(groups, [](const auto& g) { return g.title == "The section strip"; }));
+    const auto frame = r.ws.frame();
+    CHECK(std::ranges::any_of(
+        frame, [](const Region& region)
+        { return region.background == Role::Panel && region.bounds.height > 10 * kCell.height; }));
+
+    // While it shows, keys turn its pages or close it, and change nothing.
+    r.type(U"xdd");
+    CHECK(r.ws.showingKeys());
+    CHECK(bassNotes(r) == before);
+    r.type(U"q");
+    CHECK_FALSE(r.ws.showingKeys());
+
+    // Elsewhere, what's there: the strip's keys on the strip, and no pitch keys.
+    r.type(U"gags,?");
+    const auto strip = r.ws.keyList();
+    CHECK(std::ranges::any_of(strip, [](const auto& g) { return g.title == "The section strip"; }));
+    CHECK(std::ranges::none_of(strip,
+                               [](const auto& g) { return g.title == "Pitch in the piano roll"; }));
+    r.press(Key::of(NamedKey::Escape));
+    CHECK_FALSE(r.ws.showingKeys());
+}

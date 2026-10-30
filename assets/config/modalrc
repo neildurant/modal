@@ -1,8 +1,10 @@
 " Modal's built-in command file: the default key bindings. It runs first, then modalrc in
 " your config directory, which can change any of it. modal --write-config FILE writes every
-" setting, binding and colour there is, to start from.
+" setting, binding and colour there is, to start from. keysection "TITLE" starts a group of
+" keys in the list of keys (, ?).
 
 " Moving the cursor
+keysection "Moving the cursor"
 nmap h          cursor-left       "Left"
 nmap <Left>     cursor-left       "Left"
 nmap j          cursor-down       "Down"
@@ -21,6 +23,7 @@ nmap G          go-last           "End, or bar {count}"
 " Moving in time, to the event at or after where each lands, in the track's bars: the same
 " place a bar on, a bar line, a chord (events starting within chordwindow of each other), a
 " section's start, a marker
+keysection "Moving in time"
 nmap }          cursor-bar-next           "Same place, next bar"
 nmap {          cursor-bar-previous       "Same place, bar before"
 nmap ]b         cursor-bar-line-next      "Next bar line"
@@ -35,6 +38,7 @@ nmap [m         cursor-marker-previous    "Marker before"
 " The piano roll: k and j move a semitone, K and J an octave (J joins sections on the
 " section strip), and Tab and Shift-Tab go to the next note's start at any pitch and the one
 " before, notes starting together low to high
+keysection "Pitch in the piano roll"
 nmap K          octave-up                 "Up an octave"
 nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
@@ -44,6 +48,7 @@ nmap <S-Tab>    cursor-note-previous      "Note before"
 " go left and right; Ctrl-T turns triplets on and off; and
 " , n takes the current note's length and velocity as the default note, which o adds. :grid
 " and :len set them by length, such as 1/8 or 1/16t.
+keysection "The grid and default note"
 nmap zh         grid-finer                "Finer grid"
 nmap z<Left>    grid-finer                "Finer grid"
 nmap zl         grid-coarser              "Coarser grid"
@@ -61,6 +66,7 @@ nmap <leader>n  note-default              "Default note from this one"
 " event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
 " cursor's bar. u and Ctrl-R undo and redo.
+keysection "Changing events"
 nmap <CR>       field-edit        "Edit this field"
 nmap +          field-increase-fine "Step up"
 nmap =          field-increase    "Step up"
@@ -74,20 +80,24 @@ nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"
 nmap Y          yank-this         "Yank this"
+keysection "After an operator"
 omap ib         object-bar-contents "This bar's events"
 omap ab         object-bar        "This bar, as time"
 omap in         object-note       "This note"
+keysection "Changing events"
 nmap o          note-add          "Add a note"
 nmap O          note-add-advance  "Add a note and move on"
 nmap u          undo              "Undo"
 nmap <C-r>      redo              "Redo"
 
 " Tracks: the conductor's list is track 0, before track 1
+keysection "Tracks"
 nmap gt         track-next        "Next track, or track {count}"
 nmap gT         track-previous    "Track before"
 
 " Scrolling. Ctrl with a direction moves the cursor and scrolls with it, so it stays in
 " place on screen, until the view can't scroll further.
+keysection "Scrolling"
 nmap <C-h>      cursor-left-scroll  "Left, scrolling"
 nmap <C-Left>   cursor-left-scroll  "Left, scrolling"
 nmap <C-j>      cursor-down-scroll  "Down, scrolling"
@@ -114,6 +124,7 @@ nmap zf         playhead-follow   "Follow the playhead again"
 
 " Views: the arrangement, the piano roll and the event list, each at the cursor, and
 " Backspace back to the view before
+keysection "Views"
 nmap ga         view-arrangement  "Arrangement"
 nmap gr         view-piano-roll   "Piano roll"
 nmap ge         view-events       "Event list"
@@ -123,6 +134,7 @@ nmap <BS>       view-back         "Back"
 " track), j back. There, h and l go between sections, x, d, y, Y, p and P delete, yank and
 " put them, Alt-h and Alt-l move one, J joins it with the next, + and - lengthen and shorten
 " it by a bar, i and a insert a new one, c renames it, and Enter plays from it.
+keysection "The section strip"
 nmap gs         section-strip     "Section strip"
 nmap <A-h>      move-left         "Move earlier"
 nmap <A-l>      move-right        "Move later"
@@ -135,6 +147,7 @@ nmap J          join              "Join with the next"
 " Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j
 " a semitone, Alt-K and Alt-J an octave, or Alt and Alt-Shift with the arrow keys. = and -
 " move its end to the grid steps either side, + and _ a nudge.
+keysection "Moving notes"
 nmap <A-Left>   move-left         "Move earlier"
 nmap <A-Right>  move-right        "Move later"
 nmap <A-S-Left> move-left-fine    "Nudge earlier"
@@ -162,13 +175,16 @@ nmap c          change            "Rename"
 " edits the field under the cursor in place, as Enter does. Tab and Shift-Tab set the field
 " and go to the next or the one before, round from the last to the first; Enter sets it and
 " leaves, Escape leaves it; Up and Down step it.
+keysection "The inspector"
 nmap e          inspector-edit    "Edit in the inspector"
 
 " The leader key, comma unless the leader setting names another, starts the commands used now
 " and then. After a pause, the hint menu shows what can follow it, as it does after any keys
 " that start longer bindings; ngroup gives such keys their title there. <leader><leader> is
 " kept free, for a command used often enough to earn it.
+keysection "The leader"
 ngroup <leader>  "Leader"
+nmap <leader>?   keys-show         "The keys here"
 ngroup <leader>v "Views"
 nmap <leader>va  view-arrangement  "Arrangement"
 nmap <leader>vp  view-piano-roll   "Piano roll"
@@ -180,6 +196,7 @@ ngroup [         "Before"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too.
+keysection "Text size"
 nmap <C-=>      font-bigger       "Bigger text"
 nmap <C-S-=>    font-bigger       "Bigger text"
 nmap <C-+>      font-bigger       "Bigger text"
@@ -191,6 +208,7 @@ nmap <C-k0>     font-reset        "Text size from the config"
 
 " The command line: : opens it, and in it these keys edit, run and recall lines. Other
 " characters are typed.
+keysection "The command line"
 nmap :          command-line            "Command line"
 cmap <CR>       command-line-run        "Run"
 cmap <Esc>      command-line-cancel     "Cancel"
@@ -213,6 +231,7 @@ nmap <Esc>      cancel            "Cancel"
 " default) the marker stays put; without, it moves to where playback stops. , t Space turns
 " rewind on or off.
 " Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
+keysection "Playing"
 nmap <Space>    play-toggle       "Play or stop"
 nmap <C-Space>  play-cursor       "Play from the cursor"
 nmap m<Space>   marker-set        "Play from here"

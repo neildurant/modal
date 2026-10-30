@@ -119,6 +119,9 @@ constexpr std::array kSharedCommands{
                 .description = "Yank the note or event under the cursor, as yin does, or the "
                                "section on the section strip",
                 .count = true},
+    CommandInfo{.name = "keys-show",
+                .description = "Show the keys that do something here, in groups: q or Escape "
+                               "closes it, j and k turn its pages"},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
@@ -540,6 +543,25 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         }
         return true;
     }
+    // The list of keys takes the keys while it shows: q, Escape or ? closes it, j and k (or the
+    // arrows and Page Down and Up) turn its pages, and other keys do nothing.
+    if (keysPage_)
+    {
+        const auto pages = static_cast<int>(keyPages(keyList()).size());
+        const bool next = key == Key::typed(U'j') || key == Key::of(NamedKey::Down) ||
+                          key == Key::of(NamedKey::PageDown) || key == Key::of(NamedKey::Right);
+        const bool back = key == Key::typed(U'k') || key == Key::of(NamedKey::Up) ||
+                          key == Key::of(NamedKey::PageUp) || key == Key::of(NamedKey::Left);
+        if (key == Key::typed(U'q') || key == Key::of(NamedKey::Escape) || key == Key::typed(U'?'))
+        {
+            keysPage_.reset();
+        }
+        else if (next || back)
+        {
+            keysPage_ = std::clamp(*keysPage_ + (next ? 1 : -1), 0, std::max(pages - 1, 0));
+        }
+        return true;
+    }
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
         (key.modifiers & (kCtrl | kAlt)) == 0)
@@ -658,14 +680,26 @@ std::string hintKey(const Key& key)
     return formatKey(key);
 }
 
-// The keys of one command, its other keys after the first, as h/←: characters before named
-// keys, which sort first on their own.
+// The keys of one command together, as h/← or <A-h>/<A-Left>: characters first, then
+// characters with modifiers, then named keys, which sort first on their own.
 void addKeys(std::vector<std::string>& keys, std::string more)
 {
     keys.push_back(std::move(more));
-    std::ranges::stable_sort(
-        keys, {}, [](const std::string& k)
-        { return k.starts_with("<") || k == "←" || k == "→" || k == "↑" || k == "↓"; });
+    std::ranges::stable_sort(keys, {},
+                             [](const std::string& k)
+                             {
+                                 const auto text = decodeUtf8(k);
+                                 if (text.size() > 2 && text.front() == U'<')
+                                 {
+                                     const auto dash = text.find_last_of(U'-');
+                                     const auto name =
+                                         text.substr(dash == std::u32string::npos ? 1 : dash + 1);
+                                     return name.size() == 2 ? 1 : 2; // a character and >
+                                 }
+                                 const bool arrow =
+                                     text.size() == 1 && text[0] >= U'←' && text[0] <= U'↓';
+                                 return arrow ? 2 : 0;
+                             });
 }
 
 std::string joined(const std::vector<std::string>& keys)
@@ -834,6 +868,208 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
         hints.push_back(std::move(hint));
     }
     return hints;
+}
+
+std::vector<Workspace::KeyGroup> Workspace::keyList() const
+{
+    // Normal mode's bindings that do something here, and the objects after an operator, each
+    // command once under its section with all its keys, the sections in modalrc's order.
+    std::vector<KeyGroup> groups;
+    std::vector<std::vector<std::vector<std::string>>> keys; // each group's keys of each
+    std::vector<std::vector<std::string>> commands;          // and their commands
+    const auto add = [&](const std::vector<Key>& sequence, const Binding& binding)
+    {
+        if (!offered(binding.command) || binding.command == "cancel")
+        {
+            return;
+        }
+        const auto relabelled = view().relabel(binding.command);
+        const auto title = relabelled                ? relabelled->first
+                           : binding.section.empty() ? std::string{"Other keys"}
+                                                     : binding.section;
+        std::string written;
+        for (const auto& k : sequence)
+        {
+            written += hintKey(keys_.typed(k));
+        }
+        // A command once, with all its keys, in the group its first binding is in.
+        for (std::size_t g = 0; g < groups.size(); ++g)
+        {
+            if (const auto same = std::ranges::find(commands[g], binding.command);
+                same != commands[g].end())
+            {
+                addKeys(keys[g][static_cast<std::size_t>(same - commands[g].begin())],
+                        std::move(written));
+                return;
+            }
+        }
+        auto group = std::ranges::find(groups, title, &KeyGroup::title);
+        if (group == groups.end())
+        {
+            groups.push_back({title, {}});
+            keys.emplace_back();
+            commands.emplace_back();
+            group = std::prev(groups.end());
+        }
+        const auto g = static_cast<std::size_t>(group - groups.begin());
+        const auto* info = commands_.find(binding.command);
+        auto name = relabelled              ? relabelled->second
+                    : !binding.hint.empty() ? binding.hint
+                    : info != nullptr       ? titleOf(*info)
+                                            : binding.command;
+        if (const auto at = name.find("{count}"); at != std::string::npos)
+        {
+            name.replace(at, 7, "N");
+        }
+        group->keys.push_back({.keys = {}, .title = std::move(name), .group = false});
+        keys[g].push_back({written});
+        commands[g].push_back(binding.command);
+    };
+    for (const auto mode : {Mode::Normal, Mode::OperatorPending})
+    {
+        for (const auto& [sequence, binding] : keymap_.bindings(mode))
+        {
+            add(sequence, binding);
+        }
+    }
+    for (std::size_t g = 0; g < groups.size(); ++g)
+    {
+        for (std::size_t i = 0; i < groups[g].keys.size(); ++i)
+        {
+            groups[g].keys[i].keys = joined(keys[g][i]);
+        }
+        std::ranges::stable_sort(groups[g].keys, {},
+                                 [](const Hint& h) { return hintOrder(h.keys); });
+    }
+    // In the order modalrc's sections come in, those it has none for last.
+    const auto& order = keymap_.sections();
+    std::ranges::stable_sort(groups, {},
+                             [&](const KeyGroup& group)
+                             {
+                                 const auto at = std::ranges::find(order, group.title);
+                                 return at == order.end()
+                                            ? order.size()
+                                            : static_cast<std::size_t>(at - order.begin());
+                             });
+    return groups;
+}
+
+std::vector<std::vector<Workspace::KeyColumn>>
+Workspace::keyPages(const std::vector<KeyGroup>& groups) const
+{
+    // Down each column and then across, a group's title never last in a column, as many
+    // columns to a page as fit across, each as wide as what's in it.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
+    const int rows = std::max(layout_.main.height / cell_.height - 3, 2);
+    std::vector<KeyColumn> columns(1);
+    for (const auto& group : groups)
+    {
+        if (static_cast<int>(columns.back().lines.size()) + 2 > rows)
+        {
+            columns.emplace_back();
+        }
+        if (!columns.back().lines.empty())
+        {
+            columns.back().lines.push_back({nullptr, nullptr}); // a line between groups
+        }
+        columns.back().lines.push_back({&group, nullptr});
+        for (const auto& key : group.keys)
+        {
+            if (static_cast<int>(columns.back().lines.size()) >= rows)
+            {
+                columns.emplace_back();
+            }
+            columns.back().lines.push_back({&group, &key});
+        }
+    }
+    for (auto& column : columns)
+    {
+        for (const auto& line : column.lines)
+        {
+            if (line.key != nullptr)
+            {
+                column.keys =
+                    std::max(column.keys, static_cast<int>(decodeUtf8(line.key->keys).size()));
+                column.width =
+                    std::max(column.width, static_cast<int>(decodeUtf8(line.key->title).size()));
+            }
+        }
+        column.width += column.keys + 3;
+        for (const auto& line : column.lines)
+        {
+            if (line.key == nullptr && line.group != nullptr)
+            {
+                column.width =
+                    std::max(column.width, static_cast<int>(decodeUtf8(line.group->title).size()));
+            }
+        }
+    }
+    std::vector<std::vector<KeyColumn>> pages(1);
+    int used = 0;
+    for (auto& column : columns)
+    {
+        if (!pages.back().empty() && used + column.width > room)
+        {
+            pages.emplace_back();
+            used = 0;
+        }
+        used += column.width + 4;
+        pages.back().push_back(std::move(column));
+    }
+    return pages;
+}
+
+Region Workspace::keysRegion() const
+{
+    // Over the view, on a panel: what it is and how to close it, then the page of columns, the
+    // groups' titles in the accent colour, keys as in the hint menu.
+    const auto groups = keyList();
+    const auto pages = keyPages(groups);
+    const auto page =
+        static_cast<std::size_t>(std::clamp(*keysPage_, 0, static_cast<int>(pages.size()) - 1));
+    const int margin = BarSpacing::forCell(cell_).margin;
+    Region region{
+        .bounds = layout_.main, .background = Role::Panel, .text = {}, .under = {}, .over = {}};
+    const Style headingStyle{Role::Dim, Role::Panel, kPlain};
+    const Style groupStyle{Role::Accent, Role::Panel, kBold};
+    const Style keyStyle{Role::HintKey, Role::Panel, kPlain};
+    const Style colonStyle{Role::Dim, Role::Panel, kPlain};
+    const Style titleStyle{Role::Text, Role::Panel, kPlain};
+    const auto x = [&](int column) { return margin + column * cell_.width; };
+    const int pad = cell_.height / 4;
+    std::string heading = "Keys in " + std::string{view().name()} + ": q or Escape closes";
+    if (pages.size() > 1)
+    {
+        heading += "; j and k turn the pages (" + std::to_string(page + 1) + " of " +
+                   std::to_string(pages.size()) + ")";
+    }
+    region.text.push_back({x(0), pad, decodeUtf8(heading), headingStyle});
+    int left = 0;
+    for (const auto& column : pages[page])
+    {
+        int row = 2;
+        for (const auto& line : column.lines)
+        {
+            const int y = pad + row * cell_.height;
+            if (line.key != nullptr)
+            {
+                const auto keys = decodeUtf8(line.key->keys);
+                region.text.push_back(
+                    {x(left + column.keys - static_cast<int>(keys.size())), y, keys, keyStyle});
+                region.text.push_back({x(left + column.keys), y, U" : ", colonStyle});
+                region.text.push_back(
+                    {x(left + column.keys + 3), y, decodeUtf8(line.key->title), titleStyle});
+            }
+            else if (line.group != nullptr)
+            {
+                region.text.push_back({x(left), y, decodeUtf8(line.group->title), groupStyle});
+            }
+            ++row;
+        }
+        left += column.width + 4;
+    }
+    return region;
 }
 
 Region Workspace::hintRegion(const std::vector<Hint>& hints) const
@@ -1104,6 +1340,11 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         mode_ = Mode::CommandLine;
         line_.open();
+        return true;
+    }
+    if (command == "keys-show")
+    {
+        keysPage_ = 0;
         return true;
     }
     if (command == "yank-this")
@@ -1725,6 +1966,10 @@ Frame Workspace::frame() const
 {
     Frame frame;
     view().addRegions(frame);
+    if (keysPage_)
+    {
+        frame.push_back(keysRegion());
+    }
     if (const auto shown = hints())
     {
         frame.push_back(hintRegion(*shown));

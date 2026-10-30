@@ -141,6 +141,17 @@ public:
     // What the hint menu shows now, if it's showing.
     std::optional<std::vector<Hint>> hints() const;
 
+    // The list of keys (, ?, decided October 2026): every binding that does something where the
+    // cursor is, under the built-in modalrc's sections, over the view; its pages, if it needs
+    // more than one, and whether it's showing.
+    struct KeyGroup
+    {
+        std::string title;
+        std::vector<Hint> keys;
+    };
+    std::vector<KeyGroup> keyList() const;
+    bool showingKeys() const { return keysPage_.has_value(); }
+
     // Where the cursor is, and whether a command does something there, so the hint menu
     // offers it.
     Where where() const;
@@ -282,6 +293,22 @@ private:
     void noteWaiting(std::int64_t now);
     std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
     std::vector<Hint> operatorHints() const;
+    std::optional<int> keysPage_; // the list of keys' page, while it shows
+    // The list of keys laid out in pages of columns, each a run of lines: a group's title, or
+    // a key and its title.
+    struct KeyLine
+    {
+        const KeyGroup* group;
+        const Hint* key; // or null for the group's title
+    };
+    struct KeyColumn
+    {
+        std::vector<KeyLine> lines;
+        int keys = 0;
+        int width = 0;
+    };
+    std::vector<std::vector<KeyColumn>> keyPages(const std::vector<KeyGroup>& groups) const;
+    Region keysRegion() const;
     Region hintRegion(const std::vector<Hint>& hints) const;
 };
 

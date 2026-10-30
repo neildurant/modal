@@ -156,6 +156,15 @@ public:
     // operator-line over the cursor's place and as many after it as the count says.
     virtual bool operate(std::string_view op, std::string_view motion, int count) = 0;
 
+    // A command's group and title in the list of keys here, where the view reads its key as
+    // another command, as the piano roll reads J's join as down an octave; or nothing to keep
+    // the binding's own.
+    virtual std::optional<std::pair<std::string, std::string>>
+    relabel(std::string_view /*command*/) const
+    {
+        return std::nullopt;
+    }
+
     // What an operator would take over a range or object here, for the hint menu after it
     // ("this bar's notes"), or nothing if it takes nothing over it in this view.
     virtual std::optional<std::string> describeRange(std::string_view /*op*/,
