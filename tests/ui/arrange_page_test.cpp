@@ -234,6 +234,10 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
     const auto bass = rowShapes(timeline, 1, Role::BeatLine);
     REQUIRE(bass.size() >= 8);
     CHECK(bass[0].rect.height == 1);
+    // Dim where it crosses the cursor's bar, the first, so as to show through the selection.
+    const auto crossing = rowShapes(timeline, 1, Role::Dim);
+    REQUIRE(crossing.size() == 1);
+    CHECK(crossing[0].rect == bass[0].rect);
 
     // The empty tracks have dots.
     CHECK(rowShapes(timeline, 10, Role::Dim).size() >= 20);

@@ -379,11 +379,15 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
 
     // The cursor's bar, as a span of time across every track, and boxed on its own track: its
     // sides in the gaps either side of the bar's block, its top and bottom above and below it.
+    int cursorX0 = 0;
+    int cursorX1 = 0;
     {
         const auto& meter = meterOf(currentTrack());
         const auto barNumber = meter.toBarBeatTick(time_).bar;
         const int x0 = scale.toX(meter.barStart(barNumber));
         const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
+        cursorX0 = x0;
+        cursorX1 = x1;
         timeline.under.push_back(
             {{x0, tracksTop, x1 - x0, tracksBottom - tracksTop}, Role::Selection, 255});
         if (!stripCursor_ && track_ >= topTrack_ &&
@@ -438,11 +442,17 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
                 density(events.startingIn(start, barEnd).size(), barEnd - start, song_.ppqn());
             if (level == 0)
             {
+                // Dim where it crosses the cursor's bar, as the empty tracks' dots are, since
+                // beat-line is close to the selection's colour.
                 const int thickness = std::max(cell_.height / 16, 1);
-                timeline.under.push_back(
-                    {{x0, y + (cell_.height - thickness) / 2, width, thickness},
-                     Role::BeatLine,
-                     255});
+                const int lineY = y + (cell_.height - thickness) / 2;
+                timeline.under.push_back({{x0, lineY, width, thickness}, Role::BeatLine, 255});
+                const int from = std::max(x0, cursorX0);
+                const int to = std::min(x0 + width, cursorX1);
+                if (from < to)
+                {
+                    timeline.under.push_back({{from, lineY, to - from, thickness}, Role::Dim, 255});
+                }
             }
             else
             {
