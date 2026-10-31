@@ -442,3 +442,42 @@ TEST_CASE(
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.message() == "Also: zi"); // Zoom in, the best match
 }
+
+TEST_CASE("the : prompt shows the arguments a command takes, and the palette asks for them")
+{
+    Paletting p;
+    const auto hint = [&]
+    {
+        std::u32string dimmed;
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+        {
+            if (run.style.foreground == Role::Dim)
+            {
+                dimmed = run.text;
+            }
+        }
+        return dimmed;
+    };
+    p.type(U":bar-insert");
+    CHECK(hint().empty()); // not until a space after the name
+    p.type(U" ");
+    CHECK(hint() == U"[N] [METER]");
+    p.type(U"2");
+    CHECK(hint() == U"[METER]");
+    p.type(U" 3/4");
+    CHECK(hint().empty());
+    p.press(Key::of(NamedKey::Escape));
+
+    // In the palette, its arguments after its title; Enter puts it on the prompt, the hint
+    // showing, rather than running it.
+    p.open();
+    p.type(U"bar insert");
+    const auto end = p.document.song().end();
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::CommandLine);
+    CHECK(p.ws.commandLine().text() == U"bar-insert ");
+    CHECK(hint() == U"[N] [METER]");
+    CHECK(p.document.song().end() == end); // nothing yet
+    p.press(Key::of(NamedKey::Escape));
+}

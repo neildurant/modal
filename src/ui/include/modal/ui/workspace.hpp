@@ -331,6 +331,8 @@ private:
     std::optional<bool> runVisual(std::string_view command, int count);
     // What the prompt shows before the line.
     std::u32string promptLabel() const;
+    // The arguments of the command at the prompt not yet typed, as a hint after the line.
+    std::string argumentHint() const;
     // The command palette, open at the prompt: the commands it searches, those matching what's
     // typed, best first, a command's keys (none if it has none), its keys while it's open, and
     // the list above the prompt.

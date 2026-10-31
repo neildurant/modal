@@ -25,6 +25,7 @@ struct PaletteItem
     std::string aliases;
     bool offered = true;
     std::vector<std::string> keys = {};
+    std::string usage = {}; // its arguments, as [N] [METER], shown after its title
     double rank = 0;
 };
 

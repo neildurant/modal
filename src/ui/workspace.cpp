@@ -3447,6 +3447,7 @@ std::vector<PaletteItem> Workspace::paletteItems() const
                          .aliases = std::string{info.aliases},
                          .offered = offered(info.name),
                          .keys = {},
+                         .usage = std::string{info.usage},
                          .rank = remembered_.rank(info.name, now)});
         if (const auto bound = keys.find(info.name); bound != keys.end())
         {
@@ -3482,6 +3483,7 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
                          .aliases = "",
                          .offered = true,
                          .keys = {},
+                         .usage = {},
                          .rank = 0});
     };
     if (prefix == '@')
@@ -3663,13 +3665,17 @@ bool Workspace::runPalette(std::string_view command)
             remembered_.ran(item.name, clock_());
             rememberedChanged();
         }
-        const bool needs = info != nullptr && !info->usage.empty() && !info->usage.starts_with("[");
-        if (command == "command-line-next" || needs)
+        // Taking arguments, even ones it can do without, it goes to the prompt, their hint
+        // showing (decided with Neil, after use), so what it takes isn't missed; those it must
+        // have with their choices showing too.
+        const bool takes = info != nullptr && !info->usage.empty();
+        const bool needs = takes && !info->usage.starts_with("[");
+        if (command == "command-line-next" || takes)
         {
             line_.open(decodeUtf8(item.name + " "));
             if (needs)
             {
-                complete(1); // its choices showing
+                complete(1);
             }
             return true;
         }
@@ -3722,7 +3728,9 @@ Region Workspace::paletteRegion() const
     for (auto i = first; i < first + rows; ++i)
     {
         keys.push_back(keysFor(shown[i].name));
-        titleWidth = std::max(titleWidth, decodeUtf8(shown[i].title).size());
+        titleWidth = std::max(
+            titleWidth, decodeUtf8(shown[i].title).size() +
+                            (shown[i].usage.empty() ? 0 : 1 + decodeUtf8(shown[i].usage).size()));
         keysWidth = std::max(keysWidth, decodeUtf8(keys.back()).size());
     }
     const auto x = [&](std::size_t column)
@@ -3745,6 +3753,13 @@ Region Workspace::paletteRegion() const
         };
         region.text.push_back(
             {x(0), y, decodeUtf8(item.title), {role(Role::Text), background, kPlain}});
+        if (!item.usage.empty())
+        {
+            region.text.push_back({x(decodeUtf8(item.title).size() + 1),
+                                   y,
+                                   decodeUtf8(item.usage),
+                                   {isChosen ? Role::CursorText : Role::Dim, background, kPlain}});
+        }
         region.text.push_back(
             {x(titleWidth + 2), y, decodeUtf8(keys[r]), {role(Role::HintKey), background, kPlain}});
         region.text.push_back({x(titleWidth + keysWidth + 4),
@@ -3815,7 +3830,73 @@ Region Workspace::promptRegion() const
     {
         region.text.push_back({x(lead + 1 + cursor - first), 0, text.substr(cursor + 1), kBarText});
     }
+    // The command's arguments not yet typed, dimmed after the line ([N] [METER]).
+    if (const auto hint = argumentHint(); !hint.empty())
+    {
+        const auto end = std::max(text.size(), cursor + 1);
+        const bool spaced = !text.empty() && text.back() == U' ';
+        region.text.push_back({x(lead + end - first + (spaced ? 0 : 1)),
+                               0,
+                               decodeUtf8(hint),
+                               {Role::Dim, Role::Bar, kPlain}});
+    }
     return region;
+}
+
+std::string Workspace::argumentHint() const
+{
+    // At the : prompt, once the line holds a command and a space: its arguments from the one
+    // being typed on, as its usage writes them, brackets for those it can do without (decided
+    // with Neil, October 2026, so :bar-insert says it takes [N] [METER]).
+    if (answer_ || palette_ || view().typing())
+    {
+        return {};
+    }
+    const auto text = encodeUtf8(line_.text());
+    const auto space = text.find(' ');
+    if (space == std::string::npos)
+    {
+        return {};
+    }
+    const auto* info = commands_.find(std::string_view{text}.substr(0, space));
+    if (info == nullptr || info->usage.empty())
+    {
+        return {};
+    }
+    // The arguments typed, or being typed: words after the name, the last only once a space
+    // follows it.
+    std::size_t typed = 0;
+    for (std::size_t at = space; at < text.size();)
+    {
+        const auto start = text.find_first_not_of(' ', at);
+        if (start == std::string::npos)
+        {
+            break;
+        }
+        const auto stop = std::min(text.find(' ', start), text.size());
+        typed += stop < text.size() ? 1 : 0;
+        at = stop;
+    }
+    std::vector<std::string_view> words;
+    const auto usage = info->usage;
+    for (std::size_t at = 0; at < usage.size();)
+    {
+        const auto start = usage.find_first_not_of(' ', at);
+        if (start == std::string_view::npos)
+        {
+            break;
+        }
+        const auto stop = std::min(usage.find(' ', start), usage.size());
+        words.push_back(usage.substr(start, stop - start));
+        at = stop;
+    }
+    const bool typing = !text.ends_with(' ');
+    std::string hint;
+    for (auto i = typed + (typing ? 1 : 0); i < words.size(); ++i)
+    {
+        hint += (hint.empty() ? "" : " ") + std::string{words[i]};
+    }
+    return hint;
 }
 
 Region Workspace::statusRegion() const
