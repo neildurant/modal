@@ -73,8 +73,14 @@ std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::st
     {
         return 2;
     }
+    // A key starting with it, but one in <> only once more than the < is typed: < alone is the
+    // key <, not the start of <C-k>.
     if (std::ranges::any_of(item.keys,
-                            [&](const std::string& keys) { return keys.starts_with(typed); }))
+                            [&](const std::string& keys)
+                            {
+                                return keys.starts_with(typed) &&
+                                       !(keys.starts_with('<') && keys.size() > 1 && typed == "<");
+                            }))
     {
         return 3;
     }

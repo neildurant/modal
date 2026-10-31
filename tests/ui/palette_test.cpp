@@ -104,6 +104,9 @@ TEST_CASE("the palette matches keys too, as typed: exactly first, then starting 
     CHECK(titles(items, "<Down>").front() == "Cursor down");
     // The title starting with it, then keys starting with it.
     CHECK(titles(items, "z") == std::vector<std::string>{"Zebra", "Zoom in", "Grid finer"});
+    // < alone is the key <, not the start of every key written in <>.
+    CHECK(titles(items, "<").empty());
+    CHECK(titles(items, "<D").front() == "Cursor down");
 }
 
 namespace
