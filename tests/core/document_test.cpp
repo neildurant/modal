@@ -139,6 +139,21 @@ TEST_CASE("a group of edits is one step")
     e.document.endGroup();
     CHECK_FALSE(e.document.canUndo());
     CHECK(e.document.canRedo());
+
+    // A group without a title takes its last edit's, as cutting notes before an operator does.
+    e.document.beginGroup({}, {});
+    e.document.edit("Cut", {},
+                    [&](Song& song)
+                    {
+                        song.updateEvents(e.bass(), [](EventList& events)
+                                          { events.insert({0, Note{60, 100, 10}}); });
+                    });
+    e.addNote(7);
+    e.document.endGroup();
+    const auto titled = e.document.undo();
+    REQUIRE(titled);
+    CHECK(titled->title != "Cut");
+    CHECK_FALSE(titled->title.empty());
 }
 
 TEST_CASE("the song is modified until saved, and unmodified when undone back to it")

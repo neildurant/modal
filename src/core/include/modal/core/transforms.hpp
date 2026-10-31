@@ -103,4 +103,9 @@ Transformed humanize(const EventList& events, std::span<const std::size_t> which
                      const std::function<Tick(Tick)>& maxShift, int maxVelocity, Tick end,
                      const std::function<std::int64_t(std::int64_t, std::int64_t)>& random);
 
+// Cuts the notes that sound across a time, those `which` takes, in two there (cutting at a
+// range's edges, decided October 2026): a part ending there, its release velocity the usual
+// 64, and a part starting there with the note's own velocity and release.
+EventList cutAt(const EventList& events, Tick tick, const std::function<bool(const Note&)>& which);
+
 } // namespace modal::core

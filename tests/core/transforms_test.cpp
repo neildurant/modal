@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -209,4 +210,38 @@ TEST_CASE("humanising moves notes and velocities by up to the amounts, at random
     // Each note: its time by the highest, its velocity by the lowest.
     CHECK(shifted == std::vector{note(q / 10, 60, q, 92), pedal(q, 127),
                                  note(q + q / 10, 60, q, 92), note(2 * q + q / 10, 64, q, 92)});
+}
+
+TEST_CASE("cutting notes at a time splits those sounding across it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    // C4 for a half note, released at 90; E4 for a quarter; G4 from an eighth in; a pedal.
+    const Event c4{0, Note{60, 100, 2 * q, 90}};
+    const auto events = listOf({c4, note(0, 64, q), note(q / 2, 67, 2 * q), pedal(q / 2, 127)});
+    // At q: the C4 and the G4 sound across it, the E4 ends there; only C4 and E4 are taken.
+    const auto cut = cutAt(events, q, [](const Note& n) { return n.pitch != 67; });
+    std::vector<std::pair<Tick, Note>> notes;
+    for (const auto& event : cut.all())
+    {
+        if (const auto* n = std::get_if<Note>(&event.data))
+        {
+            notes.emplace_back(event.tick, *n);
+        }
+    }
+    REQUIRE(notes.size() == 4);
+    CHECK(notes[0].first == 0);
+    CHECK(notes[0].second.pitch == 60);
+    CHECK(notes[0].second.duration == q);
+    CHECK(notes[0].second.releaseVelocity == Note{}.releaseVelocity);
+    CHECK(notes[1].second.pitch == 64); // ending at q, as it was
+    CHECK(notes[1].second.duration == q);
+    CHECK(notes[2].second.pitch == 67); // not taken: whole
+    CHECK(notes[2].second.duration == 2 * q);
+    CHECK(notes[3].first == q);
+    CHECK(notes[3].second.pitch == 60);
+    CHECK(notes[3].second.duration == q);
+    CHECK(notes[3].second.releaseVelocity == 90);
+    CHECK(notes[3].second.velocity == 100);
+    CHECK(cut.size() == events.size() + 1); // the pedal too
 }

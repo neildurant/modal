@@ -76,7 +76,9 @@ public:
               std::string_view mergeKey);
 
     // Makes the edits until the matching end one undo step, with this title and place, as a
-    // recording pass, a macro or a repeat with . will. Groups can nest; the outermost counts.
+    // recording pass, a macro or a repeat with . will; with no title, its last edit's, as when
+    // notes are cut at a range's edges before an operator. Groups can nest; the outermost
+    // counts.
     void beginGroup(std::string title, const EditPlace& place);
     void endGroup();
 
@@ -131,6 +133,7 @@ private:
     std::size_t undoLevels_ = kDefaultUndoLevels;
     int groupDepth_ = 0;
     std::optional<EditStep> group_; // the step being grouped
+    std::string lastInGroup_;       // the title of its last edit, for a group without one
     std::string mergeKey_;          // the latest step's, while it can be merged into
     Listener listener_;
 };

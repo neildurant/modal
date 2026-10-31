@@ -324,4 +324,27 @@ Transformed humanize(const EventList& events, std::span<const std::size_t> which
     return finish(events, which, changed, true);
 }
 
+EventList cutAt(const EventList& events, Tick tick, const std::function<bool(const Note&)>& which)
+{
+    EventList cut;
+    for (const auto& event : events.all())
+    {
+        const auto* note = std::get_if<Note>(&event.data);
+        if (note == nullptr || event.tick >= tick || event.tick + note->duration <= tick ||
+            !which(*note))
+        {
+            cut.insert(event);
+            continue;
+        }
+        auto before = *note;
+        before.duration = tick - event.tick;
+        before.releaseVelocity = Note{}.releaseVelocity;
+        auto after = *note;
+        after.duration = event.tick + note->duration - tick;
+        cut.insert({event.tick, before});
+        cut.insert({tick, after});
+    }
+    return cut;
+}
+
 } // namespace modal::core

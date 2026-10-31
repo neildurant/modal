@@ -68,6 +68,10 @@ bool Document::edit(std::string title, const EditPlace& place,
         record({std::move(title), place, std::chrono::system_clock::now()});
         mergeKey_ = mergeKey;
     }
+    else
+    {
+        lastInGroup_ = std::move(title);
+    }
     changed();
     return true;
 }
@@ -88,7 +92,13 @@ void Document::endGroup()
         return;
     }
     mergeKey_.clear();
-    // Edits that undid each other make no step.
+    // Edits that undid each other make no step. A group without a title takes its last
+    // edit's.
+    if (group_->title.empty())
+    {
+        group_->title = std::move(lastInGroup_);
+    }
+    lastInGroup_.clear();
     if (!(Song{states_[current_].parts} == song_))
     {
         record(std::move(*group_));
