@@ -1199,6 +1199,7 @@ std::optional<std::string> EventListView::setConductor(std::size_t row, std::str
                    " bar here; change or delete it first";
         }
         edit("Set meter to " + std::string{text}, apply);
+        host_.chosenMeter(*signature);
         return std::nullopt;
     }
     default:

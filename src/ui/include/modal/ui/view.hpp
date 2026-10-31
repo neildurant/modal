@@ -183,6 +183,10 @@ public:
 
     // The Visual selection, if there is one; operators take it as the motion "visual".
     virtual std::optional<Selection> selection() const = 0;
+
+    // A meter the user chose, typed in a field or at the prompt, offered from now on if it
+    // isn't among the built-in ones.
+    virtual void chosenMeter(core::TimeSignature /*meter*/) {}
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the

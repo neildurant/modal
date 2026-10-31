@@ -222,6 +222,7 @@ private:
              std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;
     std::optional<Selection> selection() const override { return selection_; }
+    void chosenMeter(core::TimeSignature meter) override;
     void stopTyping() override { mode_ = Mode::Normal; }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }

@@ -493,6 +493,16 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{3, 4});
     type(v.ws, U"u");
     CHECK(song().meter().signatureAt(0) == core::TimeSignature{4, 4});
+    // A meter chosen that isn't built in is remembered, to be offered from now on; 3/4 is
+    // built in.
+    CHECK(v.ws.remembered().meters().empty());
+    enter(v.ws);
+    type(v.ws, U"2/2");
+    enter(v.ws);
+    REQUIRE(song().meter().signatureAt(0) == core::TimeSignature{2, 2});
+    REQUIRE(v.ws.remembered().meters().size() == 1);
+    CHECK(v.ws.remembered().meters().front() == core::TimeSignature{2, 2});
+    type(v.ws, U"u");
 
     // A section's own tempo and meter, and the section, can't be deleted; a marker can.
     type(v.ws, U"gg3x");
@@ -1144,7 +1154,7 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     press(NamedKey::Tab);
     CHECK(line() == "bar-insert 2/4");
     press(NamedKey::Right);
-    CHECK(line() == "bar-insert 1/8"); // the next column's first, the song's own 1/8
+    CHECK(line() == "bar-insert 3/8"); // the next column's first
     press(NamedKey::Left);
     press(NamedKey::Left);
     CHECK(line() == "bar-insert 2/4");
@@ -1254,7 +1264,7 @@ TEST_CASE("the meters offered: built in, the song's own and those typed, in orde
     };
     const auto before = offered();
     CHECK(std::ranges::find(before, "13/16") == before.end());
-    // Typed, and so offered from now on, by denominator then numerator.
+    // Chosen, and so offered from now on, by denominator then numerator.
     REQUIRE(v.registry.runLine("bar-insert 13/16").message.empty());
     v.document.undo(); // the song without it: offered as typed, not as the song's
     const auto after = offered();

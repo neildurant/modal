@@ -2227,31 +2227,16 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         return found;
     case Choices::Meter:
     {
-        // The built-in ones, the song's own and those typed before, as one list in order by
+        // The built-in ones and those the user has chosen before, as one list in order by
         // denominator then numerator, so the one wanted can be found by scanning (decided with
-        // Neil, October 2026).
+        // Neil, October 2026); not the song's own, which may be remainder bars of no use.
         std::vector<core::TimeSignature> meters{kOfferedMeters.begin(), kOfferedMeters.end()};
-        const auto add = [&](core::TimeSignature meter)
+        for (const auto meter : remembered_.meters())
         {
             if (std::ranges::find(meters, meter) == meters.end())
             {
                 meters.push_back(meter);
             }
-        };
-        for (const auto& change : song.meter().changes())
-        {
-            add(change.signature);
-        }
-        for (const auto& track : song.tracks())
-        {
-            for (const auto& change : song.meter(track->id()).changes())
-            {
-                add(change.signature);
-            }
-        }
-        for (const auto meter : remembered_.meters())
-        {
-            add(meter);
         }
         std::ranges::sort(meters, {}, [](core::TimeSignature meter)
                           { return std::pair{meter.denominator, meter.numerator}; });
@@ -3024,13 +3009,21 @@ CommandResult Workspace::barInsert(std::string_view arguments)
     document_.edit("Insert " + what + " before bar " + std::to_string(bar) + " on every track",
                    view().place(), [&](core::Song& s) { s = edited; });
     refresh();
-    // A meter typed that isn't offered among the built-in ones is offered from now on.
-    if (signature && std::ranges::find(kOfferedMeters, *signature) == kOfferedMeters.end())
+    if (signature)
     {
-        remembered_.typedMeter(*signature);
-        rememberedChanged();
+        chosenMeter(*signature);
     }
     return {true, {}, false};
+}
+
+void Workspace::chosenMeter(core::TimeSignature meter)
+{
+    // Offered from now on, unless it's built in.
+    if (std::ranges::find(kOfferedMeters, meter) == kOfferedMeters.end())
+    {
+        remembered_.typedMeter(meter);
+        rememberedChanged();
+    }
 }
 
 CommandResult Workspace::renameSection(std::string_view name)
