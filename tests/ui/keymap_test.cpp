@@ -210,3 +210,29 @@ TEST_CASE("keys that start longer bindings can have a title, for the hint menu")
     CHECK(keymap.groupTitle(Mode::Visual, keys).empty());
     CHECK(keymap.groups(Mode::Normal).size() == 1);
 }
+
+TEST_CASE("keys bound to several commands mean the one doing something in the place resolved for")
+{
+    Keymap keymap;
+    REQUIRE(keymap.bind(Mode::Normal, "J", {"join", "Join"}).empty());
+    REQUIRE(keymap.bind(Mode::Normal, "J", {"octave-down", "Down an octave"}).empty());
+    // Both kept, in the order bound; matched as the latest.
+    CHECK(keymap.bindings(Mode::Normal).size() == 2);
+    CHECK(keymap.match(Mode::Normal, std::vector{Key::typed(U'J')}).binding->command ==
+          "octave-down");
+    // Resolved for a place, the one doing something there.
+    const auto strip =
+        keymap.resolved([](const std::string& command) { return command == "join"; });
+    CHECK(strip.bindings(Mode::Normal).size() == 1);
+    CHECK(strip.match(Mode::Normal, std::vector{Key::typed(U'J')}).binding->command == "join");
+    // Where none does, the latest, to say where it's for.
+    const auto none = keymap.resolved([](const std::string&) { return false; });
+    CHECK(none.match(Mode::Normal, std::vector{Key::typed(U'J')}).binding->command ==
+          "octave-down");
+    // Bound again to the same command, it's the latest once; unbound, from them all.
+    REQUIRE(keymap.bind(Mode::Normal, "J", {"join", "Join again"}).empty());
+    CHECK(keymap.bindings(Mode::Normal).size() == 2);
+    CHECK(keymap.match(Mode::Normal, std::vector{Key::typed(U'J')}).binding->hint == "Join again");
+    CHECK(keymap.unbind(Mode::Normal, std::vector{Key::typed(U'J')}));
+    CHECK(keymap.bindings(Mode::Normal).empty());
+}

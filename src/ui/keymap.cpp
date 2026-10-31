@@ -45,7 +45,9 @@ void Keymap::bind(Mode mode, std::vector<Key> keys, Binding binding)
     {
         sections_.push_back(binding.section);
     }
-    modes_[static_cast<std::size_t>(mode)].insert_or_assign(std::move(keys), std::move(binding));
+    auto& bound = modes_[static_cast<std::size_t>(mode)][std::move(keys)];
+    std::erase_if(bound, [&](const Binding& b) { return b.command == binding.command; });
+    bound.push_back(std::move(binding));
 }
 
 bool Keymap::unbind(Mode mode, const std::vector<Key>& keys)
@@ -53,10 +55,33 @@ bool Keymap::unbind(Mode mode, const std::vector<Key>& keys)
     return modes_[static_cast<std::size_t>(mode)].erase(keys) > 0;
 }
 
+Keymap Keymap::resolved(const std::function<bool(const std::string& command)>& here) const
+{
+    Keymap one = *this;
+    for (auto& mode : one.modes_)
+    {
+        for (auto& [keys, bound] : mode)
+        {
+            const auto it = std::ranges::find_if(bound.rbegin(), bound.rend(),
+                                                 [&](const Binding& b) { return here(b.command); });
+            const Binding chosen = it != bound.rend() ? *it : bound.back();
+            bound.assign(1, chosen);
+        }
+    }
+    return one;
+}
+
 std::vector<std::pair<std::vector<Key>, Binding>> Keymap::bindings(Mode mode) const
 {
-    const auto& bindings = modes_[static_cast<std::size_t>(mode)];
-    return {bindings.begin(), bindings.end()};
+    std::vector<std::pair<std::vector<Key>, Binding>> all;
+    for (const auto& [keys, bound] : modes_[static_cast<std::size_t>(mode)])
+    {
+        for (const auto& binding : bound)
+        {
+            all.emplace_back(keys, binding);
+        }
+    }
+    return all;
 }
 
 void Keymap::group(Mode mode, std::vector<Key> keys, std::string title)
@@ -85,7 +110,7 @@ Keymap::Match Keymap::match(Mode mode, std::span<const Key> keys) const
     auto it = bindings.lower_bound(wanted);
     if (it != bindings.end() && it->first == wanted)
     {
-        match.binding = &it->second;
+        match.binding = &it->second.back();
         ++it;
     }
     // Longer sequences starting with these keys sort straight after them.

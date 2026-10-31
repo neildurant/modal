@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <span>
@@ -41,19 +42,30 @@ struct Binding
     friend bool operator==(const Binding&, const Binding&) = default;
 };
 
-// Key sequences bound to commands, in each mode.
+// Key sequences bound to commands, in each mode. Keys may be bound to several commands, each
+// doing something in places of its own, as J joins sections on the strip and goes down an
+// octave in the piano roll (decided October 2026, in place of one command meaning different
+// things in different views); the later bound is preferred where more than one does
+// something, so a user's binding overrides a built-in one. resolved() picks one for a place.
 class Keymap
 {
 public:
-    // Binds keys written in notation (see key_notation.hpp), replacing any binding of the
-    // same keys; returns why not if the notation can't be read, or else nothing.
+    // Binds keys written in notation (see key_notation.hpp) to a command, beside any other of
+    // the same keys, or again if they're bound to it already, as the latest; returns why not
+    // if the notation can't be read, or else nothing.
     std::string bind(Mode mode, std::string_view keys, Binding binding);
     void bind(Mode mode, std::vector<Key> keys, Binding binding);
 
+    // Unbinds keys from every command they're bound to.
     bool unbind(Mode mode, const std::vector<Key>& keys);
 
-    // What some keys typed in a mode match: a binding of exactly those keys, if any, and
-    // whether there are bindings of longer sequences starting with them.
+    // The keymap with one binding for each keys: the latest of those whose command does
+    // something here, by `here`, or the latest of them all, so keys bound only elsewhere still
+    // say where they're for.
+    Keymap resolved(const std::function<bool(const std::string& command)>& here) const;
+
+    // What some keys typed in a mode match: a binding of exactly those keys, if any (the
+    // latest), and whether there are bindings of longer sequences starting with them.
     struct Match
     {
         const Binding* binding = nullptr;
@@ -61,7 +73,8 @@ public:
     };
     Match match(Mode mode, std::span<const Key> keys) const;
 
-    // A mode's bindings, in the order of their keys.
+    // A mode's bindings, in the order of their keys, those of the same keys in the order
+    // bound.
     std::vector<std::pair<std::vector<Key>, Binding>> bindings(Mode mode) const;
 
     // A title for keys that start longer bindings, which the hint menu shows for them
@@ -80,7 +93,7 @@ private:
     {
         bool operator()(const std::vector<Key>& a, const std::vector<Key>& b) const;
     };
-    using Bindings = std::map<std::vector<Key>, Binding, KeysLess>;
+    using Bindings = std::map<std::vector<Key>, std::vector<Binding>, KeysLess>;
     using Groups = std::map<std::vector<Key>, std::string, KeysLess>;
 
     std::array<Bindings, kModeCount> modes_;

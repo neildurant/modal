@@ -536,8 +536,36 @@ void Workspace::setKeymap(Keymap keymap)
     buildOperatorKeymap();
 }
 
+const Keymap& Workspace::keymapHere() const
+{
+    resolveKeymaps();
+    return keymapHere_;
+}
+
+const Keymap& Workspace::operatorKeymapHere() const
+{
+    resolveKeymaps();
+    return operatorKeymapHere_;
+}
+
+void Workspace::resolveKeymaps() const
+{
+    // Keys bound to several commands mean the one that does something here (J joins sections
+    // on the strip and goes down an octave in the piano roll).
+    const auto here = where();
+    if (resolvedFor_ == here)
+    {
+        return;
+    }
+    const auto offeredHere = [this](const std::string& command) { return offered(command); };
+    keymapHere_ = keymap_.resolved(offeredHere);
+    operatorKeymapHere_ = operatorKeymap_.resolved(offeredHere);
+    resolvedFor_ = here;
+}
+
 void Workspace::buildOperatorKeymap()
 {
+    resolvedFor_.reset();
     operatorKeymap_ = keymap_;
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
@@ -1012,8 +1040,9 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     }
     const auto before = pending();
     const auto typedIn = mode_;
-    const auto& keymap =
-        mode_ == Mode::OperatorPending || mode_ == Mode::Visual ? operatorKeymap_ : keymap_;
+    const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
+                             ? operatorKeymapHere()
+                             : keymapHere();
     const auto actions = keys_.key(keymap, mode_, key, now);
     const auto unbound =
         shownKeys(std::vector<Key>(keys_.unbound().begin(), keys_.unbound().end()));
@@ -1069,7 +1098,7 @@ std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
     }
     const auto mode = keys_.mode();
     const auto& keymap =
-        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymap_ : keymap_;
+        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymapHere() : keymapHere();
     auto hints = hintsAfter(keymap, mode, keys_.keys());
     if (hints.empty())
     {
@@ -1266,7 +1295,7 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
     std::vector<std::pair<int, Hint>> ranked;
     std::vector<std::string> seen;                      // the commands, as ranked has them
     std::vector<std::vector<std::string>> alternatives; // and their keys
-    for (const auto& [sequence, binding] : operatorKeymap_.bindings(Mode::OperatorPending))
+    for (const auto& [sequence, binding] : operatorKeymapHere().bindings(Mode::OperatorPending))
     {
         const auto& command = binding.command;
         const auto* info = commands_.find(command);
@@ -1330,7 +1359,7 @@ std::vector<Workspace::KeyGroup> Workspace::keyList() const
     std::vector<std::pair<std::string, std::vector<Item>>> groups;
     for (const auto mode : {Mode::Normal, Mode::OperatorPending})
     {
-        const auto bindings = keymap_.bindings(mode);
+        const auto bindings = keymapHere().bindings(mode);
         const auto hinted = [&](const std::string& command)
         {
             return std::ranges::any_of(
@@ -1600,12 +1629,12 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
     const auto x = [&](int column) { return margin + column * cell_.width; };
     const auto mode = keys_.mode();
     const auto& keymap =
-        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymap_ : keymap_;
+        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymapHere() : keymapHere();
     auto heading = pending();
     if (keys_.keys().empty() && operator_)
     {
         // After an operator: its key's hint, Delete or Yank.
-        for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+        for (const auto& [keys, binding] : keymapHere().bindings(Mode::Normal))
         {
             if (binding.command == operator_->name && !binding.hint.empty())
             {
@@ -1669,8 +1698,9 @@ bool Workspace::wake(std::int64_t now)
 {
     lastTime_ = now;
     const auto before = keys_.pending();
-    const auto& keymap =
-        mode_ == Mode::OperatorPending || mode_ == Mode::Visual ? operatorKeymap_ : keymap_;
+    const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
+                             ? operatorKeymapHere()
+                             : keymapHere();
     bool changed = runAll(keys_.timeout(keymap, now));
     if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
     {
@@ -2364,7 +2394,7 @@ std::string Workspace::shownKeys(const std::vector<Key>& keys) const
 std::string Workspace::keysOf(std::string_view command) const
 {
     std::string shortest;
-    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+    for (const auto& [keys, binding] : keymapHere().bindings(Mode::Normal))
     {
         if (binding.command == command)
         {

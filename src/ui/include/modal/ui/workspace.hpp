@@ -255,6 +255,14 @@ private:
     // The keymap in operator-pending mode: the Normal mode's motions, the operator's own keys
     // again for the cursor's place (dd), and Escape, unless omap binds those keys.
     void buildOperatorKeymap();
+    // The keymaps for where the cursor is: of keys bound to several commands, the one doing
+    // something here (see Keymap::resolved); kept until the place or the keymap changes.
+    const Keymap& keymapHere() const;
+    const Keymap& operatorKeymapHere() const;
+    void resolveKeymaps() const;
+    mutable std::optional<Where> resolvedFor_;
+    mutable Keymap keymapHere_;
+    mutable Keymap operatorKeymapHere_;
 
     // Runs a motion or the operator's own key after an operator, then the operator.
     bool runOperator(std::string_view command, int count);
