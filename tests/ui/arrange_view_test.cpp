@@ -233,8 +233,9 @@ TEST_CASE("a command a view doesn't have says so")
 {
     Arranging a;
     a.type(U"=");
-    CHECK(a.ws.message() ==
-          "Field increase is for the section strip, the piano roll and the event list");
+    CHECK(a.ws.message() == "= is for the section strip, the piano roll and the event list");
+    a.registry.runLine("note-lengthen"); // by name, not keys
+    CHECK(a.ws.message() == "Note lengthen is for the piano roll");
     a.type(U"ge");
     a.type(U"zi");
     CHECK(a.ws.message() ==

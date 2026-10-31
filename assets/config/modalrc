@@ -35,14 +35,18 @@ nmap [s         cursor-section-previous   "Section before"
 nmap ]m         cursor-marker-next        "Next marker"
 nmap [m         cursor-marker-previous    "Marker before"
 
-" The piano roll: k and j move a semitone, K and J an octave (J joins sections on the
-" section strip), and Tab and Shift-Tab go to the next note's start at any pitch and the one
-" before, notes starting together low to high. In the arrangement, Tab and Shift-Tab go past
-" empty bars to the next bar with events on the track and the one before.
+" The piano roll: k and j move a semitone, K and J an octave, and Tab and Shift-Tab go to
+" the next note's start at any pitch and the one before, notes starting together low to high.
+" In the arrangement, Tab and Shift-Tab go past empty bars to the next bar with events on the
+" track and the one before. Keys may be bound to several commands, each meaning the one that
+" does something where the cursor is (J here is join on the section strip).
 keysection "Pitch in the piano roll"
 nmap K          octave-up                 "Up an octave"
+nmap J          octave-down               "Down an octave"
 nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
+nmap <Tab>      bar-events-next           "Next bar with events"
+nmap <S-Tab>    bar-events-previous       "Bar with events before"
 
 " The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
 " with Left and Right) make the grid finer and coarser, its steps narrower and wider as h and l
@@ -87,6 +91,12 @@ nmap <C-a>      number-increase   "Step up"
 nmap -          field-decrease    "Step down"
 nmap _          field-decrease-fine "Step down"
 nmap <C-x>      number-decrease   "Step down"
+nmap =          note-lengthen     "Lengthen to the grid"
+nmap -          note-shorten      "Shorten to the grid"
+nmap +          note-lengthen-fine "Lengthen by a nudge"
+nmap _          note-shorten-fine "Shorten by a nudge"
+nmap <C-a>      velocity-up       "Velocity up"
+nmap <C-x>      velocity-down     "Velocity down"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
 nmap >          operator-transpose-up "Transpose up"
@@ -190,6 +200,12 @@ nmap gs         go-section-strip  "Section strip"
 nmap <A-h>      move-left         "Move earlier"
 nmap <A-l>      move-right        "Move later"
 nmap J          join              "Join with the next"
+nmap +          section-lengthen  "A bar longer"
+nmap =          section-lengthen  "A bar longer"
+nmap <C-a>      section-lengthen  "A bar longer"
+nmap -          section-shorten   "A bar shorter"
+nmap _          section-shorten   "A bar shorter"
+nmap <C-x>      section-shorten   "A bar shorter"
 
 " Adding notes in the piano roll: o adds the track's default note at the cursor, and O adds
 " it and moves on, past its end, or with gridadvance (, t a) to the next grid step; 8O adds

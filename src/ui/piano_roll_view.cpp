@@ -30,6 +30,30 @@ namespace
 
 constexpr std::array kCommands{
     CommandInfo{.name = "octave-up", .description = "Up an octave, {count} times", .count = true},
+    CommandInfo{
+        .name = "octave-down", .description = "Down an octave, {count} times", .count = true},
+    CommandInfo{.name = "note-lengthen",
+                .description = "Lengthen the current note to the next grid step after its end, "
+                               "{count} times",
+                .count = true},
+    CommandInfo{.name = "note-shorten",
+                .description = "Shorten the current note to the grid step before its end, "
+                               "{count} times",
+                .count = true},
+    CommandInfo{.name = "note-lengthen-fine",
+                .description = "Lengthen the current note by a nudge (the nudge setting), "
+                               "{count} times",
+                .count = true},
+    CommandInfo{.name = "note-shorten-fine",
+                .description = "Shorten the current note by a nudge (the nudge setting), "
+                               "{count} times",
+                .count = true},
+    CommandInfo{.name = "velocity-up",
+                .description = "The current note's velocity up, {count} at a time",
+                .count = true},
+    CommandInfo{.name = "velocity-down",
+                .description = "The current note's velocity down, {count} at a time",
+                .count = true},
     CommandInfo{.name = "cursor-note-next",
                 .description = "Next note's start, at any pitch",
                 .count = true},
@@ -1127,9 +1151,8 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         moveToPitch(pitch_ + (command == "cursor-up" ? n : -n));
     }
-    else if (command == "octave-up" || command == "join")
+    else if (command == "octave-up" || command == "octave-down")
     {
-        // J is join on the section strip and an octave down here.
         moveToPitch(pitch_ + 12 * (command == "octave-up" ? n : -n));
     }
     else if (command == "cursor-up-scroll" || command == "cursor-down-scroll")
@@ -1372,10 +1395,10 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                               return true;
                           });
     }
-    else if (command == "field-increase" || command == "field-decrease")
+    else if (command == "note-lengthen" || command == "note-shorten")
     {
         // The end to the grid steps either side, never shorter than a grid step.
-        const bool longer = command == "field-increase";
+        const bool longer = command == "note-lengthen";
         return changeNote(longer ? "Lengthen" : "Shorten",
                           [&](core::Event& event)
                           {
@@ -1396,10 +1419,10 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                               return true;
                           });
     }
-    else if (command == "field-increase-fine" || command == "field-decrease-fine")
+    else if (command == "note-lengthen-fine" || command == "note-shorten-fine")
     {
         // The end a nudge on or back, never shorter than a nudge.
-        const bool longer = command == "field-increase-fine";
+        const bool longer = command == "note-lengthen-fine";
         return changeNote(longer ? "Lengthen" : "Shorten",
                           [&](core::Event& event)
                           {
@@ -1417,7 +1440,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                               return true;
                           });
     }
-    else if (command == "number-increase" || command == "number-decrease")
+    else if (command == "velocity-up" || command == "velocity-down")
     {
         // The current note's velocity, by 1 a press; steps one after another on a note undo
         // together, as the grid's do.
@@ -1430,7 +1453,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         auto event = song.events(id)[*index];
         auto& note = std::get<core::Note>(event.data);
         const auto to = static_cast<std::uint8_t>(
-            std::clamp(note.velocity + (command == "number-increase" ? n : -n), 1, 127));
+            std::clamp(note.velocity + (command == "velocity-up" ? n : -n), 1, 127));
         if (to == note.velocity)
         {
             return false;
@@ -1637,7 +1660,7 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
 bool PianoRollView::acrossPitches(std::string_view motion) const
 {
     const bool across = motion == "cursor-up" || motion == "cursor-down" || motion == "octave-up" ||
-                        motion == "join";
+                        motion == "octave-down";
     if (across)
     {
         host_.setMessage("Ranges across pitches come with Visual mode", MessageKind::Information);
@@ -1835,29 +1858,6 @@ bool PianoRollView::operateOnBars(std::string_view op, int count, bool time)
     refresh();
     moveTo(from);
     return true;
-}
-
-std::optional<std::pair<std::string, std::string>>
-PianoRollView::relabel(std::string_view command) const
-{
-    // J's join is down an octave here, and the step keys change the current note.
-    constexpr std::array<std::array<std::string_view, 3>, 7> kHere{{
-        {"join", "Pitch in the piano roll", "Down an octave"},
-        {"field-increase", "", "Lengthen to the grid"},
-        {"field-decrease", "", "Shorten to the grid"},
-        {"field-increase-fine", "", "Lengthen by a nudge"},
-        {"field-decrease-fine", "", "Shorten by a nudge"},
-        {"number-increase", "", "Velocity up"},
-        {"number-decrease", "", "Velocity down"},
-    }};
-    for (const auto& [name, group, title] : kHere)
-    {
-        if (name == command)
-        {
-            return std::pair{std::string{group}, std::string{title}};
-        }
-    }
-    return std::nullopt;
 }
 
 std::optional<std::string> PianoRollView::describeRange(std::string_view op,

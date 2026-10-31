@@ -31,6 +31,21 @@ constexpr std::array kCommands{
                 .description = "Move this section or note later, {count} places or steps",
                 .count = true},
     CommandInfo{.name = "join", .description = "Join this section with the next"},
+    CommandInfo{.name = "section-lengthen",
+                .description = "Lengthen this section by a bar, or {count} bars, the rest of the "
+                               "song moving on",
+                .count = true},
+    CommandInfo{.name = "section-shorten",
+                .description = "Shorten this section by a bar, or {count} bars, deleting what "
+                               "starts in them",
+                .count = true},
+    CommandInfo{.name = "bar-events-next",
+                .description = "Past empty bars to the next bar with events on the track, "
+                               "{count} times",
+                .count = true},
+    CommandInfo{.name = "bar-events-previous",
+                .description = "Past empty bars to the bar with events before, {count} times",
+                .count = true},
     CommandInfo{.name = "insert-before",
                 .description = "Insert a new section before this one, of {count} bars (4)",
                 .count = true},
@@ -194,9 +209,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*to);
     }
-    else if (command == "cursor-note-next" || command == "cursor-note-previous")
+    else if (command == "bar-events-next" || command == "bar-events-previous")
     {
-        return toBarWithEvents(command == "cursor-note-next" ? n : -n);
+        return toBarWithEvents(command == "bar-events-next" ? n : -n);
     }
     else if (command == "register-put" || command == "register-put-before")
     {
@@ -952,10 +967,9 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(section);
         return true;
     }
-    if (command.starts_with("field-increase") || command.starts_with("field-decrease") ||
-        command == "number-increase" || command == "number-decrease")
+    if (command == "section-lengthen" || command == "section-shorten")
     {
-        const auto bars = command.find("-increase") != std::string_view::npos ? n : -n;
+        const auto bars = command == "section-lengthen" ? n : -n;
         bool changed = false;
         edit((bars > 0 ? "Lengthen " : "Shorten ") + name(section) + " by " +
                  (n == 1 ? std::string{"a bar"} : std::to_string(n) + " bars"),
@@ -1194,37 +1208,6 @@ bool ArrangeView::toBarWithEvents(int count)
     }
     page_.setCursor(page_.track(), m.barStart(bar));
     return true;
-}
-
-std::optional<std::pair<std::string, std::string>>
-ArrangeView::relabel(std::string_view command) const
-{
-    // On the tracks, Tab and Shift-Tab go by bars with events; on the strip, the step keys
-    // lengthen and shorten the section.
-    if (!page_.stripCursor())
-    {
-        if (command == "cursor-note-next")
-        {
-            return std::pair{std::string{"Moving the cursor"}, std::string{"Next bar with events"}};
-        }
-        if (command == "cursor-note-previous")
-        {
-            return std::pair{std::string{"Moving the cursor"},
-                             std::string{"Bar with events before"}};
-        }
-        return std::nullopt;
-    }
-    if (command == "field-increase" || command == "field-increase-fine" ||
-        command == "number-increase")
-    {
-        return std::pair{std::string{}, std::string{"A bar longer"}};
-    }
-    if (command == "field-decrease" || command == "field-decrease-fine" ||
-        command == "number-decrease")
-    {
-        return std::pair{std::string{}, std::string{"A bar shorter"}};
-    }
-    return std::nullopt;
 }
 
 std::optional<std::string> ArrangeView::describeRange(std::string_view op,

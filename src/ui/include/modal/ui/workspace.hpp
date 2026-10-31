@@ -250,6 +250,8 @@ private:
     bool runViewCommand(std::string_view command, int count);
     // Says where a command does something, for one run where it does nothing.
     bool sayWhereFor(std::string_view command);
+    bool fromKeys_ = false;      // running commands typed as keys, not from the command line
+    std::vector<Key> typedKeys_; // and the keys, as the bindings have them
     std::optional<bool> runCommandLine(std::string_view command);
 
     // The keymap in operator-pending mode: the Normal mode's motions, the operator's own keys

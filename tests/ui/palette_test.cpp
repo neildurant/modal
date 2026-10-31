@@ -481,14 +481,3 @@ TEST_CASE("the : prompt shows the arguments a command takes, and the palette ask
     CHECK(p.document.song().end() == end); // nothing yet
     p.press(Key::of(NamedKey::Escape));
 }
-
-TEST_CASE("the palette names a command as the view does where it does something else there")
-{
-    Paletting p;
-    p.type(U"gr"); // the piano roll, where J is down an octave, not join
-    p.open();
-    p.type(U"J");
-    REQUIRE_FALSE(p.rows().empty());
-    CHECK(p.rows().front() == U"Down an octave");
-    p.press(Key::of(NamedKey::Escape));
-}

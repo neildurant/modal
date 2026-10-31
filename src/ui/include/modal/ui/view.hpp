@@ -239,15 +239,6 @@ public:
         return std::nullopt;
     }
 
-    // A command's group and title in the list of keys here, where it does something else than
-    // its binding's hint says, as the piano roll reads J's join as down an octave and = as
-    // lengthening a note; or nothing to keep the binding's own. An empty group keeps its own.
-    virtual std::optional<std::pair<std::string, std::string>>
-    relabel(std::string_view /*command*/) const
-    {
-        return std::nullopt;
-    }
-
     // What an operator would take over a range or object here, for the hint menu after it
     // ("this bar's notes"), or nothing if it takes nothing over it in this view.
     virtual std::optional<std::string> describeRange(std::string_view /*op*/,

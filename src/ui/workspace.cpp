@@ -366,7 +366,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 64> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 75> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -385,7 +385,18 @@ std::span<const CommandInfo> Workspace::commands()
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
             {"go-section-strip", onlyIn({Tracks, Strip})},
-            {"join", onlyIn({Strip, PianoRoll})},
+            {"join", onlyIn({Strip})},
+            {"octave-down", onlyIn({PianoRoll})},
+            {"note-lengthen", onlyIn({PianoRoll})},
+            {"note-shorten", onlyIn({PianoRoll})},
+            {"note-lengthen-fine", onlyIn({PianoRoll})},
+            {"note-shorten-fine", onlyIn({PianoRoll})},
+            {"velocity-up", onlyIn({PianoRoll})},
+            {"velocity-down", onlyIn({PianoRoll})},
+            {"section-lengthen", onlyIn({Strip})},
+            {"section-shorten", onlyIn({Strip})},
+            {"bar-events-next", onlyIn({Tracks})},
+            {"bar-events-previous", onlyIn({Tracks})},
             {"move-left", onlyIn({Strip, PianoRoll})},
             {"move-right", onlyIn({Strip, PianoRoll})},
             {"register-put-before", onlyIn({Tracks, Strip, PianoRoll})},
@@ -393,12 +404,12 @@ std::span<const CommandInfo> Workspace::commands()
             {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},
             {"field-edit", onlyIn({Tracks, Strip, EventList})},
-            {"field-increase", onlyIn({Strip, PianoRoll, EventList})},
-            {"field-decrease", onlyIn({Strip, PianoRoll, EventList})},
-            {"field-increase-fine", onlyIn({Strip, PianoRoll, EventList})},
-            {"field-decrease-fine", onlyIn({Strip, PianoRoll, EventList})},
-            {"number-increase", onlyIn({Strip, PianoRoll, EventList})},
-            {"number-decrease", onlyIn({Strip, PianoRoll, EventList})},
+            {"field-increase", onlyIn({EventList})},
+            {"field-decrease", onlyIn({EventList})},
+            {"field-increase-fine", onlyIn({EventList})},
+            {"field-decrease-fine", onlyIn({EventList})},
+            {"number-increase", onlyIn({EventList})},
+            {"number-decrease", onlyIn({EventList})},
             {"note-add", onlyIn({PianoRoll, EventList})},
             {"cursor-chord-next", onlyIn({PianoRoll, EventList})},
             {"cursor-chord-previous", onlyIn({PianoRoll, EventList})},
@@ -421,8 +432,8 @@ std::span<const CommandInfo> Workspace::commands()
             {"scroll-half-up", onlyIn({Tracks, PianoRoll, EventList})},
             {"scroll-page-down", onlyIn({Tracks, PianoRoll, EventList})},
             {"scroll-page-up", onlyIn({Tracks, PianoRoll, EventList})},
-            {"cursor-note-next", onlyIn({Tracks, PianoRoll})},
-            {"cursor-note-previous", onlyIn({Tracks, PianoRoll})},
+            {"cursor-note-next", onlyIn({PianoRoll})},
+            {"cursor-note-previous", onlyIn({PianoRoll})},
             {"octave-up", onlyIn({PianoRoll})},
             {"note-add-advance", onlyIn({PianoRoll})},
             {"default-note-set", onlyIn({PianoRoll})},
@@ -1043,6 +1054,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
                              ? operatorKeymapHere()
                              : keymapHere();
+    typedKeys_.assign(keys_.keys().begin(), keys_.keys().end());
+    typedKeys_.push_back(key);
     const auto actions = keys_.key(keymap, mode_, key, now);
     const auto unbound =
         shownKeys(std::vector<Key>(keys_.unbound().begin(), keys_.unbound().end()));
@@ -1394,15 +1407,12 @@ std::vector<Workspace::KeyGroup> Workspace::keyList() const
             {
                 continue;
             }
-            const auto relabelled = view().relabel(binding.command);
-            const auto section = relabelled && !relabelled->first.empty() ? relabelled->first
-                                 : binding.section.empty() ? std::string{"Other keys"}
-                                                           : binding.section;
+            const auto section =
+                binding.section.empty() ? std::string{"Other keys"} : binding.section;
             const auto* info = commands_.find(binding.command);
-            auto name = relabelled              ? relabelled->second
-                        : !binding.hint.empty() ? binding.hint
-                        : info != nullptr       ? titleOf(*info)
-                                                : binding.command;
+            auto name = !binding.hint.empty() ? binding.hint
+                        : info != nullptr     ? titleOf(*info)
+                                              : binding.command;
             if (const auto at = name.find("{count}"); at != std::string::npos)
             {
                 name.replace(at, 7, "N");
@@ -1701,6 +1711,7 @@ bool Workspace::wake(std::int64_t now)
     const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
                              ? operatorKeymapHere()
                              : keymapHere();
+    typedKeys_.assign(keys_.keys().begin(), keys_.keys().end());
     bool changed = runAll(keys_.timeout(keymap, now));
     if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
     {
@@ -1724,10 +1735,12 @@ bool Workspace::wake(std::int64_t now)
 bool Workspace::runAll(const std::vector<Action>& actions)
 {
     bool changed = false;
+    fromKeys_ = true;
     for (const auto& action : actions)
     {
         changed = run(action.command, action.count).changed || changed;
     }
+    fromKeys_ = false;
     return changed;
 }
 
@@ -1820,6 +1833,33 @@ bool Workspace::sayWhereFor(std::string_view command)
     // were missing: "Note default is for the piano roll".
     const auto* info = commands_.find(command);
     auto title = info != nullptr ? titleOf(*info) : std::string{command};
+    std::uint8_t where = info != nullptr ? info->where : 0;
+    // Typed keys bound to several commands, none of them doing something here, say where each
+    // does: "= is for the section strip, the piano roll and the event list".
+    if (fromKeys_)
+    {
+        const auto mode = mode_ == Mode::Visual ? Mode::Visual : Mode::Normal;
+        std::uint8_t theirs = 0;
+        int bound = 0;
+        bool ours = false;
+        for (const auto& [keys, binding] : keymap_.bindings(mode))
+        {
+            if (keys == typedKeys_)
+            {
+                ++bound;
+                ours = ours || binding.command == command;
+                if (const auto* its = commands_.find(binding.command))
+                {
+                    theirs |= its->where;
+                }
+            }
+        }
+        if (ours && bound > 1)
+        {
+            title = shownKeys(typedKeys_);
+            where = theirs;
+        }
+    }
     std::vector<std::string> places;
     constexpr std::array<std::pair<Where, std::string_view>, 4> kPlaces{{
         {Where::Tracks, "the arrangement's tracks"},
@@ -1829,7 +1869,7 @@ bool Workspace::sayWhereFor(std::string_view command)
     }};
     for (const auto& [place, name] : kPlaces)
     {
-        if (info != nullptr && (info->where & whereBit(place)) != 0)
+        if ((where & whereBit(place)) != 0)
         {
             places.emplace_back(name);
         }
@@ -3482,14 +3522,6 @@ std::vector<PaletteItem> Workspace::paletteItems() const
         if (const auto bound = keys.find(info.name); bound != keys.end())
         {
             items.back().keys = bound->second;
-        }
-        // As the view here calls it, where it does something else than its own title says
-        // (the piano roll's J, down an octave, is join on the strip), as the list of keys has
-        // it; then without the description, which is of the other.
-        if (const auto here = view().relabel(info.name); here && !here->second.empty())
-        {
-            items.back().title = here->second;
-            items.back().description.clear();
         }
     }
     return items;
