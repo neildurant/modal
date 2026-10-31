@@ -253,6 +253,21 @@ constexpr std::array kSharedCommands{
     atPrompt("command-line-newer", "Recall the line run after"),
 };
 
+// The meters :bar-insert offers before any others the song has or were typed.
+constexpr std::array<core::TimeSignature, 13> kOfferedMeters{{{2, 4},
+                                                              {3, 4},
+                                                              {4, 4},
+                                                              {5, 4},
+                                                              {6, 4},
+                                                              {7, 4},
+                                                              {3, 8},
+                                                              {5, 8},
+                                                              {6, 8},
+                                                              {7, 8},
+                                                              {9, 8},
+                                                              {11, 8},
+                                                              {12, 8}}};
+
 bool isShared(std::string_view name)
 {
     return std::ranges::find(kSharedCommands, name, &CommandInfo::name) != kSharedCommands.end();
@@ -2211,8 +2226,42 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         }
         return found;
     case Choices::Meter:
-        return {"2/4", "3/4", "4/4", "5/4", "6/4",  "7/4", "3/8",
-                "5/8", "6/8", "7/8", "9/8", "11/8", "12/8"};
+    {
+        // The built-in ones, the song's own and those typed before, as one list in order by
+        // denominator then numerator, so the one wanted can be found by scanning (decided with
+        // Neil, October 2026).
+        std::vector<core::TimeSignature> meters{kOfferedMeters.begin(), kOfferedMeters.end()};
+        const auto add = [&](core::TimeSignature meter)
+        {
+            if (std::ranges::find(meters, meter) == meters.end())
+            {
+                meters.push_back(meter);
+            }
+        };
+        for (const auto& change : song.meter().changes())
+        {
+            add(change.signature);
+        }
+        for (const auto& track : song.tracks())
+        {
+            for (const auto& change : song.meter(track->id()).changes())
+            {
+                add(change.signature);
+            }
+        }
+        for (const auto meter : remembered_.meters())
+        {
+            add(meter);
+        }
+        std::ranges::sort(meters, {}, [](core::TimeSignature meter)
+                          { return std::pair{meter.denominator, meter.numerator}; });
+        for (const auto meter : meters)
+        {
+            found.push_back(std::to_string(meter.numerator) + "/" +
+                            std::to_string(meter.denominator));
+        }
+        return found;
+    }
     case Choices::Length:
         return {"1/1",  "1/2",  "1/4",  "1/8",  "1/16",  "1/32", "1/2.",
                 "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
@@ -2975,6 +3024,12 @@ CommandResult Workspace::barInsert(std::string_view arguments)
     document_.edit("Insert " + what + " before bar " + std::to_string(bar) + " on every track",
                    view().place(), [&](core::Song& s) { s = edited; });
     refresh();
+    // A meter typed that isn't offered among the built-in ones is offered from now on.
+    if (signature && std::ranges::find(kOfferedMeters, *signature) == kOfferedMeters.end())
+    {
+        remembered_.typedMeter(*signature);
+        rememberedChanged();
+    }
     return {true, {}, false};
 }
 

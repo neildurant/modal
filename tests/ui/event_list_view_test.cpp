@@ -1144,7 +1144,7 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     press(NamedKey::Tab);
     CHECK(line() == "bar-insert 2/4");
     press(NamedKey::Right);
-    CHECK(line() == "bar-insert 3/8"); // the next column's first
+    CHECK(line() == "bar-insert 1/8"); // the next column's first, the song's own 1/8
     press(NamedKey::Left);
     press(NamedKey::Left);
     CHECK(line() == "bar-insert 2/4");
@@ -1232,4 +1232,36 @@ TEST_CASE("a message too long for the status line is shown whole above it until 
     }
     v.ws.handle(Key::typed(U'j'), 0);
     CHECK(panel().empty());
+}
+
+TEST_CASE("the meters offered: built in, the song's own and those typed, in order")
+{
+    // One track, following the conductor's 4/4, so bars of any meter go in.
+    core::Song song{core::kPpqn};
+    const auto bass = song.addTrack("Bass");
+    song.updateEvents(bass, [](core::EventList& events)
+                      { events.insert({0, core::Note{40, 100, core::kPpqn.quarter()}}); });
+    song.fitToContent();
+    Viewing v{std::move(song)};
+    v.ws.setRemembered({}, {});
+    const auto offered = [&]
+    {
+        type(v.ws, U":bar-insert ");
+        v.ws.handle(Key::of(NamedKey::Tab), 0);
+        const auto shown = v.ws.completions();
+        v.ws.handle(Key::of(NamedKey::Escape), 0);
+        return shown ? shown->matches : std::vector<std::string>{};
+    };
+    const auto before = offered();
+    CHECK(std::ranges::find(before, "13/16") == before.end());
+    // Typed, and so offered from now on, by denominator then numerator.
+    REQUIRE(v.registry.runLine("bar-insert 13/16").message.empty());
+    v.document.undo(); // the song without it: offered as typed, not as the song's
+    const auto after = offered();
+    REQUIRE(std::ranges::find(after, "13/16") != after.end());
+    CHECK(after.back() == "13/16");
+    CHECK(v.ws.remembered().meters().front() == core::TimeSignature{13, 16});
+    // One built in is offered anyway, so isn't remembered.
+    REQUIRE(v.registry.runLine("bar-insert 7/8").message.empty());
+    CHECK(v.ws.remembered().meters().size() == 1);
 }
