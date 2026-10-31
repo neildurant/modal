@@ -270,6 +270,8 @@ private:
     CommandResult section(std::string_view name);
     // Bars on every track, at the cursor's bar in the conductor's bars.
     CommandResult barDelete(int count);
+    // The conductor's bars from one bar line to another, on every track, closing up.
+    CommandResult deleteBars(core::Tick from, core::Tick to);
     CommandResult barInsert(std::string_view arguments);
     // Markers made section starts, the one at or before the cursor, or all of them.
     CommandResult markerToSection();
@@ -306,6 +308,8 @@ private:
     std::optional<std::pair<Selection, SongCursor>> lastSelection_;
     // A command in Visual mode, or nothing to run it as in Normal mode; and ending it.
     std::optional<bool> runVisual(std::string_view command, int count);
+    bool operateOnSelection(std::string_view command, int count);
+    bool putOverSelection();
     void endVisual();
     // A question asked: what it runs for y, for another key, and for Escape.
     struct Question

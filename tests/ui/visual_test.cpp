@@ -13,6 +13,8 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
+#include <vector>
 
 using namespace modal;
 using namespace modal::ui;
@@ -174,4 +176,96 @@ TEST_CASE("keys bound to nothing in Visual mode say so, and it goes on")
     s.type(U"vQ");
     CHECK(s.ws.message() == "Q isn't a key here");
     CHECK(s.ws.mode() == Mode::Visual);
+}
+
+namespace
+{
+
+// A track's notes' pitches, in order, counting tracks from 0.
+std::vector<int> pitches(const core::Document& document, std::size_t track)
+{
+    std::vector<int> found;
+    const auto& song = document.song();
+    for (const auto& event : song.events(song.tracks()[track]->id()).all())
+    {
+        if (const auto* note = std::get_if<core::Note>(&event.data))
+        {
+            found.push_back(note->pitch);
+        }
+    }
+    return found;
+}
+
+std::vector<std::string> sections(const core::Document& document)
+{
+    std::vector<std::string> names;
+    for (const auto& section : document.song().sections())
+    {
+        names.push_back(section->name());
+    }
+    return names;
+}
+
+using Pitches = std::vector<int>;
+
+} // namespace
+
+TEST_CASE("d, y and the other operators act on the selection at once, ending Visual mode")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"lvld"); // bars 2-3
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{60, 63, 64, 65, 66, 67});
+    CHECK(s.document.song().end() == 8 * s.bar); // contents only
+    s.type(U"u");
+    CHECK(s.ws.message() == "Undid: Delete " + s.bars(2, 3));
+    s.type(U"gglvlx"); // x as d
+    CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // The count before an operator is how far, as in Normal mode.
+    s.type(U"ggv2l2>");
+    CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 43, 44, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{62, 63, 64, 63, 64, 65, 66, 67});
+    CHECK(s.ws.mode() == Mode::Normal);
+    s.type(U"u");
+
+    // y yanks it, as bars on every track.
+    s.type(U"ggvly");
+    CHECK(s.ws.registerArea().tracks.size() == 2);
+    CHECK(s.ws.mode() == Mode::Normal);
+}
+
+TEST_CASE("D takes a selection on every track out of the song, as :bar-delete does")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"lvlD"); // bars 2-3, across A's end and B's start
+    CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
+    CHECK(s.document.song().end() == 6 * s.bar);
+    CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
+    s.type(U"u");
+    CHECK(s.document.song().end() == 8 * s.bar);
+
+    // A whole section goes.
+    s.type(U"gg3lvisD"); // bar 4, in B
+    CHECK(sections(s.document) == std::vector<std::string>{"A", "C"});
+    CHECK(pitches(s.document, 1) == Pitches{60, 61, 65, 66, 67});
+}
+
+TEST_CASE("p puts the register in the selection's place, as one undo step")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"yy");    // bar 1 of the bass
+    s.type(U"3lvlp"); // over bars 4-5
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 40, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{60, 61, 62, 65, 66, 67});
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(s.ws.registerArea().tracks.front().size() == 1); // it keeps what it had
+    s.type(U"u");
+    CHECK(s.ws.message() == "Undid: Put over " + s.bars(4, 5));
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 43, 44, 45, 46, 47});
 }

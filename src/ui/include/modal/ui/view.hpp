@@ -225,10 +225,15 @@ public:
     virtual void addRegions(Frame& frame) const = 0;
 
     // The Visual selection here, as words for the status line ("bars 3-4 on every track"), or
-    // nothing if the view can't select; its own index at the cursor, for a selection started
+    // nothing if the view can't select; its span of time; its own index at the cursor, for a
+    // selection started
     // there (see Selection); and the span of time an object takes, which Visual mode selects
     // (vis), or nothing, having said why.
     virtual std::optional<std::string> selectionStatus() const { return std::nullopt; }
+    virtual std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const
+    {
+        return std::nullopt;
+    }
     virtual std::optional<std::size_t> selectionIndex() const { return std::nullopt; }
     virtual std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view /*object*/,
                                                                         int /*count*/)

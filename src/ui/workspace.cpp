@@ -84,6 +84,10 @@ constexpr std::array kSharedCommands{
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "visual-delete-time",
+                .description = "In Visual mode, take the selection's time out, closing the gap: "
+                               "from the song, when it's on every track",
+                .modes = modeBit(Mode::Visual)},
     CommandInfo{.name = "visual-other-end",
                 .description = "In Visual mode, go to the selection's other end",
                 .modes = modeBit(Mode::Visual)},
@@ -1649,6 +1653,15 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         view().setCursor(other);
         return true;
     }
+    if (isOperator(command) || command == "event-delete" || command == "yank-this" ||
+        command == "visual-delete-time")
+    {
+        return operateOnSelection(command, count);
+    }
+    if (command == "register-put" || command == "register-put-before")
+    {
+        return putOverSelection();
+    }
     if (const auto* info = commands_.find(command); info != nullptr && info->object)
     {
         const auto span = view().objectSpan(command, count);
@@ -1662,6 +1675,77 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         return true;
     }
     return std::nullopt;
+}
+
+bool Workspace::operateOnSelection(std::string_view command, int count)
+{
+    // d and x delete what's in it, y and Y yank it, D takes its time out, and the other
+    // operators change it, the count before them saying how far; then Visual mode ends.
+    const auto selection = *selection_;
+    const auto span = view().selectionSpan();
+    const auto done = [&]
+    {
+        if (command == "visual-delete-time")
+        {
+            if (selection.kind == SelectionKind::Range && selection.where == Where::Tracks && span)
+            {
+                // On every track: out of the song, as :bar-delete takes bars.
+                const auto result = deleteBars(span->first, span->second);
+                setMessage(result.message,
+                           result.warning ? MessageKind::Warning : MessageKind::Information);
+                return true;
+            }
+            return view().operate("operator-delete", "visual-time", 0);
+        }
+        if (command == "event-delete" || command == "operator-delete")
+        {
+            return view().operate("operator-delete", "visual", 0);
+        }
+        if (command == "yank-this" || command == "operator-yank")
+        {
+            return view().operate("operator-yank", "visual", 0);
+        }
+        return transform(command, std::max(count, 1), "visual", 0);
+    }();
+    // Ended once the view has taken it; ^'s question keeps what it took.
+    endVisual();
+    return done;
+}
+
+bool Workspace::putOverSelection()
+{
+    // p and P: what's in it goes, and the register goes in its place, as one undo step; the
+    // register keeps what it had.
+    const auto what = view().selectionStatus().value_or("the selection");
+    const auto span = view().selectionSpan();
+    if (register_.empty())
+    {
+        endVisual();
+        setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        return true;
+    }
+    if (!register_.sections.empty())
+    {
+        endVisual();
+        setMessage("The register holds sections: put them on the section strip",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto saved = register_;
+    document_.beginGroup("Put over " + what, view().place());
+    view().operate("operator-delete", "visual", 0);
+    register_ = saved;
+    endVisual();
+    if (span)
+    {
+        auto at = view().cursor();
+        at.tick = span->first;
+        view().setCursor(at);
+    }
+    view().run("register-put", 1);
+    document_.endGroup();
+    refresh();
+    return true;
 }
 
 void Workspace::endVisual()
@@ -2476,7 +2560,6 @@ void Workspace::finishMarkers(const MarkerRun& run)
 
 CommandResult Workspace::barDelete(int count)
 {
-    // Done on a copy first, which says whether it can be, as one undo step.
     const auto& song = document_.song();
     const auto& meter = song.meter();
     const auto bar = meter.toBarBeatTick(view().cursor().tick).bar;
@@ -2485,8 +2568,29 @@ CommandResult Workspace::barDelete(int count)
     {
         return CommandResult::error("There are no bars after the song's end to delete");
     }
-    const auto n = std::max(count, 1);
-    const auto bars = barsText(meter, from, std::min(meter.barStart(bar + n), song.end()));
+    return deleteBars(from, std::min(meter.barStart(bar + std::max(count, 1)), song.end()));
+}
+
+CommandResult Workspace::deleteBars(core::Tick from, core::Tick to)
+{
+    // The conductor's bars from one bar line to another, on every track, done on a copy first,
+    // which says whether it can be, as one undo step.
+    const auto& song = document_.song();
+    const auto& meter = song.meter();
+    const auto bar = meter.toBarBeatTick(from).bar;
+    const auto last = meter.toBarBeatTick(to).bar;
+    if (meter.barStart(bar) != from || (to < song.end() && meter.barStart(last) != to))
+    {
+        return CommandResult::error(barsText(meter, from, to) +
+                                    " aren't whole bars of the conductor's; take them out of "
+                                    "each track instead");
+    }
+    auto n = last - bar;
+    if (meter.barStart(last) != to)
+    {
+        ++n; // to the song's end, inside a bar
+    }
+    const auto bars = barsText(meter, from, to);
     auto edited = song;
     const auto edit = edited.removeBars(from, n);
     if (!edit.done)

@@ -248,6 +248,12 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     return area && operateOn(op, *area, motion == "object-bar", sectionWhat(*area, motion, count));
 }
 
+std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::selectionSpan() const
+{
+    const auto area = selectionArea();
+    return area ? std::optional{std::pair{area->from, area->to}} : std::nullopt;
+}
+
 std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int count)
 {
     // The events starting in the area, controllers too, on each of its tracks; on the strip,
@@ -323,6 +329,10 @@ std::pair<ArrangeView::Area, std::string> ArrangeView::stripContents(std::size_t
 
 std::string ArrangeView::sectionWhat(const Area& area, std::string_view motion, int count) const
 {
+    if (motion == "visual")
+    {
+        return selectionStatus().value_or("");
+    }
     // is on a track, "Verse of Bass", and it, "all of Bass", rather than their bars.
     if (motion == "object-track")
     {
@@ -390,6 +400,10 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
     const auto end = [&](std::int64_t b)
     { return std::min(m.barStart(b + 1), document_.song().end()); };
     Area area{track, track, m.barStart(bar), end(bar)};
+    if (motion == "visual")
+    {
+        return selectionArea();
+    }
     if (motion == "object-track")
     {
         // it: the whole track, and as many after it as the count says less one.

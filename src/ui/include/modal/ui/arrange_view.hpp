@@ -39,6 +39,7 @@ public:
 
     std::string_view name() const override { return "the arrangement"; }
     std::optional<std::string> selectionStatus() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
                                                                 int count) override;
     std::vector<int> topHeights(CellSize cell) const override;
