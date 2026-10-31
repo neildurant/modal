@@ -12,6 +12,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using namespace modal;
@@ -77,6 +78,30 @@ TEST_CASE("the palette matches titles, then words, then letters in order, then d
     CHECK(titles(items, "") == std::vector<std::string>{"Section rename", "Velocity compress",
                                                         "Velocity ramp", "Zoom in", "Grid"});
     CHECK(titles(items, "qqq").empty());
+}
+
+TEST_CASE("the palette matches keys too, as typed: exactly first, then starting with it")
+{
+    const auto item = [](std::string name, std::string title, std::vector<std::string> keys)
+    {
+        return PaletteItem{.name = std::move(name),
+                           .title = std::move(title),
+                           .description = "",
+                           .aliases = "",
+                           .offered = true,
+                           .keys = std::move(keys)};
+    };
+    const std::vector<PaletteItem> items{
+        item("zoom-in", "Zoom in", {"zi"}), item("grid-finer", "Grid finer", {"zh"}),
+        item("join", "Join", {"J"}),        item("cursor-down", "Cursor down", {"j", "<Down>"}),
+        item("zebra", "Zebra", {}),
+    };
+    CHECK(titles(items, "zh").front() == "Grid finer");
+    CHECK(titles(items, "J").front() == "Join");
+    CHECK(titles(items, "j").front() == "Cursor down");
+    CHECK(titles(items, "<Down>").front() == "Cursor down");
+    // The title starting with it, then keys starting with it.
+    CHECK(titles(items, "z") == std::vector<std::string>{"Zebra", "Zoom in", "Grid finer"});
 }
 
 namespace
@@ -175,6 +200,12 @@ TEST_CASE("Ctrl-p opens the palette at the prompt, and Enter runs the command ch
     CHECK(p.ws.mode() == Mode::Normal);
     CHECK(p.ws.arrangement().page().zoom() == zoom - 1);
     CHECK(p.ws.message() == "Also: zi"); // its keys, to learn
+
+    // By its keys, as remembered.
+    p.open();
+    p.type(U"zo");
+    REQUIRE_FALSE(p.rows().empty());
+    CHECK(p.rows().front() == U"Zoom out");
 }
 
 TEST_CASE("in the palette, Up and Down choose, Tab puts the command on the prompt")

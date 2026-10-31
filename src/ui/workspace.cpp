@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cctype>
 #include <charconv>
+#include <map>
 #include <tuple>
 #include <utility>
 
@@ -3046,7 +3047,12 @@ Frame Workspace::frame() const
 
 std::vector<PaletteItem> Workspace::paletteItems() const
 {
-    // The commands that can be run from Normal mode, the palette apart.
+    // The commands that can be run from Normal mode, the palette apart, with their keys.
+    std::map<std::string, std::vector<std::string>, std::less<>> keys;
+    for (const auto& [sequence, binding] : keymap_.bindings(Mode::Normal))
+    {
+        keys[binding.command].push_back(shownKeys(sequence));
+    }
     std::vector<PaletteItem> items;
     for (const auto& info : commands_.all())
     {
@@ -3059,7 +3065,12 @@ std::vector<PaletteItem> Workspace::paletteItems() const
                          .title = titleOf(info),
                          .description = std::string{info.description},
                          .aliases = std::string{info.aliases},
-                         .offered = offered(info.name)});
+                         .offered = offered(info.name),
+                         .keys = {}});
+        if (const auto bound = keys.find(info.name); bound != keys.end())
+        {
+            items.back().keys = bound->second;
+        }
     }
     return items;
 }

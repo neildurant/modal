@@ -56,27 +56,37 @@ bool inOrder(std::string_view text, std::string_view query)
     return true;
 }
 
-std::optional<int> tier(const PaletteItem& item, std::string_view query)
+std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::string_view query)
 {
+    // typed as it was, for keys, whose case matters; query lower case, for the rest.
     const auto title = lowered(item.title);
     const auto name = lowered(item.name);
-    if (title.starts_with(query))
+    if (std::ranges::find(item.keys, typed) != item.keys.end())
     {
         return 0;
     }
-    if (startsWord(title, query) || name.starts_with(query))
+    if (title.starts_with(query))
     {
         return 1;
     }
-    if (inOrder(title, query))
+    if (startsWord(title, query) || name.starts_with(query))
     {
         return 2;
+    }
+    if (std::ranges::any_of(item.keys,
+                            [&](const std::string& keys) { return keys.starts_with(typed); }))
+    {
+        return 3;
+    }
+    if (inOrder(title, query))
+    {
+        return 4;
     }
     if (lowered(item.description).find(query) != std::string::npos ||
         lowered(item.aliases).find(query) != std::string::npos ||
         name.find(query) != std::string::npos)
     {
-        return 3;
+        return 5;
     }
     return std::nullopt;
 }
@@ -89,10 +99,10 @@ std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std:
     std::vector<std::tuple<int, std::string, std::size_t>> found;
     for (std::size_t i = 0; i < items.size(); ++i)
     {
-        const auto rank = wanted.empty() ? std::optional{0} : tier(items[i], wanted);
+        const auto rank = wanted.empty() ? std::optional{0} : tier(items[i], query, wanted);
         if (rank)
         {
-            found.emplace_back(*rank + (items[i].offered ? 0 : 4), lowered(items[i].title), i);
+            found.emplace_back(*rank + (items[i].offered ? 0 : 6), lowered(items[i].title), i);
         }
     }
     std::ranges::sort(found);
