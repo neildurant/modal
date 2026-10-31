@@ -1807,6 +1807,23 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         selection_->cut = !selection_->cut;
         return true;
     }
+    if (command == "field-edit" && selection_->where == Where::Tracks)
+    {
+        // Enter on bars in the arrangement opens exactly those in the piano roll, on the
+        // cursor's track; whole tracks open as Enter does.
+        const auto span = view().selectionSpan();
+        const bool whole = selection_->kind == SelectionKind::Rows && !selection_->span;
+        auto cursor = view().cursor();
+        endVisual();
+        if (!span || whole)
+        {
+            return std::nullopt;
+        }
+        cursor.tick = span->first;
+        switchTo(*pianoRoll_, true, true);
+        pianoRoll_->openBars(cursor, span->first, span->second);
+        return true;
+    }
     if (command == "visual-other-end")
     {
         const auto other = selection_->anchor;

@@ -114,7 +114,12 @@ public:
     core::Tick time() const { return time_; }
     std::uint8_t pitch() const { return pitch_; }
     std::uint8_t topPitch() const { return topPitch_; }
-    std::int64_t pageBars() const { return kPageSizes[pageSize_]; }
+    std::int64_t pageBars() const { return openedBars_.value_or(kPageSizes[pageSize_]); }
+
+    // Opens a selection of bars as the page (Enter on a selection in the arrangement): from a
+    // time to another, as many bars as there, up to the most a page holds; turning then moves
+    // on by as many, until zooming brings pages back into line.
+    void openBars(const SongCursor& cursor, core::Tick from, core::Tick to);
     core::NoteFraction grid() const; // the track's
     int noteRows() const;            // the pitch rows fully in view
 
@@ -232,6 +237,7 @@ private:
     std::uint8_t topPitch_ = 72;
     std::optional<core::Tick> barOffset_; // where in the bar { and } keep to, while repeated
     std::size_t pageSize_ = kDefaultPageSize;
+    std::optional<std::int64_t> openedBars_; // the bars of a selection opened as the page
     std::optional<core::Tick> playhead_;
     bool opened_ = false;                            // on a track yet, since the song was shown
     std::map<core::TrackId, std::uint8_t> pitches_;  // the pitch last used on each track

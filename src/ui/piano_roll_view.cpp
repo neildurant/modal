@@ -800,6 +800,7 @@ void PianoRollView::turn(core::Tick tick)
 
 void PianoRollView::zoomTo(std::size_t size)
 {
+    openedBars_.reset(); // pages back in line with the section
     // The cursor kept at the same place across the view, so zooming back returns to the same
     // view; as far as the view can't start before bar 1.
     const auto across = time_ - viewStart_;
@@ -886,6 +887,7 @@ void PianoRollView::moveToPitch(int pitch)
 
 void PianoRollView::showTrack(std::size_t track, std::optional<std::uint8_t> pitch)
 {
+    openedBars_.reset(); // another track's pages
     const auto tracks = document_.song().tracks();
     if (tracks.empty())
     {
@@ -1265,6 +1267,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         // The default number of bars, as whole bars, the page holding the cursor.
         pageSize_ = kDefaultPageSize;
+        openedBars_.reset();
         align();
     }
     else if (command == "grid-coarser" || command == "grid-finer")
@@ -2428,8 +2431,19 @@ void PianoRollView::setCursor(const SongCursor& cursor)
 
 void PianoRollView::open(const SongCursor& cursor)
 {
+    openedBars_.reset();
     setCursor(cursor);
     align();
+}
+
+void PianoRollView::openBars(const SongCursor& cursor, core::Tick from, core::Tick to)
+{
+    open(cursor);
+    const auto& m = meter();
+    const auto bars = m.toBarBeatTick(std::max(to - 1, from)).bar - m.toBarBeatTick(from).bar + 1;
+    openedBars_ = std::clamp<std::int64_t>(bars, 1, kPageSizes.back());
+    viewStart_ = from;
+    viewLength_.reset();
 }
 
 core::EditPlace PianoRollView::place() const

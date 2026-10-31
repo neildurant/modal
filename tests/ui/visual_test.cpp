@@ -778,3 +778,31 @@ TEST_CASE("cutting in the piano roll, the parts of notes outside the selection a
     ws.handle(Key::typed(U'|'), 0);
     CHECK(dimmed() == 3); // and the C3's parts before and after
 }
+
+TEST_CASE("Enter on a selection of bars opens exactly those in the piano roll")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"lvl"); // bars 2-3
+    s.press(NamedKey::Enter);
+    REQUIRE(s.ws.mode() == Mode::Normal);
+    const auto& roll = s.ws.pianoRoll();
+    CHECK(roll.page().start == s.bar);
+    CHECK(roll.page().end == 3 * s.bar);
+    CHECK(roll.time() == s.bar);
+    // Turning moves on by as many bars.
+    s.type(U"2}");
+    CHECK(roll.page().start == 3 * s.bar);
+    CHECK(roll.page().end == 5 * s.bar);
+    // Until zooming, when pages fall back into line.
+    s.type(U"zo"); // the default 4 bars' next, 8
+    CHECK(roll.pageBars() == 8);
+
+    // Whole tracks open as Enter does.
+    s.type(U"ga");
+    s.type(U"ggV");
+    s.press(NamedKey::Enter);
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(roll.page().start == 0);
+    CHECK(roll.pageBars() == 8); // the track's own page size, as it was left
+}
