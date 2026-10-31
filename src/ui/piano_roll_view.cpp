@@ -359,7 +359,7 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::objectSpan(std::
     {
         taken = chordHere(count);
     }
-    else if (object == "object-track")
+    else if (object == "object-track" || object == "object-song")
     {
         return std::pair{core::Tick{0}, song.end()};
     }
@@ -1543,9 +1543,10 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         moveTo(from);
         return true;
     }
-    if (motion == "object-track")
+    if (motion == "object-track" || motion == "object-song")
     {
-        // it: the track's notes, from the start, taken as bars.
+        // it, and ie, the song as far as this track goes: the track's notes, from the start, taken
+        // as bars.
         const auto end = document_.song().end();
         const bool done = operateOn(op, notesIn(0, end), 0, end);
         host_.eventRegister().bars = true;
@@ -1693,7 +1694,7 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
         span =
             std::pair{m.barStart(bar), std::min(m.barStart(bar + std::max(count, 1)), song.end())};
     }
-    else if (motion == "object-track")
+    else if (motion == "object-track" || motion == "object-song")
     {
         span = std::pair{core::Tick{0}, song.end()};
     }
@@ -1853,6 +1854,10 @@ std::optional<std::string> PianoRollView::describeRange(std::string_view op,
     if (motion == "object-track")
     {
         return "this track's notes";
+    }
+    if (motion == "object-song")
+    {
+        return "the whole song, this track's notes";
     }
     if (motion == "object-section-contents")
     {

@@ -541,3 +541,24 @@ TEST_CASE("V in the event list and on the strip selects as v does there")
     s.type(U"d");
     CHECK(sections(s.document) == std::vector<std::string>{"C"});
 }
+
+TEST_CASE("ie takes the whole song: every track in the arrangement, the track elsewhere")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"3ldie");
+    CHECK(pitches(s.document, 0).empty());
+    CHECK(pitches(s.document, 1).empty());
+    s.type(U"u");
+    CHECK(s.ws.message() == "Undid: Delete the whole song");
+
+    // vie selects it all.
+    s.type(U"vie");
+    CHECK(s.selected() == s.bars(1, 8));
+    s.press(NamedKey::Escape);
+
+    // In the piano roll, the track's notes.
+    s.type(U"gr>ie");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 44, 45, 46, 47, 48});
+    CHECK(pitches(s.document, 1).front() == 60);
+}

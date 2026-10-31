@@ -609,7 +609,7 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
         const auto chord = chordHere(count);
         return chord.empty() || operateEvents(op, chord, row_);
     }
-    if (motion == "object-track" && track_ == 0)
+    if ((motion == "object-track" || motion == "object-song") && track_ == 0)
     {
         setMessage("it isn't on the conductor's list, whose tempo and meter changes the song "
                    "needs",
@@ -751,9 +751,9 @@ std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motio
         // in, x, Y: the event under the cursor, or as many from it as the count says.
         return Rows{row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1};
     }
-    if (motion == "object-track")
+    if (motion == "object-track" || motion == "object-song")
     {
-        // it: every row, taken as bars from the start.
+        // it, and ie, the song as far as this track goes: every row, taken as bars from the start.
         return Rows{0, list_.rows().size() - 1, core::Tick{0}, document_.song().end()};
     }
     if (motion == "operator-line" || motion == "object-bar-contents" || isSectionObject(motion))
@@ -1633,6 +1633,10 @@ std::optional<std::string> EventListView::describeRange(std::string_view op,
     if (motion == "object-track")
     {
         return "this track's events";
+    }
+    if (motion == "object-song")
+    {
+        return "the whole song, this track's events";
     }
     if (motion == "object-section-contents")
     {

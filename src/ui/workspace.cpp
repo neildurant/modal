@@ -136,6 +136,11 @@ constexpr std::array kSharedCommands{
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
+    CommandInfo{.name = "object-song",
+                .description = "After an operator, the whole song (ie): every track in the "
+                               "arrangement, this track's events elsewhere",
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
+                .object = true},
     CommandInfo{.name = "object-note",
                 .description = "After an operator, the note or event under the cursor (in)",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),

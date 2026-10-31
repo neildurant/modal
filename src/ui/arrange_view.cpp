@@ -391,6 +391,10 @@ std::string ArrangeView::sectionWhat(const Area& area, std::string_view motion, 
     {
         return "all of " + tracksText(area);
     }
+    if (motion == "object-song")
+    {
+        return "the whole song";
+    }
     if (!isSectionObject(motion))
     {
         return {};
@@ -505,6 +509,11 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
     if (motion == "visual")
     {
         return selectionArea();
+    }
+    if (motion == "object-song")
+    {
+        // ie: every track, from the start to the end.
+        return Area{0, document_.song().tracks().size() - 1, 0, document_.song().end()};
     }
     if (motion == "object-track")
     {
@@ -1255,6 +1264,10 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
     if (motion == "object-track")
     {
         return "this track's events";
+    }
+    if (motion == "object-song")
+    {
+        return "the whole song, every track";
     }
     return describeTimeRange(motion);
 }
