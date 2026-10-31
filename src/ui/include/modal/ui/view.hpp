@@ -102,6 +102,9 @@ struct Selection
     SelectionKind kind = SelectionKind::Range;
     Where where = Where::Tracks;
     std::optional<std::size_t> index;
+    // The time whole rows (V) take, once an object has set it (Vis); until then the whole
+    // song's, or in the piano roll the page's when V was pressed.
+    std::optional<std::pair<core::Tick, core::Tick>> span;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -241,10 +244,15 @@ public:
         return std::nullopt;
     }
     // Makes a selection what an object takes, the cursor at its far end: by default from
-    // the start of its span to its last tick.
+    // the start of its span to its last tick; or for whole rows, its time.
     virtual void selectObject(std::string_view object, int count, Selection& selection)
     {
-        if (const auto span = objectSpan(object, count))
+        if (const auto span = objectSpan(object, count);
+            span && selection.kind == SelectionKind::Rows)
+        {
+            selection.span = span;
+        }
+        else if (span)
         {
             const auto here = cursor();
             selection.anchor = SongCursor{here.track, span->first, here.pitch};

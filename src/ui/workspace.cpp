@@ -83,6 +83,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
+    CommandInfo{.name = "visual-rows",
+                .description = "Visual mode by whole rows: tracks in the arrangement, at every "
+                               "time until an object sets it (Vis); V again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
     CommandInfo{.name = "visual-delete-time",
                 .description = "In Visual mode, take the selection's time out, closing the gap: "
@@ -299,9 +302,10 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 61> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 62> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"visual-rows", onlyIn({Tracks})},
             {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -1467,12 +1471,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         mode_ = Mode::OperatorPending;
         return true;
     }
-    if (command == "visual")
+    if (command == "visual" || command == "visual-rows")
     {
-        selection_ = Selection{.anchor = view().cursor(),
-                               .kind = SelectionKind::Range,
-                               .where = where(),
-                               .index = view().selectionIndex()};
+        selection_ =
+            Selection{.anchor = view().cursor(),
+                      .kind = command == "visual" ? SelectionKind::Range : SelectionKind::Rows,
+                      .where = where(),
+                      .index = view().selectionIndex(),
+                      .span = std::nullopt};
         mode_ = Mode::Visual;
         return true;
     }
@@ -1644,9 +1650,24 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
 {
     // Escape or v again ends it; o goes to the other end; an object selects what it takes.
     // Motions, and the rest, are as in Normal mode, the selection following the cursor.
-    if (command == "cancel" || command == "visual")
+    if (command == "cancel")
     {
         endVisual();
+        return true;
+    }
+    if (command == "visual" || command == "visual-rows")
+    {
+        // Its own key again ends it, as in Vim; the other's changes to it.
+        const auto kind = command == "visual" ? SelectionKind::Range : SelectionKind::Rows;
+        if (selection_->kind == kind)
+        {
+            endVisual();
+        }
+        else
+        {
+            selection_->kind = kind;
+            selection_->span.reset();
+        }
         return true;
     }
     if (command == "visual-other-end")

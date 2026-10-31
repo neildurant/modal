@@ -244,8 +244,56 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
                          MessageKind::Information);
         return true;
     }
+    if (motion == "visual-time")
+    {
+        return deleteTime();
+    }
     const auto area = areaFor(motion, count);
     return area && operateOn(op, *area, motion == "object-bar", sectionWhat(*area, motion, count));
+}
+
+bool ArrangeView::deleteTime()
+{
+    // D on some tracks: their time out of each section the selection crosses, each part
+    // closing up within its own section, silence gathering at each one's end, since the other
+    // tracks still fill it (decided October 2026).
+    const auto area = selectionArea();
+    if (!area)
+    {
+        return false;
+    }
+    const auto what = *selectionStatus();
+    EventRegister taken;
+    taken.tracks.resize(area->bottom - area->top + 1);
+    taken.span = area->to - area->from;
+    taken.bars = true;
+    edit("Delete " + what + ", closing the gap",
+         [&](core::Song& s)
+         {
+             // Rippling stays in its section, so each part leaves the others' times alone.
+             const auto last = s.sectionAt(std::max<core::Tick>(area->to - 1, 0));
+             for (auto i = s.sectionAt(area->from); i <= last; ++i)
+             {
+                 const auto from = std::max(area->from, s.sectionStart(i));
+                 const auto to = std::min(area->to, s.sectionStart(i + 1));
+                 if (from >= to)
+                 {
+                     continue;
+                 }
+                 auto part = rippleDelete(s, area->top, area->bottom, from, to);
+                 for (std::size_t k = 0; k < part.tracks.size() && k < taken.tracks.size(); ++k)
+                 {
+                     for (auto event : part.tracks[k])
+                     {
+                         event.tick += from - area->from;
+                         taken.tracks[k].push_back(std::move(event));
+                     }
+                 }
+             }
+         });
+    host_.eventRegister() = std::move(taken);
+    page_.setCursor(area->top, area->from);
+    return true;
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::selectionSpan() const
@@ -366,6 +414,18 @@ std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
     {
         return std::nullopt;
     }
+    if (selection->kind == SelectionKind::Rows)
+    {
+        // V: the tracks from where it started to the cursor's, both in, at every time, or
+        // the time an object set.
+        const auto tracks = song.tracks();
+        const auto at = std::ranges::find(tracks, selection->anchor.track,
+                                          [](const auto& track) { return track->id(); });
+        const auto anchor =
+            at == tracks.end() ? page_.track() : static_cast<std::size_t>(at - tracks.begin());
+        const auto [from, to] = selection->span.value_or(std::pair{core::Tick{0}, song.end()});
+        return Area{std::min(anchor, page_.track()), std::max(anchor, page_.track()), from, to};
+    }
     const auto& m = meter();
     const auto first = m.toBarBeatTick(std::min(selection->anchor.tick, page_.time())).bar;
     const auto last = m.toBarBeatTick(std::max(selection->anchor.tick, page_.time())).bar;
@@ -402,6 +462,10 @@ std::optional<std::string> ArrangeView::selectionStatus() const
     if (!area)
     {
         return std::nullopt;
+    }
+    if (host_.selection()->kind == SelectionKind::Rows)
+    {
+        return describe(*area);
     }
     return barsText(meter(), area->from, area->to) + " on every track";
 }

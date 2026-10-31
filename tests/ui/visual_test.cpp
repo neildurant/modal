@@ -439,3 +439,51 @@ TEST_CASE("a selection stays shown while an operator asks about it, as q does ab
     CHECK_FALSE(s.ws.pianoRoll().selectionSpan());
     CHECK(s.ws.mode() == Mode::Normal);
 }
+
+TEST_CASE("V in the arrangement selects whole tracks, an object setting their time")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const Pitches lead{60, 61, 62, 63, 64, 65, 66, 67};
+    s.type(U"3lV"); // bar 4 of the bass
+    CHECK(s.selected() == barsText(s.document.song().meter(), 0, 8 * s.bar) + " of Bass");
+    s.type(U"l"); // moving in time changes nothing
+    CHECK(s.selected() == barsText(s.document.song().meter(), 0, 8 * s.bar) + " of Bass");
+    s.type(U"d");
+    CHECK(pitches(s.document, 0).empty());
+    CHECK(pitches(s.document, 1) == lead);
+    s.type(U"u");
+
+    // j takes the next track too; an object sets the time.
+    s.type(U"gg3lVjis");
+    CHECK(s.selected() ==
+          barsText(s.document.song().meter(), 2 * s.bar, 5 * s.bar) + " of Bass and Lead");
+    s.type(U">");
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 43, 44, 45, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{60, 61, 63, 64, 65, 65, 66, 67});
+    s.type(U"u");
+
+    // v and V change one to the other.
+    s.type(U"ggVv");
+    CHECK(s.selected() == s.bars(1, 1));
+    s.press(NamedKey::Escape);
+}
+
+TEST_CASE("D on whole rows closes up within each section the selection crosses")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"lV3ib"); // bars 2-4 of the bass, across A's end and B's start
+    s.type(U"D");
+    // Out of A, bar 2, A closing up: silence at its end. Out of B, bars 3-4, bar 5's note
+    // moving up to bar 3: silence at B's end. C as it was, and the song as long.
+    CHECK(pitches(s.document, 0) == Pitches{40, 44, 45, 46, 47});
+    const auto& song = s.document.song();
+    const auto& events = song.events(song.tracks()[0]->id());
+    CHECK(events[1].tick == 2 * s.bar);
+    CHECK(pitches(s.document, 1).size() == 8);
+    CHECK(song.end() == 8 * s.bar);
+    CHECK(s.ws.registerArea().tracks.front().size() == 3);
+    s.type(U"u");
+    CHECK(pitches(s.document, 0).size() == 8);
+}
