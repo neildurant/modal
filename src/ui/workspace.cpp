@@ -159,7 +159,12 @@ constexpr std::array kSharedCommands{
                 .description = "Redo the change undone last, or {count} changes",
                 .count = true},
     CommandInfo{.name = "cancel", .description = "Cancel"},
-    CommandInfo{.name = "play-toggle", .description = "Play from the play-from marker, or stop"},
+    CommandInfo{.name = "play-toggle",
+                .description = "Play from the play-from marker, or stop where it is, the cursor "
+                               "landing there"},
+    CommandInfo{.name = "play-stop-back",
+                .description = "Stop, the cursor going back to where it was when playback "
+                               "started; or play, as Space does"},
     CommandInfo{.name = "play-cursor",
                 .description = "Put the play-from marker at the cursor, and play from there"},
     CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
@@ -1545,8 +1550,8 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         return false;
     }
-    if (command == "play-toggle" || command == "play-cursor" || command == "marker-set" ||
-        command == "panic")
+    if (command == "play-toggle" || command == "play-stop-back" || command == "play-cursor" ||
+        command == "marker-set" || command == "panic")
     {
         return transport(command);
     }
@@ -2432,6 +2437,11 @@ bool Workspace::transport(std::string_view command)
     {
         player_->toggle();
     }
+    else if (command == "play-stop-back")
+    {
+        returning_ = player_->playing();
+        player_->toggle();
+    }
     else if (command == "play-cursor" || command == "marker-set")
     {
         player_->setMarker(view().cursor().tick);
@@ -2473,22 +2483,38 @@ void Workspace::showPlayhead()
     if (playing && !wasPlaying_)
     {
         following_ = true;
+        playedFrom_ = view().cursor();
     }
     if (playing)
     {
         // Until the engine starts, the playhead is at the marker, where it will start.
-        view().showPlayhead(player_->position().value_or(player_->marker()),
-                            !following_ ? Follow::None
-                            : rewind_   ? Follow::View
-                                        : Follow::Cursor);
+        lastPlayhead_ = player_->position().value_or(player_->marker());
+        view().showPlayhead(lastPlayhead_, !following_ ? Follow::None
+                                           : rewind_   ? Follow::View
+                                                       : Follow::Cursor);
     }
     else if (wasPlaying_)
     {
-        // Stopped: with rewind, or once moved away from the playhead, back to the cursor;
-        // otherwise the cursor goes with the marker to where playback stopped, once the
-        // engine says where.
-        view().stopPlayhead(rewind_ || !following_ ? std::nullopt
-                                                   : std::optional{player_->marker()});
+        // Stopped where it is (decided October 2026, after use), with rewind on or off, which
+        // says only where the next play starts: the view staying and the cursor landing there,
+        // without rewind where the engine says it stopped; but where the cursor was moved to
+        // while playing, it stays; and with play-stop-back it goes back to where it was when
+        // playback started.
+        if (returning_ && playedFrom_)
+        {
+            view().stopPlayhead(std::nullopt);
+            view().setCursor(*playedFrom_);
+        }
+        else
+        {
+            view().stopPlayhead(!following_ ? std::nullopt
+                                : rewind_   ? std::optional{lastPlayhead_}
+                                            : std::optional{player_->marker()});
+        }
+        if (!player_->stopping())
+        {
+            returning_ = false;
+        }
     }
     wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
 }

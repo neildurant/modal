@@ -103,9 +103,9 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `Ctrl-Shift-h` `Ctrl-Shift-l` (or the arrows) | In the arrangement and the piano roll, a page earlier or later, the cursor staying in place on screen |
 | `zz` | Centre the cursor |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
-| Space | Play from the play-from marker (the ▶ in the margin), or stop |
+| Space, Shift-Space | Play from the play-from marker (the ▶ in the margin), or stop where it is, the cursor landing there; Shift-Space stops and goes back to where the cursor was |
 | `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |
-| `, t Space` | Rewind on or off: whether the marker stays put when playback stops, or moves to where it stopped |
+| `, t Space` | Rewind on or off: whether the marker stays put when playback stops, so Space plays the same again, or moves to where it stopped, so Space carries on |
 | `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
 | `ga`, `ge`, Backspace | The arrangement, the event list, and back to the view before |
 | `,` | The leader key, for commands used now and then: after any keys that start longer ones, or an operator, a pause shows a menu of what can follow |

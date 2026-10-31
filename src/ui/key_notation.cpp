@@ -156,6 +156,10 @@ std::variant<Key, std::string> parseBracketed(std::u32string_view token)
     }
     if (modifiers == kShift)
     {
+        if (c == U' ')
+        {
+            return Key::typed(c, modifiers); // Shift-Space, a key of its own: the same space
+        }
         if (!isLetter(c))
         {
             return "Shift with " + encodeUtf8(std::u32string(1, c)) +

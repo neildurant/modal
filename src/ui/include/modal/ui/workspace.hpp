@@ -369,9 +369,12 @@ private:
     WindowLayout layout_;
     core::Player* player_ = nullptr;
     bool rewind_ = true;
-    bool wasPlaying_ = false;   // or stopping, until the player knows where it stopped
-    bool following_ = true;     // the views following the playhead, until moved away from it
-    std::int64_t lastTime_ = 0; // of the last key or wake-up
+    bool wasPlaying_ = false;     // or stopping, until the player knows where it stopped
+    bool following_ = true;       // the views following the playhead, until moved away from it
+    core::Tick lastPlayhead_ = 0; // where the playhead was last shown
+    std::optional<SongCursor> playedFrom_; // the cursor when playback started
+    bool returning_ = false;               // stopping with play-stop-back, back to it
+    std::int64_t lastTime_ = 0;            // of the last key or wake-up
     bool hintsOn_ = true;
     std::int64_t hintDelay_ = 400;
     std::optional<std::int64_t> waitingSince_; // when keys started longer bindings

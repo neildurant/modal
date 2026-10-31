@@ -277,13 +277,15 @@ cmap <PageUp>   command-line-page-up    "A screen back"
 
 nmap <Esc>      cancel            "Cancel"
 
-" Playing: Space plays from the play-from marker (the ▶ in the margin), or stops; m Space puts
-" the marker at the cursor, and Ctrl-Space puts it there and plays. With rewind (on by
-" default) the marker stays put; without, it moves to where playback stops. , t Space turns
-" rewind on or off.
+" Playing: Space plays from the play-from marker (the ▶ in the margin), or stops where it is,
+" the cursor landing there; Shift-Space stops and goes back to where the cursor was when it
+" started. m Space puts the marker at the cursor, and Ctrl-Space puts it there and plays.
+" With rewind (on by default) the marker stays put, so Space plays the same again; without,
+" it moves to where playback stops, so Space carries on. , t Space turns rewind on or off.
 " Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
 keysection "Playing"
 nmap <Space>    play-toggle       "Play or stop"
+nmap <S-Space>  play-stop-back    "Stop and go back"
 nmap <C-Space>  play-cursor       "Play from the cursor"
 nmap m<Space>   marker-set        "Play from here"
 ngroup <leader>t "Toggles"

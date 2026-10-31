@@ -39,6 +39,7 @@ TEST_CASE("typed characters stand for themselves")
     CHECK(keys("gg") == std::vector{Key::typed(U'g'), Key::typed(U'g')});
     CHECK(keys("$G") == std::vector{Key::typed(U'$'), Key::typed(U'G')});
     CHECK(keys("é") == std::vector{Key::typed(U'é')});
+    CHECK(keys("<S-Space>") == std::vector{Key::typed(U' ', kShift)});
     CHECK(keys("<lt>") == std::vector{Key::typed(U'<')});
     CHECK(keys("<Space>") == std::vector{Key::typed(U' ')});
     CHECK(keys(">") == std::vector{Key::typed(U'>')});

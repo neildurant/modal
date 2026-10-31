@@ -427,6 +427,13 @@ public:
             {
                 own = event.key.key;
             }
+            // Shift-Space a key of its own, rather than the space it types, which says nothing of
+            // Shift; where text is typed it still types a space.
+            if (own == SDLK_SPACE && mods == kShift)
+            {
+                skipText_ = true;
+                return key_(Key::typed(U' ', mods), time(event));
+            }
             if (ctrlOrAlt && !altGr && own >= 0x20 && own < 0x7f)
             {
                 // Some systems type text for Alt and a key as well; it's the same key.

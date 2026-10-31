@@ -103,7 +103,7 @@ bool contains(const std::u32string& text, std::u32string_view part)
 
 } // namespace
 
-TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays")
+TEST_CASE("Space plays from the marker and stops where it is; with rewind, the marker stays")
 {
     Playing p;
     REQUIRE(p.ws.rewind());
@@ -133,11 +133,12 @@ TEST_CASE("Space plays from the marker and stops; with rewind, the cursor stays"
     CHECK(row == p.view.top() + third);
     CHECK(p.view.row() == 5);
 
-    // Stopped, back to the cursor, and the marker where it was.
+    // Stopped where it is, the cursor landing there, and the marker where it was.
     p.type(U" ");
     CHECK_FALSE(p.player.playing());
     CHECK(p.view.playheadRow() == std::nullopt);
-    CHECK(p.view.top() <= 5);
+    CHECK(p.view.row() == row);
+    CHECK(p.view.top() > 5);
     CHECK_FALSE(contains(p.status(), U"▶"));
     p.runFor(1ms);
     CHECK(p.ws.deadline() == std::nullopt); // no more frames
@@ -280,4 +281,31 @@ TEST_CASE("without a player, the transport says there's nothing to play to")
     p.ws.setPlayer(nullptr);
     p.type(U" ");
     CHECK(p.ws.message() == "Nothing to play to");
+}
+
+TEST_CASE("Shift-Space stops and goes back to where the cursor was when playback started")
+{
+    Playing p;
+    p.type(U"5j ");
+    p.runFor(11s);
+    REQUIRE(p.view.top() > 5);
+    p.press(Key::typed(U' ', kShift));
+    CHECK_FALSE(p.player.playing());
+    p.runFor(1ms);
+    CHECK(p.view.row() == 5);
+    CHECK(p.view.top() <= 5);
+    CHECK(p.player.marker() == 0); // with rewind, where it was
+
+    // Without rewind too, the marker moving to where it stopped.
+    p.ws.setRewind(false);
+    p.type(U" ");
+    p.runFor(11s);
+    p.press(Key::typed(U' ', kShift));
+    p.runFor(1ms);
+    CHECK(p.view.row() == 5);
+    CHECK(p.player.marker() > 0);
+
+    // Stopped, it plays, as Space does.
+    p.press(Key::typed(U' ', kShift));
+    CHECK(p.player.playing());
 }
