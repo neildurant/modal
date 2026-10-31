@@ -7,6 +7,7 @@
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
+#include <modal/ui/settings.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -3142,15 +3143,123 @@ std::vector<PaletteItem> Workspace::paletteItems() const
     return items;
 }
 
+std::optional<char> Workspace::palettePrefix() const
+{
+    // A first character that searches something else than the commands.
+    const auto& text = line_.text();
+    if (!text.empty() &&
+        std::u32string_view{U"@#'?"}.find(text.front()) != std::u32string_view::npos)
+    {
+        return static_cast<char>(text.front());
+    }
+    return std::nullopt;
+}
+
+std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
+{
+    // @ sections, # tracks, ' markers and ? settings (decided October 2026), each with what
+    // helps choose it: its bars and meter, its port and channel, where it is, its value.
+    const auto& song = document_.song();
+    std::vector<PaletteItem> items;
+    const auto item = [&](std::string id, std::string title, std::string about)
+    {
+        items.push_back({.name = std::move(id),
+                         .title = std::move(title),
+                         .description = std::move(about),
+                         .aliases = "",
+                         .offered = true,
+                         .keys = {},
+                         .rank = 0});
+    };
+    if (prefix == '@')
+    {
+        for (std::size_t i = 0; i < song.sections().size(); ++i)
+        {
+            const auto start = song.sectionStart(i);
+            item(std::to_string(i), song.sections()[i]->name(),
+                 barsText(song.meter(), start, song.sectionStart(i + 1)) + ", " +
+                     std::to_string(song.meter().signatureAt(start).numerator) + "/" +
+                     std::to_string(song.meter().signatureAt(start).denominator));
+        }
+    }
+    else if (prefix == '#')
+    {
+        const auto tracks = song.tracks();
+        for (std::size_t i = 0; i < tracks.size(); ++i)
+        {
+            const auto& track = *tracks[i];
+            item(std::to_string(i),
+                 track.name.empty() ? "Track " + std::to_string(i + 1) : track.name,
+                 "track " + std::to_string(i + 1) + ", " +
+                     (track.port.empty() ? std::string{"the default port"} : track.port) +
+                     ", channel " + std::to_string(track.channel));
+        }
+    }
+    else if (prefix == '\'')
+    {
+        const auto markers = song.markers();
+        for (std::size_t i = 0; i < markers.size(); ++i)
+        {
+            item(std::to_string(i), markers[i].name, positionText(song.meter(), markers[i].tick));
+        }
+    }
+    else if (prefix == '?' && settings_ != nullptr)
+    {
+        for (const auto& setting : settings_->all())
+        {
+            item(std::string{setting.name}, std::string{setting.name},
+                 formatValue(setting.value) + "  " + std::string{setting.description});
+        }
+    }
+    return items;
+}
+
 std::vector<PaletteItem> Workspace::paletteShown() const
 {
-    const auto items = paletteItems();
+    const auto prefix = palettePrefix();
+    const auto items = prefix ? prefixItems(*prefix) : paletteItems();
+    auto query = encodeUtf8(line_.text());
+    if (prefix)
+    {
+        query.erase(0, 1);
+    }
     std::vector<PaletteItem> shown;
-    for (const auto i : paletteMatches(items, encodeUtf8(line_.text())))
+    for (const auto i : paletteMatches(items, query))
     {
         shown.push_back(items[i]);
     }
     return shown;
+}
+
+bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
+{
+    // Going to a section, a track or a marker, or a setting on the : prompt to change.
+    const auto& song = document_.song();
+    if (prefix == '?')
+    {
+        const auto* setting = settings_ != nullptr ? settings_->find(item.name) : nullptr;
+        line_.open(decodeUtf8("set " + item.name + "=" +
+                              (setting != nullptr ? formatValue(setting->value) : std::string{})));
+        return true;
+    }
+    line_.clear();
+    mode_ = selection_ ? Mode::Visual : Mode::Normal;
+    const auto index = static_cast<std::size_t>(std::stoul(item.name));
+    auto cursor = view().cursor();
+    if (prefix == '@' && index < song.sections().size())
+    {
+        cursor.tick = song.sectionStart(index);
+    }
+    else if (prefix == '#' && index < song.tracks().size())
+    {
+        cursor.track = song.tracks()[index]->id();
+    }
+    else if (prefix == '\'' && index < song.markers().size())
+    {
+        cursor.tick = song.markers()[index].tick;
+    }
+    view().setCursor(cursor);
+    return true;
 }
 
 void Workspace::setRemembered(Remembered remembered, std::function<void(const Remembered&)> changed)
@@ -3212,6 +3321,11 @@ bool Workspace::runPalette(std::string_view command)
             return false; // nothing chosen yet
         }
         const auto& item = shown[std::min(*palette_->chosen, last)];
+        if (const auto prefix = palettePrefix())
+        {
+            palette_.reset();
+            return runPrefixItem(*prefix, item);
+        }
         const auto* info = commands_.find(item.name);
         palette_.reset();
         if (command == "command-line-run")

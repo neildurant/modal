@@ -34,6 +34,8 @@
 namespace modal::ui
 {
 
+class Settings;
+
 // Whether a command is an operator, waiting for a range or object: d, y, > and the others.
 bool isOperator(std::string_view command);
 
@@ -153,6 +155,9 @@ public:
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
 
     void setKeymap(Keymap keymap);
+
+    // The settings, for the palette's ? to list with their values.
+    void setSettings(const Settings* settings) { settings_ = settings; }
 
     // What's remembered between sessions, as read from the state directory, and what to call
     // when it changes, to write it there; and the clock it's kept by, seconds since 1970 (the
@@ -333,6 +338,7 @@ private:
     static constexpr std::ptrdiff_t kPaletteRows = 12;
     std::optional<PaletteState> palette_;
     Remembered remembered_;
+    const Settings* settings_ = nullptr;
     std::function<void(const Remembered&)> rememberedChanged_;
     std::function<std::int64_t()> clock_ = []
     {
@@ -343,6 +349,11 @@ private:
     void rememberedChanged();
     std::vector<PaletteItem> paletteItems() const;
     std::vector<PaletteItem> paletteShown() const;
+    // The palette searching other things, by a first character: @ sections, # tracks, '
+    // markers, ? settings; what it lists then, and going to one.
+    std::optional<char> palettePrefix() const;
+    std::vector<PaletteItem> prefixItems(char prefix) const;
+    bool runPrefixItem(char prefix, const PaletteItem& item);
     std::string keysFor(std::string_view command) const;
     bool runPalette(std::string_view command);
     Region paletteRegion() const;

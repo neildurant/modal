@@ -4,6 +4,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/palette.hpp>
+#include <modal/ui/settings.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -341,4 +342,54 @@ TEST_CASE("the palette ranks commands by how often and how lately they're run fr
     p.open();
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.mode() == Mode::CommandLine);
+}
+
+TEST_CASE("a first character searches other things: @ sections, # tracks, ' markers, ? settings")
+{
+    Paletting p;
+    const auto& song = p.document.song();
+    p.document.edit("Marker", {},
+                    [](core::Song& s) { s.setMarker(4 * core::kPpqn.whole(), "Fill"); });
+
+    // @ goes to a section.
+    REQUIRE(song.sections().size() > 1);
+    const auto& second = song.sections()[1]->name();
+    p.open();
+    p.type(U"@");
+    CHECK(p.rows().size() == song.sections().size());
+    p.type(decodeUtf8(second));
+    REQUIRE_FALSE(p.rows().empty());
+    CHECK(p.rows().front() == decodeUtf8(second));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::Normal);
+    CHECK(p.ws.arrangement().page().time() == song.sectionStart(1));
+
+    // # goes to a track.
+    const auto last = song.tracks().size() - 1;
+    p.open();
+    p.type(U"#");
+    CHECK(p.rows().size() == std::min<std::size_t>(song.tracks().size(), 12)); // as fit
+    // As the palette names it: by its name, or its number if it has none.
+    const auto& named = song.tracks()[last]->name;
+    p.type(decodeUtf8(named.empty() ? "Track " + std::to_string(last + 1) : named));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.arrangement().page().track() == last);
+
+    // ' goes to a marker.
+    p.open();
+    p.type(U"'fill");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.arrangement().page().bar() == 5);
+
+    // ? puts a setting on the : prompt, with its value, to change.
+    Settings settings;
+    p.ws.setSettings(&settings);
+    p.open();
+    p.type(U"?hintdel");
+    REQUIRE_FALSE(p.rows().empty());
+    CHECK(p.rows().front() == U"hintdelay");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::CommandLine);
+    CHECK(p.ws.commandLine().text() ==
+          U"set hintdelay=" + decodeUtf8(formatValue(settings.find("hintdelay")->value)));
 }

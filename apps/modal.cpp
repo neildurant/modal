@@ -581,6 +581,7 @@ int main(int argc, char* argv[])
             }
             return lookup;
         });
+    view.setSettings(&settings);
     // The choices completion offers for settings and files; the workspace has the rest.
     view.setChoices(ui::Choices::Setting,
                     [&](std::string_view word)
