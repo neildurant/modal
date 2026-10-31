@@ -40,6 +40,7 @@ public:
     std::string_view name() const override { return "the arrangement"; }
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
+    std::optional<std::size_t> selectionIndex() const override { return page_.stripCursor(); }
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
                                                                 int count) override;
     std::vector<int> topHeights(CellSize cell) const override;
@@ -83,8 +84,10 @@ private:
         core::Tick to;
     };
 
-    // The Visual selection's area, or nothing if there's none here.
+    // The Visual selection's area, or nothing if there's none here; on the strip, its
+    // sections, first and last, and their area on every track.
     std::optional<Area> selectionArea() const;
+    std::optional<std::pair<std::size_t, std::size_t>> selectedSections() const;
 
     // The area a range or object takes from the cursor, or nothing if it takes none.
     std::optional<Area> areaFor(std::string_view motion, int count);

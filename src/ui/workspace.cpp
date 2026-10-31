@@ -301,8 +301,8 @@ std::span<const CommandInfo> Workspace::commands()
         using enum Where;
         const std::array<std::pair<std::string_view, std::uint8_t>, 61> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
-            {"visual", onlyIn({Tracks, PianoRoll})},
-            {"visual-again", onlyIn({Tracks, PianoRoll})},
+            {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-velocity", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -1664,14 +1664,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
     }
     if (const auto* info = commands_.find(command); info != nullptr && info->object)
     {
-        const auto span = view().objectSpan(command, count);
-        if (span)
-        {
-            const auto here = view().cursor();
-            selection_->anchor = SongCursor{here.track, span->first, here.pitch};
-            selection_->index.reset();
-            view().setCursor(SongCursor{here.track, span->second - 1, here.pitch});
-        }
+        view().selectObject(command, count, *selection_);
         return true;
     }
     return std::nullopt;
@@ -1724,25 +1717,37 @@ bool Workspace::putOverSelection()
         setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
-    if (!register_.sections.empty())
+    const bool strip = selection_->where == Where::Strip;
+    if (register_.sections.empty() == strip)
     {
         endVisual();
-        setMessage("The register holds sections: put them on the section strip",
+        setMessage(strip ? "The register holds bars of tracks: put them on the tracks"
+                         : "The register holds sections: put them on the section strip",
                    MessageKind::Warning);
         return true;
     }
     const auto saved = register_;
+    const auto first = span ? document_.song().sectionAt(span->first) : 0;
     document_.beginGroup("Put over " + what, view().place());
     view().operate("operator-delete", "visual", 0);
     register_ = saved;
     endVisual();
-    if (span)
+    if (strip)
     {
-        auto at = view().cursor();
-        at.tick = span->first;
-        view().setCursor(at);
+        // Before what followed them, or after the last.
+        view().run(
+            first < document_.song().sections().size() ? "register-put-before" : "register-put", 1);
     }
-    view().run("register-put", 1);
+    else
+    {
+        if (span)
+        {
+            auto at = view().cursor();
+            at.tick = span->first;
+            view().setCursor(at);
+        }
+        view().run("register-put", 1);
+    }
     document_.endGroup();
     refresh();
     return true;

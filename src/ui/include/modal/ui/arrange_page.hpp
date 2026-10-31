@@ -110,6 +110,7 @@ public:
         std::size_t bottom;
         core::Tick from;
         core::Tick to;
+        bool sections = false; // on the strip, sections, drawn there too
     };
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
                     std::optional<Selected> selected = std::nullopt) const;

@@ -265,6 +265,11 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
     }
     if (const auto section = page_.stripCursor())
     {
+        if (motion == "visual")
+        {
+            const auto area = selectionArea();
+            return area ? targetIn(*area, *selectionStatus() + " on every track") : std::nullopt;
+        }
         if (!isSectionObject(motion))
         {
             host_.setMessage("On the section strip, operators take is, this section's events on "
@@ -352,6 +357,11 @@ std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
     // bars, on every track.
     const auto selection = host_.selection();
     const auto& song = document_.song();
+    if (const auto sections = selectedSections(); sections && !song.tracks().empty())
+    {
+        return Area{0, song.tracks().size() - 1, song.sectionStart(sections->first),
+                    song.sectionStart(sections->second + 1)};
+    }
     if (!selection || selection->where != Where::Tracks || song.tracks().empty())
     {
         return std::nullopt;
@@ -363,8 +373,31 @@ std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
                 std::min(m.barStart(last + 1), song.end())};
 }
 
+std::optional<std::pair<std::size_t, std::size_t>> ArrangeView::selectedSections() const
+{
+    // v on the strip: the sections from where it started to the cursor's, both in.
+    const auto selection = host_.selection();
+    const auto here = page_.stripCursor();
+    if (!selection || selection->where != Where::Strip || !here)
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto anchor = std::min(selection->index.value_or(song.sectionAt(selection->anchor.tick)),
+                                 song.sections().size() - 1);
+    return std::pair{std::min(anchor, *here), std::max(anchor, *here)};
+}
+
 std::optional<std::string> ArrangeView::selectionStatus() const
 {
+    if (const auto sections = selectedSections())
+    {
+        const auto& song = document_.song();
+        return sectionsText(song, SectionRange{.first = sections->first,
+                                               .count = sections->second - sections->first + 1,
+                                               .from = 0,
+                                               .to = 0});
+    }
     const auto area = selectionArea();
     if (!area)
     {
@@ -376,6 +409,11 @@ std::optional<std::string> ArrangeView::selectionStatus() const
 std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::objectSpan(std::string_view object,
                                                                          int count)
 {
+    if (page_.stripCursor())
+    {
+        host_.setMessage("On the strip, h and l select sections", MessageKind::Information);
+        return std::nullopt;
+    }
     if (object == "object-note" || object == "object-chord")
     {
         host_.setMessage("There's no single note or chord here to select",
@@ -879,6 +917,16 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
     {
         lastTaken = std::min(section + static_cast<std::size_t>(std::max(count, 1)) - 1, last);
     }
+    else if (motion == "visual" || motion == "visual-time")
+    {
+        const auto selected = selectedSections();
+        if (!selected)
+        {
+            return false;
+        }
+        first = selected->first;
+        lastTaken = selected->second;
+    }
     else
     {
         run(motion, count);
@@ -1185,7 +1233,8 @@ void ArrangeView::addRegions(Frame& frame) const
     std::optional<ArrangePage::Selected> selected;
     if (const auto area = selectionArea())
     {
-        selected = ArrangePage::Selected{area->top, area->bottom, area->from, area->to};
+        selected = ArrangePage::Selected{area->top, area->bottom, area->from, area->to,
+                                         selectedSections().has_value()};
     }
     page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt,
                      selected);

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -301,4 +302,61 @@ TEST_CASE("v in the piano roll selects time at every pitch, on the cursor's trac
     CHECK(pitches(s.document, 0) == Pitches{40, 41, 45, 46, 47});
     CHECK(pitches(s.document, 1).size() == 8);
     CHECK(s.document.song().end() == 8 * s.bar);
+}
+
+TEST_CASE("v in the event list selects rows of events")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    const auto at = [&](core::Tick tick)
+    { s.ws.eventList().setCursor({.track = bass, .tick = tick, .pitch = std::nullopt}); };
+    s.type(U"ge");
+    const auto& list = s.ws.eventList();
+    while (list.list().rows()[list.row()].kind != RowKind::Event) // past the section's rows
+    {
+        s.type(U"j");
+    }
+    s.type(U"vj");
+    CHECK(s.ws.eventList().selectionStatus() == "2 events in Bass");
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // An object selects its rows; D, taking time out, isn't for the event list.
+    at(3 * s.bar); // the note in bar 4, in B
+    s.type(U"vis");
+    CHECK(s.ws.eventList().selectionStatus() == "3 events in Bass");
+    s.type(U"D");
+    CHECK(s.ws.message().starts_with("D takes time out"));
+    CHECK(pitches(s.document, 0).size() == 8);
+    at(3 * s.bar);
+    s.type(U"vis>");
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 43, 44, 45, 45, 46, 47});
+}
+
+TEST_CASE("v on the section strip selects sections, and the operators take them")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"gsvl");
+    CHECK(s.ws.arrangement().selectionStatus() == "2 sections from A");
+    s.type(U"d");
+    CHECK(sections(s.document) == std::vector<std::string>{"C"});
+    s.type(U"u");
+
+    // The other operators change their events on every track.
+    s.type(U"ggvl>");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 44, 45, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{61, 62, 63, 64, 65, 65, 66, 67});
+    s.type(U"u");
+
+    // p puts the register's sections in their place.
+    s.type(U"$Y"); // C
+    s.type(U"ggvlp");
+    CHECK(sections(s.document).size() == 2);
+    CHECK(s.document.song().end() == 6 * s.bar);
+    CHECK(pitches(s.document, 0) == Pitches{45, 46, 47, 45, 46, 47});
+    s.type(U"u");
+    CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
 }

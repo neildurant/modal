@@ -668,8 +668,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             {
                 continue;
             }
+            const bool picked =
+                selected && selected->sections && start >= selected->from && start < selected->to;
             timeline.under.push_back({{x0, y + stripInset, x1 - x0, cell_.height - 2 * stripInset},
-                                      i % 2 == 0 ? Role::Panel : Role::Bar,
+                                      picked       ? Role::Selection
+                                      : i % 2 == 0 ? Role::Panel
+                                                   : Role::Bar,
                                       255});
             const int room = (x1 - x0 - 2 * lineWidth) / cell_.width;
             auto name = decodeUtf8(song_.sections()[i]->name());

@@ -240,6 +240,18 @@ public:
     {
         return std::nullopt;
     }
+    // Makes a selection what an object takes, the cursor at its far end: by default from
+    // the start of its span to its last tick.
+    virtual void selectObject(std::string_view object, int count, Selection& selection)
+    {
+        if (const auto span = objectSpan(object, count))
+        {
+            const auto here = cursor();
+            selection.anchor = SongCursor{here.track, span->first, here.pitch};
+            selection.index.reset();
+            setCursor(SongCursor{here.track, span->second - 1, here.pitch});
+        }
+    }
 
     // For the status line: where the cursor is, and where a time is, each as its position,
     // the meter there and its section, in the view's own bars; and a time's position alone.

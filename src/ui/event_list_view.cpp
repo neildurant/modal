@@ -591,6 +591,13 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
 
 bool EventListView::operate(std::string_view op, std::string_view motion, int count)
 {
+    if (motion == "visual-time")
+    {
+        setMessage("D takes time out, which the event list, being events, doesn't hold; d "
+                   "deletes the events",
+                   MessageKind::Information);
+        return true;
+    }
     if (motion == "object-bar")
     {
         setMessage("ab isn't in the event list, which is for events rather than time",
@@ -679,8 +686,66 @@ std::optional<OperatorTarget> EventListView::target(std::string_view motion, int
     return result;
 }
 
+std::optional<std::pair<std::size_t, std::size_t>> EventListView::selectedRows() const
+{
+    // v: the rows from where it started to the cursor's, both in.
+    const auto selection = host_.selection();
+    const auto& rows = list_.rows();
+    if (!selection || selection->where != Where::EventList || rows.empty())
+    {
+        return std::nullopt;
+    }
+    const auto anchor =
+        std::min(selection->index.value_or(list_.rowAt(selection->anchor.tick)), rows.size() - 1);
+    return std::pair{std::min(anchor, row_), std::max(anchor, row_)};
+}
+
+std::optional<std::string> EventListView::selectionStatus() const
+{
+    const auto selected = selectedRows();
+    if (!selected)
+    {
+        return std::nullopt;
+    }
+    std::size_t events = 0;
+    for (auto r = selected->first; r <= selected->second; ++r)
+    {
+        events += list_.rows()[r].kind == RowKind::Event ? 1 : 0;
+    }
+    return eventCount(events) + " in " + trackName();
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> EventListView::selectionSpan() const
+{
+    const auto selected = selectedRows();
+    if (!selected)
+    {
+        return std::nullopt;
+    }
+    return std::pair{list_.rows()[selected->first].tick, list_.rows()[selected->second].tick + 1};
+}
+
+void EventListView::selectObject(std::string_view object, int count, Selection& selection)
+{
+    // The rows the object takes, the cursor on the last.
+    const auto rows = rowsFor(object, count);
+    if (!rows)
+    {
+        return;
+    }
+    selection.anchor = cursor();
+    selection.index = std::min(rows->from, rows->to);
+    row_ = std::min(std::max(rows->from, rows->to), list_.rows().size() - 1);
+    follow();
+}
+
 std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motion, int count)
 {
+    if (motion == "visual")
+    {
+        const auto selected = selectedRows();
+        return selected ? std::optional{Rows{selected->first, selected->second}} : std::nullopt;
+    }
     if (motion == "object-note")
     {
         // in, x, Y: the event under the cursor, or as many from it as the count says.
@@ -1470,6 +1535,7 @@ Region EventListView::listRegion() const
             std::to_string(data.releaseVelocity);
     }
     const auto cursorField = field();
+    const auto selected = selectedRows();
     for (int line = 1; line < rows; ++line)
     {
         auto row = top_ + static_cast<std::size_t>(line - 1);
@@ -1487,6 +1553,11 @@ Region EventListView::listRegion() const
         if (!isAdded && row == playheadRow_)
         {
             style.background = Role::Playhead;
+            grid.fill(0, line, layout_.columns, 1, {U' ', style});
+        }
+        else if (!isAdded && selected && row >= selected->first && row <= selected->second)
+        {
+            style.background = Role::Selection;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});
         }
         for (std::size_t c = 0; c < kColumnCount; ++c)

@@ -42,6 +42,10 @@ public:
     EventListView& operator=(const EventListView&) = delete;
 
     std::string_view name() const override { return "the event list"; }
+    std::optional<std::string> selectionStatus() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
+    std::optional<std::size_t> selectionIndex() const override { return row_; }
+    void selectObject(std::string_view object, int count, Selection& selection) override;
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
@@ -114,6 +118,8 @@ private:
         core::Tick span = 0;
     };
     std::optional<Rows> rowsFor(std::string_view motion, int count);
+    // The Visual selection's rows, first and last, or nothing if there's none here.
+    std::optional<std::pair<std::size_t, std::size_t>> selectedRows() const;
 
     // Deletes or yanks the track's own events among some rows, which may be in either order.
     // Deletes or yanks the track's events among rows; with a bar's start, taken as bars, their
