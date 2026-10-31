@@ -212,6 +212,7 @@ private:
     void ask(std::string question, std::function<void()> yes, std::function<void()> no = {},
              std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;
+    std::optional<Selection> selection() const override { return selection_; }
     void stopTyping() override { mode_ = Mode::Normal; }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
@@ -300,6 +301,12 @@ private:
         int count;
     };
     std::optional<PendingOperator> operator_;
+    // The Visual selection, and the last one with the cursor at its end, for gv.
+    std::optional<Selection> selection_;
+    std::optional<std::pair<Selection, SongCursor>> lastSelection_;
+    // A command in Visual mode, or nothing to run it as in Normal mode; and ending it.
+    std::optional<bool> runVisual(std::string_view command, int count);
+    void endVisual();
     // A question asked: what it runs for y, for another key, and for Escape.
     struct Question
     {

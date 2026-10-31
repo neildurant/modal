@@ -80,6 +80,13 @@ constexpr std::array kSharedCommands{
                                "at random in time and velocity, by up to humanizetime and "
                                "humanizevel; ~~ this bar's",
                 .count = true},
+    CommandInfo{.name = "visual",
+                .description = "Visual mode: select from here as the cursor moves, a range of "
+                               "time on every track; v again or Escape ends it"},
+    CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "visual-other-end",
+                .description = "In Visual mode, go to the selection's other end",
+                .modes = modeBit(Mode::Visual)},
     CommandInfo{.name = "operator-line",
                 .description = "After an operator, this bar's events, or {count} bars' from it",
                 .modes = modeBit(Mode::OperatorPending),
@@ -87,44 +94,44 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "object-bar-contents",
                 .description = "After an operator, this bar's events (ib), or {count} bars' "
                                "from it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-bar",
                 .description = "After an operator, this bar as time (ab), which d takes out, "
                                "closing the gap; or {count} bars from it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-section-contents",
                 .description = "After an operator, this section's events on this track (is), "
                                "or on every track on the section strip; or {count} sections' "
                                "from it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-section",
                 .description = "After an operator, this section itself (as), which d takes out "
                                "of the song and y yanks as a section; or {count} sections from "
                                "it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-chord",
                 .description = "After an operator, the chord holding the note under the cursor "
                                "(ic): the notes starting with it; or {count} chords from it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-track",
                 .description = "After an operator, this track's events (it), from the start to "
                                "the end; in the arrangement, or {count} tracks' from it",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-note",
                 .description = "After an operator, the note or event under the cursor (in)",
-                .modes = modeBit(Mode::OperatorPending),
+                .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{
@@ -288,8 +295,10 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 59> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 61> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
+            {"visual", onlyIn({Tracks})},
+            {"visual-again", onlyIn({Tracks})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-velocity", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -427,6 +436,13 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return *result;
                          }
+                         if (mode_ == Mode::Visual)
+                         {
+                             if (const auto done = runVisual(name, call.count))
+                             {
+                                 return {*done};
+                             }
+                         }
                          // After an operator, every command is its motion, or gives it up.
                          if (mode_ == Mode::OperatorPending)
                          {
@@ -462,6 +478,28 @@ void Workspace::buildOperatorKeymap()
         if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
         {
             operatorKeymap_.bind(Mode::OperatorPending, keys, binding);
+        }
+    }
+    // Visual mode's own keys, then the objects, which select what they take (vis), then
+    // Normal mode's, but for keys that start an object's (i, a).
+    const auto free = [&](const std::vector<Key>& keys)
+    {
+        const auto match = operatorKeymap_.match(Mode::Visual, keys);
+        return match.binding == nullptr && !match.longer;
+    };
+    for (const auto& [keys, binding] : keymap_.bindings(Mode::OperatorPending))
+    {
+        const auto* info = commands_.find(binding.command);
+        if (info != nullptr && info->object && free(keys))
+        {
+            operatorKeymap_.bind(Mode::Visual, keys, binding);
+        }
+    }
+    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+    {
+        if (free(keys))
+        {
+            operatorKeymap_.bind(Mode::Visual, keys, binding);
         }
     }
 }
@@ -663,7 +701,8 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     }
     const auto before = pending();
     const auto typedIn = mode_;
-    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const auto& keymap =
+        mode_ == Mode::OperatorPending || mode_ == Mode::Visual ? operatorKeymap_ : keymap_;
     const auto actions = keys_.key(keymap, mode_, key, now);
     const auto unbound =
         shownKeys(std::vector<Key>(keys_.unbound().begin(), keys_.unbound().end()));
@@ -680,7 +719,7 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         operator_.reset();
         mode_ = Mode::Normal;
     }
-    else if (typedIn == Mode::Normal && !unbound.empty())
+    else if ((typedIn == Mode::Normal || typedIn == Mode::Visual) && !unbound.empty())
     {
         setMessage(unbound + " isn't a key here", MessageKind::Information);
     }
@@ -718,7 +757,8 @@ std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
         return hints.empty() ? std::nullopt : std::optional{std::move(hints)};
     }
     const auto mode = keys_.mode();
-    const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const auto& keymap =
+        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymap_ : keymap_;
     auto hints = hintsAfter(keymap, mode, keys_.keys());
     if (hints.empty())
     {
@@ -1248,7 +1288,8 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
     const Style headingStyle{Role::Dim, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell_.width; };
     const auto mode = keys_.mode();
-    const auto& keymap = mode == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const auto& keymap =
+        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymap_ : keymap_;
     auto heading = pending();
     if (keys_.keys().empty() && operator_)
     {
@@ -1317,7 +1358,8 @@ bool Workspace::wake(std::int64_t now)
 {
     lastTime_ = now;
     const auto before = keys_.pending();
-    const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
+    const auto& keymap =
+        mode_ == Mode::OperatorPending || mode_ == Mode::Visual ? operatorKeymap_ : keymap_;
     bool changed = runAll(keys_.timeout(keymap, now));
     if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
     {
@@ -1415,6 +1457,27 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         operator_ = PendingOperator{std::string{command}, count};
         mode_ = Mode::OperatorPending;
+        return true;
+    }
+    if (command == "visual")
+    {
+        selection_ = Selection{.anchor = view().cursor(),
+                               .kind = SelectionKind::Range,
+                               .where = where(),
+                               .index = view().selectionIndex()};
+        mode_ = Mode::Visual;
+        return true;
+    }
+    if (command == "visual-again")
+    {
+        if (!lastSelection_)
+        {
+            setMessage("No selection yet to select again", MessageKind::Information);
+            return true;
+        }
+        selection_ = lastSelection_->first;
+        view().setCursor(lastSelection_->second);
+        mode_ = Mode::Visual;
         return true;
     }
     if (command == "undo" || command == "redo")
@@ -1567,6 +1630,48 @@ bool Workspace::runOperator(std::string_view command, int count)
     // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
     const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
     return view().operate(op.name, command, total);
+}
+
+std::optional<bool> Workspace::runVisual(std::string_view command, int count)
+{
+    // Escape or v again ends it; o goes to the other end; an object selects what it takes.
+    // Motions, and the rest, are as in Normal mode, the selection following the cursor.
+    if (command == "cancel" || command == "visual")
+    {
+        endVisual();
+        return true;
+    }
+    if (command == "visual-other-end")
+    {
+        const auto other = selection_->anchor;
+        selection_->anchor = view().cursor();
+        selection_->index = view().selectionIndex();
+        view().setCursor(other);
+        return true;
+    }
+    if (const auto* info = commands_.find(command); info != nullptr && info->object)
+    {
+        const auto span = view().objectSpan(command, count);
+        if (span)
+        {
+            const auto here = view().cursor();
+            selection_->anchor = SongCursor{here.track, span->first, here.pitch};
+            selection_->index.reset();
+            view().setCursor(SongCursor{here.track, span->second - 1, here.pitch});
+        }
+        return true;
+    }
+    return std::nullopt;
+}
+
+void Workspace::endVisual()
+{
+    if (selection_)
+    {
+        lastSelection_ = std::pair{*selection_, view().cursor()};
+    }
+    selection_.reset();
+    mode_ = Mode::Normal;
 }
 
 bool Workspace::operateOnSections(std::string_view op, int count)
@@ -2653,7 +2758,10 @@ Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
-    bottom.left = {{view().typing() ? " EDIT " : " NORMAL ", {Role::ModeText, Role::Mode, kBold}}};
+    bottom.left = {{view().typing()         ? " EDIT "
+                    : mode_ == Mode::Visual ? " VISUAL "
+                                            : " NORMAL ",
+                    {Role::ModeText, Role::Mode, kBold}}};
     if (withMessage && !message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
@@ -2663,6 +2771,10 @@ Bar Workspace::statusBar(bool withMessage) const
     {
         // While playing, where the playhead is.
         bottom.left.push_back({"  ▶ " + view().timeStatus(*at), {Role::Accent, Role::Bar, kBold}});
+    }
+    else if (const auto selected = mode_ == Mode::Visual ? view().selectionStatus() : std::nullopt)
+    {
+        bottom.left.push_back({"  " + *selected, kBarText});
     }
     else
     {

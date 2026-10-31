@@ -99,6 +99,14 @@ nmap x          event-delete      "Delete this event"
 nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"
 nmap Y          yank-this         "Yank this"
+
+" Visual mode: v selects from the cursor as it moves, a range of time on every track, and v
+" again or Escape ends it; an object selects what it takes (vis this section), o goes to the
+" selection's other end, and gv selects the last selection again.
+keysection "Visual mode"
+nmap v          visual            "Visual"
+nmap gv         visual-again      "Last selection"
+vmap o          visual-other-end  "Other end"
 keysection "After an operator"
 omap ib         object-bar-contents "This bar's events"
 omap ab         object-bar        "This bar, as time"

@@ -319,8 +319,8 @@ TEST_CASE("the default config changes nothing, and uncommented gives the default
         const auto end = text.find('\n', start);
         auto line = text.substr(start, end - start);
         start = end + 1;
-        for (const auto* command : {"\"set ", "\"nmap ", "\"omap ", "\"cmap ", "\"ngroup ",
-                                    "\"keysection ", "\"highlight "})
+        for (const auto* command : {"\"set ", "\"nmap ", "\"vmap ", "\"omap ", "\"cmap ",
+                                    "\"ngroup ", "\"keysection ", "\"highlight "})
         {
             if (line.starts_with(command))
             {

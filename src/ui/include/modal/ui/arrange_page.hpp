@@ -102,7 +102,17 @@ public:
     int viewTracks() const;
 
     // The tracks and ruler, with the play-from marker in the ruler if there's one.
-    void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt) const;
+    // A Visual selection, drawn in place of the cursor's bar across the tracks: the tracks
+    // from the top to the bottom one, counting from 0, from one time to another.
+    struct Selected
+    {
+        std::size_t top;
+        std::size_t bottom;
+        core::Tick from;
+        core::Tick to;
+    };
+    void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
+                    std::optional<Selected> selected = std::nullopt) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

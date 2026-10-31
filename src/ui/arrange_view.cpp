@@ -336,6 +336,50 @@ std::string ArrangeView::sectionWhat(const Area& area, std::string_view motion, 
     return sectionsText(song, sectionsFrom(song, area.from, count)) + " of " + tracksText(area);
 }
 
+std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
+{
+    // v: the bars from where it started to the cursor's, both in, in the cursor's track's
+    // bars, on every track.
+    const auto selection = host_.selection();
+    const auto& song = document_.song();
+    if (!selection || selection->where != Where::Tracks || song.tracks().empty())
+    {
+        return std::nullopt;
+    }
+    const auto& m = meter();
+    const auto first = m.toBarBeatTick(std::min(selection->anchor.tick, page_.time())).bar;
+    const auto last = m.toBarBeatTick(std::max(selection->anchor.tick, page_.time())).bar;
+    return Area{0, song.tracks().size() - 1, m.barStart(first),
+                std::min(m.barStart(last + 1), song.end())};
+}
+
+std::optional<std::string> ArrangeView::selectionStatus() const
+{
+    const auto area = selectionArea();
+    if (!area)
+    {
+        return std::nullopt;
+    }
+    return barsText(meter(), area->from, area->to) + " on every track";
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::objectSpan(std::string_view object,
+                                                                         int count)
+{
+    if (object == "object-note" || object == "object-chord")
+    {
+        host_.setMessage("There's no single note or chord here to select",
+                         MessageKind::Information);
+        return std::nullopt;
+    }
+    const auto area = areaFor(object, count);
+    if (!area)
+    {
+        return std::nullopt;
+    }
+    return std::pair{area->from, area->to};
+}
+
 std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, int count)
 {
     // The cursor's bar, and its end, cut short by the song's.
@@ -1124,7 +1168,13 @@ Inspection ArrangeView::inspection() const
 void ArrangeView::addRegions(Frame& frame) const
 {
     const auto* player = host_.player();
-    page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt);
+    std::optional<ArrangePage::Selected> selected;
+    if (const auto area = selectionArea())
+    {
+        selected = ArrangePage::Selected{area->top, area->bottom, area->from, area->to};
+    }
+    page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt,
+                     selected);
     const auto track = trackId() ? page_.track() + 1 : 0;
     frame.push_back(trackBarRegion(document_.song(), track, page_.time(), meter(), layout_.top[0],
                                    width_, cell_));

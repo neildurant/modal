@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
@@ -84,6 +85,25 @@ struct EventRegister
     }
 };
 
+// A Visual selection (milestone 6): where it started, the cursor being its other end, and its
+// kind: v a time range, V whole rows, Ctrl-v a box. Where the view counts in rows a time can't
+// tell apart, as the event list's rows at one time, or the strip's sections, it keeps its own
+// index there too, for the place it was started in.
+enum class SelectionKind : std::uint8_t
+{
+    Range,
+    Rows,
+    Box,
+};
+
+struct Selection
+{
+    SongCursor anchor;
+    SelectionKind kind = SelectionKind::Range;
+    Where where = Where::Tracks;
+    std::optional<std::size_t> index;
+};
+
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
 // on each track, the events it takes, by index among the track's events, in order; what they
 // are, for messages and undo ("4 notes in Bass", "bar 3 of Bass"); and whether only notes are
@@ -138,6 +158,9 @@ public:
 
     // Puts the play-from marker at a time and plays from there, as Enter on a section does.
     virtual void playFrom(core::Tick tick) = 0;
+
+    // The Visual selection, if there is one; operators take it as the motion "visual".
+    virtual std::optional<Selection> selection() const = 0;
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the
@@ -200,6 +223,18 @@ public:
 
     // Its area, its bar and the inspector, in that order.
     virtual void addRegions(Frame& frame) const = 0;
+
+    // The Visual selection here, as words for the status line ("bars 3-4 on every track"), or
+    // nothing if the view can't select; its own index at the cursor, for a selection started
+    // there (see Selection); and the span of time an object takes, which Visual mode selects
+    // (vis), or nothing, having said why.
+    virtual std::optional<std::string> selectionStatus() const { return std::nullopt; }
+    virtual std::optional<std::size_t> selectionIndex() const { return std::nullopt; }
+    virtual std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view /*object*/,
+                                                                        int /*count*/)
+    {
+        return std::nullopt;
+    }
 
     // For the status line: where the cursor is, and where a time is, each as its position,
     // the meter there and its section, in the view's own bars; and a time's position alone.

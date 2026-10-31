@@ -38,6 +38,9 @@ public:
     ArrangeView(core::Document& document, ViewHost& host);
 
     std::string_view name() const override { return "the arrangement"; }
+    std::optional<std::string> selectionStatus() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
+                                                                int count) override;
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
@@ -78,6 +81,9 @@ private:
         core::Tick from;
         core::Tick to;
     };
+
+    // The Visual selection's area, or nothing if there's none here.
+    std::optional<Area> selectionArea() const;
 
     // The area a range or object takes from the cursor, or nothing if it takes none.
     std::optional<Area> areaFor(std::string_view motion, int count);

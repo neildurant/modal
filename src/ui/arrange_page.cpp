@@ -324,7 +324,8 @@ void ArrangePage::follow()
     leftTick_ = left;
 }
 
-void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) const
+void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
+                             std::optional<Selected> selected) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -393,8 +394,9 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
     const auto spaced = [&](core::Tick ticks)
     { return ticks * cell_.width >= minLineSpacing(cell_) * column; };
 
-    // The cursor's bar, as a span of time across every track, and boxed on its own track: its
-    // sides in the gaps either side of the bar's block, its top and bottom above and below it.
+    // The cursor's bar, as a span of time across every track, or a Visual selection in its
+    // place, and the cursor's bar boxed on its own track: its sides in the gaps either side of
+    // the bar's block, its top and bottom above and below it.
     int cursorX0 = 0;
     int cursorX1 = 0;
     {
@@ -404,8 +406,29 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom) c
         const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
         cursorX0 = x0;
         cursorX1 = x1;
-        timeline.under.push_back(
-            {{x0, tracksTop, x1 - x0, tracksBottom - tracksTop}, Role::Selection, 255});
+        int fillTop = tracksTop;
+        int fillBottom = tracksBottom;
+        if (selected)
+        {
+            cursorX0 = scale.toX(selected->from);
+            cursorX1 = scale.toX(selected->to) + gap;
+            const auto row = [&](std::size_t track)
+            {
+                const auto shown = std::clamp<std::int64_t>(
+                    static_cast<std::int64_t>(track) - static_cast<std::int64_t>(topTrack_), 0,
+                    shownTracks);
+                return tracksTop + static_cast<int>(shown) * cell_.height;
+            };
+            fillTop = row(selected->top);
+            fillBottom = row(selected->bottom + 1);
+        }
+        if (fillBottom > fillTop)
+        {
+            timeline.under.push_back(
+                {{cursorX0, fillTop, cursorX1 - cursorX0, fillBottom - fillTop},
+                 Role::Selection,
+                 255});
+        }
         if (!stripCursor_ && track_ >= topTrack_ &&
             track_ < topTrack_ + static_cast<std::size_t>(shownTracks))
         {
