@@ -220,7 +220,8 @@ An independent setting for the length of new notes, after Sequencer Plus Gold's 
   - **`is`** is the cursor's section on the cursor's track, as `ib` is its bar, in every view; on the section strip, the section's events on every track, so `qis` there quantises the whole section.
   - **`as`** is the section itself, on every track, since sections are whole bars on every track: `das` takes it out of the song and `yas` yanks it as a section, from any view, as `x` and `Y` do on the strip. To the operators that change events in place (`>`, `t`, `q`, `^`, `~`) it's `is`, as `ab` is `ib` to them, and their hint menu leaves it out.
   - **`ic`** is the chord holding the note under the cursor: the notes starting within `chordwindow` of it, as `(` and `)` take chords, in the piano roll and the event list. With no note under the cursor, and in the arrangement, it's refused, as `in` is.
-  - **`it`** is the track's events, not the track: `dit` empties it, keeping the track. In the arrangement a count takes more tracks from the cursor's; it's refused on the conductor's list.
+  - **`it`** is the track's events, not the track: `dit` empties it, keeping the track. In the arrangement a count takes more tracks from the cursor's; in the piano roll, which shows only notes, it takes the notes, as its other ranges do; it's refused on the conductor's list.
+  - **As built:** `das` and `yas` from the tracks put the sections in the register as the strip's `x` and `Y` do ("Verse yanked; p on the section strip puts it back"), refusing to take a song's last section. The undo titles name the sections and tracks: "Delete Verse of Bass", "Delete Verse on every track", "Delete all of Bass". In the event list, `ic` takes the chord's notes only, not a controller among them.
   - **On the section strip,** the operators other than `d` and `y` take only `is` and `as`, refusing anything else, pointing to `is`.
 
 **Operators**
