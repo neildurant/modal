@@ -116,6 +116,12 @@ constexpr std::array kSharedCommands{
                 .modes = modeBit(Mode::OperatorPending),
                 .count = true,
                 .object = true},
+    CommandInfo{.name = "object-track",
+                .description = "After an operator, this track's events (it), from the start to "
+                               "the end; in the arrangement, or {count} tracks' from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
     CommandInfo{.name = "object-note",
                 .description = "After an operator, the note or event under the cursor (in)",
                 .modes = modeBit(Mode::OperatorPending),

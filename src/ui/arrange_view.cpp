@@ -319,16 +319,17 @@ std::pair<ArrangeView::Area, std::string> ArrangeView::stripContents(std::size_t
 
 std::string ArrangeView::sectionWhat(const Area& area, std::string_view motion, int count) const
 {
-    // is on a track: "Verse of Bass", rather than its bars.
+    // is on a track, "Verse of Bass", and it, "all of Bass", rather than their bars.
+    if (motion == "object-track")
+    {
+        return "all of " + tracksText(area);
+    }
     if (!isSectionObject(motion))
     {
         return {};
     }
     const auto& song = document_.song();
-    const auto range = sectionsFrom(song, area.from, count);
-    const auto& track = *song.tracks()[area.top];
-    return sectionsText(song, range) + " of " +
-           (track.name.empty() ? "track " + std::to_string(area.top + 1) : track.name);
+    return sectionsText(song, sectionsFrom(song, area.from, count)) + " of " + tracksText(area);
 }
 
 std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, int count)
@@ -341,6 +342,15 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
     const auto end = [&](std::int64_t b)
     { return std::min(m.barStart(b + 1), document_.song().end()); };
     Area area{track, track, m.barStart(bar), end(bar)};
+    if (motion == "object-track")
+    {
+        // it: the whole track, and as many after it as the count says less one.
+        const auto last = document_.song().tracks().size() - 1;
+        area.bottom = std::min(track + static_cast<std::size_t>(std::max(count, 1)) - 1, last);
+        area.from = 0;
+        area.to = document_.song().end();
+        return area;
+    }
     if (isSectionObject(motion))
     {
         // is: the cursor's section on its track, and as many after it as the count says less
@@ -396,14 +406,17 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
 
 std::string ArrangeView::describe(const Area& area) const
 {
-    const auto bars = barsText(meter(), area.from, area.to);
+    return barsText(meter(), area.from, area.to) + " of " + tracksText(area);
+}
+
+std::string ArrangeView::tracksText(const Area& area) const
+{
     const auto tracks = document_.song().tracks();
     const auto name = [&](std::size_t i)
     { return tracks[i]->name.empty() ? "track " + std::to_string(i + 1) : tracks[i]->name; };
-    const auto which = area.top == area.bottom       ? name(area.top)
-                       : area.bottom == area.top + 1 ? name(area.top) + " and " + name(area.bottom)
-                                                     : name(area.top) + " to " + name(area.bottom);
-    return bars + " of " + which;
+    return area.top == area.bottom       ? name(area.top)
+           : area.bottom == area.top + 1 ? name(area.top) + " and " + name(area.bottom)
+                                         : name(area.top) + " to " + name(area.bottom);
 }
 
 bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, std::string named)
@@ -1001,6 +1014,10 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
     if (motion == "object-section")
     {
         return sectionDescription(op);
+    }
+    if (motion == "object-track")
+    {
+        return "this track's events";
     }
     return describeTimeRange(motion);
 }

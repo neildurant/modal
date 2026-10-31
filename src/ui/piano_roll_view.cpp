@@ -1348,6 +1348,14 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return operateOnBars(op, count, motion == "object-bar");
     }
+    if (motion == "object-track")
+    {
+        // it: the track's notes, from the start, taken as bars.
+        const auto end = document_.song().end();
+        const bool done = operateOn(op, notesIn(0, end), 0, end);
+        host_.eventRegister().bars = true;
+        return done;
+    }
     if (isSectionObject(motion))
     {
         // is: this section's notes and as many sections' after it as the count says less one,
@@ -1490,6 +1498,10 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
         span =
             std::pair{m.barStart(bar), std::min(m.barStart(bar + std::max(count, 1)), song.end())};
     }
+    else if (motion == "object-track")
+    {
+        span = std::pair{core::Tick{0}, song.end()};
+    }
     else if (isSectionObject(motion))
     {
         // is, and as, which is is to the operators that don't take time out.
@@ -1631,6 +1643,10 @@ std::optional<std::string> PianoRollView::describeRange(std::string_view op,
     if (motion == "object-chord")
     {
         return "this chord";
+    }
+    if (motion == "object-track")
+    {
+        return "this track's notes";
     }
     if (motion == "object-section-contents")
     {

@@ -102,7 +102,8 @@ private:
                         int count);
     // is on the strip: the sections' events on every track, and the area that is.
     std::pair<Area, std::string> stripContents(std::size_t section, int count) const;
-    // What is takes on a track, as words ("Verse of Bass"), or nothing for other motions.
+    // What is and it take on tracks, as words ("Verse of Bass", "all of Bass"), or nothing for
+    // other motions.
     std::string sectionWhat(const Area& area, std::string_view motion, int count) const;
     bool putSections(std::size_t section, bool before);
     Inspection sectionInspection(std::size_t section) const;
@@ -115,6 +116,8 @@ private:
 
     // An area's bars, in the cursor's track's bars, and its tracks, as words: "bars 3–4 of Bass".
     std::string describe(const Area& area) const;
+    // The area's tracks as words: "Bass", "Bass and Lead", "Bass to Keys".
+    std::string tracksText(const Area& area) const;
 
     // The cursor's track's meter, or the conductor's with no tracks.
     const core::MeterMap& meter() const;

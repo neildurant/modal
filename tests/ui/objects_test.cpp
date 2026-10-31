@@ -301,3 +301,46 @@ TEST_CASE("ic takes the chord holding the note under the cursor, as ( and ) find
     CHECK(o.ws.message() == "There's no single chord here; dd takes this bar's events");
     CHECK(o.sorted(0) == Pitches{60, 62, 64, 65, 67, 69});
 }
+
+TEST_CASE("it takes the track's events, keeping the track, and in the arrangement more tracks")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Objects o{ppqn};
+    const Pitches bass{40, 41, 42, 43, 44, 45, 46, 47};
+    const Pitches lead{60, 61, 62, 63, 64, 65, 66, 67};
+
+    // The arrangement: this track, or with a count more.
+    o.type(U"3ldit");
+    CHECK(o.pitches(0).empty());
+    CHECK(o.pitches(1) == lead);
+    CHECK(o.document.song().tracks().size() == 2);
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Delete all of Bass");
+    o.type(U">2it");
+    CHECK(o.pitches(0) == Pitches{41, 42, 43, 44, 45, 46, 47, 48});
+    CHECK(o.pitches(1) == Pitches{61, 62, 63, 64, 65, 66, 67, 68});
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Transpose all of Bass and Lead up a semitone");
+
+    // The piano roll and the event list.
+    o.type(U"gr");
+    o.type(U"<it");
+    CHECK(o.pitches(0) == Pitches{39, 40, 41, 42, 43, 44, 45, 46});
+    o.type(U"u");
+    o.type(U"ge");
+    o.type(U"dit");
+    CHECK(o.pitches(0).empty());
+    o.type(U"u");
+    CHECK(o.pitches(0) == bass);
+
+    // Not on the conductor's list, nor on the section strip.
+    o.type(U"gT");
+    o.type(U"dit");
+    CHECK(o.ws.message() ==
+          "it isn't on the conductor's list, whose tempo and meter changes the song needs");
+    o.type(U"gags>it");
+    CHECK(o.ws.message() ==
+          "On the section strip, operators take is, this section's events on every track");
+    CHECK(o.pitches(0) == bass);
+    CHECK(o.pitches(1) == lead);
+}
