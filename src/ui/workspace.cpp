@@ -754,7 +754,7 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
 
 EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
 {
-    // Laid end to end (decided with Neil): after the span what's there took, its rests kept, or
+    // Laid end to end (decided October 2026): after the span what's there took, its rests kept, or
     // without one, as from the event list's rows, at its last event's time; sections after
     // sections.
     if (to.empty())
@@ -1844,7 +1844,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         answer_ = {};
         completing_.reset();
         // The command ranked first chosen at once, once there's one, so Ctrl-p Enter runs it
-        // again (decided with Neil).
+        // again (decided October 2026).
         if (const auto shown = paletteShown(); !shown.empty() && shown.front().rank > 0)
         {
             palette_->chosen = 0;
@@ -2538,8 +2538,8 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
     case Choices::Meter:
     {
         // The built-in ones and those the user has chosen before, as one list in order by
-        // denominator then numerator, so the one wanted can be found by scanning (decided with
-        // Neil, October 2026); not the song's own, which may be remainder bars of no use.
+        // denominator then numerator, so the one wanted can be found by scanning (decided October
+        // 2026); not the song's own, which may be remainder bars of no use.
         std::vector<core::TimeSignature> meters{kOfferedMeters.begin(), kOfferedMeters.end()};
         for (const auto meter : remembered_.meters())
         {
@@ -3532,7 +3532,7 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
 bool Workspace::inSongOrder() const
 {
     // Sections, tracks and markers, listed from the top down as the song has them (decided
-    // with Neil, October 2026), rather than ranked from the line up as commands are.
+    // October 2026), rather than ranked from the line up as commands are.
     const auto prefix = palettePrefix();
     return prefix && *prefix != '?';
 }
@@ -3666,7 +3666,7 @@ bool Workspace::runPalette(std::string_view command)
             rememberedChanged();
         }
         // Taking arguments, even ones it can do without, it goes to the prompt, their hint
-        // showing (decided with Neil, after use), so what it takes isn't missed; those it must
+        // showing (decided October 2026, after use), so what it takes isn't missed; those it must
         // have with their choices showing too.
         const bool takes = info != nullptr && !info->usage.empty();
         const bool needs = takes && !info->usage.starts_with("[");
@@ -3847,7 +3847,7 @@ std::string Workspace::argumentHint() const
 {
     // At the : prompt, once the line holds a command and a space: its arguments from the one
     // being typed on, as its usage writes them, brackets for those it can do without (decided
-    // with Neil, October 2026, so :bar-insert says it takes [N] [METER]).
+    // October 2026, so :bar-insert says it takes [N] [METER]).
     if (answer_ || palette_ || view().typing())
     {
         return {};
