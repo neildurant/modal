@@ -92,6 +92,9 @@ private:
     // Puts the register at the start of the cursor's bar, over what's there, or with insert
     // moving what's after it in the section later (P), asking first if the section must grow.
     bool put(bool insert);
+    // Moves the cursor to the bar a count of bars with events on (Tab), or back if negative
+    // (Shift-Tab), on its track, or as far as there are; saying so if there's none.
+    bool toBarWithEvents(int count);
 
     // The section strip: going onto it and back, its commands and operators, and what the
     // inspector shows of the section under the cursor.

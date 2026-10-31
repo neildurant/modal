@@ -906,3 +906,55 @@ TEST_CASE(":marker-to-section-all goes through the markers, asking about those o
     CHECK(a.ws.message() == "Turned 1 marker into a section; 1 was at a section's start; 2 were "
                             "left as they were");
 }
+
+TEST_CASE("Tab and Shift-Tab go past empty bars to the bars with events on the track")
+{
+    // Bass: a note in bar 1, only a sustain pedal in bar 5, and a note late in bar 9; Lead:
+    // a note in bar 3.
+    core::Song song{core::kPpqn};
+    const auto bass = song.addTrack("Bass");
+    const auto lead = song.addTrack("Lead");
+    song.updateEvents(bass,
+                      [](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{40, 100, kQuarter}});
+                          events.insert({4 * kBar + kQuarter, core::ControlChange{64, 127}});
+                          events.insert({8 * kBar + 3 * kQuarter, core::Note{43, 100, kQuarter}});
+                      });
+    song.updateEvents(lead, [](core::EventList& events)
+                      { events.insert({2 * kBar, core::Note{60, 100, kQuarter}}); });
+    song.fitToContent();
+    Arranging a{std::move(song)};
+    const auto tab = [&] { a.press(Key::of(NamedKey::Tab)); };
+    const auto backTab = [&] { a.press(Key::of(NamedKey::Tab, kShift)); };
+
+    tab();
+    CHECK(a.page().bar() == 5); // the pedal's bar, not the lead's bar 3
+    CHECK(a.page().time() == 4 * kBar);
+    tab();
+    CHECK(a.page().bar() == 9);
+    tab();
+    CHECK(a.ws.message() == "No bars with events after this on Bass");
+    CHECK(a.page().bar() == 9);
+    backTab();
+    CHECK(a.page().bar() == 5);
+    a.type(U"G");
+    a.type(U"2");
+    backTab(); // two back, from bar 9
+    CHECK(a.page().bar() == 1);
+    a.type(U"gg");
+    backTab();
+    CHECK(a.ws.message() == "No bars with events before this on Bass");
+
+    // A count goes as far as there are.
+    a.type(U"5");
+    tab();
+    CHECK(a.page().bar() == 9);
+
+    // It only moves the cursor, so isn't a range.
+    a.type(U"gg");
+    a.type(U"d");
+    tab();
+    CHECK(a.ws.message() == "<Tab> isn't a range or object after d");
+    CHECK(a.document.song().events(a.document.song().tracks()[0]->id()).size() == 3);
+}

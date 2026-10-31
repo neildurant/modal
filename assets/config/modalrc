@@ -37,7 +37,8 @@ nmap [m         cursor-marker-previous    "Marker before"
 
 " The piano roll: k and j move a semitone, K and J an octave (J joins sections on the
 " section strip), and Tab and Shift-Tab go to the next note's start at any pitch and the one
-" before, notes starting together low to high
+" before, notes starting together low to high. In the arrangement, Tab and Shift-Tab go past
+" empty bars to the next bar with events on the track and the one before.
 keysection "Pitch in the piano roll"
 nmap K          octave-up                 "Up an octave"
 nmap <Tab>      cursor-note-next          "Next note"

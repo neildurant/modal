@@ -194,6 +194,10 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*to);
     }
+    else if (command == "cursor-note-next" || command == "cursor-note-previous")
+    {
+        return toBarWithEvents(command == "cursor-note-next" ? n : -n);
+    }
     else if (command == "register-put" || command == "register-put-before")
     {
         return put(command == "register-put-before");
@@ -916,12 +920,75 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     return result;
 }
 
+bool ArrangeView::toBarWithEvents(int count)
+{
+    // Tab and Shift-Tab: past empty bars to the next or previous bar where an event of the
+    // cursor's track starts, controllers too, as Sequencer Plus Gold's Tab went.
+    const auto id = trackId();
+    if (!id)
+    {
+        return false;
+    }
+    const auto all = document_.song().events(*id).all();
+    const auto& m = meter();
+    auto bar = m.toBarBeatTick(page_.time()).bar;
+    for (int i = 0; i < std::abs(count); ++i)
+    {
+        std::optional<core::Tick> found;
+        if (count > 0)
+        {
+            const auto at =
+                std::ranges::lower_bound(all, m.barStart(bar + 1), {}, &core::Event::tick);
+            if (at != all.end())
+            {
+                found = at->tick;
+            }
+        }
+        else
+        {
+            const auto at = std::ranges::lower_bound(all, m.barStart(bar), {}, &core::Event::tick);
+            if (at != all.begin())
+            {
+                found = std::prev(at)->tick;
+            }
+        }
+        if (!found)
+        {
+            if (i == 0)
+            {
+                const auto& track = *document_.song().tracks()[page_.track()];
+                host_.setMessage(std::string{"No bars with events "} +
+                                     (count > 0 ? "after" : "before") + " this on " +
+                                     (track.name.empty()
+                                          ? "track " + std::to_string(page_.track() + 1)
+                                          : track.name),
+                                 MessageKind::Information);
+                return true;
+            }
+            break;
+        }
+        bar = m.toBarBeatTick(*found).bar;
+    }
+    page_.setCursor(page_.track(), m.barStart(bar));
+    return true;
+}
+
 std::optional<std::pair<std::string, std::string>>
 ArrangeView::relabel(std::string_view command) const
 {
-    // On the strip, the step keys lengthen and shorten the section.
+    // On the tracks, Tab and Shift-Tab go by bars with events; on the strip, the step keys
+    // lengthen and shorten the section.
     if (!page_.stripCursor())
     {
+        if (command == "cursor-note-next")
+        {
+            return std::pair{std::string{"Moving the cursor"}, std::string{"Next bar with events"}};
+        }
+        if (command == "cursor-note-previous")
+        {
+            return std::pair{std::string{"Moving the cursor"},
+                             std::string{"Bar with events before"}};
+        }
         return std::nullopt;
     }
     if (command == "field-increase" || command == "field-increase-fine" ||
