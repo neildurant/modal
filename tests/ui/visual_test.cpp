@@ -408,6 +408,17 @@ TEST_CASE("in the piano roll the notes a selection takes, and the current one, s
     CHECK(one > 0);
     s.type(U"v}");
     CHECK(standing() == 2 * one); // and the note in bar 2
+    s.press(NamedKey::Escape);
+
+    // Selecting leftwards, the cursor on a note starting before the selection: only the
+    // notes it takes stand out, not that one.
+    s.ws.pianoRoll().setCursor(
+        {.track = s.document.song().tracks()[0]->id(), .tick = s.bar + s.bar / 4, .pitch = 41});
+    s.type(U"v");
+    s.ws.pianoRoll().setCursor(
+        {.track = s.document.song().tracks()[0]->id(), .tick = s.bar / 16, .pitch = 40});
+    REQUIRE(s.ws.pianoRoll().currentNote()); // on bar 1's note, which starts before it
+    CHECK(standing() == one);                // only bar 2's note
 }
 
 TEST_CASE("a selection stays shown while an operator asks about it, as q does about pedals")

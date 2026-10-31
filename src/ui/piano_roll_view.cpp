@@ -2123,9 +2123,10 @@ void PianoRollView::addRegions(Frame& frame) const
             {
                 continue;
             }
-            // The current note, and the notes a selection takes, stand out.
+            // The current note stands out; or while selecting, the notes the selection takes,
+            // those starting in it, and only those, even the one under the cursor.
             const bool picked =
-                current == i || (span && event.tick >= span->first && event.tick < span->second);
+                span ? event.tick >= span->first && event.tick < span->second : current == i;
             const Role role = picked ? Role::NoteSelected : Role::Note;
             const int x0 = scale.toX(std::max(event.tick, p.start));
             const int x1 = scale.toX(std::min(end, p.end));
