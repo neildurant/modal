@@ -393,3 +393,49 @@ TEST_CASE("a first character searches other things: @ sections, # tracks, ' mark
     CHECK(p.ws.commandLine().text() ==
           U"set hintdelay=" + decodeUtf8(formatValue(settings.find("hintdelay")->value)));
 }
+
+TEST_CASE(
+    "sections, tracks and markers are listed top down in song order, the keys moving as it looks")
+{
+    Paletting p;
+    const auto& song = p.document.song();
+    const auto tracks = song.tracks().size();
+    REQUIRE(tracks > 12);
+    const auto name = [&](std::size_t i)
+    {
+        const auto& named = song.tracks()[i]->name;
+        return decodeUtf8(named.empty() ? "Track " + std::to_string(i + 1) : named);
+    };
+    p.open();
+    p.type(U"#");
+    // From the top, in the arrangement's order; rows() lists them from the bottom.
+    auto rows = p.rows();
+    REQUIRE(rows.size() == 12);
+    CHECK(rows.back() == name(0));
+    CHECK(rows.front() == name(11));
+
+    // Down from none chosen is the first; End the last, the list scrolling to it.
+    p.press(Key::of(NamedKey::Down));
+    p.press(Key::of(NamedKey::Down));
+    p.press(Key::of(NamedKey::End));
+    rows = p.rows();
+    CHECK(rows.front() == name(tracks - 1));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.arrangement().page().track() == tracks - 1);
+
+    // Home is the top: the first track.
+    p.open();
+    p.type(U"#");
+    p.press(Key::of(NamedKey::End));
+    p.press(Key::of(NamedKey::Home));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.arrangement().page().track() == 0);
+
+    // For commands, the best is at the bottom: Home goes up to the worst, End back down.
+    p.open();
+    p.type(U"zoom");
+    p.press(Key::of(NamedKey::Home));
+    p.press(Key::of(NamedKey::End));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "Also: zi"); // Zoom in, the best match
+}

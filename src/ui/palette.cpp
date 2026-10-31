@@ -93,7 +93,8 @@ std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::st
 
 } // namespace
 
-std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std::string_view query)
+std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std::string_view query,
+                                        bool inOrder)
 {
     const auto wanted = lowered(query);
     std::vector<std::tuple<int, double, std::string, std::size_t>> found;
@@ -103,7 +104,7 @@ std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std:
         if (rank)
         {
             found.emplace_back(*rank + (items[i].offered ? 0 : 6), -items[i].rank,
-                               lowered(items[i].title), i);
+                               inOrder ? std::string{} : lowered(items[i].title), i);
         }
     }
     std::ranges::sort(found);

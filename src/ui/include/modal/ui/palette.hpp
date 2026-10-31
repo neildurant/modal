@@ -33,7 +33,9 @@ struct PaletteItem
 // starting with it, then its letters in order in the title (vcomp, Velocity compress), then
 // found in the description or other names. Keys match as typed, the rest ignoring case. Those
 // that do nothing here come after the rest, and within each, the highest ranked first, then by
-// title. With no query, every item.
-std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std::string_view query);
+// title; or for items in an order of their own, as sections are in the song, in that order.
+// With no query, every item.
+std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std::string_view query,
+                                        bool inOrder = false);
 
 } // namespace modal::ui

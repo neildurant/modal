@@ -352,6 +352,7 @@ private:
     // The palette searching other things, by a first character: @ sections, # tracks, '
     // markers, ? settings; what it lists then, and going to one.
     std::optional<char> palettePrefix() const;
+    bool inSongOrder() const;
     std::vector<PaletteItem> prefixItems(char prefix) const;
     bool runPrefixItem(char prefix, const PaletteItem& item);
     std::string keysFor(std::string_view command) const;

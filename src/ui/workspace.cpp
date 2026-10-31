@@ -3214,6 +3214,14 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
     return items;
 }
 
+bool Workspace::inSongOrder() const
+{
+    // Sections, tracks and markers, listed from the top down as the song has them (decided
+    // with Neil, October 2026), rather than ranked from the line up as commands are.
+    const auto prefix = palettePrefix();
+    return prefix && *prefix != '?';
+}
+
 std::vector<PaletteItem> Workspace::paletteShown() const
 {
     const auto prefix = palettePrefix();
@@ -3224,7 +3232,7 @@ std::vector<PaletteItem> Workspace::paletteShown() const
         query.erase(0, 1);
     }
     std::vector<PaletteItem> shown;
-    for (const auto i : paletteMatches(items, query))
+    for (const auto i : paletteMatches(items, query, inSongOrder()))
     {
         shown.push_back(items[i]);
     }
@@ -3301,17 +3309,26 @@ bool Workspace::runPalette(std::string_view command)
     if (command == "command-line-older" || command == "command-line-newer" ||
         command == "command-line-page-up" || command == "command-line-page-down")
     {
-        // Up the list is away from the line, to the matches after the best.
-        const std::ptrdiff_t by = command == "command-line-older"     ? 1
-                                  : command == "command-line-newer"   ? -1
-                                  : command == "command-line-page-up" ? kPaletteRows
-                                                                      : -kPaletteRows;
+        // Up and Down the way the list looks: for commands up is away from the line, to the
+        // matches after the best; in song order up is earlier.
+        const std::ptrdiff_t up = inSongOrder() ? -1 : 1;
+        const std::ptrdiff_t by = command == "command-line-older"     ? up
+                                  : command == "command-line-newer"   ? -up
+                                  : command == "command-line-page-up" ? up * kPaletteRows
+                                                                      : -up * kPaletteRows;
         // From none chosen, the best.
         palette_->chosen = !palette_->chosen
                                ? 0
                                : static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
                                      static_cast<std::ptrdiff_t>(*palette_->chosen) + by, 0,
                                      static_cast<std::ptrdiff_t>(last)));
+        return true;
+    }
+    if (command == "command-line-start" || command == "command-line-end")
+    {
+        // Home and End: the top and the bottom of the list as it looks.
+        const bool top = command == "command-line-start";
+        palette_->chosen = top == inSongOrder() ? 0 : last;
         return true;
     }
     if (command == "command-line-run" || command == "command-line-next")
@@ -3361,9 +3378,9 @@ bool Workspace::runPalette(std::string_view command)
 
 Region Workspace::paletteRegion() const
 {
-    // Above the prompt, as completion's matches are: the best nearest the line, each with its
-    // keys and what it does; the one chosen in the cursor's colours; those that do nothing
-    // here dimmed.
+    // Above the prompt, as completion's matches are: the best nearest the line, or in song order
+    // from the top down, each with its keys and what it does; the one chosen in the cursor's
+    // colours; those that do nothing here dimmed; a ▲ or ▼ at the side where there are more.
     const auto shown = paletteShown();
     // The row chosen, as an index, or past the matches if none is.
     const auto chosen = palette_->chosen
@@ -3401,7 +3418,8 @@ Region Workspace::paletteRegion() const
     {
         const auto i = first + r;
         const auto& item = shown[i];
-        const int y = pad + static_cast<int>(rows - 1 - r) * cell_.height; // the best at the bottom
+        const auto row = inSongOrder() ? r : rows - 1 - r; // the best at the bottom
+        const int y = pad + static_cast<int>(row) * cell_.height;
         const bool isChosen = i == chosen;
         const auto background = isChosen ? Role::Cursor : Role::Panel;
         if (isChosen)
@@ -3420,6 +3438,22 @@ Region Workspace::paletteRegion() const
                                y,
                                decodeUtf8(item.description),
                                {isChosen ? Role::CursorText : Role::Dim, background, kPlain}});
+    }
+    // More before the first shown, or after the last, at the side they'd be.
+    const int side = region.bounds.width - margin - cell_.width;
+    const Style more{Role::Dim, Role::Panel, kPlain};
+    const bool before = first > 0;
+    const bool after = first + rows < shown.size();
+    const bool down = inSongOrder();
+    const int top = pad;
+    const int bottom = pad + static_cast<int>(rows - 1) * cell_.height;
+    if (down ? before : after)
+    {
+        region.text.push_back({side, top, U"▲", more});
+    }
+    if (down ? after : before)
+    {
+        region.text.push_back({side, bottom, U"▼", more});
     }
     return region;
 }
