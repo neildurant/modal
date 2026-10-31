@@ -110,6 +110,12 @@ constexpr std::array kSharedCommands{
                 .modes = modeBit(Mode::OperatorPending),
                 .count = true,
                 .object = true},
+    CommandInfo{.name = "object-chord",
+                .description = "After an operator, the chord holding the note under the cursor "
+                               "(ic): the notes starting with it; or {count} chords from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
     CommandInfo{.name = "object-note",
                 .description = "After an operator, the note or event under the cursor (in)",
                 .modes = modeBit(Mode::OperatorPending),

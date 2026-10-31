@@ -7,9 +7,11 @@
 #include <modal/core/tick.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace modal::ui
 {
@@ -41,5 +43,11 @@ std::optional<core::Tick> previousOf(std::span<const core::Tick> ticks, core::Ti
 // recorded a little apart do: within the window, in time at the song's tempo.
 bool together(const core::Song& song, core::Tick first, core::Tick tick,
               std::chrono::milliseconds window);
+
+// The notes of the chord holding a note, and of as many chords after it as the count says
+// less one (ic): chords as ( and ) find them, a note starting within the window of its
+// chord's first being in it. Indexes into the events, in order.
+std::vector<std::size_t> chordNotes(const core::Song& song, const core::EventList& events,
+                                    std::size_t note, int count, std::chrono::milliseconds window);
 
 } // namespace modal::ui

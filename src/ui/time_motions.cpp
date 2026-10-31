@@ -70,4 +70,43 @@ bool together(const core::Song& song, core::Tick first, core::Tick tick,
     return tempo.toTime(tick) - tempo.toTime(first) <= window;
 }
 
+std::vector<std::size_t> chordNotes(const core::Song& song, const core::EventList& events,
+                                    std::size_t note, int count, std::chrono::milliseconds window)
+{
+    // Each note's chord, counting from 0; then those from the note's chord on.
+    std::vector<std::size_t> taken;
+    std::optional<core::Tick> first;
+    std::int64_t chord = -1;
+    std::optional<std::int64_t> from;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (!events[i].isNote())
+        {
+            continue;
+        }
+        if (!first || !together(song, *first, events[i].tick, window))
+        {
+            first = events[i].tick;
+            ++chord;
+        }
+        if (i == note)
+        {
+            from = chord;
+            // The chord's notes before this one.
+            for (auto j = i; j > 0; --j)
+            {
+                if (events[j - 1].isNote() && events[j - 1].tick >= *first)
+                {
+                    taken.insert(taken.begin(), j - 1);
+                }
+            }
+        }
+        if (from && chord >= *from && chord < *from + std::max(count, 1))
+        {
+            taken.push_back(i);
+        }
+    }
+    return taken;
+}
+
 } // namespace modal::ui

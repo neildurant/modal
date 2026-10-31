@@ -120,6 +120,13 @@ private:
     // ticks from it, and the bars' length.
     bool operateRows(std::string_view op, std::size_t from, std::size_t to,
                      std::optional<core::Tick> bar = std::nullopt, core::Tick span = 0);
+    // The same for some of the track's events, by index in order, the cursor going to a row.
+    bool operateEvents(std::string_view op, const std::vector<std::size_t>& indices,
+                       std::size_t row, std::optional<core::Tick> bar = std::nullopt,
+                       core::Tick span = 0);
+    // The notes of the chord holding the note on the cursor's row and as many chords after it
+    // as the count says less one (ic), or none, saying so, if it isn't a note's.
+    std::vector<std::size_t> chordHere(int count);
     bool put();
 
     // Starts editing the field under the cursor in place, with its value in it; then sets it

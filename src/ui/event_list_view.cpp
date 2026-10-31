@@ -597,8 +597,28 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
                    MessageKind::Information);
         return true;
     }
+    if (motion == "object-chord")
+    {
+        const auto chord = chordHere(count);
+        return chord.empty() || operateEvents(op, chord, row_);
+    }
     const auto rows = rowsFor(motion, count);
     return rows && operateRows(op, rows->from, rows->to, rows->bar, rows->span);
+}
+
+std::vector<std::size_t> EventListView::chordHere(int count)
+{
+    // The chord holding the note on the cursor's row, notes only.
+    const auto& row = list_.rows()[row_];
+    const auto id = list_.track();
+    if (track_ == 0 || !id || row.kind != RowKind::Event ||
+        !document_.song().events(*id)[row.index].isNote())
+    {
+        setMessage("No chord here", MessageKind::Warning);
+        return {};
+    }
+    const auto& song = document_.song();
+    return chordNotes(song, song.events(*id), row.index, count, chordWindow_);
 }
 
 std::optional<OperatorTarget> EventListView::target(std::string_view motion, int count)
@@ -616,14 +636,24 @@ std::optional<OperatorTarget> EventListView::target(std::string_view motion, int
                    MessageKind::Information);
         return std::nullopt;
     }
+    const auto id = *list_.track();
+    OperatorTarget result{.parts = {{id, {}}}, .what = {}, .notesOnly = false};
+    auto& taken = result.parts.front().events;
+    if (motion == "object-chord")
+    {
+        taken = chordHere(count);
+        if (taken.empty())
+        {
+            return std::nullopt;
+        }
+        result.what = eventCount(taken.size()) + " in " + trackName();
+        return result;
+    }
     const auto rows = rowsFor(motion, count);
     if (!rows)
     {
         return std::nullopt;
     }
-    const auto id = *list_.track();
-    OperatorTarget result{.parts = {{id, {}}}, .what = {}, .notesOnly = false};
-    auto& taken = result.parts.front().events;
     const auto last = std::min(std::max(rows->from, rows->to), list_.rows().size() - 1);
     for (auto r = std::min(rows->from, rows->to); r <= last; ++r)
     {
@@ -724,6 +754,12 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     {
         return false;
     }
+    return operateEvents(op, indices, from, bar, span);
+}
+
+bool EventListView::operateEvents(std::string_view op, const std::vector<std::size_t>& indices,
+                                  std::size_t row, std::optional<core::Tick> bar, core::Tick span)
+{
     const auto id = *list_.track();
     const auto& events = document_.song().events(id);
     const auto first = bar.value_or(events[indices.front()].tick);
@@ -758,7 +794,7 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
                                });
          });
     // On what followed, as in Vim.
-    row_ = std::min(from, list_.rows().size() - 1);
+    row_ = std::min(row, list_.rows().size() - 1);
     follow();
     return true;
 }
@@ -1506,6 +1542,10 @@ std::optional<std::string> EventListView::describeRange(std::string_view op,
     if (motion == "object-note")
     {
         return "this event";
+    }
+    if (motion == "object-chord")
+    {
+        return "this chord";
     }
     if (motion == "object-section-contents")
     {

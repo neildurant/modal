@@ -171,6 +171,9 @@ private:
                     std::string_view mergeKey = {});
     // The note the cursor is on, or a message saying there's none to do something to.
     std::optional<std::size_t> noteHere(std::string_view what) const;
+    // The notes of the chord holding the note under the cursor and as many chords after it as
+    // the count says less one (ic), or none, saying so, if there's no note there.
+    std::vector<std::size_t> chordHere(int count) const;
 
     // Adds the default note at the cursor, or with advancing (O) as many as the count says one
     // after another, the cursor moving on past each; deletes or yanks notes, as indices into

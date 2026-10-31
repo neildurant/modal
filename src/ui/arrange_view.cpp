@@ -232,9 +232,11 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     {
         return false;
     }
-    if (motion == "object-note")
+    if (motion == "object-note" || motion == "object-chord")
     {
-        host_.setMessage("There's no single note here; dd takes this bar's events",
+        host_.setMessage(std::string{"There's no single "} +
+                             (motion == "object-note" ? "note" : "chord") +
+                             " here; dd takes this bar's events",
                          MessageKind::Information);
         return true;
     }
@@ -263,9 +265,11 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
         auto [area, what] = stripContents(*section, count);
         return targetIn(area, std::move(what));
     }
-    if (motion == "object-note")
+    if (motion == "object-note" || motion == "object-chord")
     {
-        host_.setMessage("There's no single note here; ib takes this bar's events",
+        host_.setMessage(std::string{"There's no single "} +
+                             (motion == "object-note" ? "note" : "chord") +
+                             " here; ib takes this bar's events",
                          MessageKind::Information);
         return std::nullopt;
     }
@@ -986,7 +990,7 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
     {
         return "this bar here and on the track above";
     }
-    if (motion == "object-note")
+    if (motion == "object-note" || motion == "object-chord")
     {
         return std::nullopt;
     }

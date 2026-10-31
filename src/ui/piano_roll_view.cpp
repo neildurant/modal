@@ -261,6 +261,18 @@ void PianoRollView::editEvents(std::string title,
     refresh();
 }
 
+std::vector<std::size_t> PianoRollView::chordHere(int count) const
+{
+    const auto index = currentNote();
+    if (!index)
+    {
+        host_.setMessage("No chord here", MessageKind::Warning);
+        return {};
+    }
+    const auto& song = document_.song();
+    return chordNotes(song, song.events(*trackId()), *index, count, chordWindow_);
+}
+
 std::optional<std::size_t> PianoRollView::noteHere(std::string_view what) const
 {
     const auto index = currentNote();
@@ -1346,6 +1358,22 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         host_.eventRegister().bars = true;
         return done;
     }
+    if (motion == "object-chord")
+    {
+        const auto chord = chordHere(count);
+        if (chord.empty())
+        {
+            return true;
+        }
+        const auto& events = document_.song().events(*id);
+        core::Tick end = 0;
+        for (const auto i : chord)
+        {
+            end = std::max(end, events[i].tick + std::get<core::Note>(events[i].data).duration);
+        }
+        const auto from = events[chord.front()].tick;
+        return operateOn(op, chord, from, std::max<core::Tick>(end - from, 1));
+    }
     if (motion == "object-note")
     {
         // in, x, Y: the current note (a count waits, as o's does).
@@ -1427,6 +1455,21 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
     const auto& events = song.events(*id);
     OperatorTarget result{.parts = {{*id, {}}}, .what = {}, .notesOnly = true};
     auto& taken = result.parts.front().events;
+    if (motion == "object-chord")
+    {
+        taken = chordHere(count);
+        if (taken.empty())
+        {
+            return std::nullopt;
+        }
+        result.what = std::to_string(taken.size()) + " notes in " + trackName();
+        if (taken.size() == 1)
+        {
+            result.what = core::pitchName(std::get<core::Note>(events[taken.front()].data).pitch) +
+                          " in " + trackName();
+        }
+        return result;
+    }
     if (motion == "object-note")
     {
         const auto index = noteHere("change");
@@ -1584,6 +1627,10 @@ std::optional<std::string> PianoRollView::describeRange(std::string_view op,
     if (motion == "object-note")
     {
         return "this note";
+    }
+    if (motion == "object-chord")
+    {
+        return "this chord";
     }
     if (motion == "object-section-contents")
     {

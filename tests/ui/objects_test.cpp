@@ -7,10 +7,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -53,8 +55,12 @@ core::Song sectioned(core::Ppqn ppqn)
 struct Objects
 {
     explicit Objects(core::Ppqn ppqn = core::kPpqn)
-        : document{sectioned(ppqn)}
-        , bar{ppqn.whole()}
+        : Objects{sectioned(ppqn)}
+    {
+    }
+    explicit Objects(core::Song song)
+        : bar{song.ppqn().whole()}
+        , document{std::move(song)}
     {
         registry.add(windowCommands());
         ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
@@ -84,6 +90,14 @@ struct Objects
         return found;
     }
 
+    // The same, lowest first.
+    std::vector<int> sorted(std::size_t track) const
+    {
+        auto found = pitches(track);
+        std::ranges::sort(found);
+        return found;
+    }
+
     std::vector<std::string> sections() const
     {
         std::vector<std::string> names;
@@ -107,13 +121,37 @@ struct Objects
         return "(none)";
     }
 
-    core::Document document;
     core::Tick bar;
+    core::Document document;
     CommandRegistry registry;
     Workspace ws{registry, document};
 };
 
 using Pitches = std::vector<int>;
+
+// One track, Keys: a chord of C4, E4 and G4 at the start, the E4 played a 128th note late, at
+// 120 a minute about 16 ms, with the sustain pedal down there too; a chord of D4 and F4 in bar
+// 2; and an A4 alone in bar 3.
+core::Song chords(core::Ppqn ppqn)
+{
+    const auto q = ppqn.quarter();
+    const auto bar = ppqn.whole();
+    core::Song song{ppqn};
+    const auto keys = song.addTrack("Keys");
+    song.updateEvents(keys,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{60, 100, q}});
+                          events.insert({0, core::ControlChange{64, 127}});
+                          events.insert({q / 32, core::Note{64, 100, q}});
+                          events.insert({0, core::Note{67, 100, q}});
+                          events.insert({bar, core::Note{62, 100, q}});
+                          events.insert({bar, core::Note{65, 100, q}});
+                          events.insert({2 * bar, core::Note{69, 100, q}});
+                      });
+    song.fitToContent();
+    return song;
+}
 
 } // namespace
 
@@ -226,4 +264,40 @@ TEST_CASE("on the section strip, is takes the section's events on every track, a
     // as is the section, as x takes it.
     o.type(U"das");
     CHECK(o.sections() == std::vector<std::string>{"A", "C"});
+}
+
+TEST_CASE("ic takes the chord holding the note under the cursor, as ( and ) find chords")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Objects o{chords(ppqn)};
+    // The piano roll, on the late E4.
+    o.type(U"gr");
+    const auto keys = o.document.song().tracks()[0]->id();
+    o.ws.pianoRoll().setCursor({.track = keys, .tick = ppqn.quarter() / 32, .pitch = 64});
+    o.type(U">ic");
+    CHECK(o.sorted(0) == Pitches{61, 62, 65, 65, 68, 69});
+    o.type(U"u");
+    CHECK(o.ws.message() == "Undid: Transpose 3 notes in Keys up a semitone");
+    o.type(U">2ic"); // and the next chord
+    CHECK(o.sorted(0) == Pitches{61, 63, 65, 66, 68, 69});
+    o.type(U"u");
+    o.type(U"k"); // F4, where no note is
+    o.type(U"dic");
+    CHECK(o.ws.message() == "No chord here");
+
+    // The event list, on the E4's row: its notes, not the pedal among them.
+    o.type(U"j");
+    o.type(U"ge");
+    o.type(U"dic");
+    CHECK(o.sorted(0) == Pitches{62, 65, 69});
+    const auto& events = o.document.song().events(o.document.song().tracks()[0]->id());
+    CHECK(std::ranges::count_if(events.all(),
+                                [](const core::Event& event) { return !event.isNote(); }) == 1);
+    o.type(U"u");
+
+    // Not in the arrangement, where there's no single chord.
+    o.type(U"ga");
+    o.type(U"dic");
+    CHECK(o.ws.message() == "There's no single chord here; dd takes this bar's events");
+    CHECK(o.sorted(0) == Pitches{60, 62, 64, 65, 67, 69});
 }
