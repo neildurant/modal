@@ -366,6 +366,7 @@ TEST_CASE("^ on a selection asks how to change the velocity, then changes it")
     Selecting s;
     s.type(U"grv}^");
     REQUIRE(s.ws.mode() == Mode::CommandLine);
+    CHECK(s.ws.pianoRoll().selectionSpan()); // still shown while it asks
     s.type(U"80");
     s.press(NamedKey::Enter);
     const auto& song = s.document.song();
@@ -374,6 +375,15 @@ TEST_CASE("^ on a selection asks how to change the velocity, then changes it")
     CHECK(std::get<core::Note>(events[1].data).velocity == 80);
     CHECK(std::get<core::Note>(events[2].data).velocity == 100);
     CHECK(s.ws.mode() == Mode::Normal);
+    CHECK_FALSE(s.ws.pianoRoll().selectionSpan());
+
+    // Escape at the prompt ends it too, changing nothing.
+    s.type(U"ggv}^");
+    CHECK(s.ws.pianoRoll().selectionSpan());
+    s.press(NamedKey::Escape);
+    CHECK_FALSE(s.ws.pianoRoll().selectionSpan());
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(std::get<core::Note>(events[0].data).velocity == 80);
 }
 
 TEST_CASE("in the piano roll the notes a selection takes, and the current one, stand out")
@@ -398,4 +408,23 @@ TEST_CASE("in the piano roll the notes a selection takes, and the current one, s
     CHECK(one > 0);
     s.type(U"v}");
     CHECK(standing() == 2 * one); // and the note in bar 2
+}
+
+TEST_CASE("a selection stays shown while an operator asks about it, as q does about pedals")
+{
+    Selecting s;
+    const auto bass = s.document.song().tracks()[0]->id();
+    s.document.edit("Pedal", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            bass, [&](core::EventList& events)
+                            { events.insert({s.bar / 8, core::ControlChange{64, 127}}); });
+                    });
+    s.type(U"grv}q");
+    CHECK(s.ws.message().starts_with("Move the pedalling with its notes?"));
+    CHECK(s.ws.pianoRoll().selectionSpan());
+    s.type(U"n");
+    CHECK_FALSE(s.ws.pianoRoll().selectionSpan());
+    CHECK(s.ws.mode() == Mode::Normal);
 }

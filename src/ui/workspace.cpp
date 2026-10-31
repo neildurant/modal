@@ -658,6 +658,10 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         {
             setMessage("Nothing done", MessageKind::Information);
         }
+        if (!question_)
+        {
+            endVisual(); // a selection the question was about
+        }
         return true;
     }
     // The list of keys takes the keys while it shows: q, Escape or ? closes it, j and k (or the
@@ -1700,8 +1704,13 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
         }
         return transform(command, std::max(count, 1), "visual", 0);
     }();
-    // Ended once the view has taken it; ^'s question keeps what it took.
-    endVisual();
+    // Ended once the view has taken it; while the operator asks something, at the prompt as ^
+    // does or yes or no as q does about pedalling, it stays shown until the answer or Escape,
+    // though what's changed is already taken (decided October 2026).
+    if (!answer_ && !question_)
+    {
+        endVisual();
+    }
     return done;
 }
 
@@ -1886,6 +1895,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         {
             answer(text);
         }
+        endVisual(); // a selection the question was about
         return true;
     }
     if (command == "command-line-run")
@@ -1902,7 +1912,10 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         (command == "command-line-backspace" && line_.text().empty())) // as in Vim
     {
         mode_ = Mode::Normal;
-        answer_ = {};
+        if (std::exchange(answer_, {}))
+        {
+            endVisual(); // a selection the question was about
+        }
         return true;
     }
     return editLine(line_, command);
