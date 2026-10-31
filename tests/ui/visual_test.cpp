@@ -562,3 +562,75 @@ TEST_CASE("ie takes the whole song: every track in the arrangement, the track el
     CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 44, 45, 46, 47, 48});
     CHECK(pitches(s.document, 1).front() == 60);
 }
+
+namespace
+{
+
+std::u32string statusLine(const Selecting& s)
+{
+    std::u32string text;
+    const auto frame = s.ws.frame();
+    for (const auto& run : frame.back().text)
+    {
+        text += run.text;
+    }
+    return text;
+}
+
+} // namespace
+
+TEST_CASE("Ctrl-v in the arrangement selects a box of tracks by bars")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto box = [&] { s.ws.handle(Key::typed(U'v', kCtrl), 0); };
+    s.type(U"l");
+    box();
+    s.type(U"l"); // bars 2-3 of the bass, across B's start
+    CHECK(s.selected() == barsText(s.document.song().meter(), s.bar, 3 * s.bar) + " of Bass");
+    CHECK(statusLine(s).find(U"D closes up within each section") != std::u32string::npos);
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
+    CHECK(pitches(s.document, 1).size() == 8);
+    s.type(U"u");
+
+    // Within a section, no warning; j takes the next track.
+    s.type(U"gg");
+    box();
+    s.type(U"lj");
+    CHECK(s.selected() == barsText(s.document.song().meter(), 0, 2 * s.bar) + " of Bass and Lead");
+    CHECK(statusLine(s).find(U"D closes up") == std::u32string::npos);
+    s.press(NamedKey::Escape);
+
+    // An object sets its time, keeping its tracks.
+    s.type(U"gg3lk"); // bar 4 of the bass
+    box();
+    s.type(U"jis");
+    CHECK(s.selected() ==
+          barsText(s.document.song().meter(), 2 * s.bar, 5 * s.bar) + " of Bass and Lead");
+    s.type(U"D");
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{60, 61, 65, 66, 67});
+    CHECK(s.document.song().end() == 8 * s.bar);
+}
+
+TEST_CASE("Ctrl-v in the piano roll selects a box of pitches by grid steps")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 41});
+    s.ws.handle(Key::typed(U'v', kCtrl), 0);
+    s.type(U"j}"); // E2 to F2, bar 1 to bar 2's first step
+    CHECK(s.ws.pianoRoll().selectionStatus().value_or("").starts_with("E2 to F2, "));
+    s.type(U">");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 42, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // Not in the event list.
+    s.type(U"ge");
+    s.ws.handle(Key::typed(U'v', kCtrl), 0);
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(s.ws.message().find("is for") != std::string::npos);
+}

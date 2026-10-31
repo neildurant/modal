@@ -418,23 +418,47 @@ std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
     {
         return std::nullopt;
     }
+    // The tracks from where it started to the cursor's, both in.
+    const auto tracks = song.tracks();
+    const auto at = std::ranges::find(tracks, selection->anchor.track,
+                                      [](const auto& track) { return track->id(); });
+    const auto anchor =
+        at == tracks.end() ? page_.track() : static_cast<std::size_t>(at - tracks.begin());
+    const auto top = std::min(anchor, page_.track());
+    const auto bottom = std::max(anchor, page_.track());
     if (selection->kind == SelectionKind::Rows)
     {
-        // V: the tracks from where it started to the cursor's, both in, at every time, or
-        // the time an object set.
-        const auto tracks = song.tracks();
-        const auto at = std::ranges::find(tracks, selection->anchor.track,
-                                          [](const auto& track) { return track->id(); });
-        const auto anchor =
-            at == tracks.end() ? page_.track() : static_cast<std::size_t>(at - tracks.begin());
+        // V: those tracks at every time, or the time an object set.
         const auto [from, to] = selection->span.value_or(std::pair{core::Tick{0}, song.end()});
-        return Area{std::min(anchor, page_.track()), std::max(anchor, page_.track()), from, to};
+        return Area{top, bottom, from, to};
     }
+    // v: the bars from where it started to the cursor's, both in, in the cursor's track's
+    // bars, on every track; Ctrl-v the same bars on those tracks.
     const auto& m = meter();
     const auto first = m.toBarBeatTick(std::min(selection->anchor.tick, page_.time())).bar;
     const auto last = m.toBarBeatTick(std::max(selection->anchor.tick, page_.time())).bar;
-    return Area{0, song.tracks().size() - 1, m.barStart(first),
+    const bool box = selection->kind == SelectionKind::Box;
+    return Area{box ? top : 0, box ? bottom : song.tracks().size() - 1, m.barStart(first),
                 std::min(m.barStart(last + 1), song.end())};
+}
+
+std::optional<std::string> ArrangeView::selectionWarning() const
+{
+    // A box across a section's start: D would close up within each section apart (decided
+    // October 2026, since it may not be what's expected).
+    const auto selection = host_.selection();
+    const auto area = selectionArea();
+    if (!selection || selection->kind != SelectionKind::Box || !area || selectedSections())
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto next = song.sectionAt(area->from) + 1;
+    if (next < song.sections().size() && song.sectionStart(next) < area->to)
+    {
+        return std::string{"D closes up within each section"};
+    }
+    return std::nullopt;
 }
 
 std::optional<std::pair<std::size_t, std::size_t>> ArrangeView::selectedSections() const
@@ -467,7 +491,7 @@ std::optional<std::string> ArrangeView::selectionStatus() const
     {
         return std::nullopt;
     }
-    if (host_.selection()->kind == SelectionKind::Rows)
+    if (host_.selection()->kind != SelectionKind::Range)
     {
         return describe(*area);
     }

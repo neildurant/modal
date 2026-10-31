@@ -86,6 +86,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "visual-rows",
                 .description = "Visual mode by whole rows: tracks in the arrangement, at every "
                                "time until an object sets it (Vis); V again or Escape ends it"},
+    CommandInfo{.name = "visual-box",
+                .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
+                               "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
     CommandInfo{.name = "visual-delete-time",
                 .description = "In Visual mode, take the selection's time out, closing the gap: "
@@ -237,6 +240,14 @@ bool isShared(std::string_view name)
     return std::ranges::find(kSharedCommands, name, &CommandInfo::name) != kSharedCommands.end();
 }
 
+// The kind of selection v, V and Ctrl-v make.
+SelectionKind selectionKind(std::string_view command)
+{
+    return command == "visual"        ? SelectionKind::Range
+           : command == "visual-rows" ? SelectionKind::Rows
+                                      : SelectionKind::Box;
+}
+
 } // namespace
 
 std::optional<bool> editLine(CommandLine& line, std::string_view command)
@@ -307,10 +318,11 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 62> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 63> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"visual-box", onlyIn({Tracks, Strip, PianoRoll})},
             {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -1431,6 +1443,11 @@ bool Workspace::runViewCommand(std::string_view command, int count)
         }
         return *changed;
     }
+    return sayWhereFor(command);
+}
+
+bool Workspace::sayWhereFor(std::string_view command)
+{
     // Where it does something instead, rather than where it doesn't, which reads as if it
     // were missing: "Note default is for the piano roll".
     const auto* info = commands_.find(command);
@@ -1461,6 +1478,10 @@ bool Workspace::runViewCommand(std::string_view command, int count)
 
 std::optional<bool> Workspace::runShared(std::string_view command, int count)
 {
+    if (!offered(command))
+    {
+        return sayWhereFor(command); // as the views' own commands do
+    }
     const int n = std::max(count, 1);
     if (command.starts_with("command-line-"))
     {
@@ -1472,14 +1493,15 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         mode_ = Mode::OperatorPending;
         return true;
     }
-    if (command == "visual" || command == "visual-rows")
+    if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
+        const auto kind = selectionKind(command);
         selection_ =
             Selection{.anchor = view().cursor(),
-                      .kind = command == "visual" ? SelectionKind::Range : SelectionKind::Rows,
+                      .kind = kind,
                       .where = where(),
                       .index = view().selectionIndex(),
-                      .span = command == "visual" ? std::nullopt : view().rowsSpan()};
+                      .span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt};
         mode_ = Mode::Visual;
         return true;
     }
@@ -1656,10 +1678,10 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         endVisual();
         return true;
     }
-    if (command == "visual" || command == "visual-rows")
+    if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
-        // Its own key again ends it, as in Vim; the other's changes to it.
-        const auto kind = command == "visual" ? SelectionKind::Range : SelectionKind::Rows;
+        // Its own key again ends it, as in Vim; another's changes to it.
+        const auto kind = selectionKind(command);
         if (selection_->kind == kind)
         {
             endVisual();
@@ -2966,6 +2988,10 @@ Bar Workspace::statusBar(bool withMessage) const
     else if (const auto selected = mode_ == Mode::Visual ? view().selectionStatus() : std::nullopt)
     {
         bottom.left.push_back({"  " + *selected, kBarText});
+        if (const auto warning = view().selectionWarning())
+        {
+            bottom.left.push_back({"; " + *warning, {Role::Warning, Role::Bar, kPlain}});
+        }
     }
     else
     {

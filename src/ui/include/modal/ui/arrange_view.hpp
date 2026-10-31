@@ -39,6 +39,7 @@ public:
 
     std::string_view name() const override { return "the arrangement"; }
     std::optional<std::string> selectionStatus() const override;
+    std::optional<std::string> selectionWarning() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::size_t> selectionIndex() const override { return page_.stripCursor(); }
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,

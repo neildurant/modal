@@ -233,6 +233,9 @@ public:
     // there (see Selection); and the span of time an object takes, which Visual mode selects
     // (vis), or nothing, having said why.
     virtual std::optional<std::string> selectionStatus() const { return std::nullopt; }
+    // A warning about what the selection would do, shown after it, as a box across a
+    // section's start, whose time D takes out of each section apart.
+    virtual std::optional<std::string> selectionWarning() const { return std::nullopt; }
     virtual std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const
     {
         return std::nullopt;
@@ -257,6 +260,13 @@ public:
             span && selection.kind == SelectionKind::Rows)
         {
             selection.span = span;
+        }
+        else if (span && selection.kind == SelectionKind::Box)
+        {
+            // Its time, keeping the rows: the corner it started at keeps its track or pitch.
+            const auto here = cursor();
+            selection.anchor.tick = span->first;
+            setCursor(SongCursor{here.track, span->second - 1, here.pitch});
         }
         else if (span)
         {

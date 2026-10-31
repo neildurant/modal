@@ -94,7 +94,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
 | `v`, then a motion or object | Select: in the arrangement bars on every track, in the piano roll time at every pitch, in the event list rows, on the strip sections; then `d` deletes what's selected, `D` takes its time out, `y` yanks, `p` puts over it and the other operators change it. `o` the other end, `gv` the last selection again, Escape ends it |
-| `V`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:marker-to-section`) |
+| `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:marker-to-section`) |
 | `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
 | Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
