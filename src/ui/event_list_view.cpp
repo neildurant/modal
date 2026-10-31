@@ -649,14 +649,21 @@ std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motio
         // in, x, Y: the event under the cursor, or as many from it as the count says.
         return Rows{row_, row_ + static_cast<std::size_t>(std::max(count, 1)) - 1};
     }
-    if (motion == "operator-line" || motion == "object-bar-contents")
+    if (motion == "operator-line" || motion == "object-bar-contents" || isSectionObject(motion))
     {
         // dd, ib: the rows of the cursor's bar and as many after it as the count says less one,
-        // taken as bars.
+        // taken as bars; is the same for sections.
         const auto& meter = list_.meter();
-        const auto bar = meter.toBarBeatTick(list_.rows()[row_].tick).bar;
-        const auto from = meter.barStart(bar);
-        const auto to = meter.barStart(bar + std::max(count, 1));
+        const auto tick = list_.rows()[row_].tick;
+        const auto bar = meter.toBarBeatTick(tick).bar;
+        auto from = meter.barStart(bar);
+        auto to = meter.barStart(bar + std::max(count, 1));
+        if (isSectionObject(motion))
+        {
+            const auto range = sectionsFrom(document_.song(), tick, count);
+            from = range.from;
+            to = range.to;
+        }
         const auto first = list_.rowAt(from);
         auto last = first;
         while (last + 1 < list_.rows().size() && list_.rows()[last + 1].tick < to)
@@ -1488,7 +1495,7 @@ Region EventListView::listRegion() const
     return ui::gridRegion(grid, main, cell_, Role::Background);
 }
 
-std::optional<std::string> EventListView::describeRange(std::string_view /*op*/,
+std::optional<std::string> EventListView::describeRange(std::string_view op,
                                                         std::string_view motion) const
 {
     // Rows of events; the event list has no time to take out.
@@ -1499,6 +1506,14 @@ std::optional<std::string> EventListView::describeRange(std::string_view /*op*/,
     if (motion == "object-note")
     {
         return "this event";
+    }
+    if (motion == "object-section-contents")
+    {
+        return "this section's events";
+    }
+    if (motion == "object-section")
+    {
+        return sectionDescription(op);
     }
     if (motion == "cursor-down")
     {

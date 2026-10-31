@@ -226,7 +226,8 @@ TEST_CASE("q quantises notes' starts to the grid, and the event list and arrange
     o.type(U"gT>>");
     CHECK(o.ws.message() == "The conductor's tempo and meter changes aren't changed this way");
     o.type(U"gags>>");
-    CHECK(o.ws.message() == "The section strip is for sections; change their events on the tracks");
+    CHECK(o.ws.message() ==
+          "On the section strip, operators take is, this section's events on every track");
     o.type(U"j>in");
     CHECK(o.ws.message() == "There's no single note here; ib takes this bar's events");
 }

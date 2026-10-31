@@ -216,6 +216,12 @@ An independent setting for the length of new notes, after Sequencer Plus Gold's 
 
 - `ib` / `ab`: this bar's contents / this bar as time, which `dab` takes out, closing the gap; `in`: this note (in the event list, this event); `is`: this section's contents; `as`: this section as a structural unit (its contents, length, tempo and meters); `ic`: this chord (notes starting together); `it`: this whole track; `gn`: the next search match (see Search). `is` and `as` replace the earlier "phrase between markers" (`ip`), since markers are now bookmarks.
 - Read as Vim's help reads `aw`, "a word": `dib` is "delete inner bar", its contents, and `dab` "delete a bar", the bar itself (decided October 2026).
+- **The other objects (decided October 2026, for milestone 6).** A count after each takes more of them (`d2is`, `>3ic`, `q3it`).
+  - **`is`** is the cursor's section on the cursor's track, as `ib` is its bar, in every view; on the section strip, the section's events on every track, so `qis` there quantises the whole section.
+  - **`as`** is the section itself, on every track, since sections are whole bars on every track: `das` takes it out of the song and `yas` yanks it as a section, from any view, as `x` and `Y` do on the strip. To the operators that change events in place (`>`, `t`, `q`, `^`, `~`) it's `is`, as `ab` is `ib` to them, and their hint menu leaves it out.
+  - **`ic`** is the chord holding the note under the cursor: the notes starting within `chordwindow` of it, as `(` and `)` take chords, in the piano roll and the event list. With no note under the cursor, and in the arrangement, it's refused, as `in` is.
+  - **`it`** is the track's events, not the track: `dit` empties it, keeping the track. In the arrangement a count takes more tracks from the cursor's; it's refused on the conductor's list.
+  - **On the section strip,** the operators other than `d` and `y` take only `is` and `as`, refusing anything else, pointing to `is`.
 
 **Operators**
 
@@ -244,7 +250,7 @@ Examples: `d2]b` deletes from the cursor to the second bar line on, `>ib` transp
   - **Pedalling follows quantised notes, if wanted.** When the range has sustain, sostenuto or soft pedal events (CC 64, 66, 67), `q` asks "Move the pedalling with its notes? (y/n)". With `y`, each pedal event moves as far as the latest note at or before it moved, a chord's notes moving as one, so a pedal pressed just after a chord stays just after it, and a lift just before the next chord stays with the chord it ends; one before any note in the range stays put. If a pedal would move past the next of its pedal, the change is refused, saying where. A setting could answer the question in advance later (`quantizepedal`), if asking proves tiresome.
   - **`^`** asks at the prompt, its label in place of the `:` ("Velocity of 2 notes in Bass (80, +10, 80%): "), for a value from 1 to 127, a change (`+10`, `-10`) or a percentage (`80%`), velocities kept between 1 and 127. The answer stays out of the `:` prompt's history, and Tab doesn't complete it.
   - **`~`** moves each note's start by up to `humanizetime` (10 ms) either way, at its own tempo, and its velocity by up to `humanizevel` (8) either way.
-  - **Not on the section strip** for now: its sections' contents across every track are for the objects `is` and `as`.
+  - **Not on the section strip** at first: its sections' contents across every track came with the objects `is` and `as`, which the operators take there.
   - **`c` is kept for change,** as in Vim: delete the range and start Insert mode (step entry) there, when Insert mode comes in milestone 8 (`cib` to play a new part into this bar). Changing a channel is the track's (`:channel`, the inspector); moving a range to another track is `d` and `p` for now, perhaps later a command with no key, `:move-to TRACK`.
 
 **Ranges, objects and putting (decided October 2026, in milestone 5).** Every range an operator takes says what it is: either from the cursor to a boundary its key names, or an object, a whole thing at the cursor named by its letter. Where they differ, this replaces the notes on operators in the event list (milestone 4), the arrangement, the piano roll and the section strip, which say what was built at the time.

@@ -12,7 +12,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace modal::ui
 {
@@ -50,6 +52,29 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
 // Ripple, staying inside the section (see How far ripple reaches in the design). The end of
 // the section holding a time.
 core::Tick sectionEndAt(const core::Song& song, core::Tick tick);
+
+// The sections is and as take: the one holding a time and as many after it as the count says
+// less one, as far as the last; their span of time, and their names as words ("Verse", "3
+// sections from Verse").
+struct SectionRange
+{
+    std::size_t first = 0;
+    std::size_t count = 1;
+    core::Tick from = 0;
+    core::Tick to = 0;
+};
+SectionRange sectionsFrom(const core::Song& song, core::Tick tick, int count);
+std::string sectionsText(const core::Song& song, const SectionRange& range);
+
+// What as takes after an operator, for the hint menu: the section itself for d and y, and
+// nothing for the others, to which it's is.
+std::optional<std::string> sectionDescription(std::string_view op);
+
+// Whether a motion is is or as.
+inline bool isSectionObject(std::string_view motion)
+{
+    return motion == "object-section-contents" || motion == "object-section";
+}
 
 // Removes the events starting in a span of time on tracks (counting from 0, first to last),
 // stopping at the section's end, and moves those after it in the section earlier by its

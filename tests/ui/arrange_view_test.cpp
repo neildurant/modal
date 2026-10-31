@@ -519,8 +519,8 @@ TEST_CASE("sections are deleted, yanked and put like lines")
     for (const auto* keys : {U"dd", U"yy", U"dib", U"yab", U"din"})
     {
         s.type(keys);
-        CHECK(s.ws.message() == "The strip holds sections, not bars or notes: x deletes this "
-                                "section and Y yanks it");
+        CHECK(s.ws.message() == "The strip holds sections, not bars or notes: as takes this "
+                                "section, and is its events on every track");
         CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
     }
 

@@ -96,6 +96,20 @@ constexpr std::array kSharedCommands{
                 .modes = modeBit(Mode::OperatorPending),
                 .count = true,
                 .object = true},
+    CommandInfo{.name = "object-section-contents",
+                .description = "After an operator, this section's events on this track (is), "
+                               "or on every track on the section strip; or {count} sections' "
+                               "from it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
+    CommandInfo{.name = "object-section",
+                .description = "After an operator, this section itself (as), which d takes out "
+                               "of the song and y yanks as a section; or {count} sections from "
+                               "it",
+                .modes = modeBit(Mode::OperatorPending),
+                .count = true,
+                .object = true},
     CommandInfo{.name = "object-note",
                 .description = "After an operator, the note or event under the cursor (in)",
                 .modes = modeBit(Mode::OperatorPending),
@@ -263,13 +277,13 @@ std::span<const CommandInfo> Workspace::commands()
         const std::array<std::pair<std::string_view, std::uint8_t>, 59> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
-            {"operator-humanize", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-velocity", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-transpose-up", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-transpose-down", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-shift-later", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-shift-earlier", onlyIn({Tracks, PianoRoll, EventList})},
-            {"operator-quantize", onlyIn({Tracks, PianoRoll, EventList})},
+            {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-velocity", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-transpose-up", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-transpose-down", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-shift-later", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-shift-earlier", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
@@ -1500,6 +1514,12 @@ bool Workspace::runOperator(std::string_view command, int count)
             return true;
         }
     }
+    if ((op.name == "operator-delete" || op.name == "operator-yank") &&
+        command == "object-section" && where() != Where::Strip)
+    {
+        // das and yas: the section itself, as on the strip, from anywhere.
+        return operateOnSections(op.name, std::max(op.count, 1) * std::max(count, 1));
+    }
     if (op.name != "operator-delete" && op.name != "operator-yank")
     {
         // The count before the operator is how far (3>ib, up three semitones), the one after
@@ -1509,6 +1529,33 @@ bool Workspace::runOperator(std::string_view command, int count)
     // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
     const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
     return view().operate(op.name, command, total);
+}
+
+bool Workspace::operateOnSections(std::string_view op, int count)
+{
+    const auto& song = document_.song();
+    const auto range = sectionsFrom(song, view().cursor().tick, count);
+    const auto what = sectionsText(song, range);
+    register_ = EventRegister{};
+    for (auto i = range.first; i < range.first + range.count; ++i)
+    {
+        register_.sections.push_back(song.sections()[i]);
+    }
+    if (op == "operator-yank")
+    {
+        setMessage(what + " yanked; p on the section strip puts it back", MessageKind::Information);
+        return true;
+    }
+    if (range.count >= song.sections().size())
+    {
+        setMessage("A song keeps at least one section", MessageKind::Warning);
+        return true;
+    }
+    document_.edit("Delete " + (range.count == 1 ? "section " : std::string{}) + what,
+                   view().place(),
+                   [&](core::Song& s) { s.removeSections(range.first, range.count); });
+    refresh();
+    return true;
 }
 
 std::string Workspace::shownKeys(const std::vector<Key>& keys) const

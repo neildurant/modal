@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
@@ -81,8 +82,13 @@ private:
     // The area a range or object takes from the cursor, or nothing if it takes none.
     std::optional<Area> areaFor(std::string_view motion, int count);
     // Deletes or yanks the events starting in an area, or with time, as ab does, deletes the
-    // area's time too, closing the gap up to the section's end.
-    bool operateOn(std::string_view op, const Area& area, bool time = false);
+    // area's time too, closing the gap up to the section's end; named as given, or by its
+    // bars and tracks.
+    bool operateOn(std::string_view op, const Area& area, bool time = false,
+                   std::string named = {});
+    // The events starting in an area on each of its tracks, for the operators other than d
+    // and y, or nothing, saying so, if there are none.
+    std::optional<OperatorTarget> targetIn(const Area& area, std::string what) const;
     // Puts the register at the start of the cursor's bar, over what's there, or with insert
     // moving what's after it in the section later (P), asking first if the section must grow.
     bool put(bool insert);
@@ -94,6 +100,10 @@ private:
     std::optional<bool> runOnStrip(std::size_t section, std::string_view command, int count);
     bool operateOnStrip(std::size_t section, std::string_view op, std::string_view motion,
                         int count);
+    // is on the strip: the sections' events on every track, and the area that is.
+    std::pair<Area, std::string> stripContents(std::size_t section, int count) const;
+    // What is takes on a track, as words ("Verse of Bass"), or nothing for other motions.
+    std::string sectionWhat(const Area& area, std::string_view motion, int count) const;
     bool putSections(std::size_t section, bool before);
     Inspection sectionInspection(std::size_t section) const;
 

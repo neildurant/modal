@@ -239,22 +239,29 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
         return true;
     }
     const auto area = areaFor(motion, count);
-    return area && operateOn(op, *area, motion == "object-bar");
+    return area && operateOn(op, *area, motion == "object-bar", sectionWhat(*area, motion, count));
 }
 
 std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int count)
 {
-    // The events starting in the area, controllers too, on each of its tracks.
-    if (page_.stripCursor())
-    {
-        host_.setMessage("The section strip is for sections; change their events on the tracks",
-                         MessageKind::Information);
-        return std::nullopt;
-    }
+    // The events starting in the area, controllers too, on each of its tracks; on the strip,
+    // is takes the section's on every track, and as is is to these operators.
     const auto& song = document_.song();
     if (song.tracks().empty())
     {
         return std::nullopt;
+    }
+    if (const auto section = page_.stripCursor())
+    {
+        if (!isSectionObject(motion))
+        {
+            host_.setMessage("On the section strip, operators take is, this section's events on "
+                             "every track",
+                             MessageKind::Information);
+            return std::nullopt;
+        }
+        auto [area, what] = stripContents(*section, count);
+        return targetIn(area, std::move(what));
     }
     if (motion == "object-note")
     {
@@ -267,13 +274,20 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
     {
         return std::nullopt;
     }
-    OperatorTarget result{.parts = {}, .what = describe(*area), .notesOnly = false};
+    auto what = sectionWhat(*area, motion, count);
+    return targetIn(*area, what.empty() ? describe(*area) : std::move(what));
+}
+
+std::optional<OperatorTarget> ArrangeView::targetIn(const Area& area, std::string what) const
+{
+    const auto& song = document_.song();
+    OperatorTarget result{.parts = {}, .what = std::move(what), .notesOnly = false};
     bool any = false;
-    for (auto i = area->top; i <= area->bottom; ++i)
+    for (auto i = area.top; i <= area.bottom; ++i)
     {
         const auto id = song.tracks()[i]->id();
         const auto& events = song.events(id);
-        const auto inside = events.startingIn(area->from, area->to);
+        const auto inside = events.startingIn(area.from, area.to);
         auto& part = result.parts.emplace_back(OperatorTarget::Part{id, {}});
         const auto first = static_cast<std::size_t>(inside.data() - events.all().data());
         for (std::size_t k = 0; k < inside.size(); ++k)
@@ -290,6 +304,29 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
     return result;
 }
 
+std::pair<ArrangeView::Area, std::string> ArrangeView::stripContents(std::size_t section,
+                                                                     int count) const
+{
+    const auto& song = document_.song();
+    const auto range = sectionsFrom(song, song.sectionStart(section), count);
+    return {Area{0, song.tracks().size() - 1, range.from, range.to},
+            sectionsText(song, range) + " on every track"};
+}
+
+std::string ArrangeView::sectionWhat(const Area& area, std::string_view motion, int count) const
+{
+    // is on a track: "Verse of Bass", rather than its bars.
+    if (!isSectionObject(motion))
+    {
+        return {};
+    }
+    const auto& song = document_.song();
+    const auto range = sectionsFrom(song, area.from, count);
+    const auto& track = *song.tracks()[area.top];
+    return sectionsText(song, range) + " of " +
+           (track.name.empty() ? "track " + std::to_string(area.top + 1) : track.name);
+}
+
 std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, int count)
 {
     // The cursor's bar, and its end, cut short by the song's.
@@ -300,6 +337,15 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
     const auto end = [&](std::int64_t b)
     { return std::min(m.barStart(b + 1), document_.song().end()); };
     Area area{track, track, m.barStart(bar), end(bar)};
+    if (isSectionObject(motion))
+    {
+        // is: the cursor's section on its track, and as many after it as the count says less
+        // one.
+        const auto range = sectionsFrom(document_.song(), time, count);
+        area.from = range.from;
+        area.to = range.to;
+        return area;
+    }
     if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")
     {
         // dd, ib, ab: the cursor's bar, and as many after it as the count says less one.
@@ -356,7 +402,7 @@ std::string ArrangeView::describe(const Area& area) const
     return bars + " of " + which;
 }
 
-bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time)
+bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, std::string named)
 {
     // The events starting in the area, as the register's, their ticks from its start, taken as
     // bars; deleting time, as far as the section's end, where ripple stops.
@@ -376,7 +422,7 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time)
         total += events.size();
     }
     host_.eventRegister() = taken;
-    auto what = describe(area);
+    auto what = named.empty() ? describe(area) : std::move(named);
     if (ripple)
     {
         edit("Delete " + what + ", closing the gap",
@@ -722,11 +768,27 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
 {
     // Sections behave like lines (decided October 2026): x and Y this one, or as many as the
     // count; motions across sections up to where they land, or with G and gg including it. dd,
-    // yy and the objects, which are bars and notes, aren't on the strip.
-    if (motion == "operator-line" || motion.starts_with("object-"))
+    // yy and the bars' and notes' objects aren't on the strip. as is this section, as x and Y
+    // take it, and is its events on every track.
+    if (motion == "object-section-contents")
     {
-        host_.setMessage("The strip holds sections, not bars or notes: x deletes this section "
-                         "and Y yanks it",
+        if (document_.song().tracks().empty())
+        {
+            return false;
+        }
+        auto [area, what] = stripContents(section, count);
+        const bool done = operateOn(op, area, false, std::move(what));
+        page_.setStripCursor(section);
+        return done;
+    }
+    if (motion == "object-section")
+    {
+        motion = "this-section";
+    }
+    else if (motion == "operator-line" || motion.starts_with("object-"))
+    {
+        host_.setMessage("The strip holds sections, not bars or notes: as takes this section, "
+                         "and is its events on every track",
                          MessageKind::Information);
         return true;
     }
@@ -863,10 +925,19 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
 {
     if (page_.stripCursor())
     {
-        // Sections, as lines, for d and y; dd, yy and the objects aren't on the strip.
+        // Sections, as lines, for d and y, and the section's events on every track; dd, yy
+        // and the bars' and notes' objects aren't on the strip.
+        if (motion == "object-section-contents")
+        {
+            return "this section's events on every track";
+        }
         if (op != "operator-delete" && op != "operator-yank")
         {
             return std::nullopt;
+        }
+        if (motion == "object-section")
+        {
+            return "this section";
         }
         if (motion == "cursor-right")
         {
@@ -918,6 +989,14 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
     if (motion == "object-note")
     {
         return std::nullopt;
+    }
+    if (motion == "object-section-contents")
+    {
+        return "this section's events";
+    }
+    if (motion == "object-section")
+    {
+        return sectionDescription(op);
     }
     return describeTimeRange(motion);
 }

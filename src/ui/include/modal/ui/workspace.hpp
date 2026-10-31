@@ -237,6 +237,9 @@ private:
 
     // Runs a motion or the operator's own key after an operator, then the operator.
     bool runOperator(std::string_view command, int count);
+    // das and yas away from the section strip: the cursor's section and as many after it as
+    // the count says less one, taken out of the song or yanked, as x and Y do on the strip.
+    bool operateOnSections(std::string_view op, int count);
     // The operators other than d and y, over what a range or object takes in the view shown,
     // by an amount (semitones, grid steps) the count before the operator gives (decided for
     // milestone 6); and changing the events each track's part of it takes, as one undo step,

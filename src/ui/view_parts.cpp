@@ -218,6 +218,36 @@ core::Tick sectionEndAt(const core::Song& song, core::Tick tick)
     return song.sectionStart(song.sectionAt(tick) + 1);
 }
 
+SectionRange sectionsFrom(const core::Song& song, core::Tick tick, int count)
+{
+    SectionRange range;
+    range.first = song.sectionAt(tick);
+    range.count = std::min(static_cast<std::size_t>(std::max(count, 1)),
+                           song.sections().size() - range.first);
+    range.from = song.sectionStart(range.first);
+    range.to = song.sectionStart(range.first + range.count);
+    return range;
+}
+
+std::optional<std::string> sectionDescription(std::string_view op)
+{
+    if (op == "operator-delete")
+    {
+        return "this section, taken out of the song";
+    }
+    if (op == "operator-yank")
+    {
+        return "this section, as a section";
+    }
+    return std::nullopt;
+}
+
+std::string sectionsText(const core::Song& song, const SectionRange& range)
+{
+    const auto& name = song.sections()[range.first]->name();
+    return range.count == 1 ? name : std::to_string(range.count) + " sections from " + name;
+}
+
 EventRegister rippleDelete(core::Song& song, std::size_t first, std::size_t last, core::Tick from,
                            core::Tick to)
 {
