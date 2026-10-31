@@ -82,11 +82,12 @@ bool isOperator(std::string_view command)
 
 bool Workspace::transform(std::string_view op, int amount, std::string_view motion, int count)
 {
-    const auto target = view().target(motion, count);
+    auto target = view().target(motion, count);
     if (!target)
     {
         return true;
     }
+    target->cut = cutting_;
     const auto& song = document_.song();
     if (op == "operator-transpose-up" || op == "operator-transpose-down")
     {
@@ -201,6 +202,32 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
     std::vector<core::EventList> changed;
     for (const auto& part : target.parts)
     {
+        // Cutting at the edges, the notes crossing them cut first, and what's inside taken.
+        const auto& range = target.cut;
+        if (range && std::ranges::find(range->tracks, part.track) != range->tracks.end())
+        {
+            const auto which = [&](const core::Note& note) { return range->takes(note); };
+            const auto cut = core::cutAt(core::cutAt(song.events(part.track), range->from, which),
+                                         range->to, which);
+            OperatorTarget::Part inside{part.track, {}};
+            for (std::size_t i = 0; i < cut.size(); ++i)
+            {
+                const auto* note = std::get_if<core::Note>(&cut[i].data);
+                if (cut[i].tick >= range->from && cut[i].tick < range->to &&
+                    (note != nullptr ? range->takes(*note) : !range->pitches))
+                {
+                    inside.events.push_back(i);
+                }
+            }
+            auto result = change(cut, inside);
+            if (const auto* refusal = std::get_if<core::Refusal>(&result))
+            {
+                setMessage(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
+                return true;
+            }
+            changed.push_back(std::move(std::get<core::EventList>(result)));
+            continue;
+        }
         auto result = change(song.events(part.track), part);
         if (const auto* refusal = std::get_if<core::Refusal>(&result))
         {

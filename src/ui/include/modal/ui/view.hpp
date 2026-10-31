@@ -105,6 +105,7 @@ struct Selection
     // The time whole rows (V) take, once an object has set it (Vis); until then the whole
     // song's, or in the piano roll the page's when V was pressed.
     std::optional<std::pair<core::Tick, core::Tick>> span;
+    bool cut = false; // cutting at its edges (|)
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -112,6 +113,21 @@ struct Selection
 // are, for messages and undo ("4 notes in Bass", "bar 3 of Bass"); and whether only notes are
 // to be moved in time, as in the piano roll, which shows only notes, while elsewhere what
 // moves in time moves together, controllers too.
+// Where a range's edges cut notes, when cutting at the edges (|, decided October 2026): its
+// tracks, its time, and with V or Ctrl-v in the piano roll its pitches, lowest and highest.
+struct CutRange
+{
+    std::vector<core::TrackId> tracks;
+    core::Tick from = 0;
+    core::Tick to = 0;
+    std::optional<std::pair<std::uint8_t, std::uint8_t>> pitches;
+
+    bool takes(const core::Note& note) const
+    {
+        return !pitches || (note.pitch >= pitches->first && note.pitch <= pitches->second);
+    }
+};
+
 struct OperatorTarget
 {
     struct Part
@@ -123,6 +139,9 @@ struct OperatorTarget
     std::vector<Part> parts;
     std::string what;
     bool notesOnly = false;
+    // Cutting at the range's edges first, in the same change; the parts' events are then those
+    // starting in it once cut.
+    std::optional<CutRange> cut = std::nullopt;
 };
 
 // What a view asks of the workspace that shows it.
@@ -199,6 +218,13 @@ public:
     // Runs an operator (operator-delete or operator-yank) over where a motion goes, or with
     // operator-line over the cursor's place and as many after it as the count says.
     virtual bool operate(std::string_view op, std::string_view motion, int count) = 0;
+
+    // Where a range, object or the selection (visual) cuts notes, when cutting at the edges,
+    // or nothing where it can't, as in the event list, whose ranges are rows.
+    virtual std::optional<CutRange> cutRange(std::string_view /*motion*/, int /*count*/)
+    {
+        return std::nullopt;
+    }
 
     // What an operator other than d and y takes over a range or object here, or nothing if it
     // takes nothing, having said why where it's not plain.

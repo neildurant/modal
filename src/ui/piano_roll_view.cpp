@@ -125,6 +125,7 @@ std::string noteText(const core::Track& track)
 constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row and column
 constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
 constexpr std::uint8_t kFaint = 96;     // and of markers' lines, as in the arrangement
+constexpr std::uint8_t kDimmed = 150;   // and of the shade over a note's part outside a range
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -303,6 +304,37 @@ bool PianoRollView::takes(core::Tick tick, std::uint8_t pitch) const
     const auto pitches = selectedPitches();
     return span && tick >= span->first && tick < span->second &&
            (!pitches || (pitch >= pitches->first && pitch <= pitches->second));
+}
+
+std::optional<CutRange> PianoRollView::cutRange(std::string_view motion, int count)
+{
+    // The selection's time and its pitches, or the time a range or object takes.
+    const auto id = trackId();
+    if (!id)
+    {
+        return std::nullopt;
+    }
+    std::optional<std::pair<core::Tick, core::Tick>> span;
+    if (motion == "visual")
+    {
+        span = selected();
+    }
+    else if (motion == "operator-line" || motion.starts_with("object-"))
+    {
+        span = objectSpan(motion, count);
+    }
+    else
+    {
+        span = timeSpan(motion, count);
+    }
+    if (!span)
+    {
+        return std::nullopt;
+    }
+    return CutRange{.tracks = {*id},
+                    .from = span->first,
+                    .to = span->second,
+                    .pitches = motion == "visual" ? selectedPitches() : std::nullopt};
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::rowsSpan() const
@@ -2185,6 +2217,9 @@ void PianoRollView::addRegions(Frame& frame) const
     // In the lane, a bar for each note starting on the page, as high as its velocity.
     const auto current = currentNote();
     const auto span = selected();
+    const auto pitches = selectedPitches();
+    const auto selection = host_.selection();
+    const bool cutting = span && selection && selection->cut;
     if (const auto id = trackId())
     {
         const auto events = song.events(*id).all();
@@ -2220,6 +2255,35 @@ void PianoRollView::addRegions(Frame& frame) const
                 notes.under.push_back({{x0 + start, y, noteWidth - start, h - 2 * inset},
                                        role,
                                        bodyAlpha(note->velocity)});
+                // At a selection's edges: cutting, the part of a note sounding in from before
+                // stands out and the part outside is dimmed, as is, either way, the part of a
+                // note it takes sounding on past its end.
+                const auto part =
+                    [&](core::Tick from, core::Tick to, Role partRole, std::uint8_t alpha)
+                {
+                    const int a = scale.toX(std::clamp(from, p.start, p.end));
+                    const int b =
+                        std::min(scale.toX(std::clamp(to, p.start, p.end)), x0 + noteWidth);
+                    if (b > a)
+                    {
+                        notes.under.push_back({{a, y, b - a, h - 2 * inset}, partRole, alpha});
+                    }
+                };
+                if (span &&
+                    (!pitches || (note->pitch >= pitches->first && note->pitch <= pitches->second)))
+                {
+                    if (cutting && event.tick < span->first && end > span->first)
+                    {
+                        part(event.tick, span->first, Role::Background, kDimmed);
+                        part(span->first, std::min(end, span->second), Role::NoteSelected,
+                             bodyAlpha(note->velocity));
+                    }
+                    if (event.tick < span->second && end > span->second &&
+                        (cutting || event.tick >= span->first))
+                    {
+                        part(span->second, end, Role::Background, kDimmed);
+                    }
+                }
             }
             if (event.tick >= p.start)
             {

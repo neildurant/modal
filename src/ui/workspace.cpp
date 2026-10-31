@@ -90,6 +90,10 @@ constexpr std::array kSharedCommands{
                 .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
                                "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "cut-at-edges",
+                .description = "Cut the notes crossing a range's edges, so an operator takes "
+                               "only the parts inside: before an operator for it alone (|d]b), "
+                               "or in Visual mode on or off for the selection"},
     CommandInfo{.name = "visual-delete-time",
                 .description = "In Visual mode, take the selection's time out, closing the gap: "
                                "from the song, when it's on every track",
@@ -318,11 +322,12 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 63> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 64> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-box", onlyIn({Tracks, Strip, PianoRoll})},
+            {"cut-at-edges", onlyIn({Tracks, PianoRoll})},
             {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -533,7 +538,7 @@ const std::vector<core::Event>& Workspace::registerEvents() const
 
 std::string Workspace::pending() const
 {
-    std::string text;
+    std::string text = cutNext_ ? keysOf("cut-at-edges") : std::string{};
     if (operator_)
     {
         text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
@@ -1417,6 +1422,10 @@ bool Workspace::runAll(const std::vector<Action>& actions)
 
 CommandResult Workspace::run(std::string_view command, int count)
 {
+    if (command != "cut-at-edges" && !isOperator(command) && mode_ != Mode::OperatorPending)
+    {
+        cutNext_ = false; // | is for the next operator only
+    }
     auto result = commands_.run(command, count, mode_);
     if (!result.message.empty())
     {
@@ -1493,6 +1502,11 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         mode_ = Mode::OperatorPending;
         return true;
     }
+    if (command == "cut-at-edges")
+    {
+        cutNext_ = true; // for the next operator
+        return true;
+    }
     if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
         const auto kind = selectionKind(command);
@@ -1501,7 +1515,8 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                       .kind = kind,
                       .where = where(),
                       .index = view().selectionIndex(),
-                      .span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt};
+                      .span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt,
+                      .cut = false};
         mode_ = Mode::Visual;
         return true;
     }
@@ -1618,6 +1633,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
 
 bool Workspace::runOperator(std::string_view command, int count)
 {
+    const bool cut = std::exchange(cutNext_, false);
     const auto op = *operator_;
     operator_.reset();
     mode_ = Mode::Normal;
@@ -1662,11 +1678,104 @@ bool Workspace::runOperator(std::string_view command, int count)
     {
         // The count before the operator is how far (3>ib, up three semitones), the one after
         // it the range's (>3ib, three bars up one).
-        return transform(op.name, std::max(op.count, 1), command, count);
+        const auto run = [&] { return transform(op.name, std::max(op.count, 1), command, count); };
+        return cut ? cutThen(op.name, command, count, run) : run();
     }
     // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
     const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
-    return view().operate(op.name, command, total);
+    const auto run = [&] { return view().operate(op.name, command, total); };
+    return cut ? cutThen(op.name, command, total, run) : run();
+}
+
+bool Workspace::cutThen(std::string_view op, std::string_view motion, int count,
+                        const std::function<bool()>& run)
+{
+    // Cutting the notes crossing the range's edges, then the operator on what's inside: d, D
+    // and p after the cut, as one undo step under the operator's name; y on the song as it is,
+    // what it yanks then cut to the range; the others cutting in their own change, so one that
+    // asks first (^) cuts nothing if it's cancelled.
+    const auto range = view().cutRange(motion, count);
+    if (!range)
+    {
+        setMessage("Cutting at the edges is for the arrangement and the piano roll",
+                   MessageKind::Information);
+        return true;
+    }
+    if (op == "operator-yank")
+    {
+        const bool done = run();
+        cutRegister(*range);
+        return done;
+    }
+    if (op != "operator-delete" && op != "visual-delete-time")
+    {
+        cutting_ = range;
+        const bool done = run();
+        cutting_.reset();
+        return done;
+    }
+    document_.beginGroup({}, view().place());
+    cutSong(*range);
+    const bool done = run();
+    document_.endGroup();
+    refresh();
+    return done;
+}
+
+void Workspace::cutSong(const CutRange& range)
+{
+    document_.edit("Cut at the edges", view().place(),
+                   [&](core::Song& song)
+                   {
+                       for (const auto id : range.tracks)
+                       {
+                           song.updateEvents(id,
+                                             [&](core::EventList& events)
+                                             {
+                                                 const auto which = [&](const core::Note& note)
+                                                 { return range.takes(note); };
+                                                 events = core::cutAt(
+                                                     core::cutAt(events, range.from, which),
+                                                     range.to, which);
+                                             });
+                       }
+                   });
+}
+
+void Workspace::cutRegister(const CutRange& range)
+{
+    // What y took, its ticks from the range's start, cut to it: the parts inside of the notes
+    // sounding into it from before, and of those sounding on past its end.
+    const auto& song = document_.song();
+    const auto length = range.to - range.from;
+    for (std::size_t k = 0; k < register_.tracks.size() && k < range.tracks.size(); ++k)
+    {
+        auto& taken = register_.tracks[k];
+        for (auto& event : taken)
+        {
+            auto* note = std::get_if<core::Note>(&event.data);
+            if (note != nullptr && range.takes(*note) && event.tick + note->duration > length)
+            {
+                note->duration = length - event.tick;
+                note->releaseVelocity = core::Note{}.releaseVelocity;
+            }
+        }
+        for (const auto& event : song.events(range.tracks[k]).all())
+        {
+            const auto* note = std::get_if<core::Note>(&event.data);
+            if (note != nullptr && range.takes(*note) && event.tick < range.from &&
+                event.tick + note->duration > range.from)
+            {
+                auto inside = *note;
+                inside.duration = std::min(event.tick + note->duration, range.to) - range.from;
+                if (event.tick + note->duration > range.to)
+                {
+                    inside.releaseVelocity = core::Note{}.releaseVelocity;
+                }
+                taken.insert(taken.begin(), core::Event{0, inside});
+            }
+        }
+    }
 }
 
 std::optional<bool> Workspace::runVisual(std::string_view command, int count)
@@ -1691,6 +1800,11 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
             selection_->kind = kind;
             selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
         }
+        return true;
+    }
+    if (command == "cut-at-edges")
+    {
+        selection_->cut = !selection_->cut;
         return true;
     }
     if (command == "visual-other-end")
@@ -1724,7 +1838,7 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     // operators change it, the count before them saying how far; then Visual mode ends.
     const auto selection = *selection_;
     const auto span = view().selectionSpan();
-    const auto done = [&]
+    const auto run = [&]
     {
         if (command == "visual-delete-time")
         {
@@ -1747,7 +1861,11 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
             return view().operate("operator-yank", "visual", 0);
         }
         return transform(command, std::max(count, 1), "visual", 0);
-    }();
+    };
+    const auto op = command == "event-delete" ? std::string_view{"operator-delete"}
+                    : command == "yank-this"  ? std::string_view{"operator-yank"}
+                                              : command;
+    const bool done = selection.cut ? cutThen(op, "visual", 0, run) : run();
     // Ended once the view has taken it; while the operator asks something, at the prompt as ^
     // does or yes or no as q does about pedalling, it stays shown until the answer or Escape,
     // though what's changed is already taken (decided October 2026).
@@ -1781,7 +1899,12 @@ bool Workspace::putOverSelection()
     }
     const auto saved = register_;
     const auto first = span ? document_.song().sectionAt(span->first) : 0;
+    const auto cut = selection_->cut ? view().cutRange("visual", 0) : std::nullopt;
     document_.beginGroup("Put over " + what, view().place());
+    if (cut)
+    {
+        cutSong(*cut);
+    }
     view().operate("operator-delete", "visual", 0);
     register_ = saved;
     endVisual();
@@ -2991,6 +3114,10 @@ Bar Workspace::statusBar(bool withMessage) const
         if (const auto warning = view().selectionWarning())
         {
             bottom.left.push_back({"; " + *warning, {Role::Warning, Role::Bar, kPlain}});
+        }
+        if (selection_ && selection_->cut)
+        {
+            bottom.left.push_back({"; cutting at the edges", {Role::Accent, Role::Bar, kPlain}});
         }
     }
     else

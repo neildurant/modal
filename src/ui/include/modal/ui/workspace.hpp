@@ -314,6 +314,14 @@ private:
     // What the prompt shows before the line.
     std::u32string promptLabel() const;
     bool operateOnSelection(std::string_view command, int count);
+    // Cutting at the edges (|): an operator run after cutting the notes crossing its range's
+    // edges, as cutThen says; the cut on the song; and what y took, cut to the range.
+    bool cutThen(std::string_view op, std::string_view motion, int count,
+                 const std::function<bool()>& run);
+    void cutSong(const CutRange& range);
+    void cutRegister(const CutRange& range);
+    bool cutNext_ = false;            // | typed, for the next operator
+    std::optional<CutRange> cutting_; // the range the operator running cuts, for its target
     bool putOverSelection();
     void endVisual();
     // A question asked: what it runs for y, for another key, and for Escape.

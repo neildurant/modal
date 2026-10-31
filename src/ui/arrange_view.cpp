@@ -442,6 +442,26 @@ std::optional<ArrangeView::Area> ArrangeView::selectionArea() const
                 std::min(m.barStart(last + 1), song.end())};
 }
 
+std::optional<CutRange> ArrangeView::cutRange(std::string_view motion, int count)
+{
+    // The area's tracks and time; not on the strip, whose edges cut no notes.
+    if (page_.stripCursor())
+    {
+        return std::nullopt;
+    }
+    const auto area = motion == "visual" ? selectionArea() : areaFor(motion, count);
+    if (!area)
+    {
+        return std::nullopt;
+    }
+    CutRange range{.tracks = {}, .from = area->from, .to = area->to, .pitches = std::nullopt};
+    for (auto i = area->top; i <= area->bottom; ++i)
+    {
+        range.tracks.push_back(document_.song().tracks()[i]->id());
+    }
+    return range;
+}
+
 std::optional<std::string> ArrangeView::selectionWarning() const
 {
     // A box across a section's start: D would close up within each section apart (decided

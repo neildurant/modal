@@ -61,6 +61,7 @@ public:
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const override;
+    std::optional<CutRange> cutRange(std::string_view motion, int count) override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
                                                                 int count) override;
     std::vector<int> topHeights(CellSize cell) const override;

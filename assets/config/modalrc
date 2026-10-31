@@ -108,11 +108,14 @@ nmap Y          yank-this         "Yank this"
 " other end, and gv selects the last selection again. d and x delete what's selected, y and
 " Y yank it, D takes its time out (from the song, when it's on every track), p and P put the
 " register in its place, and the other operators change it at once.
+" | cuts the notes crossing the edges, so operators take only the parts inside: in Visual
+" mode on or off for the selection, or before an operator for it alone (|d]b).
 keysection "Visual mode"
 nmap v          visual            "Visual"
 nmap V          visual-rows       "Visual rows"
 nmap <C-v>      visual-box        "Visual box"
 nmap gv         visual-again      "Last selection"
+nmap |          cut-at-edges      "Cut at the edges"
 vmap o          visual-other-end  "Other end"
 vmap D          visual-delete-time "Take the time out"
 keysection "After an operator"

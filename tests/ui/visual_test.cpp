@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -633,4 +634,147 @@ TEST_CASE("Ctrl-v in the piano roll selects a box of pitches by grid steps")
     s.ws.handle(Key::typed(U'v', kCtrl), 0);
     CHECK(s.ws.mode() == Mode::Normal);
     CHECK(s.ws.message().find("is for") != std::string::npos);
+}
+
+namespace
+{
+
+// A three-bar C3 on the bass from the start, a D3 a quarter long in bar 2, and nothing else.
+core::Song sustained(core::Ppqn ppqn)
+{
+    const auto bar = ppqn.whole();
+    core::Song song{ppqn};
+    const auto bass = song.addTrack("Bass");
+    song.addTrack("Lead");
+    song.updateEvents(bass,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{48, 100, 3 * bar, 90}});
+                          events.insert({bar, core::Note{50, 100, ppqn.quarter()}});
+                      });
+    song.fitToContent();
+    return song;
+}
+
+// The bass's notes as start, pitch and length.
+std::vector<std::tuple<core::Tick, int, core::Tick>> notesOf(const core::Document& document)
+{
+    std::vector<std::tuple<core::Tick, int, core::Tick>> found;
+    const auto& song = document.song();
+    for (const auto& event : song.events(song.tracks()[0]->id()).all())
+    {
+        if (const auto* note = std::get_if<core::Note>(&event.data))
+        {
+            found.emplace_back(event.tick, note->pitch, note->duration);
+        }
+    }
+    return found;
+}
+
+using Notes = std::vector<std::tuple<core::Tick, int, core::Tick>>;
+
+} // namespace
+
+TEST_CASE("| cuts the notes crossing a selection's edges, so operators take what's inside")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto bar = ppqn.whole();
+    core::Document document{sustained(ppqn)};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace ws{registry, document};
+    ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
+    ws.show(ViewKind::Arrangement);
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            ws.handle(Key::typed(key), 0);
+        }
+    };
+    const Notes before{{0, 48, 3 * bar}, {bar, 50, ppqn.quarter()}};
+
+    // Without cutting, bar 2 takes the D3 alone, the C3 starting before it.
+    type(U"lvd");
+    CHECK(notesOf(document) == Notes{{0, 48, 3 * bar}});
+    type(U"u");
+
+    // Cutting, the C3's part in bar 2 goes too, as one step.
+    type(U"v|");
+    CHECK(ws.mode() == Mode::Visual);
+    type(U"d");
+    CHECK(notesOf(document) == Notes{{0, 48, bar}, {2 * bar, 48, bar}});
+    const auto& events = document.song().events(document.song().tracks()[0]->id());
+    CHECK(std::get<core::Note>(events[0].data).releaseVelocity == core::Note{}.releaseVelocity);
+    CHECK(std::get<core::Note>(events[1].data).releaseVelocity == 90);
+    type(U"u");
+    CHECK(ws.message() == "Undid: Delete bar 2 on every track");
+    CHECK(notesOf(document) == before);
+
+    // The other operators change only the part inside.
+    type(U"v|>");
+    CHECK(notesOf(document) ==
+          Notes{{0, 48, bar}, {bar, 49, bar}, {bar, 51, ppqn.quarter()}, {2 * bar, 48, bar}});
+    type(U"u");
+    CHECK(notesOf(document) == before);
+
+    // y takes the part inside, leaving the song as it is.
+    type(U"v|y");
+    CHECK(notesOf(document) == before);
+    const auto& taken = ws.registerArea().tracks.front();
+    REQUIRE(taken.size() == 2);
+    CHECK(taken[0].tick == 0);
+    CHECK(std::get<core::Note>(taken[0].data).duration == bar);
+
+    // Before an operator, for it alone: |dd is bar 2's, cut.
+    type(U"|");
+    CHECK(ws.pending() == "|");
+    type(U"dd");
+    CHECK(notesOf(document) == Notes{{0, 48, bar}, {2 * bar, 48, bar}});
+    type(U"u");
+    type(U"dd"); // and then not
+    CHECK(notesOf(document) == Notes{{0, 48, 3 * bar}});
+    type(U"u");
+
+    // ^ cuts in its own change: cancelled, nothing's cut.
+    type(U"v|^");
+    REQUIRE(ws.mode() == Mode::CommandLine);
+    ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(notesOf(document) == before);
+
+    // Not in the event list, whose ranges are rows.
+    type(U"ge|");
+    CHECK(ws.message() == "Cut at edges is for the arrangement's tracks and the piano roll");
+    CHECK(ws.pending().empty());
+}
+
+TEST_CASE("cutting in the piano roll, the parts of notes outside the selection are dimmed")
+{
+    const auto ppqn = core::kPpqn;
+    core::Document document{sustained(ppqn)};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace ws{registry, document};
+    ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
+    ws.show(ViewKind::PianoRoll);
+    const auto dimmed = [&]
+    {
+        int count = 0;
+        for (const auto& region : ws.frame())
+        {
+            for (const auto& shape : region.under)
+            {
+                count += shape.role == Role::Background && shape.alpha == 150 ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    ws.pianoRoll().setCursor(
+        {.track = document.song().tracks()[0]->id(), .tick = ppqn.whole(), .pitch = 48});
+    // Bar 2's first step: the C3 sounds across both its edges, and the D3 starts in it and
+    // runs on past its end, taken whole, its part past the end dimmed.
+    ws.handle(Key::typed(U'v'), 0);
+    CHECK(dimmed() == 1);
+    ws.handle(Key::typed(U'|'), 0);
+    CHECK(dimmed() == 3); // and the C3's parts before and after
 }
