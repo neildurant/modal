@@ -98,6 +98,8 @@ std::string utcNow()
     std::fprintf(stderr, "%s\n", line.c_str());
     if (crashLog)
     {
+        std::error_code error;
+        std::filesystem::create_directories(crashLog->parent_path(), error);
         std::ofstream file{*crashLog, std::ios::app};
         file << line << "\n";
     }
@@ -466,9 +468,9 @@ int main(int argc, char* argv[])
     commands.add(ui::fileCommands());
     ui::Config config;
     const auto configDirectory = platform::configDirectory();
-    if (configDirectory)
+    if (const auto stateDirectory = platform::stateDirectory())
     {
-        crashLog = *configDirectory / "crash.log";
+        crashLog = *stateDirectory / "crash.log"; // what Modal writes, not the user
     }
     std::set_terminate(logCrash);
     ui::ConfigReader reader{config, commands, configDirectory};

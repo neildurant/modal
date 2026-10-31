@@ -11,9 +11,7 @@ Modal is configured with a plain-text command file, `modalrc`, in the style of a
 
 At startup Modal runs its built-in command file (the default key bindings), then `modalrc` in the config directory, if there is one. Your own themes go in `themes/` in the same directory.
 
-If Modal ever stops on an error it didn't expect, it adds a line saying what it was to `crash.log` in the same directory, with the time and Modal's version. Including that line in a bug report helps find the cause.
-
-What Modal remembers between sessions without being told goes in a file of its own, `remembered`, in the state directory: `%LOCALAPPDATA%\Modal` on Windows, `$XDG_STATE_HOME/modal` (or `~/.local/state/modal`) on Linux. It holds how often and how lately each command was run from the command palette, which ranks it there (`:palette-forget` forgets that), and the meters typed that weren't offered, which are offered from then on. It's plain text, written by Modal, and safe to delete.
+What Modal writes for itself goes in the state directory: `%LOCALAPPDATA%\Modal` on Windows, `$XDG_STATE_HOME/modal` (or `~/.local/state/modal`) on Linux. `remembered` holds what it remembers between sessions without being told: how often and how lately each command was run from the command palette, which ranks it there (`:palette-forget` forgets that), and the meters you've chosen that aren't built in, which are offered from then on. It's plain text, and safe to delete. If Modal ever stops on an error it didn't expect, it adds a line saying what it was to `crash.log` there, with the time and Modal's version. Including that line in a bug report helps find the cause.
 
 To start a `modalrc`, have Modal write one with everything in it: at the `:` prompt, `:write-config modalrc` writes it straight into the config directory (`:write-config!` to overwrite one that's there), or from a terminal:
 
