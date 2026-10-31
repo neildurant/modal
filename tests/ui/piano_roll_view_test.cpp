@@ -193,8 +193,9 @@ TEST_CASE("the piano roll's time motions go by the grid and bars")
     r.type(U"5G");
     r.press(Key::of(NamedKey::Tab)); // C2, 7 ticks into bar 5
     REQUIRE(r.view().time() == t.bar(5) + 7);
+    // On it, a sixteenth long, l goes off it to the first grid step at or after its end.
     r.type(U"l");
-    CHECK(r.view().time() == t.bar(5) + t.sixteenth());
+    CHECK(r.view().time() == t.bar(5) + 2 * t.sixteenth());
     r.press(Key::of(NamedKey::Tab));
     r.press(Key::of(NamedKey::Tab, kShift));
     r.type(U"h");
@@ -533,9 +534,7 @@ TEST_CASE("the note under the piano roll's cursor is the current note, which the
     CHECK(contains(inspector, U"Note"));
     CHECK(contains(inspector, U"E1 (28)"));
     CHECK(contains(inspector, U"96"));
-    r.type(U"l"); // inside it still
-    CHECK(r.view().currentNote());
-    r.type(U"l"); // at its end
+    r.type(U"l"); // off it in one step, to its end, rather than a grid step inside it
     CHECK_FALSE(r.view().currentNote());
     inspector = r.textOn(Role::Panel);
     CHECK(contains(inspector, U"No note"));
@@ -714,12 +713,41 @@ TEST_CASE("the piano roll's cursor covers the current note, or the default note 
     const auto& t = r.t;
     r.type(U"8j"); // E1, an eighth note at the start
     CHECK(r.view().cursorSpan() == std::pair{core::Tick{0}, t.quarters(1) / 2});
-    r.type(U"l"); // inside it still
-    CHECK(r.view().cursorSpan() == std::pair{core::Tick{0}, t.quarters(1) / 2});
-    r.type(U"l"); // past it: the default note, the grid's length
+    r.type(U"l"); // past it in one: the default note, the grid's length
     CHECK(r.view().cursorSpan() == std::pair{t.quarters(1) / 2, t.quarters(1) / 2 + t.sixteenth()});
     r.registry.runLine("len 1/2");
     CHECK(r.view().cursorSpan() == std::pair{t.quarters(1) / 2, t.quarters(1) / 2 + t.quarters(2)});
+    r.type(U"h"); // back onto its last grid step
+    CHECK(r.view().cursorSpan() == std::pair{core::Tick{0}, t.quarters(1) / 2});
+    CHECK(r.view().time() == t.quarters(1) / 2 - t.sixteenth());
+}
+
+TEST_CASE("h and l go off a long note in one step, to the grid steps either side of it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    // A half note on E1 at bar 3's second beat, the grid a sixteenth.
+    const auto start = t.bar(3) + t.quarters(1);
+    r.document.edit("Add", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            song.tracks()[0]->id(), [&](core::EventList& events)
+                            { events.insert({start, core::Note{28, 90, t.quarters(2)}}); });
+                    });
+    r.ws.pianoRoll().setCursor(
+        {.track = r.document.song().tracks()[0]->id(), .tick = start + t.quarters(1), .pitch = 28});
+    REQUIRE(r.view().currentNote());
+    r.type(U"l");
+    CHECK(r.view().time() == start + t.quarters(2)); // its end
+    CHECK_FALSE(r.view().currentNote());
+    r.type(U"h"); // back onto its last step
+    CHECK(r.view().time() == start + t.quarters(2) - t.sixteenth());
+    r.type(U"h"); // and off before its start
+    CHECK(r.view().time() == start - t.sixteenth());
+    r.type(U"2l"); // onto its start, then past its end
+    CHECK(r.view().time() == start + t.quarters(2));
 }
 
 TEST_CASE("the piano roll draws at any window size, even none")

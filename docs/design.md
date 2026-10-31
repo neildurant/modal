@@ -122,7 +122,7 @@ Motions in time work the same in every view. In the piano roll the cursor is als
 
 | Key | Moves to |
 | --- | --- |
-| `h` / `l` | Previous / next grid step |
+| `h` / `l` | Previous / next grid step; on a note at the cursor's pitch, off it in one, to the grid step before its start or the first at or after its end (decided October 2026, after use, since stepping through a long note changed nothing shown) |
 | `{` / `}` | The same position one bar earlier / later (`4}` = four bars later) |
 | `[b` / `]b` | Previous / next bar line |
 | `0` / `$` | Start / last grid step of the current bar |

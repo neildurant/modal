@@ -835,6 +835,11 @@ void PianoRollView::showTrack(std::size_t track, std::optional<std::uint8_t> pit
 
 std::optional<std::size_t> PianoRollView::currentNote() const
 {
+    return noteAt(time_);
+}
+
+std::optional<std::size_t> PianoRollView::noteAt(core::Tick tick) const
+{
     const auto id = trackId();
     if (!id)
     {
@@ -842,16 +847,40 @@ std::optional<std::size_t> PianoRollView::currentNote() const
     }
     const auto events = document_.song().events(*id).all();
     std::optional<std::size_t> found;
-    for (std::size_t i = 0; i < events.size() && events[i].tick <= time_; ++i)
+    for (std::size_t i = 0; i < events.size() && events[i].tick <= tick; ++i)
     {
         const auto* note = std::get_if<core::Note>(&events[i].data);
         if (note != nullptr && note->pitch == pitch_ &&
-            time_ < events[i].tick + std::max<core::Tick>(note->duration, 1))
+            tick < events[i].tick + std::max<core::Tick>(note->duration, 1))
         {
             found = i;
         }
     }
     return found;
+}
+
+core::Tick PianoRollView::stepLeft(core::Tick tick) const
+{
+    // Off a note at the cursor's pitch in one step, to the grid step before its start, rather
+    // than a step at a time through it (decided October 2026, after use).
+    if (const auto index = noteAt(tick))
+    {
+        return gridBefore(document_.song().events(*trackId())[*index].tick);
+    }
+    return gridBefore(tick);
+}
+
+core::Tick PianoRollView::stepRight(core::Tick tick) const
+{
+    // And to the first grid step at or after its end.
+    if (const auto index = noteAt(tick))
+    {
+        const auto& event = document_.song().events(*trackId())[*index];
+        const auto end =
+            event.tick + std::max<core::Tick>(std::get<core::Note>(event.data).duration, 1);
+        return std::max(gridAfter(end - 1), gridAfter(tick));
+    }
+    return gridAfter(tick);
 }
 
 std::pair<core::Tick, core::Tick> PianoRollView::cursorSpan() const
@@ -936,7 +965,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         auto tick = time_;
         for (int i = 0; i < n; ++i)
         {
-            tick = gridBefore(tick);
+            tick = stepLeft(tick);
         }
         if (command == "cursor-left-scroll")
         {
@@ -950,9 +979,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     else if (command == "cursor-right" || command == "cursor-right-scroll")
     {
         auto tick = time_;
-        for (int i = 0; i < n && gridAfter(tick) <= lastTick(); ++i)
+        for (int i = 0; i < n && stepRight(tick) <= lastTick(); ++i)
         {
-            tick = gridAfter(tick);
+            tick = stepRight(tick);
         }
         if (command == "cursor-right-scroll")
         {
