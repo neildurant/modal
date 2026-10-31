@@ -275,7 +275,8 @@ private:
     CommandResult barInsert(std::string_view arguments);
     // Markers made section starts, the one at or before the cursor, or all of them.
     CommandResult markerToSection();
-    CommandResult markerToSectionAll();
+    // :marker-to-section on a selection: every marker from one time to another.
+    CommandResult markersToSections(core::Tick from, core::Tick to);
     CommandResult renameSection(std::string_view name);
 
     Region promptRegion() const;
@@ -308,6 +309,8 @@ private:
     std::optional<std::pair<Selection, SongCursor>> lastSelection_;
     // A command in Visual mode, or nothing to run it as in Normal mode; and ending it.
     std::optional<bool> runVisual(std::string_view command, int count);
+    // What the prompt shows before the line.
+    std::u32string promptLabel() const;
     bool operateOnSelection(std::string_view command, int count);
     bool putOverSelection();
     void endVisual();
@@ -327,7 +330,8 @@ private:
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};
-    // :marker-to-section-all, going through the markers, asking about those off a bar line.
+    // :marker-to-section on a selection, going through its markers, asking about those off a
+    // bar line.
     struct MarkerRun
     {
         SongCursor from; // where the cursor goes back to
@@ -337,6 +341,8 @@ private:
         int atStarts = 0;
         int sharing = 0;
         int declined = 0;
+        core::Tick first = 0; // the selection's span, outside which markers are passed over
+        core::Tick last = 0;
     };
     void runMarkers(std::shared_ptr<MarkerRun> run);
     void finishMarkers(const MarkerRun& run);

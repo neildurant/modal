@@ -872,12 +872,32 @@ TEST_CASE(":marker-to-section starts a section at a marker, asking unless it's o
           "Top is at the start of Section 1, so there's no section to start");
 }
 
-TEST_CASE(":marker-to-section-all goes through the markers, asking about those off a bar line")
+TEST_CASE(":marker-to-section on a selection goes through its markers, asking about those off a "
+          "bar line")
 {
     Arranging a{markerSong()};
     const auto& song = a.document.song();
-    a.type(U"l"); // bar 2, where the cursor comes back to
-    a.registry.runLine("marker-to-section-all");
+    // The : prompt runs lines through the registry, showing messages as the program does.
+    a.ws.setLineHandler(
+        [&](const std::string& line)
+        {
+            const auto result = a.registry.runLine(line);
+            if (!result.message.empty())
+            {
+                a.ws.setMessage(result.message,
+                                result.warning ? MessageKind::Warning : MessageKind::Information);
+            }
+        });
+    const auto run = [&](std::u32string_view line)
+    {
+        a.type(U":");
+        a.type(line);
+        a.press(Key::of(NamedKey::Enter));
+    };
+    a.type(U"lvie"); // the whole song, the cursor at its end, where it comes back to
+    const auto back = a.page().bar();
+    CHECK(a.ws.commandLine().text().empty());
+    run(U"marker-to-section");
     CHECK(a.ws.message() ==
           "Start a section at 5:1:000 from the marker Fill at 5:2:000? (y/n, Escape stops)");
     CHECK(a.page().bar() == 5);         // showing it
@@ -887,24 +907,44 @@ TEST_CASE(":marker-to-section-all goes through the markers, asking about those o
                             "in a bar with another");
     CHECK(sectionNames(song) == std::vector<std::string>{"Section 1", "Chorus", "Fill"});
     CHECK(song.markers().size() == 2);
-    CHECK(a.page().bar() == 2);
+    CHECK(a.page().bar() == back);
+    CHECK(a.ws.mode() == Mode::Normal);
     a.type(U"u"); // all of it, as one step
     CHECK(song.sections().size() == 1);
     CHECK(song.markers().size() == 4);
 
     // Escape stops, with nothing done; no goes on to the next.
-    a.registry.runLine("marker-to-section-all");
+    a.type(U"gv");
+    run(U"marker-to-section");
     a.press(Key::of(NamedKey::Escape));
     CHECK(a.ws.message() == "Nothing done");
     CHECK(song.sections().size() == 1);
-    CHECK(a.page().bar() == 2);
-    a.registry.runLine("marker-to-section-all");
+    a.type(U"gv");
+    run(U"marker-to-section");
     a.type(U"n");
     CHECK(a.ws.message() ==
           "Start a section at 5:1:000 from the marker Late at 5:3:000? (y/n, Escape stops)");
     a.type(U"n");
     CHECK(a.ws.message() == "Turned 1 marker into a section; 1 was at a section's start; 2 were "
                             "left as they were");
+    a.type(U"u");
+
+    // Only the markers in the selection: none in bar 2.
+    a.type(U"gglv");
+    run(U"marker-to-section");
+    CHECK(a.ws.message() == "There are no markers in bar 2 on every track");
+
+    // A command that takes no range says so, doing nothing.
+    a.type(U"v");
+    run(U"zoom-in");
+    CHECK(a.ws.message() == "zoom-in doesn't take a selection");
+    CHECK(a.ws.mode() == Mode::Normal);
+
+    // :bar-delete takes the selection's bars, on every track.
+    const auto end = song.end();
+    a.type(U"ggv");
+    run(U"bar-delete");
+    CHECK(song.end() == end - kBar);
 }
 
 TEST_CASE("Tab and Shift-Tab go past empty bars to the bars with events on the track")

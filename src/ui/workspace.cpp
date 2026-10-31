@@ -176,7 +176,8 @@ constexpr std::array kSharedCommands{
                 .description = "Delete the cursor's bar, or {count} bars from it, on every track, "
                                "closing up; they go in the register as a section",
                 .count = true,
-                .keys = false},
+                .keys = false,
+                .range = true},
     CommandInfo{.name = "bar-insert",
                 .description = "Insert an empty bar, or N, before the cursor's bar on every "
                                "track, in the meter there or one given (2 3/4)",
@@ -185,12 +186,11 @@ constexpr std::array kSharedCommands{
                 .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
     CommandInfo{.name = "marker-to-section",
                 .description = "Start a section at the marker at or before the cursor, named "
-                               "after it, at the bar line of its bar; the marker goes",
-                .keys = false},
-    CommandInfo{.name = "marker-to-section-all",
-                .description = "Start a section at every marker, asking about those off a bar "
-                               "line, as one undo step",
-                .keys = false},
+                               "after it, at the bar line of its bar; the marker goes. On a "
+                               "selection, at every marker in it (vie, the whole song), asking "
+                               "about those off a bar line, as one undo step",
+                .keys = false,
+                .range = true},
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor; with no name, asking for one, "
                                "with its name to edit",
@@ -428,10 +428,6 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "marker-to-section")
                          {
                              return markerToSection();
-                         }
-                         if (name == "marker-to-section-all")
-                         {
-                             return markerToSectionAll();
                          }
                          if (name == "bar-delete")
                          {
@@ -1928,20 +1924,35 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         mode_ = Mode::Normal;
         const auto text = line_.take();
+        if (selection_ && !text.empty())
+        {
+            // From Visual mode: only commands that take a range act on the selection.
+            const auto& words = text;
+            const auto start = words.find_first_not_of(" \t");
+            const auto name = start == std::string::npos
+                                  ? std::string{}
+                                  : words.substr(start, words.find_first_of(" \t!", start) - start);
+            const auto* info = commands_.find(name);
+            if (info == nullptr || !info->range)
+            {
+                endVisual();
+                setMessage(name + " doesn't take a selection", MessageKind::Warning);
+                return true;
+            }
+        }
         if (lineHandler_ && !text.empty())
         {
             lineHandler_(text);
         }
+        endVisual();
         return true;
     }
     if (command == "command-line-cancel" ||
         (command == "command-line-backspace" && line_.text().empty())) // as in Vim
     {
         mode_ = Mode::Normal;
-        if (std::exchange(answer_, {}))
-        {
-            endVisual(); // a selection the question was about
-        }
+        answer_ = {};
+        endVisual(); // a selection the question or the line was about
         return true;
     }
     return editLine(line_, command);
@@ -2445,6 +2456,10 @@ std::string trackNameOf(const core::Song& song, core::TrackId id)
 
 CommandResult Workspace::markerToSection()
 {
+    if (const auto span = selection_ ? view().selectionSpan() : std::nullopt)
+    {
+        return markersToSections(span->first, span->second);
+    }
     // The marker at or before the cursor, its section starting at the bar line of its bar in
     // the conductor's bars, asking first unless the cursor is on it and it's on a bar line.
     const auto& song = document_.song();
@@ -2492,14 +2507,19 @@ CommandResult Workspace::markerToSection()
     return {true, {}, false};
 }
 
-CommandResult Workspace::markerToSectionAll()
+CommandResult Workspace::markersToSections(core::Tick from, core::Tick to)
 {
-    if (document_.song().markers().empty())
+    const auto markers = document_.song().markers();
+    if (std::ranges::none_of(markers, [&](const core::Marker& marker)
+                             { return marker.tick >= from && marker.tick < to; }))
     {
-        return CommandResult::error("There are no markers to turn into sections");
+        return CommandResult::error("There are no markers in " +
+                                    view().selectionStatus().value_or("the selection"));
     }
     auto run = std::make_shared<MarkerRun>();
     run->from = view().cursor();
+    run->first = from;
+    run->last = to;
     runMarkers(run);
     return {true, {}, false};
 }
@@ -2515,6 +2535,10 @@ void Workspace::runMarkers(std::shared_ptr<MarkerRun> run)
     for (; run->next < markers.size(); ++run->next)
     {
         const auto marker = markers[run->next];
+        if (marker.tick < run->first || marker.tick >= run->last)
+        {
+            continue; // outside the selection
+        }
         const auto start = meter.barStart(meter.toBarBeatTick(marker.tick).bar);
         if (song.sectionStart(song.sectionAt(start)) == start)
         {
@@ -2607,6 +2631,10 @@ void Workspace::finishMarkers(const MarkerRun& run)
 
 CommandResult Workspace::barDelete(int count)
 {
+    if (const auto span = selection_ ? view().selectionSpan() : std::nullopt)
+    {
+        return deleteBars(span->first, span->second);
+    }
     const auto& song = document_.song();
     const auto& meter = song.meter();
     const auto bar = meter.toBarBeatTick(view().cursor().tick).bar;
@@ -2803,23 +2831,35 @@ Frame Workspace::frame() const
     return frame;
 }
 
+std::u32string Workspace::promptLabel() const
+{
+    // ":", or a question's label, for its answer; or from Visual mode, what's selected, which
+    // the line acts on.
+    if (answer_)
+    {
+        return decodeUtf8(answerLabel_);
+    }
+    if (selection_)
+    {
+        return decodeUtf8(view().selectionStatus().value_or("selection") + ": ");
+    }
+    return U":";
+}
+
 Region Workspace::promptRegion() const
 {
     // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own.
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto& text = line_.text();
     const auto cursor = line_.cursor();
+    const auto label = promptLabel();
     const auto room = static_cast<std::size_t>(
-        std::max((width_ - 2 * margin) / cell_.width - 1 -
-                     (answer_ ? static_cast<int>(decodeUtf8(answerLabel_).size()) : 1),
-                 1));
+        std::max((width_ - 2 * margin) / cell_.width - 1 - static_cast<int>(label.size()), 1));
     const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
     Region region{
         .bounds = layout_.bottom[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
     const auto x = [&](std::size_t column)
     { return margin + static_cast<int>(column) * cell_.width; };
-    // Or a question's label, for its answer.
-    const auto label = answer_ ? decodeUtf8(answerLabel_) : std::u32string{U":"};
     const auto lead = label.size();
     region.text.push_back({x(0), 0, label, kBarText});
     region.text.push_back({x(lead), 0, text.substr(first, cursor - first), kBarText});
