@@ -14,17 +14,32 @@
 namespace modal::platform
 {
 
+namespace
+{
+
+std::optional<std::filesystem::path> knownFolder(const KNOWNFOLDERID& id)
+{
+    PWSTR folder = nullptr;
+    const HRESULT found = SHGetKnownFolderPath(id, 0, nullptr, &folder);
+    std::optional<std::filesystem::path> directory;
+    if (SUCCEEDED(found) && folder != nullptr)
+    {
+        directory = std::filesystem::path{folder} / "Modal";
+    }
+    CoTaskMemFree(folder); // even on failure
+    return directory;
+}
+
+} // namespace
+
 std::optional<std::filesystem::path> configDirectory()
 {
-    PWSTR roaming = nullptr;
-    const HRESULT found = SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming);
-    std::optional<std::filesystem::path> directory;
-    if (SUCCEEDED(found) && roaming != nullptr)
-    {
-        directory = std::filesystem::path{roaming} / "Modal";
-    }
-    CoTaskMemFree(roaming); // even on failure
-    return directory;
+    return knownFolder(FOLDERID_RoamingAppData);
+}
+
+std::optional<std::filesystem::path> stateDirectory()
+{
+    return knownFolder(FOLDERID_LocalAppData);
 }
 
 } // namespace modal::platform

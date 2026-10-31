@@ -13,4 +13,10 @@ namespace modal::platform
 // system doesn't say where. It may not exist yet.
 std::optional<std::filesystem::path> configDirectory();
 
+// The directory for what Modal remembers between sessions without being told, such as the
+// palette's ranking (decided October 2026), apart from what the user writes: on Linux
+// $XDG_STATE_HOME/modal, or ~/.local/state/modal; on Windows %LOCALAPPDATA%\Modal. Nothing
+// if the system doesn't say where. It may not exist yet.
+std::optional<std::filesystem::path> stateDirectory();
+
 } // namespace modal::platform
