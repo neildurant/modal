@@ -102,6 +102,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
 | `Ctrl-Shift-h` `Ctrl-Shift-l` (or the arrows) | In the arrangement and the piano roll, a page earlier or later, the cursor staying in place on screen |
 | `zz` | Centre the cursor |
+| `Ctrl-p`, `, :` | The command palette: type part of a command's name or what it does, Enter runs it, Tab puts it on the `:` prompt |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
 | Space, Shift-Space | Play from the play-from marker (the ▶ in the margin), or stop where it is, the cursor landing there; Shift-Space stops and goes back to where the cursor was |
 | `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |

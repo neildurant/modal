@@ -9,6 +9,7 @@ add_library(modal_ui STATIC
     command_line.cpp
     commands.cpp
     completion.cpp
+    palette.cpp
     config.cpp
     demo_song.cpp
     event_list.cpp

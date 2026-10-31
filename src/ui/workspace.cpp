@@ -6,6 +6,7 @@
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
+#include <modal/ui/palette.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -90,6 +91,9 @@ constexpr std::array kSharedCommands{
                 .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
                                "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "palette",
+                .description = "The command palette: find a command by typing part of its name "
+                               "or what it does, and run it"},
     CommandInfo{.name = "cut-at-edges",
                 .description = "Cut the notes crossing a range's edges, so an operator takes "
                                "only the parts inside: before an operator for it alone (|d]b), "
@@ -726,6 +730,10 @@ bool Workspace::handle(const Key& key, std::int64_t now)
             {
                 const bool listed = completions().has_value();
                 line_.insert(key.character);
+                if (palette_)
+                {
+                    palette_->chosen = 0; // the best of what now matches
+                }
                 if (listed)
                 {
                     refilter(); // the matches follow what's typed
@@ -1512,6 +1520,15 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         cutNext_ = true; // for the next operator
         return true;
     }
+    if (command == "palette")
+    {
+        palette_ = PaletteState{};
+        mode_ = Mode::CommandLine;
+        line_.open();
+        answer_ = {};
+        completing_.reset();
+        return true;
+    }
     if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
         const auto kind = selectionKind(command);
@@ -2042,6 +2059,10 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         return view().runTyping(command);
     }
+    if (palette_)
+    {
+        return runPalette(command);
+    }
     if (command == "command-line-next" || command == "command-line-previous")
     {
         return !answer_ && complete(command == "command-line-next" ? 1 : -1);
@@ -2195,7 +2216,7 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
 
 std::optional<Workspace::Completions> Workspace::completions() const
 {
-    if (mode_ != Mode::CommandLine || view().typing() || !completing_ ||
+    if (mode_ != Mode::CommandLine || view().typing() || palette_ || !completing_ ||
         completing_->line != line_.text() || completing_->matches.size() < 2)
     {
         return std::nullopt;
@@ -3006,6 +3027,10 @@ Frame Workspace::frame() const
     {
         frame.push_back(completionRegion(*shown));
     }
+    if (palette_)
+    {
+        frame.push_back(paletteRegion());
+    }
     if (const auto shown = hints())
     {
         frame.push_back(hintRegion(*shown));
@@ -3019,6 +3044,165 @@ Frame Workspace::frame() const
     return frame;
 }
 
+std::vector<PaletteItem> Workspace::paletteItems() const
+{
+    // The commands that can be run from Normal mode, the palette apart.
+    std::vector<PaletteItem> items;
+    for (const auto& info : commands_.all())
+    {
+        const bool normal = info.modes == 0 || (info.modes & modeBit(Mode::Normal)) != 0;
+        if (!normal || info.object || info.name == "palette")
+        {
+            continue;
+        }
+        items.push_back({.name = std::string{info.name},
+                         .title = titleOf(info),
+                         .description = std::string{info.description},
+                         .aliases = std::string{info.aliases},
+                         .offered = offered(info.name)});
+    }
+    return items;
+}
+
+std::vector<PaletteItem> Workspace::paletteShown() const
+{
+    const auto items = paletteItems();
+    std::vector<PaletteItem> shown;
+    for (const auto i : paletteMatches(items, encodeUtf8(line_.text())))
+    {
+        shown.push_back(items[i]);
+    }
+    return shown;
+}
+
+std::string Workspace::keysFor(std::string_view command) const
+{
+    auto keys = keysOf(command);
+    return keys == command ? std::string{} : keys;
+}
+
+bool Workspace::runPalette(std::string_view command)
+{
+    // Enter runs the command chosen, or with an argument it must have, puts it on the : prompt,
+    // its choices showing; Tab puts it there as it is to edit; Up and Down, and Ctrl-p and
+    // Ctrl-n, go up and down the list; Escape closes it; the rest edit what's typed.
+    const auto shown = paletteShown();
+    const auto chosen = std::min(palette_->chosen, shown.empty() ? 0 : shown.size() - 1);
+    if (command == "command-line-cancel" ||
+        (command == "command-line-backspace" && line_.text().empty()))
+    {
+        palette_.reset();
+        mode_ = Mode::Normal;
+        endVisual();
+        return true;
+    }
+    if (command == "command-line-older" || command == "command-line-newer" ||
+        command == "command-line-page-up" || command == "command-line-page-down")
+    {
+        // Up the list is away from the line, to the matches after the best.
+        const std::ptrdiff_t by = command == "command-line-older"     ? 1
+                                  : command == "command-line-newer"   ? -1
+                                  : command == "command-line-page-up" ? kPaletteRows
+                                                                      : -kPaletteRows;
+        palette_->chosen = static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
+            static_cast<std::ptrdiff_t>(chosen) + by, 0,
+            std::max<std::ptrdiff_t>(static_cast<std::ptrdiff_t>(shown.size()) - 1, 0)));
+        return true;
+    }
+    if (command == "command-line-run" || command == "command-line-next")
+    {
+        if (shown.empty())
+        {
+            return false;
+        }
+        const auto& item = shown[chosen];
+        const auto* info = commands_.find(item.name);
+        palette_.reset();
+        const bool needs = info != nullptr && !info->usage.empty() && !info->usage.starts_with("[");
+        if (command == "command-line-next" || needs)
+        {
+            line_.open(decodeUtf8(item.name + " "));
+            if (needs)
+            {
+                complete(1); // its choices showing
+            }
+            return true;
+        }
+        line_.open(decodeUtf8(item.name));
+        const auto ran = runCommandLine("command-line-run");
+        if (const auto keys = keysFor(item.name); message_.empty() && !keys.empty())
+        {
+            setMessage("Also: " + keys, MessageKind::Information); // teaching the binding
+        }
+        return ran.value_or(true);
+    }
+    const auto edited = editLine(line_, command);
+    palette_->chosen = 0;
+    return edited.value_or(false);
+}
+
+Region Workspace::paletteRegion() const
+{
+    // Above the prompt, as completion's matches are: the best nearest the line, each with its
+    // keys and what it does; the one chosen in the cursor's colours; those that do nothing
+    // here dimmed.
+    const auto shown = paletteShown();
+    const auto chosen = std::min(palette_->chosen, shown.empty() ? 0 : shown.size() - 1);
+    const auto rows = std::min<std::size_t>(shown.size(), kPaletteRows);
+    const auto first = chosen >= rows ? chosen - rows + 1 : 0;
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int pad = cell_.height / 4;
+    const int height = std::max<int>(static_cast<int>(rows), 1) * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    if (shown.empty())
+    {
+        region.text.push_back(
+            {margin, pad, U"No command matches", {Role::Dim, Role::Panel, kPlain}});
+        return region;
+    }
+    std::size_t titleWidth = 0;
+    std::size_t keysWidth = 0;
+    std::vector<std::string> keys;
+    for (auto i = first; i < first + rows; ++i)
+    {
+        keys.push_back(keysFor(shown[i].name));
+        titleWidth = std::max(titleWidth, decodeUtf8(shown[i].title).size());
+        keysWidth = std::max(keysWidth, decodeUtf8(keys.back()).size());
+    }
+    const auto x = [&](std::size_t column)
+    { return margin + static_cast<int>(column) * cell_.width; };
+    for (std::size_t r = 0; r < rows; ++r)
+    {
+        const auto i = first + r;
+        const auto& item = shown[i];
+        const int y = pad + static_cast<int>(rows - 1 - r) * cell_.height; // the best at the bottom
+        const bool isChosen = i == chosen;
+        const auto background = isChosen ? Role::Cursor : Role::Panel;
+        if (isChosen)
+        {
+            region.under.push_back({{0, y, region.bounds.width, cell_.height}, Role::Cursor, 255});
+        }
+        const auto role = [&](Role own)
+        {
+            return isChosen ? Role::CursorText : item.offered ? own : Role::Dim;
+        };
+        region.text.push_back(
+            {x(0), y, decodeUtf8(item.title), {role(Role::Text), background, kPlain}});
+        region.text.push_back(
+            {x(titleWidth + 2), y, decodeUtf8(keys[r]), {role(Role::HintKey), background, kPlain}});
+        region.text.push_back({x(titleWidth + keysWidth + 4),
+                               y,
+                               decodeUtf8(item.description),
+                               {isChosen ? Role::CursorText : Role::Dim, background, kPlain}});
+    }
+    return region;
+}
+
 std::u32string Workspace::promptLabel() const
 {
     // ":", or a question's label, for its answer; or from Visual mode, what's selected, which
@@ -3026,6 +3210,12 @@ std::u32string Workspace::promptLabel() const
     if (answer_)
     {
         return decodeUtf8(answerLabel_);
+    }
+    if (palette_)
+    {
+        return decodeUtf8(selection_ ? "Command on " +
+                                           view().selectionStatus().value_or("selection") + ": "
+                                     : std::string{"Command: "});
     }
     if (selection_)
     {

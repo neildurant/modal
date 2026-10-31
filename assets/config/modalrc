@@ -256,9 +256,13 @@ nmap <C-0>      font-reset        "Text size from the config"
 nmap <C-k0>     font-reset
 
 " The command line: : opens it, and in it these keys edit, run and recall lines. Other
-" characters are typed.
+" characters are typed. Ctrl-p (or , :) opens the command palette there: type part of a
+" command's name or what it does; Up and Down (or Ctrl-p and Ctrl-n) choose, Enter runs, Tab
+" puts the command on the line.
 keysection "The command line"
 nmap :          command-line            "Command line"
+nmap <C-p>      palette                 "Command palette"
+nmap <leader>:  palette                 "Command palette"
 cmap <CR>       command-line-run        "Run"
 cmap <Esc>      command-line-cancel     "Cancel"
 cmap <BS>       command-line-backspace  "Delete back"
@@ -270,6 +274,10 @@ cmap <End>      command-line-end        "End"
 cmap <C-u>      command-line-clear      "Clear"
 cmap <Up>       command-line-older      "Older line"
 cmap <Down>     command-line-newer      "Newer line"
+cmap <C-p>      command-line-older
+cmap <C-n>      command-line-newer
+cmap <C-k>      command-line-older
+cmap <C-j>      command-line-newer
 cmap <Tab>      command-line-next       "Next field"
 cmap <S-Tab>    command-line-previous   "Field before"
 cmap <PageDown> command-line-page-down  "A screen on"

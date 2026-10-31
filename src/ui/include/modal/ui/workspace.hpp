@@ -14,6 +14,7 @@
 #include <modal/ui/key.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
+#include <modal/ui/palette.hpp>
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/view.hpp>
 
@@ -313,6 +314,20 @@ private:
     std::optional<bool> runVisual(std::string_view command, int count);
     // What the prompt shows before the line.
     std::u32string promptLabel() const;
+    // The command palette, open at the prompt: the commands it searches, those matching what's
+    // typed, best first, a command's keys (none if it has none), its keys while it's open, and
+    // the list above the prompt.
+    struct PaletteState
+    {
+        std::size_t chosen = 0; // among the matches, 0 the best
+    };
+    static constexpr std::ptrdiff_t kPaletteRows = 12;
+    std::optional<PaletteState> palette_;
+    std::vector<PaletteItem> paletteItems() const;
+    std::vector<PaletteItem> paletteShown() const;
+    std::string keysFor(std::string_view command) const;
+    bool runPalette(std::string_view command);
+    Region paletteRegion() const;
     bool operateOnSelection(std::string_view command, int count);
     // Cutting at the edges (|): an operator run after cutting the notes crossing its range's
     // edges, as cutThen says; the cut on the song; and what y took, cut to the range.

@@ -44,6 +44,7 @@ add_executable(modal_tests
     ui/command_line_test.cpp
     ui/commands_test.cpp
     ui/completion_test.cpp
+    ui/palette_test.cpp
     ui/config_test.cpp
     ui/demo_song_test.cpp
     ui/event_edit_test.cpp
