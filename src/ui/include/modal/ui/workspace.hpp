@@ -207,6 +207,8 @@ public:
     Mode mode() const { return mode_; }
     const CommandLine& commandLine() const { return line_; }
     std::string pending() const; // the operator, count and keys typed so far
+    // What a listing (:registers) shows, a name and what it is a line, until the next key.
+    const std::vector<std::pair<std::string, std::string>>& listing() const { return listing_; }
 
     // What the unnamed register holds: an area's events, yanked or deleted; and those of its
     // first track alone.
@@ -377,6 +379,10 @@ private:
     EventRegister registerBefore_;
     static EventRegister appended(EventRegister to, const EventRegister& more);
     static std::string registerAbout(const EventRegister& reg);
+    // A listing over the view (:registers, :macros), a name and what it is a line, closed by
+    // the next key; and drawing it.
+    std::vector<std::pair<std::string, std::string>> listing_;
+    Region listingRegion() const;
     bool sayRegisters();
     std::vector<Key> changeKeys_; // typed since Normal mode was last idle
     std::vector<Key> lastChange_;

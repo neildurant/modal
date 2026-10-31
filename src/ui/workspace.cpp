@@ -817,23 +817,60 @@ std::string Workspace::registerAbout(const EventRegister& reg)
 
 bool Workspace::sayRegisters()
 {
-    // Each holding something, the unnamed first: "a: 12 events on 2 tracks.
-    const auto about = [](const EventRegister& reg) { return registerAbout(reg); };
-    std::string text;
+    // Each holding something, the unnamed first, one a line: "a : 12 events on 2 tracks.
+    std::vector<std::pair<std::string, std::string>> lines;
     if (!register_.empty())
     {
-        text = "\"\": " + about(register_);
+        lines.emplace_back("\"\"", registerAbout(register_));
     }
     for (const auto& [name, reg] : registers_)
     {
         if (!reg.empty())
         {
-            text += (text.empty() ? "" : "; ") + std::string{"\""} +
-                    encodeUtf8(std::u32string(1, name)) + ": " + about(reg);
+            lines.emplace_back("\"" + encodeUtf8(std::u32string(1, name)), registerAbout(reg));
         }
     }
-    setMessage(text.empty() ? "The registers are empty" : text, MessageKind::Information);
+    if (lines.empty())
+    {
+        setMessage("The registers are empty", MessageKind::Information);
+        return true;
+    }
+    listing_ = std::move(lines);
     return true;
+}
+
+Region Workspace::listingRegion() const
+{
+    // Above the status line, as the hint menu is: each name right-aligned in the keys' colour,
+    // a colon in one column, and what it is.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int pad = cell_.height / 4;
+    const int height = static_cast<int>(listing_.size()) * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    std::size_t width = 0;
+    for (const auto& [name, text] : listing_)
+    {
+        width = std::max(width, decodeUtf8(name).size());
+    }
+    for (std::size_t i = 0; i < listing_.size(); ++i)
+    {
+        const auto& [name, text] = listing_[i];
+        const auto shown = decodeUtf8(name);
+        const int y = pad + static_cast<int>(i) * cell_.height;
+        const auto x = [&](std::size_t column)
+        { return margin + static_cast<int>(column) * cell_.width; };
+        region.text.push_back(
+            {x(width - shown.size()), y, shown, {Role::HintKey, Role::Panel, kPlain}});
+        region.text.push_back({x(width), y, U":", {Role::Dim, Role::Panel, kPlain}});
+        region.text.push_back(
+            {x(width + 2), y, decodeUtf8(text), {Role::Text, Role::Panel, kPlain}});
+    }
+    return region;
 }
 
 bool Workspace::repeatChange(int count)
@@ -876,6 +913,12 @@ bool Workspace::repeatChange(int count)
 bool Workspace::handleKey(const Key& key, std::int64_t now)
 {
     lastTime_ = now;
+    // A listing showing (:registers) takes the next key to close it, and nothing else.
+    if (!std::exchange(listing_, {}).empty())
+    {
+        message_.clear();
+        return true;
+    }
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
     // A question asked takes the next key as its answer: y for yes, Escape to stop a run of
     // them, any other for no.
@@ -3371,6 +3414,10 @@ Frame Workspace::frame() const
     if (const auto lines = messageLines(); !lines.empty())
     {
         frame.push_back(messageRegion(lines));
+    }
+    if (!listing_.empty())
+    {
+        frame.push_back(listingRegion());
     }
     frame.push_back(mode_ == Mode::CommandLine && !view().typing() ? promptRegion()
                                                                    : statusRegion());

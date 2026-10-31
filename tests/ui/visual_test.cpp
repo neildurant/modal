@@ -861,6 +861,17 @@ TEST_CASE(":registers says what each holds")
     s.type(U"\"ayyjvl\"by");
     s.type(U":registers");
     s.ws.handle(Key::of(NamedKey::Enter), 0);
-    CHECK(s.ws.message() ==
-          "\"\": 4 events on 2 tracks; \"a: 1 event on 1 track; \"b: 4 events on 2 tracks");
+    using Lines = std::vector<std::pair<std::string, std::string>>;
+    CHECK(s.ws.listing() == Lines{{"\"\"", "4 events on 2 tracks"},
+                                  {"\"a", "1 event on 1 track"},
+                                  {"\"b", "4 events on 2 tracks"}});
+    // One a line, over the view; the next key closes it and does nothing else.
+    const auto frame = s.ws.frame();
+    CHECK(std::ranges::any_of(
+        frame, [](const Region& region)
+        { return region.background == Role::Panel && region.text.size() == 9; }));
+    const auto bar = s.ws.arrangement().page().bar();
+    s.type(U"l");
+    CHECK(s.ws.listing().empty());
+    CHECK(s.ws.arrangement().page().bar() == bar);
 }
