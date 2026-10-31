@@ -1760,7 +1760,10 @@ void Workspace::endVisual()
         lastSelection_ = std::pair{*selection_, view().cursor()};
     }
     selection_.reset();
-    mode_ = Mode::Normal;
+    if (mode_ == Mode::Visual) // not once an operator has asked at the prompt, as ^ does
+    {
+        mode_ = Mode::Normal;
+    }
 }
 
 bool Workspace::operateOnSections(std::string_view op, int count)

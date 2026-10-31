@@ -360,3 +360,18 @@ TEST_CASE("v on the section strip selects sections, and the operators take them"
     s.type(U"u");
     CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
 }
+
+TEST_CASE("^ on a selection asks how to change the velocity, then changes it")
+{
+    Selecting s;
+    s.type(U"grv}^");
+    REQUIRE(s.ws.mode() == Mode::CommandLine);
+    s.type(U"80");
+    s.press(NamedKey::Enter);
+    const auto& song = s.document.song();
+    const auto& events = song.events(song.tracks()[0]->id());
+    CHECK(std::get<core::Note>(events[0].data).velocity == 80);
+    CHECK(std::get<core::Note>(events[1].data).velocity == 80);
+    CHECK(std::get<core::Note>(events[2].data).velocity == 100);
+    CHECK(s.ws.mode() == Mode::Normal);
+}
