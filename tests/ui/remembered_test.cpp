@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/ui/key_notation.hpp>
 #include <modal/ui/remembered.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <variant>
 #include <vector>
 
 using namespace modal;
@@ -74,4 +76,20 @@ TEST_CASE("what's remembered is kept as plain text, and read back the same")
     CHECK(read.meters().size() == 1);
     CHECK(read.rank("zoom-out", 100) > 0);
     CHECK(read.rank("x", 100) == 0);
+}
+
+TEST_CASE("macros are remembered in key notation")
+{
+    Remembered remembered;
+    const auto keys = std::get<std::vector<Key>>(parseKeys("3>>j<Space><lt><C-a>"));
+    remembered.setMacro(U'a', keys);
+    CHECK(remembered.text().find("macro a 3>>j<Space><lt><C-a>\n") != std::string::npos);
+    const auto read = Remembered::read(remembered.text());
+    REQUIRE(read.macro(U'a') != nullptr);
+    CHECK(*read.macro(U'a') == keys);
+    CHECK(read == remembered);
+    // Lines it can't read are passed over.
+    CHECK(Remembered::read("macro A x\nmacro b <Nope>\nmacro c\n").macros().empty());
+    remembered.setMacro(U'a', {});
+    CHECK(remembered.macro(U'a') == nullptr);
 }

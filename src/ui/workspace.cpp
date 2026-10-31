@@ -97,6 +97,14 @@ constexpr std::array kSharedCommands{
                 .description = "Name the register for the next yank, delete or put by a letter "
                                "after it (\"ayy, \"ap); a capital adds to it (\"Ayy)"},
     CommandInfo{.name = "registers", .description = "Say what the registers hold", .keys = false},
+    CommandInfo{.name = "macro-record",
+                .description = "Record the keys typed into a macro named by a letter after it "
+                               "(Qa), a capital adding to it (QA); while recording, end it"},
+    CommandInfo{.name = "macro-play",
+                .description = "Play the macro named by a letter after it (@a), or @ the last "
+                               "again, {count} times, as one undo step",
+                .count = true},
+    CommandInfo{.name = "macros", .description = "Say what the macros hold", .keys = false},
     CommandInfo{.name = "repeat",
                 .description = "Repeat the last change (.), with its range or object, as one "
                                "undo step; a count replaces the one it had",
@@ -747,6 +755,22 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
 
 bool Workspace::handle(const Key& key, std::int64_t now)
 {
+    // Keys typed while a macro records go into it as typed (decided October 2026, as Vim's
+    // q), but for those of the binding that ends it, which it takes off: those since nothing
+    // was waiting.
+    if (recording_ != 0)
+    {
+        if (keys_.pending().empty())
+        {
+            recordedBefore_ = recorded_.size();
+        }
+        recorded_.push_back(key);
+    }
+    return recordChange(key, now);
+}
+
+bool Workspace::recordChange(const Key& key, std::int64_t now)
+{
     // The keys of each change, for . to repeat (decided for milestone 6, as Vim's .): those
     // typed from Normal mode until it's back there, with nothing waiting, if the song changed
     // meanwhile; not undo, redo or . itself, nor while . or a macro replays them.
@@ -760,8 +784,9 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     }
     changeKeys_.push_back(key);
     const bool changed = handleKey(key, now);
-    const bool idle =
-        mode_ == Mode::Normal && keys_.pending().empty() && !operator_ && !question_ && !cutNext_;
+    // A command waiting for its letter (@a, "ap) isn't idle yet, so . repeats the whole of it.
+    const bool idle = mode_ == Mode::Normal && keys_.pending().empty() && !operator_ &&
+                      !question_ && !cutNext_ && !awaiting_ && !registerName_;
     if (idle)
     {
         if (document_.version() != versionBefore_ && !notAChange_)
@@ -774,8 +799,40 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     return changed;
 }
 
-bool Workspace::withCharacter(std::string_view command, char32_t character, int /*count*/)
+bool Workspace::withCharacter(std::string_view command, char32_t character, int count)
 {
+    if (command == "macro-record" || command == "macro-play")
+    {
+        const bool play = command == "macro-play";
+        if (play && character == U'@')
+        {
+            if (lastMacro_ == 0)
+            {
+                setMessage("No macro played yet to play again", MessageKind::Information);
+                macroFailed_ = macroDepth_ > 0;
+                return true;
+            }
+            return playMacro(lastMacro_, count);
+        }
+        if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
+        {
+            setMessage(play ? "Macros are named by letters, @a to @z, or @@ plays the last again"
+                            : "Macros are named by letters, Qa to Qz, a capital adding to one",
+                       MessageKind::Information);
+            macroFailed_ = macroDepth_ > 0;
+            return true;
+        }
+        const char32_t name = lowerLetter(character);
+        if (play)
+        {
+            return playMacro(name, count);
+        }
+        recording_ = name;
+        const auto* had = remembered_.macro(name);
+        recorded_ = character != name && had != nullptr ? *had : std::vector<Key>{};
+        recordedBefore_ = recorded_.size();
+        return true;
+    }
     if (command == "register-use")
     {
         if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
@@ -896,20 +953,126 @@ Region Workspace::listingRegion() const
     {
         width = std::max(width, decodeUtf8(name).size());
     }
+    const auto room = static_cast<std::size_t>(std::max(
+        (region.bounds.width - 2 * margin) / std::max(cell_.width, 1) - static_cast<int>(width) - 2,
+        1));
     for (std::size_t i = 0; i < listing_.size(); ++i)
     {
-        const auto& [name, text] = listing_[i];
+        const auto& [name, said] = listing_[i];
         const auto shown = decodeUtf8(name);
+        auto text = decodeUtf8(said);
+        if (text.size() > room)
+        {
+            text = text.substr(0, room - 1) + U"…";
+        }
         const int y = pad + static_cast<int>(i) * cell_.height;
         const auto x = [&](std::size_t column)
         { return margin + static_cast<int>(column) * cell_.width; };
         region.text.push_back(
             {x(width - shown.size()), y, shown, {Role::HintKey, Role::Panel, kPlain}});
         region.text.push_back({x(width), y, U":", {Role::Dim, Role::Panel, kPlain}});
-        region.text.push_back(
-            {x(width + 2), y, decodeUtf8(text), {Role::Text, Role::Panel, kPlain}});
+        region.text.push_back({x(width + 2), y, text, {Role::Text, Role::Panel, kPlain}});
     }
     return region;
+}
+
+std::string Workspace::macroName(char32_t name)
+{
+    return "@" + encodeUtf8(std::u32string(1, name));
+}
+
+bool Workspace::endRecording()
+{
+    // What was typed, without the keys that ended it, kept in the remembered state.
+    recorded_.resize(std::min(recordedBefore_, recorded_.size()));
+    const auto name = std::exchange(recording_, 0);
+    const auto count = recorded_.size();
+    remembered_.setMacro(name, std::exchange(recorded_, {}));
+    rememberedChanged();
+    setMessage(count == 0 ? macroName(name) + " is empty"
+                          : "Recorded " + macroName(name) + ", " + std::to_string(count) +
+                                (count == 1 ? " key" : " keys"),
+               MessageKind::Information);
+    return true;
+}
+
+bool Workspace::playMacro(char32_t name, int count)
+{
+    // Its keys again as typed, count times, as one undo step (decided October 2026, as Vim's
+    // @). A command failing in it, by a warning, a key that does nothing here or a motion that
+    // can't move, stops it and any playing it, what was done staying, to undo or carry on
+    // from; macros playing macros stop kMaxMacroDepth deep.
+    const auto* keys = remembered_.macro(name);
+    if (keys == nullptr)
+    {
+        setMessage(macroName(name) + " is empty", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        return true;
+    }
+    if (macroDepth_ >= kMaxMacroDepth)
+    {
+        setMessage("Macros playing macros stopped, " + std::to_string(kMaxMacroDepth) + " deep",
+                   MessageKind::Warning);
+        return true;
+    }
+    lastMacro_ = name;
+    const auto macro = *keys; // as it was, whatever's recorded meanwhile
+    // Changes in it are changes for . in it, as typed; after it, . repeats the @ itself.
+    auto changeKeys = std::exchange(changeKeys_, {});
+    const auto lastChange = lastChange_;
+    const auto versionBefore = versionBefore_;
+    const bool notAChange = std::exchange(notAChange_, false);
+    const bool replaying = std::exchange(replaying_, false);
+    ++macroDepth_;
+    document_.beginGroup({}, view().place());
+    for (int i = 0; i < std::max(count, 1) && !macroFailed_; ++i)
+    {
+        for (const auto& key : macro)
+        {
+            if (macroFailed_)
+            {
+                break;
+            }
+            recordChange(key, lastTime_);
+        }
+        // Keys left waiting for a longer binding run, as when their time is up.
+        if (const auto deadline = keys_.deadline(); deadline && !macroFailed_)
+        {
+            const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
+                                     ? operatorKeymapHere()
+                                     : keymapHere();
+            runAll(keys_.timeout(keymap, *deadline));
+        }
+    }
+    document_.endGroup();
+    if (--macroDepth_ == 0)
+    {
+        macroFailed_ = false;
+    }
+    changeKeys_ = std::move(changeKeys);
+    lastChange_ = lastChange;
+    versionBefore_ = versionBefore;
+    notAChange_ = notAChange;
+    replaying_ = replaying;
+    refresh();
+    return true;
+}
+
+bool Workspace::sayMacros()
+{
+    // One a line, as the registers: "@a : 3>>j".
+    std::vector<std::pair<std::string, std::string>> lines;
+    for (const auto& [name, keys] : remembered_.macros())
+    {
+        lines.emplace_back(macroName(name), formatKeys(keys));
+    }
+    if (lines.empty())
+    {
+        setMessage("No macros recorded", MessageKind::Information);
+        return true;
+    }
+    listing_ = std::move(lines);
+    return true;
 }
 
 bool Workspace::repeatChange(int count)
@@ -1068,6 +1231,7 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
         {
             setMessage(unbound + " isn't a range or object after " + keysOf(operator_->name),
                        MessageKind::Information);
+            macroFailed_ = macroDepth_ > 0;
         }
         operator_.reset();
         mode_ = Mode::Normal;
@@ -1075,6 +1239,7 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     else if ((typedIn == Mode::Normal || typedIn == Mode::Visual) && !unbound.empty())
     {
         setMessage(unbound + " isn't a key here", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
     }
     const bool hinted = hints().has_value();
     noteWaiting(now);
@@ -1822,6 +1987,12 @@ bool Workspace::runViewCommand(std::string_view command, int count)
         {
             following_ = false;
         }
+        // In a macro, a motion that can't move fails, as in Vim, ending a run at the song's
+        // edge or the last note.
+        if (macroDepth_ > 0 && command.starts_with("cursor-") && view().cursor() == cursor)
+        {
+            macroFailed_ = true;
+        }
         return *changed;
     }
     return sayWhereFor(command);
@@ -1881,6 +2052,7 @@ bool Workspace::sayWhereFor(std::string_view command)
     }
     setMessage(places.empty() ? title + " does nothing here" : title + " is for " + text,
                MessageKind::Information);
+    macroFailed_ = macroDepth_ > 0;
     return true;
 }
 
@@ -1965,6 +2137,19 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "registers")
     {
         return sayRegisters();
+    }
+    if (command == "macro-record" && recording_ != 0)
+    {
+        return endRecording();
+    }
+    if (command == "macro-record" || command == "macro-play")
+    {
+        awaiting_ = Awaiting{std::string{command}, count};
+        return true;
+    }
+    if (command == "macros")
+    {
+        return sayMacros();
     }
     if (command == "undo" || command == "redo")
     {
@@ -4050,6 +4235,14 @@ Bar Workspace::statusBar(bool withMessage) const
                     : mode_ == Mode::Visual ? " VISUAL "
                                             : " NORMAL ",
                     {Role::ModeText, Role::Mode, kBold}}};
+    if (recording_ != 0)
+    {
+        const auto ends = keysFor("macro-record");
+        bottom.left.push_back({"  recording " + macroName(recording_) + ", " +
+                                   (ends.empty() ? std::string{":macro-record"} : ends) +
+                                   " ends it",
+                               {Role::Accent, Role::Bar, kBold}});
+    }
     if (withMessage && !message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;

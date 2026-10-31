@@ -220,6 +220,8 @@ public:
     {
         message_ = std::move(message);
         messageKind_ = kind;
+        // A warning in a macro is a command failing, which stops it.
+        macroFailed_ = macroFailed_ || (kind == MessageKind::Warning && macroDepth_ > 0);
     }
     const std::string& message() const { return message_; }
 
@@ -375,7 +377,23 @@ private:
     // A key as typed, and as . and macros replay them; the keys of the last change, for .;
     // and repeating it.
     bool handleKey(const Key& key, std::int64_t now);
+    bool recordChange(const Key& key, std::int64_t now);
     bool repeatChange(int count);
+    // Macros, a to z, kept in the remembered state: the one recording (0 for none, rather than
+    // an optional, which GCC's release build takes for uninitialised) and its keys so far,
+    // where the keys of the binding being typed began, the last played, how deep in macros
+    // the keys being run are, and whether a command among them failed, stopping them.
+    static constexpr int kMaxMacroDepth = 20;
+    char32_t recording_ = 0;
+    std::vector<Key> recorded_;
+    std::size_t recordedBefore_ = 0;
+    char32_t lastMacro_ = 0;
+    int macroDepth_ = 0;
+    bool macroFailed_ = false;
+    static std::string macroName(char32_t name);
+    bool endRecording();
+    bool playMacro(char32_t name, int count);
+    bool sayMacros();
     // Commands that take a character after them ("a), waiting for it; running one with it.
     struct Awaiting
     {

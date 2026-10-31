@@ -380,10 +380,10 @@ TEST_CASE("keys an operator can't take, and keys bound to nothing, say so and do
     CHECK(o.ws.pending().empty());
 
     // In Normal mode too, with the leader as typed.
-    o.type(U"Q");
-    CHECK(o.ws.message() == "Q isn't a key here");
-    o.type(U",Q");
-    CHECK(o.ws.message() == ",Q isn't a key here");
+    o.type(U"Z");
+    CHECK(o.ws.message() == "Z isn't a key here");
+    o.type(U",Z");
+    CHECK(o.ws.message() == ",Z isn't a key here");
     o.type(U"j"); // the next key works as ever, and the message goes
     CHECK(o.ws.message().empty());
 
@@ -435,4 +435,116 @@ TEST_CASE(". after a Visual operator takes as much from the cursor")
     o.type(U".");
     CHECK(o.notes()[3].second == 37); // the C2 there, taken by as much from the cursor
     CHECK(o.notes().front() == first.front());
+}
+
+namespace
+{
+
+// Whether any text in the window has this in it, as the status line's.
+bool shows(const Operating& o, std::u32string_view wanted)
+{
+    for (const auto& region : o.ws.frame())
+    {
+        for (const auto& text : region.text)
+        {
+            if (text.text.find(wanted) != std::u32string::npos)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+TEST_CASE("Qa records the keys typed into macro a until Q, and @a plays them as one undo step")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto before = o.notes();
+    o.type(U"gr"); // the piano roll, at bar 1
+    o.type(U"Qa");
+    CHECK(shows(o, U"recording @a, Q ends it"));
+    o.type(U">>}"); // bar 1's notes up a semitone, and on to bar 2
+    o.type(U"Q");
+    CHECK(o.ws.message() == "Recorded @a, 3 keys");
+    CHECK_FALSE(shows(o, U"recording"));
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 32});
+
+    o.type(U"@a"); // bar 2's A2 up, and on to bar 3
+    CHECK(o.notes()[2] == std::pair{4 * q, 46});
+    o.type(U"u");
+    CHECK(o.notes()[2] == before[2]);
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 32});
+
+    // @@ plays the last again; a count plays it that many times, as one step.
+    o.type(U"gg}@@");
+    CHECK(o.notes()[2] == std::pair{4 * q, 46});
+    o.type(U"u");
+    o.type(U"gg3@a"); // bars 1 to 3
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 33});
+    CHECK(o.notes()[2] == std::pair{4 * q, 46});
+    o.type(U"u");
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 32});
+    CHECK(o.notes()[2] == before[2]);
+}
+
+TEST_CASE("QA adds to a macro, :macros lists them, and . repeats one played")
+{
+    Operating o;
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U"gr");
+    o.type(U"Qa>>Q");
+    o.type(U"QA}Q");
+    CHECK(o.ws.message() == "Recorded @a, 3 keys");
+    o.type(U":macros");
+    o.press(NamedKey::Enter);
+    using Lines = std::vector<std::pair<std::string, std::string>>;
+    CHECK(o.ws.listing() == Lines{{"@a", ">>}"}});
+    o.press(NamedKey::Escape); // closes it
+
+    o.type(U"@a"); // bar 2's A2, from where QA left the cursor
+    CHECK(o.notes()[2].second == 46);
+    o.type(U"gg."); // @a again, at bar 1
+    CHECK(o.notes().front().second == 33);
+    o.type(U"u");
+    CHECK(o.notes().front().second == 32);
+    CHECK(o.notes()[2].second == 46);
+}
+
+TEST_CASE("A command failing stops a macro, and macros playing macros stop 20 deep")
+{
+    Operating o;
+    o.type(U"gr"); // at the song's start
+    // h can't move from the start, which stops the macro after its first >>.
+    o.type(U"Qa>>hQ");
+    CHECK(o.notes().front().second == 32);
+    o.type(U"5@a");
+    CHECK(o.notes().front().second == 33);
+
+    // A macro playing itself: each >> and @b again, until 20 deep.
+    o.type(U"Qb>>@bQ"); // recording, @b is empty, which does nothing
+    CHECK(o.notes().front().second == 34);
+    o.type(U"@b");
+    CHECK(o.ws.message() == "Macros playing macros stopped, 20 deep");
+    CHECK(o.notes().front().second == 54);
+    o.type(U"u"); // all one step
+    CHECK(o.notes().front().second == 34);
+}
+
+TEST_CASE("Q and @ take a letter, Escape giving it up")
+{
+    Operating o;
+    o.type(U"Q1");
+    CHECK(o.ws.message() == "Macros are named by letters, Qa to Qz, a capital adding to one");
+    CHECK_FALSE(shows(o, U"recording"));
+    o.type(U"Q");
+    o.press(NamedKey::Escape);
+    CHECK_FALSE(shows(o, U"recording"));
+    o.type(U"@z");
+    CHECK(o.ws.message() == "@z is empty");
+    o.type(U"@@");
+    CHECK(o.ws.message() == "No macro played yet to play again");
 }

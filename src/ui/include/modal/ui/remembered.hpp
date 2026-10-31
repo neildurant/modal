@@ -3,9 +3,11 @@
 #pragma once
 
 #include <modal/core/meter_map.hpp>
+#include <modal/ui/key.hpp>
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,8 +18,9 @@ namespace modal::ui
 
 // What Modal remembers between sessions without being told (decided October 2026): how often
 // and how lately each command was run from the palette, which ranks it there, and the meters
-// typed that weren't offered, offered again after. Kept as plain text in the state directory,
-// written by Modal and safe to delete.
+// typed that weren't offered, offered again after, and the macros recorded, being the user's
+// tools rather than a song's. Kept as plain text in the state directory, written by Modal and
+// safe to delete.
 class Remembered
 {
 public:
@@ -37,6 +40,11 @@ public:
     void typedMeter(core::TimeSignature meter);
     std::span<const core::TimeSignature> meters() const { return meters_; }
 
+    // The macros, a to z, as their keys; setting one to no keys forgets it.
+    void setMacro(char32_t name, std::vector<Key> keys);
+    const std::vector<Key>* macro(char32_t name) const;
+    const std::map<char32_t, std::vector<Key>>& macros() const { return macros_; }
+
     // As the file has it, and from it, passing over lines it doesn't know.
     std::string text() const;
     static Remembered read(std::string_view text);
@@ -55,6 +63,7 @@ private:
 
     std::vector<Use> uses_;
     std::vector<core::TimeSignature> meters_;
+    std::map<char32_t, std::vector<Key>> macros_;
 };
 
 } // namespace modal::ui

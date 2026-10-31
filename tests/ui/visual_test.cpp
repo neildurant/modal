@@ -175,8 +175,8 @@ TEST_CASE("the selection is drawn across every track, in place of the cursor's b
 TEST_CASE("keys bound to nothing in Visual mode say so, and it goes on")
 {
     Selecting s;
-    s.type(U"vQ");
-    CHECK(s.ws.message() == "Q isn't a key here");
+    s.type(U"vZ");
+    CHECK(s.ws.message() == "Z isn't a key here");
     CHECK(s.ws.mode() == Mode::Visual);
 }
 

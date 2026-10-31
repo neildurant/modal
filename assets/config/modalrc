@@ -73,7 +73,8 @@ nmap <leader>n  default-note-set          "Default note from this one"
 " event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
 " cursor's bar. "a before a yank, delete or put uses register a ("A adds to it); u and Ctrl-R
-" undo and redo, and . repeats the last change.
+" undo and redo, and . repeats the last change. Qa records the keys typed into macro a until
+" Q again (QA adds to it), @a plays it, @@ the last again, and 3@a three times.
 "
 " The other operators take the same ranges and objects, a count before them saying how far:
 " > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
@@ -111,6 +112,8 @@ nmap p          register-put      "Put"
 nmap P          register-put-before "Put before"
 nmap Y          yank-this         "Yank this"
 nmap "          register-use      "Register"
+nmap Q          macro-record      "Record a macro"
+nmap @          macro-play        "Play a macro"
 
 " Visual mode: v selects from the cursor as it moves, a range of time on every track, and v
 " again or Escape ends it; V selects whole rows: tracks at every time, or in the piano roll

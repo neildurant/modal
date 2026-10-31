@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/ui/key_notation.hpp>
 #include <modal/ui/remembered.hpp>
 
 #include <algorithm>
 #include <charconv>
 #include <optional>
+#include <utility>
+#include <variant>
 
 namespace modal::ui
 {
@@ -106,6 +109,24 @@ void Remembered::typedMeter(core::TimeSignature meter)
     }
 }
 
+void Remembered::setMacro(char32_t name, std::vector<Key> keys)
+{
+    if (keys.empty())
+    {
+        macros_.erase(name);
+    }
+    else
+    {
+        macros_[name] = std::move(keys);
+    }
+}
+
+const std::vector<Key>* Remembered::macro(char32_t name) const
+{
+    const auto it = macros_.find(name);
+    return it != macros_.end() ? &it->second : nullptr;
+}
+
 std::string Remembered::text() const
 {
     std::string text =
@@ -119,6 +140,11 @@ std::string Remembered::text() const
     {
         text += "meter " + std::to_string(meter.numerator) + "/" +
                 std::to_string(meter.denominator) + "\n";
+    }
+    // In key notation, which has no spaces: "macro a 3>>j".
+    for (const auto& [name, keys] : macros_)
+    {
+        text += "macro " + std::string(1, static_cast<char>(name)) + " " + formatKeys(keys) + "\n";
     }
     return text;
 }
@@ -144,6 +170,15 @@ Remembered Remembered::read(std::string_view text)
             if (count && last && *count > 0)
             {
                 remembered.uses_.push_back({std::string{parts[1]}, *count, *last});
+            }
+        }
+        else if (parts.size() == 3 && parts[0] == "macro" && parts[1].size() == 1 &&
+                 parts[1][0] >= 'a' && parts[1][0] <= 'z')
+        {
+            if (auto keys = parseKeys(parts[2]); std::holds_alternative<std::vector<Key>>(keys))
+            {
+                remembered.setMacro(static_cast<char32_t>(parts[1][0]),
+                                    std::move(std::get<std::vector<Key>>(keys)));
             }
         }
         else if (parts.size() == 2 && parts[0] == "meter")
