@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -299,4 +300,45 @@ TEST_CASE("the palette leaves out the commands for config files")
     p.type(U"set");
     REQUIRE_FALSE(p.rows().empty());
     CHECK(p.rows().front() == U"Set"); // set stays
+}
+
+TEST_CASE("the palette ranks commands by how often and how lately they're run from it")
+{
+    Paletting p;
+    std::int64_t now = 1'800'000'000;
+    p.ws.setClock([&] { return now; });
+    int written = 0;
+    p.ws.setRemembered({}, [&](const Remembered&) { ++written; });
+
+    // Run Zoom out twice from the palette.
+    for (int i = 0; i < 2; ++i)
+    {
+        p.open();
+        p.type(U"zoom out");
+        p.press(Key::of(NamedKey::Enter));
+    }
+    CHECK(written == 2);
+    CHECK(p.ws.remembered().rank("zoom-out", now) > 0);
+
+    // Now it's chosen as the palette opens, so Enter runs it again.
+    const auto zoom = p.ws.arrangement().page().zoom();
+    p.open();
+    CHECK(p.rows().front() == U"Zoom out");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.arrangement().page().zoom() == zoom + 1);
+
+    // And first among what matches: zoom finds Zoom out before Zoom in.
+    p.open();
+    p.type(U"zoom");
+    CHECK(p.rows().front() == U"Zoom out");
+    p.press(Key::of(NamedKey::Escape));
+
+    // Forgotten, nothing's chosen at first again.
+    p.ws.setLineHandler([&](const std::string& line) { p.registry.runLine(line); });
+    p.type(U":palette-forget");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.remembered().rank("zoom-out", now) == 0);
+    p.open();
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::CommandLine);
 }

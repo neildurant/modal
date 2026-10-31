@@ -96,18 +96,19 @@ std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::st
 std::vector<std::size_t> paletteMatches(std::span<const PaletteItem> items, std::string_view query)
 {
     const auto wanted = lowered(query);
-    std::vector<std::tuple<int, std::string, std::size_t>> found;
+    std::vector<std::tuple<int, double, std::string, std::size_t>> found;
     for (std::size_t i = 0; i < items.size(); ++i)
     {
         const auto rank = wanted.empty() ? std::optional{0} : tier(items[i], query, wanted);
         if (rank)
         {
-            found.emplace_back(*rank + (items[i].offered ? 0 : 6), lowered(items[i].title), i);
+            found.emplace_back(*rank + (items[i].offered ? 0 : 6), -items[i].rank,
+                               lowered(items[i].title), i);
         }
     }
     std::ranges::sort(found);
     std::vector<std::size_t> result;
-    for (const auto& [rank, title, index] : found)
+    for (const auto& [tier, rank, title, index] : found)
     {
         result.push_back(index);
     }

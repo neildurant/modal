@@ -36,6 +36,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -537,6 +538,23 @@ int main(int argc, char* argv[])
 
     ui::Workspace view{commands, document, config.keymap};
     view.setPlayer(&playback.player());
+    // What's remembered between sessions, read from the state directory and written back there
+    // after each change: a file that may be missing, or deleted, at any time.
+    if (const auto stateDirectory = platform::stateDirectory())
+    {
+        const auto file = *stateDirectory / "remembered";
+        std::ifstream in{file, std::ios::binary};
+        const std::string text{std::istreambuf_iterator<char>{in},
+                               std::istreambuf_iterator<char>{}};
+        view.setRemembered(ui::Remembered::read(text),
+                           [file](const ui::Remembered& remembered)
+                           {
+                               std::error_code error;
+                               std::filesystem::create_directories(file.parent_path(), error);
+                               std::ofstream out{file, std::ios::binary | std::ios::trunc};
+                               out << remembered.text();
+                           });
+    }
     view.show(ui::ViewKind::Arrangement); // the home view
     view.setPortFinder(
         [&](std::string_view name)

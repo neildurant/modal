@@ -16,6 +16,7 @@
 #include <modal/ui/layout.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/piano_roll_view.hpp>
+#include <modal/ui/remembered.hpp>
 #include <modal/ui/view.hpp>
 
 #include <chrono>
@@ -152,6 +153,13 @@ public:
     void setLineHandler(LineHandler handler) { lineHandler_ = std::move(handler); }
 
     void setKeymap(Keymap keymap);
+
+    // What's remembered between sessions, as read from the state directory, and what to call
+    // when it changes, to write it there; and the clock it's kept by, seconds since 1970 (the
+    // system's, unless a test sets one).
+    void setRemembered(Remembered remembered, std::function<void(const Remembered&)> changed);
+    const Remembered& remembered() const { return remembered_; }
+    void setClock(std::function<std::int64_t()> clock) { clock_ = std::move(clock); }
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
     void setLeader(const Key& leader) { keys_.setLeader(leader); }
 
@@ -323,6 +331,15 @@ private:
     };
     static constexpr std::ptrdiff_t kPaletteRows = 12;
     std::optional<PaletteState> palette_;
+    Remembered remembered_;
+    std::function<void(const Remembered&)> rememberedChanged_;
+    std::function<std::int64_t()> clock_ = []
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    };
+    void rememberedChanged();
     std::vector<PaletteItem> paletteItems() const;
     std::vector<PaletteItem> paletteShown() const;
     std::string keysFor(std::string_view command) const;

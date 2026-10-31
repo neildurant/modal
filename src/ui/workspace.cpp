@@ -95,6 +95,10 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "palette",
                 .description = "The command palette: find a command by typing part of its name "
                                "or what it does, and run it"},
+    CommandInfo{.name = "palette-forget",
+                .description = "Forget how often and how lately commands were run from the "
+                               "palette, which ranks them there",
+                .keys = false},
     CommandInfo{.name = "cut-at-edges",
                 .description = "Cut the notes crossing a range's edges, so an operator takes "
                                "only the parts inside: before an operator for it alone (|d]b), "
@@ -1528,6 +1532,19 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         line_.open();
         answer_ = {};
         completing_.reset();
+        // The command ranked first chosen at once, once there's one, so Ctrl-p Enter runs it
+        // again (decided with Neil).
+        if (const auto shown = paletteShown(); !shown.empty() && shown.front().rank > 0)
+        {
+            palette_->chosen = 0;
+        }
+        return true;
+    }
+    if (command == "palette-forget")
+    {
+        remembered_.forgetCommands();
+        rememberedChanged();
+        setMessage("The palette's ranking of commands is forgotten", MessageKind::Information);
         return true;
     }
     if (command == "visual" || command == "visual-rows" || command == "visual-box")
@@ -3054,6 +3071,7 @@ std::vector<PaletteItem> Workspace::paletteItems() const
         keys[binding.command].push_back(shownKeys(sequence));
     }
     std::vector<PaletteItem> items;
+    const auto now = clock_();
     for (const auto& info : commands_.all())
     {
         const bool normal = info.modes == 0 || (info.modes & modeBit(Mode::Normal)) != 0;
@@ -3066,7 +3084,8 @@ std::vector<PaletteItem> Workspace::paletteItems() const
                          .description = std::string{info.description},
                          .aliases = std::string{info.aliases},
                          .offered = offered(info.name),
-                         .keys = {}});
+                         .keys = {},
+                         .rank = remembered_.rank(info.name, now)});
         if (const auto bound = keys.find(info.name); bound != keys.end())
         {
             items.back().keys = bound->second;
@@ -3084,6 +3103,20 @@ std::vector<PaletteItem> Workspace::paletteShown() const
         shown.push_back(items[i]);
     }
     return shown;
+}
+
+void Workspace::setRemembered(Remembered remembered, std::function<void(const Remembered&)> changed)
+{
+    remembered_ = std::move(remembered);
+    rememberedChanged_ = std::move(changed);
+}
+
+void Workspace::rememberedChanged()
+{
+    if (rememberedChanged_)
+    {
+        rememberedChanged_(remembered_);
+    }
 }
 
 std::string Workspace::keysFor(std::string_view command) const
@@ -3133,6 +3166,11 @@ bool Workspace::runPalette(std::string_view command)
         const auto& item = shown[std::min(*palette_->chosen, last)];
         const auto* info = commands_.find(item.name);
         palette_.reset();
+        if (command == "command-line-run")
+        {
+            remembered_.ran(item.name, clock_());
+            rememberedChanged();
+        }
         const bool needs = info != nullptr && !info->usage.empty() && !info->usage.starts_with("[");
         if (command == "command-line-next" || needs)
         {
