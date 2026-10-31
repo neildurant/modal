@@ -542,7 +542,7 @@ TEST_CASE("the note under the piano roll's cursor is the current note, which the
     CHECK(contains(inspector, U"1:1:480"));
     CHECK(contains(inspector, U"E1 (28)"));
 
-    // The current note is drawn in the accent colour.
+    // The current note is drawn in its own colour.
     r.type(U"0");
     const auto frame = r.ws.frame();
     CHECK(std::ranges::any_of(frame,
@@ -550,7 +550,7 @@ TEST_CASE("the note under the piano roll's cursor is the current note, which the
                               {
                                   return std::ranges::any_of(
                                       region.under, [](const Shape& shape)
-                                      { return shape.role == Role::Accent; });
+                                      { return shape.role == Role::NoteSelected; });
                               }));
 }
 

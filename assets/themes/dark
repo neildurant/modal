@@ -22,6 +22,7 @@ highlight grid-line    #24283b
 highlight beat-line    #343a55
 highlight bar-line     #565f89
 highlight note         #9ece6a
+highlight note-selected #ff9e64
 highlight marker       #ff9e64
 highlight density-1    #3a4d2e
 highlight density-2    #5b7d3f

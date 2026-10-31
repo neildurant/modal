@@ -375,3 +375,27 @@ TEST_CASE("^ on a selection asks how to change the velocity, then changes it")
     CHECK(std::get<core::Note>(events[2].data).velocity == 100);
     CHECK(s.ws.mode() == Mode::Normal);
 }
+
+TEST_CASE("in the piano roll the notes a selection takes, and the current one, stand out")
+{
+    Selecting s;
+    const auto standing = [&]
+    {
+        int count = 0;
+        for (const auto& region : s.ws.frame())
+        {
+            for (const auto& shape : region.under)
+            {
+                count += shape.role == Role::NoteSelected ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor(
+        {.track = s.document.song().tracks()[0]->id(), .tick = 0, .pitch = 40});
+    const auto one = standing(); // the current note: its start, body and lane bar
+    CHECK(one > 0);
+    s.type(U"v}");
+    CHECK(standing() == 2 * one); // and the note in bar 2
+}

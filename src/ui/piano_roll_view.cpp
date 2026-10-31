@@ -2064,9 +2064,11 @@ void PianoRollView::addRegions(Frame& frame) const
     }
 
     // Each note at its exact place: brighter the louder, with a solid start so repeated notes
-    // read apart, and a pixel's gap before the next; the current note in the accent colour.
+    // read apart, and a pixel's gap before the next; the current note, and those a selection
+    // takes, in their own colour.
     // In the lane, a bar for each note starting on the page, as high as its velocity.
     const auto current = currentNote();
+    const auto span = selected();
     if (const auto id = trackId())
     {
         const auto events = song.events(*id).all();
@@ -2085,7 +2087,10 @@ void PianoRollView::addRegions(Frame& frame) const
             {
                 continue;
             }
-            const Role role = current == i ? Role::Accent : Role::Note;
+            // The current note, and the notes a selection takes, stand out.
+            const bool picked =
+                current == i || (span && event.tick >= span->first && event.tick < span->second);
+            const Role role = picked ? Role::NoteSelected : Role::Note;
             const int x0 = scale.toX(std::max(event.tick, p.start));
             const int x1 = scale.toX(std::min(end, p.end));
             const int noteWidth = std::max(x1 - x0 - 1, 1);

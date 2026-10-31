@@ -12,7 +12,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "background",  "text",      "dim",       "accent",    "warning",  "message",    "cursor",
     "cursor-text", "selection", "playhead",  "bar",       "bar-text", "panel",      "chrome",
     "mode",        "mode-text", "grid-line", "beat-line", "bar-line", "note",       "marker",
-    "density-1",   "density-2", "density-3", "density-4", "hint-key", "hint-group",
+    "density-1",   "density-2", "density-3", "density-4", "hint-key", "hint-group", "note-selected",
 };
 
 std::optional<int> hexDigit(char c)
