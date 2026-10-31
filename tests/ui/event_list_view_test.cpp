@@ -958,6 +958,16 @@ TEST_CASE(":section-split starts a new section at the bar line of the cursor's b
     CHECK(names() == std::vector<std::string>{"Section 1"});
     CHECK(v.registry.runLine("section-split").message == "Section 2 starts at 3:1:000");
     CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
+    // Then asking for a name, with that one to edit; Escape keeps it.
+    REQUIRE(v.ws.mode() == Mode::CommandLine);
+    CHECK(v.ws.commandLine().text() == U"section-rename Section 2");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
+    // As renaming with no name asks, with the section's name to edit.
+    CHECK(v.registry.runLine("section-rename").changed);
+    CHECK(v.ws.commandLine().text() == U"section-rename Section 2");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    REQUIRE(v.ws.mode() == Mode::Normal);
 
     // From the lead, in 2/4, its second bar starts in the middle of the conductor's first,
     // which ends short.

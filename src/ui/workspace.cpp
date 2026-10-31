@@ -149,7 +149,8 @@ constexpr std::array kSharedCommands{
                 .choices = {Choices::Port}},
     CommandInfo{.name = "section-split",
                 .description = "Start a new section at the cursor's bar line, splitting the "
-                               "section it's in; named Section and a number if no name is given",
+                               "section it's in; with no name, named Section and a number, then "
+                               "asking for a name, as i on the section strip does",
                 .usage = "[NAME]",
                 .keys = false},
     CommandInfo{.name = "bar-delete",
@@ -172,8 +173,9 @@ constexpr std::array kSharedCommands{
                                "line, as one undo step",
                 .keys = false},
     CommandInfo{.name = "section-rename",
-                .description = "Rename the section at the cursor",
-                .usage = "NAME",
+                .description = "Rename the section at the cursor; with no name, asking for one, "
+                               "with its name to edit",
+                .usage = "[NAME]",
                 .keys = false,
                 .choices = {Choices::Section}},
     CommandInfo{.name = "yank-this",
@@ -2167,8 +2169,13 @@ CommandResult Workspace::section(std::string_view name)
     {
         return CommandResult::error("Can't start a section at " + at);
     }
-    // The name it got, numbered if another section had it.
+    // The name it got, numbered if another section had it; asking for one, with that to edit,
+    // if none was given (decided October 2026, splitting first as i on the strip does).
     const auto& named = document_.song().sections()[split->index]->name();
+    if (name.empty())
+    {
+        openPrompt("section-rename " + named);
+    }
     std::string cut;
     if (split->conductor)
     {
@@ -2463,13 +2470,15 @@ CommandResult Workspace::barInsert(std::string_view arguments)
 CommandResult Workspace::renameSection(std::string_view name)
 {
     const auto first = name.find_first_not_of(" \t");
-    if (first == std::string_view::npos)
-    {
-        return CommandResult::error("section-rename needs a name");
-    }
-    name = name.substr(first, name.find_last_not_of(" \t") - first + 1);
     const auto index = document_.song().sectionAt(view().cursor().tick);
     const auto old = document_.song().sections()[index]->name();
+    if (first == std::string_view::npos)
+    {
+        // Asking for one, with its name to edit, as c on the strip does.
+        openPrompt("section-rename " + old);
+        return {true};
+    }
+    name = name.substr(first, name.find_last_not_of(" \t") - first + 1);
     document_.edit("Rename " + old + " to " + std::string{name}, view().place(),
                    [&](core::Song& song) { song.renameSection(index, std::string{name}); });
     refresh();
