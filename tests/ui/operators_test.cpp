@@ -358,3 +358,36 @@ TEST_CASE(
     o.type(U"~~");
     CHECK(o.ws.message() == "Nothing changed in 2 notes in Bass");
 }
+
+TEST_CASE("keys an operator can't take, and keys bound to nothing, say so and do nothing")
+{
+    Operating o;
+    const auto before = o.notes();
+
+    // Another operator's key isn't a range: only the operator's own takes the bar.
+    o.type(U"gr");
+    o.type(U"dt");
+    CHECK(o.ws.message() == "t isn't a range or object after d");
+    o.type(U">q");
+    CHECK(o.ws.message() == "q isn't a range or object after >");
+    // Keys that start ranges or objects but continue none: the whole of them is given up, not
+    // the last taken alone (dat isn't dt, nor dd).
+    o.type(U"dat");
+    CHECK(o.ws.message() == "at isn't a range or object after d");
+    o.type(U"dx");
+    CHECK(o.ws.message() == "x isn't a range or object after d");
+    CHECK(o.notes() == before);
+    CHECK(o.ws.pending().empty());
+
+    // In Normal mode too, with the leader as typed.
+    o.type(U"Q");
+    CHECK(o.ws.message() == "Q isn't a key here");
+    o.type(U",Q");
+    CHECK(o.ws.message() == ",Q isn't a key here");
+    o.type(U"j"); // the next key works as ever, and the message goes
+    CHECK(o.ws.message().empty());
+
+    // The operator's own key still takes the bar.
+    o.type(U"dd");
+    CHECK(o.notes().size() == before.size() - 2);
+}

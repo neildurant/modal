@@ -454,12 +454,12 @@ void Workspace::buildOperatorKeymap()
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
         const auto* info = commands_.find(binding.command);
-        const bool again = isOperator(binding.command);
-        const bool wanted = again || binding.command == "cancel" || (info && info->motion);
+        // An operator's own key again takes the cursor's bar (dd, >>); another's is refused.
+        const bool wanted =
+            isOperator(binding.command) || binding.command == "cancel" || (info && info->motion);
         if (wanted && keymap_.match(Mode::OperatorPending, keys).binding == nullptr)
         {
-            operatorKeymap_.bind(Mode::OperatorPending, keys,
-                                 again ? Binding{"operator-line", binding.hint} : binding);
+            operatorKeymap_.bind(Mode::OperatorPending, keys, binding);
         }
     }
 }
@@ -660,14 +660,27 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         }
     }
     const auto before = pending();
+    const auto typedIn = mode_;
     const auto& keymap = mode_ == Mode::OperatorPending ? operatorKeymap_ : keymap_;
     const auto actions = keys_.key(keymap, mode_, key, now);
+    const auto unbound =
+        shownKeys(std::vector<Key>(keys_.unbound().begin(), keys_.unbound().end()));
     const bool changed = runAll(actions);
-    // Keys after an operator that are no motion give the operator up, as in Vim.
+    // Keys after an operator that are no motion give the operator up, as in Vim, saying so;
+    // and keys bound to nothing say so (decided October 2026, rather than nothing happening).
     if (mode_ == Mode::OperatorPending && actions.empty() && keys_.pending().empty())
     {
+        if (!unbound.empty())
+        {
+            setMessage(unbound + " isn't a range or object after " + keysOf(operator_->name),
+                       MessageKind::Information);
+        }
         operator_.reset();
         mode_ = Mode::Normal;
+    }
+    else if (typedIn == Mode::Normal && !unbound.empty())
+    {
+        setMessage(unbound + " isn't a key here", MessageKind::Information);
     }
     const bool hinted = hints().has_value();
     noteWaiting(now);
@@ -904,17 +917,17 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
     {
         const auto& command = binding.command;
         const auto* info = commands_.find(command);
-        const bool line = command == "operator-line";
+        const bool line = isOperator(command);
         if (sequence.size() > 2 || info == nullptr || !(line || info->motion || info->object) ||
             std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
         {
             continue;
         }
-        if (line && shownKeys(sequence) != keysOf(operator_->name))
+        if (line && command != operator_->name)
         {
-            continue; // dd after d, yy after y
+            continue; // dd after d, yy after y, and no other operator
         }
-        auto text = view().describeRange(operator_->name, command);
+        auto text = view().describeRange(operator_->name, line ? "operator-line" : command);
         if (!text)
         {
             continue;
@@ -1509,6 +1522,17 @@ bool Workspace::runOperator(std::string_view command, int count)
     if (command == "cancel")
     {
         return true;
+    }
+    if (isOperator(command))
+    {
+        // Its own key again is the cursor's bar, as dd is.
+        if (command != op.name)
+        {
+            setMessage(keysOf(command) + " isn't a range or object after " + keysOf(op.name),
+                       MessageKind::Information);
+            return true;
+        }
+        command = "operator-line";
     }
     if (command != "operator-line")
     {

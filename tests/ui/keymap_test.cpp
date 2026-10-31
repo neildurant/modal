@@ -123,26 +123,35 @@ TEST_CASE("keys that are a binding and start a longer one wait only so long")
     CHECK_FALSE(dispatcher.deadline());
 }
 
-TEST_CASE("a key that continues no binding runs the keys before it if it can, then itself")
+TEST_CASE("a key that continues no binding runs the keys before it if they're one, then itself")
 {
     const auto keymap = testKeymap();
     KeyDispatcher dispatcher;
     // z is a binding: it runs with the count, then j afresh.
     CHECK(type(dispatcher, keymap, "4zj") == Actions{{"centre", 4}, {"down", 0}});
-    // g isn't: it and the count are given up, then j runs.
-    CHECK(type(dispatcher, keymap, "4gj") == Actions{{"down", 0}});
-    // The key taken afresh can begin a count or another sequence.
-    CHECK(type(dispatcher, keymap, "g5") == Actions{});
-    CHECK(dispatcher.pending() == "5");
-    CHECK(type(dispatcher, keymap, "g") == Actions{});
-    CHECK(dispatcher.pending() == "5g");
+    CHECK(dispatcher.unbound().empty());
     CHECK(type(dispatcher, keymap, "z") == Actions{});
     CHECK(dispatcher.pending() == "z");
     CHECK(type(dispatcher, keymap, "z") == Actions{{"reset", 0}});
+}
 
-    // A key bound to nothing gives up the count.
+TEST_CASE("keys bound to nothing are given up together, with the count, saying which")
+{
+    const auto keymap = testKeymap();
+    KeyDispatcher dispatcher;
+    // g isn't a binding: it, the j and the count are given up, as Vim gives them up, rather
+    // than j running alone.
+    CHECK(type(dispatcher, keymap, "4gj") == Actions{});
+    CHECK(dispatcher.pending().empty());
+    CHECK(dispatcher.unbound().size() == 2);
+    CHECK(dispatcher.unbound().front() == Key::typed(U'g'));
+    // A key bound to nothing gives up the count too.
     CHECK(type(dispatcher, keymap, "7x") == Actions{});
     CHECK(dispatcher.pending().empty());
+    CHECK(dispatcher.unbound().size() == 1);
+    // The next key starts afresh.
+    CHECK(type(dispatcher, keymap, "j") == Actions{{"down", 0}});
+    CHECK(dispatcher.unbound().empty());
 }
 
 TEST_CASE("Escape gives up a count and keys waiting, or else runs its binding")

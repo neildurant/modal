@@ -113,6 +113,7 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
     const bool leads =
         mode == Mode::Normal || mode == Mode::Visual || mode == Mode::OperatorPending;
     const auto key = leads && typed == leader_ ? Key::of(NamedKey::Leader) : typed;
+    unbound_.clear();
     if (key == Key::of(NamedKey::Escape) && (count_ > 0 || !keys_.empty()))
     {
         clear();
@@ -149,18 +150,19 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
     }
 
     // These keys continue no binding: run the keys before the last if they're one, then
-    // take the last afresh.
-    keys_.pop_back();
-    if (keys_.empty())
+    // take the last afresh; or else give them all up, the last too, rather than take it
+    // apart from the keys it was typed after (dat, with no at, isn't d and then t).
+    const auto* before = keys_.size() > 1
+                             ? keymap.match(mode_, std::span{keys_}.first(keys_.size() - 1)).binding
+                             : nullptr;
+    if (before == nullptr)
     {
-        clear(); // a key bound to nothing
+        auto given = std::move(keys_);
+        clear();
+        unbound_ = std::move(given);
         return {};
     }
-    std::vector<Action> actions;
-    if (const auto* binding = keymap.match(mode_, keys_).binding)
-    {
-        actions.push_back({binding->command, count_});
-    }
+    std::vector<Action> actions{{before->command, count_}};
     clear();
     auto more = this->key(keymap, mode, typed, now);
     actions.insert(actions.end(), more.begin(), more.end());

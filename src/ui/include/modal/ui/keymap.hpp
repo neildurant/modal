@@ -106,7 +106,8 @@ inline constexpr int kMaxCount = 99999;
 // operator-pending mode, digits typed first are a count, except a 0 that would begin one. Keys that
 // only start longer bindings wait for the next key; keys that are a binding and also start a longer
 // one wait up to the timeout, then run. A key that continues no binding runs the keys before it, if
-// they're a binding, and is then taken afresh; otherwise those keys and the count are given up.
+// they're a binding, and is then taken afresh; otherwise it, those keys and the count are given up,
+// as Vim gives them up, and unbound() says which they were.
 // Escape gives up any count and keys waiting. Times are in milliseconds, from any fixed point. The
 // keymap is passed with each key, and should be the same while keys are waiting.
 class KeyDispatcher
@@ -137,6 +138,10 @@ public:
     std::span<const Key> keys() const { return keys_; }
     Mode mode() const { return mode_; }
 
+    // The keys the last key() gave up because they're bound to nothing, the last of them the
+    // key typed, as the bindings have them; empty if it gave none up.
+    std::span<const Key> unbound() const { return unbound_; }
+
     // A key in bindings as it's typed: the leader key for <leader>.
     Key typed(const Key& key) const { return key.named == NamedKey::Leader ? leader_ : key; }
 
@@ -148,6 +153,7 @@ private:
     Mode mode_ = Mode::Normal; // the mode the waiting keys were typed in
     int count_ = 0;
     std::vector<Key> keys_;
+    std::vector<Key> unbound_;
     std::optional<std::int64_t> deadline_;
 };
 
