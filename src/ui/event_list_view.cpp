@@ -81,10 +81,14 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-last",
                 .description = "Move to the last field, or the last bar",
                 .motion = true},
-    motion("cursor-bar-next", "Move to the event at or after the same place a bar on"),
-    motion("cursor-bar-previous", "Move to the event at or after the same place a bar back"),
-    motion("cursor-bar-line-next", "Move to the event at or after the next bar line"),
-    motion("cursor-bar-line-previous", "Move to the event at or after the bar line before"),
+    motion("cursor-bar-next", "Move to the same place a bar on (in the event list, the event at "
+                              "or after it)"),
+    motion("cursor-bar-previous", "Move to the same place a bar back (in the event list, the "
+                                  "event at or after it)"),
+    motion("cursor-bar-line-next", "Move to the next bar line (in the event list, the event at "
+                                   "or after it)"),
+    motion("cursor-bar-line-previous", "Move to the bar line before (in the event list, the "
+                                       "event at or after it)"),
     motion("cursor-chord-next", "Move to the next chord, or event"),
     motion("cursor-chord-previous", "Move to the chord, or event, before"),
     motion("cursor-section-next", "Move to the next section's start"),
@@ -93,8 +97,12 @@ constexpr std::array kCommands{
     motion("cursor-marker-previous", "Move to the marker before"),
     motion("go-first", "Go to the first event, or bar {count}"),
     motion("go-last", "Go to the end, or bar {count}"),
-    counted("cursor-left-scroll", "Move to the field before"),
-    counted("cursor-right-scroll", "Move to the next field"),
+    counted("cursor-left-scroll",
+            "Move left, scrolling to keep the cursor in place (in the event list, to the field "
+            "before)"),
+    counted("cursor-right-scroll",
+            "Move right, scrolling to keep the cursor in place (in the event list, to the next "
+            "field)"),
     counted("cursor-down-scroll", "Move down, scrolling to keep the cursor in place"),
     counted("cursor-up-scroll", "Move up, scrolling to keep the cursor in place"),
     counted("scroll-half-down", "Scroll down half a page"),
@@ -106,9 +114,7 @@ constexpr std::array kCommands{
     counted("track-previous", "Show the track's list before, {count} tracks back"),
     CommandInfo{.name = "field-edit",
                 .description = "Edit the field under the cursor, typing a value or a change"},
-    CommandInfo{.name = "note-add",
-                .description = "Add a note at the cursor: in the piano roll at its pitch, a count "
-                               "adding that many, in the event list typing its pitch"},
+    CommandInfo{.name = "note-add", .description = "Add a note at the cursor"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
     counted(
@@ -126,7 +132,8 @@ constexpr std::array kCommands{
                 .description = "Edit the fields in the inspector: Tab and Shift-Tab go between "
                                "them, Enter sets one and Escape leaves it"},
     CommandInfo{.name = "register-put",
-                .description = "Put the yanked or deleted events, the first at the cursor's time"},
+                .description = "Put the yanked or deleted events over what's there, the first at "
+                               "the cursor's time, or sections after this one"},
 };
 
 // Text to show in a cell of a width, without control characters, cut short with an

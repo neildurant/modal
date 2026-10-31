@@ -23,7 +23,8 @@ namespace
 constexpr std::array kCommands{
     CommandInfo{.name = "go-section-strip", .description = "Go to the section strip"},
     CommandInfo{.name = "register-put-before",
-                .description = "Put the yanked or deleted sections before this one"},
+                .description = "Put the yanked or deleted events in at the cursor, moving the "
+                               "rest of the section later, or sections before this one"},
     CommandInfo{.name = "move-left",
                 .description = "Move this section or note earlier, {count} places or steps",
                 .count = true},
