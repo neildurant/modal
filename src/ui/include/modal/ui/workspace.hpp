@@ -376,6 +376,7 @@ private:
     std::optional<char32_t> registerName_;
     EventRegister registerBefore_;
     static EventRegister appended(EventRegister to, const EventRegister& more);
+    static std::string registerAbout(const EventRegister& reg);
     bool sayRegisters();
     std::vector<Key> changeKeys_; // typed since Normal mode was last idle
     std::vector<Key> lastChange_;

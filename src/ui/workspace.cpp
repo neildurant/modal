@@ -791,31 +791,34 @@ EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
     return to;
 }
 
+std::string Workspace::registerAbout(const EventRegister& reg)
+{
+    // What a register holds: "12 events on 2 tracks", "2 sections, Verse, Chorus".
+    if (!reg.sections.empty())
+    {
+        std::string names;
+        for (const auto& section : reg.sections)
+        {
+            names += (names.empty() ? "" : ", ") + section->name();
+        }
+        return std::to_string(reg.sections.size()) +
+               (reg.sections.size() == 1 ? " section, " : " sections, ") + names;
+    }
+    std::size_t events = 0;
+    std::size_t tracks = 0;
+    for (const auto& list : reg.tracks)
+    {
+        events += list.size();
+        tracks += list.empty() ? 0 : 1;
+    }
+    return eventCount(events) + " on " + std::to_string(tracks) +
+           (tracks == 1 ? " track" : " tracks");
+}
+
 bool Workspace::sayRegisters()
 {
     // Each holding something, the unnamed first: "a: 12 events on 2 tracks.
-    const auto about = [](const EventRegister& reg)
-    {
-        if (!reg.sections.empty())
-        {
-            std::string names;
-            for (const auto& section : reg.sections)
-            {
-                names += (names.empty() ? "" : ", ") + section->name();
-            }
-            return std::to_string(reg.sections.size()) +
-                   (reg.sections.size() == 1 ? " section, " : " sections, ") + names;
-        }
-        std::size_t events = 0;
-        std::size_t tracks = 0;
-        for (const auto& list : reg.tracks)
-        {
-            events += list.size();
-            tracks += list.empty() ? 0 : 1;
-        }
-        return eventCount(events) + " on " + std::to_string(tracks) +
-               (tracks == 1 ? " track" : " tracks");
-    };
+    const auto about = [](const EventRegister& reg) { return registerAbout(reg); };
     std::string text;
     if (!register_.empty())
     {
@@ -1663,18 +1666,20 @@ CommandResult Workspace::run(std::string_view command, int count)
     }
     // A register named before ("a): a put puts from it, a yank or delete fills it, or with a
     // capital adds to it, the unnamed register getting what's taken either way, as in Vim.
-    const auto named = command != "register-use" ? registerName_ : std::nullopt;
+    // (As a letter, 0 for none, rather than an optional, which GCC's release build takes for
+    // uninitialised.)
+    const char32_t named = command != "register-use" ? registerName_.value_or(0) : 0;
+    const char32_t letter = lowerLetter(named);
+    const auto letterText = encodeUtf8(std::u32string(1, letter));
     const bool put = command == "register-put" || command == "register-put-before";
     std::optional<EventRegister> unnamed;
-    if (named && put)
+    if (named != 0 && put)
     {
-        const auto& from = registers_[lowerLetter(*named)];
+        const auto& from = registers_[letter];
         if (from.empty())
         {
             registerName_.reset();
-            setMessage("Register " + encodeUtf8(std::u32string(1, lowerLetter(*named))) +
-                           " is empty",
-                       MessageKind::Warning);
+            setMessage("Register " + letterText + " is empty", MessageKind::Warning);
             return {true};
         }
         unnamed = std::exchange(register_, from);
@@ -1685,17 +1690,31 @@ CommandResult Workspace::run(std::string_view command, int count)
         setMessage(result.message,
                    result.warning ? MessageKind::Warning : MessageKind::Information);
     }
-    if (named && put)
+    if (named != 0 && put)
     {
         register_ = std::move(*unnamed);
         registerName_.reset();
     }
-    else if (named && mode_ != Mode::OperatorPending && !awaiting_ && !answer_)
+    else if (named != 0 && mode_ != Mode::OperatorPending && !awaiting_ && !answer_)
     {
         if (!(register_ == registerBefore_))
         {
-            auto& into = registers_[lowerLetter(*named)];
-            into = lowerLetter(*named) == *named ? register_ : appended(into, register_);
+            // Saying which register, and adding, what it now holds.
+            auto& into = registers_[letter];
+            if (letter == named)
+            {
+                into = register_;
+                setMessage((message_.empty() ? std::string{"Taken"} : message_) +
+                               ", into register " + letterText,
+                           messageKind_);
+            }
+            else
+            {
+                into = appended(into, register_);
+                setMessage("Added to register " + letterText + ", which now holds " +
+                               registerAbout(into),
+                           MessageKind::Information);
+            }
         }
         registerName_.reset();
     }

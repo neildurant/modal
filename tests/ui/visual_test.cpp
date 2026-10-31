@@ -807,7 +807,7 @@ TEST_CASE("Enter on a selection of bars opens exactly those in the piano roll")
     CHECK(roll.pageBars() == 8); // the track's own page size, as it was left
 }
 
-TEST_CASE("\"a names the register for a yank, a delete or a put; \"A adds to it")
+TEST_CASE("Named registers: \"a for a yank, a delete or a put, \"A adding to it")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Selecting s{ppqn};
@@ -823,7 +823,10 @@ TEST_CASE("\"a names the register for a yank, a delete or a put; \"A adds to it"
     s.type(U"u");
 
     // A capital adds, laid end to end: bars 1 and 3 into a, put as two bars.
-    s.type(U"gg\"ayy2l\"Ayy");
+    s.type(U"gg\"ayy");
+    CHECK(s.ws.message().ends_with(", into register a"));
+    s.type(U"2l\"Ayy");
+    CHECK(s.ws.message() == "Added to register a, which now holds 2 events on 1 track");
     s.type(U"gg5l\"ap"); // bar 6
     const auto& song = s.document.song();
     const auto& events = song.events(song.tracks()[0]->id());
