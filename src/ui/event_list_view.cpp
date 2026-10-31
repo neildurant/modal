@@ -107,7 +107,8 @@ constexpr std::array kCommands{
     CommandInfo{.name = "field-edit",
                 .description = "Edit the field under the cursor, typing a value or a change"},
     CommandInfo{.name = "note-add",
-                .description = "Add a note at the cursor's time, typing its pitch"},
+                .description = "Add a note at the cursor: in the piano roll at its pitch, a count "
+                               "adding that many, in the event list typing its pitch"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
     counted(
