@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <random>
@@ -361,6 +362,21 @@ private:
     // and repeating it.
     bool handleKey(const Key& key, std::int64_t now);
     bool repeatChange(int count);
+    // Commands that take a character after them ("a), waiting for it; running one with it.
+    struct Awaiting
+    {
+        std::string command;
+        int count = 0;
+    };
+    std::optional<Awaiting> awaiting_;
+    bool withCharacter(std::string_view command, char32_t character, int count);
+    // The named registers, a to z: the one named for the next command, the unnamed register
+    // as it was then, adding to a register, and saying what they hold.
+    std::map<char32_t, EventRegister> registers_;
+    std::optional<char32_t> registerName_;
+    EventRegister registerBefore_;
+    static EventRegister appended(EventRegister to, const EventRegister& more);
+    bool sayRegisters();
     std::vector<Key> changeKeys_; // typed since Normal mode was last idle
     std::vector<Key> lastChange_;
     std::uint64_t versionBefore_ = 0;

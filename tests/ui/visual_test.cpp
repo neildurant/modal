@@ -806,3 +806,58 @@ TEST_CASE("Enter on a selection of bars opens exactly those in the piano roll")
     CHECK(roll.page().start == 0);
     CHECK(roll.pageBars() == 8); // the track's own page size, as it was left
 }
+
+TEST_CASE("\"a names the register for a yank, a delete or a put; \"A adds to it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    // In the arrangement, on the bass: bar 1 into a, bar 2 into the unnamed register.
+    s.type(U"\"ayy");
+    CHECK(s.ws.pending().empty());
+    s.type(U"lyy");
+    s.type(U"4l\"ap"); // bar 6: a's, bar 1's E2 (40), after bar 6's own
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 43, 44, 45, 40, 46, 47});
+    s.type(U"u");
+    s.type(U"p"); // the unnamed: bar 2's
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 43, 44, 45, 41, 46, 47});
+    s.type(U"u");
+
+    // A capital adds, laid end to end: bars 1 and 3 into a, put as two bars.
+    s.type(U"gg\"ayy2l\"Ayy");
+    s.type(U"gg5l\"ap"); // bar 6
+    const auto& song = s.document.song();
+    const auto& events = song.events(song.tracks()[0]->id());
+    std::vector<std::pair<core::Tick, int>> found;
+    for (const auto& event : events.all())
+    {
+        found.emplace_back(event.tick, std::get<core::Note>(event.data).pitch);
+    }
+    CHECK(std::ranges::count(found, std::pair{5 * s.bar, 40}) == 1);
+    CHECK(std::ranges::count(found, std::pair{6 * s.bar, 42}) == 1);
+    s.type(U"u");
+
+    // From Visual mode too.
+    s.type(U"ggvl\"by");
+    s.type(U":registers");
+    s.ws.handle(Key::of(NamedKey::Enter), 0);
+
+    // An empty one says so; one not a letter is refused.
+    s.type(U"\"zp");
+    CHECK(s.ws.message() == "Register z is empty");
+    s.type(U"\"1");
+    CHECK(s.ws.message().starts_with("Registers are named by letters"));
+}
+
+TEST_CASE(":registers says what each holds")
+{
+    Selecting s;
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    s.type(U":registers");
+    s.ws.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(s.ws.message() == "The registers are empty");
+    s.type(U"\"ayyjvl\"by");
+    s.type(U":registers");
+    s.ws.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(s.ws.message() ==
+          "\"\": 4 events on 2 tracks; \"a: 1 event on 1 track; \"b: 4 events on 2 tracks");
+}

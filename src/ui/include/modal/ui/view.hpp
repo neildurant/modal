@@ -83,6 +83,8 @@ struct EventRegister
         return sections.empty() &&
                std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
     }
+
+    friend bool operator==(const EventRegister&, const EventRegister&) = default;
 };
 
 // A Visual selection (milestone 6): where it started, the cursor being its other end, and its

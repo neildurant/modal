@@ -93,6 +93,10 @@ constexpr std::array kSharedCommands{
                 .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
                                "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "register-use",
+                .description = "Name the register for the next yank, delete or put by a letter "
+                               "after it (\"ayy, \"ap); a capital adds to it (\"Ayy)"},
+    CommandInfo{.name = "registers", .description = "Say what the registers hold", .keys = false},
     CommandInfo{.name = "repeat",
                 .description = "Repeat the last change (.), with its range or object, as one "
                                "undo step; a count replaces the one it had",
@@ -272,6 +276,12 @@ constexpr std::array<core::TimeSignature, 13> kOfferedMeters{{{2, 4},
                                                               {9, 8},
                                                               {11, 8},
                                                               {12, 8}}};
+
+// A register's letter, as its lower case.
+char32_t lowerLetter(char32_t letter)
+{
+    return letter >= U'A' && letter <= U'Z' ? letter - U'A' + U'a' : letter;
+}
 
 bool isShared(std::string_view name)
 {
@@ -573,6 +583,14 @@ const std::vector<core::Event>& Workspace::registerEvents() const
 std::string Workspace::pending() const
 {
     std::string text = cutNext_ ? keysOf("cut-at-edges") : std::string{};
+    if (registerName_)
+    {
+        text += keysOf("register-use") + encodeUtf8(std::u32string(1, *registerName_));
+    }
+    if (awaiting_)
+    {
+        text += keysOf(awaiting_->command);
+    }
     if (operator_)
     {
         text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
@@ -717,6 +735,104 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     return changed;
 }
 
+bool Workspace::withCharacter(std::string_view command, char32_t character, int /*count*/)
+{
+    if (command == "register-use")
+    {
+        if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
+        {
+            setMessage("Registers are named by letters, \"a to \"z, a capital adding to one",
+                       MessageKind::Information);
+            return true;
+        }
+        registerName_ = character;
+        registerBefore_ = register_;
+        return true;
+    }
+    return false;
+}
+
+EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
+{
+    // Laid end to end (decided with Neil): after the span what's there took, its rests kept, or
+    // without one, as from the event list's rows, at its last event's time; sections after
+    // sections.
+    if (to.empty())
+    {
+        return more;
+    }
+    if (!more.sections.empty() || !to.sections.empty())
+    {
+        to.sections.insert(to.sections.end(), more.sections.begin(), more.sections.end());
+        return to;
+    }
+    core::Tick offset = to.span;
+    if (offset == 0)
+    {
+        for (const auto& events : to.tracks)
+        {
+            for (const auto& event : events)
+            {
+                offset = std::max(offset, event.tick);
+            }
+        }
+    }
+    to.tracks.resize(std::max(to.tracks.size(), more.tracks.size()));
+    for (std::size_t k = 0; k < more.tracks.size(); ++k)
+    {
+        for (auto event : more.tracks[k])
+        {
+            event.tick += offset;
+            to.tracks[k].push_back(std::move(event));
+        }
+    }
+    to.span = more.span > 0 ? offset + more.span : 0;
+    to.bars = to.bars && more.bars;
+    return to;
+}
+
+bool Workspace::sayRegisters()
+{
+    // Each holding something, the unnamed first: "a: 12 events on 2 tracks.
+    const auto about = [](const EventRegister& reg)
+    {
+        if (!reg.sections.empty())
+        {
+            std::string names;
+            for (const auto& section : reg.sections)
+            {
+                names += (names.empty() ? "" : ", ") + section->name();
+            }
+            return std::to_string(reg.sections.size()) +
+                   (reg.sections.size() == 1 ? " section, " : " sections, ") + names;
+        }
+        std::size_t events = 0;
+        std::size_t tracks = 0;
+        for (const auto& list : reg.tracks)
+        {
+            events += list.size();
+            tracks += list.empty() ? 0 : 1;
+        }
+        return eventCount(events) + " on " + std::to_string(tracks) +
+               (tracks == 1 ? " track" : " tracks");
+    };
+    std::string text;
+    if (!register_.empty())
+    {
+        text = "\"\": " + about(register_);
+    }
+    for (const auto& [name, reg] : registers_)
+    {
+        if (!reg.empty())
+        {
+            text += (text.empty() ? "" : "; ") + std::string{"\""} +
+                    encodeUtf8(std::u32string(1, name)) + ": " + about(reg);
+        }
+    }
+    setMessage(text.empty() ? "The registers are empty" : text, MessageKind::Information);
+    return true;
+}
+
 bool Workspace::repeatChange(int count)
 {
     // The last change's keys again, as one undo step; a count replaces the one it began with.
@@ -804,6 +920,21 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
             keysPage_ = std::clamp(*keysPage_ + (next ? 1 : -1), 0, std::max(pages - 1, 0));
         }
         return true;
+    }
+    // A command waiting for a character after it ("a): the next key, Escape giving it up.
+    if (const auto waiting = std::exchange(awaiting_, std::nullopt))
+    {
+        if (key.named == NamedKey::Escape)
+        {
+            return true;
+        }
+        if (key.named != NamedKey::None || (key.modifiers & (kCtrl | kAlt)) != 0)
+        {
+            setMessage(keysFor(waiting->command) + " takes a letter after it",
+                       MessageKind::Information);
+            return true;
+        }
+        return withCharacter(waiting->command, key.character, waiting->count);
     }
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
@@ -1530,11 +1661,43 @@ CommandResult Workspace::run(std::string_view command, int count)
     {
         cutNext_ = false; // | is for the next operator only
     }
+    // A register named before ("a): a put puts from it, a yank or delete fills it, or with a
+    // capital adds to it, the unnamed register getting what's taken either way, as in Vim.
+    const auto named = command != "register-use" ? registerName_ : std::nullopt;
+    const bool put = command == "register-put" || command == "register-put-before";
+    std::optional<EventRegister> unnamed;
+    if (named && put)
+    {
+        const auto& from = registers_[lowerLetter(*named)];
+        if (from.empty())
+        {
+            registerName_.reset();
+            setMessage("Register " + encodeUtf8(std::u32string(1, lowerLetter(*named))) +
+                           " is empty",
+                       MessageKind::Warning);
+            return {true};
+        }
+        unnamed = std::exchange(register_, from);
+    }
     auto result = commands_.run(command, count, mode_);
     if (!result.message.empty())
     {
         setMessage(result.message,
                    result.warning ? MessageKind::Warning : MessageKind::Information);
+    }
+    if (named && put)
+    {
+        register_ = std::move(*unnamed);
+        registerName_.reset();
+    }
+    else if (named && mode_ != Mode::OperatorPending && !awaiting_ && !answer_)
+    {
+        if (!(register_ == registerBefore_))
+        {
+            auto& into = registers_[lowerLetter(*named)];
+            into = lowerLetter(*named) == *named ? register_ : appended(into, register_);
+        }
+        registerName_.reset();
     }
     return result;
 }
@@ -1661,6 +1824,15 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "repeat")
     {
         return repeatChange(count);
+    }
+    if (command == "register-use")
+    {
+        awaiting_ = Awaiting{std::string{command}, count};
+        return true;
+    }
+    if (command == "registers")
+    {
+        return sayRegisters();
     }
     if (command == "undo" || command == "redo")
     {
