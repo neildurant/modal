@@ -238,6 +238,12 @@ public:
         return std::nullopt;
     }
     virtual std::optional<std::size_t> selectionIndex() const { return std::nullopt; }
+    // The time whole rows (V) take when they're first selected, if not the whole song's: the
+    // piano roll's page.
+    virtual std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const
+    {
+        return std::nullopt;
+    }
     virtual std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view /*object*/,
                                                                         int /*count*/)
     {

@@ -274,9 +274,40 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selected() const
     {
         return std::nullopt;
     }
+    if (selection->kind == SelectionKind::Rows)
+    {
+        // V: the page's time when it started, or an object's.
+        return selection->span.value_or(std::pair{page().start, page().end});
+    }
     const auto from = std::min(selection->anchor.tick, time_);
     const auto last = std::max(selection->anchor.tick, time_);
     return std::pair{from, std::max(gridAfter(last), last + 1)};
+}
+
+std::optional<std::pair<std::uint8_t, std::uint8_t>> PianoRollView::selectedPitches() const
+{
+    const auto selection = host_.selection();
+    if (!selection || selection->where != Where::PianoRoll ||
+        selection->kind != SelectionKind::Rows)
+    {
+        return std::nullopt;
+    }
+    // From the pitch where it started to the cursor's, both in.
+    const auto anchor = selection->anchor.pitch.value_or(pitch_);
+    return std::pair{std::min(anchor, pitch_), std::max(anchor, pitch_)};
+}
+
+bool PianoRollView::takes(core::Tick tick, std::uint8_t pitch) const
+{
+    const auto span = selected();
+    const auto pitches = selectedPitches();
+    return span && tick >= span->first && tick < span->second &&
+           (!pitches || (pitch >= pitches->first && pitch <= pitches->second));
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::rowsSpan() const
+{
+    return std::pair{page().start, page().end};
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selectionSpan() const
@@ -292,7 +323,15 @@ std::optional<std::string> PianoRollView::selectionStatus() const
         return std::nullopt;
     }
     const auto& m = meter();
-    return positionText(m, span->first) + " to " + positionText(m, span->second) + " in " +
+    std::string rows;
+    if (const auto pitches = selectedPitches())
+    {
+        rows =
+            core::pitchName(pitches->first) +
+            (pitches->second == pitches->first ? "" : " to " + core::pitchName(pitches->second)) +
+            ", ";
+    }
+    return rows + positionText(m, span->first) + " to " + positionText(m, span->second) + " in " +
            trackName();
 }
 
@@ -1477,7 +1516,23 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         const auto [from, to] = *span;
         if (motion == "visual")
         {
-            return operateOn(op, notesIn(from, to), from, to - from);
+            std::vector<std::size_t> taken;
+            const auto& events = document_.song().events(*trackId());
+            for (const auto i : notesIn(from, to))
+            {
+                if (takes(events[i].tick, std::get<core::Note>(events[i].data).pitch))
+                {
+                    taken.push_back(i);
+                }
+            }
+            return operateOn(op, taken, from, to - from);
+        }
+        if (selectedPitches())
+        {
+            host_.setMessage("D takes time out of the whole track, not some of its pitches; v "
+                             "selects every pitch",
+                             MessageKind::Information);
+            return true;
         }
         const auto& song = document_.song();
         const auto end = std::min(to, sectionEndAt(song, from));
@@ -1662,8 +1717,15 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
     }
     std::size_t notes = 0;
     std::optional<std::size_t> only;
+    const auto pitches = motion == "visual" ? selectedPitches() : std::nullopt;
     for (std::size_t i = 0; i < events.size(); ++i)
     {
+        // With V, only the notes at its pitches, not the controllers with them.
+        const auto* note = std::get_if<core::Note>(&events[i].data);
+        if (pitches && (note == nullptr || !takes(events[i].tick, note->pitch)))
+        {
+            continue;
+        }
         if (events[i].tick >= span->first && events[i].tick < span->second)
         {
             taken.push_back(i);
@@ -2049,13 +2111,26 @@ void PianoRollView::addRegions(Frame& frame) const
         notes.under.push_back({{cursorX, 0, cursorWidth, notesHeight}, Role::Selection, kBand});
         lane.under.push_back({{cursorX, 0, cursorWidth, laneHeight}, Role::Selection, kBand});
     }
-    // A Visual selection, its time at every pitch, tinted through the notes and the lane.
+    // A Visual selection: its time at every pitch, tinted through the notes and the lane; or
+    // with V its rows, through the notes alone.
     if (const auto span = selected(); span && span->first < p.end && span->second > p.start)
     {
         const int x0 = scale.toX(std::max(span->first, p.start));
         const int x1 = scale.toX(std::min(span->second, p.end));
-        notes.under.push_back({{x0, 0, x1 - x0, notesHeight}, Role::Selection, 255});
-        lane.under.push_back({{x0, 0, x1 - x0, laneHeight}, Role::Selection, 255});
+        if (const auto pitches = selectedPitches())
+        {
+            const int top = std::max(rowOf(pitches->second), 0) * h;
+            const int bottom = std::min(rowOf(pitches->first) + 1, rows) * h;
+            if (bottom > top)
+            {
+                notes.under.push_back({{x0, top, x1 - x0, bottom - top}, Role::Selection, 255});
+            }
+        }
+        else
+        {
+            notes.under.push_back({{x0, 0, x1 - x0, notesHeight}, Role::Selection, 255});
+            lane.under.push_back({{x0, 0, x1 - x0, laneHeight}, Role::Selection, 255});
+        }
     }
     for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid(), cell_))
     {
@@ -2125,8 +2200,7 @@ void PianoRollView::addRegions(Frame& frame) const
             }
             // The current note stands out; or while selecting, the notes the selection takes,
             // those starting in it, and only those, even the one under the cursor.
-            const bool picked =
-                span ? event.tick >= span->first && event.tick < span->second : current == i;
+            const bool picked = span ? takes(event.tick, note->pitch) : current == i;
             const Role role = picked ? Role::NoteSelected : Role::Note;
             const int x0 = scale.toX(std::max(event.tick, p.start));
             const int x1 = scale.toX(std::min(end, p.end));

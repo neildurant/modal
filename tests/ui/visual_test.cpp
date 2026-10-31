@@ -487,3 +487,36 @@ TEST_CASE("D on whole rows closes up within each section the selection crosses")
     s.type(U"u");
     CHECK(pitches(s.document, 0).size() == 8);
 }
+
+TEST_CASE("V in the piano roll selects pitch rows across the page it started on")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    const auto page = s.ws.pianoRoll().page();
+    s.type(U"V");
+    CHECK(s.ws.pianoRoll().selectionStatus().value_or("").starts_with("E2, "));
+    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{page.start, page.end});
+    s.type(U"k"); // and F2
+    CHECK(s.ws.pianoRoll().selectionStatus().value_or("").starts_with("E2 to F2, "));
+    // The time stays the page's as the cursor moves on, the view turning.
+    s.type(U"4}");
+    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{page.start, page.end});
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // An object sets the time: these rows across the whole track.
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"Vkkit>");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // D takes time out of whole tracks, not some pitches.
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"VD");
+    CHECK(s.ws.message().starts_with("D takes time out of the whole track"));
+    CHECK(pitches(s.document, 0).size() == 8);
+}

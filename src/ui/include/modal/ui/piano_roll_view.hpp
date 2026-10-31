@@ -60,6 +60,7 @@ public:
     std::string_view name() const override { return "the piano roll"; }
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
                                                                 int count) override;
     std::vector<int> topHeights(CellSize cell) const override;
@@ -199,6 +200,10 @@ private:
     // The Visual selection's span: from where it started to the cursor, the grid step at the
     // later end in, at every pitch; or nothing if there's none here.
     std::optional<std::pair<core::Tick, core::Tick>> selected() const;
+    // With V, the pitches it takes, lowest and highest; with v, every pitch, so nothing.
+    std::optional<std::pair<std::uint8_t, std::uint8_t>> selectedPitches() const;
+    // Whether a note at a time and pitch is one the selection takes.
+    bool takes(core::Tick tick, std::uint8_t pitch) const;
     bool selecting() const; // whether there's a Visual selection here
     // Where a range goes in time from the cursor, or nothing if it goes nowhere; and whether a
     // motion goes across pitches, which isn't a range yet, saying so if it does.

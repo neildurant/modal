@@ -305,7 +305,7 @@ std::span<const CommandInfo> Workspace::commands()
         const std::array<std::pair<std::string_view, std::uint8_t>, 62> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"visual-rows", onlyIn({Tracks})},
+            {"visual-rows", onlyIn({Tracks, PianoRoll})},
             {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -1478,7 +1478,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                       .kind = command == "visual" ? SelectionKind::Range : SelectionKind::Rows,
                       .where = where(),
                       .index = view().selectionIndex(),
-                      .span = std::nullopt};
+                      .span = command == "visual" ? std::nullopt : view().rowsSpan()};
         mode_ = Mode::Visual;
         return true;
     }
@@ -1666,7 +1666,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         else
         {
             selection_->kind = kind;
-            selection_->span.reset();
+            selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
         }
         return true;
     }
