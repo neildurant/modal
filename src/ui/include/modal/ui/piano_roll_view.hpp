@@ -58,6 +58,10 @@ public:
     bool gridAdvance() const { return gridAdvance_; }
 
     std::string_view name() const override { return "the piano roll"; }
+    std::optional<std::string> selectionStatus() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
+    std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
+                                                                int count) override;
     std::vector<int> topHeights(CellSize cell) const override;
     void resize(const WindowLayout& layout, int width, CellSize cell) override;
     std::optional<bool> run(std::string_view command, int count) override;
@@ -187,6 +191,9 @@ private:
     std::optional<std::string> setNote(const std::string& heading, const core::Event& changed);
     // The track's notes starting in a span of time, by index.
     std::vector<std::size_t> notesIn(core::Tick from, core::Tick to) const;
+    // The Visual selection's span: from where it started to the cursor, the grid step at the
+    // later end in, at every pitch; or nothing if there's none here.
+    std::optional<std::pair<core::Tick, core::Tick>> selected() const;
     // Where a range goes in time from the cursor, or nothing if it goes nowhere; and whether a
     // motion goes across pitches, which isn't a range yet, saying so if it does.
     std::optional<std::pair<core::Tick, core::Tick>> timeSpan(std::string_view motion, int count);

@@ -261,6 +261,87 @@ void PianoRollView::editEvents(std::string title,
     refresh();
 }
 
+std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selected() const
+{
+    const auto selection = host_.selection();
+    if (!selection || selection->where != Where::PianoRoll || !trackId())
+    {
+        return std::nullopt;
+    }
+    const auto from = std::min(selection->anchor.tick, time_);
+    const auto last = std::max(selection->anchor.tick, time_);
+    return std::pair{from, std::max(gridAfter(last), last + 1)};
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selectionSpan() const
+{
+    return selected();
+}
+
+std::optional<std::string> PianoRollView::selectionStatus() const
+{
+    const auto span = selected();
+    if (!span)
+    {
+        return std::nullopt;
+    }
+    const auto& m = meter();
+    return positionText(m, span->first) + " to " + positionText(m, span->second) + " in " +
+           trackName();
+}
+
+std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::objectSpan(std::string_view object,
+                                                                           int count)
+{
+    // The time an object takes: a note's or a chord's from its start to its last end, or the
+    // span of bars, sections or the track.
+    const auto id = trackId();
+    if (!id)
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& events = song.events(*id);
+    std::vector<std::size_t> taken;
+    if (object == "object-note")
+    {
+        if (const auto index = noteHere("select"))
+        {
+            taken.push_back(*index);
+        }
+    }
+    else if (object == "object-chord")
+    {
+        taken = chordHere(count);
+    }
+    else if (object == "object-track")
+    {
+        return std::pair{core::Tick{0}, song.end()};
+    }
+    else if (isSectionObject(object))
+    {
+        const auto range = sectionsFrom(song, time_, count);
+        return std::pair{range.from, range.to};
+    }
+    else
+    {
+        const auto& m = meter();
+        const auto bar = m.toBarBeatTick(time_).bar;
+        return std::pair{m.barStart(bar),
+                         std::min(m.barStart(bar + std::max(count, 1)), song.end())};
+    }
+    if (taken.empty())
+    {
+        return std::nullopt;
+    }
+    core::Tick end = 0;
+    for (const auto i : taken)
+    {
+        end = std::max(end, events[i].tick + std::get<core::Note>(events[i].data).duration);
+    }
+    return std::pair{events[taken.front()].tick, end};
+}
+
 std::vector<std::size_t> PianoRollView::chordHere(int count) const
 {
     const auto index = currentNote();
@@ -1348,6 +1429,29 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return operateOnBars(op, count, motion == "object-bar");
     }
+    if (motion == "visual" || motion == "visual-time")
+    {
+        // A selection: its notes, put at the cursor's time rather than a bar's; with D its
+        // time too, every event there, the gap closing as far as the section's end.
+        const auto span = selected();
+        if (!span)
+        {
+            return false;
+        }
+        const auto [from, to] = *span;
+        if (motion == "visual")
+        {
+            return operateOn(op, notesIn(from, to), from, to - from);
+        }
+        const auto& song = document_.song();
+        const auto end = std::min(to, sectionEndAt(song, from));
+        document_.edit("Delete " + *selectionStatus() + ", closing the gap", place(),
+                       [&](core::Song& s)
+                       { host_.eventRegister() = rippleDelete(s, track_, track_, from, end); });
+        refresh();
+        moveTo(from);
+        return true;
+    }
     if (motion == "object-track")
     {
         // it: the track's notes, from the start, taken as bars.
@@ -1501,6 +1605,10 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
     else if (motion == "object-track")
     {
         span = std::pair{core::Tick{0}, song.end()};
+    }
+    else if (motion == "visual")
+    {
+        span = selected();
     }
     else if (isSectionObject(motion))
     {
@@ -1904,6 +2012,14 @@ void PianoRollView::addRegions(Frame& frame) const
     {
         notes.under.push_back({{cursorX, 0, cursorWidth, notesHeight}, Role::Selection, kBand});
         lane.under.push_back({{cursorX, 0, cursorWidth, laneHeight}, Role::Selection, kBand});
+    }
+    // A Visual selection, its time at every pitch, tinted through the notes and the lane.
+    if (const auto span = selected(); span && span->first < p.end && span->second > p.start)
+    {
+        const int x0 = scale.toX(std::max(span->first, p.start));
+        const int x1 = scale.toX(std::min(span->second, p.end));
+        notes.under.push_back({{x0, 0, x1 - x0, notesHeight}, Role::Selection, 255});
+        lane.under.push_back({{x0, 0, x1 - x0, laneHeight}, Role::Selection, 255});
     }
     for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid(), cell_))
     {

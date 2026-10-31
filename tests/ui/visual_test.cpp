@@ -269,3 +269,36 @@ TEST_CASE("p puts the register in the selection's place, as one undo step")
     CHECK(s.ws.message() == "Undid: Put over " + s.bars(4, 5));
     CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 43, 44, 45, 46, 47});
 }
+
+TEST_CASE("v in the piano roll selects time at every pitch, on the cursor's track")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"grv}"); // bar 1's start to bar 2's first grid step
+    REQUIRE(s.ws.mode() == Mode::Visual);
+    CHECK(s.ws.pianoRoll().selectionStatus().value_or("").ends_with(" in Bass"));
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 45, 46, 47});
+    CHECK(pitches(s.document, 1).size() == 8); // only the cursor's track
+    s.type(U"u");
+
+    // The other operators.
+    s.type(U"ggv}>");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 42, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // An object selects exactly what it takes: vin the note, vis the section.
+    s.ws.pianoRoll().setCursor(
+        {.track = s.document.song().tracks()[0]->id(), .tick = 0, .pitch = 40});
+    s.type(U"vin");
+    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{core::Tick{0}, ppqn.quarter()});
+    s.press(NamedKey::Escape);
+
+    // D takes the time out of this track, closing the gap as far as the section's end.
+    s.type(U"3}vis");
+    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{2 * s.bar, 5 * s.bar});
+    s.type(U"D");
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 45, 46, 47});
+    CHECK(pitches(s.document, 1).size() == 8);
+    CHECK(s.document.song().end() == 8 * s.bar);
+}
