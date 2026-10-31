@@ -3453,6 +3453,14 @@ std::vector<PaletteItem> Workspace::paletteItems() const
         {
             items.back().keys = bound->second;
         }
+        // As the view here calls it, where it does something else than its own title says
+        // (the piano roll's J, down an octave, is join on the strip), as the list of keys has
+        // it; then without the description, which is of the other.
+        if (const auto here = view().relabel(info.name); here && !here->second.empty())
+        {
+            items.back().title = here->second;
+            items.back().description.clear();
+        }
     }
     return items;
 }
