@@ -520,3 +520,24 @@ TEST_CASE("V in the piano roll selects pitch rows across the page it started on"
     CHECK(s.ws.message().starts_with("D takes time out of the whole track"));
     CHECK(pitches(s.document, 0).size() == 8);
 }
+
+TEST_CASE("V in the event list and on the strip selects as v does there")
+{
+    Selecting s;
+    s.type(U"ge");
+    const auto& list = s.ws.eventList();
+    while (list.list().rows()[list.row()].kind != RowKind::Event)
+    {
+        s.type(U"j");
+    }
+    s.type(U"Vj");
+    CHECK(s.ws.eventList().selectionStatus() == "2 events in Bass");
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    s.type(U"gagsVl");
+    CHECK(s.ws.arrangement().selectionStatus() == "2 sections from A");
+    s.type(U"d");
+    CHECK(sections(s.document) == std::vector<std::string>{"C"});
+}

@@ -102,9 +102,9 @@ nmap Y          yank-this         "Yank this"
 
 " Visual mode: v selects from the cursor as it moves, a range of time on every track, and v
 " again or Escape ends it; V selects whole rows: tracks at every time, or in the piano roll
-" pitches across the page, until an object sets the time. An object selects what it takes
-" (vis this section), o goes to the selection's other end, and gv selects the last selection
-" again. d and x delete what's selected, y and Y yank it, D takes its time out (from the
+" pitches across the page, until an object sets the time (in the event list and on the
+" strip, as v). An object selects what it takes (vis this section), o goes to the
+" selection's other end, and gv selects the last selection again. d and x delete what's selected, y and Y yank it, D takes its time out (from the
 " song, when it's on every track), p and P put the register in its place, and the other
 " operators change it at once.
 keysection "Visual mode"

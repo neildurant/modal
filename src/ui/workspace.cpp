@@ -305,7 +305,7 @@ std::span<const CommandInfo> Workspace::commands()
         const std::array<std::pair<std::string_view, std::uint8_t>, 62> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"visual-rows", onlyIn({Tracks, PianoRoll})},
+            {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
