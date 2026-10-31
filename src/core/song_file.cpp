@@ -350,6 +350,7 @@ private:
     bool readMeter(std::span<const Token> tokens);
     bool readTempo(std::span<const Token> tokens);
     bool readMarker(std::span<const Token> tokens);
+    bool readMark(std::span<const Token> tokens);
     bool readBlock(std::span<const Token> tokens);
     bool readEvent(std::span<const Token> tokens);
     std::optional<EventData> eventData(std::span<const Token> tokens);
@@ -390,7 +391,8 @@ private:
         bool meterClosed = false; // by a tempo, marker or track line
         std::vector<std::pair<Pending, Tempo>> tempo;
         std::vector<std::pair<Pending, std::string>> markers;
-        std::optional<Section> section; // once the conductor's part is complete
+        std::vector<std::pair<int, Mark>> marks; // with their lines
+        std::optional<Section> section;          // once the conductor's part is complete
         std::set<TrackId> blocks;
     };
 
@@ -412,6 +414,7 @@ private:
     std::vector<Section> sections_;
     std::optional<OpenSection> section_;
     std::optional<OpenBlock> block_;
+    std::set<char> marked_; // the letters marked so far, which mark one place in the song
 };
 
 SongReadResult Reader::read(std::string_view text)
@@ -497,15 +500,16 @@ bool Reader::readLine(std::span<const Token> tokens)
         }
         return word == "metronome" ? readMetronome(tokens) : readCountIn(tokens);
     }
-    if (word == "meter" || word == "tempo" || word == "marker")
+    if (word == "meter" || word == "tempo" || word == "marker" || word == "mark")
     {
         if (!section_)
         {
             return fail(word + " belongs in a section");
         }
-        return word == "meter"   ? readMeter(tokens)
-               : word == "tempo" ? readTempo(tokens)
-                                 : readMarker(tokens);
+        return word == "meter"    ? readMeter(tokens)
+               : word == "tempo"  ? readTempo(tokens)
+               : word == "marker" ? readMarker(tokens)
+                                  : readMark(tokens);
     }
     return fail("unknown line \"" + word + "\"");
 }
@@ -920,6 +924,67 @@ bool Reader::readMarker(std::span<const Token> tokens)
     return true;
 }
 
+bool Reader::readMark(std::span<const Token> tokens)
+{
+    // mark a 3:1:000 track=2 pitch=C3, the track and pitch if it has them.
+    if (block_ || section_->section)
+    {
+        return fail("mark lines come before the section's tracks");
+    }
+    if (tokens.size() < 3 || tokens[1].quoted || tokens[1].text.size() != 1 ||
+        tokens[1].text[0] < 'a' || tokens[1].text[0] > 'z')
+    {
+        return fail("a mark line is a letter from a to z, a position and its track and pitch");
+    }
+    if (!section_->meter)
+    {
+        return fail("the section's meter comes before its marks");
+    }
+    Mark mark;
+    mark.letter = tokens[1].text[0];
+    if (!marked_.insert(mark.letter).second)
+    {
+        return fail("there's already a mark " + tokens[1].text);
+    }
+    section_->meterClosed = true;
+    const auto tick = tickAt(*section_->meter, tokens[2].text);
+    if (!tick)
+    {
+        return false;
+    }
+    mark.tick = *tick;
+    for (const auto& token : tokens.subspan(3))
+    {
+        const auto [name, value] = settingOf(token);
+        if (value && name == "track")
+        {
+            const auto number = parseInteger(*value, 1, std::numeric_limits<std::int64_t>::max());
+            const TrackId id{number ? static_cast<std::uint64_t>(*number) : 0};
+            if (!number || std::ranges::none_of(tracks_, [id](const Track& track)
+                                                { return track.id() == id; }))
+            {
+                return fail("the mark's track " + std::string{*value} + " isn't one of the song's");
+            }
+            mark.track = id;
+        }
+        else if (value && name == "pitch")
+        {
+            const auto at = pitch(*value);
+            if (!at)
+            {
+                return false;
+            }
+            mark.pitch = *at;
+        }
+        else
+        {
+            return fail("a mark has a track= and a pitch=, not \"" + token.text + "\"");
+        }
+    }
+    section_->marks.emplace_back(line_, mark);
+    return true;
+}
+
 bool Reader::readBlock(std::span<const Token> tokens)
 {
     if (!closeConductor() || !closeBlock())
@@ -1184,6 +1249,14 @@ bool Reader::closeConductor()
         }
         section.addMarker({at.tick, name});
     }
+    for (const auto& [at, mark] : open.marks)
+    {
+        if (mark.tick >= length)
+        {
+            return failAt(at, "the mark is past the end of the section");
+        }
+        section.addMark(mark);
+    }
     open.section = std::move(section);
     return true;
 }
@@ -1362,6 +1435,11 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
             }
             section.addMarker({tick, marker.name});
         }
+        for (auto mark : old->marks())
+        {
+            mark.tick = scale(mark.tick);
+            section.addMark(mark);
+        }
         for (const auto& track : song.tracks())
         {
             const auto* content = old->content(track->id());
@@ -1502,6 +1580,20 @@ std::string writeSong(const Song& song)
         for (const auto& marker : section->markers())
         {
             line(1, "marker " + positionText(meter, marker.tick) + " " + quotedText(marker.name));
+        }
+        for (const auto& mark : section->marks())
+        {
+            std::string markText =
+                "mark " + std::string(1, mark.letter) + " " + positionText(meter, mark.tick);
+            if (mark.track)
+            {
+                markText += " track=" + std::to_string(mark.track->value);
+            }
+            if (mark.pitch != Mark::kNoPitch)
+            {
+                markText += " pitch=" + pitchName(static_cast<std::uint8_t>(mark.pitch));
+            }
+            line(1, markText);
         }
         for (const auto& track : song.tracks())
         {

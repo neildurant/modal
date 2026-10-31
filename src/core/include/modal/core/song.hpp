@@ -30,6 +30,22 @@ struct Marker
     friend bool operator==(const Marker&, const Marker&) = default;
 };
 
+// A mark (ma, decided October 2026): a place named by a letter, a to z, saved with the song
+// and kept in the section it's in, so it goes where the section goes: a track (none for the
+// conductor), a time and, for one set in the piano roll, a pitch (kNoPitch otherwise, rather
+// than an optional, which GCC's release build takes for uninitialised).
+struct Mark
+{
+    static constexpr int kNoPitch = -1;
+
+    char letter = 'a';
+    Tick tick = 0;
+    std::optional<TrackId> track;
+    int pitch = kNoPitch;
+
+    friend bool operator==(const Mark&, const Mark&) = default;
+};
+
 // One track's part of a section, positioned from the section's start.
 struct TrackContent
 {
@@ -61,6 +77,9 @@ public:
     // Bookmarks in tick order, each with a name of its own within the section.
     std::span<const Marker> markers() const { return markers_; }
 
+    // The marks in it, by letter.
+    std::span<const Mark> marks() const { return marks_; }
+
     // A track's content here, or null if it has no events and follows the conductor.
     const TrackContent* content(TrackId id) const;
 
@@ -69,6 +88,7 @@ public:
     void setColour(std::optional<std::string> colour) { colour_ = std::move(colour); }
     void addTempo(TempoChange change); // after the others; at 0, replaces the first
     void addMarker(Marker marker);     // after the others
+    void addMark(Mark mark);           // of a letter not there yet
     void setContent(TrackId id, TrackContent content);
 
     friend bool operator==(const Section& a, const Section& b);
@@ -82,6 +102,7 @@ private:
     std::vector<TempoChange> tempo_;
     MeterMap meter_;
     std::vector<Marker> markers_;
+    std::vector<Mark> marks_;
     std::map<TrackId, std::shared_ptr<const TrackContent>> content_;
 };
 
@@ -230,6 +251,9 @@ public:
     const TempoMap& tempo() const { return tempo_; }
     const MeterMap& meter() const { return meter_; } // the conductor's
     std::span<const Marker> markers() const { return markers_; }
+    // The marks, by letter, at ticks from the song's start; and one by its letter, if set.
+    std::span<const Mark> marks() const { return marks_; }
+    const Mark* mark(char letter) const;
 
     // A track's meter (its own where it has one, the conductor's elsewhere) and events. Not
     // to be asked of a track the song doesn't have.
@@ -253,6 +277,13 @@ public:
     // bookmark in the same section has it.
     void setMarker(Tick tick, std::string name);
     bool removeMarker(Tick tick);
+
+    // Sets a mark, at a tick from the song's start, moving it if it's set already; and
+    // removes one. Marks go with their sections; those in sections taken out go with them, and
+    // sections put in bring none, so a letter marks one place. Removing a track removes its
+    // marks.
+    void setMark(Mark mark);
+    bool removeMark(char letter);
 
     // Whether two songs have the same settings, tracks and sections.
     friend bool operator==(const Song& a, const Song& b);
@@ -315,6 +346,7 @@ private:
     TempoMap tempo_;
     MeterMap meter_;
     std::vector<Marker> markers_;
+    std::vector<Mark> marks_;
     std::vector<Tick> starts_;         // each section's start, then the song's end
     std::vector<Flattened> flattened_; // parallel to tracks_
 };

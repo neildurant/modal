@@ -128,6 +128,14 @@ void Section::addMarker(Marker marker)
     markers_.push_back(std::move(marker));
 }
 
+void Section::addMark(Mark mark)
+{
+    assert(mark.tick >= 0 && mark.tick < length_);
+    assert(std::ranges::find(marks_, mark.letter, &Mark::letter) == marks_.end());
+    marks_.insert(std::ranges::upper_bound(marks_, mark.letter, {}, &Mark::letter),
+                  std::move(mark));
+}
+
 void Section::setContent(TrackId id, TrackContent content)
 {
     if (!content.meter && content.events.empty())
@@ -144,7 +152,7 @@ bool operator==(const Section& a, const Section& b)
     { return x.first == y.first && (x.second == y.second || *x.second == *y.second); };
     return a.name_ == b.name_ && a.colour_ == b.colour_ && a.length_ == b.length_ &&
            a.tempo_ == b.tempo_ && a.meter_ == b.meter_ && a.markers_ == b.markers_ &&
-           std::ranges::equal(a.content_, b.content_, sameContent);
+           a.marks_ == b.marks_ && std::ranges::equal(a.content_, b.content_, sameContent);
 }
 
 Song::Song(Ppqn ppqn)
@@ -249,12 +257,20 @@ bool Song::removeTrack(TrackId id)
     }
     for (std::size_t i = 0; i < sections_.size(); ++i)
     {
-        if (sections_[i]->content(id))
+        const auto& marks = sections_[i]->marks_;
+        const bool marked =
+            std::ranges::any_of(marks, [id](const Mark& m) { return m.track == id; });
+        if (sections_[i]->content(id) || marked)
         {
             auto section = std::make_shared<Section>(*sections_[i]);
             section->content_.erase(id);
+            std::erase_if(section->marks_, [id](const Mark& m) { return m.track == id; });
             sections_[i] = std::move(section);
         }
+    }
+    if (std::ranges::any_of(marks_, [id](const Mark& m) { return m.track == id; }))
+    {
+        rebuildConductor();
     }
     const auto offset = static_cast<std::ptrdiff_t>(index);
     tracks_.erase(tracks_.begin() + offset);
@@ -316,6 +332,16 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
         if (marker.tick >= at)
         {
             second->markers_.push_back({marker.tick - at, marker.name});
+        }
+    }
+    std::erase_if(first->marks_, [at](const Mark& mark) { return mark.tick >= at; });
+    second->marks_.clear();
+    for (auto mark : old.marks_)
+    {
+        if (mark.tick >= at)
+        {
+            mark.tick -= at;
+            second->marks_.push_back(mark);
         }
     }
 
@@ -390,6 +416,7 @@ bool Song::insertSections(std::size_t index,
     {
         auto copy = std::make_shared<Section>(*section);
         copy->name_ = uniqueSectionName(copy->name_);
+        copy->marks_.clear();
         std::erase_if(copy->content_,
                       [this](const auto& entry)
                       {
@@ -488,6 +515,7 @@ bool Song::resizeSection(std::size_t index, std::int64_t bars)
         section->meter_ = meterBetween(old.meter_, 0, end);
         std::erase_if(section->tempo_, [end](const auto& change) { return change.tick >= end; });
         std::erase_if(section->markers_, [end](const auto& marker) { return marker.tick >= end; });
+        std::erase_if(section->marks_, [end](const Mark& mark) { return mark.tick >= end; });
         for (auto it = section->content_.begin(); it != section->content_.end();)
         {
             TrackContent shorter{std::nullopt, eventsBetween(it->second->events, 0, end)};
@@ -550,6 +578,12 @@ bool Song::joinSections(std::size_t index)
             name = numbered(marker.name, n);
         }
         joined->markers_.push_back({at + marker.tick, std::move(name)});
+    }
+    for (auto mark : second.marks_)
+    {
+        mark.tick += at;
+        joined->marks_.insert(
+            std::ranges::upper_bound(joined->marks_, mark.letter, {}, &Mark::letter), mark);
     }
 
     joined->content_.clear();
@@ -734,6 +768,10 @@ void Song::fitToContent()
     {
         extent = std::max(extent, marker.tick + 1);
     }
+    for (const auto& mark : section->marks_)
+    {
+        extent = std::max(extent, mark.tick + 1);
+    }
     for (const auto& change : section->tempo_)
     {
         extent = std::max(extent, change.tick + 1);
@@ -907,6 +945,41 @@ void Song::setMarker(Tick tick, std::string name)
     rebuildConductor();
 }
 
+const Mark* Song::mark(char letter) const
+{
+    const auto it = std::ranges::find(marks_, letter, &Mark::letter);
+    return it != marks_.end() ? &*it : nullptr;
+}
+
+void Song::setMark(Mark mark)
+{
+    assert(mark.tick >= 0);
+    removeMark(mark.letter);
+    growTo(mark.tick + 1);
+    const auto index = sectionAt(mark.tick);
+    mark.tick -= starts_[index];
+    auto section = std::make_shared<Section>(*sections_[index]);
+    section->addMark(mark);
+    sections_[index] = std::move(section);
+    rebuildConductor();
+}
+
+bool Song::removeMark(char letter)
+{
+    for (auto& held : sections_)
+    {
+        if (std::ranges::find(held->marks_, letter, &Mark::letter) != held->marks_.end())
+        {
+            auto section = std::make_shared<Section>(*held);
+            std::erase_if(section->marks_, [letter](const Mark& m) { return m.letter == letter; });
+            held = std::move(section);
+            rebuildConductor();
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Song::removeMarker(Tick tick)
 {
     if (tick < 0 || tick >= end())
@@ -984,6 +1057,7 @@ void Song::rebuildConductor()
     tempo_ = TempoMap{ppqn, sections_.front()->tempo_.front().tempo};
     meter_ = MeterMap{ppqn, sections_.front()->meter_.changes().front().signature};
     markers_.clear();
+    marks_.clear();
     starts_.clear();
     Tick start = 0;
     for (const auto& section : sections_)
@@ -1004,9 +1078,15 @@ void Song::rebuildConductor()
         {
             markers_.push_back({start + marker.tick, marker.name});
         }
+        for (auto mark : section->marks_)
+        {
+            mark.tick += start;
+            marks_.push_back(mark);
+        }
         start += section->length_;
     }
     starts_.push_back(start);
+    std::ranges::sort(marks_, {}, &Mark::letter);
 }
 
 void Song::rebuildEvents(std::size_t trackIndex)

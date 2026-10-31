@@ -70,6 +70,9 @@ Song everything(Ppqn ppqn)
         });
     song.setMarker(q, "fix \"this\" fill");
     song.setMarker(5 * bar, "later");
+    song.setMark({'a', q + 1, bass, 60});                       // off the grid, with a pitch
+    song.setMark({'z', 5 * bar, std::nullopt, Mark::kNoPitch}); // the conductor's
+    song.setMark({'m', 3 * bar, lead, Mark::kNoPitch});
     song.updateEvents(bass,
                       [&](EventList& events)
                       {
@@ -146,6 +149,8 @@ TEST_CASE("the song format")
     song.updateEvents(drums, [&](EventList& events)
                       { events.insert({7 * q / 2 + q / 4, Note{36, 110, q / 4}}); });
     song.setMarker(8 * q, "fix this fill");
+    song.setMark({'b', 4 * q, bass, 40});
+    song.setMark({'a', 0, std::nullopt, Mark::kNoPitch});
     song.splitSection(16 * q, "Verse 1");
     song.renameSection(0, "Intro");
     song.fitToContent();
@@ -162,6 +167,8 @@ section "Intro" bars=4
   meter 1:1:0 4/4
   tempo 1:1:0 120
   marker 3:1:0 "fix this fill"
+  mark a 1:1:0
+  mark b 2:1:0 track=1 pitch=E2
   track 1
     1:1:0 note E1 v=96 len=1/8
   track 2
@@ -190,6 +197,7 @@ TEST_CASE("a song at another resolution is rescaled")
                           events.insert({4 * q, Note{64, 100, q}}); // on a bar line
                       });
     song.setMarker(5, "early");
+    song.setMark({'a', q, piano, 60});
     const auto text = writeSong(song);
 
     for (const Ppqn to : {Ppqn{96}, Ppqn{6720}})
@@ -205,6 +213,8 @@ TEST_CASE("a song at another resolution is rescaled")
         CHECK(events[0].tick + first.duration == events[1].tick); // still touching
         CHECK(events[2].tick == to.whole());
         CHECK(std::get<Note>(events[2].data).duration == to.quarter());
+        REQUIRE(back.song->mark('a') != nullptr);
+        CHECK(back.song->mark('a')->tick == to.quarter());
     }
 }
 
@@ -284,6 +294,13 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + "metronome when=sometimes\n", "line 4", "off, recording or always"},
         {header + "countin bars=-1\n", "line 4", "0 to 999"},
         {header + "bogus\n", "line 4", "unknown line"},
+        {header + section + "  mark A 1:1:0\n", "line 7", "letter from a to z"},
+        {header + section + "  mark a 1:1:0\n  mark a 2:1:0\n", "line 8", "already a mark a"},
+        {header + section + "  mark a 1:1:0 track=2\n", "line 7", "isn't one of the song's"},
+        {header + section + "  mark a 1:1:0 pitch=H2\n", "line 7", "pitch"},
+        {header + section + "  mark a 1:1:0 colour=red\n", "line 7", "track= and a pitch="},
+        {header + section + "  mark a 3:1:0\n", "line 7", "past the end"},
+        {header + section + "  track 1\n  mark a 1:1:0\n", "line 8", "before the section's"},
     };
     for (const auto& [text, line, says] : cases)
     {

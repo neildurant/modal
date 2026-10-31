@@ -322,3 +322,48 @@ TEST_CASE("inserting empty bars on every track moves what's after them on, in th
         CHECK(s.song == before);
     }
 }
+
+TEST_CASE("marks go with their sections, and a letter marks one place")
+{
+    Sections s{MODAL_ANY_PPQN()};
+    const auto bar = s.bar;
+    const auto q = bar / 4;
+    s.song.setMark({'a', 3 * bar + q, s.track, 60});              // in B
+    s.song.setMark({'b', 6 * bar, std::nullopt, Mark::kNoPitch}); // C's second bar
+    REQUIRE(s.song.marks().size() == 2);
+    CHECK(s.song.marks()[0] == Mark{'a', 3 * bar + q, s.track, 60});
+
+    // Set again, it moves.
+    s.song.setMark({'a', bar, s.track, 62});
+    CHECK(s.song.marks().size() == 2);
+    CHECK(s.song.mark('a')->tick == bar);
+    CHECK(s.song.sections()[0]->marks().size() == 1);
+    CHECK(s.song.sections()[1]->marks().empty());
+
+    // Moving a section takes its marks; splitting and joining keep them in place.
+    s.song.moveSection(2, -1); // C before B
+    CHECK(s.song.mark('b')->tick == 3 * bar);
+    s.song.splitSection(3 * bar + q, "C2");
+    CHECK(s.song.mark('b')->tick == 3 * bar);
+    s.song.joinSections(1);
+    CHECK(s.song.mark('b')->tick == 3 * bar);
+    CHECK(s.song.sections()[1]->marks().size() == 1);
+
+    // Bars taken out take their marks; sections put back in bring none.
+    const auto removed = s.song.removeBars(3 * bar, 1);
+    REQUIRE(removed.done);
+    CHECK(s.song.mark('b') == nullptr);
+    s.song.insertSections(0, removed.removed);
+    CHECK(s.song.marks().size() == 1);
+
+    // A shorter section loses those past its end; removing a track, its marks.
+    Sections t{s.song.ppqn()};
+    t.song.setMark({'c', 4 * bar, std::nullopt, Mark::kNoPitch}); // B's last bar
+    t.song.setMark({'d', 2 * bar, t.track, Mark::kNoPitch});
+    CHECK(t.song.resizeSection(1, -1));
+    CHECK(t.song.mark('c') == nullptr);
+    CHECK(t.song.mark('d') != nullptr);
+    t.song.removeTrack(t.track);
+    CHECK(t.song.marks().empty());
+    CHECK_FALSE(t.song.removeMark('q'));
+}
