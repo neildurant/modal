@@ -61,6 +61,7 @@ struct CommandInfo
     bool motion = false;           // moves the cursor, so an operator can take it (d]b)
     bool object = false;           // a text object, which only an operator takes (dib)
     bool range = false;            // at the : prompt from Visual mode, acts on the selection
+    bool palette = true;           // offered in the palette: not for config files alone (nmap)
     std::uint8_t where = 0;        // where it does something, as whereBit makes it; 0 everywhere
     // The kinds of its arguments, for completion: the first, second and third, the third for
     // any after it too, as set takes settings one after another.

@@ -374,14 +374,24 @@ namespace
 {
 
 constexpr CommandInfo configCommand(std::string_view name, std::string_view description,
-                                    std::string_view usage, std::array<Choices, 3> choices = {})
+                                    std::string_view usage, std::array<Choices, 3> choices = {},
+                                    bool palette = true)
 {
     return {.name = name,
             .description = description,
             .usage = usage,
             .config = true,
             .keys = false,
+            .palette = palette,
             .choices = choices};
+}
+
+// The commands that make a config file, binding keys and naming groups of them, which the
+// palette leaves out (decided October 2026, as Emacs leaves non-interactive commands out of M-x).
+constexpr CommandInfo bindingCommand(std::string_view name, std::string_view description,
+                                     std::string_view usage, std::array<Choices, 3> choices = {})
+{
+    return configCommand(name, description, usage, choices, false);
 }
 
 constexpr std::array<Choices, 3> kMapChoices{Choices::None, Choices::Command, Choices::None};
@@ -392,28 +402,30 @@ constexpr std::array kConfigCommands{
     configCommand("set", "Set settings; set NAME? shows one", "NAME=VALUE...",
                   {Choices::Setting, Choices::Setting, Choices::Setting}),
     configCommand("highlight", "Set a theme role's colour", "ROLE #rrggbb", {Choices::Role}),
-    configCommand("nmap", "Bind keys to a command in Normal mode", kMapUsage, kMapChoices),
-    configCommand("vmap", "Bind keys to a command in Visual mode", kMapUsage, kMapChoices),
-    configCommand("imap", "Bind keys to a command in Insert mode", kMapUsage, kMapChoices),
-    configCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage,
-                  kMapChoices),
-    configCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage, kMapChoices),
-    configCommand("ngroup",
-                  "Give keys that start longer bindings a title in the hint menu, in "
-                  "Normal mode",
-                  "KEYS \"TITLE\""),
-    configCommand("vgroup", "Give keys a title in the hint menu, in Visual mode", "KEYS \"TITLE\""),
-    configCommand("igroup", "Give keys a title in the hint menu, in Insert mode", "KEYS \"TITLE\""),
-    configCommand("ogroup", "Give keys a title in the hint menu, in operator-pending mode",
-                  "KEYS \"TITLE\""),
-    configCommand("cgroup", "Give keys a title in the hint menu, in command-line mode",
-                  "KEYS \"TITLE\""),
-    configCommand("keysection", "Start a group of keys for the list of keys (, ?)", "\"TITLE\""),
-    configCommand("nunmap", "Unbind keys in Normal mode", "KEYS"),
-    configCommand("vunmap", "Unbind keys in Visual mode", "KEYS"),
-    configCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
-    configCommand("ounmap", "Unbind keys in operator-pending mode", "KEYS"),
-    configCommand("cunmap", "Unbind keys in command-line mode", "KEYS"),
+    bindingCommand("nmap", "Bind keys to a command in Normal mode", kMapUsage, kMapChoices),
+    bindingCommand("vmap", "Bind keys to a command in Visual mode", kMapUsage, kMapChoices),
+    bindingCommand("imap", "Bind keys to a command in Insert mode", kMapUsage, kMapChoices),
+    bindingCommand("omap", "Bind keys to a command in operator-pending mode", kMapUsage,
+                   kMapChoices),
+    bindingCommand("cmap", "Bind keys to a command in command-line mode", kMapUsage, kMapChoices),
+    bindingCommand("ngroup",
+                   "Give keys that start longer bindings a title in the hint menu, in "
+                   "Normal mode",
+                   "KEYS \"TITLE\""),
+    bindingCommand("vgroup", "Give keys a title in the hint menu, in Visual mode",
+                   "KEYS \"TITLE\""),
+    bindingCommand("igroup", "Give keys a title in the hint menu, in Insert mode",
+                   "KEYS \"TITLE\""),
+    bindingCommand("ogroup", "Give keys a title in the hint menu, in operator-pending mode",
+                   "KEYS \"TITLE\""),
+    bindingCommand("cgroup", "Give keys a title in the hint menu, in command-line mode",
+                   "KEYS \"TITLE\""),
+    bindingCommand("keysection", "Start a group of keys for the list of keys (, ?)", "\"TITLE\""),
+    bindingCommand("nunmap", "Unbind keys in Normal mode", "KEYS"),
+    bindingCommand("vunmap", "Unbind keys in Visual mode", "KEYS"),
+    bindingCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
+    bindingCommand("ounmap", "Unbind keys in operator-pending mode", "KEYS"),
+    bindingCommand("cunmap", "Unbind keys in command-line mode", "KEYS"),
     configCommand("source", "Run a command file; at the : prompt, modalrc again if none", "FILE",
                   {Choices::ConfigFile}),
 };

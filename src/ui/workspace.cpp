@@ -3051,7 +3051,7 @@ std::vector<PaletteItem> Workspace::paletteItems() const
     for (const auto& info : commands_.all())
     {
         const bool normal = info.modes == 0 || (info.modes & modeBit(Mode::Normal)) != 0;
-        if (!normal || info.object || info.name == "palette")
+        if (!normal || info.object || !info.palette || info.name == "palette")
         {
             continue;
         }
@@ -3087,13 +3087,14 @@ bool Workspace::runPalette(std::string_view command)
     // its choices showing; Tab puts it there as it is to edit; Up and Down, and Ctrl-p and
     // Ctrl-n, go up and down the list; Escape closes it; the rest edit what's typed.
     const auto shown = paletteShown();
-    const auto chosen = std::min(palette_->chosen, shown.empty() ? 0 : shown.size() - 1);
+    const auto last = shown.empty() ? 0 : shown.size() - 1;
     if (command == "command-line-cancel" ||
         (command == "command-line-backspace" && line_.text().empty()))
     {
+        // Back to the mode it was opened from, a selection kept.
         palette_.reset();
-        mode_ = Mode::Normal;
-        endVisual();
+        line_.clear();
+        mode_ = selection_ ? Mode::Visual : Mode::Normal;
         return true;
     }
     if (command == "command-line-older" || command == "command-line-newer" ||
@@ -3104,18 +3105,21 @@ bool Workspace::runPalette(std::string_view command)
                                   : command == "command-line-newer"   ? -1
                                   : command == "command-line-page-up" ? kPaletteRows
                                                                       : -kPaletteRows;
-        palette_->chosen = static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
-            static_cast<std::ptrdiff_t>(chosen) + by, 0,
-            std::max<std::ptrdiff_t>(static_cast<std::ptrdiff_t>(shown.size()) - 1, 0)));
+        // From none chosen, the best.
+        palette_->chosen = !palette_->chosen
+                               ? 0
+                               : static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
+                                     static_cast<std::ptrdiff_t>(*palette_->chosen) + by, 0,
+                                     static_cast<std::ptrdiff_t>(last)));
         return true;
     }
     if (command == "command-line-run" || command == "command-line-next")
     {
-        if (shown.empty())
+        if (shown.empty() || !palette_->chosen)
         {
-            return false;
+            return false; // nothing chosen yet
         }
-        const auto& item = shown[chosen];
+        const auto& item = shown[std::min(*palette_->chosen, last)];
         const auto* info = commands_.find(item.name);
         palette_.reset();
         const bool needs = info != nullptr && !info->usage.empty() && !info->usage.starts_with("[");
@@ -3128,16 +3132,19 @@ bool Workspace::runPalette(std::string_view command)
             }
             return true;
         }
-        line_.open(decodeUtf8(item.name));
-        const auto ran = runCommandLine("command-line-run");
+        // As its keys would run it in the mode the palette was opened from: in Visual mode on
+        // the selection, as an operator or a command taking a range does.
+        line_.clear();
+        mode_ = selection_ ? Mode::Visual : Mode::Normal;
+        const auto ran = run(item.name, 0);
         if (const auto keys = keysFor(item.name); message_.empty() && !keys.empty())
         {
             setMessage("Also: " + keys, MessageKind::Information); // teaching the binding
         }
-        return ran.value_or(true);
+        return ran.changed;
     }
     const auto edited = editLine(line_, command);
-    palette_->chosen = 0;
+    palette_->chosen = line_.text().empty() ? std::nullopt : std::optional<std::size_t>{0};
     return edited.value_or(false);
 }
 
@@ -3147,9 +3154,12 @@ Region Workspace::paletteRegion() const
     // keys and what it does; the one chosen in the cursor's colours; those that do nothing
     // here dimmed.
     const auto shown = paletteShown();
-    const auto chosen = std::min(palette_->chosen, shown.empty() ? 0 : shown.size() - 1);
+    // The row chosen, as an index, or past the matches if none is.
+    const auto chosen = palette_->chosen
+                            ? std::min(*palette_->chosen, shown.empty() ? 0 : shown.size() - 1)
+                            : shown.size();
     const auto rows = std::min<std::size_t>(shown.size(), kPaletteRows);
-    const auto first = chosen >= rows ? chosen - rows + 1 : 0;
+    const auto first = chosen < shown.size() && chosen >= rows ? chosen - rows + 1 : 0;
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
     const int height = std::max<int>(static_cast<int>(rows), 1) * cell_.height + 2 * pad;

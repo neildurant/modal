@@ -319,7 +319,7 @@ private:
     // the list above the prompt.
     struct PaletteState
     {
-        std::size_t chosen = 0; // among the matches, 0 the best
+        std::optional<std::size_t> chosen; // among the matches, 0 the best; none at first
     };
     static constexpr std::ptrdiff_t kPaletteRows = 12;
     std::optional<PaletteState> palette_;

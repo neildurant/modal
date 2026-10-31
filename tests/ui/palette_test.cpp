@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -209,13 +210,62 @@ TEST_CASE("in the palette, Up and Down choose, Tab puts the command on the promp
     CHECK(p.ws.mode() == Mode::Normal);
 }
 
-TEST_CASE("the palette from Visual mode runs commands on the selection")
+TEST_CASE("the palette from Visual mode runs commands as their keys would there")
 {
     Paletting p;
+    const auto statusOf = [&] { return p.prompt(); };
     p.type(U"vl");
     p.open();
     CHECK(p.prompt().starts_with(U"Command on bars 1–2 on every track: "));
-    p.type(U"zoom in");
+    // Escape goes back to the selection.
+    p.press(Key::of(NamedKey::Escape));
+    CHECK(p.ws.mode() == Mode::Visual);
+
+    // Cutting at the edges, on for the selection.
+    p.open();
+    p.type(U"cut at");
     p.press(Key::of(NamedKey::Enter));
-    CHECK(p.ws.message() == "zoom-in doesn't take a selection");
+    CHECK(p.ws.mode() == Mode::Visual);
+    CHECK(p.ws.message() == "Also: |");
+    p.type(U"oo"); // the message gone, the selection's said
+    CHECK(statusOf().find(U"cutting at the edges") != std::u32string::npos);
+
+    // An operator, on the selection.
+    p.open();
+    p.type(U"operator delete");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::Normal);
+    CHECK(p.document.modified());
+}
+
+TEST_CASE("the palette chooses nothing until something's typed or moved to")
+{
+    Paletting p;
+    p.open();
+    const auto zoom = p.ws.arrangement().page().zoom();
+    p.press(Key::of(NamedKey::Enter)); // nothing chosen: nothing runs
+    CHECK(p.ws.mode() == Mode::CommandLine);
+    p.press(Key::of(NamedKey::Down)); // the best
+    p.press(Key::of(NamedKey::Escape));
+    CHECK(p.ws.arrangement().page().zoom() == zoom);
+    // Typing chooses the best of what matches; deleting it all, none again.
+    p.open();
+    p.type(U"z");
+    p.press(Key::of(NamedKey::Backspace));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.mode() == Mode::CommandLine);
+}
+
+TEST_CASE("the palette leaves out the commands for config files")
+{
+    Paletting p;
+    p.registry.add(configCommands());
+    p.open();
+    p.type(U"cgroup");
+    CHECK((p.rows().empty() || p.rows().front() != U"Cgroup"));
+    p.press(Key::of(NamedKey::Escape));
+    p.open();
+    p.type(U"set");
+    REQUIRE_FALSE(p.rows().empty());
+    CHECK(p.rows().front() == U"Set"); // set stays
 }
