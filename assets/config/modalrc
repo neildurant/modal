@@ -131,6 +131,7 @@ keysection "Changing events"
 nmap o          note-add          "Add a note"
 nmap O          note-add-advance  "Add a note and move on"
 nmap u          undo              "Undo"
+nmap .          repeat            "Repeat the last change"
 nmap <C-r>      redo              "Redo"
 
 " Tracks: the conductor's list is track 0, before track 1

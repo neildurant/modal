@@ -93,6 +93,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
 | `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
+| `.` | Repeat the last change, with its range or object (`>>` then `.` on another bar); a count replaces its own |
 | `v`, then a motion or object | Select: in the arrangement bars on every track, in the piano roll time at every pitch, in the event list rows, on the strip sections; then `d` deletes what's selected, `D` takes its time out, `y` yanks, `p` puts over it and the other operators change it. `o` the other end, `gv` the last selection again, Escape ends it |
 | `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:marker-to-section`) |
 | Enter on a selection | In the arrangement, open its bars in the piano roll as the page, turning on by as many |

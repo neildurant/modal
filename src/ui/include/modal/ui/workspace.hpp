@@ -357,6 +357,15 @@ private:
     bool runPrefixItem(char prefix, const PaletteItem& item);
     std::string keysFor(std::string_view command) const;
     bool runPalette(std::string_view command);
+    // A key as typed, and as . and macros replay them; the keys of the last change, for .;
+    // and repeating it.
+    bool handleKey(const Key& key, std::int64_t now);
+    bool repeatChange(int count);
+    std::vector<Key> changeKeys_; // typed since Normal mode was last idle
+    std::vector<Key> lastChange_;
+    std::uint64_t versionBefore_ = 0;
+    bool notAChange_ = false; // undo, redo or . ran among them
+    bool replaying_ = false;
     Region paletteRegion() const;
     bool operateOnSelection(std::string_view command, int count);
     // Cutting at the edges (|): an operator run after cutting the notes crossing its range's

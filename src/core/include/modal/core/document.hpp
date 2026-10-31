@@ -88,6 +88,9 @@ public:
     std::optional<EditStep> redo();
 
     bool canUndo() const { return current_ > 0; }
+
+    // Which version of the song this is: another after every change, undo and redo included.
+    std::uint64_t version() const { return states_[current_].id; }
     bool canRedo() const { return current_ + 1 < states_.size(); }
 
     // Whether the song differs from the version last saved or loaded; undoing back to that

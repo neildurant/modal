@@ -391,3 +391,48 @@ TEST_CASE("keys an operator can't take, and keys bound to nothing, say so and do
     o.type(U"dd");
     CHECK(o.notes().size() == before.size() - 2);
 }
+
+TEST_CASE(". repeats the last change, with its range or object, as one undo step")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto before = o.notes();
+    o.type(U"gr>>"); // the piano roll: bar 1's notes up a semitone
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 32});
+    o.type(U"4}"); // to bar 5, moving only: not a change
+    o.type(U".");  // bar 5's C2 up too
+    CHECK(o.notes()[3] == std::pair{16 * q + q / 16, 37});
+    o.type(U"u"); // one step
+    CHECK(o.notes()[3] == before[3]);
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 32}); // the first change stays
+
+    // A count replaces the change's.
+    o.type(U"gg3.");
+    CHECK(o.notes().front() == std::pair{core::Tick{0}, 35});
+    o.type(U"uu");
+    CHECK(o.notes() == before);
+
+    // ^ repeats with the same answer, without asking.
+    o.type(U"^^80");
+    o.press(NamedKey::Enter);
+    o.type(U"4}.");
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.velocities()[3] == 80);
+
+    // Undo isn't a change to repeat.
+    o.type(U"u.");
+    CHECK(o.velocities()[3] == 80);
+}
+
+TEST_CASE(". after a Visual operator takes as much from the cursor")
+{
+    Operating o;
+    o.type(U"gr");
+    o.type(U"v}>"); // bar 1's first step to bar 2's: the G1 and E1 up
+    const auto first = o.notes();
+    o.type(U"gg4}"); // bar 5
+    o.type(U".");
+    CHECK(o.notes()[3].second == 37); // the C2 there, taken by as much from the cursor
+    CHECK(o.notes().front() == first.front());
+}

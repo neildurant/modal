@@ -93,6 +93,10 @@ constexpr std::array kSharedCommands{
                 .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
                                "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
     CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "repeat",
+                .description = "Repeat the last change (.), with its range or object, as one "
+                               "undo step; a count replaces the one it had",
+                .count = true},
     CommandInfo{.name = "palette",
                 .description = "The command palette: find a command by typing part of its name "
                                "or what it does, and run it"},
@@ -685,6 +689,72 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
 }
 
 bool Workspace::handle(const Key& key, std::int64_t now)
+{
+    // The keys of each change, for . to repeat (decided for milestone 6, as Vim's .): those
+    // typed from Normal mode until it's back there, with nothing waiting, if the song changed
+    // meanwhile; not undo, redo or . itself, nor while . or a macro replays them.
+    if (replaying_)
+    {
+        return handleKey(key, now);
+    }
+    if (changeKeys_.empty())
+    {
+        versionBefore_ = document_.version();
+    }
+    changeKeys_.push_back(key);
+    const bool changed = handleKey(key, now);
+    const bool idle =
+        mode_ == Mode::Normal && keys_.pending().empty() && !operator_ && !question_ && !cutNext_;
+    if (idle)
+    {
+        if (document_.version() != versionBefore_ && !notAChange_)
+        {
+            lastChange_ = std::move(changeKeys_);
+        }
+        changeKeys_.clear();
+        notAChange_ = false;
+    }
+    return changed;
+}
+
+bool Workspace::repeatChange(int count)
+{
+    // The last change's keys again, as one undo step; a count replaces the one it began with.
+    notAChange_ = true;
+    if (lastChange_.empty())
+    {
+        setMessage("No change yet to repeat", MessageKind::Information);
+        return true;
+    }
+    std::vector<Key> keys = lastChange_;
+    if (count > 0)
+    {
+        const auto digit = [](const Key& key)
+        {
+            return key.named == NamedKey::None && key.modifiers == kNoModifiers &&
+                   key.character >= U'0' && key.character <= U'9';
+        };
+        const auto counted = std::ranges::find_if_not(keys, digit);
+        keys.erase(keys.begin(), counted);
+        const auto digits = std::to_string(count);
+        for (auto i = digits.size(); i-- > 0;)
+        {
+            keys.insert(keys.begin(), Key::typed(static_cast<char32_t>(digits[i])));
+        }
+    }
+    replaying_ = true;
+    document_.beginGroup({}, view().place());
+    for (const auto& key : keys)
+    {
+        handleKey(key, lastTime_);
+    }
+    document_.endGroup();
+    replaying_ = false;
+    refresh();
+    return true;
+}
+
+bool Workspace::handleKey(const Key& key, std::int64_t now)
 {
     lastTime_ = now;
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
@@ -1588,8 +1658,13 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         mode_ = Mode::Visual;
         return true;
     }
+    if (command == "repeat")
+    {
+        return repeatChange(count);
+    }
     if (command == "undo" || command == "redo")
     {
+        notAChange_ = true;
         bool changed = false;
         for (int i = 0; i < n; ++i)
         {
