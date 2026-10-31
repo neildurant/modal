@@ -199,6 +199,7 @@ private:
     // The Visual selection's span: from where it started to the cursor, the grid step at the
     // later end in, at every pitch; or nothing if there's none here.
     std::optional<std::pair<core::Tick, core::Tick>> selected() const;
+    bool selecting() const; // whether there's a Visual selection here
     // Where a range goes in time from the cursor, or nothing if it goes nowhere; and whether a
     // motion goes across pitches, which isn't a range yet, saying so if it does.
     std::optional<std::pair<core::Tick, core::Tick>> timeSpan(std::string_view motion, int count);

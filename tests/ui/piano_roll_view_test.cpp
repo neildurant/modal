@@ -748,6 +748,14 @@ TEST_CASE("h and l go off a long note in one step, to the grid steps either side
     CHECK(r.view().time() == start - t.sixteenth());
     r.type(U"2l"); // onto its start, then past its end
     CHECK(r.view().time() == start + t.quarters(2));
+
+    // While selecting, a grid step at a time, each changing what's selected.
+    r.type(U"hv");
+    r.type(U"h");
+    CHECK(r.view().time() == start + t.quarters(2) - 2 * t.sixteenth());
+    r.type(U"3l");
+    CHECK(r.view().time() == start + t.quarters(2) + t.sixteenth());
+    r.press(Key::of(NamedKey::Escape));
 }
 
 TEST_CASE("the piano roll draws at any window size, even none")

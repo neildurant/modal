@@ -261,6 +261,12 @@ void PianoRollView::editEvents(std::string title,
     refresh();
 }
 
+bool PianoRollView::selecting() const
+{
+    const auto selection = host_.selection();
+    return selection && selection->where == Where::PianoRoll;
+}
+
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selected() const
 {
     const auto selection = host_.selection();
@@ -862,8 +868,9 @@ std::optional<std::size_t> PianoRollView::noteAt(core::Tick tick) const
 core::Tick PianoRollView::stepLeft(core::Tick tick) const
 {
     // Off a note at the cursor's pitch in one step, to the grid step before its start, rather
-    // than a step at a time through it (decided October 2026, after use).
-    if (const auto index = noteAt(tick))
+    // than a step at a time through it (decided October 2026, after use); but a grid step at a
+    // time while selecting, where each step changes what's selected.
+    if (const auto index = selecting() ? std::nullopt : noteAt(tick))
     {
         return gridBefore(document_.song().events(*trackId())[*index].tick);
     }
@@ -873,7 +880,7 @@ core::Tick PianoRollView::stepLeft(core::Tick tick) const
 core::Tick PianoRollView::stepRight(core::Tick tick) const
 {
     // And to the first grid step at or after its end.
-    if (const auto index = noteAt(tick))
+    if (const auto index = selecting() ? std::nullopt : noteAt(tick))
     {
         const auto& event = document_.song().events(*trackId())[*index];
         const auto end =
