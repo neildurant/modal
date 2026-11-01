@@ -159,6 +159,18 @@ constexpr std::array kSharedCommands{
                                "backwards, {count} times",
                 .title = "Search back for this pitch",
                 .count = true},
+    CommandInfo{.name = "select-bar", .description = "Select this bar, as vib does"},
+    CommandInfo{.name = "select-section", .description = "Select this section, as vis does"},
+    CommandInfo{.name = "select-track", .description = "Select the track, as vit does"},
+    CommandInfo{.name = "select-visible", .description = "Select what's shown"},
+    CommandInfo{.name = "select-matches-section",
+                .description = "Select the matches of the last search in this section"},
+    CommandInfo{.name = "select-matches-track",
+                .description = "Select the matches of the last search on the track"},
+    CommandInfo{.name = "select-matches-visible",
+                .description = "Select the matches of the last search that are shown"},
+    CommandInfo{.name = "select-matches",
+                .description = "Keep only the matches of the last search in the selection"},
     CommandInfo{.name = "search-clear",
                 .description = "Clear the matches of the last search",
                 .aliases = "noh nohlsearch"},
@@ -467,7 +479,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 87> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 95> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -526,6 +538,14 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-mark", onlyIn({Tracks, PianoRoll, EventList})},
             {"find-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"search", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-bar", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-section", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-track", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-visible", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-matches-section", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-matches-track", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-matches-visible", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-matches", onlyIn({Tracks, PianoRoll, EventList})},
             {"search-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"search-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"search-here", onlyIn({PianoRoll, EventList})},
@@ -1360,6 +1380,118 @@ bool Workspace::goToMatch(bool next, int count)
     {
         jumpedFrom_ = before;
     }
+    return true;
+}
+
+bool Workspace::select(std::string_view command)
+{
+    // Lower case the bar, section, track or what's visible; the capitals (, s S) the matches
+    // in it, a selection with the search as its filter (decided November 2026).
+    const bool matches = command.starts_with("select-matches");
+    if (matches && !search_)
+    {
+        setMessage("No search to select the matches of: " + keysOf("search") + " searches first",
+                   MessageKind::Information);
+        return true;
+    }
+    if (command == "select-matches")
+    {
+        if (!selection_)
+        {
+            setMessage("Nothing selected to keep the matches in", MessageKind::Information);
+            return true;
+        }
+        selection_->filter = search_;
+        return true;
+    }
+    const auto object = command.ends_with("bar")       ? "object-bar-contents"
+                        : command.ends_with("section") ? "object-section-contents"
+                        : command.ends_with("track")   ? "object-track"
+                                                       : "object-visible";
+    if (!selection_)
+    {
+        selection_ = Selection{.anchor = view().cursor(),
+                               .kind = SelectionKind::Range,
+                               .where = where(),
+                               .index = view().selectionIndex(),
+                               .span = std::nullopt,
+                               .cut = false};
+    }
+    view().selectObject(object, 0, *selection_);
+    selection_->filter = matches ? search_ : std::nullopt;
+    mode_ = Mode::Visual;
+    return true;
+}
+
+bool Workspace::onlyMatches(OperatorTarget& target)
+{
+    const auto& song = document_.song();
+    std::size_t count = 0;
+    for (auto& part : target.parts)
+    {
+        const auto& events = song.events(part.track);
+        std::erase_if(part.events, [&](std::size_t i)
+                      { return !core::matches(*selection_->filter, events[i].data, song.ppqn()); });
+        count += part.events.size();
+    }
+    if (count == 0)
+    {
+        setMessage("No matches in the selection", MessageKind::Information);
+        return false;
+    }
+    target.what = count == 1 ? std::string{"1 match"} : std::to_string(count) + " matches";
+    return true;
+}
+
+bool Workspace::operateOnMatches(std::string_view op)
+{
+    // d and y on the matches in the selection: taken as a register holds them, from the
+    // selection's start, as the selection would be, only fewer.
+    auto target = view().target("visual", 0);
+    if (!target || !onlyMatches(*target))
+    {
+        return true;
+    }
+    const auto& song = document_.song();
+    const auto span = view().selectionSpan();
+    const auto from = span ? span->first : 0;
+    EventRegister taken;
+    for (const auto& part : target->parts)
+    {
+        auto& events = taken.tracks.emplace_back();
+        for (const auto i : part.events)
+        {
+            auto event = song.events(part.track)[i];
+            event.tick -= from;
+            events.push_back(std::move(event));
+        }
+    }
+    taken.span = span ? span->second - span->first : 0;
+    register_ = std::move(taken);
+    if (op == "operator-yank")
+    {
+        setMessage(target->what + " yanked", MessageKind::Information);
+        return true;
+    }
+    document_.edit("Delete " + target->what, view().place(),
+                   [&](core::Song& edited)
+                   {
+                       for (auto part : target->parts)
+                       {
+                           std::ranges::sort(part.events);
+                           edited.updateEvents(part.track,
+                                               [&](core::EventList& events)
+                                               {
+                                                   for (auto it = part.events.rbegin();
+                                                        it != part.events.rend(); ++it)
+                                                   {
+                                                       events.erase(*it);
+                                                   }
+                                               });
+                       }
+                   });
+    refresh();
+    setMessage("Deleted " + target->what, MessageKind::Information);
     return true;
 }
 
@@ -2975,6 +3107,10 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         search_.reset();
         return true;
     }
+    if (command.starts_with("select-"))
+    {
+        return select(command);
+    }
     if (command == "keys-show")
     {
         keysPage_ = 0;
@@ -3245,8 +3381,21 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     // operators change it, the count before them saying how far; then Visual mode ends.
     const auto selection = *selection_;
     const auto span = view().selectionSpan();
+    if (selection.filter && command == "visual-delete-time")
+    {
+        endVisual();
+        setMessage("D takes out the selection's time, not its matches", MessageKind::Information);
+        return true;
+    }
     const auto run = [&]
     {
+        if (selection.filter && (command == "event-delete" || command == "operator-delete" ||
+                                 command == "yank-this" || command == "operator-yank"))
+        {
+            return operateOnMatches(command == "event-delete" || command == "operator-delete"
+                                        ? "operator-delete"
+                                        : "operator-yank");
+        }
         if (command == "visual-delete-time")
         {
             if (selection.kind == SelectionKind::Range && selection.where == Where::Tracks && span)
@@ -3289,6 +3438,12 @@ bool Workspace::putOverSelection()
     // register keeps what it had.
     const auto what = view().selectionStatus().value_or("the selection");
     const auto span = view().selectionSpan();
+    if (selection_->filter)
+    {
+        endVisual();
+        setMessage("p puts over the selection's time, not its matches", MessageKind::Information);
+        return true;
+    }
     if (register_.empty())
     {
         endVisual();
@@ -5138,6 +5293,10 @@ Bar Workspace::statusBar(bool withMessage) const
         if (selection_ && selection_->cut)
         {
             bottom.left.push_back({"; cutting at the edges", {Role::Accent, Role::Bar, kPlain}});
+        }
+        if (selection_ && selection_->filter)
+        {
+            bottom.left.push_back({"; only the matches", {Role::Accent, Role::Bar, kPlain}});
         }
     }
     else

@@ -109,6 +109,9 @@ struct Selection
     // song's, or in the piano roll the page's when V was pressed.
     std::optional<std::pair<core::Tick, core::Tick>> span;
     bool cut = false; // cutting at its edges (|)
+    // Only the events a search matches in it (, s S, decided November 2026), which operators
+    // take; D and p, which take its time, are refused.
+    std::optional<core::EventQuery> filter = {};
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):

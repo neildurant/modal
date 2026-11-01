@@ -1013,3 +1013,44 @@ TEST_CASE("a match is outlined in the piano roll, and its velocity in the lane i
     }
     CHECK(shapes == 5); // the outline's four sides, and the velocity's bar
 }
+
+TEST_CASE("the leader's s selects an area, or with a capital only the matches in it, which "
+          "operators take")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr");
+    o.type(U",sT");
+    CHECK(o.ws.message() == "No search to select the matches of: / searches first");
+    CHECK(o.ws.mode() == Mode::Normal);
+    search(o, U"a"); // A2 and A1
+    o.type(U",sT>");
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.notes() == Notes{{0, 31}, {0, 28}, {4 * q, 46}, {16 * q + q / 16, 36}, {28 * q, 34}});
+    CHECK(o.ws.message().empty());
+    o.type(U"u");
+    o.type(U",sTd");
+    CHECK(o.notes() == Notes{{0, 31}, {0, 28}, {16 * q + q / 16, 36}});
+    CHECK(o.ws.message() == "Deleted 2 matches");
+    o.type(U"u");
+    // Narrowing a selection to its matches; yanking them.
+    o.type(U"gg");
+    o.type(U"vit,smy");
+    CHECK(o.ws.registerEvents().size() == 2);
+    // Lower case, the area itself.
+    o.type(U"gg,sbd");
+    CHECK(o.notes().size() == 3); // bar 1's G1 and E1
+    o.type(U"u");
+    o.type(U"gg,sV");
+    CHECK(o.ws.mode() == Mode::Visual);
+    // Time can't be taken from matches.
+    o.type(U"D");
+    CHECK(o.ws.message() == "D takes out the selection's time, not its matches");
+    o.type(U",sT");
+    o.type(U"p");
+    CHECK(o.ws.message() == "p puts over the selection's time, not its matches");
+    // , s c clears the search.
+    o.type(U",sc");
+    CHECK_FALSE(o.ws.searchQuery());
+}

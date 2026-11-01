@@ -645,6 +645,13 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
         // ie: every track, from the start to the end.
         return Area{0, document_.song().tracks().size() - 1, 0, document_.song().end()};
     }
+    if (motion == "object-visible")
+    {
+        // What's shown (, s v).
+        area.from = page_.leftTick();
+        area.to = std::min(page_.rightTick(), document_.song().end());
+        return area;
+    }
     if (motion == "object-track")
     {
         // it: the whole track, and as many after it as the count says less one.

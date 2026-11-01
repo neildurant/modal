@@ -85,6 +85,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]l` `[l` | The next or previous section's start, or label |
 | `/`, `n` `N`, `*` `#` | Search the track: `/C1 vel<60`, `/>A3`, `/A3-A5 vel=60-90`, `/cc64>63`, `/len<1/16`, terms all matching, then Enter; `n` and `N` the next match and the one before, round past the ends, `match 3/24` in the status line; `*` and `#` search for the pitch under the cursor; `/` and Enter alone, or `:noh`, clears the search |
+| `, s` | Select: `b` the bar, `s` the section, `t` the track, `v` what's shown; with a capital (`, s S`, `T`, `V`) only the search's matches in it, which operators then take (`, s T` then `^` to change the velocities of every match on the track); in Visual mode `, s m` keeps only the matches in what's selected; `, s c` clears the search |
 | `f` `F` and a note name | The next or previous note of that pitch class, any octave (`fE`, `fF#`, `fbb`); then `f` and `F` go on to the next and the one before, until another key; after an operator, the range through it (`dfE`), done again to the sharp or flat if `#` or `b` follows |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
 | `ic`, `is`, `it` | With an operator, the chord this note is in, this section's events, the track's |

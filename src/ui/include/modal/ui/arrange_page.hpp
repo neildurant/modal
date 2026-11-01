@@ -127,6 +127,8 @@ public:
     core::Tick time() const { return time_; }
     std::size_t topTrack() const { return topTrack_; }
     core::Tick leftTick() const { return leftTick_; }
+    // The time at the view's right edge.
+    core::Tick rightTick() const { return leftTick_ + viewColumns() * columnTicks(); }
     std::size_t zoom() const { return zoom_; }
     core::Tick end() const { return end_; }
 

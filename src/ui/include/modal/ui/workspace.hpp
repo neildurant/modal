@@ -524,6 +524,13 @@ private:
     bool search(const std::string& text);
     bool goToMatch(bool next, int count);
     bool searchHere(bool forward, int count);
+    // The , s group: selecting the bar, section, track or what's visible, or the matches in
+    // them, or narrowing a selection to its matches (, s m).
+    bool select(std::string_view command);
+    // An operator's target narrowed to the selection's matches, saying so if there are none;
+    // whether there are any. And d and y on them.
+    bool onlyMatches(OperatorTarget& target);
+    bool operateOnMatches(std::string_view op);
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

@@ -87,6 +87,10 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     {
         return true;
     }
+    if (motion == "visual" && selection_ && selection_->filter && !onlyMatches(*target))
+    {
+        return true;
+    }
     target->cut = cutting_;
     const auto& song = document_.song();
     if (op == "operator-transpose-up" || op == "operator-transpose-down")

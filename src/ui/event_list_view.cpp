@@ -844,6 +844,12 @@ std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motio
         const auto selected = selectedRows();
         return selected ? std::optional{Rows{selected->first, selected->second}} : std::nullopt;
     }
+    if (motion == "object-visible")
+    {
+        // The rows shown (, s v).
+        const auto last = list_.rows().size() - 1;
+        return Rows{std::min(top_, last), std::min(top_ + viewRows() - 1, last)};
+    }
     if (motion == "object-note")
     {
         // in, x, Y: the event under the cursor, or as many from it as the count says.
@@ -1643,6 +1649,10 @@ Region EventListView::listRegion() const
     // A search's matches, their text in a colour of their own, as Vim's are.
     const auto search = host_.searchQuery();
     const auto matched = search ? matchRows(*search) : std::vector<std::size_t>{};
+    // A selection of matches (, s S): only their rows.
+    const auto selection = host_.selection();
+    const auto filtered =
+        selection && selection->filter ? matchRows(*selection->filter) : std::vector<std::size_t>{};
     for (int line = 1; line < rows; ++line)
     {
         auto row = top_ + static_cast<std::size_t>(line - 1);
@@ -1666,7 +1676,8 @@ Region EventListView::listRegion() const
             style.background = Role::Playhead;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});
         }
-        else if (!isAdded && selected && row >= selected->first && row <= selected->second)
+        else if (!isAdded && selected && row >= selected->first && row <= selected->second &&
+                 (filtered.empty() || std::ranges::binary_search(filtered, row)))
         {
             style.background = Role::Selection;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});

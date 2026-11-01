@@ -455,6 +455,10 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::objectSpan(std::
     {
         return std::pair{core::Tick{0}, song.end()};
     }
+    else if (object == "object-visible")
+    {
+        return std::pair{viewStart_, std::min(viewEnd(viewStart_), song.end())};
+    }
     else if (isSectionObject(object))
     {
         const auto range = sectionsFrom(song, time_, count);
@@ -2353,7 +2357,11 @@ void PianoRollView::addRegions(Frame& frame) const
             }
             // The current note stands out; or while selecting, the notes the selection takes,
             // those starting in it, and only those, even the one under the cursor.
-            const bool picked = span ? takes(event.tick, note->pitch) : current == i;
+            const bool picked =
+                span ? takes(event.tick, note->pitch) &&
+                           (!selection || !selection->filter ||
+                            core::matches(*selection->filter, event.data, song.ppqn()))
+                     : current == i;
             const Role role = picked ? Role::NoteSelected : Role::Note;
             const bool matched = search && core::matches(*search, event.data, song.ppqn());
             const int x0 = scale.toX(std::max(event.tick, p.start));
