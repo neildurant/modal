@@ -46,10 +46,20 @@ std::optional<int> number(std::string_view text, int min, int max)
     return value;
 }
 
-// A comparison and a number, all of text.
+// A comparison and a number, or = and a range of them (=60-90), all of text.
 std::optional<EventQuery::Condition> condition(std::string_view text, int min, int max)
 {
     const auto compare = takeCompare(text);
+    if (const auto dash = text.find('-', 1); compare == Compare::Equal && dash != text.npos)
+    {
+        const auto from = number(text.substr(0, dash), min, max);
+        const auto to = number(text.substr(dash + 1), min, max);
+        if (!from || !to)
+        {
+            return std::nullopt;
+        }
+        return EventQuery::Condition{Compare::Between, std::min(*from, *to), std::max(*from, *to)};
+    }
     const auto value = compare ? number(text, min, max) : std::nullopt;
     if (!value)
     {
@@ -58,11 +68,26 @@ std::optional<EventQuery::Condition> condition(std::string_view text, int min, i
     return EventQuery::Condition{*compare, *value};
 }
 
+// Where a range of pitches is split: a - before a letter, so C-1 stays a pitch.
+std::size_t rangeDash(std::string_view text)
+{
+    for (std::size_t i = 1; i + 1 < text.size(); ++i)
+    {
+        const char next = static_cast<char>(text[i + 1] | 0x20);
+        if (text[i] == '-' && next >= 'a' && next <= 'g')
+        {
+            return i;
+        }
+    }
+    return std::string_view::npos;
+}
+
 template <typename T>
 bool compared(Compare compare, T actual, T wanted)
 {
     switch (compare)
     {
+    case Compare::Between: // as Condition::holds takes it
     case Compare::Less:
         return actual < wanted;
     case Compare::LessOrEqual:
@@ -94,7 +119,8 @@ std::string lowered(std::string_view text)
 
 bool EventQuery::Condition::holds(int actual) const
 {
-    return compared(compare, actual, value);
+    return compare == Compare::Between ? actual >= value && actual <= most
+                                       : compared(compare, actual, value);
 }
 
 ParsedQuery parseQuery(std::string_view text)
@@ -127,7 +153,7 @@ ParsedQuery parseQuery(std::string_view text)
             const auto velocity = condition(word.substr(3), 0, 127);
             if (!velocity)
             {
-                return fail("vel takes a comparison and a velocity, such as vel<60");
+                return fail("vel takes a comparison and a velocity, such as vel<60 or vel=60-90");
             }
             twice = query.velocity.has_value();
             query.velocity = velocity;
@@ -154,8 +180,8 @@ ParsedQuery parseQuery(std::string_view text)
             const auto value = rest.empty() ? std::nullopt : condition(rest, 0, 127);
             if (!controller || (!rest.empty() && !value))
             {
-                return fail("cc takes a controller number, and a value if wanted, such as cc64 "
-                            "or cc1=127");
+                return fail("cc takes a controller number, and a value if wanted, such as cc64, "
+                            "cc1=127 or cc7=20-40");
             }
             twice = query.controller.has_value();
             query.controller = static_cast<std::uint8_t>(*controller);
@@ -174,14 +200,38 @@ ParsedQuery parseQuery(std::string_view text)
             twice = kind == EventQuery::Kind::Bend;
             query.value = value;
         }
+        else if (const auto dash = rangeDash(term); dash != std::string_view::npos)
+        {
+            const auto from = parsePitch(term.substr(0, dash));
+            const auto to = parsePitch(term.substr(dash + 1));
+            if (!from || !to)
+            {
+                return fail("A range of pitches has an octave at each end, such as A3-A5");
+            }
+            twice = query.pitch || query.pitchClass || query.pitches;
+            query.pitches =
+                EventQuery::Condition{Compare::Between, std::min(*from, *to), std::max(*from, *to)};
+        }
+        else if (term.starts_with('<') || term.starts_with('>') || term.starts_with('='))
+        {
+            auto rest = term;
+            const auto compare = takeCompare(rest);
+            const auto pitch = parsePitch(rest);
+            if (!pitch)
+            {
+                return fail("Give an octave to compare with, such as >A3");
+            }
+            twice = query.pitch || query.pitchClass || query.pitches;
+            query.pitches = EventQuery::Condition{*compare, *pitch};
+        }
         else if (const auto pitch = parsePitch(term))
         {
-            twice = query.pitch || query.pitchClass;
+            twice = query.pitch || query.pitchClass || query.pitches;
             query.pitch = *pitch;
         }
         else if (const auto pitchClass = parsePitchClass(term))
         {
-            twice = query.pitch || query.pitchClass;
+            twice = query.pitch || query.pitchClass || query.pitches;
             query.pitchClass = *pitchClass;
         }
         else
@@ -216,6 +266,7 @@ bool matches(const EventQuery& query, const EventData& data, Ppqn ppqn)
         const auto* note = std::get_if<Note>(&data);
         return note != nullptr && (!query.pitch || note->pitch == *query.pitch) &&
                (!query.pitchClass || note->pitch % 12 == *query.pitchClass) &&
+               (!query.pitches || query.pitches->holds(note->pitch)) &&
                (!query.velocity || query.velocity->holds(note->velocity)) &&
                (!query.length || compared(query.length->compare, note->duration,
                                           query.length->length.toTicks(ppqn)));
