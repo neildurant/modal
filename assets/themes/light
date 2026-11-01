@@ -28,3 +28,4 @@ highlight density-3    #7c9e5a
 highlight density-4    #587539
 highlight hint-key     #587539
 highlight hint-group   #9854f1
+highlight match        #007197

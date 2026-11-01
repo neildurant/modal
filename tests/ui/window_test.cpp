@@ -610,3 +610,49 @@ TEST_CASE("a sample of marks in each view", "[.sample]")
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marks-piano.bmp"));
 }
+
+TEST_CASE("a sample of search matches", "[.sample]")
+{
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    // Other notes on the piano among its Cs, which don't match.
+    document.edit("Notes", {},
+                  [](modal::core::Song& song)
+                  {
+                      const auto q = song.ppqn().quarter();
+                      song.updateEvents(
+                          song.tracks()[2]->id(),
+                          [&](modal::core::EventList& events)
+                          {
+                              for (int i = 0; i < 12; ++i)
+                              {
+                                  const auto pitch = static_cast<std::uint8_t>(55 + (i * 5) % 12);
+                                  events.insert(
+                                      {4 * q + i * q, modal::core::Note{pitch, 90, q / 2}});
+                              }
+                          });
+                  });
+    view.run("view-arrangement", 0);
+    view.handle(Key::typed(U'j'), 0); // the piano
+    view.handle(Key::typed(U'j'), 0);
+    view.run("view-piano-roll", 0);
+    for (const char32_t key : std::u32string_view{U"/c4"})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    view.handle(Key::of(NamedKey::Enter), 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-search-piano.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-search-piano-light.bmp"));
+    view.run("view-events", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-search-events.bmp"));
+}

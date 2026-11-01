@@ -2332,6 +2332,7 @@ void PianoRollView::addRegions(Frame& frame) const
     const auto pitches = selectedPitches();
     const auto selection = host_.selection();
     const bool cutting = span && selection && selection->cut;
+    const auto search = host_.searchQuery();
     if (const auto id = trackId())
     {
         const auto events = song.events(*id).all();
@@ -2367,6 +2368,20 @@ void PianoRollView::addRegions(Frame& frame) const
                 notes.under.push_back({{x0 + start, y, noteWidth - start, h - 2 * inset},
                                        role,
                                        bodyAlpha(note->velocity)});
+                // A search's match, outlined, so it shows over the current note and a
+                // selection's colour alike.
+                if (search && core::matches(*search, event.data, song.ppqn()))
+                {
+                    const int t = std::max(lineWidth, 1);
+                    const Rect box{x0, y, noteWidth, h - 2 * inset};
+                    for (const Rect side : {Rect{box.x, box.y, box.width, t},
+                                            Rect{box.x, box.y + box.height - t, box.width, t},
+                                            Rect{box.x, box.y, t, box.height},
+                                            Rect{box.x + box.width - t, box.y, t, box.height}})
+                    {
+                        notes.under.push_back({side, Role::Match, 255});
+                    }
+                }
                 // At a selection's edges: cutting, the part of a note sounding in from before
                 // stands out and the part outside is dimmed, as is, either way, the part of a
                 // note it takes sounding on past its end.

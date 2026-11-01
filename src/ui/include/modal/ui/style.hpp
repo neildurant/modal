@@ -52,9 +52,10 @@ enum class Role : std::uint8_t
     HintKey,      // a key in the hint menu
     HintGroup,    // a group in the hint menu, keys that lead to more
     NoteSelected, // the note under the cursor, and the notes a selection takes
+    Match,        // the matches of a search: notes' outlines, the event list's rows' text
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::NoteSelected) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Match) + 1;
 
 // A role's name, as themes and highlight write it: lower case with hyphens, such as
 // cursor-text or density-1; and the role of a name, if there is one.

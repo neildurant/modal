@@ -1640,6 +1640,9 @@ Region EventListView::listRegion() const
     }
     const auto cursorField = field();
     const auto selected = selectedRows();
+    // A search's matches, their text in a colour of their own, as Vim's are.
+    const auto search = host_.searchQuery();
+    const auto matched = search ? matchRows(*search) : std::vector<std::size_t>{};
     for (int line = 1; line < rows; ++line)
     {
         auto row = top_ + static_cast<std::size_t>(line - 1);
@@ -1654,6 +1657,10 @@ Region EventListView::listRegion() const
         }
         const auto text = isAdded ? added : list_.text(row);
         auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
+        if (!isAdded && std::ranges::binary_search(matched, row))
+        {
+            style.foreground = Role::Match;
+        }
         if (!isAdded && row == playheadRow_)
         {
             style.background = Role::Playhead;
