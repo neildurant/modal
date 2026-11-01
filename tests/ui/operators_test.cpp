@@ -882,8 +882,8 @@ void search(Operating& o, std::u32string_view query)
 
 } // namespace
 
-TEST_CASE("/ searches the track, and n and N go to the next match and the one before, round "
-          "past the ends")
+TEST_CASE("searching with / goes to the next match on the track, and n and N to the next "
+          "and the one before, round past the ends")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Operating o{ppqn};
