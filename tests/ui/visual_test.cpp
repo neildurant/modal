@@ -875,3 +875,22 @@ TEST_CASE(":registers says what each holds")
     CHECK(s.ws.listing().empty());
     CHECK(s.ws.arrangement().page().bar() == bar);
 }
+
+TEST_CASE("The leader's groups in Visual mode have Normal mode's titles where they have none")
+{
+    core::Document document{core::Song{core::kPpqn}};
+    CommandRegistry registry;
+    Workspace ws{registry, document};
+    ws.resize(120 * 10, 30 * 20, CellSize{10, 20});
+    ws.setHints(true, 0);
+    ws.show(ViewKind::PianoRoll);
+    for (const char32_t key : std::u32string_view{U"v,"})
+    {
+        ws.handle(Key::typed(key), 0);
+    }
+    const auto hints = ws.hints();
+    REQUIRE(hints);
+    const auto toggles = std::ranges::find(*hints, std::string{"t"}, &Workspace::Hint::keys);
+    REQUIRE(toggles != hints->end());
+    CHECK(toggles->title == "Toggles");
+}

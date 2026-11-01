@@ -2493,7 +2493,12 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
         if (more)
         {
             hint.group = true;
-            const auto title = keymap.groupTitle(mode, next);
+            // Visual mode's keys are mostly Normal mode's, their groups' titles with them.
+            auto title = keymap.groupTitle(mode, next);
+            if (title.empty() && mode != Mode::Normal)
+            {
+                title = keymap.groupTitle(Mode::Normal, next);
+            }
             if (hint.title.empty())
             {
                 hint.title = title.empty() ? std::string{"…"} : title;
