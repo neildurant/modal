@@ -1201,3 +1201,19 @@ TEST_CASE(":transpose takes the selection, or else the cursor's bar, asking when
     o.press(NamedKey::Enter);
     CHECK(o.notes()[1] == std::pair{core::Tick{0}, 40});
 }
+
+TEST_CASE("A count before an operator with no how far of its own counts bars, as 2dd does")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr2!!t1");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 32}, {0, 29}, {4 * q, 46}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    o.type(U"2^^90");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{90, 90, 90, 100, 70});
+    // Bars 4 and 5: the C2 a little after bar 5's start.
+    o.type(U"3]b2qqn"); // n: the pedal stays
+    CHECK(o.notes()[3] == std::pair{core::Tick{16 * q}, 36});
+}

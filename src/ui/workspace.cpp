@@ -3383,6 +3383,18 @@ bool Workspace::runOperator(std::string_view command, int count)
         // das and yas: the section itself, as on the strip, from anywhere.
         return operateOnSections(op.name, std::max(op.count, 1) * std::max(count, 1));
     }
+    // Those with no "how far" multiply the counts, as d and y do: 2qq quantises two bars
+    // (decided November 2026).
+    const bool howFar = op.name == "operator-transpose-up" ||
+                        op.name == "operator-transpose-down" || op.name == "operator-shift-later" ||
+                        op.name == "operator-shift-earlier";
+    if (!howFar && op.name != "operator-delete" && op.name != "operator-yank")
+    {
+        const int bars =
+            op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
+        const auto run = [&] { return transform(op.name, 1, command, bars); };
+        return cut ? cutThen(op.name, command, bars, run) : run();
+    }
     if (op.name != "operator-delete" && op.name != "operator-yank")
     {
         // The count before the operator is how far (3>ib, up three semitones), the one after
