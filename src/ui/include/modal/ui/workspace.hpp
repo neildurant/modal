@@ -414,6 +414,9 @@ private:
     // optional, which GCC's release build takes for uninitialised).
     bool setMark(char32_t character);
     bool goToMark(char32_t character, int count);
+    std::string markAbout(const core::Mark& mark) const;
+    bool sayMarks();
+    CommandResult deleteMarks(std::string_view letters);
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;
     // The named registers, a to z: the one named for the next command, the unnamed register

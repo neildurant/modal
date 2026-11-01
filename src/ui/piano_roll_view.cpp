@@ -2037,6 +2037,19 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         }
         ruler.text.push_back({textX, 0, std::move(name.text), name.style});
     }
+    // Marks (ma) on this track or the conductor without a pitch, each its letter, dim, in the
+    // markers' row; those with a pitch are shown at it, among the notes.
+    for (const auto& mark : song.marks())
+    {
+        const bool here = !mark.track || mark.track == trackId();
+        if (here && inView(mark.tick) && (mark.pitch == core::Mark::kNoPitch || !mark.track))
+        {
+            ruler.text.push_back({scale.toX(mark.tick) + 2 * lineWidth,
+                                  0,
+                                  std::u32string(1, static_cast<char32_t>(mark.letter)),
+                                  {Role::Dim, Role::Background, kPlain}});
+        }
+    }
     if (playX)
     {
         ruler.text.push_back({*playX, 0, U"\u25B6", {Role::Accent, Role::Background, kPlain}});
@@ -2221,6 +2234,18 @@ void PianoRollView::addRegions(Frame& frame) const
     for (const auto& marker : song.markers())
     {
         boundary(marker.tick, kFaint);
+    }
+    // Marks with a pitch, on this track: the letter, dim, at the mark's time and pitch.
+    for (const auto& mark : song.marks())
+    {
+        if (mark.track && mark.track == trackId() && mark.pitch != core::Mark::kNoPitch &&
+            mark.tick >= p.start && mark.tick < p.end && shown(mark.pitch))
+        {
+            notes.text.push_back({scale.toX(mark.tick) + 2 * lineWidth,
+                                  rowOf(mark.pitch) * h,
+                                  std::u32string(1, static_cast<char32_t>(mark.letter)),
+                                  {Role::Dim, Role::Background, kPlain}});
+        }
     }
 
     // Each note at its exact place: brighter the louder, with a solid start so repeated notes

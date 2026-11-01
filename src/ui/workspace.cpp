@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/pitch.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
@@ -112,6 +113,11 @@ constexpr std::array kSharedCommands{
                 .description = "Go to the place a letter after it marks ('a), or with ' back to "
                                "before the last jump; after an operator, the range to it (d'a)",
                 .motion = true},
+    CommandInfo{.name = "marks", .description = "Say where the marks are", .keys = false},
+    CommandInfo{.name = "mark-delete",
+                .description = "Delete marks by their letters: a, abc, or a-d (a-z for all)",
+                .usage = "LETTERS",
+                .keys = false},
     CommandInfo{.name = "cursor-mark",
                 .description = "To the mark ('a), as the range an operator takes",
                 .keys = false,
@@ -518,6 +524,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "section-split")
                          {
                              return section(call.arguments);
+                         }
+                         if (name == "mark-delete")
+                         {
+                             return deleteMarks(call.arguments);
                          }
                          if (name == "marker-to-section")
                          {
@@ -1123,6 +1133,111 @@ bool Workspace::goToMark(char32_t character, int count)
         jumpedFrom_ = from;
     }
     return true;
+}
+
+std::string Workspace::markAbout(const core::Mark& mark) const
+{
+    // Where it is: "5:1:000, Bass, C3", or "5:1:000, the conductor".
+    const auto& song = document_.song();
+    std::string text = positionText(song.meter(), mark.tick) + ", ";
+    const auto* track = mark.track ? song.track(*mark.track) : nullptr;
+    if (track == nullptr)
+    {
+        text += "the conductor";
+    }
+    else
+    {
+        const auto index = std::ranges::find_if(song.tracks(), [&](const auto& t)
+                                                { return t->id() == *mark.track; }) -
+                           song.tracks().begin();
+        text += track->name.empty() ? "Track " + std::to_string(index + 1) : track->name;
+    }
+    if (mark.pitch != core::Mark::kNoPitch)
+    {
+        text += ", " + core::pitchName(static_cast<std::uint8_t>(mark.pitch));
+    }
+    return text;
+}
+
+bool Workspace::sayMarks()
+{
+    std::vector<std::pair<std::string, std::string>> lines;
+    for (const auto& mark : document_.song().marks())
+    {
+        lines.emplace_back(std::string(1, mark.letter), markAbout(mark));
+    }
+    if (lines.empty())
+    {
+        setMessage("No marks set", MessageKind::Information);
+        return true;
+    }
+    listing_ = std::move(lines);
+    return true;
+}
+
+CommandResult Workspace::deleteMarks(std::string_view letters)
+{
+    // :mark-delete a, abc, a-d, as Vim's :delmarks; one undo step.
+    std::string wanted;
+    for (std::size_t i = 0; i < letters.size(); ++i)
+    {
+        const char c = letters[i];
+        if (c == ' ')
+        {
+            continue;
+        }
+        if (c < 'a' || c > 'z')
+        {
+            return CommandResult::error("Marks are named by letters: a, abc, or a-d");
+        }
+        if (i + 2 < letters.size() && letters[i + 1] == '-')
+        {
+            const char last = letters[i + 2];
+            if (last < c || last > 'z')
+            {
+                return CommandResult::error("Marks are named by letters: a, abc, or a-d");
+            }
+            for (char l = c; l <= last; ++l)
+            {
+                wanted += l;
+            }
+            i += 2;
+            continue;
+        }
+        wanted += c;
+    }
+    if (wanted.empty())
+    {
+        return CommandResult::error("Which marks? :mark-delete a, abc, or a-d");
+    }
+    std::string gone;
+    for (const char c : wanted)
+    {
+        if (document_.song().mark(c) != nullptr && gone.find(c) == std::string::npos)
+        {
+            gone += c;
+        }
+    }
+    if (gone.empty())
+    {
+        return {false, "No marks there to delete", false};
+    }
+    std::string names;
+    for (const char c : gone)
+    {
+        names += (names.empty() ? "" : ", ") + std::string(1, c);
+    }
+    auto title = (gone.size() == 1 ? "Delete mark " : "Delete marks ") + names;
+    document_.edit(title, view().place(),
+                   [&](core::Song& song)
+                   {
+                       for (const char c : gone)
+                       {
+                           song.removeMark(c);
+                       }
+                   });
+    refresh();
+    return {true, title.replace(0, 6, "Deleted"), false};
 }
 
 std::string Workspace::macroName(char32_t name)
@@ -2309,6 +2424,10 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         awaiting_ = Awaiting{std::string{command}, count};
         return true;
+    }
+    if (command == "marks")
+    {
+        return sayMarks();
     }
     if (command == "undo" || command == "redo")
     {
@@ -3936,6 +4055,11 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
         {
             item(std::to_string(i), markers[i].name, positionText(song.meter(), markers[i].tick));
         }
+        for (const auto& mark : song.marks())
+        {
+            item("mark " + std::string(1, mark.letter), "Mark " + std::string(1, mark.letter),
+                 markAbout(mark));
+        }
     }
     else if (prefix == '?' && settings_ != nullptr)
     {
@@ -3986,6 +4110,11 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
     }
     line_.clear();
     mode_ = selection_ ? Mode::Visual : Mode::Normal;
+    if (item.name.starts_with("mark "))
+    {
+        const bool done = goToMark(static_cast<char32_t>(item.name.back()), 0);
+        return done;
+    }
     const auto index = static_cast<std::size_t>(std::stoul(item.name));
     auto cursor = view().cursor();
     if (!selection_)

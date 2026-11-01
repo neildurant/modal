@@ -275,6 +275,30 @@ void EventListView::showPlayhead(core::Tick playhead, Follow follow)
     }
 }
 
+std::size_t EventListView::markRow(const core::Mark& mark) const
+{
+    // The row at its time; of the events there, its note, or without a pitch the first.
+    const auto rows = list_.rows();
+    const auto first = list_.rowAt(mark.tick);
+    for (auto r = first; r < rows.size() && rows[r].tick == mark.tick; ++r)
+    {
+        if (rows[r].kind != RowKind::Event || !list_.track())
+        {
+            continue;
+        }
+        if (mark.pitch == core::Mark::kNoPitch)
+        {
+            return r;
+        }
+        const auto& data = document_.song().events(*list_.track())[rows[r].index].data;
+        if (const auto* note = std::get_if<core::Note>(&data); note && note->pitch == mark.pitch)
+        {
+            return r;
+        }
+    }
+    return first;
+}
+
 void EventListView::setCursor(const SongCursor& cursor)
 {
     // The cursor's track (the conductor's list for none), at the row at its time; the row of
@@ -1619,6 +1643,19 @@ Region EventListView::listRegion() const
             else
             {
                 grid.write(start, line, shown, style);
+            }
+        }
+        // Marks (ma) on this list's track, or the conductor's in its list: the letter, dim,
+        // in the position column's room on the right, on the row a jump to it lands on.
+        if (!isAdded && row < list_.rows().size())
+        {
+            for (const auto& mark : document_.song().marks())
+            {
+                if (mark.track == list_.track() && row == markRow(mark))
+                {
+                    grid.write(x[0] + width[0] - 2, line, std::string(1, mark.letter),
+                               Style{Role::Dim, style.background, kPlain});
+                }
             }
         }
         // The play-from marker in the margin, over the cursor's box if it's there.

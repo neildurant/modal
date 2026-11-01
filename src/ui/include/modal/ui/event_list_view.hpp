@@ -89,6 +89,8 @@ public:
     const CommandLine& fieldLine() const { return fieldLine_; }
 
 private:
+    // The row a mark is shown on, and lands on.
+    std::size_t markRow(const core::Mark& mark) const;
     void setMessage(std::string message, MessageKind kind)
     {
         host_.setMessage(std::move(message), kind);

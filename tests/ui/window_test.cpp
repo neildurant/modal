@@ -558,3 +558,39 @@ TEST_CASE("closing a window ends its event loop once the events in hand are done
                  .wake = {}});
     CHECK(keys >= 1); // and it returned, with no quit event
 }
+
+TEST_CASE("a sample of marks in each view", "[.sample]")
+{
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            view.handle(Key::typed(key), 0);
+        }
+    };
+    type(U"12jjmajjjmb"); // the event list: two rows
+    view.run("view-arrangement", 0);
+    type(U"gg3}mcj2}md"); // the arrangement: bars 4 and 6
+    view.run("view-piano-roll", 0);
+    view.handle(Key::of(NamedKey::Tab), 0); // onto a note
+    type(U"meh");                           // a mark at the note's pitch
+    view.run("view-events", 0);
+    type(U"jjjjmfjjmg"); // two rows of this track's
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-marks-events.bmp"));
+    view.run("view-arrangement", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-marks-arrangement.bmp"));
+    view.run("view-piano-roll", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-marks-piano.bmp"));
+}

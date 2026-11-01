@@ -735,6 +735,30 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                   Role::BarLine,
                                   255});
     }
+    // Marks (ma), each its letter, dim, at its time: in its track's row, or the conductor's in
+    // the markers' row.
+    for (const auto& mark : song_.marks())
+    {
+        if (mark.tick < leftTick_ || mark.tick >= shownEnd)
+        {
+            continue;
+        }
+        int y = 0;
+        if (mark.track)
+        {
+            const auto it =
+                std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == *mark.track; });
+            const auto index = static_cast<std::size_t>(it - tracks.begin());
+            if (it == tracks.end() || index < topTrack_ ||
+                index >= topTrack_ + static_cast<std::size_t>(shownTracks))
+            {
+                continue;
+            }
+            y = tracksTop + static_cast<int>(index - topTrack_) * cell_.height;
+        }
+        timeline.text.push_back({scale.toX(mark.tick) + 2 * lineWidth, y,
+                                 std::u32string(1, static_cast<char32_t>(mark.letter)), kDim});
+    }
     // The play-from marker, in the markers' row, and the playhead, a line through the ruler and
     // the tracks.
     if (playX)

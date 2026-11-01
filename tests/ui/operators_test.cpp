@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/core/pitch.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -620,4 +621,31 @@ TEST_CASE("marks set outside the piano roll have no pitch, and going to one goes
     o.type(U"'c");
     CHECK(o.ws.pianoRoll().cursor().track == lead);
     CHECK(o.ws.pianoRoll().cursor().tick == 4 * o.q);
+}
+
+TEST_CASE(":marks says where the marks are, :mark-delete deletes them, and the views show them")
+{
+    Operating o;
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U":marks");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message() == "No marks set");
+    o.type(U"4}ma");   // the arrangement: the bass's bar 5
+    o.type(U"gr}kmb"); // the piano roll: bar 6, at a pitch
+    const auto pitch = core::pitchName(*o.ws.pianoRoll().cursor().pitch);
+    o.type(U":marks");
+    o.press(NamedKey::Enter);
+    using Lines = std::vector<std::pair<std::string, std::string>>;
+    CHECK(o.ws.listing() == Lines{{"a", "5:1:000, Bass"}, {"b", "6:1:000, Bass, " + pitch}});
+    o.press(NamedKey::Escape);
+
+    // The piano roll shows b among the notes, a in its ruler.
+    CHECK(shows(o, U"b"));
+    CHECK(o.registry.runLine("mark-delete a-b") == CommandResult{true, "Deleted marks a, b"});
+    CHECK(o.document.song().marks().empty());
+    o.type(U"u");
+    CHECK(o.document.song().marks().size() == 2);
+    CHECK(o.registry.runLine("mark-delete 9") ==
+          CommandResult::error("Marks are named by letters: a, abc, or a-d"));
+    CHECK(o.registry.runLine("mark-delete z").message == "No marks there to delete");
 }
