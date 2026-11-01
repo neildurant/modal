@@ -439,8 +439,9 @@ std::optional<core::EventQuery> queryFor(const core::EventData& data)
 
 std::optional<std::string> describeTimeRange(std::string_view motion)
 {
-    constexpr std::array<std::pair<std::string_view, std::string_view>, 17> kRanges{{
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 18> kRanges{{
         {"cursor-match-next", "to the next match"},
+        {"object-match", "the next match"},
         {"cursor-match-previous", "from the match before"},
         {"search-next", "to the next match"},
         {"search-previous", "from the match before"},

@@ -54,6 +54,7 @@ public:
                                              std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
     std::string matchStatus(const core::EventQuery& query) const override;
+    std::optional<OperatorTarget::Part> matchesHere(const core::EventQuery& query) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;

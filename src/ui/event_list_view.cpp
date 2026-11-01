@@ -462,6 +462,19 @@ std::optional<core::EventQuery> EventListView::queryHere() const
     return queryFor(document_.song().events(*id)[row.index].data);
 }
 
+std::optional<OperatorTarget::Part> EventListView::matchesHere(const core::EventQuery& query) const
+{
+    const auto id = list_.track();
+    const auto& row = list_.rows()[row_];
+    const auto& song = document_.song();
+    if (track_ == 0 || !id || row.kind != RowKind::Event ||
+        !core::matches(query, song.events(*id)[row.index].data, song.ppqn()))
+    {
+        return std::nullopt;
+    }
+    return OperatorTarget::Part{*id, {row.index}};
+}
+
 std::string EventListView::matchStatus(const core::EventQuery& query) const
 {
     return matchCount(matchRows(query), row_);

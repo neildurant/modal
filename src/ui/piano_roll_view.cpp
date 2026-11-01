@@ -231,6 +231,29 @@ std::optional<core::EventQuery> PianoRollView::queryHere() const
     return query;
 }
 
+std::optional<OperatorTarget::Part> PianoRollView::matchesHere(const core::EventQuery& query) const
+{
+    // At the cursor's time: a matching note at its pitch, or any other matching event.
+    const auto id = trackId();
+    if (!id)
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& events = song.events(*id);
+    OperatorTarget::Part part{*id, {}};
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto* note = std::get_if<core::Note>(&events[i].data);
+        if (events[i].tick == time_ && (note == nullptr || note->pitch == pitch_) &&
+            core::matches(query, events[i].data, song.ppqn()))
+        {
+            part.events.push_back(i);
+        }
+    }
+    return part.events.empty() ? std::nullopt : std::optional{std::move(part)};
+}
+
 std::string PianoRollView::matchStatus(const core::EventQuery& query) const
 {
     return matchCount(matchPlaces(query), std::pair{time_, pitch_});

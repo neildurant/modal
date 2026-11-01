@@ -129,6 +129,30 @@ std::vector<std::int64_t> ArrangeView::matchBars(const core::EventQuery& query) 
     return bars;
 }
 
+std::optional<OperatorTarget::Part> ArrangeView::matchesHere(const core::EventQuery& query) const
+{
+    // Those in the cursor's bar.
+    const auto id = trackId();
+    if (!id || page_.stripCursor())
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& m = meter();
+    const auto bar = m.toBarBeatTick(page_.time()).bar;
+    const auto& events = song.events(*id);
+    OperatorTarget::Part part{*id, {}};
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (m.toBarBeatTick(events[i].tick).bar == bar &&
+            core::matches(query, events[i].data, song.ppqn()))
+        {
+            part.events.push_back(i);
+        }
+    }
+    return part.events.empty() ? std::nullopt : std::optional{std::move(part)};
+}
+
 std::string ArrangeView::matchStatus(const core::EventQuery& query) const
 {
     // By bars, which are the cursor's places here: "bar 2/5 with matches".

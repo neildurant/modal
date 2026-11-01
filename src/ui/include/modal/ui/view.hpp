@@ -269,6 +269,12 @@ public:
     // search, for the status line ("match 3/24").
     virtual std::optional<core::EventQuery> queryHere() const { return std::nullopt; }
     virtual std::string matchStatus(const core::EventQuery& /*query*/) const { return {}; }
+    // The events of the cursor's track a query matches at the cursor, for gn: the note there,
+    // the event list's row, or in the arrangement those in the cursor's bar; nothing if none.
+    virtual std::optional<OperatorTarget::Part> matchesHere(const core::EventQuery& /*query*/) const
+    {
+        return std::nullopt;
+    }
 
     // The Visual selection here, as words for the status line ("bars 3-4 on every track"), or
     // nothing if the view can't select; its span of time; its own index at the cursor, for a

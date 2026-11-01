@@ -82,7 +82,8 @@ bool isOperator(std::string_view command)
 
 bool Workspace::transform(std::string_view op, int amount, std::string_view motion, int count)
 {
-    auto target = view().target(motion, count);
+    auto target =
+        presetTarget_ ? std::exchange(presetTarget_, std::nullopt) : view().target(motion, count);
     if (!target)
     {
         return true;

@@ -173,6 +173,12 @@ constexpr std::array kSharedCommands{
                 .description = "Select the matches of the last search that are shown"},
     CommandInfo{.name = "select-matches",
                 .description = "Keep only the matches of the last search in the selection"},
+    CommandInfo{.name = "object-match",
+                .description = "The match of the last search at the cursor, or the next (gn): "
+                               "an operator changes it, then . does the next and n skips one",
+                .object = true},
+    CommandInfo{.name = "select-match",
+                .description = "Select the match of the last search at the cursor, or the next"},
     CommandInfo{.name = "search-clear",
                 .description = "Clear the matches of the last search",
                 .aliases = "noh nohlsearch"},
@@ -481,7 +487,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 96> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 98> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -545,6 +551,8 @@ std::span<const CommandInfo> Workspace::commands()
             {"select-track", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-visible", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-bar", onlyIn({Tracks, PianoRoll, EventList})},
+            {"object-match", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-match", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-section", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-track", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-visible", onlyIn({Tracks, PianoRoll, EventList})},
@@ -1383,6 +1391,14 @@ bool Workspace::goToMatch(bool next, int count)
     {
         jumpedFrom_ = before;
     }
+    if (gnRun_)
+    {
+        const auto status = view().matchStatus(*search_);
+        setMessage("Skipped to " + status + " · " + keysOf("repeat") + " changes it, " +
+                       keysOf("search-next") + " skips again",
+                   MessageKind::Information);
+        gnKept_ = true;
+    }
     return true;
 }
 
@@ -1455,11 +1471,16 @@ bool Workspace::operateOnMatches(std::string_view op)
     {
         return true;
     }
-    const auto& song = document_.song();
     const auto span = view().selectionSpan();
-    const auto from = span ? span->first : 0;
+    return takeTarget(op, *target, span ? span->first : 0, span ? span->second - span->first : 0);
+}
+
+bool Workspace::takeTarget(std::string_view op, const OperatorTarget& target, core::Tick from,
+                           core::Tick span)
+{
+    const auto& song = document_.song();
     EventRegister taken;
-    for (const auto& part : target->parts)
+    for (const auto& part : target.parts)
     {
         auto& events = taken.tracks.emplace_back();
         for (const auto i : part.events)
@@ -1469,17 +1490,17 @@ bool Workspace::operateOnMatches(std::string_view op)
             events.push_back(std::move(event));
         }
     }
-    taken.span = span ? span->second - span->first : 0;
+    taken.span = span;
     register_ = std::move(taken);
     if (op == "operator-yank")
     {
-        setMessage(target->what + " yanked", MessageKind::Information);
+        setMessage(target.what + " yanked", MessageKind::Information);
         return true;
     }
-    document_.edit("Delete " + target->what, view().place(),
+    document_.edit("Delete " + target.what, view().place(),
                    [&](core::Song& edited)
                    {
-                       for (auto part : target->parts)
+                       for (auto part : target.parts)
                        {
                            std::ranges::sort(part.events);
                            edited.updateEvents(part.track,
@@ -1494,7 +1515,107 @@ bool Workspace::operateOnMatches(std::string_view op)
                        }
                    });
     refresh();
-    setMessage("Deleted " + target->what, MessageKind::Information);
+    setMessage("Deleted " + target.what, MessageKind::Information);
+    return true;
+}
+
+bool Workspace::toMatchForGn()
+{
+    // The match at the cursor, unless gn has just changed it, or the next; whether there's one.
+    if (!search_)
+    {
+        setMessage("No search yet: " + keysOf("search") + " searches", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        return false;
+    }
+    if (!view().matchesHere(*search_) || (gnLast_ && *gnLast_ == view().cursor()))
+    {
+        const auto before = view().cursor();
+        goToMatch(true, 0);
+        if (view().cursor() == before && gnLast_ && *gnLast_ == before)
+        {
+            return false; // the only match, done already
+        }
+    }
+    return view().matchesHere(*search_).has_value();
+}
+
+bool Workspace::operateOnMatch(std::string_view op, int amount)
+{
+    if (!toMatchForGn())
+    {
+        return true;
+    }
+    const auto part = *view().matchesHere(*search_);
+    const auto status = view().matchStatus(*search_);
+    const auto at = status.starts_with("match") ? status : std::string{"the match"};
+    const auto count = part.events.size();
+    OperatorTarget target{.parts = {part},
+                          .what = count == 1 ? std::string{"1 match"}
+                                             : std::to_string(count) + " matches",
+                          .notesOnly = false};
+    const auto here = view().cursor();
+    const bool taking = op == "operator-delete" || op == "operator-yank";
+    if (taking)
+    {
+        takeTarget(op, target, document_.song().events(part.track)[part.events.front()].tick, 0);
+    }
+    else
+    {
+        presetTarget_ = std::move(target);
+        transform(op, amount, "object-match", 0);
+        presetTarget_.reset();
+    }
+    if (op != "operator-yank")
+    {
+        gnLast_ = here; // a change, which . goes on from
+    }
+    const auto reminder = (op == "operator-delete" ? "Deleted " + at
+                           : op == "operator-yank" ? "Yanked " + at
+                                                   : "Changed " + at) +
+                          " · " + keysOf("repeat") + " does the next match, " +
+                          keysOf("search-next") + " skips one";
+    const auto remind = [this, reminder]
+    {
+        setMessage(reminder, MessageKind::Information);
+        gnRun_ = true;
+        gnKept_ = true;
+    };
+    if (answer_)
+    {
+        // As ^ asks how far: once answered.
+        answer_ = [this, inner = std::move(answer_), remind](const std::string& text)
+        {
+            inner(text);
+            remind();
+        };
+        return true;
+    }
+    remind();
+    return true;
+}
+
+bool Workspace::selectMatch()
+{
+    // gn without an operator selects the match, as in Vim, only it, by the search's filter.
+    if (!toMatchForGn())
+    {
+        return true;
+    }
+    if (!selection_)
+    {
+        selection_ = Selection{.anchor = view().cursor(),
+                               .kind = SelectionKind::Range,
+                               .where = where(),
+                               .index = view().selectionIndex(),
+                               .span = std::nullopt,
+                               .cut = false};
+    }
+    view().selectObject(where() == Where::Tracks ? "object-bar-contents" : "object-note", 0,
+                        *selection_);
+    selection_->filter = search_;
+    mode_ = Mode::Visual;
+    setMessage("The match selected · an operator changes it", MessageKind::Information);
     return true;
 }
 
@@ -1932,10 +2053,16 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // f and F repeat a find while it's the last thing done, any other key ending that, but for
     // a count or keys waiting for more.
     findKept_ = false;
+    gnKept_ = false;
     const bool changed = takeKey(key, now);
     if (!findKept_ && keys_.pending().empty())
     {
         findRepeats_ = false;
+    }
+    // gn's run through matches, the same; . and n keep it, and the keys of an answer to ^.
+    if (!gnKept_ && keys_.pending().empty() && mode_ != Mode::CommandLine && !operator_)
+    {
+        gnRun_ = false;
     }
     return changed;
 }
@@ -3111,6 +3238,10 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         search_.reset();
         return true;
     }
+    if (command == "select-match")
+    {
+        return selectMatch();
+    }
     if (command.starts_with("select-"))
     {
         return select(command);
@@ -3197,6 +3328,10 @@ bool Workspace::runOperator(std::string_view command, int count)
                        MessageKind::Information);
             return true;
         }
+    }
+    if (command == "object-match")
+    {
+        return operateOnMatch(op.name, std::max(op.count, 1));
     }
     if ((op.name == "operator-delete" || op.name == "operator-yank") &&
         command == "object-section" && where() != Where::Strip)

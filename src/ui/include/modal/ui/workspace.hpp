@@ -531,6 +531,22 @@ private:
     // whether there are any. And d and y on them.
     bool onlyMatches(OperatorTarget& target);
     bool operateOnMatches(std::string_view op);
+    // d or y on events: taken as a register holds them, from a time, with a span (0 for up to
+    // the last's end), and deleted for d.
+    bool takeTarget(std::string_view op, const OperatorTarget& target, core::Tick from,
+                    core::Tick span);
+    // gn: an operator on the match at the cursor, or the next, the cursor going to it; and
+    // without one, selecting it. While running through matches with . and n, the status line
+    // says how (decided November 2026, as it's seldom used): where the last change was, so .
+    // moves on from it though it still matches, and whether the run goes on.
+    bool operateOnMatch(std::string_view op, int amount);
+    bool selectMatch();
+    bool toMatchForGn();
+    std::optional<SongCursor> gnLast_;
+    bool gnRun_ = false;
+    bool gnKept_ = false;
+    // A target an operator takes rather than asking the view, as gn's.
+    std::optional<OperatorTarget> presetTarget_;
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};
