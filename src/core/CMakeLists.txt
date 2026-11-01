@@ -3,6 +3,7 @@ add_library(modal_core STATIC
     files.cpp
     timing_stats.cpp
     event.cpp
+    event_query.cpp
     input_queue.cpp
     meter_map.cpp
     note_fraction.cpp

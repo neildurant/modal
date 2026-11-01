@@ -8,6 +8,7 @@ add_executable(modal_tests
     core/count_in_test.cpp
     core/document_test.cpp
     core/engine_test.cpp
+    core/event_query_test.cpp
     core/event_test.cpp
     core/input_queue_test.cpp
     core/meter_map_test.cpp
