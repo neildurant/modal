@@ -417,6 +417,8 @@ private:
     std::string markAbout(const core::Mark& mark) const;
     bool sayMarks();
     CommandResult deleteMarks(std::string_view letters);
+    CommandResult label(std::string_view name);
+    CommandResult deleteLabels();
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;
     // The named registers, a to z: the one named for the next command, the unnamed register

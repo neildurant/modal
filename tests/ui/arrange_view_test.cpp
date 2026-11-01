@@ -873,6 +873,42 @@ TEST_CASE(":label-to-section starts a section at a label, asking unless it's on 
           "Top is at the start of Section 1, so there's no section to start");
 }
 
+TEST_CASE(":label puts a label at the cursor or renames it, and :label-delete deletes them")
+{
+    Arranging a{labelSong()};
+    const auto& song = a.document.song();
+    a.type(U"l"); // bar 2, with no label
+    CHECK(a.registry.runLine("label Bridge") == CommandResult{true, "Labelled Bridge", false});
+    CHECK(song.labels()[1] == core::Label{kBar, "Bridge"});
+    CHECK(a.registry.runLine("label  Middle ").message == "Renamed it Middle");
+    CHECK(song.labels()[1].name == "Middle");
+    CHECK(a.registry.runLine("label Middle").message == "The label here is already Middle");
+    a.type(U"u");
+    CHECK(song.labels()[1].name == "Bridge");
+
+    // Alone, it asks, with the name there to edit.
+    CHECK(a.registry.runLine("label") == CommandResult{true});
+    CHECK(a.ws.commandLine().text() == U"label Bridge");
+    a.press(Key::of(NamedKey::Escape));
+
+    CHECK(a.registry.runLine("label-delete") == CommandResult{true, "Deleted label Bridge", false});
+    CHECK(song.labels().size() == 4);
+    CHECK(a.registry.runLine("label-delete").message ==
+          "There's no label here; ]l goes to the next");
+    a.type(U"u");
+    CHECK(song.labels().size() == 5);
+
+    // Over a selection, every label in it, as one step: bars 2 to 5.
+    a.ws.setLineHandler([&](const std::string& line) { a.registry.runLine(line); });
+    a.type(U"v3l:");
+    a.type(U"label-delete");
+    a.press(Key::of(NamedKey::Enter));
+    CHECK(song.labels().size() == 1);
+    CHECK(a.ws.mode() == Mode::Normal);
+    a.type(U"u");
+    CHECK(song.labels().size() == 5);
+}
+
 TEST_CASE(":label-to-section on a selection goes through its labels, asking about those off a "
           "bar line")
 {

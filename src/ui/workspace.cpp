@@ -240,6 +240,15 @@ constexpr std::array kSharedCommands{
                 .usage = "[N] [METER]",
                 .keys = false,
                 .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
+    CommandInfo{.name = "label",
+                .description = "Put a label named NAME at the cursor, or rename the one there; "
+                               "with no name, asking for one, with its name to edit",
+                .usage = "[NAME]",
+                .keys = false},
+    CommandInfo{.name = "label-delete",
+                .description = "Delete the label at the cursor, or every label in a selection",
+                .keys = false,
+                .range = true},
     CommandInfo{.name = "label-to-section",
                 .description = "Start a section at the label at or before the cursor, named "
                                "after it, at the bar line of its bar; the label goes. On a "
@@ -528,6 +537,14 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "mark-delete")
                          {
                              return deleteMarks(call.arguments);
+                         }
+                         if (name == "label")
+                         {
+                             return label(call.arguments);
+                         }
+                         if (name == "label-delete")
+                         {
+                             return deleteLabels();
                          }
                          if (name == "label-to-section")
                          {
@@ -3562,6 +3579,71 @@ std::string trackNameOf(const core::Song& song, core::TrackId id)
 }
 
 } // namespace
+
+CommandResult Workspace::label(std::string_view name)
+{
+    // :label NAME puts a label at the cursor's time, or renames the one there; alone, it asks
+    // for the name, with the one there to edit, as :section-rename does.
+    while (!name.empty() && name.front() == ' ')
+    {
+        name.remove_prefix(1);
+    }
+    while (!name.empty() && name.back() == ' ')
+    {
+        name.remove_suffix(1);
+    }
+    const auto tick = view().cursor().tick;
+    const auto labels = document_.song().labels();
+    const auto it = std::ranges::find(labels, tick, &core::Label::tick);
+    if (name.empty())
+    {
+        openPrompt("label " + (it == labels.end() ? std::string{} : it->name));
+        return {true};
+    }
+    const std::string text{name};
+    if (it != labels.end() && it->name == text)
+    {
+        return {true, "The label here is already " + text, false};
+    }
+    const auto title =
+        it == labels.end() ? "Label " + text : "Rename label " + it->name + " to " + text;
+    document_.edit(title, view().place(), [&](core::Song& song) { song.setLabel(tick, text); });
+    refresh();
+    return {true, (it == labels.end() ? "Labelled " : "Renamed it ") + text, false};
+}
+
+CommandResult Workspace::deleteLabels()
+{
+    // The labels in the selection, or the one at the cursor's time; one undo step.
+    const auto span = selection_ ? view().selectionSpan() : std::nullopt;
+    const auto tick = view().cursor().tick;
+    std::vector<core::Label> doomed;
+    for (const auto& label : document_.song().labels())
+    {
+        if (span ? label.tick >= span->first && label.tick < span->second : label.tick == tick)
+        {
+            doomed.push_back(label);
+        }
+    }
+    if (doomed.empty())
+    {
+        return CommandResult::error(
+            span ? "There are no labels in " + view().selectionStatus().value_or("the selection")
+                 : std::string{"There's no label here; ]l goes to the next"});
+    }
+    const auto title = doomed.size() == 1 ? "Delete label " + doomed.front().name
+                                          : "Delete " + std::to_string(doomed.size()) + " labels";
+    document_.edit(title, view().place(),
+                   [&](core::Song& song)
+                   {
+                       for (const auto& label : doomed)
+                       {
+                           song.removeLabel(label.tick);
+                       }
+                   });
+    refresh();
+    return {true, "Deleted" + title.substr(6), false};
+}
 
 CommandResult Workspace::labelToSection()
 {

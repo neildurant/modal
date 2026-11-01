@@ -52,7 +52,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `h` `l`, `k` `j`, `K` `J` | A grid step later or earlier, a semitone up or down, an octave up or down |
 | `Tab` `Shift-Tab`, `)` `(` | The next or previous note, at any pitch, or chord |
 | `]b` `[b`, `}` `{`, `0` `$` | The next or previous bar line, the same place a bar on or back, the bar's start or last step |
-| `gg` `G`, `]s` `[s`, `]l` `[l` | The song's start and end (`5G` bar 5), sections, labels |
+| `gg` `G`, `]s` `[s`, `]l` `[l` | The song's start and end (`5G` bar 5), sections, labels (`:label fix the fill` puts one at the cursor, `:label-delete` deletes it) |
 | `zh` `zl`, `Ctrl-T` | A finer or coarser grid, triplets on or off (`:grid 1/16` sets it) |
 | `zi` `zo` `z0`, `zz` | Fewer or more bars to a page, or back to the page size it opens at; centre the cursor |
 | `o`, `O` | Add the track's default note at the cursor; or add it and move on to its end (`8O` eight in a row) |
