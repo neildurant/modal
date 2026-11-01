@@ -342,6 +342,7 @@ ngroup <leader>t "Toggles"
 " keeps only the matches in what's selected.
 ngroup <leader>s "Select"
 nmap <leader>sb  select-bar               "This bar"
+nmap <leader>sB  select-matches-bar       "The matches in this bar"
 nmap <leader>ss  select-section           "This section"
 nmap <leader>sS  select-matches-section   "The matches in this section"
 nmap <leader>st  select-track             "This track"

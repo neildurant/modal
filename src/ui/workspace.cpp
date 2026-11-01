@@ -163,6 +163,8 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "select-section", .description = "Select this section, as vis does"},
     CommandInfo{.name = "select-track", .description = "Select the track, as vit does"},
     CommandInfo{.name = "select-visible", .description = "Select what's shown"},
+    CommandInfo{.name = "select-matches-bar",
+                .description = "Select the matches of the last search in this bar"},
     CommandInfo{.name = "select-matches-section",
                 .description = "Select the matches of the last search in this section"},
     CommandInfo{.name = "select-matches-track",
@@ -479,7 +481,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 95> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 96> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -542,6 +544,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"select-section", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-track", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-visible", onlyIn({Tracks, PianoRoll, EventList})},
+            {"select-matches-bar", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-section", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-track", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-visible", onlyIn({Tracks, PianoRoll, EventList})},
@@ -1385,7 +1388,7 @@ bool Workspace::goToMatch(bool next, int count)
 
 bool Workspace::select(std::string_view command)
 {
-    // Lower case the bar, section, track or what's visible; the capitals (, s S) the matches
+    // Lower case the bar, section, track or what's visible; the capitals (, s B) the matches
     // in it, a selection with the search as its filter (decided November 2026).
     const bool matches = command.starts_with("select-matches");
     if (matches && !search_)

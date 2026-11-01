@@ -1038,6 +1038,10 @@ TEST_CASE("the leader's s selects an area, or with a capital only the matches in
     o.type(U"gg");
     o.type(U"vit,smy");
     CHECK(o.ws.registerEvents().size() == 2);
+    o.type(U"}");
+    o.type(U",sBd"); // bar 2's A2 only
+    CHECK(o.notes().size() == 4);
+    o.type(U"u");
     // Lower case, the area itself.
     o.type(U"gg,sbd");
     CHECK(o.notes().size() == 3); // bar 1's G1 and E1
