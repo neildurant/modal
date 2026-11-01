@@ -585,11 +585,26 @@ TEST_CASE("a sample of marks in each view", "[.sample]")
     type(U"meh");                           // a mark at the note's pitch
     view.run("view-events", 0);
     type(U"jjjjmfjjmg"); // two rows of this track's
+    view.run("view-conductor", 0);
+    type(U"jjjmi"); // one of the conductor's
+    // A label at the second section's start, which its name shares.
+    document.edit("Label", {}, [](modal::core::Song& song)
+                  { song.setLabel(song.sectionStart(1), "fix the fill"); });
+    view.run("view-events", 0);
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marks-events.bmp"));
     view.run("view-arrangement", 0);
+    type(U"lmj"); // the bar after d's, close to it once zoomed out
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marks-arrangement.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-marks-arrangement-light.bmp"));
+    for (int zoom = 1; zoom <= 4; ++zoom)
+    {
+        view.run("zoom-out", 0);
+        window->draw(view.frame(), *builtInTheme("dark"));
+        CHECK(window->saveFrame(base + "-marks-arrangement-out" + std::to_string(zoom) + ".bmp"));
+    }
     view.run("view-piano-roll", 0);
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marks-piano.bmp"));

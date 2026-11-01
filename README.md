@@ -45,7 +45,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 
 ### The piano roll
 
-`gr`, or Enter on a bar in the arrangement, opens the cursor's track in the piano roll: pages of whole bars, under a ruler of sections, labels and bar numbers, with the note names down the left and the velocities in a lane below. The cursor is a time and a pitch, and the note it's on is shown in the inspector above.
+`gr`, or Enter on a bar in the arrangement, opens the cursor's track in the piano roll: pages of whole bars, under a ruler of sections and labels, the play-from marker and marks, and bar numbers, with the note names down the left and the velocities in a lane below. The cursor is a time and a pitch, and the note it's on is shown in the inspector above.
 
 | Keys | What they do |
 |------|--------------|

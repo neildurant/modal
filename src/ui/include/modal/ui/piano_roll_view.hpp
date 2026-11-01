@@ -42,7 +42,7 @@ public:
     static constexpr std::size_t kDefaultPageSize = 2; // four bars
 
     static constexpr int kKeyColumns = 5; // the keyboard's note names, and a space
-    static constexpr int kRulerRows = 2;  // the sections, labels and bar numbers, above
+    static constexpr int kRulerRows = 3;  // the sections and labels, marks, and bar numbers, above
     static constexpr int kLaneRows = 3;   // the velocity lane
 
     // The document and the host outlive the view.

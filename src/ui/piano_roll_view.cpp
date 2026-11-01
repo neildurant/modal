@@ -1957,10 +1957,10 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
 
     // The top row: each section a block across its span, neighbours in two shades as on the
     // arrangement's strip, named in the colour of its line from where it shows, so the name of a
-    // section begun before the view stays at the left edge. Then the labels by name, and the
-    // play-from marker. A name stops short of the next, or of the play-from marker, or starts after
-    // the latter if it's at the name's start. The names are drawn straight on the blocks, without a
-    // background of their own, which would stand taller than the block.
+    // section begun before the view stays at the left edge. Then the labels by name, one at a
+    // section's start after the section's name ("Verse · fix the fill"). A name stops short of
+    // the next. The names are drawn straight on the blocks, without a background of their own,
+    // which would stand taller than the block.
     const int inset = std::max(h / 10, 1);
     const auto shade = [&](std::size_t section)
     { return section % 2 == 0 ? Role::Panel : Role::Bar; };
@@ -1970,6 +1970,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         int right = 0; // as far as it can run: its section's end, for a section's name
         std::u32string text;
         Style style;
+        std::u32string label = {}; // at a section's start, after its name
     };
     std::vector<Name> names;
     for (std::size_t i = 0; i < song.sections().size(); ++i)
@@ -1987,10 +1988,14 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
             continue;
         }
         ruler.under.push_back({{x0, inset, x1 - x0, h - 2 * inset}, shade(i), 255});
+        const auto labels = song.labels();
+        const auto label = std::ranges::find(labels, start, &core::Label::tick);
         names.push_back({x0 - lineWidth,
                          x1,
                          decodeUtf8(song.sections()[i]->name()),
-                         {Role::Label, Role::Background, kBold}});
+                         {Role::Label, Role::Background, kBold},
+                         label != labels.end() && start >= p.start ? decodeUtf8(label->name)
+                                                                   : std::u32string{}});
     }
     for (const auto& label : song.labels())
     {
@@ -2004,26 +2009,19 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         }
     }
     std::ranges::stable_sort(names, {}, &Name::x);
-    const auto* player = host_.player();
-    const std::optional<int> playX = player != nullptr && inView(player->marker())
-                                         ? std::optional{scale.toX(player->marker())}
-                                         : std::nullopt;
     for (std::size_t i = 0; i < names.size(); ++i)
     {
         auto& name = names[i];
-        int textX = name.x + 2 * lineWidth;
+        const int textX = name.x + 2 * lineWidth;
         int right = name.right;
         if (i + 1 < names.size())
         {
             right = std::min(right, names[i + 1].x);
         }
-        if (playX && *playX < textX + cell_.width && *playX + cell_.width > name.x)
+        const auto own = name.text.size(); // the section's name, before a label's
+        if (!name.label.empty())
         {
-            textX = *playX + cell_.width;
-        }
-        else if (playX && *playX >= textX)
-        {
-            right = std::min(right, *playX);
+            name.text += U" \u00B7 " + name.label;
         }
         const int room = (right - textX) / cell_.width;
         if (static_cast<int>(name.text.size()) > room)
@@ -2035,27 +2033,39 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
             name.text.resize(static_cast<std::size_t>(room - 1));
             name.text += U'\u2026';
         }
-        ruler.text.push_back({textX, 0, std::move(name.text), name.style});
+        // A label after a section's name in a plain face, as labels are.
+        const auto bold = std::min(own, name.text.size());
+        ruler.text.push_back({textX, 0, name.text.substr(0, bold), name.style});
+        if (bold < name.text.size())
+        {
+            ruler.text.push_back({textX + static_cast<int>(bold) * cell_.width,
+                                  0,
+                                  name.text.substr(bold),
+                                  {Role::Label, Role::Background, kPlain}});
+        }
     }
-    // Marks (ma) on this track or the conductor without a pitch, each its letter, dim, in the
-    // labels' row; those with a pitch are shown at it, among the notes.
+
+    // The second row, a row of their own (decided November 2026, as they and the names ran
+    // into each other in one): the play-from marker, and the marks (ma) on this track or the
+    // conductor without a pitch, each its letter; those with a pitch are shown at it, among
+    // the notes.
+    std::vector<RowSign> signs;
+    if (const auto* player = host_.player(); player != nullptr && inView(player->marker()))
+    {
+        signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent});
+    }
     for (const auto& mark : song.marks())
     {
         const bool here = !mark.track || mark.track == trackId();
         if (here && inView(mark.tick) && (mark.pitch == core::Mark::kNoPitch || !mark.track))
         {
-            ruler.text.push_back({scale.toX(mark.tick) + 2 * lineWidth,
-                                  0,
-                                  std::u32string(1, static_cast<char32_t>(mark.letter)),
-                                  {Role::Dim, Role::Background, kPlain}});
+            signs.push_back(
+                {scale.toX(mark.tick) + 2 * lineWidth, h, static_cast<char32_t>(mark.letter)});
         }
     }
-    if (playX)
-    {
-        ruler.text.push_back({*playX, 0, U"\u25B6", {Role::Accent, Role::Background, kPlain}});
-    }
+    addRowSigns(ruler, std::move(signs), cell_);
 
-    // The second row: the bars, in the track's bars, numbered at their lines, every so many
+    // The third row: the bars, in the track's bars, numbered at their lines, every so many
     // bars from each section's first, as few as fit the widest number and a space into the
     // shortest bar in view.
     core::Tick shortest = p.end - p.start;
@@ -2085,7 +2095,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         }
         auto text = decodeUtf8(std::to_string(bar));
         next = x + static_cast<int>(text.size() + 1) * cell_.width;
-        ruler.text.push_back({x, h, std::move(text), {Role::Dim, Role::Background, kPlain}});
+        ruler.text.push_back({x, 2 * h, std::move(text), {Role::Dim, Role::Background, kPlain}});
     }
 }
 
@@ -2235,19 +2245,6 @@ void PianoRollView::addRegions(Frame& frame) const
     {
         boundary(label.tick, kFaint);
     }
-    // Marks with a pitch, on this track: the letter, dim, at the mark's time and pitch.
-    for (const auto& mark : song.marks())
-    {
-        if (mark.track && mark.track == trackId() && mark.pitch != core::Mark::kNoPitch &&
-            mark.tick >= p.start && mark.tick < p.end && shown(mark.pitch))
-        {
-            notes.text.push_back({scale.toX(mark.tick) + 2 * lineWidth,
-                                  rowOf(mark.pitch) * h,
-                                  std::u32string(1, static_cast<char32_t>(mark.letter)),
-                                  {Role::Dim, Role::Background, kPlain}});
-        }
-    }
-
     // Each note at its exact place: brighter the louder, with a solid start so repeated notes
     // read apart, and a pixel's gap before the next; the current note, and those a selection
     // takes, in their own colour.
@@ -2331,6 +2328,20 @@ void PianoRollView::addRegions(Frame& frame) const
             }
         }
     }
+
+    // Marks with a pitch, on this track: the letter, boxed over the notes, at the mark's time
+    // and pitch.
+    std::vector<RowSign> signs;
+    for (const auto& mark : song.marks())
+    {
+        if (mark.track && mark.track == trackId() && mark.pitch != core::Mark::kNoPitch &&
+            mark.tick >= p.start && mark.tick < p.end && shown(mark.pitch))
+        {
+            signs.push_back({scale.toX(mark.tick) + 2 * lineWidth, rowOf(mark.pitch) * h,
+                             static_cast<char32_t>(mark.letter)});
+        }
+    }
+    addRowSigns(notes, std::move(signs), cell_);
 
     // The cursor's cell boxed, over the notes, and the playhead, a line through the notes and
     // the lane.

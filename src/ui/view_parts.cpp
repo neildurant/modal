@@ -155,6 +155,27 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     return region;
 }
 
+void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
+{
+    std::ranges::stable_sort(signs, [](const RowSign& a, const RowSign& b)
+                             { return a.y != b.y ? a.y < b.y : a.x < b.x; });
+    int right = 0; // the last's in the row
+    for (std::size_t i = 0; i < signs.size(); ++i)
+    {
+        auto x = signs[i].x;
+        if (i > 0 && signs[i - 1].y == signs[i].y)
+        {
+            x = std::max(x, right);
+        }
+        right = x + cell.width;
+        region.under.push_back({{x, signs[i].y, cell.width, cell.height}, Role::Background, 255});
+        region.text.push_back({x,
+                               signs[i].y,
+                               std::u32string(1, signs[i].character),
+                               {signs[i].role, Role::Background, kPlain}});
+    }
+}
+
 Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,
                       const core::MeterMap& meter, Rect bounds, int width, CellSize cell)
 {

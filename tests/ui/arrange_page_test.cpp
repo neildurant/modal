@@ -342,13 +342,13 @@ TEST_CASE("bars are numbered from bar 1 and each label, every so many bars")
     page.addRegions(frame);
     // The shortest bar, of 2/4, is ten pixels, and "53 " is thirty: every fourth bar, from
     // bar 1, the verse at 9, the chorus at 15 and the bridge at 28. Bar 27 would crowd 28.
-    CHECK(rulerText(frame[1], 2) ==
+    CHECK(rulerText(frame[1], ArrangePage::kNumberRow) ==
           std::vector<std::u32string>{U"1", U"5", U"9", U"13", U"15", U"19", U"23", U"28", U"32"});
 
     type(page, U"-", 2); // a 2/4 bar is now 2.5 pixels: every sixteenth bar
     frame.clear();
     page.addRegions(frame);
-    CHECK(rulerText(frame[1], 2) ==
+    CHECK(rulerText(frame[1], ArrangePage::kNumberRow) ==
           std::vector<std::u32string>{U"1", U"9", U"15", U"28", U"36", U"48"});
 }
 
@@ -358,12 +358,13 @@ TEST_CASE("a meter change too short for its name is shown by a tick, not hiding 
     Frame frame;
     page.addRegions(frame);
     // The single bar of 2/4 is ten pixels, too narrow for "2/4", so the bridge's 3/4 shows.
-    CHECK(rulerText(frame[1], 1) == std::vector<std::u32string>{U"4/4", U"7/8", U"4/4", U"3/4"});
+    CHECK(rulerText(frame[1], ArrangePage::kMeterRow) ==
+          std::vector<std::u32string>{U"4/4", U"7/8", U"4/4", U"3/4"});
     std::vector<int> ticks;
     for (const auto& shape : frame[1].under)
     {
-        if (shape.role == Role::Dim && shape.rect.y > kCell.height &&
-            shape.rect.y < 2 * kCell.height)
+        if (shape.role == Role::Dim && shape.rect.y > ArrangePage::kMeterRow * kCell.height &&
+            shape.rect.y < (ArrangePage::kMeterRow + 1) * kCell.height)
         {
             ticks.push_back(shape.rect.x);
         }
@@ -374,7 +375,7 @@ TEST_CASE("a meter change too short for its name is shown by a tick, not hiding 
     type(page, U"G", 27);
     frame.clear();
     page.addRegions(frame);
-    const auto meters = rulerText(frame[1], 1);
+    const auto meters = rulerText(frame[1], ArrangePage::kMeterRow);
     CHECK(std::ranges::find(meters, U"2/4") != meters.end());
 }
 
@@ -431,29 +432,34 @@ TEST_CASE("a label's line through the ruler breaks only where text sits across i
             rows.push_back(shape.rect.y / kCell.height);
         }
     }
-    CHECK(rows == std::vector<int>{0}); // beside its name, but not through "4/4" or "1"
+    // Beside its name and through the empty row below, but not through "4/4" or "1".
+    CHECK(rows == std::vector<int>{0, ArrangePage::kSignRow});
 }
 
-TEST_CASE("the play-from marker sits in the labels' row, which names give way to")
+TEST_CASE("the play-from marker and marks have a row of their own, laid out not to overlap")
 {
     // A label halfway through bar 1, ten pixels in at a half note to a column.
     core::Song song;
     const auto id = song.addTrack("Piano");
     song.updateEvents(id, [&](core::EventList& events)
                       { events.insert({0, core::Note{60, 100, 16 * song.ppqn().quarter()}}); });
-    const auto half = core::NoteFraction{1, 2}.toTicks(song.ppqn());
+    const auto quarter = song.ppqn().quarter();
+    const auto half = 2 * quarter;
     song.setLabel(half, "Middle");
+    song.setMark({'b', half, std::nullopt, core::Mark::kNoPitch});
+    song.setMark({'a', half + quarter, std::nullopt, core::Mark::kNoPitch}); // 5 pixels on
+    song.setMark({'c', 0, id, core::Mark::kNoPitch});
+    song.setMark({'d', quarter, id, core::Mark::kNoPitch});
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1);
-    const auto labelsRow = [&](core::Tick playFrom)
+    using Runs = std::vector<std::pair<int, std::u32string>>;
+    const auto row = [&](const Frame& frame, int y)
     {
-        Frame frame;
-        page.addRegions(frame, playFrom);
-        std::vector<std::pair<int, std::u32string>> runs;
+        Runs runs;
         for (const auto& run : frame[1].text)
         {
-            if (run.y == 0)
+            if (run.y == y)
             {
                 runs.emplace_back(run.x, run.text);
             }
@@ -461,17 +467,36 @@ TEST_CASE("the play-from marker sits in the labels' row, which names give way to
         std::ranges::sort(runs);
         return runs;
     };
-    using Runs = std::vector<std::pair<int, std::u32string>>;
-    CHECK(labelsRow(0) == Runs{{0, U"▶"}, {12, U"Middle"}});
-    CHECK(labelsRow(half) == Runs{{10, U"▶"}, {20, U"Middle"}}); // after it
-    CHECK(labelsRow(8 * half) == Runs{{12, U"Middle"}, {80, U"▶"}});
-    CHECK(labelsRow(6 * half) == Runs{{12, U"Mid…"}, {60, U"▶"}}); // cut short
     Frame frame;
-    page.addRegions(frame, 2 * half);
-    for (const auto& number : rulerText(frame[1], 2)) // not among the bar numbers any more
+    page.addRegions(frame, half);
+    // The label's name doesn't give way to the play-from marker, which is a row down, where
+    // the marks there go after it, each a character on from the one before.
+    CHECK(row(frame, 0) == Runs{{12, U"Middle"}});
+    CHECK(row(frame, ArrangePage::kSignRow * kCell.height) ==
+          Runs{{10, U"▶"}, {20, U"b"}, {30, U"a"}});
+    // The track's, in its row, the second after the first.
+    CHECK(row(frame, ArrangePage::kRulerRows * kCell.height) == Runs{{2, U"c"}, {12, U"d"}});
+    // Each in a box of the background, over the bars.
+    const auto boxes = std::ranges::count_if(frame[1].under, [&](const Shape& shape)
+                                             { return shape.role == Role::Background; });
+    CHECK(boxes == 5);
+    CHECK(frame[1].under.back().role == Role::Background);
+    for (const auto& number : rulerText(frame[1], ArrangePage::kNumberRow))
     {
         CHECK(number != U"▶");
     }
+}
+
+TEST_CASE("a label at a section's start is named in the labels' row")
+{
+    core::Song song;
+    song.addTrack("Piano");
+    song.setLabel(0, "Top");
+    ArrangePage page{song};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    Frame frame;
+    page.addRegions(frame);
+    CHECK(rulerText(frame[1], 0) == std::vector<std::u32string>{U"Top"});
 }
 
 TEST_CASE("the view glides under the playhead, which stays a third of the way across")

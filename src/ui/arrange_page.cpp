@@ -6,6 +6,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/view_parts.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -507,12 +508,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     // Section starts and labels: faint lines under the text and bars, so as not to distract,
     // through the ruler and across the tracks. Labels are named up to the next line, cut
     // short with an ellipsis or left out if there's no room; sections are named on the strip.
-    // A section's start wins over a label at the same tick. The play-from marker sits in the
-    // same row (decided October 2026, out of the bar numbers' way): a name stops short of it,
-    // or starts after it if it's at the name's start.
-    const std::optional<int> playX = playFrom && *playFrom >= leftTick_ && *playFrom < right
-                                         ? std::optional{scale.toX(*playFrom)}
-                                         : std::nullopt;
+    // A label at a section's start is named too, its line the section's.
     std::vector<core::Label> labels;
     for (std::size_t i = 0; i < song_.sections().size(); ++i)
     {
@@ -520,7 +516,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     }
     for (const auto& label : song_.labels())
     {
-        if (std::ranges::find(labels, label.tick, &core::Label::tick) == labels.end())
+        if (const auto at = std::ranges::find(labels, label.tick, &core::Label::tick);
+            at != labels.end())
+        {
+            at->name = label.name;
+        }
+        else
         {
             labels.push_back(label);
         }
@@ -542,20 +543,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         {
             continue; // a section's start
         }
-        int textX = x + 2 * lineWidth;
-        // Characters, to the next label or the play-from marker, or past the edge.
+        const int textX = x + 2 * lineWidth;
+        // Characters, to the next label, or past the edge.
         int roomEnd = textX + timeline.bounds.width * cell_.width;
         if (i + 1 < labels.size())
         {
             roomEnd = scale.toX(labels[i + 1].tick) - lineWidth;
-        }
-        if (playX && *playX < textX + cell_.width && *playX + cell_.width > x)
-        {
-            textX = *playX + cell_.width;
-        }
-        else if (playX && *playX >= textX)
-        {
-            roomEnd = std::min(roomEnd, *playX);
         }
         const int room = (roomEnd - textX) / cell_.width;
         auto name = decodeUtf8(labels[i].name);
@@ -589,13 +582,14 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                                 : timeline.bounds.width;
         if (static_cast<int>(text.size()) * cell_.width <= room)
         {
-            timeline.text.push_back({x + 2 * lineWidth, cell_.height, decodeUtf8(text), kDim});
+            timeline.text.push_back(
+                {x + 2 * lineWidth, kMeterRow * cell_.height, decodeUtf8(text), kDim});
         }
         else
         {
             const int height = cell_.height / 3;
             timeline.under.push_back(
-                {{x, cell_.height + height, lineWidth, height}, Role::Dim, 255});
+                {{x, kMeterRow * cell_.height + height, lineWidth, height}, Role::Dim, 255});
         }
     }
     // Bar numbers, counted in sections: bar 1 and the bar of each section start and label
@@ -624,7 +618,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     const auto [last, unique] = std::ranges::unique(sections);
     sections.erase(last, unique);
 
-    Captions numbers{timeline, 2 * cell_.height, cell_};
+    Captions numbers{timeline, kNumberRow * cell_.height, cell_};
     for (auto bar = reference.toBarBeatTick(leftTick_).bar;; ++bar)
     {
         const core::Tick start = reference.barStart(bar);
@@ -735,15 +729,21 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                   Role::BarLine,
                                   255});
     }
-    // Marks (ma), each its letter, dim, at its time: in its track's row, or the conductor's in
-    // the labels' row.
+    // In a row of their own (decided November 2026, as they and the labels' names ran into each
+    // other in one): the play-from marker, and the conductor's marks (ma). The tracks' marks are
+    // in their rows. Each a character at its time, boxed over the bars.
+    std::vector<RowSign> signs;
+    if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
+    {
+        signs.push_back({scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent});
+    }
     for (const auto& mark : song_.marks())
     {
         if (mark.tick < leftTick_ || mark.tick >= shownEnd)
         {
             continue;
         }
-        int y = 0;
+        int y = kSignRow * cell_.height;
         if (mark.track)
         {
             const auto it =
@@ -756,15 +756,11 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             }
             y = tracksTop + static_cast<int>(index - topTrack_) * cell_.height;
         }
-        timeline.text.push_back({scale.toX(mark.tick) + 2 * lineWidth, y,
-                                 std::u32string(1, static_cast<char32_t>(mark.letter)), kDim});
+        signs.push_back(
+            {scale.toX(mark.tick) + 2 * lineWidth, y, static_cast<char32_t>(mark.letter)});
     }
-    // The play-from marker, in the labels' row, and the playhead, a line through the ruler and
-    // the tracks.
-    if (playX)
-    {
-        timeline.text.push_back({*playX, 0, U"▶", {Role::Accent, Role::Background, kPlain}});
-    }
+    addRowSigns(timeline, std::move(signs), cell_);
+    // The playhead, a line through the ruler and the tracks.
     if (playhead_ && *playhead_ >= leftTick_ && *playhead_ < right)
     {
         timeline.over.push_back(

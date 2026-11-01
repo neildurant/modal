@@ -15,6 +15,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace modal::ui
 {
@@ -38,6 +39,21 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
 // holding a time with its bars in a meter, each value after its label.
 Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,
                       const core::MeterMap& meter, Rect bounds, int width, CellSize cell);
+
+// A character drawn at a time in a row, as a mark's letter (ma) or the play-from marker.
+struct RowSign
+{
+    int x = 0;
+    int y = 0;
+    char32_t character = 0;
+    Role role = Role::Text;
+};
+
+// Signs, each in a box of the background over what's drawn under it, so a mark's letter reads
+// over bars and notes of any shade (decided November 2026). Those in a row that would overlap
+// go one after another from the leftmost, so marks a beat apart read "ab" from the first's
+// place; at the same place, in the order given.
+void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell);
 
 // Puts the register's events into the song at a time, its first track's onto a track (counting
 // from 0) and the others onto those after it, as far as there are tracks, merging with what's

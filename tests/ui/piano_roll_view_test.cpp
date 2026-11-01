@@ -415,7 +415,7 @@ TEST_CASE("the piano roll's ruler names the sections and labels and numbers the 
     using Texts = std::vector<std::u32string>;
     // Bars 1-4: Section 1, then the Verse from bar 3, with the label in it.
     CHECK(texts(rulerRow(r, 0)) == Texts{U"Section 1", U"Verse", U"Fill"});
-    CHECK(texts(rulerRow(r, 1)) == Texts{U"1", U"2", U"3", U"4"});
+    CHECK(texts(rulerRow(r, 2)) == Texts{U"1", U"2", U"3", U"4"});
     // The section's start a line down through the notes, stronger than the label's.
     std::vector<std::uint8_t> lines;
     const auto frame = r.ws.frame();
@@ -442,7 +442,13 @@ TEST_CASE("the piano roll's ruler names the sections and labels and numbers the 
     REQUIRE(!top.empty());
     CHECK(top.front().second == U"Verse");
     CHECK(top.front().first < (PianoRollView::kKeyColumns + 1) * kCell.width);
-    CHECK(texts(rulerRow(r, 1)) == Texts{U"6", U"7", U"8", U"9"});
+    CHECK(texts(rulerRow(r, 2)) == Texts{U"6", U"7", U"8", U"9"});
+
+    // A label at a section's start, after its name, in a plain face.
+    r.type(U"gg");
+    r.document.edit("Label", {}, [&](core::Song& song) { song.setLabel(t.bar(3), "Fill in"); });
+    const auto named = rulerRow(r, 0);
+    CHECK(texts(named) == Texts{U"Section 1", U"Verse", U" \u00B7 Fill in", U"Fill"});
 }
 
 TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")
