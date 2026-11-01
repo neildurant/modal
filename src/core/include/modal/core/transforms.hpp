@@ -165,7 +165,7 @@ struct VelocityDynamics
 
     Kind kind = Kind::Compress;
     int percent = 50;
-    std::function<Tick(Tick)> window; // the window's length at a note's start
+    std::function<Tick(Tick)> window = {}; // the window's length at a note's start
     Centre centre = Centre::Local;
     int fixed = 64;
     std::optional<int> above = std::nullopt;
