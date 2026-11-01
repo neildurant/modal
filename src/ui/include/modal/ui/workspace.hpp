@@ -557,6 +557,9 @@ private:
     PortFinder portFinder_;
     Mode mode_ = Mode::Normal;
     CommandLine line_;
+    // The / prompt's line, with its own history, as Vim keeps searches apart from commands; it
+    // takes line_'s place while searching.
+    CommandLine searchLine_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};

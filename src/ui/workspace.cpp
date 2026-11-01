@@ -3093,6 +3093,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "search")
     {
         mode_ = Mode::CommandLine;
+        std::swap(line_, searchLine_);
         line_.open();
         answer_ = {};
         searchPrompt_ = true;
@@ -3597,8 +3598,9 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         // the selection; Escape leaves the matches as they were.
         searchPrompt_ = false;
         mode_ = selection_ ? Mode::Visual : Mode::Normal;
-        const auto text = encodeUtf8(line_.text());
+        const auto text = command == "command-line-run" ? line_.take() : std::string{};
         line_.clear();
+        std::swap(line_, searchLine_);
         return command != "command-line-run" || search(text);
     }
     // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do; Left and

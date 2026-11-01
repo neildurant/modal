@@ -1054,3 +1054,23 @@ TEST_CASE("the leader's s selects an area, or with a capital only the matches in
     o.type(U",sc");
     CHECK_FALSE(o.ws.searchQuery());
 }
+
+TEST_CASE("Up and Down at the search prompt recall earlier searches, apart from the : line's")
+{
+    Operating o;
+    o.type(U"gr");
+    search(o, U"a");
+    search(o, U"c2");
+    o.type(U":");
+    o.press(NamedKey::Escape);
+    o.type(U"/");
+    o.press(NamedKey::Up);
+    o.press(NamedKey::Up);
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.pianoRoll().matchStatus(*o.ws.searchQuery()) == "match 2/2"); // a, from C2
+    o.type(U"/");
+    o.press(NamedKey::Up);
+    o.press(NamedKey::Down);
+    o.press(NamedKey::Enter); // back to the empty line, which clears
+    CHECK_FALSE(o.ws.searchQuery());
+}
