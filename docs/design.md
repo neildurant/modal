@@ -370,8 +370,15 @@ As in Vim, search matches are a layer separate from the selection.
 - **Matches** are the result of the last search, drawn in their own style (an outline, say), distinct from the selection's fill, so both can be seen at once. They stay highlighted until `:noh` (or a key, to decide), and the status line shows the position among them, e.g. `match 3/24`.
 - **Searching:** `*` / `#` search forwards / backwards for the current note's pitch; `/` and a query searches; `n` / `N` go to the next / previous match. Search covers the current track in the piano roll and event list; across tracks in the arrangement can come later.
 - **Queries (to begin with):** a pitch (`/C1`, `/F#3`) or a drum-map name (`/kick`); conditions (`/C1 vel<60` for quiet kicks, `/vel>110`, `/len<1/32`); event types (`/cc64` for sustain, `/cc1`, `/bend`). Interval and rhythm patterns can come later (see Ideas: musical search and replace).
-- **All at once:** `g/` makes the matches on the current page the selection, and `:select matches in section` (or `in track`) does so over a wider range; then any operator or transform applies.
+- **All at once:** `g/` makes the matches on the current page the selection, and `:select matches in section` (or `in track`) does so over a wider range; then any operator or transform applies. (The keys were settled otherwise: see below.)
 - **One at a time:** `gn` is a text object for the next match. An operator with `gn` changes the next match and moves to it; `.` repeats the change on the following match, and `n` skips one. For example, `^gn +15` accents the next kick, then `.` on each kick to accent and `n` past the ones to leave.
+- **Settled for milestone 6 (decided November 2026).**
+  - **Selecting matches** is under the leader, in a group of its own for selecting, `, s` (rather than `g/`, which only means something to those who know Vim's `:g`, and since it's done less often than the keys without the leader): `, s b`, `, s s`, `, s t` and `, s v` select the bar, the section, the track and what's visible, and the capital of each but the bar selects only the matches in it (`, s S`, `, s T`, `, s V`), so each pair is listed together in the hint menu; in Visual mode `, s m` narrows the selection to the matches in it; `, s c` clears the matches. So there's no default reach to choose: it's chosen by the key. A selection of matches is the selection's area with a filter, the query, so operators take only the events in it that match, and `o` and `gv` go on working.
+  - **Clearing the matches:** `/` and Enter, an empty search having nothing to match (rather than Vim's repeating the last search, which `n` does), as well as `:noh` and `, s c`. Escape at the prompt leaves them.
+  - **`*` and `#`** search for the exact pitch under the cursor (C3, not every C, as Vim's `*` takes the whole word; `f` is for any octave), or on a controller's row of the event list that controller.
+  - **Matches follow edits:** the query is kept, not a list of events, so the matches and `match 3/24` are as the song is after each edit.
+  - **The arrangement:** the cursor's track only, `n` and `N` going to the next bar and the one before holding a match, as `f` does, without highlighting for now.
+  - **Queries:** terms separated by spaces, all of which must match: a pitch (`C1`, `F#3`), or a pitch class with no octave (`C`, any octave, as `f`); `vel<60`, `vel>110`, `vel=100`; `len<1/32`, `len>1/4`, in note fractions turned into ticks as the search runs; a controller, `cc1`, with leading zeros or without (`cc01`), and with a value or a comparison (`cc1=127`, `cc64>63`); `bend`. Drum-map names (`/kick`) wait for drum maps.
 
 **Leader key and hint menu**
 
@@ -1014,8 +1021,8 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 - [ ] Section strip: keys for selecting several sections, with Visual mode (moved from milestone 5).
 - [ ] Whether `#` in the palette, in the arrangement, moves the cursor to the track or opens it in the piano roll.
-- [ ] Clearing search highlights: a key as well as `:noh` (`, /` proposed).
-- [ ] Whether `g/` takes the page, the section or the track by default.
+- [x] Clearing search highlights: `/` and Enter, `:noh` and `, s c` (decided November 2026; see Search).
+- [x] Whether `g/` takes the page, the section or the track by default: none, the key chooses, in the leader's `, s` group in place of `g/` (decided November 2026; see Search).
 - [ ] `Ctrl-p` in Insert mode: open the palette, or keep it for step entry? `, :` and the Ctrl-Space leader reach the palette in Insert mode either way.
 - [ ] Where the palette's frecency ranking is stored (the config directory, say), and whether it can be reset.
 - [ ] Palette prefixes for takes, transform presets and other later kinds of item.
