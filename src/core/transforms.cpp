@@ -448,6 +448,143 @@ Transformed rampVelocity(const EventList& events, std::span<const std::size_t> w
                        });
 }
 
+Transformed velocityDynamics(const EventList& events, std::span<const std::size_t> which,
+                             const VelocityDynamics& dynamics, VelocityLimits limits)
+{
+    using Kind = VelocityDynamics::Kind;
+    using Centre = VelocityDynamics::Centre;
+    std::vector<std::size_t> notes;
+    double sum = 0;
+    for (const auto i : which)
+    {
+        if (const auto* note = std::get_if<Note>(&events[i].data))
+        {
+            notes.push_back(i);
+            sum += note->velocity;
+        }
+    }
+    if (notes.empty())
+    {
+        return changeNotes(events, which, [](const Note& note, Tick) { return note.velocity; });
+    }
+    const double mean = sum / static_cast<double>(notes.size());
+    const auto local = [&](Tick tick)
+    {
+        const auto half = dynamics.window ? std::max<Tick>(dynamics.window(tick), 1) / 2 : 0;
+        double total = 0;
+        int count = 0;
+        for (const auto i : notes)
+        {
+            if (events[i].tick >= tick - half && events[i].tick <= tick + half)
+            {
+                total += std::get<Note>(events[i].data).velocity;
+                ++count;
+            }
+        }
+        return total / count;
+    };
+    const double amount = dynamics.percent / 100.0;
+    return changeNotes(
+        events, which,
+        [&](const Note& note, Tick tick)
+        {
+            const double v = note.velocity;
+            if ((dynamics.above && v <= *dynamics.above) ||
+                (dynamics.below && v >= *dynamics.below))
+            {
+                return note.velocity;
+            }
+            const double around = local(tick);
+            if (dynamics.kind == Kind::Shape)
+            {
+                return eased(note.velocity, v + (around - mean) * (amount - 1.0), limits);
+            }
+            const double centre = dynamics.centre == Centre::Local     ? around
+                                  : dynamics.centre == Centre::Average ? mean
+                                                                       : dynamics.fixed;
+            const double by = dynamics.kind == Kind::Compress ? 1.0 - amount : 1.0 + amount;
+            return eased(note.velocity, centre + (v - centre) * by, limits);
+        });
+}
+
+std::vector<std::vector<std::size_t>>
+chordsOf(const EventList& events, std::span<const std::size_t> which,
+         const std::function<bool(Tick first, Tick tick)>& together)
+{
+    std::vector<std::size_t> notes;
+    for (const auto i : which)
+    {
+        if (std::holds_alternative<Note>(events[i].data))
+        {
+            notes.push_back(i);
+        }
+    }
+    std::ranges::stable_sort(notes, {}, [&](std::size_t i) { return events[i].tick; });
+    std::vector<std::vector<std::size_t>> chords;
+    std::optional<Tick> first;
+    for (const auto i : notes)
+    {
+        if (!first || !together(*first, events[i].tick))
+        {
+            first = events[i].tick;
+            chords.emplace_back();
+        }
+        chords.back().push_back(i);
+    }
+    for (auto& chord : chords)
+    {
+        std::ranges::stable_sort(chord, {}, [&](std::size_t i)
+                                 { return std::get<Note>(events[i].data).pitch; });
+    }
+    return chords;
+}
+
+Transformed chordVelocity(const EventList& events, std::span<const std::size_t> which,
+                          const std::function<bool(Tick first, Tick tick)>& together,
+                          ChordVelocity how, VelocityRamp amount, VelocityLimits limits)
+{
+    // Each note's new velocity by its index, then the notes taken changed to them.
+    std::vector<std::pair<std::size_t, std::uint8_t>> to;
+    for (const auto& chord : chordsOf(events, which, together))
+    {
+        if (chord.size() < 2)
+        {
+            continue;
+        }
+        double sum = 0;
+        for (const auto i : chord)
+        {
+            sum += std::get<Note>(events[i].data).velocity;
+        }
+        const double mean = sum / static_cast<double>(chord.size());
+        for (std::size_t n = 0; n < chord.size(); ++n)
+        {
+            const auto v = std::get<Note>(events[chord[n]].data).velocity;
+            const double along = static_cast<double>(n) / static_cast<double>(chord.size() - 1);
+            const double by = amount.from / 100.0;
+            const auto changed =
+                how == ChordVelocity::Accent
+                    ? eased(v, v + (n + 1 == chord.size() ? amount.from : -amount.from), limits)
+                : how == ChordVelocity::Balance
+                    ? limited(amount.from + (amount.to - amount.from) * along, limits)
+                : how == ChordVelocity::Compress ? eased(v, mean + (v - mean) * (1.0 - by), limits)
+                                                 : eased(v, mean + (v - mean) * (1.0 + by), limits);
+            to.emplace_back(chord[n], changed);
+        }
+    }
+    auto changed = takenEvents(events, which);
+    for (std::size_t n = 0; n < which.size(); ++n)
+    {
+        const auto found =
+            std::ranges::find(to, which[n], &std::pair<std::size_t, std::uint8_t>::first);
+        if (found != to.end())
+        {
+            std::get<Note>(changed[n].data).velocity = found->second;
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
 std::optional<VelocityRamp> parseVelocityRange(std::string_view text, bool percentages)
 {
     text = trimmed(text);

@@ -311,3 +311,59 @@ TEST_CASE("a velocity ramp goes from one value to the other by time, or scales t
     CHECK_FALSE(parseVelocityRange("0-100", false));
     CHECK_FALSE(parseVelocityRange("60", false));
 }
+
+TEST_CASE("compressing, expanding and shaping velocities work about each note's local average")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(0, 60, q, 40), pedal(q, 127), note(q, 64, q, 80)});
+    const auto all = [&](Tick) { return 8 * q; };
+    using Kind = VelocityDynamics::Kind;
+    CHECK(eventsOf(velocityDynamics(list, allOf(list), {.kind = Kind::Compress, .window = all})) ==
+          std::vector{note(0, 60, q, 50), pedal(q, 127), note(q, 64, q, 70)});
+    CHECK(eventsOf(velocityDynamics(list, allOf(list), {.kind = Kind::Expand, .window = all})) ==
+          std::vector{note(0, 60, q, 30), pedal(q, 127), note(q, 64, q, 90)});
+    // A threshold leaves the others alone.
+    CHECK(eventsOf(velocityDynamics(list, allOf(list),
+                                    {.kind = Kind::Compress, .window = all, .above = 70})) ==
+          std::vector{note(0, 60, q, 40), pedal(q, 127), note(q, 64, q, 70)});
+    // A fixed centre.
+    CHECK(eventsOf(velocityDynamics(list, allOf(list),
+                                    {.kind = Kind::Compress,
+                                     .percent = 100,
+                                     .window = all,
+                                     .centre = VelocityDynamics::Centre::Fixed,
+                                     .fixed = 64})) ==
+          std::vector{note(0, 60, q, 64), pedal(q, 127), note(q, 64, q, 64)});
+    // A window holding each note alone: shaping scales its own distance from the average.
+    const auto own = [](Tick) { return Tick{1}; };
+    CHECK(eventsOf(velocityDynamics(list, allOf(list),
+                                    {.kind = Kind::Shape, .percent = 150, .window = own})) ==
+          std::vector{note(0, 60, q, 30), pedal(q, 127), note(q, 64, q, 90)});
+}
+
+TEST_CASE("the chord tools change each chord's velocities, leaving single notes alone")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list =
+        listOf({note(0, 64, q, 70), note(0, 60, q, 60), note(1, 67, q, 80), note(q, 72, q, 90)});
+    const auto together = [](Tick first, Tick tick) { return tick - first <= 2; };
+    const auto chords = chordsOf(list, allOf(list), together);
+    REQUIRE(chords.size() == 2);
+    CHECK(chords[0].size() == 3);
+    const auto with = [&](ChordVelocity how, VelocityRamp amount)
+    {
+        std::vector<int> velocities;
+        for (const auto& event : eventsOf(chordVelocity(list, allOf(list), together, how, amount)))
+        {
+            velocities.push_back(std::get<Note>(event.data).velocity);
+        }
+        return velocities;
+    };
+    // In the list's order: E4 at 0, C4 at 0, G4 at 1, C5 at q.
+    CHECK(with(ChordVelocity::Accent, {.from = 10}) == std::vector{60, 50, 90, 90});
+    CHECK(with(ChordVelocity::Balance, {.from = 70, .to = 90}) == std::vector{80, 70, 90, 90});
+    CHECK(with(ChordVelocity::Compress, {.from = 50}) == std::vector{70, 65, 75, 90});
+    CHECK(with(ChordVelocity::Expand, {.from = 50}) == std::vector{70, 55, 85, 90});
+}

@@ -14,6 +14,7 @@
 #include <span>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace modal::core
 {
@@ -139,6 +140,62 @@ struct VelocityRamp
 
 Transformed rampVelocity(const EventList& events, std::span<const std::size_t> which,
                          VelocityRamp ramp, VelocityLimits limits = {});
+
+// Compressing, expanding and shaping velocities over time (decided October and November 2026),
+// relative to each note's local average, that of the notes taken starting within half the
+// window either side of it: compressing pulls each note a percentage of the way towards the
+// centre (the local average, the notes' average or a fixed value), expanding pushes it that
+// much again away from it, and shaping scales the local averages' own contour about the
+// notes' average (130% bigger swells, 70% flatter) keeping each note's place on it. A
+// threshold leaves alone the notes not above (or below) it.
+struct VelocityDynamics
+{
+    enum class Kind : std::uint8_t
+    {
+        Compress,
+        Expand,
+        Shape,
+    };
+    enum class Centre : std::uint8_t
+    {
+        Local,
+        Average,
+        Fixed,
+    };
+
+    Kind kind = Kind::Compress;
+    int percent = 50;
+    std::function<Tick(Tick)> window; // the window's length at a note's start
+    Centre centre = Centre::Local;
+    int fixed = 64;
+    std::optional<int> above = std::nullopt;
+    std::optional<int> below = std::nullopt;
+};
+
+Transformed velocityDynamics(const EventList& events, std::span<const std::size_t> which,
+                             const VelocityDynamics& dynamics, VelocityLimits limits = {});
+
+// The chords among the notes taken, by index, each with its notes from lowest to highest:
+// notes starting together, within the window from the chord's first, as together() says.
+std::vector<std::vector<std::size_t>>
+chordsOf(const EventList& events, std::span<const std::size_t> which,
+         const std::function<bool(Tick first, Tick tick)>& together);
+
+// Within each chord of two notes or more (decided October 2026): accenting the top note up by
+// an amount and the others down by it; balancing by pitch, a straight slope of velocities from
+// the lowest note to the highest (70-95, or 95-70 to bring out the bass); and compressing or
+// expanding the chord's velocities about its average by a percentage, as over time.
+enum class ChordVelocity : std::uint8_t
+{
+    Accent,
+    Balance,
+    Compress,
+    Expand,
+};
+
+Transformed chordVelocity(const EventList& events, std::span<const std::size_t> which,
+                          const std::function<bool(Tick first, Tick tick)>& together,
+                          ChordVelocity how, VelocityRamp amount, VelocityLimits limits = {});
 
 // Two numbers with a dash between, each 1 to 127 (20-110), or percentages up to 1000
 // (80%-120%) where percentages are allowed; none if the text isn't one.

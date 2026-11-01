@@ -123,6 +123,8 @@ public:
         humanizeVelocity_ = velocity;
     }
     bool rewind() const { return rewind_; }
+    // How far apart notes can start and still be a chord, for the chord tools.
+    void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
     // How velocity changes keep within their limits: the velclip and velfloor settings.
     void setVelocityLimits(core::VelocityLimits limits) { velocityLimits_ = limits; }
 
@@ -559,6 +561,11 @@ private:
     CommandResult transformLine(std::string_view name, std::string_view arguments);
     bool applyTransform(std::string_view name, const OperatorTarget& target,
                         const std::string& text);
+    bool velocityOverTime(std::string_view name, const OperatorTarget& target,
+                          const std::string& text);
+    bool velocityInChords(std::string_view name, const OperatorTarget& target,
+                          const std::string& text);
+    std::chrono::milliseconds chordWindow_{30};
     core::VelocityLimits velocityLimits_;
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;

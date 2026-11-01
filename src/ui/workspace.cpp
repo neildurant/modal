@@ -130,6 +130,72 @@ constexpr std::array kSharedCommands{
                 .usage = "[FROM-TO]",
                 .count = true,
                 .range = true},
+    CommandInfo{.name = "transform-velocity-compress",
+                .description =
+                    "Compress the velocities of the notes a range or object takes, pulling each a "
+                    "percentage of the way towards the average of those around it "
+                    "(50%): evens out the playing, keeping its swells; window= how "
+                    "far around (1bar, 2bars, 1/2), centre= local, average or a "
+                    "velocity, threshold= only those above (>90) or below (<30)",
+                .aliases = "vel-compress",
+                .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
+                .count = true,
+                .range = true},
+    CommandInfo{.name = "transform-velocity-expand",
+                .description =
+                    "Expand the velocities of the notes a range or object takes, pushing each a "
+                    "percentage further from the average of those around it (50%): "
+                    "sharpens accents; takes compress's options",
+                .aliases = "vel-expand",
+                .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
+                .count = true,
+                .range = true},
+    CommandInfo{
+        .name = "transform-velocity-shape",
+        .description =
+            "Shape the velocities of the notes a range or object takes, scaling the contour of "
+            "their averages over the window (130% bigger swells, 70% "
+            "flatter), keeping each note's place on it",
+        .aliases = "vel-shape",
+        .usage = "[PERCENT] [window=1bar]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-chord-accent",
+        .description =
+            "Accent the top note of each chord a range or object takes, up by an amount and the "
+            "others down by it (10), to bring out a melody",
+        .aliases = "chord-accent",
+        .usage = "[AMOUNT]",
+        .count = true,
+        .range = true},
+    CommandInfo{.name = "transform-chord-balance",
+                .description =
+                    "Balance each chord a range or object takes by pitch: a straight slope of "
+                    "velocities from its lowest note to its highest (70-95), or "
+                    "reversed to bring out the bass (95-70)",
+                .aliases = "chord-balance",
+                .usage = "[BOTTOM-TOP]",
+                .count = true,
+                .range = true},
+    CommandInfo{
+        .name = "transform-chord-compress",
+        .description =
+            "Compress each chord a range or object takes, pulling its velocities a percentage of "
+            "the way together about their average (50%)",
+        .aliases = "chord-compress",
+        .usage = "[PERCENT]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-chord-expand",
+        .description =
+            "Expand each chord a range or object takes, pushing its velocities a percentage "
+            "further apart about their average (50%)",
+        .aliases = "chord-expand",
+        .usage = "[PERCENT]",
+        .count = true,
+        .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -533,7 +599,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 104> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 111> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -554,6 +620,13 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-lower", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-compress", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-expand", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-shape", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-chord-accent", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-chord-balance", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-chord-compress", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-chord-expand", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},

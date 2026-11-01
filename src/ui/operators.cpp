@@ -4,6 +4,7 @@
 // object takes, and the workspace changes those events the same way in every view.
 
 #include <modal/core/controllers.hpp>
+#include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/event_text.hpp>
@@ -69,6 +70,92 @@ std::string refusalText(const core::Refusal& refusal, const core::MeterMap& mete
 std::string times(int count, std::string_view one, std::string_view many)
 {
     return count == 1 ? std::string{one} : std::to_string(count) + " " + std::string{many};
+}
+
+// The transforms asking how: the default in brackets taken by Enter, or examples where
+// there's none, and the options' defaults after it.
+struct Asking
+{
+    std::string_view op;
+    std::string_view label;
+    std::string_view examples;
+    std::string_view answer;
+    std::string_view options = {};
+};
+
+constexpr std::array<Asking, 12> kQuestions{{
+    {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
+    {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
+    {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
+    {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
+    {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
+    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%", ", window=1bar"},
+    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%", ", window=1bar"},
+    {"transform-velocity-shape", "Shape the velocities of {}", "", "130%", ", window=1bar"},
+    {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
+    {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
+    {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
+    {"transform-chord-expand", "Expand the chords in {}", "", "50%"},
+}};
+
+// What a transform's told: its amount, the first word not NAME=VALUE (or its default), and
+// its options.
+struct Told
+{
+    std::string amount;
+    std::vector<std::pair<std::string, std::string>> options;
+};
+
+Told told(std::string_view text, std::string_view name)
+{
+    Told result;
+    std::size_t at = 0;
+    while (at < text.size())
+    {
+        const auto start = text.find_first_not_of(" \t", at);
+        if (start == std::string_view::npos)
+        {
+            break;
+        }
+        const auto end = std::min(text.find_first_of(" \t", start), text.size());
+        const auto word = text.substr(start, end - start);
+        if (const auto equals = word.find('='); equals != std::string_view::npos && equals > 0)
+        {
+            result.options.emplace_back(word.substr(0, equals), word.substr(equals + 1));
+        }
+        else if (result.amount.empty())
+        {
+            result.amount = word;
+        }
+        else
+        {
+            result.amount += " " + std::string{word};
+        }
+        at = end;
+    }
+    if (result.amount.empty())
+    {
+        const auto question = std::ranges::find(kQuestions, name, &Asking::op);
+        result.amount = question != kQuestions.end() ? question->answer : "";
+    }
+    return result;
+}
+
+// A whole number, with or without a % after it, from 0 to most.
+std::optional<int> percentUpTo(std::string_view text, int most)
+{
+    if (text.ends_with('%'))
+    {
+        text.remove_suffix(1);
+    }
+    int value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (text.empty() || error != std::errc{} || end != text.data() + text.size() || value < 0 ||
+        value > most)
+    {
+        return std::nullopt;
+    }
+    return value;
 }
 
 std::string_view trimmed(std::string_view text)
@@ -179,6 +266,165 @@ CommandResult Workspace::transformLine(std::string_view name, std::string_view a
     return {true};
 }
 
+bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& target,
+                                 const std::string& text)
+{
+    using Kind = core::VelocityDynamics::Kind;
+    using Centre = core::VelocityDynamics::Centre;
+    const auto kind = name.ends_with("compress") ? Kind::Compress
+                      : name.ends_with("expand") ? Kind::Expand
+                                                 : Kind::Shape;
+    const auto word = kind == Kind::Compress ? std::string{"Compress"}
+                      : kind == Kind::Expand ? std::string{"Expand"}
+                                             : std::string{"Shape"};
+    const auto said = told(text, name);
+    const auto percent = percentUpTo(said.amount, kind == Kind::Compress ? 100 : 1000);
+    if (!percent)
+    {
+        setMessage("Not a percentage: " + said.amount +
+                       (kind == Kind::Compress ? "; type 0% to 100%, as 50%"
+                                               : "; type one up to 1000%, as 50%"),
+                   MessageKind::Warning);
+        return true;
+    }
+    core::VelocityDynamics dynamics{.kind = kind, .percent = *percent};
+    // The window: bars (1bar, 2bars) at the note's meter, or a note length (1/2).
+    std::string window = "1bar";
+    for (const auto& [option, value] : said.options)
+    {
+        if (option == "window")
+        {
+            window = value;
+        }
+        else if (option == "centre" || option == "center")
+        {
+            const auto fixed = percentUpTo(value, 127);
+            if (value == "local" || value == "average" || (fixed && *fixed > 0))
+            {
+                dynamics.centre = value == "local"     ? Centre::Local
+                                  : value == "average" ? Centre::Average
+                                                       : Centre::Fixed;
+                dynamics.fixed = fixed.value_or(64);
+                continue;
+            }
+            setMessage("Not a centre: " + value + "; type local, average or a velocity",
+                       MessageKind::Warning);
+            return true;
+        }
+        else if (option == "threshold")
+        {
+            const auto level = value.size() > 1 ? percentUpTo(value.substr(1), 127) : std::nullopt;
+            if (!level || (value[0] != '>' && value[0] != '<'))
+            {
+                setMessage("Not a threshold: " + value + "; type >90 or <30", MessageKind::Warning);
+                return true;
+            }
+            (value[0] == '>' ? dynamics.above : dynamics.below) = *level;
+        }
+        else
+        {
+            setMessage(word + " takes window=, centre= and threshold=, not " + option + "=",
+                       MessageKind::Warning);
+            return true;
+        }
+    }
+    std::optional<std::int64_t> bars;
+    std::optional<core::NoteFraction> length;
+    if (window.ends_with("bars") || window.ends_with("bar"))
+    {
+        const auto count = window.substr(0, window.find("bar"));
+        bars = count.empty() ? 1 : percentUpTo(count, 64).value_or(0);
+    }
+    else
+    {
+        length = core::parseNoteFraction(window);
+    }
+    if ((bars && *bars < 1) || (!bars && !length))
+    {
+        setMessage("Not a window: " + window + "; type 1bar, 2bars or a note length, as 1/2",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto& song = document_.song();
+    const auto limits = velocityLimits_;
+    return changeEvents(
+        word + " the velocities of " + target.what + " by " + std::to_string(*percent) + "%",
+        target,
+        [&](const core::EventList& events, const auto& part)
+        {
+            auto those = dynamics;
+            const auto& meter = song.meter(part.track);
+            those.window = [&](core::Tick tick)
+            {
+                return bars ? *bars * meter.signatureAt(tick).barLength().toTicks(song.ppqn())
+                            : length->toTicks(song.ppqn());
+            };
+            return core::velocityDynamics(events, part.events, those, limits);
+        });
+}
+
+bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& target,
+                                 const std::string& text)
+{
+    const auto said = told(text, name);
+    if (!said.options.empty())
+    {
+        setMessage("The chord tools take no options, as " + said.options.front().first + "=",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto how = name.ends_with("accent")     ? core::ChordVelocity::Accent
+                     : name.ends_with("balance")  ? core::ChordVelocity::Balance
+                     : name.ends_with("compress") ? core::ChordVelocity::Compress
+                                                  : core::ChordVelocity::Expand;
+    core::VelocityRamp amount;
+    std::string title;
+    if (how == core::ChordVelocity::Balance)
+    {
+        const auto range = core::parseVelocityRange(said.amount, false);
+        if (!range)
+        {
+            setMessage("Not a range of velocities: " + said.amount +
+                           "; type the bottom's and the top's, as 70-95",
+                       MessageKind::Warning);
+            return true;
+        }
+        amount = *range;
+        title = "Balance the chords in " + target.what + " from " + std::to_string(range->from) +
+                " to " + std::to_string(range->to);
+    }
+    else
+    {
+        const bool accent = how == core::ChordVelocity::Accent;
+        const auto value = accent ? semitones(said.amount) : percentUpTo(said.amount, 100);
+        if (!value || *value < 0)
+        {
+            setMessage(accent ? "Not an amount: " + said.amount + "; type one up to 127, as 10"
+                              : "Not a percentage: " + said.amount + "; type 0% to 100%, as 50%",
+                       MessageKind::Warning);
+            return true;
+        }
+        amount.from = *value;
+        title =
+            accent ? "Accent the top notes of the chords in " + target.what + " by " +
+                         std::to_string(*value)
+            : how == core::ChordVelocity::Compress
+                ? "Compress the chords in " + target.what + " by " + std::to_string(*value) + "%"
+                : "Expand the chords in " + target.what + " by " + std::to_string(*value) + "%";
+    }
+    const auto& song = document_.song();
+    const auto window = chordWindow_;
+    const auto together = [&](core::Tick first, core::Tick tick)
+    {
+        const auto& tempo = song.tempo();
+        return tempo.toTime(tick) - tempo.toTime(first) <= window;
+    };
+    const auto limits = velocityLimits_;
+    return changeEvents(
+        title, target, [&](const core::EventList& events, const auto& part)
+        { return core::chordVelocity(events, part.events, together, how, amount, limits); });
+}
+
 bool Workspace::applyTransform(std::string_view name, const OperatorTarget& target,
                                const std::string& text)
 {
@@ -241,6 +487,15 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
             target, [&](const core::EventList& events, const auto& part)
             { return core::limitVelocity(events, part.events, range->from, range->to, limits); });
     }
+    if (name == "transform-velocity-compress" || name == "transform-velocity-expand" ||
+        name == "transform-velocity-shape")
+    {
+        return velocityOverTime(name, target, text);
+    }
+    if (name.starts_with("transform-chord-"))
+    {
+        return velocityInChords(name, target, text);
+    }
     if (name == "transform-velocity-ramp")
     {
         const auto ramp = core::parseVelocityRange(text, true);
@@ -279,29 +534,14 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     {
         return openTransformMenu(std::move(*target));
     }
-    // Those asking how, the default in brackets taken by Enter, or examples where there's none.
-    struct Question
-    {
-        std::string_view op;
-        std::string_view label;
-        std::string_view examples;
-        std::string_view answer;
-    };
-    constexpr std::array<Question, 5> kQuestions{{
-        {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
-        {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
-        {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
-        {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
-        {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
-    }};
-    if (const auto question = std::ranges::find(kQuestions, op, &Question::op);
+    if (const auto question = std::ranges::find(kQuestions, op, &Asking::op);
         question != kQuestions.end())
     {
         auto label = std::string{question->label};
         label.replace(label.find("{}"), 2, target->what);
         label += " (" +
                  std::string{question->answer.empty() ? question->examples : question->answer} +
-                 "): ";
+                 std::string{question->options} + "): ";
         askFor(
             std::move(label),
             [this, name = std::string{op}, target = *target](const std::string& text)

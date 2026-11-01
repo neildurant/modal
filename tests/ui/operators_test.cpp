@@ -1263,3 +1263,32 @@ TEST_CASE("Relative velocity changes ease off near 127, or clip with velclip har
     o.press(NamedKey::Enter);
     CHECK(o.velocities() == std::vector<int>{120, 127, 50, 100, 70});
 }
+
+TEST_CASE("Compressing velocities takes a percentage and options, and the chord tools a chord's "
+          "notes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    // Bar 1's chord: G1 at 80, E1 at 96; the A2 in bar 2 at 50 is outside a bar's window.
+    o.type(U"gr2!!c");
+    o.press(NamedKey::Enter); // 50%
+    CHECK(o.velocities() == std::vector<int>{84, 92, 50, 100, 70});
+    o.type(U"u:vel-compress 100% threshold=>90");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{80, 88, 50, 100, 70});
+    o.type(U"u:vel-compress 50% speed=2");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message() == "Compress takes window=, centre= and threshold=, not speed=");
+    o.type(U"2!!cwindow=2bars");
+    o.press(NamedKey::Enter); // the default amount, the A2 now in the chord's window
+    CHECK(o.velocities()[2] > 50);
+    o.type(U"u");
+    // The top note up and the others down; then a slope from the bottom.
+    o.type(U"!!a");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{90, 86, 50, 100, 70});
+    o.type(U"u,xbib");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{95, 70, 50, 100, 70});
+}
