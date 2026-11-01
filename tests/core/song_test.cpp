@@ -42,7 +42,7 @@ TEST_CASE("a new song")
     CHECK(song.tempo().tempoAt(0) == kDefaultTempo);
     CHECK(song.meter().signatureAt(0) == kDefaultTimeSignature);
     CHECK(song.tracks().empty());
-    CHECK(song.markers().empty());
+    CHECK(song.labels().empty());
     CHECK(Song{}.ppqn() == kPpqn);
 
     // One section of eight bars.
@@ -161,7 +161,7 @@ TEST_CASE("anything put past the end grows the last section by whole bars")
     REQUIRE(song.sections().size() == 1);
     CHECK(song.sections()[0]->length() == 12 * bar34);
 
-    song.setMarker(20 * bar34, "Later");
+    song.setLabel(20 * bar34, "Later");
     CHECK(song.end() == 21 * bar34);
 
     song.updateTempo([&](TempoMap& tempo) { tempo.set(30 * bar34 + 1, Tempo{1'000'000}); });
@@ -249,7 +249,7 @@ TEST_CASE("splitting a section")
     const auto lead = song.addTrack("Lead");
     song.updateMeter(lead, [](MeterMap& meter) { meter = MeterMap{meter.ppqn(), {7, 8}}; });
     song.updateTempo([&](TempoMap& tempo) { tempo.set(2 * bar, Tempo{400'000}); });
-    song.setMarker(5 * bar, "fill");
+    song.setLabel(5 * bar, "fill");
     song.updateEvents(drums,
                       [&](EventList& events)
                       {
@@ -290,11 +290,11 @@ TEST_CASE("splitting a section")
         CHECK(verse.tempo()[0] == TempoChange{0, Tempo{400'000}});
         CHECK(song.tempo().changes().size() == 2); // with no repeat at the boundary
 
-        // The marker and events move to the Verse, positioned from its start.
-        CHECK(intro.markers().empty());
-        REQUIRE(verse.markers().size() == 1);
-        CHECK(verse.markers()[0] == Marker{bar, "fill"});
-        CHECK(song.markers()[0] == Marker{5 * bar, "fill"});
+        // The label and events move to the Verse, positioned from its start.
+        CHECK(intro.labels().empty());
+        REQUIRE(verse.labels().size() == 1);
+        CHECK(verse.labels()[0] == Label{bar, "fill"});
+        CHECK(song.labels()[0] == Label{5 * bar, "fill"});
         CHECK(ticksOf(verse.content(drums)->events) == std::vector<Tick>{0});
         CHECK(ticksOf(song.events(drums)) == std::vector<Tick>{0, 4 * bar});
 
@@ -354,31 +354,31 @@ TEST_CASE("splitting a section")
     }
 }
 
-TEST_CASE("markers")
+TEST_CASE("labels")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick bar = ppqn.whole();
     Song song{ppqn};
     song.splitSection(4 * bar, "Chorus");
 
-    song.setMarker(16 * bar, "Chorus");
-    song.setMarker(8 * bar, "Verse");
-    song.setMarker(16 * bar, "Chorus 1");
+    song.setLabel(16 * bar, "Chorus");
+    song.setLabel(8 * bar, "Verse");
+    song.setLabel(16 * bar, "Chorus 1");
 
-    REQUIRE(song.markers().size() == 2);
-    CHECK(song.markers()[0] == Marker{8 * bar, "Verse"});
-    CHECK(song.markers()[1] == Marker{16 * bar, "Chorus 1"});
+    REQUIRE(song.labels().size() == 2);
+    CHECK(song.labels()[0] == Label{8 * bar, "Verse"});
+    CHECK(song.labels()[1] == Label{16 * bar, "Chorus 1"});
     CHECK(song.end() == 17 * bar); // grown to hold the second
 
     // Names are unique within a section, not across sections.
-    song.setMarker(2 * bar, "Verse");
-    song.setMarker(9 * bar, "Verse");
-    CHECK(song.markers()[0] == Marker{2 * bar, "Verse"});
-    CHECK(song.markers()[2] == Marker{9 * bar, "Verse (2)"});
+    song.setLabel(2 * bar, "Verse");
+    song.setLabel(9 * bar, "Verse");
+    CHECK(song.labels()[0] == Label{2 * bar, "Verse"});
+    CHECK(song.labels()[2] == Label{9 * bar, "Verse (2)"});
 
-    CHECK(song.removeMarker(8 * bar));
-    CHECK_FALSE(song.removeMarker(8 * bar));
-    CHECK(song.markers().size() == 3);
+    CHECK(song.removeLabel(8 * bar));
+    CHECK_FALSE(song.removeLabel(8 * bar));
+    CHECK(song.labels().size() == 3);
 }
 
 TEST_CASE("removing a track removes its content")
@@ -420,7 +420,7 @@ TEST_CASE("a song made from its parts")
 
     Section intro{"Intro", 2 * bar, MeterMap{ppqn}, kDefaultTempo};
     intro.addTempo({bar, Tempo{400'000}});
-    intro.addMarker({bar, "fill"});
+    intro.addLabel({bar, "fill"});
     intro.setContent(TrackId{3}, {std::nullopt, events});
     Section verse{"Verse", 6 * q, MeterMap{ppqn, {3, 4}}, Tempo{400'000}};
     verse.setColour("blue");
@@ -434,7 +434,7 @@ TEST_CASE("a song made from its parts")
     CHECK(song.sections()[1]->colour() == "blue");
     CHECK(ticksOf(song.events(TrackId{3})) == std::vector<Tick>{0, 2 * bar});
     CHECK(song.tempo().changes().size() == 2); // the verse's tempo repeats the one before
-    CHECK(song.markers()[0] == Marker{bar, "fill"});
+    CHECK(song.labels()[0] == Label{bar, "fill"});
     CHECK(song.meter(TrackId{3}).signatureAt(2 * bar) == TimeSignature{3, 4});
 
     // Equal to a copy until one changes; new tracks get IDs after the highest.

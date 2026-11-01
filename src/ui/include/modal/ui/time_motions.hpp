@@ -32,7 +32,7 @@ core::Tick sameInBar(const core::MeterMap& meter, core::Tick tick, std::int64_t 
 // How far into its bar a tick is.
 core::Tick offsetInBar(const core::MeterMap& meter, core::Tick tick);
 
-// The next or previous of some ticks in order (section starts, markers), a count of them
+// The next or previous of some ticks in order (section starts, labels), a count of them
 // on or back: back from between two, the earlier counts as the first. None if there's none.
 std::optional<core::Tick> nextOf(std::span<const core::Tick> ticks, core::Tick tick,
                                  std::int64_t count);

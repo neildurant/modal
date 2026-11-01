@@ -22,12 +22,12 @@ namespace modal::core
 {
 
 // A bookmark: a named position with no structural meaning.
-struct Marker
+struct Label
 {
     Tick tick;
     std::string name;
 
-    friend bool operator==(const Marker&, const Marker&) = default;
+    friend bool operator==(const Label&, const Label&) = default;
 };
 
 // A mark (ma, decided October 2026): a place named by a letter, a to z, saved with the song
@@ -75,7 +75,7 @@ public:
     const MeterMap& meter() const { return meter_; }
 
     // Bookmarks in tick order, each with a name of its own within the section.
-    std::span<const Marker> markers() const { return markers_; }
+    std::span<const Label> labels() const { return labels_; }
 
     // The marks in it, by letter.
     std::span<const Mark> marks() const { return marks_; }
@@ -87,7 +87,7 @@ public:
     // song can't be changed this way, since the song gives out only const sections.
     void setColour(std::optional<std::string> colour) { colour_ = std::move(colour); }
     void addTempo(TempoChange change); // after the others; at 0, replaces the first
-    void addMarker(Marker marker);     // after the others
+    void addLabel(Label label);        // after the others
     void addMark(Mark mark);           // of a letter not there yet
     void setContent(TrackId id, TrackContent content);
 
@@ -101,7 +101,7 @@ private:
     Tick length_;
     std::vector<TempoChange> tempo_;
     MeterMap meter_;
-    std::vector<Marker> markers_;
+    std::vector<Label> labels_;
     std::vector<Mark> marks_;
     std::map<TrackId, std::shared_ptr<const TrackContent>> content_;
 };
@@ -126,7 +126,7 @@ public:
     // A song made from its parts, as reading a file does: its tracks in display order, and at
     // least one section, whose content is for those tracks, in order. The parts must fit
     // together: each section's conductor meter a whole number of bars, and its tempo changes,
-    // markers and events inside it.
+    // labels and events inside it.
     Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections);
 
     Ppqn ppqn() const { return tempo_.ppqn(); }
@@ -215,7 +215,7 @@ public:
     bool resizeSection(std::size_t index, std::int64_t bars);
 
     // Joins a section with the one after it, which becomes its later part: its tempo and meter
-    // changes, markers and each track's events and meter, positioned from the first section's
+    // changes, labels and each track's events and meter, positioned from the first section's
     // start. A track with a meter of its own in either keeps it, following the conductor's
     // in the other part. Returns whether there was one after to join.
     bool joinSections(std::size_t index);
@@ -231,7 +231,7 @@ public:
     };
 
     // Removes bars of the conductor's, as far as the song's end, with everything starting in
-    // them: tempo and meter changes, markers, and every track's events and meter, what's after
+    // them: tempo and meter changes, labels, and every track's events and meter, what's after
     // closing up. What went comes back as sections, named "From" and those it was taken from. Not
     // done if it would leave no bars, the tick isn't a bar line, or a track's own bars don't line
     // up with them.
@@ -250,7 +250,7 @@ public:
     // The flattened timeline.
     const TempoMap& tempo() const { return tempo_; }
     const MeterMap& meter() const { return meter_; } // the conductor's
-    std::span<const Marker> markers() const { return markers_; }
+    std::span<const Label> labels() const { return labels_; }
     // The marks, by letter, at ticks from the song's start; and one by its letter, if set.
     std::span<const Mark> marks() const { return marks_; }
     const Mark* mark(char letter) const;
@@ -275,8 +275,8 @@ public:
 
     // Adds a bookmark, or renames the one at that tick. The name is numbered if another
     // bookmark in the same section has it.
-    void setMarker(Tick tick, std::string name);
-    bool removeMarker(Tick tick);
+    void setLabel(Tick tick, std::string name);
+    bool removeLabel(Tick tick);
 
     // Sets a mark, at a tick from the song's start, moving it if it's set already; and
     // removes one. Marks go with their sections; those in sections taken out go with them, and
@@ -327,7 +327,7 @@ private:
     void updateContent(std::size_t index, TrackId id,
                        const std::function<void(TrackContent&)>& edit);
 
-    // Rebuilds the flattened timeline: the conductor's (with the section starts and markers),
+    // Rebuilds the flattened timeline: the conductor's (with the section starts and labels),
     // the tracks' meters, one track's events, or all of it.
     void rebuildConductor();
     void rebuildMeters();
@@ -345,7 +345,7 @@ private:
     // Flattened.
     TempoMap tempo_;
     MeterMap meter_;
-    std::vector<Marker> markers_;
+    std::vector<Label> labels_;
     std::vector<Mark> marks_;
     std::vector<Tick> starts_;         // each section's start, then the song's end
     std::vector<Flattened> flattened_; // parallel to tracks_

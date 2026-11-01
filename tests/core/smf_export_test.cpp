@@ -103,8 +103,8 @@ TEST_CASE("an exported song reads back the same")
     song.title = "Song";
     song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{500'000}); });
     song.updateTempo([&](TempoMap& tempo) { tempo.set(8 * q, Tempo::fromBpm(90)); });
-    song.setMarker(4 * q, "Verse");
-    song.setMarker(10 * q, "Chorus");
+    song.setLabel(4 * q, "Verse");
+    song.setLabel(10 * q, "Chorus");
     song.updateMeter([&](MeterMap& meter) { meter.set(4 * q, {3, 4}); });
 
     addTrack(song, "Piano", 1,
@@ -140,7 +140,7 @@ TEST_CASE("an exported song reads back the same")
     CHECK(back.title == "Song");
     CHECK(back.tempo().changes().size() == 2);
     CHECK(std::ranges::equal(back.tempo().changes(), song.tempo().changes()));
-    CHECK(std::ranges::equal(back.markers(), song.markers()));
+    CHECK(std::ranges::equal(back.labels(), song.labels()));
     REQUIRE(back.tracks().size() == 2);
     for (std::size_t i = 0; i < 2; ++i)
     {
@@ -159,7 +159,7 @@ TEST_CASE("sections are written as markers, and bookmarks as cue points")
     Song song{kPpqn};
     addTrack(song, "Piano", 1,
              [&](EditTrack& track) { track.events.insert({0, Note{60, 100, bar}}); });
-    song.setMarker(bar, "fix this");
+    song.setLabel(bar, "fix this");
 
     // A song of one section has no structure to show.
     const auto meta = [](std::uint8_t type, std::string_view text)
@@ -182,8 +182,8 @@ TEST_CASE("sections are written as markers, and bookmarks as cue points")
     // Read back, the section starts are bookmarks too, until they can become sections.
     const Song back = reimported(result.bytes);
     CHECK(std::ranges::equal(
-        back.markers(),
-        std::vector<Marker>{{0, "Section 1"}, {bar, "fix this"}, {4 * bar, "Verse"}}));
+        back.labels(),
+        std::vector<Label>{{0, "Section 1"}, {bar, "fix this"}, {4 * bar, "Verse"}}));
 }
 
 TEST_CASE("at each tick come note-offs, other events, note-ons, then zero-length note-offs")

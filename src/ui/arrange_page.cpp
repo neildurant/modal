@@ -21,7 +21,7 @@ namespace
 {
 
 constexpr Style kDim{Role::Dim, Role::Background, kPlain};
-constexpr std::uint8_t kFaint = 96; // the opacity of marker lines
+constexpr std::uint8_t kFaint = 96; // the opacity of label lines
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -30,10 +30,10 @@ std::string signatureText(core::TimeSignature signature)
 
 // Text placed at pixel positions along a row, left to right, leaving out any that would
 // overlap the one before.
-class Labels
+class Captions
 {
 public:
-    Labels(Region& region, int y, CellSize cell)
+    Captions(Region& region, int y, CellSize cell)
         : region_(region)
         , y_(y)
         , cell_(cell)
@@ -468,7 +468,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             {
                 if (spaced(barEnd - start))
                 {
-                    // On the bar line, where the marker lines are.
+                    // On the bar line, where the label lines are.
                     const int dot = 2 * lineWidth;
                     timeline.under.push_back(
                         {{scale.toX(start), y + (cell_.height - dot) / 2, dot, dot},
@@ -502,52 +502,52 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         }
     }
 
-    // The ruler: markers by name, the conductor's meters, and its bars, numbered where there's
+    // The ruler: labels by name, the conductor's meters, and its bars, numbered where there's
     // room for the numbers; then the section strip.
-    // Section starts and markers: faint lines under the text and bars, so as not to distract,
-    // through the ruler and across the tracks. Markers are named up to the next line, cut
+    // Section starts and labels: faint lines under the text and bars, so as not to distract,
+    // through the ruler and across the tracks. Labels are named up to the next line, cut
     // short with an ellipsis or left out if there's no room; sections are named on the strip.
-    // A section's start wins over a marker at the same tick. The play-from marker sits in the
+    // A section's start wins over a label at the same tick. The play-from marker sits in the
     // same row (decided October 2026, out of the bar numbers' way): a name stops short of it,
     // or starts after it if it's at the name's start.
     const std::optional<int> playX = playFrom && *playFrom >= leftTick_ && *playFrom < right
                                          ? std::optional{scale.toX(*playFrom)}
                                          : std::nullopt;
-    std::vector<core::Marker> markers;
+    std::vector<core::Label> labels;
     for (std::size_t i = 0; i < song_.sections().size(); ++i)
     {
-        markers.push_back({song_.sectionStart(i), {}}); // named on the strip
+        labels.push_back({song_.sectionStart(i), {}}); // named on the strip
     }
-    for (const auto& marker : song_.markers())
+    for (const auto& label : song_.labels())
     {
-        if (std::ranges::find(markers, marker.tick, &core::Marker::tick) == markers.end())
+        if (std::ranges::find(labels, label.tick, &core::Label::tick) == labels.end())
         {
-            markers.push_back(marker);
+            labels.push_back(label);
         }
     }
-    std::ranges::stable_sort(markers, {}, &core::Marker::tick);
-    std::vector<int> markerLines; // drawn through the ruler once its text is placed
-    for (std::size_t i = 0; i < markers.size(); ++i)
+    std::ranges::stable_sort(labels, {}, &core::Label::tick);
+    std::vector<int> labelLines; // drawn through the ruler once its text is placed
+    for (std::size_t i = 0; i < labels.size(); ++i)
     {
-        const auto tick = markers[i].tick;
+        const auto tick = labels[i].tick;
         if (tick < leftTick_ || tick >= shownEnd)
         {
             continue;
         }
         const int x = scale.toX(tick);
-        markerLines.push_back(x);
+        labelLines.push_back(x);
         timeline.under.push_back(
-            {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Marker, kFaint});
-        if (markers[i].name.empty())
+            {{x, tracksTop, lineWidth, tracksBottom - tracksTop}, Role::Label, kFaint});
+        if (labels[i].name.empty())
         {
             continue; // a section's start
         }
         int textX = x + 2 * lineWidth;
-        // Characters, to the next marker or the play-from marker, or past the edge.
+        // Characters, to the next label or the play-from marker, or past the edge.
         int roomEnd = textX + timeline.bounds.width * cell_.width;
-        if (i + 1 < markers.size())
+        if (i + 1 < labels.size())
         {
-            roomEnd = scale.toX(markers[i + 1].tick) - lineWidth;
+            roomEnd = scale.toX(labels[i + 1].tick) - lineWidth;
         }
         if (playX && *playX < textX + cell_.width && *playX + cell_.width > x)
         {
@@ -558,7 +558,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             roomEnd = std::min(roomEnd, *playX);
         }
         const int room = (roomEnd - textX) / cell_.width;
-        auto name = decodeUtf8(markers[i].name);
+        auto name = decodeUtf8(labels[i].name);
         if (static_cast<int>(name.size()) > room)
         {
             if (room < kMinSegmentCharacters + 1)
@@ -569,7 +569,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             name += U'\u2026';
         }
         timeline.text.push_back(
-            {textX, 0, std::move(name), {Role::Marker, Role::Background, kBold}});
+            {textX, 0, std::move(name), {Role::Label, Role::Background, kBold}});
     }
     // The conductor's meter changes, each named if the name fits before the next
     // change, or else shown by a tick, so a short change, such as a single bar, never hides
@@ -598,7 +598,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                 {{x, cell_.height + height, lineWidth, height}, Role::Dim, 255});
         }
     }
-    // Bar numbers, counted in sections: bar 1 and the bar of each section start and marker
+    // Bar numbers, counted in sections: bar 1 and the bar of each section start and label
     // start one. Each
     // section's first bar is numbered, then every n bars into it, for n of 1, 2, 4, 8..., as
     // few as fit the widest number and a space into n of the shortest bar. A number shows
@@ -609,22 +609,22 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         shortest = std::min(shortest, change.signature.barLength().toTicks(song_.ppqn()));
     }
     const auto lastNumber = std::to_string(reference.toBarBeatTick(end_ - 1).bar);
-    const core::Tick label = static_cast<core::Tick>(lastNumber.size() + 1) * cell_.width;
+    const core::Tick numberWidth = static_cast<core::Tick>(lastNumber.size() + 1) * cell_.width;
     std::int64_t every = 1;
-    while (every < 1024 && every * shortest * cell_.width < label * column)
+    while (every < 1024 && every * shortest * cell_.width < numberWidth * column)
     {
         every *= 2;
     }
     std::vector<std::int64_t> sections{1};
-    for (const auto& marker : markers)
+    for (const auto& label : labels)
     {
-        sections.push_back(reference.toBarBeatTick(marker.tick).bar);
+        sections.push_back(reference.toBarBeatTick(label.tick).bar);
     }
     std::ranges::sort(sections);
     const auto [last, unique] = std::ranges::unique(sections);
     sections.erase(last, unique);
 
-    Labels numbers{timeline, 2 * cell_.height, cell_};
+    Captions numbers{timeline, 2 * cell_.height, cell_};
     for (auto bar = reference.toBarBeatTick(leftTick_).bar;; ++bar)
     {
         const core::Tick start = reference.barStart(bar);
@@ -692,7 +692,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             if (!name.empty())
             {
                 timeline.text.push_back(
-                    {x0 + lineWidth, y, std::move(name), {Role::Marker, Role::Background, kBold}});
+                    {x0 + lineWidth, y, std::move(name), {Role::Label, Role::Background, kBold}});
             }
             if (stripCursor_ == i)
             {
@@ -706,10 +706,10 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             }
         }
     }
-    // The markers' lines through the ruler and the section strip, over its blocks, a row at a
-    // time, broken only where a label of the row sits across a line, so the line never runs
+    // The labels' lines through the ruler and the section strip, over its blocks, a row at a
+    // time, broken only where a caption of the row sits across a line, so the line never runs
     // through text.
-    for (const int x : markerLines)
+    for (const int x : labelLines)
     {
         for (int row = 0; row <= kStripRow; ++row)
         {
@@ -724,7 +724,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                     });
             if (!covered)
             {
-                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Marker, kFaint});
+                timeline.under.push_back({{x, y, lineWidth, cell_.height}, Role::Label, kFaint});
             }
         }
     }
@@ -736,7 +736,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                   255});
     }
     // Marks (ma), each its letter, dim, at its time: in its track's row, or the conductor's in
-    // the markers' row.
+    // the labels' row.
     for (const auto& mark : song_.marks())
     {
         if (mark.tick < leftTick_ || mark.tick >= shownEnd)
@@ -759,7 +759,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         timeline.text.push_back({scale.toX(mark.tick) + 2 * lineWidth, y,
                                  std::u32string(1, static_cast<char32_t>(mark.letter)), kDim});
     }
-    // The play-from marker, in the markers' row, and the playhead, a line through the ruler and
+    // The play-from marker, in the labels' row, and the playhead, a line through the ruler and
     // the tracks.
     if (playX)
     {

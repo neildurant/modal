@@ -276,6 +276,7 @@ TEST_CASE("roles and colours read back as they're written")
         CHECK(roleFromName(roleName(role)) == role);
     }
     CHECK_FALSE(roleFromName("Cursor"));
+    CHECK(roleFromName("marker") == Role::Label); // its old name
     CHECK(formatColour({0x1a, 0xb0, 0xff}) == "#1ab0ff");
     CHECK(parseColour("#1AB0ff") == Colour{0x1a, 0xb0, 0xff});
     CHECK_FALSE(parseColour("1ab0ff"));

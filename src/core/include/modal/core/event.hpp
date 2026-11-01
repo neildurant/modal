@@ -78,7 +78,7 @@ struct SysEx
     }
 };
 
-// Text kept with a track's events. Track names and markers aren't stored this way: they
+// Text kept with a track's events. Track names and labels aren't stored this way: they
 // belong to the track and the song.
 struct MetaText
 {

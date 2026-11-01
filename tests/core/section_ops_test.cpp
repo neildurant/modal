@@ -144,7 +144,7 @@ TEST_CASE("joining a section with the next makes one of both, with everything wh
 {
     Sections s{MODAL_ANY_PPQN()};
     const auto bar = s.bar;
-    s.song.setMarker(3 * bar, "fill");
+    s.song.setLabel(3 * bar, "fill");
     s.song.updateTempo([&](TempoMap& tempo) { tempo.set(3 * bar, Tempo{400'000}); });
     // B has a meter of its own on a second track.
     const auto lead = s.song.addTrack("Lead");
@@ -155,8 +155,8 @@ TEST_CASE("joining a section with the next makes one of both, with everything wh
     CHECK(s.names() == std::vector<std::string>{"A", "C"});
     CHECK(s.song.sectionStart(1) == 5 * bar);
     CHECK(s.pitches() == std::vector<int>{40, 41, 42, 43, 44, 45, 46, 47});
-    REQUIRE(s.song.markers().size() == 1);
-    CHECK(s.song.markers()[0].tick == 3 * bar);
+    REQUIRE(s.song.labels().size() == 1);
+    CHECK(s.song.labels()[0].tick == 3 * bar);
     CHECK(s.song.tempo().changes().size() == before);
     // The lead keeps its own meter from where B was, following the conductor's before.
     CHECK(s.song.meter(lead).signatureAt(0) == TimeSignature{4, 4});
@@ -215,7 +215,7 @@ TEST_CASE("removing bars on every track closes up after them, each section stayi
     }
 }
 
-TEST_CASE("removing bars takes the tempo and meter changes and markers in them")
+TEST_CASE("removing bars takes the tempo and meter changes and labels in them")
 {
     Sections s{MODAL_ANY_PPQN()};
     const auto bar = s.bar;
@@ -226,16 +226,16 @@ TEST_CASE("removing bars takes the tempo and meter changes and markers in them")
             tempo.set(3 * bar + q, Tempo{400'000}); // in bar 4
             tempo.set(4 * bar, Tempo{450'000});     // bar 5's start
         });
-    s.song.setMarker(3 * bar, "gone");
-    s.song.setMarker(4 * bar + q, "kept");
+    s.song.setLabel(3 * bar, "gone");
+    s.song.setLabel(4 * bar + q, "kept");
     s.song.removeBars(3 * bar, 1);
     const auto changes = s.song.tempo().changes();
     REQUIRE(changes.size() == 2);
     CHECK(changes[1].tick == 3 * bar);
     CHECK(changes[1].tempo == Tempo{450'000});
-    REQUIRE(s.song.markers().size() == 1);
-    CHECK(s.song.markers()[0].name == "kept");
-    CHECK(s.song.markers()[0].tick == 3 * bar + q);
+    REQUIRE(s.song.labels().size() == 1);
+    CHECK(s.song.labels()[0].name == "kept");
+    CHECK(s.song.labels()[0].tick == 3 * bar + q);
 
     // A bar of 3/4 taken out, the meter after it goes on: here A's last bar, left a 1/4
     // remainder by the change.

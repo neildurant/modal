@@ -391,8 +391,8 @@ std::optional<std::string> describeTimeRange(std::string_view motion)
         {"cursor-bar-line-previous", "from the bar line before"},
         {"cursor-section-next", "to the next section"},
         {"cursor-section-previous", "from the section's start"},
-        {"cursor-marker-next", "to the next marker"},
-        {"cursor-marker-previous", "from the marker before"},
+        {"cursor-label-next", "to the next label"},
+        {"cursor-label-previous", "from the label before"},
         {"go-last", "to the end of the song"},
         {"go-first", "from the start of the song"},
     }};

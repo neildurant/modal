@@ -121,11 +121,11 @@ void Section::addTempo(TempoChange change)
     tempo_.push_back(change);
 }
 
-void Section::addMarker(Marker marker)
+void Section::addLabel(Label label)
 {
-    assert(marker.tick >= 0 && marker.tick < length_);
-    assert(markers_.empty() || marker.tick > markers_.back().tick);
-    markers_.push_back(std::move(marker));
+    assert(label.tick >= 0 && label.tick < length_);
+    assert(labels_.empty() || label.tick > labels_.back().tick);
+    labels_.push_back(std::move(label));
 }
 
 void Section::addMark(Mark mark)
@@ -151,7 +151,7 @@ bool operator==(const Section& a, const Section& b)
     const auto sameContent = [](const auto& x, const auto& y)
     { return x.first == y.first && (x.second == y.second || *x.second == *y.second); };
     return a.name_ == b.name_ && a.colour_ == b.colour_ && a.length_ == b.length_ &&
-           a.tempo_ == b.tempo_ && a.meter_ == b.meter_ && a.markers_ == b.markers_ &&
+           a.tempo_ == b.tempo_ && a.meter_ == b.meter_ && a.labels_ == b.labels_ &&
            a.marks_ == b.marks_ && std::ranges::equal(a.content_, b.content_, sameContent);
 }
 
@@ -326,12 +326,12 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
         }
     }
 
-    std::erase_if(first->markers_, [at](const auto& marker) { return marker.tick >= at; });
-    for (const auto& marker : old.markers_)
+    std::erase_if(first->labels_, [at](const auto& label) { return label.tick >= at; });
+    for (const auto& label : old.labels_)
     {
-        if (marker.tick >= at)
+        if (label.tick >= at)
         {
-            second->markers_.push_back({marker.tick - at, marker.name});
+            second->labels_.push_back({label.tick - at, label.name});
         }
     }
     std::erase_if(first->marks_, [at](const Mark& mark) { return mark.tick >= at; });
@@ -514,7 +514,7 @@ bool Song::resizeSection(std::size_t index, std::int64_t bars)
         section->length_ = end;
         section->meter_ = meterBetween(old.meter_, 0, end);
         std::erase_if(section->tempo_, [end](const auto& change) { return change.tick >= end; });
-        std::erase_if(section->markers_, [end](const auto& marker) { return marker.tick >= end; });
+        std::erase_if(section->labels_, [end](const auto& label) { return label.tick >= end; });
         std::erase_if(section->marks_, [end](const Mark& mark) { return mark.tick >= end; });
         for (auto it = section->content_.begin(); it != section->content_.end();)
         {
@@ -567,17 +567,16 @@ bool Song::joinSections(std::size_t index)
             joined->tempo_.push_back({at + change.tick, change.tempo});
         }
     }
-    for (const auto& marker : second.markers_)
+    for (const auto& label : second.labels_)
     {
         // Names stay unique within the section.
-        std::string name = marker.name;
+        std::string name = label.name;
         for (int n = 2;
-             std::ranges::find(joined->markers_, name, &Marker::name) != joined->markers_.end();
-             ++n)
+             std::ranges::find(joined->labels_, name, &Label::name) != joined->labels_.end(); ++n)
         {
-            name = numbered(marker.name, n);
+            name = numbered(label.name, n);
         }
-        joined->markers_.push_back({at + marker.tick, std::move(name)});
+        joined->labels_.push_back({at + label.tick, std::move(name)});
     }
     for (auto mark : second.marks_)
     {
@@ -764,9 +763,9 @@ void Song::fitToContent()
             extent = std::max(extent, endOf(event));
         }
     }
-    for (const auto& marker : section->markers_)
+    for (const auto& label : section->labels_)
     {
-        extent = std::max(extent, marker.tick + 1);
+        extent = std::max(extent, label.tick + 1);
     }
     for (const auto& mark : section->marks_)
     {
@@ -915,31 +914,31 @@ bool Song::followConductor(TrackId id)
     return true;
 }
 
-void Song::setMarker(Tick tick, std::string name)
+void Song::setLabel(Tick tick, std::string name)
 {
     assert(tick >= 0);
     growTo(tick + 1);
     const auto index = sectionAt(tick);
     const Tick at = tick - starts_[index];
     auto section = std::make_shared<Section>(*sections_[index]);
-    auto& markers = section->markers_;
+    auto& labels = section->labels_;
 
     std::string unique = name;
-    for (int n = 2; std::ranges::any_of(markers, [&](const Marker& marker)
-                                        { return marker.name == unique && marker.tick != at; });
+    for (int n = 2; std::ranges::any_of(labels, [&](const Label& label)
+                                        { return label.name == unique && label.tick != at; });
          ++n)
     {
         unique = numbered(name, n);
     }
 
-    const auto it = std::ranges::lower_bound(markers, at, {}, &Marker::tick);
-    if (it != markers.end() && it->tick == at)
+    const auto it = std::ranges::lower_bound(labels, at, {}, &Label::tick);
+    if (it != labels.end() && it->tick == at)
     {
         it->name = std::move(unique);
     }
     else
     {
-        markers.insert(it, {at, std::move(unique)});
+        labels.insert(it, {at, std::move(unique)});
     }
     sections_[index] = std::move(section);
     rebuildConductor();
@@ -980,7 +979,7 @@ bool Song::removeMark(char letter)
     return false;
 }
 
-bool Song::removeMarker(Tick tick)
+bool Song::removeLabel(Tick tick)
 {
     if (tick < 0 || tick >= end())
     {
@@ -988,14 +987,14 @@ bool Song::removeMarker(Tick tick)
     }
     const auto index = sectionAt(tick);
     const Tick at = tick - starts_[index];
-    const auto& markers = sections_[index]->markers_;
-    const auto it = std::ranges::find(markers, at, &Marker::tick);
-    if (it == markers.end())
+    const auto& labels = sections_[index]->labels_;
+    const auto it = std::ranges::find(labels, at, &Label::tick);
+    if (it == labels.end())
     {
         return false;
     }
     auto section = std::make_shared<Section>(*sections_[index]);
-    section->markers_.erase(section->markers_.begin() + std::distance(markers.begin(), it));
+    section->labels_.erase(section->labels_.begin() + std::distance(labels.begin(), it));
     sections_[index] = std::move(section);
     rebuildConductor();
     return true;
@@ -1056,7 +1055,7 @@ void Song::rebuildConductor()
     const auto ppqn = tempo_.ppqn();
     tempo_ = TempoMap{ppqn, sections_.front()->tempo_.front().tempo};
     meter_ = MeterMap{ppqn, sections_.front()->meter_.changes().front().signature};
-    markers_.clear();
+    labels_.clear();
     marks_.clear();
     starts_.clear();
     Tick start = 0;
@@ -1074,9 +1073,9 @@ void Song::rebuildConductor()
         {
             meter_.set(start + change.tick, change.signature);
         }
-        for (const auto& marker : section->markers_)
+        for (const auto& label : section->labels_)
         {
-            markers_.push_back({start + marker.tick, marker.name});
+            labels_.push_back({start + label.tick, label.name});
         }
         for (auto mark : section->marks_)
         {

@@ -21,7 +21,7 @@ struct Two
         bass = song.addTrack("Bass");
         lead = song.addTrack("Lead");
         song.updateTempo([&](core::TempoMap& tempo) { tempo.set(4 * q, core::Tempo{400'000}); });
-        song.setMarker(2 * q, "fill");
+        song.setLabel(2 * q, "fill");
         song.updateEvents(bass,
                           [&](core::EventList& events)
                           {
@@ -69,7 +69,7 @@ TEST_CASE("a track's list has its events, the conductor's rows dimmed, and the e
     const Two two;
     const EventList list{two.song, two.bass};
     CHECK(column(list, Column::Event) ==
-          std::vector<std::string>{"section", "meter", "tempo", "program", "note", "cc", "marker",
+          std::vector<std::string>{"section", "meter", "tempo", "program", "note", "cc", "label",
                                    "section", "tempo", "note", "end"});
     CHECK(column(list, Column::Position) ==
           std::vector<std::string>{"1:1:000", "1:1:000", "1:1:000", "1:1:000", "1:1:000", "1:2:240",
@@ -93,7 +93,7 @@ TEST_CASE("a track's list has its events, the conductor's rows dimmed, and the e
     CHECK(list.text(8)[Column::Data] == "150");
 }
 
-TEST_CASE("the order at a tick: section, meter, tempo, markers, then events as sent")
+TEST_CASE("the order at a tick: section, meter, tempo, labels, then events as sent")
 {
     // At 1:1:000 the program comes before the note, as sent.
     const Two two;
@@ -127,7 +127,7 @@ TEST_CASE("the conductor's list has its own rows, undimmed, and no events")
     const Two two;
     const EventList list{two.song, std::nullopt};
     CHECK(column(list, Column::Event) == std::vector<std::string>{"section", "meter", "tempo",
-                                                                  "marker", "section", "tempo",
+                                                                  "label", "section", "tempo",
                                                                   "end"});
     for (const auto& row : list.rows())
     {

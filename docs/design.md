@@ -56,7 +56,7 @@ A song is a list of tracks, each holding a time-ordered list of events, with all
 Two distinct ideas:
 
 - **Sections are the song's structure.** A song is an ordered sequence of named sections (Intro, Verse 1, Chorus, Bridge…) that together cover the whole timeline, with no gaps or overlaps, each spanning every track. A new song starts as one section covering everything ("Section 1"), split as the structure emerges.
-- **Markers are bookmarks:** named points for navigation and reminders ("fix this fill"), with no structural meaning. Vim's marks (`ma`, `'a`) are in the same family.
+- **Labels are bookmarks:** named points for navigation and reminders ("fix this fill"), with no structural meaning. Vim's marks (`ma`, `'a`) are in the same family. Called markers until November 2026, when they were renamed labels (decided then) so they and marks aren't confused, with the play-from marker the only marker left: the commands, keys (`]l` / `[l`), event list rows, theme role and song file lines say label, songs and themes saved with `marker` still loading. A MIDI file's marker meta events are still markers, imported as labels. This document's earlier entries still say markers.
 
 Section properties: a name, a length, an optional colour (from the theme's section palette), its takes (see Input and recording), its cue slot (see Playback and recording behaviour), and later a link to another section and alternatives.
 
@@ -100,7 +100,7 @@ As in SPG, each track has its own sequence of bars and time signatures, so track
 * **Event:** tick, type, and type-specific fields. A note has pitch, velocity, duration and release velocity. Other types are CC, program change, pitch bend, channel and poly aftertouch, SysEx and meta (text, markers). Events carry no channel; the track's channel applies.
 * **Event order.** A track's events are in tick order, and events at the same tick are sent in the order stored. Import and editing put non-note events (program change, CC, etc.) before notes at the same tick, so a program change at 1:1:0 always takes effect before the first note.
 * **Overlapping notes.** The model allows overlapping notes of the same pitch, since imported files can contain them; the editor never creates them (see Playback and recording behaviour).
-* **Markers:** bookmarks, named positions used as motion targets (see Sections and markers).
+* **Labels** (once markers): bookmarks, named positions used as motion targets (see Sections and markers).
 * **Patterns (later):** reusable phrases referenced from the arrangement, if a pattern-based workflow proves useful.
 
 The model is immutable at the edit level: each edit produces a new song state, sharing unchanged sections and tracks. That makes undo cheap and lets the engine read a consistent snapshot while the UI edits the next one.
@@ -1058,7 +1058,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [x] Patterns are a nice-to-have, not version 1.
 - [x] In-process plugin hosting is wanted eventually.
 - [x] Configuration is a Vim-style command file, sharing the `:` command language.
-- [x] Sections are the song's structure and markers are bookmarks (October 2026); see Sections and markers.
+- [x] Sections are the song's structure and markers are bookmarks (October 2026); see Sections and markers. Markers renamed labels (November 2026).
 - [x] The velocity operator is `^`, since `v` is Visual mode, and `!` is the general transform operator (October 2026).
 - [x] Vim uses `,` to repeat an `f` search backwards, `,` being the leader here: `f` and `F` repeat a find instead, as Doom Emacs's evil-snipe does (decided October 2026). The scale-lock key is still to choose (see To decide, Later milestones).
 - [x] Piano roll navigation, grid and default note length (October 2026): a crosshair cursor; `{` / `}` keep the position in the bar, with bar lines on `[b` / `]b` (`[[` / `]]` until October 2026); `gg` / `G` go to the start and end of the track; pitch motions and scale lock; Alt plus a motion moves notes; a per-track grid and default note length; the piano roll shows pages of whole bars. See Editing grammar and Views.

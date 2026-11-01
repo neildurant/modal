@@ -250,7 +250,7 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
                                }));
 }
 
-TEST_CASE("markers are named in the ruler, with faint lines through it and every track")
+TEST_CASE("labels are named in the ruler, with faint lines through it and every track")
 {
     auto page = page80x22();
     Frame frame;
@@ -260,7 +260,7 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
     std::vector<int> lines;
     for (const auto& shape : timeline.under)
     {
-        if (shape.role == Role::Marker && shape.rect.y < tracksTop)
+        if (shape.role == Role::Label && shape.rect.y < tracksTop)
         {
             if (shape.rect.y == 0)
             {
@@ -269,7 +269,7 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
             CHECK(shape.rect.height == kCell.height); // a row of the ruler at a time
             CHECK(shape.alpha < 255);
         }
-        else if (shape.role == Role::Marker)
+        else if (shape.role == Role::Label)
         {
             CHECK(shape.rect.y == tracksTop);
             CHECK(shape.rect.height == 14 * kCell.height);
@@ -280,12 +280,12 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
     // the bridge 50 after that; the second chorus is out of view.
     CHECK(lines == std::vector<int>{0, 160, 265, 515});
 
-    // The sections are named on the strip, not in the ruler's top row, where only markers
+    // The sections are named on the strip, not in the ruler's top row, where only labels
     // are.
     int names = 0;
     for (const auto& run : timeline.text)
     {
-        CHECK_FALSE((run.y == 0 && run.style.foreground == Role::Marker));
+        CHECK_FALSE((run.y == 0 && run.style.foreground == Role::Label));
         names += run.y == ArrangePage::kStripRow * kCell.height ? 1 : 0;
     }
     CHECK(names == 4);
@@ -299,7 +299,7 @@ TEST_CASE("markers are named in the ruler, with faint lines through it and every
     {
         CHECK(std::any_of(
             block, timeline.under.end(), [&](const Shape& shape)
-            { return shape.role == Role::Marker && shape.rect.x == x && shape.rect.y == strip; }));
+            { return shape.role == Role::Label && shape.rect.x == x && shape.rect.y == strip; }));
     }
 }
 
@@ -335,7 +335,7 @@ TEST_CASE("section names are cut short to their sections, or left out if there's
           std::vector<std::u32string>{U"Chorus", U"Chor…"});
 }
 
-TEST_CASE("bars are numbered from bar 1 and each marker, every so many bars")
+TEST_CASE("bars are numbered from bar 1 and each label, every so many bars")
 {
     auto page = page80x22();
     Frame frame;
@@ -408,24 +408,24 @@ TEST_CASE("the cursor boxes its bar on all four sides")
           std::vector<Rect>{{0, y, 21, 2}, {0, y + 18, 21, 2}, {0, y, 1, 20}, {20, y, 1, 20}});
 }
 
-TEST_CASE("a marker's line through the ruler breaks only where a label sits across it")
+TEST_CASE("a label's line through the ruler breaks only where text sits across it")
 {
-    // A marker halfway through bar 1, which its meter and number run across.
+    // A label halfway through bar 1, which its meter and number run across.
     core::Song song;
     const auto id = song.addTrack("Piano");
     song.updateEvents(id, [&](core::EventList& events)
                       { events.insert({0, core::Note{60, 100, song.ppqn().quarter()}}); });
-    song.setMarker(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
+    song.setLabel(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
-    page.zoomBy(1); // a half note to a column, so the marker is ten pixels in
+    page.zoomBy(1); // a half note to a column, so the label is ten pixels in
     Frame frame;
     page.addRegions(frame);
 
     std::vector<int> rows;
     for (const auto& shape : frame[1].under)
     {
-        if (shape.role == Role::Marker && shape.rect.x == 10 &&
+        if (shape.role == Role::Label && shape.rect.x == 10 &&
             shape.rect.y < ArrangePage::kRulerRows * kCell.height)
         {
             rows.push_back(shape.rect.y / kCell.height);
@@ -434,19 +434,19 @@ TEST_CASE("a marker's line through the ruler breaks only where a label sits acro
     CHECK(rows == std::vector<int>{0}); // beside its name, but not through "4/4" or "1"
 }
 
-TEST_CASE("the play-from marker sits in the markers' row, which names give way to")
+TEST_CASE("the play-from marker sits in the labels' row, which names give way to")
 {
-    // A marker halfway through bar 1, ten pixels in at a half note to a column.
+    // A label halfway through bar 1, ten pixels in at a half note to a column.
     core::Song song;
     const auto id = song.addTrack("Piano");
     song.updateEvents(id, [&](core::EventList& events)
                       { events.insert({0, core::Note{60, 100, 16 * song.ppqn().quarter()}}); });
     const auto half = core::NoteFraction{1, 2}.toTicks(song.ppqn());
-    song.setMarker(half, "Middle");
+    song.setLabel(half, "Middle");
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1);
-    const auto markersRow = [&](core::Tick playFrom)
+    const auto labelsRow = [&](core::Tick playFrom)
     {
         Frame frame;
         page.addRegions(frame, playFrom);
@@ -462,10 +462,10 @@ TEST_CASE("the play-from marker sits in the markers' row, which names give way t
         return runs;
     };
     using Runs = std::vector<std::pair<int, std::u32string>>;
-    CHECK(markersRow(0) == Runs{{0, U"▶"}, {12, U"Middle"}});
-    CHECK(markersRow(half) == Runs{{10, U"▶"}, {20, U"Middle"}}); // after it
-    CHECK(markersRow(8 * half) == Runs{{12, U"Middle"}, {80, U"▶"}});
-    CHECK(markersRow(6 * half) == Runs{{12, U"Mid…"}, {60, U"▶"}}); // cut short
+    CHECK(labelsRow(0) == Runs{{0, U"▶"}, {12, U"Middle"}});
+    CHECK(labelsRow(half) == Runs{{10, U"▶"}, {20, U"Middle"}}); // after it
+    CHECK(labelsRow(8 * half) == Runs{{12, U"Middle"}, {80, U"▶"}});
+    CHECK(labelsRow(6 * half) == Runs{{12, U"Mid…"}, {60, U"▶"}}); // cut short
     Frame frame;
     page.addRegions(frame, 2 * half);
     for (const auto& number : rulerText(frame[1], 2)) // not among the bar numbers any more

@@ -40,7 +40,7 @@ TEST_CASE("the demo song has sections in several meters, on most tracks")
     CHECK(song.sectionStart(1) == drums.barStart(9));
     CHECK(song.sectionStart(3) == drums.barStart(28));
     CHECK(song.sectionStart(5) == drums.barStart(48));
-    CHECK(song.markers().empty());
+    CHECK(song.labels().empty());
 
     // Two tracks have meters of their own, whose bars start again at each section.
     const auto& ostinato = song.meter(song.tracks()[6]->id());

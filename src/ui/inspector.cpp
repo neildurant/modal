@@ -158,9 +158,9 @@ Inspection inspect(const EventList& list, std::size_t row)
             std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator));
         return result;
     }
-    case RowKind::Marker:
-        result.kind = "Marker";
-        add("Marker", song.markers()[r.index].name);
+    case RowKind::Label:
+        result.kind = "Label";
+        add("Label", song.labels()[r.index].name);
         return result;
     case RowKind::End:
         result.kind = "End";

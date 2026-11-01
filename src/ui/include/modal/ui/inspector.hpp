@@ -36,7 +36,7 @@ struct InspectorField
 // name, text and SysEx whole, and the time from the song's start; the track and channel
 // are in the view's bar, until a view shows several tracks at once. On a row that isn't an
 // event, what the row is: a section's bars and length, a tempo, a meter,
-// a marker, or at the end the song's length.
+// a label, or at the end the song's length.
 struct Inspection
 {
     std::string kind; // Note, CC, Section, End and so on

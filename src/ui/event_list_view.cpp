@@ -93,8 +93,8 @@ constexpr std::array kCommands{
     motion("cursor-chord-previous", "Move to the chord, or event, before"),
     motion("cursor-section-next", "Move to the next section's start"),
     motion("cursor-section-previous", "Move to the section's start, or the one before"),
-    motion("cursor-marker-next", "Move to the next marker"),
-    motion("cursor-marker-previous", "Move to the marker before"),
+    motion("cursor-label-next", "Move to the next label"),
+    motion("cursor-label-previous", "Move to the label before"),
     motion("go-first", "Go to the first event, or bar {count}"),
     motion("go-last", "Go to the end, or bar {count}"),
     counted("cursor-left-scroll",
@@ -515,7 +515,7 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         }
         row_ = list_.rowAt(*at);
     }
-    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
+    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {
         const bool sections = command.starts_with("cursor-section-");
         std::vector<core::Tick> ticks;
@@ -528,9 +528,9 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         }
         else
         {
-            for (const auto& marker : song.markers())
+            for (const auto& label : song.labels())
             {
-                ticks.push_back(marker.tick);
+                ticks.push_back(label.tick);
             }
         }
         const auto to =
@@ -539,10 +539,10 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         {
             return false;
         }
-        // On its row: a section's is the first at its tick; a marker's comes after any
+        // On its row: a section's is the first at its tick; a label's comes after any
         // section, meter or tempo change there.
         row_ = list_.rowAt(*to);
-        const auto kind = sections ? RowKind::Section : RowKind::Marker;
+        const auto kind = sections ? RowKind::Section : RowKind::Label;
         while (list_.rows()[row_].kind != kind)
         {
             ++row_;
@@ -1182,13 +1182,13 @@ std::optional<std::string> EventListView::setConductor(std::size_t row, std::str
         edit("Rename section " + song.sections()[r.index]->name() + " to " + std::string{text},
              [&](core::Song& s) { s.renameSection(r.index, std::string{text}); });
         return std::nullopt;
-    case RowKind::Marker:
+    case RowKind::Label:
         if (text.empty())
         {
-            return "A marker needs a name; dd deletes it";
+            return "A label needs a name; dd deletes it";
         }
-        edit("Rename marker " + song.markers()[r.index].name + " to " + std::string{text},
-             [&](core::Song& s) { s.setMarker(tick, std::string{text}); });
+        edit("Rename label " + song.labels()[r.index].name + " to " + std::string{text},
+             [&](core::Song& s) { s.setLabel(tick, std::string{text}); });
         return std::nullopt;
     case RowKind::Tempo:
     {
@@ -1293,7 +1293,7 @@ bool EventListView::deleteConductor(std::size_t from, std::size_t to)
     {
         const auto& row = list_.rows()[r];
         const bool fixed = row.kind == RowKind::Section || row.kind == RowKind::End ||
-                           (row.kind != RowKind::Marker && atStart(row.tick));
+                           (row.kind != RowKind::Label && atStart(row.tick));
         kept = kept || (fixed && row.kind != RowKind::End);
         if (!fixed)
         {
@@ -1317,9 +1317,9 @@ bool EventListView::deleteConductor(std::size_t from, std::size_t to)
          {
              for (const auto& row : doomed)
              {
-                 if (row.kind == RowKind::Marker)
+                 if (row.kind == RowKind::Label)
                  {
-                     s.removeMarker(row.tick);
+                     s.removeLabel(row.tick);
                  }
                  else if (row.kind == RowKind::Tempo)
                  {

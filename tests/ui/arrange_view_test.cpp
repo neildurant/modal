@@ -816,16 +816,16 @@ TEST_CASE("e edits the section's name and length in the inspector on the strip")
 namespace
 {
 
-// One section of eight bars, with markers at the start, at bar 3, and two in bar 5, off its
+// One section of eight bars, with labels at the start, at bar 3, and two in bar 5, off its
 // bar line.
-core::Song markerSong()
+core::Song labelSong()
 {
     core::Song song{core::kPpqn};
     song.addTrack("Bass");
-    song.setMarker(0, "Top");
-    song.setMarker(2 * kBar, "Chorus");
-    song.setMarker(4 * kBar + kQuarter, "Fill");
-    song.setMarker(4 * kBar + 2 * kQuarter, "Late");
+    song.setLabel(0, "Top");
+    song.setLabel(2 * kBar, "Chorus");
+    song.setLabel(4 * kBar + kQuarter, "Fill");
+    song.setLabel(4 * kBar + 2 * kQuarter, "Late");
     return song;
 }
 
@@ -841,42 +841,42 @@ std::vector<std::string> sectionNames(const core::Song& song)
 
 } // namespace
 
-TEST_CASE(":marker-to-section starts a section at a marker, asking unless it's on it")
+TEST_CASE(":label-to-section starts a section at a label, asking unless it's on it")
 {
-    Arranging a{markerSong()};
+    Arranging a{labelSong()};
     const auto& song = a.document.song();
     a.type(U"2l"); // bar 3, on Chorus
-    CHECK(a.registry.runLine("marker-to-section") == CommandResult{true, {}, false});
-    CHECK(a.ws.message() == "Chorus starts at 3:1:000, from its marker");
+    CHECK(a.registry.runLine("label-to-section") == CommandResult{true, {}, false});
+    CHECK(a.ws.message() == "Chorus starts at 3:1:000, from its label");
     CHECK(sectionNames(song) == std::vector<std::string>{"Section 1", "Chorus"});
     CHECK(song.sectionStart(1) == 2 * kBar);
-    CHECK(song.markers().size() == 3);
+    CHECK(song.labels().size() == 3);
     a.type(U"u");
     CHECK(song.sections().size() == 1);
 
-    a.type(U"l"); // bar 4: the marker before, Chorus, asked about
-    a.registry.runLine("marker-to-section");
-    CHECK(a.ws.message() == "Start a section from the marker Chorus at 3:1:000? (y/n)");
+    a.type(U"l"); // bar 4: the label before, Chorus, asked about
+    a.registry.runLine("label-to-section");
+    CHECK(a.ws.message() == "Start a section from the label Chorus at 3:1:000? (y/n)");
     a.type(U"n");
     CHECK(a.ws.message() == "Nothing done");
     CHECK(song.sections().size() == 1);
 
     a.type(U"2l"); // bar 6: Late, off its bar line, the section at the bar line before
-    a.registry.runLine("marker-to-section");
-    CHECK(a.ws.message() == "Start a section at 5:1:000 from the marker Late at 5:3:000? (y/n)");
+    a.registry.runLine("label-to-section");
+    CHECK(a.ws.message() == "Start a section at 5:1:000 from the label Late at 5:3:000? (y/n)");
     a.type(U"y");
     CHECK(sectionNames(song) == std::vector<std::string>{"Section 1", "Late"});
     CHECK(song.sectionStart(1) == 4 * kBar);
 
     a.type(U"gg"); // Top, at the section's start
-    CHECK(a.registry.runLine("marker-to-section").message ==
+    CHECK(a.registry.runLine("label-to-section").message ==
           "Top is at the start of Section 1, so there's no section to start");
 }
 
-TEST_CASE(":marker-to-section on a selection goes through its markers, asking about those off a "
+TEST_CASE(":label-to-section on a selection goes through its labels, asking about those off a "
           "bar line")
 {
-    Arranging a{markerSong()};
+    Arranging a{labelSong()};
     const auto& song = a.document.song();
     // The : prompt runs lines through the registry, showing messages as the program does.
     a.ws.setLineHandler(
@@ -898,42 +898,42 @@ TEST_CASE(":marker-to-section on a selection goes through its markers, asking ab
     a.type(U"lvie"); // the whole song, the cursor at its end, where it comes back to
     const auto back = a.page().bar();
     CHECK(a.ws.commandLine().text().empty());
-    run(U"marker-to-section");
+    run(U"label-to-section");
     CHECK(a.ws.message() ==
-          "Start a section at 5:1:000 from the marker Fill at 5:2:000? (y/n, Escape stops)");
+          "Start a section at 5:1:000 from the label Fill at 5:2:000? (y/n, Escape stops)");
     CHECK(a.page().bar() == 5);         // showing it
     CHECK(song.sections().size() == 1); // nothing yet
     a.type(U"y");                       // Late is then in a bar with Fill
-    CHECK(a.ws.message() == "Turned 2 markers into sections; 1 was at a section's start; 1 was "
+    CHECK(a.ws.message() == "Turned 2 labels into sections; 1 was at a section's start; 1 was "
                             "in a bar with another");
     CHECK(sectionNames(song) == std::vector<std::string>{"Section 1", "Chorus", "Fill"});
-    CHECK(song.markers().size() == 2);
+    CHECK(song.labels().size() == 2);
     CHECK(a.page().bar() == back);
     CHECK(a.ws.mode() == Mode::Normal);
     a.type(U"u"); // all of it, as one step
     CHECK(song.sections().size() == 1);
-    CHECK(song.markers().size() == 4);
+    CHECK(song.labels().size() == 4);
 
     // Escape stops, with nothing done; no goes on to the next.
     a.type(U"gv");
-    run(U"marker-to-section");
+    run(U"label-to-section");
     a.press(Key::of(NamedKey::Escape));
     CHECK(a.ws.message() == "Nothing done");
     CHECK(song.sections().size() == 1);
     a.type(U"gv");
-    run(U"marker-to-section");
+    run(U"label-to-section");
     a.type(U"n");
     CHECK(a.ws.message() ==
-          "Start a section at 5:1:000 from the marker Late at 5:3:000? (y/n, Escape stops)");
+          "Start a section at 5:1:000 from the label Late at 5:3:000? (y/n, Escape stops)");
     a.type(U"n");
-    CHECK(a.ws.message() == "Turned 1 marker into a section; 1 was at a section's start; 2 were "
+    CHECK(a.ws.message() == "Turned 1 label into a section; 1 was at a section's start; 2 were "
                             "left as they were");
     a.type(U"u");
 
-    // Only the markers in the selection: none in bar 2.
+    // Only the labels in the selection: none in bar 2.
     a.type(U"gglv");
-    run(U"marker-to-section");
-    CHECK(a.ws.message() == "There are no markers in bar 2 on every track");
+    run(U"label-to-section");
+    CHECK(a.ws.message() == "There are no labels in bar 2 on every track");
 
     // A command that takes no range says so, doing nothing.
     a.type(U"v");

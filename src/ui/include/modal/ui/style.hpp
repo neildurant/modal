@@ -44,7 +44,7 @@ enum class Role : std::uint8_t
     BeatLine,
     BarLine,
     Note,
-    Marker,
+    Label,
     Density1, // how busy a stretch of a track is, as in the arrangement, from sparse to dense
     Density2,
     Density3,

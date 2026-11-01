@@ -193,7 +193,7 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*at);
     }
-    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
+    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {
         std::vector<core::Tick> ticks;
         if (command.starts_with("cursor-section-"))
@@ -205,9 +205,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         else
         {
-            for (const auto& marker : song.markers())
+            for (const auto& label : song.labels())
             {
-                ticks.push_back(marker.tick);
+                ticks.push_back(label.tick);
             }
         }
         const auto tick = page_.time();

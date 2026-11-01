@@ -148,7 +148,7 @@ std::string noteText(const core::Track& track)
 
 constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row and column
 constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
-constexpr std::uint8_t kFaint = 96;     // and of markers' lines, as in the arrangement
+constexpr std::uint8_t kFaint = 96;     // and of labels' lines, as in the arrangement
 constexpr std::uint8_t kDimmed = 150;   // and of the shade over a note's part outside a range
 
 std::string signatureText(core::TimeSignature signature)
@@ -1247,7 +1247,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         }
         moveTo(*at);
     }
-    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
+    else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {
         std::vector<core::Tick> ticks;
         if (command.starts_with("cursor-section-"))
@@ -1259,9 +1259,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         }
         else
         {
-            for (const auto& marker : song.markers())
+            for (const auto& label : song.labels())
             {
-                ticks.push_back(marker.tick);
+                ticks.push_back(label.tick);
             }
         }
         const auto to =
@@ -1957,7 +1957,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
 
     // The top row: each section a block across its span, neighbours in two shades as on the
     // arrangement's strip, named in the colour of its line from where it shows, so the name of a
-    // section begun before the view stays at the left edge. Then the markers by name, and the
+    // section begun before the view stays at the left edge. Then the labels by name, and the
     // play-from marker. A name stops short of the next, or of the play-from marker, or starts after
     // the latter if it's at the name's start. The names are drawn straight on the blocks, without a
     // background of their own, which would stand taller than the block.
@@ -1990,17 +1990,17 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         names.push_back({x0 - lineWidth,
                          x1,
                          decodeUtf8(song.sections()[i]->name()),
-                         {Role::Marker, Role::Background, kBold}});
+                         {Role::Label, Role::Background, kBold}});
     }
-    for (const auto& marker : song.markers())
+    for (const auto& label : song.labels())
     {
-        const auto section = song.sectionAt(marker.tick);
-        if (inView(marker.tick) && marker.tick != song.sectionStart(section))
+        const auto section = song.sectionAt(label.tick);
+        if (inView(label.tick) && label.tick != song.sectionStart(section))
         {
-            names.push_back({scale.toX(marker.tick),
+            names.push_back({scale.toX(label.tick),
                              width,
-                             decodeUtf8(marker.name),
-                             {Role::Marker, Role::Background, kPlain}});
+                             decodeUtf8(label.name),
+                             {Role::Label, Role::Background, kPlain}});
         }
     }
     std::ranges::stable_sort(names, {}, &Name::x);
@@ -2038,7 +2038,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         ruler.text.push_back({textX, 0, std::move(name.text), name.style});
     }
     // Marks (ma) on this track or the conductor without a pitch, each its letter, dim, in the
-    // markers' row; those with a pitch are shown at it, among the notes.
+    // labels' row; those with a pitch are shown at it, among the notes.
     for (const auto& mark : song.marks())
     {
         const bool here = !mark.track || mark.track == trackId();
@@ -2216,24 +2216,24 @@ void PianoRollView::addRegions(Frame& frame) const
         lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::BarLine, 255});
     }
     // Where each section starts, a line down through the notes and the lane, stronger than a
-    // bar line, so a view running on into the next section shows where; and each marker, a
+    // bar line, so a view running on into the next section shows where; and each label, a
     // faint one.
     const auto boundary = [&](core::Tick tick, std::uint8_t alpha)
     {
         if (tick >= p.start && tick < p.end)
         {
             const int x = scale.toX(tick);
-            notes.under.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::Marker, alpha});
-            lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::Marker, alpha});
+            notes.under.push_back({{x, 0, 2 * lineWidth, notesHeight}, Role::Label, alpha});
+            lane.under.push_back({{x, 0, 2 * lineWidth, laneHeight}, Role::Label, alpha});
         }
     };
     for (std::size_t i = 1; i < song.sections().size(); ++i)
     {
         boundary(song.sectionStart(i), 255);
     }
-    for (const auto& marker : song.markers())
+    for (const auto& label : song.labels())
     {
-        boundary(marker.tick, kFaint);
+        boundary(label.tick, kFaint);
     }
     // Marks with a pitch, on this track: the letter, dim, at the mark's time and pitch.
     for (const auto& mark : song.marks())

@@ -240,10 +240,10 @@ constexpr std::array kSharedCommands{
                 .usage = "[N] [METER]",
                 .keys = false,
                 .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
-    CommandInfo{.name = "marker-to-section",
-                .description = "Start a section at the marker at or before the cursor, named "
-                               "after it, at the bar line of its bar; the marker goes. On a "
-                               "selection, at every marker in it (vie, the whole song), asking "
+    CommandInfo{.name = "label-to-section",
+                .description = "Start a section at the label at or before the cursor, named "
+                               "after it, at the bar line of its bar; the label goes. On a "
+                               "selection, at every label in it (vie, the whole song), asking "
                                "about those off a bar line, as one undo step",
                 .keys = false,
                 .range = true},
@@ -447,9 +447,9 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-bar-line-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-section-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-section-previous", onlyIn({Tracks, PianoRoll, EventList})},
-            {"cursor-marker-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-label-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-mark", onlyIn({Tracks, PianoRoll, EventList})},
-            {"cursor-marker-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-label-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-left-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-right-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-up-scroll", onlyIn({Tracks, PianoRoll, EventList})},
@@ -529,9 +529,9 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return deleteMarks(call.arguments);
                          }
-                         if (name == "marker-to-section")
+                         if (name == "label-to-section")
                          {
-                             return markerToSection();
+                             return labelToSection();
                          }
                          if (name == "bar-delete")
                          {
@@ -1120,7 +1120,7 @@ bool Workspace::goToMark(char32_t character, int count)
     }
     if (operator_)
     {
-        // The range to its time, as ]m's to a marker's.
+        // The range to its time, as ]l's to a label's.
         jumpTime_ = to.tick;
         const bool done = runOperator("cursor-mark", count);
         jumpTime_ = -1;
@@ -2234,13 +2234,13 @@ bool Workspace::runViewCommand(std::string_view command, int count)
     if (const auto changed = view().run(command, count))
     {
         // Jumps, for '' to go back from (decided October 2026): to the song's ends, sections,
-        // markers and marks, but not bars, which are steps.
+        // labels and marks, but not bars, which are steps.
         constexpr std::array<std::string_view, 6> kJumps{"go-first",
                                                          "go-last",
                                                          "cursor-section-next",
                                                          "cursor-section-previous",
-                                                         "cursor-marker-next",
-                                                         "cursor-marker-previous"};
+                                                         "cursor-label-next",
+                                                         "cursor-label-previous"};
         if (std::ranges::find(kJumps, command) != kJumps.end() && view().cursor() != cursor &&
             mode_ != Mode::Visual)
         {
@@ -3403,7 +3403,7 @@ void Workspace::showPlayhead()
     }
     if (playing)
     {
-        // Until the engine starts, the playhead is at the marker, where it will start.
+        // Until the engine starts, the playhead is at the play-from marker, where it will start.
         lastPlayhead_ = player_->position().value_or(player_->marker());
         view().showPlayhead(lastPlayhead_, !following_ ? Follow::None
                                            : rewind_   ? Follow::View
@@ -3563,92 +3563,92 @@ std::string trackNameOf(const core::Song& song, core::TrackId id)
 
 } // namespace
 
-CommandResult Workspace::markerToSection()
+CommandResult Workspace::labelToSection()
 {
     if (const auto span = selection_ ? view().selectionSpan() : std::nullopt)
     {
-        return markersToSections(span->first, span->second);
+        return labelsToSections(span->first, span->second);
     }
-    // The marker at or before the cursor, its section starting at the bar line of its bar in
+    // The label at or before the cursor, its section starting at the bar line of its bar in
     // the conductor's bars, asking first unless the cursor is on it and it's on a bar line.
     const auto& song = document_.song();
     const auto& meter = song.meter();
     const auto tick = view().cursor().tick;
-    const auto markers = song.markers();
-    const auto after = std::ranges::upper_bound(markers, tick, {}, &core::Marker::tick);
-    if (after == markers.begin())
+    const auto labels = song.labels();
+    const auto after = std::ranges::upper_bound(labels, tick, {}, &core::Label::tick);
+    if (after == labels.begin())
     {
-        return CommandResult::error("There's no marker at or before the cursor");
+        return CommandResult::error("There's no label at or before the cursor");
     }
-    const auto marker = *std::prev(after);
-    const auto start = meter.barStart(meter.toBarBeatTick(marker.tick).bar);
+    const auto label = *std::prev(after);
+    const auto start = meter.barStart(meter.toBarBeatTick(label.tick).bar);
     const auto section = song.sectionAt(start);
     if (song.sectionStart(section) == start)
     {
-        return CommandResult::error(marker.name + " is at the start of " +
+        return CommandResult::error(label.name + " is at the start of " +
                                     song.sections()[section]->name() +
                                     ", so there's no section to start");
     }
     const auto at = positionText(meter, start);
-    const auto make = [this, marker, start, at]
+    const auto make = [this, label, start, at]
     {
         std::optional<core::Song::Split> split;
-        document_.edit("Start section " + marker.name + " at " + at + ", from its marker",
+        document_.edit("Start section " + label.name + " at " + at + ", from its label",
                        view().place(),
                        [&](core::Song& s)
                        {
-                           split = s.splitSection(start, marker.name);
-                           s.removeMarker(marker.tick);
+                           split = s.splitSection(start, label.name);
+                           s.removeLabel(label.tick);
                        });
         refresh();
         const auto& named = document_.song().sections()[split->index]->name();
-        setMessage(named + " starts at " + at + ", from its marker", MessageKind::Information);
+        setMessage(named + " starts at " + at + ", from its label", MessageKind::Information);
     };
-    if (marker.tick == tick && marker.tick == start)
+    if (label.tick == tick && label.tick == start)
     {
         make();
         return {true, {}, false};
     }
-    ask(marker.tick == start ? "Start a section from the marker " + marker.name + " at " + at + "?"
-                             : "Start a section at " + at + " from the marker " + marker.name +
-                                   " at " + positionText(meter, marker.tick) + "?",
+    ask(label.tick == start ? "Start a section from the label " + label.name + " at " + at + "?"
+                            : "Start a section at " + at + " from the label " + label.name +
+                                  " at " + positionText(meter, label.tick) + "?",
         make);
     return {true, {}, false};
 }
 
-CommandResult Workspace::markersToSections(core::Tick from, core::Tick to)
+CommandResult Workspace::labelsToSections(core::Tick from, core::Tick to)
 {
-    const auto markers = document_.song().markers();
-    if (std::ranges::none_of(markers, [&](const core::Marker& marker)
-                             { return marker.tick >= from && marker.tick < to; }))
+    const auto labels = document_.song().labels();
+    if (std::ranges::none_of(labels, [&](const core::Label& label)
+                             { return label.tick >= from && label.tick < to; }))
     {
-        return CommandResult::error("There are no markers in " +
+        return CommandResult::error("There are no labels in " +
                                     view().selectionStatus().value_or("the selection"));
     }
-    auto run = std::make_shared<MarkerRun>();
+    auto run = std::make_shared<LabelRun>();
     run->from = view().cursor();
     run->first = from;
     run->last = to;
-    runMarkers(run);
+    runLabels(run);
     return {true, {}, false};
 }
 
-void Workspace::runMarkers(std::shared_ptr<MarkerRun> run)
+void Workspace::runLabels(std::shared_ptr<LabelRun> run)
 {
-    // On through the markers from where the run is: those on a bar line taken, those whose bar
-    // already starts a section (or another marker's) passed over, and for each of the others
+    // On through the labels from where the run is: those on a bar line taken, those whose bar
+    // already starts a section (or another label's) passed over, and for each of the others
     // the cursor going to it and a question, after which the run goes on.
     const auto& song = document_.song();
     const auto& meter = song.meter();
-    const auto markers = song.markers();
-    for (; run->next < markers.size(); ++run->next)
+    const auto labels = song.labels();
+    for (; run->next < labels.size(); ++run->next)
     {
-        const auto marker = markers[run->next];
-        if (marker.tick < run->first || marker.tick >= run->last)
+        const auto label = labels[run->next];
+        if (label.tick < run->first || label.tick >= run->last)
         {
             continue; // outside the selection
         }
-        const auto start = meter.barStart(meter.toBarBeatTick(marker.tick).bar);
+        const auto start = meter.barStart(meter.toBarBeatTick(label.tick).bar);
         if (song.sectionStart(song.sectionAt(start)) == start)
         {
             ++run->atStarts;
@@ -3660,32 +3660,32 @@ void Workspace::runMarkers(std::shared_ptr<MarkerRun> run)
             ++run->sharing;
             continue;
         }
-        const auto take = [run, marker, start]
+        const auto take = [run, label, start]
         {
-            run->starts.emplace_back(start, marker.name);
-            run->markers.push_back(marker.tick);
+            run->starts.emplace_back(start, label.name);
+            run->labels.push_back(label.tick);
         };
-        if (marker.tick == start)
+        if (label.tick == start)
         {
             take();
             continue;
         }
         auto cursor = view().cursor();
-        cursor.tick = marker.tick;
+        cursor.tick = label.tick;
         view().setCursor(cursor);
         ++run->next;
         ask(
-            "Start a section at " + positionText(meter, start) + " from the marker " + marker.name +
-                " at " + positionText(meter, marker.tick) + "?",
+            "Start a section at " + positionText(meter, start) + " from the label " + label.name +
+                " at " + positionText(meter, label.tick) + "?",
             [this, run, take]
             {
                 take();
-                runMarkers(run);
+                runLabels(run);
             },
             [this, run]
             {
                 ++run->declined;
-                runMarkers(run);
+                runLabels(run);
             },
             [this, run]
             {
@@ -3694,10 +3694,10 @@ void Workspace::runMarkers(std::shared_ptr<MarkerRun> run)
             });
         return;
     }
-    finishMarkers(*run);
+    finishLabels(*run);
 }
 
-void Workspace::finishMarkers(const MarkerRun& run)
+void Workspace::finishLabels(const LabelRun& run)
 {
     // Every section started at once, as one undo step, the cursor back where it was.
     view().setCursor(run.from);
@@ -3714,11 +3714,11 @@ void Workspace::finishMarkers(const MarkerRun& run)
     add(run.declined, "left as it was", "left as they were");
     if (run.starts.empty())
     {
-        setMessage("No markers turned into sections" + left, MessageKind::Information);
+        setMessage("No labels turned into sections" + left, MessageKind::Information);
         return;
     }
     const auto turned = run.starts.size();
-    document_.edit("Turn " + std::to_string(turned) + (turned == 1 ? " marker" : " markers") +
+    document_.edit("Turn " + std::to_string(turned) + (turned == 1 ? " label" : " labels") +
                        " into sections",
                    view().place(),
                    [&](core::Song& s)
@@ -3727,14 +3727,14 @@ void Workspace::finishMarkers(const MarkerRun& run)
                        {
                            s.splitSection(start, name);
                        }
-                       for (const auto tick : run.markers)
+                       for (const auto tick : run.labels)
                        {
-                           s.removeMarker(tick);
+                           s.removeLabel(tick);
                        }
                    });
     refresh();
     setMessage("Turned " + std::to_string(turned) +
-                   (turned == 1 ? " marker into a section" : " markers into sections") + left,
+                   (turned == 1 ? " label into a section" : " labels into sections") + left,
                MessageKind::Information);
 }
 
@@ -4009,7 +4009,7 @@ std::optional<char> Workspace::palettePrefix() const
 
 std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
 {
-    // @ sections, # tracks, ' markers and ? settings (decided October 2026), each with what
+    // @ sections, # tracks, ' labels and ? settings (decided October 2026), each with what
     // helps choose it: its bars and meter, its port and channel, where it is, its value.
     const auto& song = document_.song();
     std::vector<PaletteItem> items;
@@ -4050,10 +4050,10 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
     }
     else if (prefix == '\'')
     {
-        const auto markers = song.markers();
-        for (std::size_t i = 0; i < markers.size(); ++i)
+        const auto labels = song.labels();
+        for (std::size_t i = 0; i < labels.size(); ++i)
         {
-            item(std::to_string(i), markers[i].name, positionText(song.meter(), markers[i].tick));
+            item(std::to_string(i), labels[i].name, positionText(song.meter(), labels[i].tick));
         }
         for (const auto& mark : song.marks())
         {
@@ -4074,7 +4074,7 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
 
 bool Workspace::inSongOrder() const
 {
-    // Sections, tracks and markers, listed from the top down as the song has them (decided
+    // Sections, tracks and labels, listed from the top down as the song has them (decided
     // October 2026), rather than ranked from the line up as commands are.
     const auto prefix = palettePrefix();
     return prefix && *prefix != '?';
@@ -4099,7 +4099,7 @@ std::vector<PaletteItem> Workspace::paletteShown() const
 
 bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
 {
-    // Going to a section, a track or a marker, or a setting on the : prompt to change.
+    // Going to a section, a track or a label, or a setting on the : prompt to change.
     const auto& song = document_.song();
     if (prefix == '?')
     {
@@ -4129,9 +4129,9 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
     {
         cursor.track = song.tracks()[index]->id();
     }
-    else if (prefix == '\'' && index < song.markers().size())
+    else if (prefix == '\'' && index < song.labels().size())
     {
-        cursor.tick = song.markers()[index].tick;
+        cursor.tick = song.labels()[index].tick;
     }
     view().setCursor(cursor);
     return true;

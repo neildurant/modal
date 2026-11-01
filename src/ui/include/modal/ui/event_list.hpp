@@ -23,7 +23,7 @@ enum class RowKind : std::uint8_t
     Section, // a section's start
     Meter,
     Tempo,
-    Marker,
+    Label,
     Event, // one of the track's events
     End,   // the end of the song, last
 };
@@ -32,7 +32,7 @@ struct EventRow
 {
     RowKind kind;
     core::Tick tick;   // from the song's start
-    std::size_t index; // the event's in the track's events, or the section's, change's or marker's
+    std::size_t index; // the event's in the track's events, or the section's, change's or label's
     bool dim;          // the conductor's, shown in a track's list to find the way by; it's
                        // changed only in the conductor's own list (decided in milestone 4)
 };
@@ -64,10 +64,10 @@ struct RowText
 };
 
 // One track's event list, or the conductor's: a row for each of the track's events, with
-// the conductor's section starts, meter and tempo changes and markers among them, dimmed,
+// the conductor's section starts, meter and tempo changes and labels among them, dimmed,
 // and the end of the song last (decided in milestone 4). The conductor's list has its own
 // rows, not dimmed, and no events. At the same tick, a section comes first, then meter,
-// tempo and markers, then events in the order they're sent. Meters are the track's own
+// tempo and labels, then events in the order they're sent. Meters are the track's own
 // where it has them, and then not dimmed.
 class EventList
 {

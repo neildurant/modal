@@ -24,7 +24,7 @@ namespace modal::core
 //   section "Intro" bars=4
 //     meter 1:1:0 4/4
 //     tempo 1:1:0 120
-//     marker 3:1:0 "fix this fill"
+//     label 3:1:0 "fix this fill"
 //     track 1
 //       1:1:0 note E1 v=96 len=1/8
 

@@ -22,7 +22,7 @@ core::Song song()
     core::Song s{core::kPpqn};
     const auto bass = s.addTrack("Bass");
     s.updateTrack(bass, [](core::Track& t) { t.channel = 3; });
-    s.setMarker(2 * q, "fill");
+    s.setLabel(2 * q, "fill");
     s.updateEvents(bass,
                    [](core::EventList& events)
                    {
@@ -113,6 +113,6 @@ TEST_CASE("on a row that isn't an event, the inspector says what the row is")
     const EventList halfList{odd, odd.tracks()[0]->id()};
     CHECK(of(halfList, RowKind::Tempo).fields[3] == InspectorField{"Per quarter", "594.5 ms"});
     CHECK(of(list, RowKind::Meter).fields[2] == InspectorField{"Meter", "4/4"});
-    CHECK(of(list, RowKind::Marker).fields[2] == InspectorField{"Marker", "fill"});
+    CHECK(of(list, RowKind::Label).fields[2] == InspectorField{"Label", "fill"});
     CHECK(of(list, RowKind::End).fields[2] == InspectorField{"Song", "2 bars, 0:04.000"});
 }

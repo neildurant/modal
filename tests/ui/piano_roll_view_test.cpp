@@ -406,17 +406,17 @@ std::vector<std::u32string> texts(const std::vector<std::pair<int, std::u32strin
 
 } // namespace
 
-TEST_CASE("the piano roll's ruler names the sections and markers and numbers the bars")
+TEST_CASE("the piano roll's ruler names the sections and labels and numbers the bars")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
     const auto& t = r.t;
-    r.document.edit("Marker", {}, [&](core::Song& song) { song.setMarker(t.bar(4), "Fill"); });
+    r.document.edit("Label", {}, [&](core::Song& song) { song.setLabel(t.bar(4), "Fill"); });
     using Texts = std::vector<std::u32string>;
-    // Bars 1-4: Section 1, then the Verse from bar 3, with the marker in it.
+    // Bars 1-4: Section 1, then the Verse from bar 3, with the label in it.
     CHECK(texts(rulerRow(r, 0)) == Texts{U"Section 1", U"Verse", U"Fill"});
     CHECK(texts(rulerRow(r, 1)) == Texts{U"1", U"2", U"3", U"4"});
-    // The section's start a line down through the notes, stronger than the marker's.
+    // The section's start a line down through the notes, stronger than the label's.
     std::vector<std::uint8_t> lines;
     const auto frame = r.ws.frame();
     for (const auto& region : frame)
@@ -425,7 +425,7 @@ TEST_CASE("the piano roll's ruler names the sections and markers and numbers the
         {
             for (const auto& shape : region.under)
             {
-                if (shape.role == Role::Marker)
+                if (shape.role == Role::Label)
                 {
                     lines.push_back(shape.alpha);
                 }

@@ -30,7 +30,7 @@ core::Song twoTracks()
     const auto bass = song.addTrack("Bass");
     const auto lead = song.addTrack("Lead");
     song.updateTrack(bass, [](core::Track& t) { t.port = "Pro-800"; });
-    song.setMarker(2 * q, "fill");
+    song.setLabel(2 * q, "fill");
     song.updateEvents(bass,
                       [&](core::EventList& events)
                       {
@@ -235,7 +235,7 @@ TEST_CASE("gg goes to the first row and G to the end, or with a count to that ba
 TEST_CASE("time motions go to the event at or after where they land, in the track's bars")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
-    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    // 1:2:240, 6 label at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
     type(v.ws, U"6j}"); // a bar on from 1:3:000 is 2:3:000, with nothing after but the end
     CHECK(v.view.row() == 9);
@@ -292,7 +292,7 @@ TEST_CASE("( and ) go by chords: events starting within the chord window of each
     CHECK(chord.view.list().rows()[chord.view.row()].tick == 20);
 }
 
-TEST_CASE("section and marker motions go to their rows")
+TEST_CASE("section and label motions go to their rows")
 {
     Viewing v;
     type(v.ws, U"]s");
@@ -301,18 +301,18 @@ TEST_CASE("section and marker motions go to their rows")
     CHECK(v.view.row() == 0); // from the verse's first note, at its start, the section before
     type(v.ws, U"6j[s");
     CHECK(v.view.row() == 0); // from inside a section, its start
-    type(v.ws, U"]m");
+    type(v.ws, U"]l");
     CHECK(v.view.row() == 6);
-    type(v.ws, U"G[m");
+    type(v.ws, U"G[l");
     CHECK(v.view.row() == 6);
-    type(v.ws, U"]m");
+    type(v.ws, U"]l");
     CHECK(v.view.row() == 6); // none after: it stays
 }
 
 TEST_CASE("x deletes the event under the cursor, and u brings it back where it was")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
-    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    // 1:2:240, 6 label at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
@@ -349,7 +349,7 @@ TEST_CASE("x deletes the event under the cursor, and u brings it back where it w
 TEST_CASE("dd and yy take the cursor's bar's events, which p puts from the start of a bar")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
-    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    // 1:2:240, 6 label at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
@@ -443,21 +443,21 @@ TEST_CASE("an operator waits for its motion, and Escape or another key gives it 
 
 TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes changes")
 {
-    // The conductor's rows: 0 section Song, 1 meter, 2 tempo, 3 marker at 1:3:000, 4 section
+    // The conductor's rows: 0 section Song, 1 meter, 2 tempo, 3 label at 1:3:000, 4 section
     // Verse at 2:1:000, and 5 the end.
     Viewing v;
     const auto& song = [&]() -> const core::Song& { return v.document.song(); };
     type(v.ws, U"gT");
     REQUIRE(v.view.track() == 0);
 
-    type(v.ws, U"3jl"); // the marker's name
+    type(v.ws, U"3jl"); // the label's name
     enter(v.ws);
     CHECK(v.view.fieldLine().text() == U"fill");
     type(v.ws, U"fix");
     enter(v.ws);
-    CHECK(song().markers()[0].name == "fix");
+    CHECK(song().labels()[0].name == "fix");
     type(v.ws, U"u");
-    CHECK(v.ws.message() == "Undid: Rename marker fill to fix");
+    CHECK(v.ws.message() == "Undid: Rename label fill to fix");
 
     type(v.ws, U"j"); // the verse's name
     enter(v.ws);
@@ -504,13 +504,13 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
     CHECK(v.ws.remembered().meters().front() == core::TimeSignature{2, 2});
     type(v.ws, U"u");
 
-    // A section's own tempo and meter, and the section, can't be deleted; a marker can.
+    // A section's own tempo and meter, and the section, can't be deleted; a label can.
     type(v.ws, U"gg3x");
     CHECK(v.ws.message().starts_with("Every section keeps its tempo and meter at its start"));
-    type(v.ws, U"gg]m");
-    REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Marker);
+    type(v.ws, U"gg]l");
+    REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Label);
     type(v.ws, U"x");
-    CHECK(song().markers().empty());
+    CHECK(song().labels().empty());
 
     // A tempo change inside a section can.
     v.document.edit("Add a tempo change", {}, [](core::Song& s)
@@ -999,7 +999,7 @@ TEST_CASE(":section-split starts a new section at the bar line of the cursor's b
 TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on along the row")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
-    // 1:2:240, 6 marker at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
+    // 1:2:240, 6 label at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
     Viewing v;
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };

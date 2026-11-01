@@ -88,10 +88,10 @@ EventList::EventList(core::Song song, std::optional<core::TrackId> track)
     {
         add(RowKind::Tempo, tempo[i].tick, i, !conductor);
     }
-    const auto markers = song_.markers();
-    for (std::size_t i = 0; i < markers.size(); ++i)
+    const auto labels = song_.labels();
+    for (std::size_t i = 0; i < labels.size(); ++i)
     {
-        add(RowKind::Marker, markers[i].tick, i, !conductor);
+        add(RowKind::Label, labels[i].tick, i, !conductor);
     }
     if (track_)
     {
@@ -133,9 +133,9 @@ RowText EventList::text(std::size_t row) const
         set(Column::Event, "tempo");
         set(Column::Data, core::bpmText(song_.tempo().changes()[r.index].tempo));
         break;
-    case RowKind::Marker:
-        set(Column::Event, "marker");
-        set(Column::Data, song_.markers()[r.index].name);
+    case RowKind::Label:
+        set(Column::Event, "label");
+        set(Column::Data, song_.labels()[r.index].name);
         break;
     case RowKind::End:
         set(Column::Event, "end");

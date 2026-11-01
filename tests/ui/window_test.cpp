@@ -181,13 +181,13 @@ TEST_CASE("a region is clipped to its bounds, with shapes under and over its tex
                   .background = Role::Bar,
                   .text = {},
                   .under = {{{-100, -100, 1000, 1000}, Role::Note, 255}},
-                  .over = {{{20, 0, 5, 30}, Role::Marker, 255}}};
+                  .over = {{{20, 0, 5, 30}, Role::Label, 255}}};
     window->draw({region}, theme);
     CHECK(window->pixel(9, 9) == theme[Role::Chrome]);
     CHECK(window->pixel(10, 10) == theme[Role::Note]);
     CHECK(window->pixel(49, 39) == theme[Role::Note]);
     CHECK(window->pixel(50, 40) == theme[Role::Chrome]);
-    CHECK(window->pixel(32, 20) == theme[Role::Marker]); // over, offset by the bounds
+    CHECK(window->pixel(32, 20) == theme[Role::Label]); // over, offset by the bounds
 }
 
 TEST_CASE("a bottom bar touches the bottom edge, whatever the window's height")

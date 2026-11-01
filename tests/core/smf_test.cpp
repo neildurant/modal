@@ -255,8 +255,8 @@ TEST_CASE("type 1 files: conductor track, tempo, meter and markers")
     CHECK(song.tempo().tempoAt(0) == Tempo{600'000});
     CHECK(song.tempo().tempoAt(bar5) == Tempo{500'000});
 
-    REQUIRE(song.markers().size() == 1);
-    CHECK(song.markers()[0] == Marker{bar5, "Chorus"});
+    REQUIRE(song.labels().size() == 1);
+    CHECK(song.labels()[0] == Label{bar5, "Chorus"});
 
     // Time signatures apply to every track.
     for (const auto& track : song.tracks())
@@ -281,9 +281,9 @@ TEST_CASE("an imported file is one section, with a conductor track's cue points 
     const auto song = importOk(makeSmf(1, division, {conductor, bass}));
 
     REQUIRE(song.tracks().size() == 1); // the cue points don't make a track
-    REQUIRE(song.markers().size() == 2);
-    CHECK(song.markers()[0] == Marker{0, "count in"});
-    CHECK(song.markers()[1] == Marker{2 * kPpqn.whole(), "fix this"});
+    REQUIRE(song.labels().size() == 2);
+    CHECK(song.labels()[0] == Label{0, "count in"});
+    CHECK(song.labels()[1] == Label{2 * kPpqn.whole(), "fix this"});
 
     // A cue point among a track's notes stays one of its events.
     const auto id = song.tracks()[0]->id();

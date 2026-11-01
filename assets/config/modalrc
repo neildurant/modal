@@ -22,7 +22,7 @@ nmap G          go-last           "End, or bar {count}"
 
 " Moving in time, to the event at or after where each lands, in the track's bars: the same
 " place a bar on, a bar line, a chord (events starting within chordwindow of each other), a
-" section's start, a marker
+" section's start, a label
 keysection "Moving in time"
 nmap }          cursor-bar-next           "Same place, next bar"
 nmap {          cursor-bar-previous       "Same place, bar before"
@@ -32,8 +32,8 @@ nmap )          cursor-chord-next         "Next chord"
 nmap (          cursor-chord-previous     "Chord before"
 nmap ]s         cursor-section-next       "Next section"
 nmap [s         cursor-section-previous   "Section before"
-nmap ]m         cursor-marker-next        "Next marker"
-nmap [m         cursor-marker-previous    "Marker before"
+nmap ]l         cursor-label-next         "Next label"
+nmap [l         cursor-label-previous     "Label before"
 
 " The piano roll: k and j move a semitone, K and J an octave, and Tab and Shift-Tab go to
 " the next note's start at any pitch and the one before, notes starting together low to high.
@@ -285,7 +285,7 @@ nmap <C-k0>     font-reset
 " The command line: : opens it, and in it these keys edit, run and recall lines. Other
 " characters are typed. Ctrl-p (or , :) opens the command palette there: type part of a
 " command's name or what it does; Up and Down (or Ctrl-p and Ctrl-n) choose, Enter runs, Tab
-" puts the command on the line. A first @ searches the sections, # the tracks, ' the markers
+" puts the command on the line. A first @ searches the sections, # the tracks, ' the labels
 " and ? the settings.
 keysection "The command line"
 nmap :          command-line            "Command line"

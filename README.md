@@ -39,20 +39,20 @@ The programs are in `build/<preset>/apps/Release` (or `Debug`):
 
 Modal opens in the arrangement: a row for each track, its bars drawn as blocks shaded by how busy they are, under a ruler of sections, meters and bar numbers. The cursor is a bar of a track: `h` `l` move by bars, `j` `k` between tracks, `gg` `G` (or `0` `$`) to the first and last bar, `]s` `[s` to sections, Tab and Shift-Tab past empty bars to the next or previous bar with events on the track, `zi` `zo` `z0` zoom, and Enter opens the bar in the piano roll. `d` and `y` take bars as Vim's operators take text: `dd` (or `dib`) deletes the events starting in the cursor's bar, `3dd` in three bars, `d2l` this bar and the next, `dG` to the end, and `dj` the cursor's bar on this track and the next; `dab` takes the bar out, moving the rest of the section up a bar. `dis` deletes the events in the cursor's section on its track, `dit` all of the track's (`d2it` this track's and the next's), and `das` takes the section out of the song, on every track. `p` puts what was yanked or deleted at the start of the cursor's bar, over what's there, and `P` puts it in, moving the rest of the section later (asking first if the section must grow). The other operators take bars too: `>>` transposes this bar up a semitone, `t]s` moves the rest of the section on by a grid step, controllers too, and `qj` quantises this bar on this track and the next.
 
-On every track at once: `:bar-delete` deletes the cursor's bar (`:bar-delete 2` two), keeping it in the register as a section, and `:bar-insert` puts an empty bar in before it (`:bar-insert 2 3/4` two bars of 3/4). `:marker-to-section` starts a section at the marker at or before the cursor, named after it; on a selection, at every marker in it, so `vie:marker-to-section` does it for the whole song, as for an imported MIDI file whose markers mark its structure.
+On every track at once: `:bar-delete` deletes the cursor's bar (`:bar-delete 2` two), keeping it in the register as a section, and `:bar-insert` puts an empty bar in before it (`:bar-insert 2 3/4` two bars of 3/4). `:label-to-section` starts a section at the label at or before the cursor, named after it; on a selection, at every label in it, so `vie:label-to-section` does it for the whole song, as for an imported MIDI file whose labels mark its structure.
 
 Above the tracks is the section strip: `gs` (or `k` from the first track) goes to it, and `j` back. There `h` `l` go between sections; `x` and `Y` delete and yank a section, `d` and `y` with `h` `l` or `gg` `G` several, and `p` and `P` put them after or before; `is` takes the section's events on every track (`dis` clears it, `qis` quantises it, `>is` transposes it); `Alt-h` `Alt-l` move one; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert a new one; `c` renames it; `e` edits its name and length in the inspector; and Enter plays from it. `ge` shows the event list at the cursor, `ga` the arrangement, and Backspace goes back to the view before.
 
 ### The piano roll
 
-`gr`, or Enter on a bar in the arrangement, opens the cursor's track in the piano roll: pages of whole bars, under a ruler of sections, markers and bar numbers, with the note names down the left and the velocities in a lane below. The cursor is a time and a pitch, and the note it's on is shown in the inspector above.
+`gr`, or Enter on a bar in the arrangement, opens the cursor's track in the piano roll: pages of whole bars, under a ruler of sections, labels and bar numbers, with the note names down the left and the velocities in a lane below. The cursor is a time and a pitch, and the note it's on is shown in the inspector above.
 
 | Keys | What they do |
 |------|--------------|
 | `h` `l`, `k` `j`, `K` `J` | A grid step later or earlier, a semitone up or down, an octave up or down |
 | `Tab` `Shift-Tab`, `)` `(` | The next or previous note, at any pitch, or chord |
 | `]b` `[b`, `}` `{`, `0` `$` | The next or previous bar line, the same place a bar on or back, the bar's start or last step |
-| `gg` `G`, `]s` `[s`, `]m` `[m` | The song's start and end (`5G` bar 5), sections, markers |
+| `gg` `G`, `]s` `[s`, `]l` `[l` | The song's start and end (`5G` bar 5), sections, labels |
 | `zh` `zl`, `Ctrl-T` | A finer or coarser grid, triplets on or off (`:grid 1/16` sets it) |
 | `zi` `zo` `z0`, `zz` | Fewer or more bars to a page, or back to the page size it opens at; centre the cursor |
 | `o`, `O` | Add the track's default note at the cursor; or add it and move on to its end (`8O` eight in a row) |
@@ -74,7 +74,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 
 ### The event list
 
-`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`), and the event list shows it one track at a time; plain `modal` starts a new song, and `modal --demo` opens a made-up demo song. `:w` saves, `:e FILE` opens, `:export FILE.mid` exports a MIDI file and `:q` quits, as in Vim; closing the window with changes not saved asks whether to save them. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and markers are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
+`modal FILE` opens a song (`.modal`) or imports a MIDI file (`.mid`), and the event list shows it one track at a time; plain `modal` starts a new song, and `modal --demo` opens a made-up demo song. `:w` saves, `:e FILE` opens, `:export FILE.mid` exports a MIDI file and `:q` quits, as in Vim; closing the window with changes not saved asks whether to save them. Each event is a row, with its fields in columns. The conductor's section starts, meters, tempos and labels are shown dimmed among a track's events, to find the way by; they're edited in the conductor's own list, track 0.
 
 | Keys | What they do |
 |------|--------------|
@@ -83,7 +83,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `gg` `G` | First event and the end; with a count, that bar |
 | `}` `{`, `]b` `[b` | The event at or after the same place a bar on or back, or a bar line |
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
-| `]s` `[s`, `]m` `[m` | The next or previous section's start, or marker |
+| `]s` `[s`, `]l` `[l` | The next or previous section's start, or label |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
 | `ic`, `is`, `it` | With an operator, the chord this note is in, this section's events, the track's |
 | `>` `<`, `t` `T`, `q`, `^`, `~` | Transpose, move by the grid step, quantise, change velocity and humanise the events a motion takes, as in the piano roll (`>j` this event and the next) |
@@ -98,7 +98,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `ma`, `'a`, `''` | Mark the cursor's place as a, saved with the song; go to it, or after an operator take the range to it (`>'a`); go back to before the last jump |
 | `.` | Repeat the last change, with its range or object (`>>` then `.` on another bar); a count replaces its own |
 | `v`, then a motion or object | Select: in the arrangement bars on every track, in the piano roll time at every pitch, in the event list rows, on the strip sections; then `d` deletes what's selected, `D` takes its time out, `y` yanks, `p` puts over it and the other operators change it. `o` the other end, `gv` the last selection again, Escape ends it |
-| `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:marker-to-section`) |
+| `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:label-to-section`) |
 | Enter on a selection | In the arrangement, open its bars in the piano roll as the page, turning on by as many |
 | `\|` | Cut the notes crossing the edges, so operators take only the parts inside: on a selection, or before an operator for it alone (`\|d]b`) |
 | `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
@@ -106,11 +106,11 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
 | `Ctrl-Shift-h` `Ctrl-Shift-l` (or the arrows) | In the arrangement and the piano roll, a page earlier or later, the cursor staying in place on screen |
 | `zz` | Centre the cursor |
-| `Ctrl-p`, `, :` | The command palette: type part of a command's name, what it does or its keys, Enter runs it, Tab puts it on the `:` prompt; `@` first searches sections, `#` tracks, `'` markers, `?` settings |
+| `Ctrl-p`, `, :` | The command palette: type part of a command's name, what it does or its keys, Enter runs it, Tab puts it on the `:` prompt; `@` first searches sections, `#` tracks, `'` labels, `?` settings |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
 | Space, Shift-Space | Play from the play-from marker (the ▶ in the margin), or stop where it is, the cursor landing there; Shift-Space stops and goes back to where the cursor was |
 | `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |
-| `, t Space` | Rewind on or off: whether the marker stays put when playback stops, so Space plays the same again, or moves to where it stopped, so Space carries on |
+| `, t Space` | Rewind on or off: whether the play-from marker stays put when playback stops, so Space plays the same again, or moves to where it stopped, so Space carries on |
 | `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
 | `ga`, `ge`, Backspace | The arrangement, the event list, and back to the view before |
 | `,` | The leader key, for commands used now and then: after any keys that start longer ones, or an operator, a pause shows a menu of what can follow |

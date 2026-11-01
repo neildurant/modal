@@ -349,7 +349,7 @@ private:
     bool readSection(std::span<const Token> tokens);
     bool readMeter(std::span<const Token> tokens);
     bool readTempo(std::span<const Token> tokens);
-    bool readMarker(std::span<const Token> tokens);
+    bool readLabel(std::span<const Token> tokens);
     bool readMark(std::span<const Token> tokens);
     bool readBlock(std::span<const Token> tokens);
     bool readEvent(std::span<const Token> tokens);
@@ -388,9 +388,9 @@ private:
         std::optional<std::string> colour;
         std::int64_t bars = 0;
         std::optional<MeterMap> meter;
-        bool meterClosed = false; // by a tempo, marker or track line
+        bool meterClosed = false; // by a tempo, label or track line
         std::vector<std::pair<Pending, Tempo>> tempo;
-        std::vector<std::pair<Pending, std::string>> markers;
+        std::vector<std::pair<Pending, std::string>> labels;
         std::vector<std::pair<int, Mark>> marks; // with their lines
         std::optional<Section> section;          // once the conductor's part is complete
         std::set<TrackId> blocks;
@@ -500,16 +500,17 @@ bool Reader::readLine(std::span<const Token> tokens)
         }
         return word == "metronome" ? readMetronome(tokens) : readCountIn(tokens);
     }
-    if (word == "meter" || word == "tempo" || word == "marker" || word == "mark")
+    // marker: labels' old name, so songs saved before they were renamed still open.
+    if (word == "meter" || word == "tempo" || word == "label" || word == "marker" || word == "mark")
     {
         if (!section_)
         {
             return fail(word + " belongs in a section");
         }
-        return word == "meter"    ? readMeter(tokens)
-               : word == "tempo"  ? readTempo(tokens)
-               : word == "marker" ? readMarker(tokens)
-                                  : readMark(tokens);
+        return word == "meter"                       ? readMeter(tokens)
+               : word == "tempo"                     ? readTempo(tokens)
+               : word == "label" || word == "marker" ? readLabel(tokens)
+                                                     : readMark(tokens);
     }
     return fail("unknown line \"" + word + "\"");
 }
@@ -900,19 +901,19 @@ bool Reader::readTempo(std::span<const Token> tokens)
     return true;
 }
 
-bool Reader::readMarker(std::span<const Token> tokens)
+bool Reader::readLabel(std::span<const Token> tokens)
 {
     if (block_ || section_->section)
     {
-        return fail("marker lines come before the section's tracks");
+        return fail("label lines come before the section's tracks");
     }
     if (tokens.size() != 3 || !tokens[2].quoted)
     {
-        return fail("a marker line is a position and a name in quotes");
+        return fail("a label line is a position and a name in quotes");
     }
     if (!section_->meter)
     {
-        return fail("the section's meter comes before its markers");
+        return fail("the section's meter comes before its labels");
     }
     section_->meterClosed = true;
     const auto tick = tickAt(*section_->meter, tokens[1].text);
@@ -920,7 +921,7 @@ bool Reader::readMarker(std::span<const Token> tokens)
     {
         return false;
     }
-    section_->markers.push_back({{line_, *tick}, tokens[2].text});
+    section_->labels.push_back({{line_, *tick}, tokens[2].text});
     return true;
 }
 
@@ -1210,7 +1211,7 @@ bool Reader::closeConductor()
         return failAt(open.line, "the section has no meter");
     }
     std::ranges::stable_sort(open.tempo, {}, [](const auto& t) { return t.first.tick; });
-    std::ranges::stable_sort(open.markers, {}, [](const auto& m) { return m.first.tick; });
+    std::ranges::stable_sort(open.labels, {}, [](const auto& m) { return m.first.tick; });
     if (open.tempo.empty() || open.tempo.front().first.tick != 0)
     {
         return failAt(open.line, "the section has no tempo at 1:1:0");
@@ -1232,22 +1233,22 @@ bool Reader::closeConductor()
         }
         section.addTempo({at.tick, tempo});
     }
-    for (std::size_t i = 0; i < open.markers.size(); ++i)
+    for (std::size_t i = 0; i < open.labels.size(); ++i)
     {
-        const auto& [at, name] = open.markers[i];
+        const auto& [at, name] = open.labels[i];
         if (at.tick >= length)
         {
-            return failAt(at.line, "the marker is past the end of the section");
+            return failAt(at.line, "the label is past the end of the section");
         }
-        if (i > 0 && at.tick == open.markers[i - 1].first.tick)
+        if (i > 0 && at.tick == open.labels[i - 1].first.tick)
         {
-            return failAt(at.line, "there's already a marker there");
+            return failAt(at.line, "there's already a label there");
         }
-        if (std::ranges::any_of(section.markers(), [&](const Marker& m) { return m.name == name; }))
+        if (std::ranges::any_of(section.labels(), [&](const Label& m) { return m.name == name; }))
         {
-            return failAt(at.line, "there's already a marker \"" + name + "\" in this section");
+            return failAt(at.line, "there's already a label \"" + name + "\" in this section");
         }
-        section.addMarker({at.tick, name});
+        section.addLabel({at.tick, name});
     }
     for (const auto& [at, mark] : open.marks)
     {
@@ -1425,15 +1426,15 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
                 section.addTempo({tick, change.tempo});
             }
         }
-        for (const auto& marker : old->markers())
+        for (const auto& label : old->labels())
         {
-            const Tick tick = scale(marker.tick);
-            if (!section.markers().empty() && tick <= section.markers().back().tick)
+            const Tick tick = scale(label.tick);
+            if (!section.labels().empty() && tick <= section.labels().back().tick)
             {
-                error = "two markers fall on one tick at " + std::to_string(to.value) + " PPQN";
+                error = "two labels fall on one tick at " + std::to_string(to.value) + " PPQN";
                 return std::nullopt;
             }
-            section.addMarker({tick, marker.name});
+            section.addLabel({tick, label.name});
         }
         for (auto mark : old->marks())
         {
@@ -1577,9 +1578,9 @@ std::string writeSong(const Song& song)
         {
             line(1, "tempo " + positionText(meter, change.tick) + " " + bpmText(change.tempo));
         }
-        for (const auto& marker : section->markers())
+        for (const auto& label : section->labels())
         {
-            line(1, "marker " + positionText(meter, marker.tick) + " " + quotedText(marker.name));
+            line(1, "label " + positionText(meter, label.tick) + " " + quotedText(label.name));
         }
         for (const auto& mark : section->marks())
         {

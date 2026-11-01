@@ -142,7 +142,7 @@ struct ParsedFile
     std::vector<ParsedTrack> tracks;
     std::vector<TempoAt> tempos;
     std::vector<MeterAt> meters;
-    std::vector<Marker> markers;
+    std::vector<Label> markers;
     std::vector<std::string> warnings;
 };
 
@@ -656,7 +656,7 @@ Song buildSong(ParsedFile& file)
     // everything.
     for (const auto& marker : file.markers)
     {
-        song.setMarker(rescale(marker.tick), marker.name);
+        song.setLabel(rescale(marker.tick), marker.name);
     }
     song.fitToContent();
 

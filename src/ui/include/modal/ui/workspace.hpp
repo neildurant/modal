@@ -111,8 +111,8 @@ public:
     void setPlayer(core::Player* player);
 
     // Whether the play-from marker stays put when playback stops (the rewind setting), and the
-    // cursor stays where it was; otherwise the marker moves to where playback stops, and the
-    // cursor follows the playhead there.
+    // cursor stays where it was; otherwise the play-from marker moves to where playback stops, and
+    // the cursor follows the playhead there.
     void setRewind(bool rewind);
 
     // How far ~ moves notes at most, either way: in time (humanizetime) and in velocity
@@ -310,10 +310,10 @@ private:
     // The conductor's bars from one bar line to another, on every track, closing up.
     CommandResult deleteBars(core::Tick from, core::Tick to);
     CommandResult barInsert(std::string_view arguments);
-    // Markers made section starts, the one at or before the cursor, or all of them.
-    CommandResult markerToSection();
-    // :marker-to-section on a selection: every marker from one time to another.
-    CommandResult markersToSections(core::Tick from, core::Tick to);
+    // Labels made section starts, the one at or before the cursor, or all of them.
+    CommandResult labelToSection();
+    // :label-to-section on a selection: every label from one time to another.
+    CommandResult labelsToSections(core::Tick from, core::Tick to);
     CommandResult renameSection(std::string_view name);
 
     Region promptRegion() const;
@@ -372,7 +372,7 @@ private:
     std::vector<PaletteItem> paletteItems() const;
     std::vector<PaletteItem> paletteShown() const;
     // The palette searching other things, by a first character: @ sections, # tracks, '
-    // markers, ? settings; what it lists then, and going to one.
+    // labels, ? settings; what it lists then, and going to one.
     std::optional<char> palettePrefix() const;
     bool inSongOrder() const;
     std::vector<PaletteItem> prefixItems(char prefix) const;
@@ -464,22 +464,22 @@ private:
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};
-    // :marker-to-section on a selection, going through its markers, asking about those off a
+    // :label-to-section on a selection, going through its labels, asking about those off a
     // bar line.
-    struct MarkerRun
+    struct LabelRun
     {
         SongCursor from; // where the cursor goes back to
         std::size_t next = 0;
         std::vector<std::pair<core::Tick, std::string>> starts; // a section's start, its name
-        std::vector<core::Tick> markers;                        // the markers turned
+        std::vector<core::Tick> labels;                         // the labels turned
         int atStarts = 0;
         int sharing = 0;
         int declined = 0;
-        core::Tick first = 0; // the selection's span, outside which markers are passed over
+        core::Tick first = 0; // the selection's span, outside which labels are passed over
         core::Tick last = 0;
     };
-    void runMarkers(std::shared_ptr<MarkerRun> run);
-    void finishMarkers(const MarkerRun& run);
+    void runLabels(std::shared_ptr<LabelRun> run);
+    void finishLabels(const LabelRun& run);
     EventRegister register_;
     std::string message_;
     MessageKind messageKind_ = MessageKind::Information;

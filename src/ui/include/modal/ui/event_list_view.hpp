@@ -24,7 +24,7 @@ namespace modal::ui
 {
 
 // The event list (decided in milestone 4): one track's events at a time, with the
-// conductor's section starts, meter and tempo changes and markers among them, dimmed, and
+// conductor's section starts, meter and tempo changes and labels among them, dimmed, and
 // the end of the song last; or the conductor's own list, track 0. A row for each event,
 // with its fields in columns under fixed headings; the cursor is on one field of one row.
 // A bar at the top names the track and the section the cursor is in, and the inspector below
@@ -144,8 +144,8 @@ private:
     bool finishField();
     bool stepFieldBy(int steps);
 
-    // The conductor's list: sets a row's value (a section's or marker's name, a tempo, a
-    // meter) from text or steps it, or deletes the tempo and meter changes and markers among
+    // The conductor's list: sets a row's value (a section's or label's name, a tempo, a
+    // meter) from text or steps it, or deletes the tempo and meter changes and labels among
     // some rows, but not a section's own tempo and meter at its start, nor a section.
     std::optional<std::string> setConductor(std::size_t row, std::string_view text);
     std::optional<std::string> stepConductor(std::size_t row, int steps);

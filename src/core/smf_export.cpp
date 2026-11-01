@@ -285,7 +285,7 @@ SmfExportResult exportSmf(const Song& song, SmfType type)
                 {song.sectionStart(i), Slot::Conductor, meta(0x06, sections[i]->name())});
         }
     }
-    for (const auto& marker : song.markers())
+    for (const auto& marker : song.labels())
     {
         conductor.push_back({marker.tick, Slot::Conductor, meta(0x07, marker.name)});
     }

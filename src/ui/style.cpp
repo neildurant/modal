@@ -11,7 +11,7 @@ namespace
 constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "background",  "text",      "dim",       "accent",    "warning",  "message",    "cursor",
     "cursor-text", "selection", "playhead",  "bar",       "bar-text", "panel",      "chrome",
-    "mode",        "mode-text", "grid-line", "beat-line", "bar-line", "note",       "marker",
+    "mode",        "mode-text", "grid-line", "beat-line", "bar-line", "note",       "label",
     "density-1",   "density-2", "density-3", "density-4", "hint-key", "hint-group", "note-selected",
 };
 
@@ -41,6 +41,10 @@ std::string_view roleName(Role role)
 
 std::optional<Role> roleFromName(std::string_view name)
 {
+    if (name == "marker")
+    {
+        name = "label"; // labels' old name, so themes written before still load
+    }
     for (std::size_t i = 0; i < kRoleCount; ++i)
     {
         if (kRoleNames[i] == name)

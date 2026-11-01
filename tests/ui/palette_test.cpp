@@ -347,12 +347,12 @@ TEST_CASE("the palette ranks commands by how often and how lately they're run fr
     CHECK(p.ws.mode() == Mode::CommandLine);
 }
 
-TEST_CASE("a first character searches other things: @ sections, # tracks, ' markers, ? settings")
+TEST_CASE("a first character searches other things: @ sections, # tracks, ' labels, ? settings")
 {
     Paletting p;
     const auto& song = p.document.song();
-    p.document.edit("Marker", {},
-                    [](core::Song& s) { s.setMarker(4 * core::kPpqn.whole(), "Fill"); });
+    p.document.edit("Label", {},
+                    [](core::Song& s) { s.setLabel(4 * core::kPpqn.whole(), "Fill"); });
 
     // @ goes to a section.
     REQUIRE(song.sections().size() > 1);
@@ -378,7 +378,7 @@ TEST_CASE("a first character searches other things: @ sections, # tracks, ' mark
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.arrangement().page().track() == last);
 
-    // ' goes to a marker.
+    // ' goes to a label.
     p.open();
     p.type(U"'fill");
     p.press(Key::of(NamedKey::Enter));
@@ -398,7 +398,7 @@ TEST_CASE("a first character searches other things: @ sections, # tracks, ' mark
 }
 
 TEST_CASE(
-    "sections, tracks and markers are listed top down in song order, the keys moving as it looks")
+    "sections, tracks and labels are listed top down in song order, the keys moving as it looks")
 {
     Paletting p;
     const auto& song = p.document.song();

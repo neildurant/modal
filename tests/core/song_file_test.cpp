@@ -68,8 +68,8 @@ Song everything(Ppqn ppqn)
             tempo.set(0, Tempo{523'456}); // a tempo needing decimals
             tempo.set(2 * bar + q, Tempo::fromBpm(140));
         });
-    song.setMarker(q, "fix \"this\" fill");
-    song.setMarker(5 * bar, "later");
+    song.setLabel(q, "fix \"this\" fill");
+    song.setLabel(5 * bar, "later");
     song.setMark({'a', q + 1, bass, 60});                       // off the grid, with a pitch
     song.setMark({'z', 5 * bar, std::nullopt, Mark::kNoPitch}); // the conductor's
     song.setMark({'m', 3 * bar, lead, Mark::kNoPitch});
@@ -148,7 +148,7 @@ TEST_CASE("the song format")
     song.updateEvents(bass, [&](EventList& events) { events.insert({0, Note{28, 96, q / 2}}); });
     song.updateEvents(drums, [&](EventList& events)
                       { events.insert({7 * q / 2 + q / 4, Note{36, 110, q / 4}}); });
-    song.setMarker(8 * q, "fix this fill");
+    song.setLabel(8 * q, "fix this fill");
     song.setMark({'b', 4 * q, bass, 40});
     song.setMark({'a', 0, std::nullopt, Mark::kNoPitch});
     song.splitSection(16 * q, "Verse 1");
@@ -166,7 +166,7 @@ track 2 "Drums" ch=10
 section "Intro" bars=4
   meter 1:1:0 4/4
   tempo 1:1:0 120
-  marker 3:1:0 "fix this fill"
+  label 3:1:0 "fix this fill"
   mark a 1:1:0
   mark b 2:1:0 track=1 pitch=E2
   track 1
@@ -196,7 +196,7 @@ TEST_CASE("a song at another resolution is rescaled")
                           events.insert({437, Note{62, 100, q}});   // off the grid
                           events.insert({4 * q, Note{64, 100, q}}); // on a bar line
                       });
-    song.setMarker(5, "early");
+    song.setLabel(5, "early");
     song.setMark({'a', q, piano, 60});
     const auto text = writeSong(song);
 
@@ -240,6 +240,20 @@ TEST_CASE("comments, blank lines, indentation and Windows line ends are allowed"
     CHECK(back.song->events(TrackId{5})[0].tick == 96);
 }
 
+TEST_CASE("a song saved when labels were markers still reads")
+{
+    const auto back = readSong("modal-song 1\n"
+                               "song \"S\" ppqn=96\n"
+                               "section \"A\" bars=2\n"
+                               "  meter 1:1:0 4/4\n"
+                               "  tempo 1:1:0 120\n"
+                               "  marker 2:1:0 \"fix this fill\"\n",
+                               Ppqn{96});
+    INFO(back.error);
+    REQUIRE(back.song);
+    CHECK(std::ranges::equal(back.song->labels(), std::vector<Label>{{4 * 96, "fix this fill"}}));
+}
+
 TEST_CASE("anything wrong in a song file stops it being read, saying where")
 {
     const std::string header = "modal-song 1\nsong \"S\" ppqn=960\ntrack 1 \"T\" ch=1\n";
@@ -269,8 +283,8 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + section + "  meter 2:1:0 3/4\n", "line 7", "meter lines come first"},
         {header + section + "  tempo 1:2:0 1001\n", "line 7", "1 to 1000 BPM"},
         {header + section + "  tempo 3:1:0 100\n", "line 7", "past the end"},
-        {header + section + "  marker 1:1:0 \"a\"\n  marker 2:1:0 \"a\"\n", "line 8",
-         "already a marker \"a\""},
+        {header + section + "  label 1:1:0 \"a\"\n  label 2:1:0 \"a\"\n", "line 8",
+         "already a label \"a\""},
         {header + section + "  meter 1:1:0 4/4\n", "line 7", "meter lines come first"},
         {header + section + "  track 2\n", "line 7", "no track 2"},
         {header + section + "  track 1\n  track 1\n", "line 8", "comes twice"},
