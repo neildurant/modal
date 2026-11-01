@@ -216,6 +216,10 @@ public:
     const std::vector<core::Event>& registerEvents() const;
 
     // Shows a message in the status line until the next key.
+    std::optional<int> findClass() const override
+    {
+        return findClass_ >= 0 ? std::optional{findClass_} : std::nullopt;
+    }
     std::optional<core::Tick> jumpTime() const override
     {
         return jumpTime_ >= 0 ? std::optional{jumpTime_} : std::nullopt;
@@ -382,7 +386,10 @@ private:
     // A key as typed, and as . and macros replay them; the keys of the last change, for .;
     // and repeating it.
     bool handleKey(const Key& key, std::int64_t now);
+    bool takeKey(const Key& key, std::int64_t now);
     bool recordChange(const Key& key, std::int64_t now);
+    // Ends the change being typed, for ., if nothing's waiting any more.
+    void endChange();
     bool repeatChange(int count);
     // Macros, a to z, kept in the remembered state: the one recording (0 for none, rather than
     // an optional, which GCC's release build takes for uninitialised) and its keys so far,
@@ -421,6 +428,35 @@ private:
     CommandResult deleteLabels();
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;
+    // Finds (fE): the pitch class of the last (-1 for none), its name as typed, and whether f
+    // and F repeat it, while it's the last thing done, and whether the key being handled kept
+    // that. A find whose name may yet take a sharp or flat (b or #) after its letter: where it
+    // started, whether it found nothing, which a macro fails on only once the name is done,
+    // and for an operator, which can't take the range before then, when its time is up.
+    struct Naming
+    {
+        char32_t letter;
+        bool forward;
+        int count;
+        SongCursor from;
+        bool failed = false;
+        std::int64_t deadline = -1; // none, for a find without an operator
+    };
+    std::optional<Naming> naming_;
+    int findClass_ = -1;
+    std::string findName_;
+    bool findForward_ = true;
+    bool findRepeats_ = false;
+    bool findKept_ = false;
+    std::int64_t keyTimeout_;
+    bool startFind(bool forward, int count);
+    bool nameFind(std::string_view command, char32_t letter, int count);
+    bool finishNaming(std::optional<char32_t> accidental);
+    void settleNaming();
+    // Going to the find's next or previous match, saying so if there's none; whether it found
+    // one.
+    bool goToFound(bool forward, int count);
+    void sayNotFound(bool forward);
     // The named registers, a to z: the one named for the next command, the unnamed register
     // as it was then, adding to a register, and saying what they hold.
     std::map<char32_t, EventRegister> registers_;

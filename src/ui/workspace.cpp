@@ -123,6 +123,30 @@ constexpr std::array kSharedCommands{
                 .keys = false,
                 .motion = true,
                 .palette = false},
+    CommandInfo{.name = "find-next",
+                .description = "Go to the next note of the pitch class named after it, any "
+                               "octave (fE, fF#, fBb), {count} times; after a find, the next "
+                               "again; after an operator, the range to it and through it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "find-previous",
+                .description = "Go to the note before of the pitch class named after it, any "
+                               "octave (FE, FF#, FBb), {count} times; after a find, the one "
+                               "before again; after an operator, the range from it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "cursor-find-next",
+                .description = "To the next note found (fE), as the range an operator takes",
+                .count = true,
+                .keys = false,
+                .motion = true,
+                .palette = false},
+    CommandInfo{.name = "cursor-find-previous",
+                .description = "From the note found before (FE), as the range an operator takes",
+                .count = true,
+                .keys = false,
+                .motion = true,
+                .palette = false},
     CommandInfo{.name = "repeat",
                 .description = "Repeat the last change (.), with its range or object, as one "
                                "undo step; a count replaces the one it had",
@@ -404,7 +428,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 76> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 80> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -461,6 +485,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-section-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-label-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-mark", onlyIn({Tracks, PianoRoll, EventList})},
+            {"find-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"find-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-find-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-find-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-label-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-left-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-right-scroll", onlyIn({Tracks, PianoRoll, EventList})},
@@ -522,6 +550,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
+    , keyTimeout_(timeout)
 {
     keys_.setTakesCharacter([this](std::string_view command) { return takesCharacter(command); });
     for (const auto& info : commands())
@@ -580,6 +609,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              awaiting_ = Awaiting{std::string{name}, call.count};
                              return {true};
+                         }
+                         if (name == "find-next" || name == "find-previous")
+                         {
+                             return {startFind(name == "find-next", call.count)};
                          }
                          // After an operator, every command is its motion, or gives it up.
                          if (mode_ == Mode::OperatorPending)
@@ -692,7 +725,17 @@ std::string Workspace::pending() const
     {
         text += keysOf(awaiting_->command);
     }
-    return text + keys_.pending();
+    if (naming_ && naming_->deadline >= 0)
+    {
+        text += keysOf(naming_->forward ? "find-next" : "find-previous") +
+                encodeUtf8(std::u32string(1, naming_->letter));
+    }
+    text += keys_.pending();
+    if (text.empty() && findRepeats_)
+    {
+        text = keysOf(findForward_ ? "find-next" : "find-previous") + findName_;
+    }
+    return text;
 }
 
 void Workspace::resize(int width, int height, CellSize cell)
@@ -827,16 +870,33 @@ bool Workspace::recordChange(const Key& key, std::int64_t now)
     {
         return handleKey(key, now);
     }
+    // An operator's find waiting for a sharp or flat (dfB) is done at any other key, the
+    // change with it, the key not being part of it.
+    bool changed = false;
+    const bool accidental = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0 &&
+                            (key.character == U'#' || key.character == U'b');
+    if (naming_ && naming_->deadline >= 0 && !accidental && key.named != NamedKey::Escape)
+    {
+        lastTime_ = now;
+        changed = finishNaming(std::nullopt);
+        endChange();
+    }
     if (changeKeys_.empty())
     {
         versionBefore_ = document_.version();
     }
     changeKeys_.push_back(key);
-    const bool changed = handleKey(key, now);
+    changed = handleKey(key, now) || changed;
+    endChange();
+    return changed;
+}
+
+void Workspace::endChange()
+{
     // A command waiting for its letter (@a, "ap) isn't idle yet, so . repeats the whole of it.
     const bool idle = mode_ == Mode::Normal && keys_.pending().empty() && !operator_ &&
-                      !question_ && !cutNext_ && !awaiting_ && !registerName_;
-    if (idle)
+                      !question_ && !cutNext_ && !awaiting_ && !registerName_ && !naming_;
+    if (idle && !changeKeys_.empty())
     {
         if (document_.version() != versionBefore_ && !notAChange_)
         {
@@ -845,13 +905,13 @@ bool Workspace::recordChange(const Key& key, std::int64_t now)
         changeKeys_.clear();
         notAChange_ = false;
     }
-    return changed;
 }
 
 bool Workspace::takesCharacter(std::string_view command) const
 {
     return command == "register-use" || command == "mark-set" || command == "mark-go" ||
-           command == "macro-play" || (command == "macro-record" && recording_ == 0);
+           command == "find-next" || command == "find-previous" || command == "macro-play" ||
+           (command == "macro-record" && recording_ == 0);
 }
 
 bool Workspace::characterAfter(std::string_view command, const Key& key, int count)
@@ -867,7 +927,9 @@ bool Workspace::characterAfter(std::string_view command, const Key& key, int cou
     }
     if (key.named != NamedKey::None || (key.modifiers & (kCtrl | kAlt)) != 0)
     {
-        setMessage(keysFor(command) + " takes a letter after it", MessageKind::Information);
+        setMessage(keysFor(command) + (command.starts_with("find-") ? " takes a note name after it"
+                                                                    : " takes a letter after it"),
+                   MessageKind::Information);
         macroFailed_ = macroDepth_ > 0;
         if (operator_)
         {
@@ -888,6 +950,10 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
     if (command == "mark-go")
     {
         return goToMark(character, count);
+    }
+    if (command == "find-next" || command == "find-previous")
+    {
+        return nameFind(command, character, count);
     }
     if (command == "macro-record" || command == "macro-play")
     {
@@ -1155,6 +1221,144 @@ bool Workspace::goToMark(char32_t character, int count)
     return true;
 }
 
+bool Workspace::startFind(bool forward, int count)
+{
+    // After a find, f and F go to its next and previous match, as Doom Emacs's evil-snipe does
+    // (decided October 2026); otherwise, and after an operator, they take a note name.
+    if (findRepeats_ && mode_ != Mode::OperatorPending)
+    {
+        if (!goToFound(forward, count))
+        {
+            macroFailed_ = macroDepth_ > 0;
+        }
+        return true;
+    }
+    awaiting_ = Awaiting{forward ? "find-next" : "find-previous", count};
+    return true;
+}
+
+bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
+{
+    // The letter, in either case (decided November 2026, as capitals aren't needed to tell
+    // notes apart). The cursor goes at once, and again from where it was if a sharp or flat
+    // follows; an operator waits for that, or the time keys wait for more.
+    const bool forward = command == "find-next";
+    const char32_t upper = letter >= U'a' && letter <= U'g' ? letter - U'a' + U'A' : letter;
+    if (upper < U'A' || upper > U'G')
+    {
+        setMessage(keysOf(command) + " takes a note name after it, such as " + keysOf(command) +
+                       "E, " + keysOf(command) + "F# or " + keysOf(command) + "Bb",
+                   MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        if (operator_)
+        {
+            operator_.reset();
+            mode_ = Mode::Normal;
+        }
+        return true;
+    }
+    naming_ = Naming{.letter = upper, .forward = forward, .count = count, .from = view().cursor()};
+    if (operator_)
+    {
+        naming_->deadline = lastTime_ + keyTimeout_;
+        return true;
+    }
+    findClass_ = *core::parsePitchClass(encodeUtf8(std::u32string(1, upper)));
+    findName_ = encodeUtf8(std::u32string(1, upper));
+    naming_->failed = !goToFound(forward, count);
+    return true;
+}
+
+bool Workspace::finishNaming(std::optional<char32_t> accidental)
+{
+    auto naming = *std::exchange(naming_, std::nullopt);
+    auto name = encodeUtf8(std::u32string(1, naming.letter));
+    if (accidental)
+    {
+        name += static_cast<char>(*accidental);
+    }
+    findClass_ = *core::parsePitchClass(name);
+    findName_ = name;
+    if (operator_)
+    {
+        if (!runOperator(naming.forward ? "cursor-find-next" : "cursor-find-previous",
+                         naming.count))
+        {
+            sayNotFound(naming.forward);
+            macroFailed_ = macroDepth_ > 0;
+        }
+        return true;
+    }
+    // Again from where the find started, for the sharp or flat.
+    view().setCursor(naming.from);
+    if (!goToFound(naming.forward, naming.count))
+    {
+        macroFailed_ = macroDepth_ > 0;
+    }
+    return true;
+}
+
+void Workspace::settleNaming()
+{
+    // A name with nothing after it: an operator's done as it is, and a find that found nothing
+    // fails a macro now.
+    if (!naming_)
+    {
+        return;
+    }
+    if (naming_->deadline >= 0)
+    {
+        finishNaming(std::nullopt);
+        return;
+    }
+    if (naming_->failed && macroDepth_ > 0)
+    {
+        macroFailed_ = true;
+    }
+    naming_.reset();
+}
+
+bool Workspace::goToFound(bool forward, int count)
+{
+    // Not a jump, as Vim's f isn't, so '' stays where it was.
+    const auto command = forward ? "cursor-find-next" : "cursor-find-previous";
+    const auto before = view().cursor();
+    findForward_ = forward;
+    findRepeats_ = true;
+    findKept_ = true;
+    const auto moved = view().run(command, count);
+    if (!moved)
+    {
+        findRepeats_ = false;
+        sayWhereFor(command);
+        return false;
+    }
+    if (wasPlaying_)
+    {
+        following_ = false;
+    }
+    if (view().cursor() == before)
+    {
+        sayNotFound(forward);
+        return false;
+    }
+    return true;
+}
+
+void Workspace::sayNotFound(bool forward)
+{
+    // "No E after here in Bass".
+    const auto& song = document_.song();
+    const auto cursor = view().cursor();
+    const auto* track = cursor.track ? song.track(*cursor.track) : nullptr;
+    std::string text = "No " + findName_ + (forward ? " after here" : " before here");
+    if (track != nullptr && !track->name.empty())
+    {
+        text += " in " + track->name;
+    }
+    setMessage(text, MessageKind::Information);
+}
+
 std::string Workspace::markAbout(const core::Mark& mark) const
 {
     // Where it is: "5:1:000, Bass, C3", or "5:1:000, the conductor".
@@ -1327,7 +1531,12 @@ bool Workspace::playMacro(char32_t name, int count)
                                      : keymapHere();
             runAll(keys_.timeout(keymap, *deadline));
         }
+        if (!macroFailed_)
+        {
+            settleNaming();
+        }
     }
+    naming_.reset();
     document_.endGroup();
     if (--macroDepth_ == 0)
     {
@@ -1390,6 +1599,7 @@ bool Workspace::repeatChange(int count)
     {
         handleKey(key, lastTime_);
     }
+    settleNaming();
     document_.endGroup();
     replaying_ = false;
     refresh();
@@ -1397,6 +1607,19 @@ bool Workspace::repeatChange(int count)
 }
 
 bool Workspace::handleKey(const Key& key, std::int64_t now)
+{
+    // f and F repeat a find while it's the last thing done, any other key ending that, but for
+    // a count or keys waiting for more.
+    findKept_ = false;
+    const bool changed = takeKey(key, now);
+    if (!findKept_ && keys_.pending().empty())
+    {
+        findRepeats_ = false;
+    }
+    return changed;
+}
+
+bool Workspace::takeKey(const Key& key, std::int64_t now)
 {
     lastTime_ = now;
     // A listing showing (:registers) takes the next key to close it, and nothing else.
@@ -1457,6 +1680,28 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     if (const auto waiting = std::exchange(awaiting_, std::nullopt))
     {
         return characterAfter(waiting->command, key, waiting->count);
+    }
+    // A find's name, which a sharp or flat straight after its letter goes on (fB, then b);
+    // Escape gives up an operator waiting for it.
+    if (naming_)
+    {
+        const bool plain = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0;
+        if (plain && (key.character == U'#' || key.character == U'b'))
+        {
+            return finishNaming(key.character);
+        }
+        if (key.named == NamedKey::Escape && naming_->deadline >= 0)
+        {
+            naming_.reset();
+            operator_.reset();
+            mode_ = Mode::Normal;
+            return true;
+        }
+        settleNaming();
+        if (macroFailed_)
+        {
+            return true; // a find in a macro that found nothing, which stops it here
+        }
     }
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
@@ -2130,6 +2375,10 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 std::optional<std::int64_t> Workspace::deadline() const
 {
     auto deadline = keys_.deadline();
+    if (naming_ && naming_->deadline >= 0)
+    {
+        deadline = deadline ? std::min(*deadline, naming_->deadline) : naming_->deadline;
+    }
     if (hintsOn_ && waitingSince_ && !hintsShown_)
     {
         const auto shown = *waitingSince_ + hintDelay_;
@@ -2152,6 +2401,15 @@ bool Workspace::wake(std::int64_t now)
                              : keymapHere();
     typedKeys_.assign(keys_.keys().begin(), keys_.keys().end());
     bool changed = runAll(keys_.timeout(keymap, now));
+    // An operator's find with no sharp or flat after its letter in time (dfE).
+    if (naming_ && naming_->deadline >= 0 && now >= naming_->deadline)
+    {
+        changed = finishNaming(std::nullopt) || changed;
+    }
+    if (!replaying_ && macroDepth_ == 0)
+    {
+        endChange();
+    }
     if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
     {
         hintsShown_ = true;

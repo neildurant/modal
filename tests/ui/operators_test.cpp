@@ -649,3 +649,158 @@ TEST_CASE(":marks says where the marks are, :mark-delete deletes them, and the v
           CommandResult::error("Marks are named by letters: a, abc, or a-d"));
     CHECK(o.registry.runLine("mark-delete z").message == "No marks there to delete");
 }
+
+namespace
+{
+
+// The bass with a Bb1 in bar 3 and a B1 in bar 4 too.
+void addFlats(Operating& o)
+{
+    const auto bass = o.document.song().tracks()[0]->id();
+    const auto q = o.q;
+    o.document.edit("Notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(bass,
+                                          [&](core::EventList& events)
+                                          {
+                                              events.insert({8 * q, core::Note{34, 90, q}});
+                                              events.insert({12 * q, core::Note{35, 90, q}});
+                                          });
+                    });
+}
+
+} // namespace
+
+TEST_CASE("f and a note name go to the next note of that pitch class, and f and F then repeat it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto bass = o.document.song().tracks()[0]->id();
+    o.type(U"gr"); // the piano roll, at the start
+    const auto at = [&] { return o.ws.pianoRoll().cursor(); };
+    o.type(U"fa");
+    CHECK(at() == SongCursor{bass, 4 * q, 45}); // A2, any octave
+    CHECK(o.ws.pending() == "fA");
+    o.type(U"f");
+    CHECK(at() == SongCursor{bass, 28 * q, 33}); // A1
+    o.type(U"f");
+    CHECK(o.ws.message() == "No A after here in Bass");
+    CHECK(at().tick == 28 * q);
+    o.type(U"F");
+    CHECK(at().tick == 4 * q);
+    // Any other key ends it: f then takes a name again, in either case.
+    o.type(U"jfC");
+    CHECK(at() == SongCursor{bass, 16 * q + q / 16, 36});
+    o.type(U"j");
+    CHECK(o.ws.pending().empty());
+    o.type(U"Fa");
+    CHECK(at() == SongCursor{bass, 4 * q, 45});
+    // A count goes as many on.
+    o.type(U"gg2fa");
+    CHECK(at().tick == 28 * q);
+    o.type(U"2F");
+    CHECK(at().tick == 28 * q); // only one before it
+    // Anything but a note name is refused.
+    o.type(U"jfh");
+    CHECK(o.ws.message() == "f takes a note name after it, such as fE, fF# or fBb");
+}
+
+TEST_CASE("a sharp or flat after a find's letter goes again from where it started")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    addFlats(o);
+    o.type(U"gr4l");
+    o.type(U"fa"); // A2, in bar 2
+    REQUIRE(o.ws.pianoRoll().cursor().tick == 4 * o.q);
+    o.press(NamedKey::Escape); // or f would find the next A
+    o.type(U"fb");
+    CHECK(o.ws.pianoRoll().cursor().tick == 12 * q); // B1
+    o.type(U"b");
+    CHECK(o.ws.pianoRoll().cursor().tick == 8 * q); // Bb1, from bar 2 again
+    CHECK(o.ws.pianoRoll().cursor().pitch == 34);
+    CHECK(o.ws.pending() == "fBb");
+    o.type(U"f");
+    CHECK(o.ws.message() == "No Bb after here in Bass");
+    o.type(U"}Fa"); // from bar 4, A2 in bar 2
+    CHECK(o.ws.pianoRoll().cursor().tick == 4 * q);
+    o.type(U"#"); // A#, which is Bb, from bar 4 again
+    CHECK(o.ws.pianoRoll().cursor() == SongCursor{o.document.song().tracks()[0]->id(), 8 * q, 34});
+    // In a macro, a find that finds nothing fails only once its name is done.
+    // From just after Bb1, with no B before it but a Bb.
+    o.type(U"gg}}lQaFbbQ");
+    CHECK(o.ws.pianoRoll().cursor().tick == 8 * q);
+    o.type(U"gg}}l@a");
+    CHECK(o.ws.pianoRoll().cursor().tick == 8 * q);
+    CHECK(o.ws.pianoRoll().cursor().pitch == 34);
+}
+
+TEST_CASE("after an operator, a find takes the range through the note it finds")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    addFlats(o);
+    o.type(U"gr"); // the piano roll, at the start
+    o.type(U"dfa");
+    CHECK(o.notes().size() == 7); // waiting for a sharp or flat
+    CHECK(o.ws.pending() == "dfA");
+    o.ws.wake(kDefaultTimeout);
+    CHECK(o.notes() ==
+          Notes{{8 * q, 34}, {12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}}); // to A2's end
+    o.type(U"u");
+    o.type(U"dfbb");
+    CHECK(o.notes() == Notes{{12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    o.type(U"u");
+    // Escape gives it up.
+    o.type(U"dfa");
+    o.press(NamedKey::Escape);
+    o.ws.wake(kDefaultTimeout);
+    CHECK(o.notes().size() == 7);
+    CHECK(o.ws.mode() == Mode::Normal);
+    // Another key does it, then is a key of its own, not part of the change . repeats.
+    o.type(U"}}dFaj");
+    CHECK(o.notes().size() == 6); // from A2 in bar 2 to the cursor in bar 3
+    const auto pitch = o.ws.pianoRoll().cursor().pitch;
+    o.type(U"}.");
+    CHECK(o.ws.pianoRoll().cursor().pitch == pitch);
+    // Nothing to find gives the operator up.
+    o.type(U"dfd");
+    o.ws.wake(kDefaultTimeout);
+    CHECK(o.ws.message() == "No D after here in Bass");
+    CHECK(o.ws.mode() == Mode::Normal);
+}
+
+TEST_CASE("in the arrangement a find goes to the next bar with the note, and in the event list "
+          "to its row")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"fa");
+    CHECK(o.ws.arrangement().cursor().tick == 4 * q); // bar 2
+    o.type(U"f");
+    CHECK(o.ws.arrangement().cursor().tick == 28 * q); // bar 8
+    o.type(U"jfa");
+    CHECK(o.ws.message() == "No A after here in Lead");
+    // In Visual mode, the selection follows, and f repeats.
+    o.type(U"kggvfaf");
+    CHECK(o.ws.mode() == Mode::Visual);
+    CHECK(o.ws.arrangement().cursor().tick == 28 * q);
+    o.press(NamedKey::Escape);
+    // After an operator, through the bar it finds.
+    o.type(U"ggdfc");
+    o.ws.wake(kDefaultTimeout);
+    CHECK(o.notes() == Notes{{28 * q, 33}});
+    o.type(U"u");
+
+    o.ws.show(ViewKind::EventList);
+    o.type(U"ggfa");
+    CHECK(o.ws.eventList().cursor().tick == 4 * q);
+    o.type(U"ggdfa");
+    o.ws.wake(kDefaultTimeout);
+    CHECK(o.notes() == Notes{{16 * q + q / 16, 36}, {28 * q, 33}});
+}

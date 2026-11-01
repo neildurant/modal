@@ -192,6 +192,10 @@ public:
 
     // The time of the mark an operator's range goes to ('a), for the motion cursor-mark.
     virtual std::optional<core::Tick> jumpTime() const { return std::nullopt; }
+
+    // The pitch class, 0 for C to 11 for B, that a find goes to (fE), for the motions
+    // cursor-find-next and cursor-find-previous.
+    virtual std::optional<int> findClass() const { return std::nullopt; }
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the

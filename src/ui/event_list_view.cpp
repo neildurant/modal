@@ -515,6 +515,37 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         }
         row_ = list_.rowAt(*at);
     }
+    else if (command == "cursor-find-next" || command == "cursor-find-previous")
+    {
+        // The row of the next or previous note of the pitch class found (fE), any octave.
+        const auto pitchClass = host_.findClass();
+        const auto id = list_.track();
+        if (!pitchClass || track_ == 0 || !id)
+        {
+            return false;
+        }
+        const auto& events = song.events(*id);
+        const auto listed = list_.rows();
+        const auto matches = [&](std::size_t r)
+        {
+            const auto* note = listed[r].kind == RowKind::Event
+                                   ? std::get_if<core::Note>(&events[listed[r].index].data)
+                                   : nullptr;
+            return note != nullptr && note->pitch % 12 == *pitchClass;
+        };
+        const bool forward = command == "cursor-find-next";
+        auto row = row_;
+        for (int found = 0; found < n;)
+        {
+            if (forward ? row + 1 >= listed.size() : row == 0)
+            {
+                return false;
+            }
+            row = forward ? row + 1 : row - 1;
+            found += matches(row) ? 1 : 0;
+        }
+        row_ = row;
+    }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {
         const bool sections = command.starts_with("cursor-section-");
@@ -833,6 +864,11 @@ std::optional<EventListView::Rows> EventListView::rowsFor(std::string_view motio
     const bool whole = motion == "cursor-down" || motion == "cursor-up" || motion == "go-first" ||
                        motion == "go-last";
     if (whole)
+    {
+        return Rows{from, to};
+    }
+    // A find takes the note it finds too, as Vim's f does the character (dfE).
+    if (motion == "cursor-find-next" && to > from)
     {
         return Rows{from, to};
     }

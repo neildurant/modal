@@ -1180,18 +1180,23 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         turn(time_);
         centre();
     }
-    else if (command == "cursor-note-next" || command == "cursor-note-previous")
+    else if (command == "cursor-note-next" || command == "cursor-note-previous" ||
+             command == "cursor-find-next" || command == "cursor-find-previous")
     {
-        // Every note's start, in time and then low to high, landing on its pitch.
+        // Every note's start, in time and then low to high, landing on its pitch; for a find
+        // (fE), those of the pitch class found, any octave.
         const auto id = trackId();
-        if (!id)
+        const bool find = command.starts_with("cursor-find-");
+        const auto pitchClass = host_.findClass();
+        if (!id || (find && !pitchClass))
         {
             return false;
         }
         std::vector<std::pair<core::Tick, std::uint8_t>> starts;
         for (const auto& event : song.events(*id).all())
         {
-            if (const auto* note = std::get_if<core::Note>(&event.data))
+            const auto* note = std::get_if<core::Note>(&event.data);
+            if (note != nullptr && (!find || note->pitch % 12 == *pitchClass))
             {
                 starts.emplace_back(event.tick, note->pitch);
             }
@@ -1199,7 +1204,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         std::ranges::sort(starts);
         const std::pair here{time_, pitch_};
         std::ptrdiff_t at = 0;
-        if (command == "cursor-note-next")
+        if (command.ends_with("-next"))
         {
             at = std::ranges::upper_bound(starts, here) - starts.begin() + n - 1;
         }
@@ -1688,6 +1693,7 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::timeSpan(std::st
     const auto length = viewLength_;
     const auto moved = run(motion, count);
     const auto landed = time_;
+    const auto landedPitch = pitch_;
     time_ = time;
     pitch_ = pitch;
     topPitch_ = top;
@@ -1705,6 +1711,18 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::timeSpan(std::st
     if (inclusive)
     {
         to = gridAfter(to);
+    }
+    // A find takes the note it finds too, to its end, as Vim's f does the character (dfE).
+    if (motion == "cursor-find-next")
+    {
+        for (const auto& event : document_.song().events(*trackId()).all())
+        {
+            const auto* note = std::get_if<core::Note>(&event.data);
+            if (note != nullptr && event.tick == landed && note->pitch == landedPitch)
+            {
+                to = std::max(to, landed + note->duration);
+            }
+        }
     }
     if (from == to)
     {

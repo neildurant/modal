@@ -193,6 +193,39 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*at);
     }
+    else if (command == "cursor-find-next" || command == "cursor-find-previous")
+    {
+        // The next or previous bar holding a note of the pitch class found (fE), any octave,
+        // on the cursor's track.
+        const auto id = trackId();
+        const auto pitchClass = host_.findClass();
+        if (!id || !pitchClass)
+        {
+            return false;
+        }
+        const auto& m = meter();
+        std::vector<std::int64_t> bars;
+        for (const auto& event : song.events(*id).all())
+        {
+            const auto* note = std::get_if<core::Note>(&event.data);
+            if (note != nullptr && note->pitch % 12 == *pitchClass)
+            {
+                bars.push_back(m.toBarBeatTick(event.tick).bar);
+            }
+        }
+        std::ranges::sort(bars);
+        const auto here = m.toBarBeatTick(page_.time()).bar;
+        const auto unique = std::ranges::unique(bars);
+        bars.erase(unique.begin(), unique.end());
+        const auto at = command == "cursor-find-next"
+                            ? std::ranges::upper_bound(bars, here) - bars.begin() + n - 1
+                            : std::ranges::lower_bound(bars, here) - bars.begin() - n;
+        if (at < 0 || at >= static_cast<std::ptrdiff_t>(bars.size()))
+        {
+            return false;
+        }
+        moveTo(m.barStart(bars[static_cast<std::size_t>(at)]));
+    }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {
         std::vector<core::Tick> ticks;
@@ -627,8 +660,9 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
         return area;
     }
     // Across bars: up to the bar landed on, as Vim's character motions go, or with G and gg
-    // the bar landed on too, as its line motions do.
-    const bool inclusive = motion == "go-first" || motion == "go-last";
+    // the bar landed on too, as its line motions do, and a find the bar it finds (dfE).
+    const bool inclusive =
+        motion == "go-first" || motion == "go-last" || motion == "cursor-find-next";
     const auto landed = m.toBarBeatTick(landedTime).bar;
     if (landed > bar)
     {

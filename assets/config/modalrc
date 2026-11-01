@@ -34,6 +34,10 @@ nmap ]s         cursor-section-next       "Next section"
 nmap [s         cursor-section-previous   "Section before"
 nmap ]l         cursor-label-next         "Next label"
 nmap [l         cursor-label-previous     "Label before"
+" f and a note name (fE, fF#, fBb) go to the next note of that pitch class, any octave, and F to
+" the one before; then f and F go on to the next and the one before, until another key.
+nmap f          find-next                 "Find a note"
+nmap F          find-previous             "Find a note back"
 
 " The piano roll: k and j move a semitone, K and J an octave, and Tab and Shift-Tab go to
 " the next note's start at any pitch and the one before, notes starting together low to high.
