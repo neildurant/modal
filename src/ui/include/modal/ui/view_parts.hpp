@@ -10,15 +10,60 @@
 #include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/view.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
 {
+
+// Of places in order, the nth after here, or before it, going round past the ends if asked
+// (as a search does, and a find doesn't); and whether it went round. Nothing if there are
+// none, or not as many without going round.
+template <typename Place>
+std::optional<std::pair<Place, bool>> nthPlace(const std::vector<Place>& places, const Place& here,
+                                               bool forward, int n, bool wrap)
+{
+    if (places.empty())
+    {
+        return std::nullopt;
+    }
+    const auto size = static_cast<std::ptrdiff_t>(places.size());
+    auto at = forward ? std::ranges::upper_bound(places, here) - places.begin() + n - 1
+                      : std::ranges::lower_bound(places, here) - places.begin() - n;
+    const bool wrapped = at < 0 || at >= size;
+    if (wrapped && !wrap)
+    {
+        return std::nullopt;
+    }
+    at = ((at % size) + size) % size;
+    return std::pair{places[static_cast<std::size_t>(at)], wrapped};
+}
+
+// Where the cursor is among matches, for the status line: "match 3/24" on one, or "24
+// matches".
+template <typename Place>
+std::string matchCount(const std::vector<Place>& places, const Place& here)
+{
+    if (places.empty())
+    {
+        return "no matches";
+    }
+    if (const auto at = std::ranges::find(places, here); at != places.end())
+    {
+        return "match " + std::to_string(at - places.begin() + 1) + "/" +
+               std::to_string(places.size());
+    }
+    return places.size() == 1 ? std::string{"1 match"} : std::to_string(places.size()) + " matches";
+}
+
+// An event as what to search for (* and #): a note's exact pitch, a controller, or a bend.
+std::optional<core::EventQuery> queryFor(const core::EventData& data);
 
 // What every view draws above itself (decided in milestone 4): its own bar, a title for it,
 // then the inspector.

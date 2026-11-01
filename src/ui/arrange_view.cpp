@@ -107,6 +107,46 @@ std::optional<core::TrackId> ArrangeView::trackId() const
     return tracks[std::min(page_.track(), tracks.size() - 1)]->id();
 }
 
+std::vector<std::int64_t> ArrangeView::matchBars(const core::EventQuery& query) const
+{
+    std::vector<std::int64_t> bars;
+    const auto id = trackId();
+    if (!id || page_.stripCursor())
+    {
+        return bars;
+    }
+    const auto& song = document_.song();
+    const auto& m = meter();
+    for (const auto& event : song.events(*id).all())
+    {
+        if (core::matches(query, event.data, song.ppqn()))
+        {
+            bars.push_back(m.toBarBeatTick(event.tick).bar);
+        }
+    }
+    std::ranges::sort(bars);
+    bars.erase(std::ranges::unique(bars).begin(), bars.end());
+    return bars;
+}
+
+std::string ArrangeView::matchStatus(const core::EventQuery& query) const
+{
+    // By bars, which are the cursor's places here: "bar 2/5 with matches".
+    const auto bars = matchBars(query);
+    const auto here = meter().toBarBeatTick(page_.time()).bar;
+    if (bars.empty())
+    {
+        return "no matches";
+    }
+    if (const auto at = std::ranges::find(bars, here); at != bars.end())
+    {
+        return "bar " + std::to_string(at - bars.begin() + 1) + "/" + std::to_string(bars.size()) +
+               " with matches";
+    }
+    return bars.size() == 1 ? std::string{"1 bar with matches"}
+                            : std::to_string(bars.size()) + " bars with matches";
+}
+
 std::optional<bool> ArrangeView::run(std::string_view command, int count)
 {
     if (const auto section = page_.stripCursor())
@@ -193,38 +233,26 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
         }
         moveTo(*at);
     }
-    else if (command == "cursor-find-next" || command == "cursor-find-previous")
+    else if (command.starts_with("cursor-find-") || command.starts_with("cursor-match-"))
     {
-        // The next or previous bar holding a note of the pitch class found (fE), any octave,
-        // on the cursor's track.
-        const auto id = trackId();
-        const auto pitchClass = host_.findClass();
-        if (!id || !pitchClass)
-        {
-            return false;
-        }
+        // The next or previous bar holding a match of a find (fE) or a search (/C1) on the
+        // cursor's track, a search going round past the ends.
+        const bool search = command.starts_with("cursor-match-");
+        const auto query = search ? host_.searchQuery() : host_.findQuery();
+        const bool forward = command.ends_with("-next");
         const auto& m = meter();
-        std::vector<std::int64_t> bars;
-        for (const auto& event : song.events(*id).all())
-        {
-            const auto* note = std::get_if<core::Note>(&event.data);
-            if (note != nullptr && note->pitch % 12 == *pitchClass)
-            {
-                bars.push_back(m.toBarBeatTick(event.tick).bar);
-            }
-        }
-        std::ranges::sort(bars);
         const auto here = m.toBarBeatTick(page_.time()).bar;
-        const auto unique = std::ranges::unique(bars);
-        bars.erase(unique.begin(), unique.end());
-        const auto at = command == "cursor-find-next"
-                            ? std::ranges::upper_bound(bars, here) - bars.begin() + n - 1
-                            : std::ranges::lower_bound(bars, here) - bars.begin() - n;
-        if (at < 0 || at >= static_cast<std::ptrdiff_t>(bars.size()))
+        const auto to =
+            query ? nthPlace(matchBars(*query), here, forward, n, search) : std::nullopt;
+        if (!to)
         {
             return false;
         }
-        moveTo(m.barStart(bars[static_cast<std::size_t>(at)]));
+        if (to->second)
+        {
+            host_.searchWrapped(forward);
+        }
+        moveTo(m.barStart(to->first));
     }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {

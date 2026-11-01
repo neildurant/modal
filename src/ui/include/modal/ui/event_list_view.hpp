@@ -54,6 +54,8 @@ public:
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
+    std::optional<core::EventQuery> queryHere() const override;
+    std::string matchStatus(const core::EventQuery& query) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
@@ -109,6 +111,8 @@ private:
     // The rows starting chords: events starting together, within the chord window of the
     // first of them; in the conductor's list, its rows.
     std::vector<std::size_t> chordStarts() const;
+    // The rows of the track's events a query matches, in order.
+    std::vector<std::size_t> matchRows(const core::EventQuery& query) const;
 
     // The rows a range or object takes from the cursor, in either order; taken as bars, with
     // the bars' start and length.

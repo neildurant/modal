@@ -414,9 +414,36 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
     return putRegister(song, reg, firstTrack, at);
 }
 
+std::optional<core::EventQuery> queryFor(const core::EventData& data)
+{
+    core::EventQuery query;
+    if (const auto* note = std::get_if<core::Note>(&data))
+    {
+        query.pitch = note->pitch;
+    }
+    else if (const auto* change = std::get_if<core::ControlChange>(&data))
+    {
+        query.kind = core::EventQuery::Kind::Controller;
+        query.controller = change->controller;
+    }
+    else if (std::holds_alternative<core::PitchBend>(data))
+    {
+        query.kind = core::EventQuery::Kind::Bend;
+    }
+    else
+    {
+        return std::nullopt;
+    }
+    return query;
+}
+
 std::optional<std::string> describeTimeRange(std::string_view motion)
 {
-    constexpr std::array<std::pair<std::string_view, std::string_view>, 13> kRanges{{
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 17> kRanges{{
+        {"cursor-match-next", "to the next match"},
+        {"cursor-match-previous", "from the match before"},
+        {"search-next", "to the next match"},
+        {"search-previous", "from the match before"},
         {"cursor-mark", "to the mark"},
         {"find-next", "through the next note named"},
         {"find-previous", "from the note named before"},

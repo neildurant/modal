@@ -74,6 +74,8 @@ public:
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
+    std::optional<core::EventQuery> queryHere() const override;
+    std::string matchStatus(const core::EventQuery& query) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
@@ -138,6 +140,10 @@ public:
 private:
     const core::MeterMap& meter() const;
     std::optional<core::TrackId> trackId() const;
+    // Where the track's events a query matches are, in order: a note at its time and pitch,
+    // and others at their time and the cursor's pitch, which going to one keeps.
+    std::vector<std::pair<core::Tick, std::uint8_t>>
+    matchPlaces(const core::EventQuery& query) const;
     // Where the view would end, starting at a tick: as many bars on, at the same place in the
     // bar, or while it's scrolled, its length on. And where the section's page of whole bars
     // holding a tick starts, pages restarting at each section.

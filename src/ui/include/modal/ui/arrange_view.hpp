@@ -53,6 +53,7 @@ public:
     std::optional<std::string> describeRange(std::string_view op,
                                              std::string_view motion) const override;
     void addRegions(Frame& frame) const override;
+    std::string matchStatus(const core::EventQuery& query) const override;
     std::string cursorStatus() const override;
     std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
@@ -137,6 +138,8 @@ private:
 
     // The cursor's track's meter, or the conductor's with no tracks.
     const core::MeterMap& meter() const;
+    // The bars of the cursor's track holding an event a query matches, in order.
+    std::vector<std::int64_t> matchBars(const core::EventQuery& query) const;
     std::optional<core::TrackId> trackId() const;
     Inspection inspection() const;
     // Sets the section's name or length from the inspector, or says why it can't.

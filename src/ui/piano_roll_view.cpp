@@ -200,6 +200,42 @@ void PianoRollView::resize(const WindowLayout& layout, int width, CellSize cell)
     follow();
 }
 
+std::vector<std::pair<core::Tick, std::uint8_t>>
+PianoRollView::matchPlaces(const core::EventQuery& query) const
+{
+    std::vector<std::pair<core::Tick, std::uint8_t>> places;
+    const auto id = trackId();
+    if (!id)
+    {
+        return places;
+    }
+    const auto& song = document_.song();
+    for (const auto& event : song.events(*id).all())
+    {
+        if (core::matches(query, event.data, song.ppqn()))
+        {
+            const auto* note = std::get_if<core::Note>(&event.data);
+            places.emplace_back(event.tick, note != nullptr ? note->pitch : pitch_);
+        }
+    }
+    std::ranges::sort(places);
+    places.erase(std::ranges::unique(places).begin(), places.end());
+    return places;
+}
+
+std::optional<core::EventQuery> PianoRollView::queryHere() const
+{
+    // The cursor's pitch, the note's when it's on one.
+    core::EventQuery query;
+    query.pitch = pitch_;
+    return query;
+}
+
+std::string PianoRollView::matchStatus(const core::EventQuery& query) const
+{
+    return matchCount(matchPlaces(query), std::pair{time_, pitch_});
+}
+
 std::optional<core::TrackId> PianoRollView::trackId() const
 {
     const auto tracks = document_.song().tracks();
@@ -1180,23 +1216,39 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         turn(time_);
         centre();
     }
-    else if (command == "cursor-note-next" || command == "cursor-note-previous" ||
-             command == "cursor-find-next" || command == "cursor-find-previous")
+    else if (command.starts_with("cursor-find-") || command.starts_with("cursor-match-"))
     {
-        // Every note's start, in time and then low to high, landing on its pitch; for a find
-        // (fE), those of the pitch class found, any octave.
+        // The next or previous match of a find (fE) or a search (/C1), in time and then low to
+        // high, a search going round past the ends.
+        const bool search = command.starts_with("cursor-match-");
+        const auto query = search ? host_.searchQuery() : host_.findQuery();
+        const bool forward = command.ends_with("-next");
+        const auto to =
+            query ? nthPlace(matchPlaces(*query), std::pair{time_, pitch_}, forward, n, search)
+                  : std::nullopt;
+        if (!to)
+        {
+            return false;
+        }
+        if (to->second)
+        {
+            host_.searchWrapped(forward);
+        }
+        moveTo(to->first.first);
+        moveToPitch(to->first.second);
+    }
+    else if (command == "cursor-note-next" || command == "cursor-note-previous")
+    {
+        // Every note's start, in time and then low to high, landing on its pitch.
         const auto id = trackId();
-        const bool find = command.starts_with("cursor-find-");
-        const auto pitchClass = host_.findClass();
-        if (!id || (find && !pitchClass))
+        if (!id)
         {
             return false;
         }
         std::vector<std::pair<core::Tick, std::uint8_t>> starts;
         for (const auto& event : song.events(*id).all())
         {
-            const auto* note = std::get_if<core::Note>(&event.data);
-            if (note != nullptr && (!find || note->pitch % 12 == *pitchClass))
+            if (const auto* note = std::get_if<core::Note>(&event.data))
             {
                 starts.emplace_back(event.tick, note->pitch);
             }
@@ -1204,7 +1256,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         std::ranges::sort(starts);
         const std::pair here{time_, pitch_};
         std::ptrdiff_t at = 0;
-        if (command.ends_with("-next"))
+        if (command == "cursor-note-next")
         {
             at = std::ranges::upper_bound(starts, here) - starts.begin() + n - 1;
         }

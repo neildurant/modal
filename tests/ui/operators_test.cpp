@@ -845,8 +845,8 @@ TEST_CASE("the hint menu says a find waits for a note name, and after an operato
 TEST_CASE("a key bound to nothing says so at once")
 {
     Operating o;
-    CHECK(o.ws.handle(Key::typed(U'#'), 0)); // drawn, rather than waiting for the next key
-    CHECK(o.ws.message() == "# isn't a key here");
+    CHECK(o.ws.handle(Key::typed(U'%'), 0)); // drawn, rather than waiting for the next key
+    CHECK(o.ws.message() == "% isn't a key here");
 }
 
 TEST_CASE("an operator's find with a sharp plays back from a macro as one undo step")
@@ -867,4 +867,132 @@ TEST_CASE("an operator's find with a sharp plays back from a macro as one undo s
     // Without the sharp, at the macro's end, as it is.
     o.type(U"QbdfaQugg@b");
     CHECK(o.notes().size() == 4);
+}
+
+namespace
+{
+
+// Typing a search at the / prompt, and Enter.
+void search(Operating& o, std::u32string_view query)
+{
+    o.type(U"/");
+    o.type(query);
+    o.press(NamedKey::Enter);
+}
+
+} // namespace
+
+TEST_CASE("/ searches the track, and n and N go to the next match and the one before, round "
+          "past the ends")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto bass = o.document.song().tracks()[0]->id();
+    o.type(U"gr"); // the piano roll, at the start
+    const auto at = [&] { return o.ws.pianoRoll().cursor(); };
+    const auto status = [&] { return o.ws.pianoRoll().matchStatus(*o.ws.searchQuery()); };
+    o.type(U"n");
+    CHECK(o.ws.message() == "No search yet: / searches");
+    search(o, U"a");
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(at() == SongCursor{bass, 4 * q, 45});
+    CHECK(status() == "match 1/2");
+    o.type(U"n");
+    CHECK(at() == SongCursor{bass, 28 * q, 33});
+    o.type(U"n");
+    CHECK(at().tick == 4 * q);
+    CHECK(o.ws.message() == "Past the last match, round to the first");
+    o.type(U"N");
+    CHECK(at().tick == 28 * q);
+    CHECK(o.ws.message() == "Before the first match, round to the last");
+    // A jump, which '' goes back from.
+    o.type(U"''");
+    CHECK(at().tick == 4 * q);
+    // Every term matching; a pitch exact.
+    search(o, U"A1");
+    CHECK(at() == SongCursor{bass, 28 * q, 33});
+    o.type(U"n");
+    CHECK(o.ws.message() == "This is the only match for A1");
+    search(o, U"vel<60 len>=1/4");
+    CHECK(at().tick == 4 * q);
+    search(o, U"d");
+    CHECK(o.ws.message() == "No match for d on this track");
+    // Matches follow edits.
+    search(o, U"a");
+    o.type(U"x");
+    CHECK(status() == "1 match");
+    o.type(U"u");
+    // What can't be read says why; / and Enter alone clear the matches; Escape leaves them.
+    search(o, U"h2");
+    CHECK(o.ws.message() ==
+          "Can't search for \"h2\": try a pitch (C3), vel>100, len<1/16, cc64 or bend");
+    o.type(U"/");
+    o.press(NamedKey::Escape);
+    CHECK(o.ws.searchQuery());
+    o.type(U"/");
+    o.press(NamedKey::Enter);
+    CHECK_FALSE(o.ws.searchQuery());
+    search(o, U"a");
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U":noh");
+    o.press(NamedKey::Enter);
+    CHECK_FALSE(o.ws.searchQuery());
+}
+
+TEST_CASE("* and # search for the pitch under the cursor, and n keeps to their way")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    addFlats(o);
+    o.document.edit("Notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(song.tracks()[0]->id(), [&](core::EventList& events)
+                                          { events.insert({20 * q, core::Note{45, 90, q}}); });
+                    });
+    o.type(U"grfa"); // A2 in bar 2
+    o.press(NamedKey::Escape);
+    o.type(U"*");
+    CHECK(o.ws.pianoRoll().cursor().tick == 20 * q); // the other A2, not A1
+    o.type(U"#");
+    CHECK(o.ws.pianoRoll().cursor().tick == 4 * q);
+    o.type(U"n"); // backwards, as # went
+    CHECK(o.ws.pianoRoll().cursor().tick == 20 * q);
+    CHECK(o.ws.message() == "Before the first match, round to the last");
+}
+
+TEST_CASE("after an operator, n takes the range up to the next match")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr");
+    search(o, U"c2");
+    o.type(U"ggdn");
+    CHECK(o.notes() == Notes{{16 * q + q / 16, 36}, {28 * q, 33}}); // up to C2, not it
+}
+
+TEST_CASE("searching in the event list goes to rows, and in the arrangement to bars")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    search(o, U"a");
+    CHECK(o.ws.arrangement().cursor().tick == 4 * q);
+    CHECK(o.ws.arrangement().matchStatus(*o.ws.searchQuery()) == "bar 1/2 with matches");
+    o.type(U"n");
+    CHECK(o.ws.arrangement().cursor().tick == 28 * q);
+
+    o.ws.show(ViewKind::EventList);
+    o.type(U"gg");
+    search(o, U"cc064>63");
+    CHECK(o.ws.eventList().cursor().tick == 16 * q + q / 8);
+    CHECK(o.ws.eventList().matchStatus(*o.ws.searchQuery()) == "match 1/1");
+    o.type(U"gg*"); // the conductor's rows first
+    CHECK(o.ws.message() == "No note or controller here to search for");
+    search(o, U"g1");
+    o.type(U"*");
+    CHECK(o.ws.message() == "This is the only match for G1");
 }

@@ -429,6 +429,44 @@ std::vector<std::size_t> EventListView::chordStarts() const
     return starts;
 }
 
+std::vector<std::size_t> EventListView::matchRows(const core::EventQuery& query) const
+{
+    std::vector<std::size_t> found;
+    const auto id = list_.track();
+    if (track_ == 0 || !id)
+    {
+        return found;
+    }
+    const auto& song = document_.song();
+    const auto& events = song.events(*id);
+    const auto rows = list_.rows();
+    for (std::size_t r = 0; r < rows.size(); ++r)
+    {
+        if (rows[r].kind == RowKind::Event &&
+            core::matches(query, events[rows[r].index].data, song.ppqn()))
+        {
+            found.push_back(r);
+        }
+    }
+    return found;
+}
+
+std::optional<core::EventQuery> EventListView::queryHere() const
+{
+    const auto id = list_.track();
+    const auto& row = list_.rows()[row_];
+    if (track_ == 0 || !id || row.kind != RowKind::Event)
+    {
+        return std::nullopt;
+    }
+    return queryFor(document_.song().events(*id)[row.index].data);
+}
+
+std::string EventListView::matchStatus(const core::EventQuery& query) const
+{
+    return matchCount(matchRows(query), row_);
+}
+
 std::optional<bool> EventListView::run(std::string_view command, int count)
 {
     const bool keepsBarOffset = command == "cursor-bar-next" || command == "cursor-bar-previous";
@@ -515,36 +553,24 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         }
         row_ = list_.rowAt(*at);
     }
-    else if (command == "cursor-find-next" || command == "cursor-find-previous")
+    else if (command.starts_with("cursor-find-") || command.starts_with("cursor-match-"))
     {
-        // The row of the next or previous note of the pitch class found (fE), any octave.
-        const auto pitchClass = host_.findClass();
-        const auto id = list_.track();
-        if (!pitchClass || track_ == 0 || !id)
+        // The row of the next or previous match of a find (fE) or a search (/C1), a search
+        // going round past the ends.
+        const bool search = command.starts_with("cursor-match-");
+        const auto query = search ? host_.searchQuery() : host_.findQuery();
+        const bool forward = command.ends_with("-next");
+        const auto to =
+            query ? nthPlace(matchRows(*query), row_, forward, n, search) : std::nullopt;
+        if (!to)
         {
             return false;
         }
-        const auto& events = song.events(*id);
-        const auto listed = list_.rows();
-        const auto matches = [&](std::size_t r)
+        if (to->second)
         {
-            const auto* note = listed[r].kind == RowKind::Event
-                                   ? std::get_if<core::Note>(&events[listed[r].index].data)
-                                   : nullptr;
-            return note != nullptr && note->pitch % 12 == *pitchClass;
-        };
-        const bool forward = command == "cursor-find-next";
-        auto row = row_;
-        for (int found = 0; found < n;)
-        {
-            if (forward ? row + 1 >= listed.size() : row == 0)
-            {
-                return false;
-            }
-            row = forward ? row + 1 : row - 1;
-            found += matches(row) ? 1 : 0;
+            host_.searchWrapped(forward);
         }
-        row_ = row;
+        row_ = to->first;
     }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-label-"))
     {

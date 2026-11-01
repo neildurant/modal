@@ -135,6 +135,45 @@ constexpr std::array kSharedCommands{
                                "before again; after an operator, the range from it",
                 .count = true,
                 .motion = true},
+    CommandInfo{.name = "search",
+                .description = "Search the track for events: a pitch (C3, or C in any octave), "
+                               "vel<60, len<1/16, cc64 (cc01), cc1=127 or bend, every term "
+                               "matching; / and Enter alone clears the matches"},
+    CommandInfo{.name = "search-next",
+                .description = "Go to the next match of the last search, {count} times, "
+                               "going round past the end; after an operator, the range up to it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "search-previous",
+                .description = "Go to the match before, of the last search, {count} times, "
+                               "going round past the start; after an operator, the range from it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "search-here",
+                .description = "Search for the pitch under the cursor, or its controller, "
+                               "forwards, {count} times",
+                .title = "Search for this pitch",
+                .count = true},
+    CommandInfo{.name = "search-here-back",
+                .description = "Search for the pitch under the cursor, or its controller, "
+                               "backwards, {count} times",
+                .title = "Search back for this pitch",
+                .count = true},
+    CommandInfo{.name = "search-clear",
+                .description = "Clear the matches of the last search",
+                .aliases = "noh nohlsearch"},
+    CommandInfo{.name = "cursor-match-next",
+                .description = "To the next match (n), as the range an operator takes",
+                .count = true,
+                .keys = false,
+                .motion = true,
+                .palette = false},
+    CommandInfo{.name = "cursor-match-previous",
+                .description = "From the match before (N), as the range an operator takes",
+                .count = true,
+                .keys = false,
+                .motion = true,
+                .palette = false},
     CommandInfo{.name = "cursor-find-next",
                 .description = "To the next note found (fE), as the range an operator takes",
                 .count = true,
@@ -428,7 +467,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 80> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 87> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -486,6 +525,13 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-label-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-mark", onlyIn({Tracks, PianoRoll, EventList})},
             {"find-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"search", onlyIn({Tracks, PianoRoll, EventList})},
+            {"search-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"search-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"search-here", onlyIn({PianoRoll, EventList})},
+            {"search-here-back", onlyIn({PianoRoll, EventList})},
+            {"cursor-match-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-match-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"find-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-find-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-find-previous", onlyIn({Tracks, PianoRoll, EventList})},
@@ -612,6 +658,26 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "find-next" || name == "find-previous")
                          {
                              return {startFind(name == "find-next", call.count)};
+                         }
+                         if (name == "search-next" || name == "search-previous")
+                         {
+                             const bool next = name == "search-next";
+                             if (!search_)
+                             {
+                                 operator_.reset();
+                                 mode_ = mode_ == Mode::OperatorPending ? Mode::Normal : mode_;
+                                 setMessage("No search yet: " + keysOf("search") + " searches",
+                                            MessageKind::Information);
+                                 return {true};
+                             }
+                             if (mode_ == Mode::OperatorPending)
+                             {
+                                 return {runOperator(next == searchForward_
+                                                         ? "cursor-match-next"
+                                                         : "cursor-match-previous",
+                                                     call.count)};
+                             }
+                             return {goToMatch(next, call.count)};
                          }
                          // After an operator, every command is its motion, or gives it up.
                          if (mode_ == Mode::OperatorPending)
@@ -1224,6 +1290,86 @@ bool Workspace::goToMark(char32_t character, int count)
     return true;
 }
 
+bool Workspace::search(const std::string& text)
+{
+    // An empty search has nothing to match, so clears the matches (decided November 2026).
+    const auto start = text.find_first_not_of(' ');
+    if (start == std::string::npos)
+    {
+        search_.reset();
+        return true;
+    }
+    const auto parsed = core::parseQuery(text);
+    if (!parsed.query)
+    {
+        setMessage(parsed.error, MessageKind::Warning);
+        macroFailed_ = macroDepth_ > 0;
+        return true;
+    }
+    search_ = parsed.query;
+    searchText_ = text.substr(start, text.find_last_not_of(' ') - start + 1);
+    searchForward_ = true;
+    return goToMatch(true, 0);
+}
+
+bool Workspace::searchHere(bool forward, int count)
+{
+    // The exact pitch, as Vim's * takes the whole word (decided November 2026), or the
+    // controller.
+    const auto query = view().queryHere();
+    if (!query)
+    {
+        setMessage("No note or controller here to search for", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        return true;
+    }
+    search_ = query;
+    searchText_ = query->kind == core::EventQuery::Kind::Controller
+                      ? "cc" + std::to_string(*query->controller)
+                  : query->kind == core::EventQuery::Kind::Bend ? std::string{"bend"}
+                                                                : core::pitchName(*query->pitch);
+    searchForward_ = forward;
+    return goToMatch(true, count);
+}
+
+bool Workspace::goToMatch(bool next, int count)
+{
+    // A jump, as in Vim, so '' goes back from it.
+    const bool forward = next == searchForward_;
+    const auto command = forward ? "cursor-match-next" : "cursor-match-previous";
+    const auto before = view().cursor();
+    const auto moved = view().run(command, count);
+    if (!moved)
+    {
+        return sayWhereFor(command);
+    }
+    if (wasPlaying_)
+    {
+        following_ = false;
+    }
+    if (view().cursor() == before)
+    {
+        const bool on = view().matchStatus(*search_).starts_with("match");
+        setMessage(on ? "This is the only match for " + searchText_
+                      : "No match for " + searchText_ + " on this track",
+                   MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        return true;
+    }
+    if (mode_ != Mode::Visual)
+    {
+        jumpedFrom_ = before;
+    }
+    return true;
+}
+
+void Workspace::searchWrapped(bool forward)
+{
+    setMessage(forward ? "Past the last match, round to the first"
+                       : "Before the first match, round to the last",
+               MessageKind::Information);
+}
+
 bool Workspace::startFind(bool forward, int count)
 {
     // After a find, f and F go to its next and previous match, as Doom Emacs's evil-snipe does
@@ -1273,7 +1419,8 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
         return true;
     }
     naming_ = Naming{.letter = upper, .forward = forward, .count = count, .from = view().cursor()};
-    findClass_ = *core::parsePitchClass(encodeUtf8(std::u32string(1, upper)));
+    findQuery_ =
+        core::EventQuery{.pitchClass = core::parsePitchClass(encodeUtf8(std::u32string(1, upper)))};
     findName_ = encodeUtf8(std::u32string(1, upper));
     if (operator_)
     {
@@ -1300,7 +1447,7 @@ bool Workspace::finishNaming(std::optional<char32_t> accidental)
     {
         name += static_cast<char>(*accidental);
     }
-    findClass_ = *core::parsePitchClass(name);
+    findQuery_ = core::EventQuery{.pitchClass = core::parsePitchClass(name)};
     findName_ = name;
     if (naming.redo)
     {
@@ -2811,6 +2958,23 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         answer_ = {};
         return true;
     }
+    if (command == "search")
+    {
+        mode_ = Mode::CommandLine;
+        line_.open();
+        answer_ = {};
+        searchPrompt_ = true;
+        return true;
+    }
+    if (command == "search-here" || command == "search-here-back")
+    {
+        return searchHere(command == "search-here", count);
+    }
+    if (command == "search-clear")
+    {
+        search_.reset();
+        return true;
+    }
     if (command == "keys-show")
     {
         keysPage_ = 0;
@@ -3269,7 +3433,18 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     }
     if (command == "command-line-next" || command == "command-line-previous")
     {
-        return !answer_ && complete(command == "command-line-next" ? 1 : -1);
+        return !answer_ && !searchPrompt_ && complete(command == "command-line-next" ? 1 : -1);
+    }
+    if (searchPrompt_ && (command == "command-line-run" || command == "command-line-cancel" ||
+                          (command == "command-line-backspace" && line_.text().empty())))
+    {
+        // Back to Normal mode, or Visual mode if searching from it, the cursor moving with
+        // the selection; Escape leaves the matches as they were.
+        searchPrompt_ = false;
+        mode_ = selection_ ? Mode::Visual : Mode::Normal;
+        const auto text = encodeUtf8(line_.text());
+        line_.clear();
+        return command != "command-line-run" || search(text);
     }
     // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do; Left and
     // Right go across the columns, and Page Down and Up a screen of them.
@@ -4745,6 +4920,10 @@ std::u32string Workspace::promptLabel() const
     {
         return decodeUtf8(answerLabel_);
     }
+    if (searchPrompt_)
+    {
+        return U"/";
+    }
     if (palette_)
     {
         return decodeUtf8(selection_ ? "Command on " +
@@ -4968,6 +5147,11 @@ Bar Workspace::statusBar(bool withMessage) const
     if (const auto keys = pending(); !keys.empty())
     {
         bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
+    }
+    if (search_)
+    {
+        bottom.right.push_back({"/" + searchText_ + " ", label});
+        bottom.right.push_back({view().matchStatus(*search_) + "   ", kBarText});
     }
     if (player_ != nullptr)
     {

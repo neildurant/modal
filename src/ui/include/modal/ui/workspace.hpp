@@ -216,10 +216,9 @@ public:
     const std::vector<core::Event>& registerEvents() const;
 
     // Shows a message in the status line until the next key.
-    std::optional<int> findClass() const override
-    {
-        return findClass_ >= 0 ? std::optional{findClass_} : std::nullopt;
-    }
+    std::optional<core::EventQuery> findQuery() const override { return findQuery_; }
+    std::optional<core::EventQuery> searchQuery() const override { return search_; }
+    void searchWrapped(bool forward) override;
     std::optional<core::Tick> jumpTime() const override
     {
         return jumpTime_ >= 0 ? std::optional{jumpTime_} : std::nullopt;
@@ -428,7 +427,7 @@ private:
     CommandResult deleteLabels();
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;
-    // Finds (fE): the pitch class of the last (-1 for none), its name as typed, and whether f
+    // Finds (fE): the pitch class of the last, its name as typed, and whether f
     // and F repeat it, while it's the last thing done, and whether the key being handled kept
     // that. A find whose name may yet take a sharp or flat (b or #) after its letter: where it
     // started, whether it found nothing, which a macro fails on only once the name is done,
@@ -455,7 +454,7 @@ private:
         std::optional<Redo> redo = {};
     };
     std::optional<Naming> naming_;
-    int findClass_ = -1;
+    std::optional<core::EventQuery> findQuery_;
     std::string findName_;
     bool findForward_ = true;
     bool findRepeats_ = false;
@@ -513,6 +512,18 @@ private:
     void askFor(std::string label, std::function<void(const std::string&)> answer);
     std::string answerLabel_;
     std::function<void(const std::string&)> answer_;
+    // Search (/C1): what the last looks for, as typed and as read, whether it went forwards (*
+    // or /) or back (#), which n keeps to, as in Vim, and whether the prompt is for one.
+    std::optional<core::EventQuery> search_;
+    std::string searchText_;
+    bool searchForward_ = true;
+    bool searchPrompt_ = false;
+    // Searching for what's typed, / and Enter alone clearing the matches; going to the next
+    // match in the search's direction, or the one before; and searching for what's under the
+    // cursor (* and #).
+    bool search(const std::string& text);
+    bool goToMatch(bool next, int count);
+    bool searchHere(bool forward, int count);
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

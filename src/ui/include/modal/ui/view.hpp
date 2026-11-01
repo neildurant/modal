@@ -4,6 +4,7 @@
 
 #include <modal/core/document.hpp>
 #include <modal/core/event.hpp>
+#include <modal/core/event_query.hpp>
 #include <modal/core/player.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
@@ -193,9 +194,12 @@ public:
     // The time of the mark an operator's range goes to ('a), for the motion cursor-mark.
     virtual std::optional<core::Tick> jumpTime() const { return std::nullopt; }
 
-    // The pitch class, 0 for C to 11 for B, that a find goes to (fE), for the motions
-    // cursor-find-next and cursor-find-previous.
-    virtual std::optional<int> findClass() const { return std::nullopt; }
+    // What a find goes to (fE, a pitch class), for the motions cursor-find-next and
+    // cursor-find-previous; and what the last search looks for (/C1), for cursor-match-next and
+    // cursor-match-previous, which go round past the ends, as Vim's do, saying so.
+    virtual std::optional<core::EventQuery> findQuery() const { return std::nullopt; }
+    virtual std::optional<core::EventQuery> searchQuery() const { return std::nullopt; }
+    virtual void searchWrapped(bool /*forward*/) {}
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the
@@ -256,6 +260,12 @@ public:
 
     // Its area, its bar and the inspector, in that order.
     virtual void addRegions(Frame& frame) const = 0;
+
+    // The event under the cursor as what to search for (* and #): a note's pitch, or a
+    // controller, or nothing if there's none; and where the cursor is among the matches of a
+    // search, for the status line ("match 3/24").
+    virtual std::optional<core::EventQuery> queryHere() const { return std::nullopt; }
+    virtual std::string matchStatus(const core::EventQuery& /*query*/) const { return {}; }
 
     // The Visual selection here, as words for the status line ("bars 3-4 on every track"), or
     // nothing if the view can't select; its span of time; its own index at the cursor, for a
