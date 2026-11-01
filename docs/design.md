@@ -456,11 +456,27 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 | Quantise | Grid, strength %, swing, start only or start and length |
 | Humanise | Small random changes to time and velocity, within set limits |
 | Length | Legato (extend to next note), fixed length, scale lengths |
-| Thin / filter | Delete events matching a condition, e.g. velocity below 20 |
+| Thin | Thin out dense controller, pitch bend and aftertouch data, as Sequencer Plus Gold's did |
+| Filter | Delete events matching a condition, e.g. velocity below 20 |
 | Split | Move notes above or below a pitch to another track |
 | Remap | Change channel, CC number or note mapping |
 
-The song has a key and scale setting (key changes over time later), used by the in-key transforms and by step entry.
+**How transforms are reached and set (decided November 2026, for milestone 6's step 10).**
+
+- **Both orders.** `!` takes a range and then opens the transform menu (`!ib`, then a letter); each `, x` entry is the other way round, the transform first and then a range, as `^gn` is. On a Visual selection either acts at once.
+- **Asking, as `^` does.** A transform needing an amount asks at the prompt, its label saying what and with its defaults filled in ("Compress velocities of 12 notes (50%, window=1bar): "), so Enter takes them; one with an obvious default (retrograde, clean up) just runs. Each has a `:` command taking its amount and `name=value` options, given there it asks nothing, and `.` repeats it as it was answered. The hint menu shows each default in its description.
+- **Defaults to begin with, to be tried and tuned:** the soft knee eases relative velocity changes within 16 of each limit; compress, expand and shape average over a bar, centred on each note; the interactive step sizes (for adjusting by ear, milestone 8) are 10% for amounts in percent, 5 for offsets and 5 ms for the pedal offset.
+
+**Keys and scales (decided November 2026).** Few songs keep one key throughout, so a transform needing a key (transpose in key, inverting in the scale) asks for it each time, rather than the song having a single key and scale: "Key for 12 notes in Piano (D dorian): ", the last used filled in, so Enter takes it again. Up and Down go through the keys used lately (a history of their own, as `/`'s), Tab completes and lists the keys and scales there are, and naming the key in the command (`:transpose-key +2 key=Eb lydian`) asks nothing; `.` repeats with the same key. Marked key changes and a song-wide default key come later, and a MIDI file's key signatures with them.
+
+- **The scales built in:** major (ionian) and minor (natural, aeolian), harmonic and melodic minor, dorian, phrygian, lydian, mixolydian and locrian, major and minor pentatonic, blues, whole tone, and the two diminished scales. Others are defined in the modalrc by their degrees, as `scale hijaz 1 b2 3 4 5 b6 b7`.
+- **Scales of any size:** a degree is a step of the scale, five to the octave in a pentatonic one.
+- **Notes outside the scale** keep their distance above the scale's note below them, so a chromatic passing note stays one, transposing in key and inverting in the scale alike.
+
+**Thin and filter (decided November 2026).** Two transforms, not one:
+
+- **Thin** thins out dense continuous data, as Sequencer Plus Gold's did: hundreds of mod wheel (CC 1) events from one gesture, or pitch bend or aftertouch, down to what's needed. `only=` says which (`only=cc1`, `only=bend`; by default every kind of continuous data in the range, but never the switch controllers such as the pedals), `per=` the most kept in a quarter note (16), and `step=` the smallest change in value worth keeping (2). The first and last events of each gesture are always kept, so it ends where it did.
+- **Filter** deletes the events matching a query, written as `/`'s are (`:filter vel<20`, `:filter cc7`); from `!` it takes the search's query, if there is one, filled in.
 
 **Velocity without clipping (decided October 2026)**
 
@@ -508,7 +524,7 @@ Switch controllers (sustain CC 64, sostenuto CC 66, soft CC 67, legato and porta
 | Offset | Move every pedal change in a range slightly later |
 | Bake | Turn pedalling into longer notes, for instruments that ignore sustain |
 
-**Adjusting by ear**
+**Adjusting by ear** (moved to milestone 8, decided November 2026, to be built into looping's design rather than added beside it)
 
 Any velocity transform, and the pedal offset, can run interactively: run the command on a selection and the selection loops; `k` / `j` change the amount (compression 50% → 60%), applied live as it plays, with the amount and step shown in the status line; `Enter` accepts and `Esc` cancels, restoring the original. The whole adjustment is one undo step.
 
@@ -919,7 +935,7 @@ Each milestone ends with something runnable and testable on both platforms. Timi
    - **With marks:** to-do markers, brought forward from the ideas into version 1, then dropped once built (November 2026; see the views' marks above).
    - **In the key map review:** `marker-set` renamed to say what it sets, the play-from marker (`play-from-set`, say), with the other commands' names looked over for the same. `field-edit` split as `J` was (one command per meaning): Enter edits the field in the event list, opens the bar in the piano roll on the arrangement's tracks, and plays from the section on the strip, all under the one name and description. Descriptions that read differently in different views made to say what the command does in the view the cursor is in (decided October 2026): shared commands' descriptions are long when one sentence has to cover every view, as "Move left, scrolling to keep the cursor in place (in the event list, to the field before)". `gn` and `gv` described as the "go" commands they are, going somewhere and selecting what's there (decided November 2026, as `g` reads as "go" from the rest of its menu): "Go to the next match, selected" and "Go back to the last selection" in place of "Select the next match" and "Last selection", perhaps under a heading of their own in the `g` menu.
 7. **More for the views, and several songs.** The outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding. Several songs open at once (added October 2026), as Vim's buffers: switching between them, the register shared so bars, tracks and sections are yanked from one and put in another, which is also how a MIDI file's ideas come into a song (opened as a song of its own, then yanked from); and `:read FILE` to bring a file's tracks into the song directly. The engine plays the song shown. To settle then: how what's put follows the song it lands in when tempos and meters differ.
-8. **Step entry, loop and punch recording.** Take handling, section looping and takes, cueing.
+8. **Step entry, loop and punch recording.** Take handling, section looping and takes, cueing. Adjusting transforms by ear on a looping selection (moved from milestone 6, November 2026), designed in with looping.
 9. **Polish for daily use.** Configurable status bar, settings, port aliases, backups, a menu bar, performance pass, documentation; options for what MIDI export writes as markers (section starts already go as marker events; bookmarks too as markers, for programs that ignore cue points, as an option).
 
 Later: in-process plugin hosting, patterns, MIDI clock in, take lanes, splits, scripting, macOS.
@@ -1028,8 +1044,10 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [ ] `Ctrl-p` in Insert mode: open the palette, or keep it for step entry? `, :` and the Ctrl-Space leader reach the palette in Insert mode either way.
 - [ ] Where the palette's frecency ranking is stored (the config directory, say), and whether it can be reset.
 - [ ] Palette prefixes for takes, transform presets and other later kinds of item.
-- [ ] Velocity transforms: the default soft-knee width (how near the limits the easing starts), the default averaging window for compress, expand and shape, and interactive step sizes per transform.
-- [ ] Re-pedal gaps: how long before and after a chord change, in ticks or milliseconds.
+- [x] Velocity transforms: the default soft-knee width (how near the limits the easing starts), the default averaging window for compress, expand and shape, and interactive step sizes per transform (decided November 2026, to be tuned in use; see MIDI transforms).
+- [x] Re-pedal gaps: in milliseconds, as timing is heard, the pedal lifting 10 ms before a chord change and going down 60 ms after it, set by `pedallift` and `pedaldown` and in the command (decided November 2026, to be tuned in use).
+- [x] Default parameters for each transform, and how they appear in the hint menu and command line (moved from later milestones; decided November 2026, see MIDI transforms).
+- [x] Keys for the in-key transforms: asked each time, not a song setting; scales beyond major and minor (decided November 2026; see MIDI transforms).
 - [ ] Visual mode's side of the questions settled for Normal mode in milestone 5 (see Ranges, objects and putting): a selection's contents or its time, laying over or putting in, and keeping to bars.
 
 **Milestone 7: more for the views**
@@ -1053,7 +1071,6 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [ ] Files between versions of Modal: how a newer song format is read by an older Modal and the reverse, and when the format version starts to count; it stays at 1 while Modal is experimental (noted October 2026).
 
 - [ ] Scale lock, its toggle key (`, t s` proposed) and the semitone motion that ignores it: moved from milestone 5 to a later milestone (decided for milestone 5). A key and scale may change from bar to bar, so scale lock needs something like a key or chord track beside the conductor, to be designed first. Until then `k` / `j` move by semitones.
-- [ ] Default parameters for each transform, and how they appear in the hint menu and command line.
 - [x] Behaviour when a song's saved port isn't present on this machine: the track keeps the name and plays to nothing, the status line names the missing ports, and `:port` reassigns it (decided for milestone 4; see A port that isn't there).
 
 ## Decisions and open questions
