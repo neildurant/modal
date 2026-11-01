@@ -432,7 +432,19 @@ private:
     // and F repeat it, while it's the last thing done, and whether the key being handled kept
     // that. A find whose name may yet take a sharp or flat (b or #) after its letter: where it
     // started, whether it found nothing, which a macro fails on only once the name is done,
-    // and for an operator, which can't take the range before then, when its time is up.
+    // and for an operator, which has taken its range to the natural, what to do it again
+    // from: the operator, the song and registers before it, and the undo group it's in until
+    // the name is done.
+    struct Redo
+    {
+        PendingOperator op;
+        core::Song song;
+        EventRegister unnamed;
+        std::map<char32_t, EventRegister> registers;
+        std::optional<char32_t> registerName;
+        EventRegister registerBefore;
+        bool cut = false;
+    };
     struct Naming
     {
         char32_t letter;
@@ -440,7 +452,7 @@ private:
         int count;
         SongCursor from;
         bool failed = false;
-        std::int64_t deadline = -1; // none, for a find without an operator
+        std::optional<Redo> redo = {};
     };
     std::optional<Naming> naming_;
     int findClass_ = -1;
@@ -448,8 +460,10 @@ private:
     bool findForward_ = true;
     bool findRepeats_ = false;
     bool findKept_ = false;
-    std::int64_t keyTimeout_;
     bool startFind(bool forward, int count);
+    // The operator over the find's range, to its note named so far, saying so if there's none;
+    // whether it found one.
+    bool operateToFound(bool forward, int count);
     bool nameFind(std::string_view command, char32_t letter, int count);
     bool finishNaming(std::optional<char32_t> accidental);
     void settleNaming();

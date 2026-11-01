@@ -550,7 +550,6 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
-    , keyTimeout_(timeout)
 {
     keys_.setTakesCharacter([this](std::string_view command) { return takesCharacter(command); });
     for (const auto& info : commands())
@@ -725,12 +724,15 @@ std::string Workspace::pending() const
     {
         text += keysOf(awaiting_->command);
     }
-    if (naming_ && naming_->deadline >= 0)
-    {
-        text += keysOf(naming_->forward ? "find-next" : "find-previous") +
-                encodeUtf8(std::u32string(1, naming_->letter));
-    }
     text += keys_.pending();
+    if (text.empty() && naming_ && naming_->redo)
+    {
+        // An operator's find that a sharp or flat may yet change (dfC).
+        text = (naming_->redo->op.count > 0 ? std::to_string(naming_->redo->op.count)
+                                            : std::string{}) +
+               keysOf(naming_->redo->op.name) +
+               keysOf(naming_->forward ? "find-next" : "find-previous") + findName_;
+    }
     if (text.empty() && findRepeats_)
     {
         text = keysOf(findForward_ ? "find-next" : "find-previous") + findName_;
@@ -870,15 +872,16 @@ bool Workspace::recordChange(const Key& key, std::int64_t now)
     {
         return handleKey(key, now);
     }
-    // An operator's find waiting for a sharp or flat (dfB) is done at any other key, the
-    // change with it, the key not being part of it.
+    // An operator's find that a sharp or flat may yet change (dfB) is done at any other key,
+    // the change with it, the key not being part of it.
     bool changed = false;
     const bool accidental = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0 &&
                             (key.character == U'#' || key.character == U'b');
-    if (naming_ && naming_->deadline >= 0 && !accidental && key.named != NamedKey::Escape)
+    if (naming_ && naming_->redo && !accidental)
     {
         lastTime_ = now;
-        changed = finishNaming(std::nullopt);
+        settleNaming();
+        changed = true;
         endChange();
     }
     if (changeKeys_.empty())
@@ -1237,11 +1240,23 @@ bool Workspace::startFind(bool forward, int count)
     return true;
 }
 
+bool Workspace::operateToFound(bool forward, int count)
+{
+    if (!runOperator(forward ? "cursor-find-next" : "cursor-find-previous", count))
+    {
+        sayNotFound(forward);
+        return false;
+    }
+    return true;
+}
+
 bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
 {
     // The letter, in either case (decided November 2026, as capitals aren't needed to tell
     // notes apart). The cursor goes at once, and again from where it was if a sharp or flat
-    // follows; an operator waits for that, or the time keys wait for more.
+    // follows. So does an operator (decided November 2026, after waiting for the key timeout
+    // first was too hurried): done again over the new range, as one undo step, if a sharp or
+    // flat follows, however long after.
     const bool forward = command == "find-next";
     const char32_t upper = letter >= U'a' && letter <= U'g' ? letter - U'a' + U'A' : letter;
     if (upper < U'A' || upper > U'G')
@@ -1258,13 +1273,21 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
         return true;
     }
     naming_ = Naming{.letter = upper, .forward = forward, .count = count, .from = view().cursor()};
-    if (operator_)
-    {
-        naming_->deadline = lastTime_ + keyTimeout_;
-        return true;
-    }
     findClass_ = *core::parsePitchClass(encodeUtf8(std::u32string(1, upper)));
     findName_ = encodeUtf8(std::u32string(1, upper));
+    if (operator_)
+    {
+        naming_->redo = Redo{.op = *operator_,
+                             .song = document_.song(),
+                             .unnamed = register_,
+                             .registers = registers_,
+                             .registerName = registerName_,
+                             .registerBefore = registerBefore_,
+                             .cut = cutNext_};
+        document_.beginGroup({}, view().place());
+        naming_->failed = !operateToFound(forward, count);
+        return true;
+    }
     naming_->failed = !goToFound(forward, count);
     return true;
 }
@@ -1279,14 +1302,34 @@ bool Workspace::finishNaming(std::optional<char32_t> accidental)
     }
     findClass_ = *core::parsePitchClass(name);
     findName_ = name;
-    if (operator_)
+    if (naming.redo)
     {
-        if (!runOperator(naming.forward ? "cursor-find-next" : "cursor-find-previous",
-                         naming.count))
+        // The operator again, from the song, registers and cursor before it, in the undo group
+        // it began, which then ends as one step.
+        auto& redo = *naming.redo;
+        if (accidental)
         {
-            sayNotFound(naming.forward);
-            macroFailed_ = macroDepth_ > 0;
+            document_.edit({}, view().place(), [&](core::Song& song) { song = redo.song; });
+            register_ = std::move(redo.unnamed);
+            registers_ = std::move(redo.registers);
+            registerName_ = redo.registerName;
+            registerBefore_ = std::move(redo.registerBefore);
+            cutNext_ = redo.cut;
+            refresh();
+            view().setCursor(naming.from);
+            operator_ = redo.op;
+            mode_ = Mode::OperatorPending;
+            if (!operateToFound(naming.forward, naming.count))
+            {
+                macroFailed_ = macroDepth_ > 0;
+            }
         }
+        else if (naming.failed && macroDepth_ > 0)
+        {
+            macroFailed_ = true;
+        }
+        document_.endGroup();
+        refresh();
         return true;
     }
     // Again from where the find started, for the sharp or flat.
@@ -1306,7 +1349,7 @@ void Workspace::settleNaming()
     {
         return;
     }
-    if (naming_->deadline >= 0)
+    if (naming_->redo)
     {
         finishNaming(std::nullopt);
         return;
@@ -1531,12 +1574,8 @@ bool Workspace::playMacro(char32_t name, int count)
                                      : keymapHere();
             runAll(keys_.timeout(keymap, *deadline));
         }
-        if (!macroFailed_)
-        {
-            settleNaming();
-        }
+        settleNaming(); // its undo group ending within the macro's
     }
-    naming_.reset();
     document_.endGroup();
     if (--macroDepth_ == 0)
     {
@@ -1683,8 +1722,7 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
         noteWaiting(now);
         return done;
     }
-    // A find's name, which a sharp or flat straight after its letter goes on (fB, then b);
-    // Escape gives up an operator waiting for it.
+    // A find's name, which a sharp or flat straight after its letter goes on (fB, then b).
     if (naming_)
     {
         const bool plain = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0;
@@ -1693,13 +1731,6 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
             const bool done = finishNaming(key.character);
             noteWaiting(now);
             return done;
-        }
-        if (key.named == NamedKey::Escape && naming_->deadline >= 0)
-        {
-            naming_.reset();
-            operator_.reset();
-            mode_ = Mode::Normal;
-            return true;
         }
         settleNaming();
         if (macroFailed_)
@@ -1790,8 +1821,7 @@ void Workspace::noteWaiting(std::int64_t now)
 
 bool Workspace::findWaiting() const
 {
-    return (awaiting_ && awaiting_->command.starts_with("find-")) ||
-           (naming_ && naming_->deadline >= 0);
+    return (awaiting_ && awaiting_->command.starts_with("find-")) || (naming_ && naming_->redo);
 }
 
 std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
@@ -2398,10 +2428,6 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 std::optional<std::int64_t> Workspace::deadline() const
 {
     auto deadline = keys_.deadline();
-    if (naming_ && naming_->deadline >= 0)
-    {
-        deadline = deadline ? std::min(*deadline, naming_->deadline) : naming_->deadline;
-    }
     if (hintsOn_ && waitingSince_ && !hintsShown_)
     {
         const auto shown = *waitingSince_ + hintDelay_;
@@ -2424,15 +2450,6 @@ bool Workspace::wake(std::int64_t now)
                              : keymapHere();
     typedKeys_.assign(keys_.keys().begin(), keys_.keys().end());
     bool changed = runAll(keys_.timeout(keymap, now));
-    // An operator's find with no sharp or flat after its letter in time (dfE).
-    if (naming_ && naming_->deadline >= 0 && now >= naming_->deadline)
-    {
-        changed = finishNaming(std::nullopt) || changed;
-    }
-    if (!replaying_ && macroDepth_ == 0)
-    {
-        endChange();
-    }
     if (waitingSince_ && !hintsShown_ && now >= *waitingSince_ + hintDelay_)
     {
         hintsShown_ = true;

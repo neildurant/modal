@@ -84,7 +84,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `}` `{`, `]b` `[b` | The event at or after the same place a bar on or back, or a bar line |
 | `)` `(` | The next or previous chord: events within 30 ms of each other (`set chordwindow`) |
 | `]s` `[s`, `]l` `[l` | The next or previous section's start, or label |
-| `f` `F` and a note name | The next or previous note of that pitch class, any octave (`fE`, `fF#`, `fbb`); then `f` and `F` go on to the next and the one before, until another key; after an operator, the range through it (`dfE`) |
+| `f` `F` and a note name | The next or previous note of that pitch class, any octave (`fE`, `fF#`, `fbb`); then `f` and `F` go on to the next and the one before, until another key; after an operator, the range through it (`dfE`), done again to the sharp or flat if `#` or `b` follows |
 | `d` `y` with a motion, `dd` `yy` | Delete or yank events: `dj` this event and the next, `d]b` up to the next bar line, `dd` (or `dib`) this bar's |
 | `ic`, `is`, `it` | With an operator, the chord this note is in, this section's events, the track's |
 | `>` `<`, `t` `T`, `q`, `^`, `~` | Transpose, move by the grid step, quantise, change velocity and humanise the events a motion takes, as in the piano roll (`>j` this event and the next) |

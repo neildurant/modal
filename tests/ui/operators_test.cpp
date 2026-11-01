@@ -747,31 +747,46 @@ TEST_CASE("after an operator, a find takes the range through the note it finds")
     addFlats(o);
     o.type(U"gr"); // the piano roll, at the start
     o.type(U"dfa");
-    CHECK(o.notes().size() == 7); // waiting for a sharp or flat
+    // At once, to A2's end, though a sharp or flat may yet change it.
+    const Notes afterA{{8 * q, 34}, {12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}};
+    CHECK(o.notes() == afterA);
     CHECK(o.ws.pending() == "dfA");
-    o.ws.wake(kDefaultTimeout);
-    CHECK(o.notes() ==
-          Notes{{8 * q, 34}, {12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}}); // to A2's end
+    // A sharp, however long after, does it again to A# (Bb1), as one undo step; . repeats it.
+    o.ws.wake(10 * kDefaultTimeout);
+    o.type(U"#");
+    const Notes afterBb{{12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}};
+    CHECK(o.notes() == afterBb);
+    CHECK(o.ws.pending().empty());
+    o.type(U"u");
+    CHECK(o.notes().size() == 7);
+    o.type(U".");
+    CHECK(o.notes() == afterBb);
     o.type(U"u");
     o.type(U"dfbb");
     CHECK(o.notes() == Notes{{12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}});
     o.type(U"u");
-    // Escape gives it up.
+    // A yank done again takes what the new range does, not both.
+    o.type(U"yfa#");
+    CHECK(o.ws.registerEvents().size() == 4);
+    // Another key, Escape among them, leaves it as it is, and is a key of its own, not part of
+    // the change . repeats.
     o.type(U"dfa");
     o.press(NamedKey::Escape);
-    o.ws.wake(kDefaultTimeout);
-    CHECK(o.notes().size() == 7);
-    CHECK(o.ws.mode() == Mode::Normal);
-    // Another key does it, then is a key of its own, not part of the change . repeats.
+    CHECK(o.notes() == afterA);
+    o.type(U"#");
+    CHECK(o.notes() == afterA);
+    o.type(U"u");
     o.type(U"}}dFaj");
     CHECK(o.notes().size() == 6); // from A2 in bar 2 to the cursor in bar 3
     const auto pitch = o.ws.pianoRoll().cursor().pitch;
     o.type(U"}.");
     CHECK(o.ws.pianoRoll().cursor().pitch == pitch);
-    // Nothing to find gives the operator up.
+    // Nothing to find gives the operator up, and with the sharp too.
     o.type(U"dfd");
-    o.ws.wake(kDefaultTimeout);
     CHECK(o.ws.message() == "No D after here in Bass");
+    CHECK(o.ws.mode() == Mode::Normal);
+    o.type(U"#");
+    CHECK(o.ws.message() == "No D# after here in Bass");
     CHECK(o.ws.mode() == Mode::Normal);
 }
 
@@ -794,7 +809,6 @@ TEST_CASE("in the arrangement a find goes to the next bar with the note, and in 
     o.press(NamedKey::Escape);
     // After an operator, through the bar it finds.
     o.type(U"ggdfc");
-    o.ws.wake(kDefaultTimeout);
     CHECK(o.notes() == Notes{{28 * q, 33}});
     o.type(U"u");
 
@@ -802,7 +816,6 @@ TEST_CASE("in the arrangement a find goes to the next bar with the note, and in 
     o.type(U"ggfa");
     CHECK(o.ws.eventList().cursor().tick == 4 * q);
     o.type(U"ggdfa");
-    o.ws.wake(kDefaultTimeout);
     CHECK(o.notes() == Notes{{16 * q + q / 16, 36}, {28 * q, 33}});
 }
 
@@ -825,7 +838,7 @@ TEST_CASE("the hint menu says a find waits for a note name, and after an operato
                              Workspace::Hint{"f", "through the next note named", false}) == 1);
     o.type(U"fa");
     CHECK(o.ws.hints() == Hints{{"#", "sharp", false}, {"b", "flat", false}});
-    o.ws.wake(kDefaultTimeout);
+    o.type(U"j"); // until the next key
     CHECK_FALSE(o.ws.hints());
 }
 
@@ -834,4 +847,24 @@ TEST_CASE("a key bound to nothing says so at once")
     Operating o;
     CHECK(o.ws.handle(Key::typed(U'#'), 0)); // drawn, rather than waiting for the next key
     CHECK(o.ws.message() == "# isn't a key here");
+}
+
+TEST_CASE("an operator's find with a sharp plays back from a macro as one undo step")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    addFlats(o);
+    const Notes afterBb{{12 * q, 35}, {16 * q + q / 16, 36}, {28 * q, 33}};
+    o.type(U"grQadfa#Q");
+    CHECK(o.notes() == afterBb);
+    o.type(U"u");
+    REQUIRE(o.notes().size() == 7);
+    o.type(U"gg@a");
+    CHECK(o.notes() == afterBb);
+    o.type(U"u");
+    CHECK(o.notes().size() == 7);
+    // Without the sharp, at the macro's end, as it is.
+    o.type(U"QbdfaQugg@b");
+    CHECK(o.notes().size() == 4);
 }
