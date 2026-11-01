@@ -7,6 +7,7 @@
 #include <optional>
 
 using modal::core::parsePitch;
+using modal::core::parsePitchClass;
 using modal::core::pitchName;
 
 TEST_CASE("pitches are named with middle C as C4, and sharps")
@@ -38,5 +39,20 @@ TEST_CASE("anything else isn't a pitch")
     {
         CAPTURE(text);
         CHECK(parsePitch(text) == std::nullopt);
+    }
+}
+
+TEST_CASE("pitch classes are read without an octave, in either case")
+{
+    CHECK(parsePitchClass("C") == 0);
+    CHECK(parsePitchClass("e") == 4);
+    CHECK(parsePitchClass("F#") == 6);
+    CHECK(parsePitchClass("bb") == 10);
+    CHECK(parsePitchClass("Cb") == 11);
+    CHECK(parsePitchClass("B#") == 0);
+    for (const auto* text : {"", "H", "C4", "#", "C##", "Cx"})
+    {
+        CAPTURE(text);
+        CHECK(parsePitchClass(text) == std::nullopt);
     }
 }

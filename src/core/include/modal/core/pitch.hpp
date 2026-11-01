@@ -19,4 +19,8 @@ std::string pitchName(std::uint8_t pitch);
 // from -1 to 9. Returns nothing for anything else or outside 0-127 (such as "Cb-1").
 std::optional<std::uint8_t> parsePitch(std::string_view text);
 
+// A pitch class, any octave, read as parsePitch() reads a note's name without the octave: "F#"
+// is 6, "Bb" 10, "Cb" 11 and "B#" 0. Returns nothing for anything else.
+std::optional<int> parsePitchClass(std::string_view text);
+
 } // namespace modal::core

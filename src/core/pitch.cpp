@@ -18,14 +18,9 @@ constexpr std::array<std::string_view, 12> kNames{"C",  "C#", "D",  "D#", "E",  
 // Semitones above C for each letter from A.
 constexpr std::array<int, 7> kLetters{9, 11, 0, 2, 4, 5, 7};
 
-} // namespace
-
-std::string pitchName(std::uint8_t pitch)
-{
-    return std::string{kNames[pitch % 12]} + std::to_string(pitch / 12 - 1);
-}
-
-std::optional<std::uint8_t> parsePitch(std::string_view text)
+// The letter and any sharp or flat at the start of text, as semitones above C (-1 for Cb, 12
+// for B#), taken off text.
+std::optional<int> takeSemitone(std::string_view& text)
 {
     if (text.empty())
     {
@@ -43,6 +38,24 @@ std::optional<std::uint8_t> parsePitch(std::string_view text)
         semitone += text[0] == '#' ? 1 : -1;
         text.remove_prefix(1);
     }
+    return semitone;
+}
+
+} // namespace
+
+std::string pitchName(std::uint8_t pitch)
+{
+    return std::string{kNames[pitch % 12]} + std::to_string(pitch / 12 - 1);
+}
+
+std::optional<std::uint8_t> parsePitch(std::string_view text)
+{
+    const auto taken = takeSemitone(text);
+    if (!taken)
+    {
+        return std::nullopt;
+    }
+    const int semitone = *taken;
 
     int octave = 0;
     const auto* const end = text.data() + text.size();
@@ -57,6 +70,16 @@ std::optional<std::uint8_t> parsePitch(std::string_view text)
         return std::nullopt;
     }
     return static_cast<std::uint8_t>(pitch);
+}
+
+std::optional<int> parsePitchClass(std::string_view text)
+{
+    const auto semitone = takeSemitone(text);
+    if (!semitone || !text.empty())
+    {
+        return std::nullopt;
+    }
+    return (*semitone + 12) % 12;
 }
 
 } // namespace modal::core
