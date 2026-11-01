@@ -59,7 +59,8 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell);
 // A mark's dot, at its time in a row of bars or notes, its letter being in the ruler's row of
 // marks: a small square in the text's colour, ringed by a pixel of the background so it shows
 // over bars and notes of any shade (decided November 2026, after a letter boxed there blotted
-// out the bar under it).
+// out the bar under it). Its ring starts at x, so from where letters start, a pixel clear of
+// the line at the time.
 void addMarkDot(Region& region, int x, int y, CellSize cell);
 
 // Puts the register's events into the song at a time, its first track's onto a track (counting

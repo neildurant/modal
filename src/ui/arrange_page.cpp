@@ -731,31 +731,42 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     }
     // In a row of their own (decided November 2026, as they and the labels' names ran into each
     // other in one): the play-from marker, and the marks (ma), each its letter at its time. A
-    // track's mark is a dot in the track's row too, if it's shown.
+    // track's mark is a dot in the track's row too, if it's shown. Marks at one time go in the
+    // order of their rows from the top, the conductor's first, so the letters read as the dots
+    // below them do (decided November 2026).
     std::vector<RowSign> signs;
     if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
     {
         signs.push_back({scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent, false});
     }
+    std::vector<std::pair<std::size_t, const core::Mark*>> marks; // with its row, the conductor 0
     for (const auto& mark : song_.marks())
     {
         if (mark.tick < leftTick_ || mark.tick >= shownEnd)
         {
             continue;
         }
-        const int x = scale.toX(mark.tick) + 2 * lineWidth;
-        signs.push_back({x, kSignRow * cell_.height, static_cast<char32_t>(mark.letter)});
+        std::size_t row = 0;
         if (mark.track)
         {
             const auto it =
                 std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == *mark.track; });
-            const auto index = static_cast<std::size_t>(it - tracks.begin());
-            if (it != tracks.end() && index >= topTrack_ &&
-                index < topTrack_ + static_cast<std::size_t>(shownTracks))
-            {
-                addMarkDot(timeline, x,
-                           tracksTop + static_cast<int>(index - topTrack_) * cell_.height, cell_);
-            }
+            row = static_cast<std::size_t>(it - tracks.begin()) + 1;
+        }
+        marks.emplace_back(row, &mark);
+    }
+    std::ranges::sort(
+        marks, [](const auto& a, const auto& b)
+        { return std::pair{a.second->tick, a.first} < std::pair{b.second->tick, b.first}; });
+    for (const auto& [row, mark] : marks)
+    {
+        const int x = scale.toX(mark->tick) + 2 * lineWidth;
+        signs.push_back({x, kSignRow * cell_.height, static_cast<char32_t>(mark->letter)});
+        if (row > topTrack_ && row <= tracks.size() &&
+            row <= topTrack_ + static_cast<std::size_t>(shownTracks))
+        {
+            addMarkDot(timeline, x,
+                       tracksTop + static_cast<int>(row - 1 - topTrack_) * cell_.height, cell_);
         }
     }
     addRowSigns(timeline, std::move(signs), cell_);

@@ -2047,20 +2047,29 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
 
     // The second row, a row of their own (decided November 2026, as they and the names ran
     // into each other in one): the play-from marker, and the marks (ma) on this track or the
-    // conductor, each its letter; one with a pitch is a dot at it too, among the notes.
+    // conductor, each its letter; one with a pitch is a dot at it too, among the notes. Marks at
+    // one time go in the order of their dots from the top, those without one first.
     std::vector<RowSign> signs;
     if (const auto* player = host_.player(); player != nullptr && inView(player->marker()))
     {
         signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent, false});
     }
+    std::vector<const core::Mark*> marks;
     for (const auto& mark : song.marks())
     {
-        const bool here = !mark.track || mark.track == trackId();
-        if (here && inView(mark.tick))
+        if ((!mark.track || mark.track == trackId()) && inView(mark.tick))
         {
-            signs.push_back(
-                {scale.toX(mark.tick) + 2 * lineWidth, h, static_cast<char32_t>(mark.letter)});
+            marks.push_back(&mark);
         }
+    }
+    const auto height = [](const core::Mark* mark)
+    { return mark->track && mark->pitch != core::Mark::kNoPitch ? -mark->pitch : -128; };
+    std::ranges::sort(marks, [&](const core::Mark* a, const core::Mark* b)
+                      { return std::pair{a->tick, height(a)} < std::pair{b->tick, height(b)}; });
+    for (const auto* mark : marks)
+    {
+        signs.push_back(
+            {scale.toX(mark->tick) + 2 * lineWidth, h, static_cast<char32_t>(mark->letter)});
     }
     addRowSigns(ruler, std::move(signs), cell_);
 

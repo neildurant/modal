@@ -490,12 +490,36 @@ TEST_CASE("the play-from marker and marks have a row of their own, laid out not 
             rings += shape.role == Role::Background ? 1 : 0;
         }
     }
-    CHECK(dots == std::vector<int>{42, 47});
+    CHECK(dots == std::vector<int>{43, 48}); // a pixel clear of the line
     CHECK(rings == 2);
     for (const auto& number : rulerText(frame[1], ArrangePage::kNumberRow))
     {
         CHECK(number != U"▶");
     }
+}
+
+TEST_CASE("marks at one time are lettered in the order of their rows, from the top")
+{
+    core::Song song;
+    const auto first = song.addTrack("Bass");
+    const auto second = song.addTrack("Drums");
+    const auto bar = song.ppqn().whole();
+    song.setMark({'a', bar, second, core::Mark::kNoPitch});
+    song.setMark({'b', bar, first, core::Mark::kNoPitch});
+    song.setMark({'c', bar, std::nullopt, core::Mark::kNoPitch});
+    ArrangePage page{song};
+    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    Frame frame;
+    page.addRegions(frame);
+    std::u32string letters;
+    for (const auto& run : frame[1].text)
+    {
+        if (run.y == ArrangePage::kSignRow * kCell.height)
+        {
+            letters += run.text;
+        }
+    }
+    CHECK(letters == U"cba");
 }
 
 TEST_CASE("a label at a section's start is named in the labels' row")

@@ -182,8 +182,8 @@ void addMarkDot(Region& region, int x, int y, CellSize cell)
     const int ring = std::max(hairline(cell), 1);
     const int top = y + (cell.height - side) / 2;
     region.under.push_back(
-        {{x - ring, top - ring, side + 2 * ring, side + 2 * ring}, Role::Background, 255});
-    region.under.push_back({{x, top, side, side}, Role::Text, 255});
+        {{x, top - ring, side + 2 * ring, side + 2 * ring}, Role::Background, 255});
+    region.under.push_back({{x + ring, top, side, side}, Role::Text, 255});
 }
 
 Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,
