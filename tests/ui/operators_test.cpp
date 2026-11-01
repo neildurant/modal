@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -803,4 +804,27 @@ TEST_CASE("in the arrangement a find goes to the next bar with the note, and in 
     o.type(U"ggdfa");
     o.ws.wake(kDefaultTimeout);
     CHECK(o.notes() == Notes{{16 * q + q / 16, 36}, {28 * q, 33}});
+}
+
+TEST_CASE("the hint menu says a find waits for a note name, and after an operator for a sharp or "
+          "flat")
+{
+    Operating o;
+    o.ws.setHints(true, 0);
+    using Hints = std::vector<Workspace::Hint>;
+    o.type(U"grf");
+    CHECK(o.ws.hints() == Hints{{"c d e f g a b", "a note name, any octave", false},
+                                {"# b", "then sharp or flat", false}});
+    o.type(U"a");
+    CHECK_FALSE(o.ws.hints());
+    o.press(NamedKey::Escape);
+    // After an operator, f among the ranges, then the sharp or flat.
+    o.type(U"d");
+    REQUIRE(o.ws.hints());
+    CHECK(std::ranges::count(*o.ws.hints(),
+                             Workspace::Hint{"f", "through the next note named", false}) == 1);
+    o.type(U"fa");
+    CHECK(o.ws.hints() == Hints{{"#", "sharp", false}, {"b", "flat", false}});
+    o.ws.wake(kDefaultTimeout);
+    CHECK_FALSE(o.ws.hints());
 }

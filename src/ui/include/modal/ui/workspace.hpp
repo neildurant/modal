@@ -544,6 +544,9 @@ private:
     void noteWaiting(std::int64_t now);
     std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
     std::vector<Hint> operatorHints() const;
+    // A find waiting for its note name (f), or after an operator for a sharp or flat (dfB),
+    // which the hint menu shows.
+    bool findWaiting() const;
     std::optional<int> keysPage_; // the list of keys' page, while it shows
     std::array<ChoiceSource, kChoicesCount> sources_;
     // Completing at the prompt: the matches, the one chosen as Tab goes round them, where the

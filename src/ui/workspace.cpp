@@ -1679,7 +1679,9 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
     // A command waiting for a character after it ("a): the next key, Escape giving it up.
     if (const auto waiting = std::exchange(awaiting_, std::nullopt))
     {
-        return characterAfter(waiting->command, key, waiting->count);
+        const bool done = characterAfter(waiting->command, key, waiting->count);
+        noteWaiting(now);
+        return done;
     }
     // A find's name, which a sharp or flat straight after its letter goes on (fB, then b);
     // Escape gives up an operator waiting for it.
@@ -1688,7 +1690,9 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
         const bool plain = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0;
         if (plain && (key.character == U'#' || key.character == U'b'))
         {
-            return finishNaming(key.character);
+            const bool done = finishNaming(key.character);
+            noteWaiting(now);
+            return done;
         }
         if (key.named == NamedKey::Escape && naming_->deadline >= 0)
         {
@@ -1767,9 +1771,9 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
 
 void Workspace::noteWaiting(std::int64_t now)
 {
-    // Keys waiting for more, or an operator waiting for its range, start the wait for the hint
-    // menu, or show it at once with no delay.
-    if (keys_.keys().empty() && !operator_)
+    // Keys waiting for more, an operator waiting for its range, or a find for its note name,
+    // start the wait for the hint menu, or show it at once with no delay.
+    if (keys_.keys().empty() && !operator_ && !findWaiting())
     {
         waitingSince_.reset();
         hintsShown_ = false;
@@ -1782,11 +1786,28 @@ void Workspace::noteWaiting(std::int64_t now)
     }
 }
 
+bool Workspace::findWaiting() const
+{
+    return (awaiting_ && awaiting_->command.starts_with("find-")) ||
+           (naming_ && naming_->deadline >= 0);
+}
+
 std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
 {
-    if (!hintsOn_ || !hintsShown_ || (keys_.keys().empty() && !operator_))
+    if (!hintsOn_ || !hintsShown_ || (keys_.keys().empty() && !operator_ && !findWaiting()))
     {
         return std::nullopt;
+    }
+    // A find's note name: the letters, then a sharp or flat (decided November 2026, so f
+    // says what it's waiting for).
+    if (awaiting_ && awaiting_->command.starts_with("find-"))
+    {
+        return std::vector<Hint>{{.keys = "c d e f g a b", .title = "a note name, any octave"},
+                                 {.keys = "# b", .title = "then sharp or flat"}};
+    }
+    if (findWaiting())
+    {
+        return std::vector<Hint>{{.keys = "#", .title = "sharp"}, {.keys = "b", .title = "flat"}};
     }
     if (keys_.keys().empty())
     {
@@ -2415,7 +2436,7 @@ bool Workspace::wake(std::int64_t now)
         hintsShown_ = true;
         changed = changed || hints().has_value();
     }
-    if (keys_.keys().empty() && !operator_)
+    if (keys_.keys().empty() && !operator_ && !findWaiting())
     {
         waitingSince_.reset();
         hintsShown_ = false;
