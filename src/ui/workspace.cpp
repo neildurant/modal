@@ -97,6 +97,39 @@ constexpr std::array kSharedCommands{
                 .usage = "[SEMITONES]",
                 .count = true,
                 .range = true},
+    CommandInfo{.name = "transform-velocity-lift",
+                .description = "Lift the velocities of the notes a range or object takes a "
+                               "percentage of the way towards 127, keeping their order and "
+                               "proportions, asking how far (25%); :vel-lift N% those of the "
+                               "selection, or else of the cursor's bar",
+                .aliases = "vel-lift",
+                .usage = "[PERCENT]",
+                .count = true,
+                .range = true},
+    CommandInfo{.name = "transform-velocity-lower",
+                .description = "Lower the velocities of the notes a range or object takes a "
+                               "percentage of the way towards the floor (velfloor), keeping "
+                               "their order and proportions, asking how far (25%)",
+                .aliases = "vel-lower",
+                .usage = "[PERCENT]",
+                .count = true,
+                .range = true},
+    CommandInfo{.name = "transform-velocity-limit",
+                .description = "Keep the velocities of the notes a range or object takes "
+                               "between two values, asking which (20-110)",
+                .aliases = "vel-limit",
+                .usage = "[LOW-HIGH]",
+                .count = true,
+                .range = true},
+    CommandInfo{.name = "transform-velocity-ramp",
+                .description = "A crescendo or diminuendo over the notes a range or object "
+                               "takes, by time: velocities set from one value to another "
+                               "(60-100), or their own scaled from one percentage to another "
+                               "(80%-120%)",
+                .aliases = "vel-ramp",
+                .usage = "[FROM-TO]",
+                .count = true,
+                .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -500,7 +533,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 100> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 104> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -517,6 +550,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-transform", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-transpose", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-lift", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-lower", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
@@ -3829,8 +3866,12 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         // An answer to a question, kept out of the : prompt's history.
         mode_ = Mode::Normal;
-        const auto text = encodeUtf8(line_.text());
+        auto text = encodeUtf8(line_.text());
         line_.clear();
+        if (text.find_first_not_of(' ') == std::string::npos)
+        {
+            text = std::exchange(answerDefault_, {});
+        }
         if (const auto answer = std::exchange(answer_, {}); !text.empty())
         {
             answer(text);
@@ -4827,12 +4868,14 @@ void Workspace::ask(std::string question, std::function<void()> yes, std::functi
     question_ = Question{std::move(yes), std::move(no), std::move(stop)};
 }
 
-void Workspace::askFor(std::string label, std::function<void(const std::string&)> answer)
+void Workspace::askFor(std::string label, std::function<void(const std::string&)> answer,
+                       std::string defaultAnswer)
 {
     mode_ = Mode::CommandLine;
     line_.open();
     answerLabel_ = std::move(label);
     answer_ = std::move(answer);
+    answerDefault_ = std::move(defaultAnswer);
 }
 
 void Workspace::playFrom(core::Tick tick)

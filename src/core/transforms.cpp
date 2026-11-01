@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cmath>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -106,6 +107,79 @@ std::vector<Event> takenEvents(const EventList& events, std::span<const std::siz
 std::uint8_t clampedVelocity(std::int64_t velocity)
 {
     return static_cast<std::uint8_t>(std::clamp<std::int64_t>(velocity, 1, 127));
+}
+
+std::uint8_t limited(double velocity, VelocityLimits limits)
+{
+    const auto floor = std::clamp(limits.floor, 1, 127);
+    return static_cast<std::uint8_t>(std::clamp<std::int64_t>(std::llround(velocity), floor, 127));
+}
+
+// The soft knee towards the top, as a curve from a velocity with no limit to one under 127,
+// the same below the knee, and its inverse; the bottom's mirrors it above the floor.
+double kneeTop(double u)
+{
+    const double start = 127.0 - kVelocityKnee;
+    return u <= start ? u : start + kVelocityKnee * (1.0 - std::exp(-(u - start) / kVelocityKnee));
+}
+
+double unkneeTop(double v)
+{
+    const double start = 127.0 - kVelocityKnee;
+    v = std::min(v, 126.5); // 127 itself as just under, to come back from
+    return v <= start ? v : start - kVelocityKnee * std::log(1.0 - (v - start) / kVelocityKnee);
+}
+
+double kneeBottom(double u, double floor)
+{
+    const double start = floor + kVelocityKnee;
+    return u >= start ? u : start - kVelocityKnee * (1.0 - std::exp(-(start - u) / kVelocityKnee));
+}
+
+double unkneeBottom(double v, double floor)
+{
+    const double start = floor + kVelocityKnee;
+    v = std::max(v, floor + 0.5);
+    return v >= start ? v : start + kVelocityKnee * std::log(1.0 - (start - v) / kVelocityKnee);
+}
+
+template <typename Change>
+Transformed changeNotes(const EventList& events, std::span<const std::size_t> which, Change change)
+{
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        if (auto* note = std::get_if<Note>(&event.data))
+        {
+            note->velocity = change(*note, event.tick);
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
+std::optional<int> number(std::string_view text)
+{
+    int value = 0;
+    const auto* last = text.data() + text.size();
+    const auto [end, error] = std::from_chars(text.data(), last, value);
+    if (text.empty() || error != std::errc{} || end != last)
+    {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::string_view trimmed(std::string_view text)
+{
+    while (!text.empty() && text.front() == ' ')
+    {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && text.back() == ' ')
+    {
+        text.remove_suffix(1);
+    }
+    return text;
 }
 
 } // namespace
@@ -275,32 +349,149 @@ std::optional<VelocityChange> parseVelocityChange(std::string_view text)
     return VelocityChange{kind, sign * amount};
 }
 
-std::uint8_t changedVelocity(std::uint8_t velocity, VelocityChange change)
+std::uint8_t eased(std::uint8_t velocity, double target, VelocityLimits limits)
+{
+    if (!limits.soft)
+    {
+        return limited(target, limits);
+    }
+    // The change made on the curve's far side, where there's no limit, and brought back.
+    const double v = velocity;
+    const double floor = std::clamp(limits.floor, 1, 127);
+    const double by = target - v;
+    if (by > 0)
+    {
+        return limited(kneeTop(unkneeTop(v) + by), limits);
+    }
+    if (by < 0)
+    {
+        return limited(kneeBottom(unkneeBottom(v, floor) + by, floor), limits);
+    }
+    return limited(v, limits);
+}
+
+std::uint8_t changedVelocity(std::uint8_t velocity, VelocityChange change, VelocityLimits limits)
 {
     switch (change.kind)
     {
     case VelocityChange::Kind::Set:
-        return clampedVelocity(change.amount);
+        return limited(change.amount, limits);
     case VelocityChange::Kind::Add:
-        return clampedVelocity(std::int64_t{velocity} + change.amount);
+        return eased(velocity, static_cast<double>(velocity) + change.amount, limits);
     case VelocityChange::Kind::Percent:
-        return clampedVelocity((std::int64_t{velocity} * change.amount + 50) / 100);
+        return eased(velocity, static_cast<double>(velocity) * change.amount / 100.0, limits);
     }
     return velocity;
 }
 
 Transformed changeVelocity(const EventList& events, std::span<const std::size_t> which,
-                           VelocityChange change)
+                           VelocityChange change, VelocityLimits limits)
 {
-    auto changed = takenEvents(events, which);
-    for (auto& event : changed)
+    return changeNotes(events, which, [&](const Note& note, Tick)
+                       { return changedVelocity(note.velocity, change, limits); });
+}
+
+Transformed liftVelocity(const EventList& events, std::span<const std::size_t> which, int percent,
+                         VelocityLimits limits)
+{
+    return changeNotes(events, which,
+                       [&](const Note& note, Tick)
+                       {
+                           const double v = note.velocity;
+                           return limited(v + (127.0 - v) * percent / 100.0, limits);
+                       });
+}
+
+Transformed lowerVelocity(const EventList& events, std::span<const std::size_t> which, int percent,
+                          VelocityLimits limits)
+{
+    const double floor = std::clamp(limits.floor, 1, 127);
+    return changeNotes(events, which,
+                       [&](const Note& note, Tick)
+                       {
+                           const double v = note.velocity;
+                           return v <= floor ? limited(v, limits)
+                                             : limited(v - (v - floor) * percent / 100.0, limits);
+                       });
+}
+
+Transformed limitVelocity(const EventList& events, std::span<const std::size_t> which, int low,
+                          int high, VelocityLimits limits)
+{
+    return changeNotes(events, which, [&](const Note& note, Tick)
+                       { return limited(std::clamp<int>(note.velocity, low, high), limits); });
+}
+
+Transformed rampVelocity(const EventList& events, std::span<const std::size_t> which,
+                         VelocityRamp ramp, VelocityLimits limits)
+{
+    // From the first note's start to the last's, a chord's notes alike.
+    std::optional<Tick> first;
+    std::optional<Tick> last;
+    for (const auto i : which)
     {
-        if (auto* note = std::get_if<Note>(&event.data))
+        if (std::holds_alternative<Note>(events[i].data))
         {
-            note->velocity = changedVelocity(note->velocity, change);
+            first = std::min(first.value_or(events[i].tick), events[i].tick);
+            last = std::max(last.value_or(events[i].tick), events[i].tick);
         }
     }
-    return finish(events, which, changed, false);
+    const auto span = first ? *last - *first : Tick{0};
+    return changeNotes(events, which,
+                       [&](const Note& note, Tick tick)
+                       {
+                           const double along = span > 0 ? double(tick - *first) / double(span) : 0;
+                           const double amount = ramp.from + (ramp.to - ramp.from) * along;
+                           return ramp.percent
+                                      ? eased(note.velocity, note.velocity * amount / 100.0, limits)
+                                      : limited(amount, limits);
+                       });
+}
+
+std::optional<VelocityRamp> parseVelocityRange(std::string_view text, bool percentages)
+{
+    text = trimmed(text);
+    const auto dash = text.find('-');
+    if (dash == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    auto from = trimmed(text.substr(0, dash));
+    auto to = trimmed(text.substr(dash + 1));
+    const bool percent = from.ends_with('%') && to.ends_with('%');
+    if (percent != (from.ends_with('%') || to.ends_with('%')) || (percent && !percentages))
+    {
+        return std::nullopt;
+    }
+    if (percent)
+    {
+        from.remove_suffix(1);
+        to.remove_suffix(1);
+    }
+    const auto a = number(from);
+    const auto b = number(to);
+    const int most = percent ? 1000 : 127;
+    const int least = percent ? 0 : 1;
+    if (!a || !b || *a < least || *a > most || *b < least || *b > most)
+    {
+        return std::nullopt;
+    }
+    return VelocityRamp{percent, *a, *b};
+}
+
+std::optional<int> parsePercent(std::string_view text)
+{
+    text = trimmed(text);
+    if (text.ends_with('%'))
+    {
+        text.remove_suffix(1);
+    }
+    const auto value = number(text);
+    if (!value || *value < 0 || *value > 100)
+    {
+        return std::nullopt;
+    }
+    return value;
 }
 
 Transformed humanize(const EventList& events, std::span<const std::size_t> which,

@@ -91,10 +91,61 @@ struct VelocityChange
 // percentage outside 0 to 1000.
 std::optional<VelocityChange> parseVelocityChange(std::string_view text);
 
-std::uint8_t changedVelocity(std::uint8_t velocity, VelocityChange change);
+// How velocity changes keep within the floor and 127 (decided October 2026): with a soft
+// knee, a relative change (+10, 120%) is made in full in the middle of the range but eases off
+// within kVelocityKnee of the limit it goes towards, never quite reaching it, and is made in
+// full away from it; otherwise, plain clipping. Nothing goes below the floor, as 0 is note-off.
+struct VelocityLimits
+{
+    bool soft = true;
+    int floor = 1;
+
+    friend bool operator==(const VelocityLimits&, const VelocityLimits&) = default;
+};
+
+inline constexpr int kVelocityKnee = 16;
+
+std::uint8_t changedVelocity(std::uint8_t velocity, VelocityChange change,
+                             VelocityLimits limits = {});
+
+// A velocity moved towards a target as a relative change is, softly or clipped.
+std::uint8_t eased(std::uint8_t velocity, double target, VelocityLimits limits);
 
 Transformed changeVelocity(const EventList& events, std::span<const std::size_t> which,
-                           VelocityChange change);
+                           VelocityChange change, VelocityLimits limits = {});
+
+// Lifting moves each note's velocity a percentage of the way towards 127, and lowering towards
+// the floor, keeping their order and proportions; neither reaches the limit short of 100%.
+Transformed liftVelocity(const EventList& events, std::span<const std::size_t> which, int percent,
+                         VelocityLimits limits = {});
+Transformed lowerVelocity(const EventList& events, std::span<const std::size_t> which, int percent,
+                          VelocityLimits limits = {});
+
+// Velocities kept between low and high, those outside moved to the nearer.
+Transformed limitVelocity(const EventList& events, std::span<const std::size_t> which, int low,
+                          int high, VelocityLimits limits = {});
+
+// A crescendo or diminuendo, by each note's time from the first note's to the last's: values
+// set from one to the other (60-100), or the notes' own scaled by a changing percentage
+// (80%-120%), as relative changes are.
+struct VelocityRamp
+{
+    bool percent = false;
+    int from = 0;
+    int to = 0;
+
+    friend bool operator==(const VelocityRamp&, const VelocityRamp&) = default;
+};
+
+Transformed rampVelocity(const EventList& events, std::span<const std::size_t> which,
+                         VelocityRamp ramp, VelocityLimits limits = {});
+
+// Two numbers with a dash between, each 1 to 127 (20-110), or percentages up to 1000
+// (80%-120%) where percentages are allowed; none if the text isn't one.
+std::optional<VelocityRamp> parseVelocityRange(std::string_view text, bool percentages);
+
+// A percentage from 0 to 100, with or without its %: 25%, 25.
+std::optional<int> parsePercent(std::string_view text);
 
 // Small random changes to notes: each start moved by up to maxShift(its tick) either way, not
 // before 0 nor at or after the end, and each velocity by up to maxVelocity either way, between

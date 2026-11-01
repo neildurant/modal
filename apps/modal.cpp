@@ -388,6 +388,13 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.pianoRoll().setGridAdvance(settings.flag("gridadvance"));
     view.setHumanize(std::chrono::milliseconds{settings.integer("humanizetime")},
                      static_cast<int>(settings.integer("humanizevel")));
+    const auto clip = settings.text("velclip");
+    if (clip != "soft" && clip != "hard" && error.empty())
+    {
+        error = "velclip is soft or hard";
+    }
+    view.setVelocityLimits(
+        {.soft = clip != "hard", .floor = static_cast<int>(settings.integer("velfloor"))});
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())

@@ -123,6 +123,8 @@ public:
         humanizeVelocity_ = velocity;
     }
     bool rewind() const { return rewind_; }
+    // How velocity changes keep within their limits: the velclip and velfloor settings.
+    void setVelocityLimits(core::VelocityLimits limits) { velocityLimits_ = limits; }
 
     // What a port name given to :port refers to: the output port's full name, or else the
     // ports it could be when several match equally well (none when none match); and every
@@ -509,7 +511,10 @@ private:
     std::optional<Question> question_;
     // A question answered at the prompt, such as ^'s velocity: its label, shown in place of
     // the :, and what runs with the line typed.
-    void askFor(std::string label, std::function<void(const std::string&)> answer);
+    // An answer given nothing takes the default, if there's one, as a transform's does.
+    void askFor(std::string label, std::function<void(const std::string&)> answer,
+                std::string defaultAnswer = {});
+    std::string answerDefault_;
     std::string answerLabel_;
     std::function<void(const std::string&)> answer_;
     // Search (/C1): what the last looks for, as typed and as read, whether it went forwards (*
@@ -554,6 +559,7 @@ private:
     CommandResult transformLine(std::string_view name, std::string_view arguments);
     bool applyTransform(std::string_view name, const OperatorTarget& target,
                         const std::string& text);
+    core::VelocityLimits velocityLimits_;
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

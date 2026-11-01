@@ -1217,3 +1217,49 @@ TEST_CASE("A count before an operator with no how far of its own counts bars, as
     o.type(U"3]b2qqn"); // n: the pedal stays
     CHECK(o.notes()[3] == std::pair{core::Tick{16 * q}, 36});
 }
+
+TEST_CASE("Lifting and lowering velocities take their default at Enter, and limits and ramps ask")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U"gr!!l");
+    CHECK(o.ws.mode() == Mode::CommandLine);
+    o.press(NamedKey::Enter); // 25%
+    CHECK(o.velocities() == std::vector<int>{92, 104, 50, 100, 70});
+    o.type(U"u,xLib50");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{41, 49, 50, 100, 70});
+    CHECK(o.ws.message().empty());
+    o.type(U"u");
+    // The cursor's bar: only the chord, at the ramp's start.
+    o.type(U":vel-ramp 60-100");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{60, 60, 50, 100, 70});
+    // Four bars: 60 at the chord, 100 at the A2.
+    o.type(U"u4!!r60-100");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{60, 60, 100, 100, 70});
+    o.type(U"u:vel-limit 85-90");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{85, 90, 50, 100, 70});
+    o.type(U"u!!m90-85");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message() ==
+          "Not a range of velocities: 90-85; type the lowest and the highest, as 20-110");
+}
+
+TEST_CASE("Relative velocity changes ease off near 127, or clip with velclip hard")
+{
+    Operating o;
+    o.type(U"gr^^+40");
+    o.press(NamedKey::Enter);
+    const auto soft = o.velocities();
+    CHECK(soft[0] < soft[1]);
+    CHECK(soft[1] < 127);
+    o.type(U"u");
+    o.ws.setVelocityLimits({.soft = false, .floor = 1});
+    o.type(U"^^+40");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{120, 127, 50, 100, 70});
+}

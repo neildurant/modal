@@ -113,6 +113,11 @@ Settings::Settings()
                   std::int64_t{10}, 0, 1000),
           setting("humanizevel", "How far ~ changes a note's velocity at most, either way",
                   std::int64_t{8}, 0, 127),
+          setting("velclip",
+                  "How velocity changes keep within their limits: soft, easing off near them, "
+                  "or hard, clipping",
+                  std::string{"soft"}),
+          setting("velfloor", "The lowest velocity a change makes a note", std::int64_t{1}, 1, 127),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
           setting("ownports",

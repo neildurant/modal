@@ -102,6 +102,8 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `nudge` | `5` | How far, in milliseconds, `Alt-H` / `Alt-L` nudge a note in the piano roll and `+` / `_` lengthen or shorten it (1 to 1000) |
 | `humanizetime` | `10` | How far, in milliseconds, `~` moves a note in time at most, either way (0 to 1000) |
 | `humanizevel` | `8` | How far `~` changes a note's velocity at most, either way (0 to 127) |
+| `velclip` | `soft` | How velocity changes keep within their limits: `soft`, a relative change (`^ +10`, `^ 120%`, a ramp in percentages) easing off near the limit it goes towards, or `hard`, clipping |
+| `velfloor` | `1` | The lowest velocity a change makes a note (1 to 127) |
 | `undolevels` | `1000`  | How many changes can be undone (0 to 100000) |
 | `ownports`   | `1`     | How many MIDI output ports of its own Modal makes, for other programs such as a plugin host to connect to (0 to 16; Linux only, since Windows can't) |
 | `ownportname` | `Modal` | The name of Modal's own ports: one is `Modal`, several are `Modal 1`, `Modal 2` and so on |

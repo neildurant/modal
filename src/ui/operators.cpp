@@ -203,6 +203,62 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
                             target, [by = *by](const core::EventList& events, const auto& part)
                             { return core::transpose(events, part.events, by); });
     }
+    const auto limits = velocityLimits_;
+    if (name == "transform-velocity-lift" || name == "transform-velocity-lower")
+    {
+        const bool lift = name == "transform-velocity-lift";
+        const auto percent = core::parsePercent(text);
+        if (!percent)
+        {
+            setMessage("Not a percentage: " + text + "; type 0% to 100%, as 25%",
+                       MessageKind::Warning);
+            return true;
+        }
+        return changeEvents(
+            (lift ? "Lift the velocities of " : "Lower the velocities of ") + target.what + " by " +
+                std::to_string(*percent) + "%",
+            target,
+            [&](const core::EventList& events, const auto& part)
+            {
+                return lift ? core::liftVelocity(events, part.events, *percent, limits)
+                            : core::lowerVelocity(events, part.events, *percent, limits);
+            });
+    }
+    if (name == "transform-velocity-limit")
+    {
+        const auto range = core::parseVelocityRange(text, false);
+        if (!range || range->from > range->to)
+        {
+            setMessage("Not a range of velocities: " + text +
+                           "; type the lowest and the "
+                           "highest, as 20-110",
+                       MessageKind::Warning);
+            return true;
+        }
+        return changeEvents(
+            "Keep the velocities of " + target.what + " between " + std::to_string(range->from) +
+                " and " + std::to_string(range->to),
+            target, [&](const core::EventList& events, const auto& part)
+            { return core::limitVelocity(events, part.events, range->from, range->to, limits); });
+    }
+    if (name == "transform-velocity-ramp")
+    {
+        const auto ramp = core::parseVelocityRange(text, true);
+        if (!ramp)
+        {
+            setMessage("Not a ramp: " + text +
+                           "; type the velocities at its start and end, as "
+                           "60-100, or percentages, as 80%-120%",
+                       MessageKind::Warning);
+            return true;
+        }
+        const auto unit = ramp->percent ? std::string{"%"} : std::string{};
+        return changeEvents("Ramp the velocities of " + target.what + " from " +
+                                std::to_string(ramp->from) + unit + " to " +
+                                std::to_string(ramp->to) + unit,
+                            target, [&](const core::EventList& events, const auto& part)
+                            { return core::rampVelocity(events, part.events, *ramp, limits); });
+    }
     return false;
 }
 
@@ -223,11 +279,33 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     {
         return openTransformMenu(std::move(*target));
     }
-    if (op == "transform-transpose")
+    // Those asking how, the default in brackets taken by Enter, or examples where there's none.
+    struct Question
     {
-        askFor("Transpose " + target->what + " by how many semitones (+12, -3): ",
-               [this, target = *target](const std::string& text)
-               { applyTransform("transform-transpose", target, text); });
+        std::string_view op;
+        std::string_view label;
+        std::string_view examples;
+        std::string_view answer;
+    };
+    constexpr std::array<Question, 5> kQuestions{{
+        {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
+        {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
+        {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
+        {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
+        {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
+    }};
+    if (const auto question = std::ranges::find(kQuestions, op, &Question::op);
+        question != kQuestions.end())
+    {
+        auto label = std::string{question->label};
+        label.replace(label.find("{}"), 2, target->what);
+        label += " (" +
+                 std::string{question->answer.empty() ? question->examples : question->answer} +
+                 "): ";
+        askFor(
+            std::move(label),
+            [this, name = std::string{op}, target = *target](const std::string& text)
+            { applyTransform(name, target, text); }, std::string{question->answer});
         return true;
     }
     const auto& song = document_.song();
@@ -279,8 +357,9 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
                                  (change->amount > 0 ? "+" : "") + amount
                            : "Scale the velocity of " + target.what + " to " + amount + "%";
                    changeEvents(title, target,
-                                [c = *change](const core::EventList& events, const auto& part)
-                                { return core::changeVelocity(events, part.events, c); });
+                                [c = *change, limits = velocityLimits_](
+                                    const core::EventList& events, const auto& part)
+                                { return core::changeVelocity(events, part.events, c, limits); });
                });
         return true;
     }
