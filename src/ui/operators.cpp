@@ -8,6 +8,7 @@
 #include <modal/core/pitch.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/frame.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <algorithm>
@@ -89,9 +90,9 @@ constexpr std::array<Asking, 12> kQuestions{{
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
     {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
     {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
-    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%", ", window=1bar"},
-    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%", ", window=1bar"},
-    {"transform-velocity-shape", "Shape the velocities of {}", "", "130%", ", window=1bar"},
+    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%", " window=1bar"},
+    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%", " window=1bar"},
+    {"transform-velocity-shape", "Shape the velocities of {}", "", "130%", " window=1bar"},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -112,12 +113,12 @@ Told told(std::string_view text, std::string_view name)
     std::size_t at = 0;
     while (at < text.size())
     {
-        const auto start = text.find_first_not_of(" \t", at);
+        const auto start = text.find_first_not_of(" \t,", at);
         if (start == std::string_view::npos)
         {
             break;
         }
-        const auto end = std::min(text.find_first_of(" \t", start), text.size());
+        const auto end = std::min(text.find_first_of(" \t,", start), text.size());
         const auto word = text.substr(start, end - start);
         if (const auto equals = word.find('='); equals != std::string_view::npos && equals > 0)
         {
@@ -198,6 +199,42 @@ bool isOperator(std::string_view command)
         "operator-transform"};
     return command.starts_with("transform-") ||
            std::ranges::find(kOperators, command) != kOperators.end();
+}
+
+std::vector<TransformOption> transformOptions(std::string_view command)
+{
+    const TransformOption window{.name = "window",
+                                 .form = "1bar|2bars|1/2",
+                                 .values = {"1bar", "2bars", "4bars"},
+                                 .lengths = true};
+    if (command == "transform-velocity-compress" || command == "transform-velocity-expand")
+    {
+        return {window,
+                {.name = "centre", .form = "local|average|N", .values = {"local", "average"}},
+                {.name = "threshold", .form = ">N|<N"}};
+    }
+    if (command == "transform-velocity-shape")
+    {
+        return {window};
+    }
+    return {};
+}
+
+std::string Workspace::optionsCommand() const
+{
+    // The transform asking, or the one on the : line.
+    if (answer_)
+    {
+        return answerCommand_;
+    }
+    const auto text = encodeUtf8(line_.text());
+    const auto start = text.find_first_not_of(' ');
+    if (start == std::string::npos)
+    {
+        return {};
+    }
+    const auto* info = commands_.find(text.substr(start, text.find(' ', start) - start));
+    return info != nullptr ? std::string{info->name} : std::string{};
 }
 
 std::vector<Key> Workspace::transformKeys() const
@@ -546,6 +583,7 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
             std::move(label),
             [this, name = std::string{op}, target = *target](const std::string& text)
             { applyTransform(name, target, text); }, std::string{question->answer});
+        answerCommand_ = op;
         return true;
     }
     const auto& song = document_.song();

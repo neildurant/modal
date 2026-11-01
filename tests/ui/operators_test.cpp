@@ -1292,3 +1292,39 @@ TEST_CASE("Compressing velocities takes a percentage and options, and the chord 
     o.press(NamedKey::Enter);
     CHECK(o.velocities() == std::vector<int>{95, 70, 50, 100, 70});
 }
+
+TEST_CASE("A transform's question shows the options not yet given, and Tab completes them")
+{
+    Operating o;
+    const auto hint = [&]
+    {
+        std::u32string dimmed;
+        const auto frame = o.ws.frame();
+        for (const auto& run : frame.back().text)
+        {
+            if (run.style.foreground == Role::Dim)
+            {
+                dimmed = run.text;
+            }
+        }
+        return dimmed;
+    };
+    const auto line = [&] { return o.ws.commandLine().text(); };
+    o.type(U"gr!!c");
+    CHECK(hint() == U"window=1bar|2bars|1/2 centre=local|average|N threshold=>N|<N");
+    o.type(U"60% ce");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"60% centre=");
+    CHECK(hint() == U"window=1bar|2bars|1/2 threshold=>N|<N");
+    o.type(U"a");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"60% centre=average ");
+    o.type(U"window=2");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"60% centre=average window=2bars ");
+    // As the brackets once showed them, with a comma.
+    o.press(NamedKey::Escape);
+    o.type(U"!!c50%, window=1bar");
+    o.press(NamedKey::Enter);
+    CHECK(o.velocities() == std::vector<int>{84, 92, 50, 100, 70});
+}

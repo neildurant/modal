@@ -140,7 +140,8 @@ constexpr std::array kSharedCommands{
                 .aliases = "vel-compress",
                 .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
                 .count = true,
-                .range = true},
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
     CommandInfo{.name = "transform-velocity-expand",
                 .description =
                     "Expand the velocities of the notes a range or object takes, pushing each a "
@@ -149,7 +150,8 @@ constexpr std::array kSharedCommands{
                 .aliases = "vel-expand",
                 .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
                 .count = true,
-                .range = true},
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
     CommandInfo{
         .name = "transform-velocity-shape",
         .description =
@@ -159,7 +161,8 @@ constexpr std::array kSharedCommands{
         .aliases = "vel-shape",
         .usage = "[PERCENT] [window=1bar]",
         .count = true,
-        .range = true},
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
     CommandInfo{
         .name = "transform-chord-accent",
         .description =
@@ -3898,7 +3901,9 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     }
     if (command == "command-line-next" || command == "command-line-previous")
     {
-        return !answer_ && !searchPrompt_ && complete(command == "command-line-next" ? 1 : -1);
+        const bool options = answer_ && !transformOptions(answerCommand_).empty();
+        return (!answer_ || options) && !searchPrompt_ &&
+               complete(command == "command-line-next" ? 1 : -1);
     }
     if (searchPrompt_ && (command == "command-line-run" || command == "command-line-cancel" ||
                           (command == "command-line-backspace" && line_.text().empty())))
@@ -4066,6 +4071,39 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
     case Choices::Length:
         return {"1/1",  "1/2",  "1/4",  "1/8",  "1/16",  "1/32", "1/2.",
                 "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
+    case Choices::Option:
+    {
+        // The names, NAME= to go on with, and then the values of the one named.
+        const auto options = transformOptions(optionsCommand());
+        const auto equals = word.find('=');
+        for (const auto& option : options)
+        {
+            if (equals == std::string_view::npos)
+            {
+                found.push_back(std::string{option.name} + "=");
+                continue;
+            }
+            if (word.substr(0, equals) != option.name)
+            {
+                continue;
+            }
+            for (const auto value : option.values)
+            {
+                found.push_back(std::string{option.name} + "=" + std::string{value});
+            }
+            if (option.lengths)
+            {
+                for (const auto& length : choices(Choices::Length, {}))
+                {
+                    if (length != "grid")
+                    {
+                        found.push_back(std::string{option.name} + "=" + length);
+                    }
+                }
+            }
+        }
+        return found;
+    }
     case Choices::Port:
         if (portFinder_)
         {
@@ -4099,6 +4137,12 @@ Workspace::CompletingWord Workspace::completingWord() const
     CompletingWord result{word.start,
                           encodeUtf8(text.substr(word.start, line_.cursor() - word.start)),
                           Choices::Command};
+    if (answer_)
+    {
+        // A transform's question: its options, wherever they're typed.
+        result.kind = Choices::Option;
+        return result;
+    }
     if (word.index > 0)
     {
         const auto first = wordAt(text, 0);
@@ -4957,6 +5001,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     answerLabel_ = std::move(label);
     answer_ = std::move(answer);
     answerDefault_ = std::move(defaultAnswer);
+    answerCommand_.clear();
 }
 
 void Workspace::playFrom(core::Tick tick)
@@ -5453,7 +5498,22 @@ std::string Workspace::argumentHint() const
     // At the : prompt, once the line holds a command and a space: its arguments from the one
     // being typed on, as its usage writes them, brackets for those it can do without (decided
     // October 2026, so :bar-insert says it takes [N] [METER]).
-    if (answer_ || palette_ || view().typing())
+    if (answer_)
+    {
+        // A transform's question: the options not yet given, as they're written.
+        const auto given = encodeUtf8(line_.text());
+        std::string hint;
+        for (const auto& option : transformOptions(answerCommand_))
+        {
+            if (given.find(std::string{option.name} + "=") == std::string::npos)
+            {
+                hint += (hint.empty() ? "" : " ") + std::string{option.name} + "=" +
+                        std::string{option.form};
+            }
+        }
+        return hint;
+    }
+    if (palette_ || view().typing())
     {
         return {};
     }

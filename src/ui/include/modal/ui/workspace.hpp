@@ -40,6 +40,18 @@ class Settings;
 // Whether a command is an operator, waiting for a range or object: d, y, > and the others.
 bool isOperator(std::string_view command);
 
+// A transform's options, NAME=VALUE after its amount: how each is written, for the hint under
+// its question, and the values Tab offers, note lengths too where it takes one.
+struct TransformOption
+{
+    std::string_view name;
+    std::string_view form;
+    std::vector<std::string_view> values = {};
+    bool lengths = false;
+};
+
+std::vector<TransformOption> transformOptions(std::string_view command);
+
 // The window's contents: the views of the song, one shown at a time, with what they share
 // (decided for milestone 5). The workspace handles keys through the keymap, with counts and
 // pending operators, runs the commands every view has (the : prompt, playing, undo, :port)
@@ -517,6 +529,8 @@ private:
     void askFor(std::string label, std::function<void(const std::string&)> answer,
                 std::string defaultAnswer = {});
     std::string answerDefault_;
+    std::string answerCommand_; // the transform asking, for its options
+    std::string optionsCommand() const;
     std::string answerLabel_;
     std::function<void(const std::string&)> answer_;
     // Search (/C1): what the last looks for, as typed and as read, whether it went forwards (*

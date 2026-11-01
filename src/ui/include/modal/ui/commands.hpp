@@ -42,8 +42,9 @@ enum class Choices : std::uint8_t
     Section,    // a section's name
     Meter,      // a time signature, such as 3/4
     Length,     // a note length, such as 1/8 or 1/16t
+    Option,     // a transform's option, NAME=VALUE, with its values
 };
-inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Length) + 1;
+inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Option) + 1;
 
 struct CommandInfo
 {
