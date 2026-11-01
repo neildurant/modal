@@ -483,8 +483,10 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 
 Adding a fixed amount clips loud notes at 127 and soft ones at the floor, flattening the dynamics, so velocity changes avoid hard limits by default:
 
-- **Lift and lower by headroom.** `:vel lift 25%` moves each note a quarter of the way towards 127, and `:vel lower 25%` a quarter of the way towards the floor, keeping the notes' order and proportional spacing; nothing reaches the limit.
-- **A soft knee on relative changes.** `+10` (in the inspector, the command line or the `^` operator) and the step keys add the amount in the middle of the range but ease off smoothly near the limits. `:set velclip=hard` gives plain clipping.
+- **Lift and lower by headroom.** `:vel-lift 25%` moves each note a quarter of the way towards 127, and `:vel-lower 25%` a quarter of the way towards the floor, keeping the notes' order and proportional spacing; nothing reaches the limit.
+- **A soft knee on relative changes.** `+10` (in the inspector, the command line or the `^` operator) and percentages (`120%`) change the amount in the middle of the range but ease off smoothly near the limit being approached, not the one being moved away from. `:set velclip=hard` gives plain clipping. The step keys (`Ctrl-a` and `Ctrl-x` in the piano roll, the field steps in the event list) stay exact, one a press, clipping at the limits (decided November 2026): eased, a press near the top could round to no change, and 127 couldn't be reached.
+- **Single names (decided November 2026):** `:vel-lift`, `:vel-lower`, `:vel-limit 20-110` and `:vel-ramp`, and so on, rather than `:vel` and a word, so they complete and show in the palette as every other command does.
+- **The ramp:** `:vel-ramp 60-100` sets velocities from 60 at the first note to 100 at the last, by time, a chord's notes alike; `:vel-ramp 80%-120%` scales the notes' own velocities by a changing amount instead, keeping the playing's shape (decided November 2026).
 - **A floor,** 1 by default and configurable. Velocity is never set to 0, which means note-off.
 
 **Velocity compress and expand over time**
@@ -493,12 +495,12 @@ Two timescales for two aims, evenness from note to note and the shape of a phras
 
 | Command | Effect |
 | --- | --- |
-| `:vel compress 50%` | Pull each note halfway towards the local average: evens out note-to-note unevenness, keeps crescendos |
-| `:vel expand 150%` | Push notes away from the local average: sharpens accents |
-| `:vel shape 130%` | Exaggerate the phrase's contour (the moving average itself): bigger swells, the same note-to-note detail |
-| `:vel shape 70%` | Flatten the contour: a more level part |
+| `:vel-compress 50%` | Pull each note halfway towards the local average: evens out note-to-note unevenness, keeps crescendos |
+| `:vel-expand 50%` | Push notes half as far again from the local average: sharpens accents |
+| `:vel-shape 130%` | Exaggerate the phrase's contour (the moving average itself): bigger swells, the same note-to-note detail |
+| `:vel-shape 70%` | Flatten the contour: a more level part |
 
-Options: `window=` the averaging window (`1/2`, `1bar` by default, `2bars`; a larger window treats more as phrase shape); `centre=` the local average (default), the selection's average or a fixed value; `threshold=` to act only on notes above (or below) a value, like an audio compressor taming peaks. All use the soft limits above, and compress and expand also work within chords.
+Compress and expand say the direction, and the percentage how much (decided November 2026, as an audio compressor's amount): compress takes away that much of each note's distance from the average, up to 100% (every note on it), and expand adds that much again; shape, with no opposite, is a factor of the contour, 100% leaving it as it is. Options: `window=` the averaging window (`1/2`, `1bar` by default, `2bars`; a larger window treats more as phrase shape); `centre=` the local average (default), the selection's average or a fixed value; `threshold=` to act only on notes above (or below) a value, like an audio compressor taming peaks. All use the soft limits above, and compress and expand also work within chords.
 
 **Chords and voicing balance**
 
