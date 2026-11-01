@@ -1129,3 +1129,75 @@ TEST_CASE("gn without an operator selects the match, only it")
     o.type(U"d");
     CHECK(o.notes().size() == 4);
 }
+
+TEST_CASE("The transform key and a range open the transform menu at once, and its key transforms "
+          "the range")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.ws.setHints(true, 400);
+    o.type(U"gr");
+    o.type(U"!ib");
+    CHECK(o.ws.pending() == ",x");
+    const auto hints = o.ws.hints();
+    REQUIRE(hints);
+    CHECK(std::ranges::find(*hints,
+                            Workspace::Hint{.keys = "t", .title = "Transpose by semitones"}) !=
+          hints->end());
+    o.type(U"t+12");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 43}, {0, 40}, {4 * q, 45}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    CHECK(o.ws.pending().empty());
+    // . does it again, as it was answered.
+    o.type(U".");
+    CHECK(o.notes() == Notes{{0, 55}, {0, 52}, {4 * q, 45}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    // Escape gives the menu up, and its range with it: t is then shifting's operator.
+    o.type(U"!ib");
+    o.press(NamedKey::Escape);
+    CHECK(o.ws.pending().empty());
+    CHECK_FALSE(o.ws.hints());
+    o.type(U"u");
+    CHECK(o.notes()[1] == std::pair{core::Tick{0}, 40});
+}
+
+TEST_CASE("The transform menu's keys before a range are an operator, and on a selection act at "
+          "once")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr");
+    o.type(U",xtib");
+    CHECK(o.ws.mode() == Mode::CommandLine);
+    o.type(U"-3");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 28}, {0, 25}, {4 * q, 45}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    o.type(U",xtibx");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message() == "Not a number of semitones: x; type +12, -3 or 7");
+    o.type(U"vib!t2");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 30}, {0, 27}, {4 * q, 45}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    CHECK(o.ws.mode() == Mode::Normal);
+}
+
+TEST_CASE(":transpose takes the selection, or else the cursor's bar, asking when given nothing")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U"gr:transpose 12");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 43}, {0, 40}, {4 * q, 45}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    o.type(U"v]b]b:transpose -1"); // bars 1 and 2
+    o.press(NamedKey::Enter);
+    CHECK(o.notes() == Notes{{0, 42}, {0, 39}, {4 * q, 44}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    o.type(U"gg:transpose");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.mode() == Mode::CommandLine);
+    o.type(U"+1");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes()[1] == std::pair{core::Tick{0}, 40});
+}

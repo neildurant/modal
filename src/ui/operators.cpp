@@ -11,7 +11,9 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdint>
+#include <cstdlib>
 #include <random>
 #include <string>
 #include <utility>
@@ -69,15 +71,139 @@ std::string times(int count, std::string_view one, std::string_view many)
     return count == 1 ? std::string{one} : std::to_string(count) + " " + std::string{many};
 }
 
+std::string_view trimmed(std::string_view text)
+{
+    const auto start = text.find_first_not_of(" \t");
+    if (start == std::string_view::npos)
+    {
+        return {};
+    }
+    return text.substr(start, text.find_last_not_of(" \t") - start + 1);
+}
+
+// A number of semitones, up or down: 7, +12, -3.
+std::optional<int> semitones(std::string_view text)
+{
+    text = trimmed(text);
+    if (text.starts_with('+'))
+    {
+        text.remove_prefix(1);
+    }
+    int value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (text.empty() || error != std::errc{} || end != text.data() + text.size() ||
+        std::abs(value) > 127)
+    {
+        return std::nullopt;
+    }
+    return value;
+}
+
 } // namespace
 
 bool isOperator(std::string_view command)
 {
-    constexpr std::array<std::string_view, 9> kOperators{
+    // The transforms are operators too, each in the transform menu (decided November 2026).
+    constexpr std::array<std::string_view, 10> kOperators{
         "operator-delete",         "operator-yank",        "operator-transpose-up",
         "operator-transpose-down", "operator-shift-later", "operator-shift-earlier",
-        "operator-quantize",       "operator-velocity",    "operator-humanize"};
-    return std::ranges::find(kOperators, command) != kOperators.end();
+        "operator-quantize",       "operator-velocity",    "operator-humanize",
+        "operator-transform"};
+    return command.starts_with("transform-") ||
+           std::ranges::find(kOperators, command) != kOperators.end();
+}
+
+std::vector<Key> Workspace::transformKeys() const
+{
+    // The keys the transforms' bindings start with, the menu's (<leader>x at first), so a
+    // user's own bindings make the menu theirs.
+    std::optional<std::vector<Key>> common;
+    for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
+    {
+        if (!binding.command.starts_with("transform-") || keys.size() < 2)
+        {
+            continue;
+        }
+        const std::vector<Key> before(keys.begin(), keys.end() - 1);
+        if (!common)
+        {
+            common = before;
+            continue;
+        }
+        const auto [mine, theirs] = std::ranges::mismatch(*common, before);
+        common->erase(mine, common->end());
+    }
+    return common.value_or(std::vector<Key>{});
+}
+
+bool Workspace::openTransformMenu(OperatorTarget target)
+{
+    // ! and a range: the range kept and the menu's keys typed, so the hint menu shows the
+    // transforms at once and the next key picks one, as the same keys before a range would
+    // (decided November 2026).
+    const auto keys = transformKeys();
+    if (keys.empty())
+    {
+        setMessage("No keys start the transforms, for a menu of them", MessageKind::Warning);
+        return true;
+    }
+    transformTarget_ = std::move(target);
+    for (const auto& key : keys)
+    {
+        keys_.key(keymapHere(), Mode::Normal, keys_.typed(key), lastTime_);
+    }
+    return true;
+}
+
+CommandResult Workspace::transformLine(std::string_view name, std::string_view arguments)
+{
+    // At the : prompt, the selection's events, or else the cursor's bar's, as a doubled
+    // operator takes it; asking, as the keys do, when it's given nothing.
+    auto target = view().target(selection_ ? "visual" : "operator-line", 0);
+    if (!target)
+    {
+        return {true};
+    }
+    if (selection_ && selection_->filter && !onlyMatches(*target))
+    {
+        return {true};
+    }
+    if (trimmed(arguments).empty())
+    {
+        presetTarget_ = std::move(target);
+        transform(name, 1, "preset", 0);
+        presetTarget_.reset();
+        return {true};
+    }
+    applyTransform(name, *target, std::string{arguments});
+    return {true};
+}
+
+bool Workspace::applyTransform(std::string_view name, const OperatorTarget& target,
+                               const std::string& text)
+{
+    // A transform with what it's been told: the answer to its question, or what follows its
+    // name at the : prompt.
+    if (name == "transform-transpose")
+    {
+        const auto by = semitones(text);
+        if (!by)
+        {
+            setMessage("Not a number of semitones: " + text + "; type +12, -3 or 7",
+                       MessageKind::Warning);
+            return true;
+        }
+        if (*by == 0)
+        {
+            setMessage("Transposing by 0 semitones changes nothing", MessageKind::Information);
+            return true;
+        }
+        return changeEvents("Transpose " + target.what + (*by > 0 ? " up " : " down ") +
+                                times(std::abs(*by), "a semitone", "semitones"),
+                            target, [by = *by](const core::EventList& events, const auto& part)
+                            { return core::transpose(events, part.events, by); });
+    }
+    return false;
 }
 
 bool Workspace::transform(std::string_view op, int amount, std::string_view motion, int count)
@@ -93,6 +219,17 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
         return true;
     }
     target->cut = cutting_;
+    if (op == "operator-transform")
+    {
+        return openTransformMenu(std::move(*target));
+    }
+    if (op == "transform-transpose")
+    {
+        askFor("Transpose " + target->what + " by how many semitones (+12, -3): ",
+               [this, target = *target](const std::string& text)
+               { applyTransform("transform-transpose", target, text); });
+        return true;
+    }
     const auto& song = document_.song();
     if (op == "operator-transpose-up" || op == "operator-transpose-down")
     {

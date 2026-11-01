@@ -84,6 +84,19 @@ constexpr std::array kSharedCommands{
                                "at random in time and velocity, by up to humanizetime and "
                                "humanizevel; ~~ this bar's",
                 .count = true},
+    CommandInfo{.name = "operator-transform",
+                .description = "Transform the events a range or object takes, choosing the "
+                               "transform from the menu then shown (!ib, then a key); on a "
+                               "selection, at once",
+                .count = true},
+    CommandInfo{.name = "transform-transpose",
+                .description = "Transpose the notes a range or object takes by a number of "
+                               "semitones, asking how many (+12, -3); :transpose N those of the "
+                               "selection, or else of the cursor's bar",
+                .aliases = "transpose",
+                .usage = "[SEMITONES]",
+                .count = true,
+                .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -487,7 +500,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 98> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 100> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -502,6 +515,8 @@ std::span<const CommandInfo> Workspace::commands()
             {"operator-shift-later", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-shift-earlier", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"operator-transform", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-transpose", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},
@@ -669,6 +684,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "section-rename")
                          {
                              return renameSection(call.arguments);
+                         }
+                         if (name.starts_with("transform-") && !call.line.empty())
+                         {
+                             return transformLine(name, call.arguments);
                          }
                          if (auto result = view().runLine(name, call.arguments))
                          {
@@ -2076,6 +2095,11 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     {
         gnRun_ = false;
     }
+    // The transform menu given up (Escape, or a key it hasn't), its range with it.
+    if (keys_.keys().empty())
+    {
+        transformTarget_.reset();
+    }
     return changed;
 }
 
@@ -2236,7 +2260,7 @@ void Workspace::noteWaiting(std::int64_t now)
     if (!waitingSince_ || !hintsShown_)
     {
         waitingSince_ = now;
-        hintsShown_ = hintDelay_ == 0;
+        hintsShown_ = hintDelay_ == 0 || transformTarget_.has_value(); // a menu, so at once
     }
 }
 
@@ -3077,6 +3101,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     }
     if (isOperator(command))
     {
+        if (transformTarget_ && command != "operator-delete" && command != "operator-yank" &&
+            command != "operator-transform")
+        {
+            presetTarget_ = std::exchange(transformTarget_, std::nullopt);
+            const bool done = transform(command, n, "preset", 0);
+            presetTarget_.reset();
+            return done;
+        }
         operator_ = PendingOperator{std::string{command}, count};
         mode_ = Mode::OperatorPending;
         return true;

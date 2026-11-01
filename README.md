@@ -65,6 +65,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `>` `<` with a range, `>>` | Transpose the notes up or down a semitone: `>>` this bar's, `3>ib` three semitones, `>3ib` three bars |
 | `t` `T`, `q` | Move the notes later or earlier by the grid step (`tt` this bar's); quantise their starts to the grid, asking whether the pedals go with them |
 | `^`, `~` | Set or change velocity, asking how (`80`, `+10`, `80%`); humanise, moving notes a little at random in time and velocity |
+| `!` | Transform: a range, then the transform menu's key (`!ib` then `t`, transpose by semitones, asking how many); on a selection, at once. The same keys before a range, `, x` and the transform's key, are its operator (`, x t ib`); `:transpose -12` does the selection's, or the cursor's bar's |
 | `p`, `P` | Put what was yanked over what's there, or put it in, moving the rest of the section later; bars go to the start of the cursor's bar |
 | `Alt-h` `Alt-l`, `Alt-k` `Alt-j` | Move the note a grid step, or a semitone (`Alt-K` `Alt-J` an octave, `Alt-{` `Alt-}` a bar) |
 | `Alt-H` `Alt-L`, `=` `-`, `+` `_` | Nudge it by 5 ms (`set nudge`); lengthen or shorten it to the grid, or by a nudge |

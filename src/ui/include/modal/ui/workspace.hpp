@@ -547,6 +547,13 @@ private:
     bool gnKept_ = false;
     // A target an operator takes rather than asking the view, as gn's.
     std::optional<OperatorTarget> presetTarget_;
+    // The transforms: ! and a range keeps the range while the transform menu waits for a key.
+    std::optional<OperatorTarget> transformTarget_;
+    bool openTransformMenu(OperatorTarget target);
+    std::vector<Key> transformKeys() const;
+    CommandResult transformLine(std::string_view name, std::string_view arguments);
+    bool applyTransform(std::string_view name, const OperatorTarget& target,
+                        const std::string& text);
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

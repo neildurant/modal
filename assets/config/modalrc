@@ -342,6 +342,13 @@ ngroup <leader>t "Toggles"
 " Selecting (decided November 2026): the bar, section, track or what's shown, and with a capital
 " only the matches of the last search in it, which operators then take; in Visual mode , s m
 " keeps only the matches in what's selected.
+ngroup <leader>x "Transforms"
+nmap !           operator-transform    "Transform"
+nmap <leader>xt  transform-transpose   "Transpose by semitones"
+nmap <leader>xv  operator-velocity     "Velocity"
+nmap <leader>xq  operator-quantize     "Quantise"
+nmap <leader>xh  operator-humanize     "Humanise"
+vgroup <leader>x "Transforms"
 ngroup <leader>s "Select"
 nmap <leader>sb  select-bar               "This bar"
 nmap <leader>sB  select-matches-bar       "The matches in this bar"
