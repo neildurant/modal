@@ -54,13 +54,13 @@ struct EventQuery
     };
 
     Kind kind = Kind::Note;
-    std::optional<std::uint8_t> pitch;
-    std::optional<int> pitchClass;    // 0 for C to 11 for B
-    std::optional<Condition> pitches; // above, below or between pitches
-    std::optional<Condition> velocity;
-    std::optional<LengthCondition> length;
-    std::optional<std::uint8_t> controller;
-    std::optional<Condition> value; // a controller's or a bend's
+    std::optional<std::uint8_t> pitch = {};
+    std::optional<int> pitchClass = {};    // 0 for C to 11 for B
+    std::optional<Condition> pitches = {}; // above, below or between pitches
+    std::optional<Condition> velocity = {};
+    std::optional<LengthCondition> length = {};
+    std::optional<std::uint8_t> controller = {};
+    std::optional<Condition> value = {}; // a controller's or a bend's
 
     friend bool operator==(const EventQuery&, const EventQuery&) = default;
 };
