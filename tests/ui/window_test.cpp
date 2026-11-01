@@ -606,6 +606,7 @@ TEST_CASE("a sample of marks in each view", "[.sample]")
         CHECK(window->saveFrame(base + "-marks-arrangement-out" + std::to_string(zoom) + ".bmp"));
     }
     view.run("view-piano-roll", 0);
+    type(U"llmk"); // a note's, two steps on
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marks-piano.bmp"));
 }

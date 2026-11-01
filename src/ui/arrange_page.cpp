@@ -562,7 +562,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             name += U'\u2026';
         }
         timeline.text.push_back(
-            {textX, 0, std::move(name), {Role::Label, Role::Background, kBold}});
+            {textX, 0, std::move(name), {Role::Label, Role::Background, kPlain}});
     }
     // The conductor's meter changes, each named if the name fits before the next
     // change, or else shown by a tick, so a short change, such as a single bar, never hides
@@ -730,12 +730,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                   255});
     }
     // In a row of their own (decided November 2026, as they and the labels' names ran into each
-    // other in one): the play-from marker, and the conductor's marks (ma). The tracks' marks are
-    // in their rows. Each a character at its time, boxed over the bars.
+    // other in one): the play-from marker, and the marks (ma), each its letter at its time. A
+    // track's mark is a dot in the track's row too, if it's shown.
     std::vector<RowSign> signs;
     if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
     {
-        signs.push_back({scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent});
+        signs.push_back({scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent, false});
     }
     for (const auto& mark : song_.marks())
     {
@@ -743,21 +743,20 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         {
             continue;
         }
-        int y = kSignRow * cell_.height;
+        const int x = scale.toX(mark.tick) + 2 * lineWidth;
+        signs.push_back({x, kSignRow * cell_.height, static_cast<char32_t>(mark.letter)});
         if (mark.track)
         {
             const auto it =
                 std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == *mark.track; });
             const auto index = static_cast<std::size_t>(it - tracks.begin());
-            if (it == tracks.end() || index < topTrack_ ||
-                index >= topTrack_ + static_cast<std::size_t>(shownTracks))
+            if (it != tracks.end() && index >= topTrack_ &&
+                index < topTrack_ + static_cast<std::size_t>(shownTracks))
             {
-                continue;
+                addMarkDot(timeline, x,
+                           tracksTop + static_cast<int>(index - topTrack_) * cell_.height, cell_);
             }
-            y = tracksTop + static_cast<int>(index - topTrack_) * cell_.height;
         }
-        signs.push_back(
-            {scale.toX(mark.tick) + 2 * lineWidth, y, static_cast<char32_t>(mark.letter)});
     }
     addRowSigns(timeline, std::move(signs), cell_);
     // The playhead, a line through the ruler and the tracks.

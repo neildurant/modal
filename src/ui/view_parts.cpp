@@ -163,7 +163,7 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
     for (std::size_t i = 0; i < signs.size(); ++i)
     {
         auto x = signs[i].x;
-        if (i > 0 && signs[i - 1].y == signs[i].y)
+        if (i > 0 && signs[i - 1].y == signs[i].y && signs[i].moves)
         {
             x = std::max(x, right);
         }
@@ -174,6 +174,16 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
                                std::u32string(1, signs[i].character),
                                {signs[i].role, Role::Background, kPlain}});
     }
+}
+
+void addMarkDot(Region& region, int x, int y, CellSize cell)
+{
+    const int side = std::max(cell.height / 4, 3);
+    const int ring = std::max(hairline(cell), 1);
+    const int top = y + (cell.height - side) / 2;
+    region.under.push_back(
+        {{x - ring, top - ring, side + 2 * ring, side + 2 * ring}, Role::Background, 255});
+    region.under.push_back({{x, top, side, side}, Role::Text, 255});
 }
 
 Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,

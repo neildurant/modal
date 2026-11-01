@@ -448,8 +448,8 @@ TEST_CASE("the play-from marker and marks have a row of their own, laid out not 
     song.setLabel(half, "Middle");
     song.setMark({'b', half, std::nullopt, core::Mark::kNoPitch});
     song.setMark({'a', half + quarter, std::nullopt, core::Mark::kNoPitch}); // 5 pixels on
-    song.setMark({'c', 0, id, core::Mark::kNoPitch});
-    song.setMark({'d', quarter, id, core::Mark::kNoPitch});
+    song.setMark({'c', 4 * half, id, core::Mark::kNoPitch});
+    song.setMark({'d', 4 * half + quarter, id, core::Mark::kNoPitch});
     ArrangePage page{song};
     page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1);
@@ -470,17 +470,28 @@ TEST_CASE("the play-from marker and marks have a row of their own, laid out not 
     Frame frame;
     page.addRegions(frame, half);
     // The label's name doesn't give way to the play-from marker, which is a row down, where
-    // the marks there go after it, each a character on from the one before.
+    // the marks go after it, each a character on from the one before; the track's too.
     CHECK(row(frame, 0) == Runs{{12, U"Middle"}});
     CHECK(row(frame, ArrangePage::kSignRow * kCell.height) ==
-          Runs{{10, U"▶"}, {20, U"b"}, {30, U"a"}});
-    // The track's, in its row, the second after the first.
-    CHECK(row(frame, ArrangePage::kRulerRows * kCell.height) == Runs{{2, U"c"}, {12, U"d"}});
-    // Each in a box of the background, over the bars.
-    const auto boxes = std::ranges::count_if(frame[1].under, [&](const Shape& shape)
-                                             { return shape.role == Role::Background; });
-    CHECK(boxes == 5);
-    CHECK(frame[1].under.back().role == Role::Background);
+          Runs{{10, U"▶"}, {20, U"b"}, {30, U"a"}, {42, U"c"}, {52, U"d"}});
+    // The track's marks are dots in its row, at their times, each ringed in the background.
+    const int y = ArrangePage::kRulerRows * kCell.height;
+    CHECK(row(frame, y).empty());
+    std::vector<int> dots;
+    std::size_t rings = 0;
+    for (const auto& shape : frame[1].under)
+    {
+        if (shape.rect.y > y && shape.rect.y < y + kCell.height && shape.rect.width < kCell.width)
+        {
+            if (shape.role == Role::Text)
+            {
+                dots.push_back(shape.rect.x);
+            }
+            rings += shape.role == Role::Background ? 1 : 0;
+        }
+    }
+    CHECK(dots == std::vector<int>{42, 47});
+    CHECK(rings == 2);
     for (const auto& number : rulerText(frame[1], ArrangePage::kNumberRow))
     {
         CHECK(number != U"▶");

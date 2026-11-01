@@ -2047,17 +2047,16 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
 
     // The second row, a row of their own (decided November 2026, as they and the names ran
     // into each other in one): the play-from marker, and the marks (ma) on this track or the
-    // conductor without a pitch, each its letter; those with a pitch are shown at it, among
-    // the notes.
+    // conductor, each its letter; one with a pitch is a dot at it too, among the notes.
     std::vector<RowSign> signs;
     if (const auto* player = host_.player(); player != nullptr && inView(player->marker()))
     {
-        signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent});
+        signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent, false});
     }
     for (const auto& mark : song.marks())
     {
         const bool here = !mark.track || mark.track == trackId();
-        if (here && inView(mark.tick) && (mark.pitch == core::Mark::kNoPitch || !mark.track))
+        if (here && inView(mark.tick))
         {
             signs.push_back(
                 {scale.toX(mark.tick) + 2 * lineWidth, h, static_cast<char32_t>(mark.letter)});
@@ -2329,19 +2328,16 @@ void PianoRollView::addRegions(Frame& frame) const
         }
     }
 
-    // Marks with a pitch, on this track: the letter, boxed over the notes, at the mark's time
-    // and pitch.
-    std::vector<RowSign> signs;
+    // Marks with a pitch, on this track: a dot over the notes at the mark's time and pitch, its
+    // letter above in the ruler.
     for (const auto& mark : song.marks())
     {
         if (mark.track && mark.track == trackId() && mark.pitch != core::Mark::kNoPitch &&
             mark.tick >= p.start && mark.tick < p.end && shown(mark.pitch))
         {
-            signs.push_back({scale.toX(mark.tick) + 2 * lineWidth, rowOf(mark.pitch) * h,
-                             static_cast<char32_t>(mark.letter)});
+            addMarkDot(notes, scale.toX(mark.tick) + 2 * lineWidth, rowOf(mark.pitch) * h, cell_);
         }
     }
-    addRowSigns(notes, std::move(signs), cell_);
 
     // The cursor's cell boxed, over the notes, and the playhead, a line through the notes and
     // the lane.

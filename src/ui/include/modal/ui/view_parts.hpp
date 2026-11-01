@@ -47,13 +47,20 @@ struct RowSign
     int y = 0;
     char32_t character = 0;
     Role role = Role::Text;
+    bool moves = true; // false for the play-from marker, whose place matters
 };
 
-// Signs, each in a box of the background over what's drawn under it, so a mark's letter reads
-// over bars and notes of any shade (decided November 2026). Those in a row that would overlap
-// go one after another from the leftmost, so marks a beat apart read "ab" from the first's
-// place; at the same place, in the order given.
+// Signs, each in a box of the background, so a line through the row doesn't run through it.
+// Those in a row that would overlap go one after another from the leftmost, so marks a beat
+// apart read "ab" from the first's place; at the same place, in the order given. One that
+// doesn't move stays at its place, the next going after it.
 void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell);
+
+// A mark's dot, at its time in a row of bars or notes, its letter being in the ruler's row of
+// marks: a small square in the text's colour, ringed by a pixel of the background so it shows
+// over bars and notes of any shade (decided November 2026, after a letter boxed there blotted
+// out the bar under it).
+void addMarkDot(Region& region, int x, int y, CellSize cell);
 
 // Puts the register's events into the song at a time, its first track's onto a track (counting
 // from 0) and the others onto those after it, as far as there are tracks, merging with what's
