@@ -1079,8 +1079,8 @@ TEST_CASE("Up and Down at the search prompt recall earlier searches, apart from 
     CHECK_FALSE(o.ws.searchQuery());
 }
 
-TEST_CASE("gn after an operator changes the match at the cursor or the next, . the next, and "
-          "n skips one, the status line saying so")
+TEST_CASE("gn after an operator changes the match at the cursor or the next, going on to the "
+          "next, which . changes and n skips, the status line saying so")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Operating o{ppqn};
@@ -1093,25 +1093,29 @@ TEST_CASE("gn after an operator changes the match at the cursor or the next, . t
     o.type(U"^gn+10");
     o.press(NamedKey::Enter);
     CHECK(o.velocities() == std::vector<int>{80, 96, 60, 100, 70});
-    CHECK(o.ws.message() == "Changed match 1/2 · . does the next match, n skips one");
-    // Still a match, but . goes on to the next.
+    CHECK(o.ws.message() == "Changed match 1/2 · on to the next: . changes it, n skips it");
+    CHECK(o.ws.pianoRoll().cursor().tick == 28 * q);
     o.type(U".");
     CHECK(o.velocities() == std::vector<int>{80, 96, 60, 100, 80});
-    CHECK(o.ws.message() == "Changed match 2/2 · . does the next match, n skips one");
+    CHECK(o.ws.message() == "Changed match 2/2 · on to the next: . changes it, n skips it");
+    CHECK(o.ws.pianoRoll().cursor().tick == 4 * q); // round to the first again
     o.type(U"n");
-    CHECK(o.ws.pianoRoll().cursor().tick == 4 * q);
-    CHECK(o.ws.message() == "Skipped to match 1/2 · . changes it, n skips again");
+    CHECK(o.ws.pianoRoll().cursor().tick == 28 * q);
+    CHECK(o.ws.message() == "Skipped to match 2/2 · . changes it, n skips again");
     // Any other key ends the run.
     o.type(U"jn");
     CHECK(o.ws.message().find("Skipped") == std::string::npos);
     // d and y take the match; one no longer matching after a change moves on too.
     o.type(U">gn");
     CHECK(o.notes()[2] == std::pair{core::Tick{4 * q}, 46});
+    CHECK(o.ws.pianoRoll().cursor().tick == 28 * q);
     o.type(U"ygn");
     CHECK(o.ws.registerEvents().size() == 1);
+    CHECK(o.ws.message() == "Yanked match 1/1");
     CHECK(o.ws.pianoRoll().cursor().tick == 28 * q);
     o.type(U"dgn");
     CHECK(o.notes().size() == 4);
+    CHECK(o.ws.message() == "Deleted match 1/1 · no other match");
 }
 
 TEST_CASE("gn without an operator selects the match, only it")

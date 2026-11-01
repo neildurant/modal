@@ -1566,18 +1566,30 @@ bool Workspace::operateOnMatch(std::string_view op, int amount)
         transform(op, amount, "object-match", 0);
         presetTarget_.reset();
     }
-    if (op != "operator-yank")
+    if (op == "operator-yank")
     {
-        gnLast_ = here; // a change, which . goes on from
+        setMessage("Yanked " + at, MessageKind::Information);
+        return true;
     }
-    const auto reminder = (op == "operator-delete" ? "Deleted " + at
-                           : op == "operator-yank" ? "Yanked " + at
-                                                   : "Changed " + at) +
-                          " · " + keysOf("repeat") + " does the next match, " +
-                          keysOf("search-next") + " skips one";
-    const auto remind = [this, reminder]
+    gnLast_ = here; // a change, which . goes on from
+    const auto done = (op == "operator-delete" ? "Deleted " : "Changed ") + at;
+    // Then on to the next match, so it's seen before . changes it (decided November 2026).
+    const auto remind = [this, done]
     {
-        setMessage(reminder, MessageKind::Information);
+        const auto from = view().cursor();
+        view().run("cursor-match-next", 1);
+        if (view().cursor() == from || !view().matchesHere(*search_))
+        {
+            setMessage(done + " · no other match", MessageKind::Information);
+            return;
+        }
+        if (wasPlaying_)
+        {
+            following_ = false;
+        }
+        setMessage(done + " · on to the next: " + keysOf("repeat") + " changes it, " +
+                       keysOf("search-next") + " skips it",
+                   MessageKind::Information);
         gnRun_ = true;
         gnKept_ = true;
     };
