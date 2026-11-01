@@ -1584,7 +1584,7 @@ bool Workspace::operateOnMatch(std::string_view op, int amount)
     if (answer_)
     {
         // As ^ asks how far: once answered.
-        answer_ = [this, inner = std::move(answer_), remind](const std::string& text)
+        answer_ = [inner = std::move(answer_), remind](const std::string& text)
         {
             inner(text);
             remind();
