@@ -472,6 +472,7 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 
 - **The scales built in:** major (ionian) and minor (natural, aeolian), harmonic and melodic minor, dorian, phrygian, lydian, mixolydian and locrian, major and minor pentatonic, blues, whole tone, and the two diminished scales. Others are defined in the modalrc by their degrees, as `scale hijaz 1 b2 3 4 5 b6 b7`.
 - **Scales of any size:** a degree is a step of the scale, five to the octave in a pentatonic one.
+- **Searching by key (decided November 2026):** `/outside D dorian` matches the notes not in the key, and `/inside D dorian` those in it, so `n`, `, s T` and `^gn` find and fix wrong notes as other searches do.
 - **Notes outside the scale** keep their distance above the scale's note below them, so a chromatic passing note stays one, transposing in key and inverting in the scale alike.
 
 **Thin and filter (decided November 2026).** Two transforms, not one:
