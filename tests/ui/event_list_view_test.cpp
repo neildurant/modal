@@ -1125,18 +1125,19 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     CHECK(line() == "section-rename Verse ");
     v.ws.handle(Key::of(NamedKey::Escape), 0);
 
-    // A source the program gives, as for settings; NAME= goes on without a space.
+    // A source the program gives, as for settings; a setting's name goes on without a space,
+    // so ? or = can follow, and so does NAME=.
     v.ws.setChoices(Choices::Setting,
                     [](std::string_view word)
                     {
                         return std::string_view{word}.find('=') == std::string_view::npos
-                                   ? std::vector<std::string>{"theme=", "timeoutlen="}
+                                   ? std::vector<std::string>{"theme", "timeoutlen"}
                                    : std::vector<std::string>{"theme=dark", "theme=light"};
                     });
     type(v.ws, U":set th");
     tab();
-    CHECK(line() == "set theme=");
-    type(v.ws, U"l");
+    CHECK(line() == "set theme");
+    type(v.ws, U"=l");
     tab();
     CHECK(line() == "set theme=light ");
 }

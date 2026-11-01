@@ -72,11 +72,14 @@ TEST_CASE("set completes settings' names, and then their values")
     const Settings settings;
     const Strings themes{"dark", "light"};
     const auto names = settingChoices(settings, "", themes);
-    CHECK(std::ranges::find(names, "theme=") != names.end());
+    CHECK(std::ranges::find(names, "theme") != names.end());
     CHECK(std::ranges::find(names, "rewind") != names.end());
     CHECK(std::ranges::find(names, "norewind") != names.end());
     CHECK(settingChoices(settings, "theme=", themes) == Strings{"theme=dark", "theme=light"});
     CHECK(settingChoices(settings, "rewind=", themes) == Strings{"rewind=on", "rewind=off"});
     CHECK(settingChoices(settings, "fontsize=", themes) == Strings{"fontsize=12"});
     CHECK(settingChoices(settings, "nosuch=", themes).empty());
+    // A name typed whole, and no other's start, goes on to its values.
+    CHECK(settingChoices(settings, "fontsize", themes) == Strings{"fontsize=12"});
+    CHECK(settingChoices(settings, "font", themes).size() > 1);
 }

@@ -139,20 +139,26 @@ std::vector<std::string> settingChoices(const Settings& settings, std::string_vi
                                         std::span<const std::string> themes)
 {
     std::vector<std::string> found;
+    // Names alone, so ? or = can follow (decided November 2026); a name typed whole, and no
+    // other's start, has its values offered, as if = were typed.
+    const auto* exact = settings.find(word);
+    const bool others =
+        std::ranges::any_of(settings.all(), [&](const auto& setting)
+                            { return setting.name.starts_with(word) && setting.name != word; });
+    if (exact != nullptr && !others && !std::holds_alternative<bool>(exact->value))
+    {
+        return settingChoices(settings, std::string{word} + "=", themes);
+    }
     const auto equals = word.find('=');
     if (equals == std::string_view::npos)
     {
         for (const auto& setting : settings.all())
         {
             const std::string name{setting.name};
+            found.push_back(name);
             if (std::holds_alternative<bool>(setting.value))
             {
-                found.push_back(name);
                 found.push_back("no" + name);
-            }
-            else
-            {
-                found.push_back(name + "=");
             }
         }
         return found;

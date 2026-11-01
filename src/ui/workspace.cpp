@@ -4074,7 +4074,10 @@ bool Workspace::complete(int by)
     if (found.size() == 1)
     {
         const auto& only = found.front();
-        replaceWord(word.start, only + (only.ends_with('=') || only.ends_with('/') ? "" : " "));
+        // A setting's name goes on too, with =, ? or !.
+        const bool goesOn = only.ends_with('=') || only.ends_with('/') ||
+                            (word.kind == Choices::Setting && only.find('=') == std::string::npos);
+        replaceWord(word.start, only + (goesOn ? "" : " "));
         return true;
     }
     // With several, the first Tab only shows them, none chosen, so typing can narrow them (: Tab
