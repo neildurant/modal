@@ -1766,7 +1766,9 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
     }
     const bool hinted = hints().has_value();
     noteWaiting(now);
-    return changed || hadMessage || pending() != before || hinted != hints().has_value();
+    // A message said, such as for a key bound to nothing, is drawn at once.
+    return changed || hadMessage || !message_.empty() || pending() != before ||
+           hinted != hints().has_value();
 }
 
 void Workspace::noteWaiting(std::int64_t now)

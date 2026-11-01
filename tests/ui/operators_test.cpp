@@ -828,3 +828,10 @@ TEST_CASE("the hint menu says a find waits for a note name, and after an operato
     o.ws.wake(kDefaultTimeout);
     CHECK_FALSE(o.ws.hints());
 }
+
+TEST_CASE("a key bound to nothing says so at once")
+{
+    Operating o;
+    CHECK(o.ws.handle(Key::typed(U'#'), 0)); // drawn, rather than waiting for the next key
+    CHECK(o.ws.message() == "# isn't a key here");
+}
