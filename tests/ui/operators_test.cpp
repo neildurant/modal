@@ -548,3 +548,76 @@ TEST_CASE("Q and @ take a letter, Escape giving it up")
     o.type(U"@@");
     CHECK(o.ws.message() == "No macro played yet to play again");
 }
+
+TEST_CASE("ma marks the cursor's place, as an undo step, and 'a goes back to it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto bass = o.document.song().tracks()[0]->id();
+    o.type(U"gr4}kk"); // the piano roll, bar 5, two semitones up
+    const auto pitch = o.ws.pianoRoll().cursor().pitch;
+    o.type(U"ma");
+    const auto* mark = o.document.song().mark('a');
+    REQUIRE(mark != nullptr);
+    CHECK(mark->tick == 16 * q);
+    CHECK(mark->track == bass);
+    CHECK(pitch.has_value());
+    CHECK(mark->pitch == static_cast<int>(pitch.value_or(0)));
+
+    o.type(U"ggjjj'a");
+    CHECK(o.ws.pianoRoll().cursor() == SongCursor{bass, 16 * q, pitch});
+    // '' goes back to before the jump, and again comes back.
+    o.type(U"''");
+    CHECK(o.ws.pianoRoll().cursor().tick == 0);
+    o.type(U"`'");
+    CHECK(o.ws.pianoRoll().cursor().tick == 16 * q);
+
+    // An undo step; set again, it moves.
+    o.type(U"u");
+    CHECK(o.document.song().mark('a') == nullptr);
+    o.type(U"}ma");
+    CHECK(o.document.song().mark('a')->tick == 20 * q);
+    o.type(U"mb");
+    CHECK(o.document.song().marks().size() == 2);
+
+    // Letters only; m Space is still the play-from marker, and sets no mark.
+    o.type(U"mA");
+    CHECK(o.ws.message() == "Marks are named by letters, a to z");
+    o.type(U"m ");
+    CHECK(o.document.song().marks().size() == 2);
+    o.type(U"'z");
+    CHECK(o.ws.message() == "Mark z isn't set");
+}
+
+TEST_CASE("a mark is a range after an operator, to its time")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr4}ma"); // bar 5
+    o.type(U"gg>'a");  // bars 1 to 4's notes up
+    CHECK(o.notes() == Notes{{0, 32}, {0, 29}, {4 * q, 46}, {16 * q + q / 16, 36}, {28 * q, 33}});
+    CHECK(o.ws.pianoRoll().cursor().tick == 0);
+    o.type(U"u");
+    o.type(U"d'z"); // no mark z: the operator given up
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.notes().front().second == 31);
+}
+
+TEST_CASE("marks set outside the piano roll have no pitch, and going to one goes to its track")
+{
+    Operating o;
+    const auto lead = o.document.song().tracks()[1]->id();
+    o.type(U"j}mc"); // the arrangement: the lead's bar 2
+    const auto* mark = o.document.song().mark('c');
+    REQUIRE(mark != nullptr);
+    CHECK(mark->track == lead);
+    CHECK(mark->tick == 4 * o.q);
+    CHECK(mark->pitch == core::Mark::kNoPitch);
+
+    o.type(U"kgr"); // the bass in the piano roll
+    o.type(U"'c");
+    CHECK(o.ws.pianoRoll().cursor().track == lead);
+    CHECK(o.ws.pianoRoll().cursor().tick == 4 * o.q);
+}

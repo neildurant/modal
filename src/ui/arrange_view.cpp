@@ -184,6 +184,15 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     {
         page_.resetZoom();
     }
+    else if (command == "cursor-mark")
+    {
+        const auto at = host_.jumpTime();
+        if (!at)
+        {
+            return false;
+        }
+        moveTo(*at);
+    }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
     {
         std::vector<core::Tick> ticks;

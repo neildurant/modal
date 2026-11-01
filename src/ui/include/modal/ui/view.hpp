@@ -189,6 +189,9 @@ public:
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.
     virtual void chosenMeter(core::TimeSignature /*meter*/) {}
+
+    // The time of the mark an operator's range goes to ('a), for the motion cursor-mark.
+    virtual std::optional<core::Tick> jumpTime() const { return std::nullopt; }
 };
 
 // A view of the song in the workspace: the event list, and later the arrangement and the

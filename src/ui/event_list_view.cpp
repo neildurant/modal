@@ -482,6 +482,15 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
             }
         }
     }
+    else if (command == "cursor-mark")
+    {
+        const auto at = host_.jumpTime();
+        if (!at)
+        {
+            return false;
+        }
+        row_ = list_.rowAt(*at);
+    }
     else if (command.starts_with("cursor-section-") || command.starts_with("cursor-marker-"))
     {
         const bool sections = command.starts_with("cursor-section-");

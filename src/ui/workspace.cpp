@@ -105,6 +105,18 @@ constexpr std::array kSharedCommands{
                                "again, {count} times, as one undo step",
                 .count = true},
     CommandInfo{.name = "macros", .description = "Say what the macros hold", .keys = false},
+    CommandInfo{.name = "mark-set",
+                .description = "Mark the cursor's place, its track, time and in the piano roll "
+                               "its pitch, with a letter after it, a to z (ma)"},
+    CommandInfo{.name = "mark-go",
+                .description = "Go to the place a letter after it marks ('a), or with ' back to "
+                               "before the last jump; after an operator, the range to it (d'a)",
+                .motion = true},
+    CommandInfo{.name = "cursor-mark",
+                .description = "To the mark ('a), as the range an operator takes",
+                .keys = false,
+                .motion = true,
+                .palette = false},
     CommandInfo{.name = "repeat",
                 .description = "Repeat the last change (.), with its range or object, as one "
                                "undo step; a count replaces the one it had",
@@ -374,7 +386,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 75> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 76> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -430,6 +442,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-section-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-section-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-marker-next", onlyIn({Tracks, PianoRoll, EventList})},
+            {"cursor-mark", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-marker-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-left-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-right-scroll", onlyIn({Tracks, PianoRoll, EventList})},
@@ -492,6 +505,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , keymap_(std::move(keymap))
     , keys_(timeout)
 {
+    keys_.setTakesCharacter([this](std::string_view command) { return takesCharacter(command); });
     for (const auto& info : commands())
     {
         registry.add(info,
@@ -531,6 +545,11 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                              {
                                  return {*done};
                              }
+                         }
+                         if (name == "mark-go")
+                         {
+                             awaiting_ = Awaiting{std::string{name}, call.count};
+                             return {true};
                          }
                          // After an operator, every command is its motion, or gives it up.
                          if (mode_ == Mode::OperatorPending)
@@ -634,14 +653,14 @@ std::string Workspace::pending() const
     {
         text += keysOf("register-use") + encodeUtf8(std::u32string(1, *registerName_));
     }
-    if (awaiting_)
-    {
-        text += keysOf(awaiting_->command);
-    }
     if (operator_)
     {
         text = (operator_->count > 0 ? std::to_string(operator_->count) : std::string{}) +
                keysOf(operator_->name);
+    }
+    if (awaiting_)
+    {
+        text += keysOf(awaiting_->command);
     }
     return text + keys_.pending();
 }
@@ -799,8 +818,47 @@ bool Workspace::recordChange(const Key& key, std::int64_t now)
     return changed;
 }
 
+bool Workspace::takesCharacter(std::string_view command) const
+{
+    return command == "register-use" || command == "mark-set" || command == "mark-go" ||
+           command == "macro-play" || (command == "macro-record" && recording_ == 0);
+}
+
+bool Workspace::characterAfter(std::string_view command, const Key& key, int count)
+{
+    if (key.named == NamedKey::Escape)
+    {
+        if (operator_)
+        {
+            operator_.reset(); // d' Escape gives the operator up too
+            mode_ = Mode::Normal;
+        }
+        return true;
+    }
+    if (key.named != NamedKey::None || (key.modifiers & (kCtrl | kAlt)) != 0)
+    {
+        setMessage(keysFor(command) + " takes a letter after it", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        if (operator_)
+        {
+            operator_.reset();
+            mode_ = Mode::Normal;
+        }
+        return true;
+    }
+    return withCharacter(command, key.character, count);
+}
+
 bool Workspace::withCharacter(std::string_view command, char32_t character, int count)
 {
+    if (command == "mark-set")
+    {
+        return setMark(character);
+    }
+    if (command == "mark-go")
+    {
+        return goToMark(character, count);
+    }
     if (command == "macro-record" || command == "macro-play")
     {
         const bool play = command == "macro-play";
@@ -974,6 +1032,97 @@ Region Workspace::listingRegion() const
         region.text.push_back({x(width + 2), y, text, {Role::Text, Role::Panel, kPlain}});
     }
     return region;
+}
+
+bool Workspace::setMark(char32_t character)
+{
+    // m Space is the play-from marker, which the keys bind apart, unless typed slowly.
+    if (character == U' ')
+    {
+        return run("marker-set", 0).changed;
+    }
+    if (character < U'a' || character > U'z')
+    {
+        setMessage("Marks are named by letters, a to z", MessageKind::Information);
+        macroFailed_ = macroDepth_ > 0;
+        return true;
+    }
+    const auto cursor = view().cursor();
+    core::Mark mark{.letter = static_cast<char>(character),
+                    .tick = cursor.tick,
+                    .track = cursor.track,
+                    .pitch = core::Mark::kNoPitch};
+    if (where() == Where::PianoRoll && cursor.pitch)
+    {
+        mark.pitch = *cursor.pitch;
+    }
+    document_.edit("Mark " + std::string(1, mark.letter), view().place(),
+                   [&](core::Song& song) { song.setMark(mark); });
+    refresh();
+    return true;
+}
+
+bool Workspace::goToMark(char32_t character, int count)
+{
+    // A mark's place, or with ' (or `) where the cursor was before the last jump, swapping
+    // with it so '' goes back and forth. Without a pitch, the cursor keeps its own; without
+    // a track (the conductor's), its track.
+    const bool back = character == U'\'' || character == U'`';
+    auto to = view().cursor();
+    if (back)
+    {
+        if (!jumpedFrom_)
+        {
+            setMessage("No jump yet to go back from", MessageKind::Information);
+            macroFailed_ = macroDepth_ > 0;
+            return true;
+        }
+        to = *jumpedFrom_;
+    }
+    else
+    {
+        const auto* mark = character >= U'a' && character <= U'z'
+                               ? document_.song().mark(static_cast<char>(character))
+                               : nullptr;
+        if (mark == nullptr)
+        {
+            setMessage(character >= U'a' && character <= U'z'
+                           ? "Mark " + encodeUtf8(std::u32string(1, character)) + " isn't set"
+                           : std::string{"Marks are named by letters, a to z"},
+                       MessageKind::Information);
+            macroFailed_ = macroDepth_ > 0;
+            if (operator_)
+            {
+                operator_.reset();
+                mode_ = Mode::Normal;
+            }
+            return true;
+        }
+        to.tick = mark->tick;
+        if (mark->track)
+        {
+            to.track = mark->track;
+        }
+        if (mark->pitch != core::Mark::kNoPitch)
+        {
+            to.pitch = static_cast<std::uint8_t>(mark->pitch);
+        }
+    }
+    if (operator_)
+    {
+        // The range to its time, as ]m's to a marker's.
+        jumpTime_ = to.tick;
+        const bool done = runOperator("cursor-mark", count);
+        jumpTime_ = -1;
+        return done;
+    }
+    const auto from = view().cursor();
+    view().setCursor(to);
+    if (mode_ != Mode::Visual)
+    {
+        jumpedFrom_ = from;
+    }
+    return true;
 }
 
 std::string Workspace::macroName(char32_t name)
@@ -1172,17 +1321,7 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // A command waiting for a character after it ("a): the next key, Escape giving it up.
     if (const auto waiting = std::exchange(awaiting_, std::nullopt))
     {
-        if (key.named == NamedKey::Escape)
-        {
-            return true;
-        }
-        if (key.named != NamedKey::None || (key.modifiers & (kCtrl | kAlt)) != 0)
-        {
-            setMessage(keysFor(waiting->command) + " takes a letter after it",
-                       MessageKind::Information);
-            return true;
-        }
-        return withCharacter(waiting->command, key.character, waiting->count);
+        return characterAfter(waiting->command, key, waiting->count);
     }
     // At the prompt, a character that starts no command-line binding is typed.
     if (mode_ == Mode::CommandLine && keys_.pending().empty() && key.named == NamedKey::None &&
@@ -1903,7 +2042,9 @@ bool Workspace::runAll(const std::vector<Action>& actions)
     fromKeys_ = true;
     for (const auto& action : actions)
     {
-        changed = run(action.command, action.count).changed || changed;
+        changed = (action.withAfter ? characterAfter(action.command, action.after, action.count)
+                                    : run(action.command, action.count).changed) ||
+                  changed;
     }
     fromKeys_ = false;
     return changed;
@@ -1977,6 +2118,19 @@ bool Workspace::runViewCommand(std::string_view command, int count)
     const auto cursor = view().cursor();
     if (const auto changed = view().run(command, count))
     {
+        // Jumps, for '' to go back from (decided October 2026): to the song's ends, sections,
+        // markers and marks, but not bars, which are steps.
+        constexpr std::array<std::string_view, 6> kJumps{"go-first",
+                                                         "go-last",
+                                                         "cursor-section-next",
+                                                         "cursor-section-previous",
+                                                         "cursor-marker-next",
+                                                         "cursor-marker-previous"};
+        if (std::ranges::find(kJumps, command) != kJumps.end() && view().cursor() != cursor &&
+            mode_ != Mode::Visual)
+        {
+            jumpedFrom_ = cursor;
+        }
         // Moving the cursor or scrolling while playing lets go of the playhead (decided
         // October 2026, as in most sequencers): the view stays with the cursor, until
         // playback starts again or playhead-follow. A motion that leaves the cursor where it
@@ -2150,6 +2304,11 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "macros")
     {
         return sayMacros();
+    }
+    if (command == "mark-set")
+    {
+        awaiting_ = Awaiting{std::string{command}, count};
+        return true;
     }
     if (command == "undo" || command == "redo")
     {
@@ -3148,6 +3307,11 @@ void Workspace::showPlayhead()
             view().stopPlayhead(!following_ ? std::nullopt
                                 : rewind_   ? std::optional{lastPlayhead_}
                                             : std::optional{player_->marker()});
+            // Stopping in place is a jump, so '' goes back as Shift-Space does.
+            if (following_ && playedFrom_ && view().cursor() != *playedFrom_)
+            {
+                jumpedFrom_ = playedFrom_;
+            }
         }
         if (!player_->stopping())
         {
@@ -3824,6 +3988,10 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
     mode_ = selection_ ? Mode::Visual : Mode::Normal;
     const auto index = static_cast<std::size_t>(std::stoul(item.name));
     auto cursor = view().cursor();
+    if (!selection_)
+    {
+        jumpedFrom_ = cursor;
+    }
     if (prefix == '@' && index < song.sections().size())
     {
         cursor.tick = song.sectionStart(index);

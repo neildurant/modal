@@ -106,6 +106,10 @@ struct Action
 {
     std::string command;
     int count = 0;
+    // For a command taking a character after it (ma), the key typed after its keys, where
+    // they also start longer bindings (m<Space>).
+    Key after = {};
+    bool withAfter = false;
 
     friend bool operator==(const Action&, const Action&) = default;
 };
@@ -139,6 +143,14 @@ public:
 
     void setTimeout(std::int64_t timeout) { timeout_ = timeout; }
 
+    // Which commands take a character after them (", m, '): keys bound to one that also start
+    // longer bindings wait for the next key without a timeout, and a key that continues none
+    // is the command's character.
+    void setTakesCharacter(std::function<bool(std::string_view command)> takes)
+    {
+        takesCharacter_ = std::move(takes);
+    }
+
     // The key that stands for <leader> in bindings, in Normal, Visual and operator-pending
     // mode: comma at first.
     void setLeader(const Key& leader) { leader_ = leader; }
@@ -168,6 +180,7 @@ private:
     std::vector<Key> keys_;
     std::vector<Key> unbound_;
     std::optional<std::int64_t> deadline_;
+    std::function<bool(std::string_view command)> takesCharacter_;
 };
 
 } // namespace modal::ui

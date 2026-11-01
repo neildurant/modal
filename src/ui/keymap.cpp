@@ -161,10 +161,15 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
     }
     keys_.push_back(key);
     const auto match = keymap.match(mode_, keys_);
+    const auto takes = [this](const Binding* binding)
+    { return binding != nullptr && takesCharacter_ && takesCharacter_(binding->command); };
     if (match.longer)
     {
-        // Wait for the next key, or only so long if these keys are a binding already.
-        deadline_ = match.binding != nullptr ? std::optional{now + timeout_} : std::nullopt;
+        // Wait for the next key, or only so long if these keys are a binding already, unless
+        // it takes the next key as its character.
+        deadline_ = match.binding != nullptr && !takes(match.binding)
+                        ? std::optional{now + timeout_}
+                        : std::nullopt;
         return {};
     }
     if (match.binding != nullptr)
@@ -186,6 +191,13 @@ std::vector<Action> KeyDispatcher::key(const Keymap& keymap, Mode mode, const Ke
         clear();
         unbound_ = std::move(given);
         return {};
+    }
+    if (takes(before))
+    {
+        std::vector<Action> actions{
+            {.command = before->command, .count = count_, .after = typed, .withAfter = true}};
+        clear();
+        return actions;
     }
     std::vector<Action> actions{{before->command, count_}};
     clear();

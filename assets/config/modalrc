@@ -74,7 +74,9 @@ nmap <leader>n  default-note-set          "Default note from this one"
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
 " cursor's bar. "a before a yank, delete or put uses register a ("A adds to it); u and Ctrl-R
 " undo and redo, and . repeats the last change. Qa records the keys typed into macro a until
-" Q again (QA adds to it), @a plays it, @@ the last again, and 3@a three times.
+" Q again (QA adds to it), @a plays it, @@ the last again, and 3@a three times. ma marks the
+" cursor's place with a letter, saved with the song; 'a (or `a) goes there, and after an
+" operator is the range to it (d'a); '' goes back to before the last jump.
 "
 " The other operators take the same ranges and objects, a count before them saying how far:
 " > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
@@ -113,6 +115,9 @@ nmap P          register-put-before "Put before"
 nmap Y          yank-this         "Yank this"
 nmap "          register-use      "Register"
 nmap Q          macro-record      "Record a macro"
+nmap m          mark-set          "Mark"
+nmap '          mark-go           "Go to a mark"
+nmap `          mark-go           "Go to a mark"
 nmap @          macro-play        "Play a macro"
 
 " Visual mode: v selects from the cursor as it moves, a range of time on every track, and v

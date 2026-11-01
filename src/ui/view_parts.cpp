@@ -385,7 +385,8 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
 
 std::optional<std::string> describeTimeRange(std::string_view motion)
 {
-    constexpr std::array<std::pair<std::string_view, std::string_view>, 8> kRanges{{
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 9> kRanges{{
+        {"cursor-mark", "to the mark"},
         {"cursor-bar-line-next", "to the next bar line"},
         {"cursor-bar-line-previous", "from the bar line before"},
         {"cursor-section-next", "to the next section"},

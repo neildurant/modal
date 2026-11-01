@@ -216,6 +216,11 @@ public:
     const std::vector<core::Event>& registerEvents() const;
 
     // Shows a message in the status line until the next key.
+    std::optional<core::Tick> jumpTime() const override
+    {
+        return jumpTime_ >= 0 ? std::optional{jumpTime_} : std::nullopt;
+    }
+
     void setMessage(std::string message, MessageKind kind) override
     {
         message_ = std::move(message);
@@ -401,7 +406,16 @@ private:
         int count = 0;
     };
     std::optional<Awaiting> awaiting_;
+    bool takesCharacter(std::string_view command) const;
+    bool characterAfter(std::string_view command, const Key& key, int count);
     bool withCharacter(std::string_view command, char32_t character, int count);
+    // Marks: setting one, going to one or back (''), the place before the last jump, and the
+    // time of the one an operator is taking the range to (-1 for none, rather than an
+    // optional, which GCC's release build takes for uninitialised).
+    bool setMark(char32_t character);
+    bool goToMark(char32_t character, int count);
+    std::optional<SongCursor> jumpedFrom_;
+    core::Tick jumpTime_ = -1;
     // The named registers, a to z: the one named for the next command, the unnamed register
     // as it was then, adding to a register, and saying what they hold.
     std::map<char32_t, EventRegister> registers_;
