@@ -2355,6 +2355,7 @@ void PianoRollView::addRegions(Frame& frame) const
             // those starting in it, and only those, even the one under the cursor.
             const bool picked = span ? takes(event.tick, note->pitch) : current == i;
             const Role role = picked ? Role::NoteSelected : Role::Note;
+            const bool matched = search && core::matches(*search, event.data, song.ppqn());
             const int x0 = scale.toX(std::max(event.tick, p.start));
             const int x1 = scale.toX(std::min(end, p.end));
             const int noteWidth = std::max(x1 - x0 - 1, 1);
@@ -2370,7 +2371,7 @@ void PianoRollView::addRegions(Frame& frame) const
                                        bodyAlpha(note->velocity)});
                 // A search's match, outlined, so it shows over the current note and a
                 // selection's colour alike.
-                if (search && core::matches(*search, event.data, song.ppqn()))
+                if (matched)
                 {
                     const int t = std::max(lineWidth, 1);
                     const Rect box{x0, y, noteWidth, h - 2 * inset};
@@ -2416,8 +2417,11 @@ void PianoRollView::addRegions(Frame& frame) const
             {
                 const int top = laneInset + lineWidth;
                 const int high = (laneHeight - top) * note->velocity / 127;
-                lane.under.push_back(
-                    {{x0, laneHeight - high, std::max(2 * lineWidth, 2), high}, role, 255});
+                // A match's velocity in the match's colour, so it reads with the note above
+                // (decided November 2026), unless it's the current note or selected.
+                lane.under.push_back({{x0, laneHeight - high, std::max(2 * lineWidth, 2), high},
+                                      matched && !picked ? Role::Match : role,
+                                      255});
             }
         }
     }

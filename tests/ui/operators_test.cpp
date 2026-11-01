@@ -996,3 +996,20 @@ TEST_CASE("searching in the event list goes to rows, and in the arrangement to b
     o.type(U"*");
     CHECK(o.ws.message() == "This is the only match for G1");
 }
+
+TEST_CASE("a match is outlined in the piano roll, and its velocity in the lane in the match's "
+          "colour")
+{
+    Operating o;
+    o.type(U"gr");
+    search(o, U"vel<60"); // A2, in bar 2
+    o.type(U"gg");        // off it, so it isn't the current note
+    const auto frame = o.ws.frame();
+    std::size_t shapes = 0;
+    for (const auto& region : frame)
+    {
+        shapes += static_cast<std::size_t>(std::ranges::count_if(
+            region.under, [](const Shape& shape) { return shape.role == Role::Match; }));
+    }
+    CHECK(shapes == 5); // the outline's four sides, and the velocity's bar
+}
