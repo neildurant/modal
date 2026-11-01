@@ -873,6 +873,18 @@ TEST_CASE(":label-to-section starts a section at a label, asking unless it's on 
           "Top is at the start of Section 1, so there's no section to start");
 }
 
+TEST_CASE("gc shows the conductor's list in the event list, at the cursor's time")
+{
+    Arranging a{labelSong()};
+    a.type(U"2l"); // bar 3, on Chorus
+    a.type(U"gc");
+    REQUIRE(a.ws.shown() == ViewKind::EventList);
+    CHECK(a.ws.eventList().track() == 0);
+    CHECK(a.ws.eventList().cursor().tick == 2 * kBar);
+    a.type(U"gt"); // and on to the first track
+    CHECK(a.ws.eventList().track() == 1);
+}
+
 TEST_CASE(":label puts a label at the cursor or renames it, and :label-delete deletes them")
 {
     Arranging a{labelSong()};

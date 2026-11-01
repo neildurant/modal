@@ -411,11 +411,13 @@ TEST_CASE(
     };
     p.open();
     p.type(U"#");
-    // From the top, in the arrangement's order; rows() lists them from the bottom.
+    // From the top, the conductor first, then the arrangement's order; rows() lists them from
+    // the bottom.
     auto rows = p.rows();
     REQUIRE(rows.size() == 12);
-    CHECK(rows.back() == name(0));
-    CHECK(rows.front() == name(11));
+    CHECK(rows.back() == U"Conductor");
+    CHECK(rows[10] == name(0));
+    CHECK(rows.front() == name(10));
 
     // Down from none chosen is the first; End the last, the list scrolling to it.
     p.press(Key::of(NamedKey::Down));
@@ -426,13 +428,15 @@ TEST_CASE(
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.arrangement().page().track() == tracks - 1);
 
-    // Home is the top: the first track.
+    // Home is the top: the conductor, its list shown in the event list.
     p.open();
     p.type(U"#");
     p.press(Key::of(NamedKey::End));
     p.press(Key::of(NamedKey::Home));
     p.press(Key::of(NamedKey::Enter));
-    CHECK(p.ws.arrangement().page().track() == 0);
+    CHECK(p.ws.shown() == ViewKind::EventList);
+    CHECK(p.ws.eventList().track() == 0);
+    p.type(U"ga");
 
     // For commands, the best is at the bottom: Home goes up to the worst, End back down.
     p.open();

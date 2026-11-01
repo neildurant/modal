@@ -101,12 +101,12 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the page in the piano roll, an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`vie:label-to-section`) |
 | Enter on a selection | In the arrangement, open its bars in the piano roll as the page, turning on by as many |
 | `\|` | Cut the notes crossing the edges, so operators take only the parts inside: on a selection, or before an operator for it alone (`\|d]b`) |
-| `gt` `gT` | Next and previous track, the conductor as track 0; `3gt` goes to track 3 |
+| `gt` `gT`, `gc` | Next and previous track, the conductor as track 0; `3gt` goes to track 3; `gc` shows the conductor's list from any view |
 | Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
 | `Ctrl-Shift-h` `Ctrl-Shift-l` (or the arrows) | In the arrangement and the piano roll, a page earlier or later, the cursor staying in place on screen |
 | `zz` | Centre the cursor |
-| `Ctrl-p`, `, :` | The command palette: type part of a command's name, what it does or its keys, Enter runs it, Tab puts it on the `:` prompt; `@` first searches sections, `#` tracks, `'` labels, `?` settings |
+| `Ctrl-p`, `, :` | The command palette: type part of a command's name, what it does or its keys, Enter runs it, Tab puts it on the `:` prompt; `@` first searches sections, `#` tracks (the conductor first), `'` labels, `?` settings |
 | `Ctrl-+` `Ctrl--` `Ctrl-0` | Text bigger, smaller, or back to its configured size |
 | Space, Shift-Space | Play from the play-from marker (the ▶ in the margin), or stop where it is, the cursor landing there; Shift-Space stops and goes back to where the cursor was |
 | `m Space`, `Ctrl-Space` | Put the play-from marker at the cursor; or put it there and play |

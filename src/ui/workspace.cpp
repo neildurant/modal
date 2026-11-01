@@ -279,6 +279,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "view-arrangement", .description = "Show the arrangement"},
     CommandInfo{.name = "view-piano-roll", .description = "Show the piano roll"},
     CommandInfo{.name = "view-events", .description = "Show the event list"},
+    CommandInfo{.name = "view-conductor",
+                .description = "Show the conductor's list in the event list: its tempos, "
+                               "meters, sections and labels"},
     CommandInfo{.name = "view-back", .description = "Go back to the view shown before"},
     atPrompt("command-line-run", "Run the command line"),
     atPrompt("command-line-cancel", "Close the command line"),
@@ -2531,6 +2534,16 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                                            : ViewKind::PianoRoll);
         return true;
     }
+    if (command == "view-conductor")
+    {
+        // The event list's track 0, at the cursor's time.
+        show(ViewKind::EventList);
+        auto cursor = view().cursor();
+        cursor.track.reset();
+        cursor.pitch.reset();
+        view().setCursor(cursor);
+        return true;
+    }
     if (command == "view-back")
     {
         if (history_.empty())
@@ -4119,6 +4132,8 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
     }
     else if (prefix == '#')
     {
+        // The conductor first, as the event list's track 0 (decided November 2026).
+        item("conductor", "Conductor", "track 0, the tempos, meters, sections and labels");
         const auto tracks = song.tracks();
         for (std::size_t i = 0; i < tracks.size(); ++i)
         {
@@ -4196,6 +4211,10 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
     {
         const bool done = goToMark(static_cast<char32_t>(item.name.back()), 0);
         return done;
+    }
+    if (item.name == "conductor")
+    {
+        return run("view-conductor", 0).changed;
     }
     const auto index = static_cast<std::size_t>(std::stoul(item.name));
     auto cursor = view().cursor();

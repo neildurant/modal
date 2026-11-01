@@ -197,6 +197,7 @@ keysection "Views"
 nmap ga         view-arrangement  "Arrangement"
 nmap gr         view-piano-roll   "Piano roll"
 nmap ge         view-events       "Event list"
+nmap gc         view-conductor    "Conductor's list"
 nmap <BS>       view-back         "Back"
 
 " The section strip, above the arrangement's tracks: gs goes to it (or k from the first
