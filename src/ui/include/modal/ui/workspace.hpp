@@ -56,6 +56,16 @@ struct TransformSetting
 
 std::vector<TransformSetting> transformSettings(std::string_view command);
 
+// How the transform menu's quantise was answered: a grid (or each track's own), how far, the
+// swing and what's moved.
+struct Quantizing
+{
+    std::optional<core::NoteFraction> grid = std::nullopt;
+    int swing = 50;
+    core::QuantizeHow::Move move = core::QuantizeHow::Move::Starts;
+    int strength = 100;
+};
+
 // The window's contents: the views of the song, one shown at a time, with what they share
 // (decided for milestone 5). The workspace handles keys through the keymap, with counts and
 // pending operators, runs the commands every view has (the : prompt, playing, undo, :port)
@@ -310,15 +320,6 @@ private:
     // or saying why it can't be.
     bool transform(std::string_view op, int amount, std::string_view motion, int count);
     // Quantises the notes' starts, and the pedals with them if asked.
-    // How the transform menu's quantise was answered: a grid (or each track's own), how far,
-    // the swing and what's moved.
-    struct Quantizing
-    {
-        std::optional<core::NoteFraction> grid = std::nullopt;
-        int swing = 50;
-        core::QuantizeHow::Move move = core::QuantizeHow::Move::Starts;
-        int strength = 100;
-    };
     bool quantize(const OperatorTarget& target, bool pedals, const Quantizing& how = {});
     bool quantizeAsked(const OperatorTarget& target, const std::string& text);
     std::string gridOf(const OperatorTarget& target) const;
