@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/scale.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
@@ -28,6 +29,7 @@ struct Config
     Settings settings;
     Keymap keymap;
     Theme theme = *builtInTheme("dark");
+    std::vector<core::Scale> scales; // the modalrc's own, by scale NAME DEGREES
 };
 
 // A command that couldn't be run, where it was.
@@ -56,6 +58,8 @@ struct ConfigError
 //                                 mode; keys are in notation (see key_notation.hpp)
 //   nunmap KEYS                   unbinds them, and so on for the other modes
 //   source FILE                   runs another file, relative to the one running it
+//   scale NAME DEGREES...         defines a scale for the keys transforms ask for, by its
+//                                 degrees: scale hijaz 1 b2 3 4 5 b6 b7
 //
 // Arguments are separated by spaces. As in a shell, text in double quotes keeps its spaces,
 // with \" and \\ for a quote and a backslash, so set font="C:/My Fonts/Mono.ttf" works; but

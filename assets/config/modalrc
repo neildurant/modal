@@ -342,9 +342,16 @@ ngroup <leader>t "Toggles"
 " Selecting (decided November 2026): the bar, section, track or what's shown, and with a capital
 " only the matches of the last search in it, which operators then take; in Visual mode , s m
 " keeps only the matches in what's selected.
+" The transforms: ! and a range, then one of these keys, or these keys and then a range.
+" Those in a key ask for it each time; a scale of your own is defined by its degrees, as
+" scale hijaz 1 b2 3 4 5 b6 b7, and is then a key's scale as the built-in ones are.
 ngroup <leader>x "Transforms"
 nmap !           operator-transform    "Transform"
 nmap <leader>xt  transform-transpose   "Transpose by semitones"
+nmap <leader>xk  transform-transpose-key "Transpose in a key"
+nmap <leader>xi  transform-invert        "Invert"
+nmap <leader>xI  transform-invert-key    "Invert in a key"
+nmap <leader>xR  transform-retrograde    "Retrograde"
 nmap <leader>xl  transform-velocity-lift  "Lift velocities (25%)"
 nmap <leader>xL  transform-velocity-lower "Lower velocities (25%)"
 nmap <leader>xm  transform-velocity-limit "Limit velocities"

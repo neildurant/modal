@@ -14,6 +14,7 @@ add_library(modal_core STATIC
     playback_plan.cpp
     player.cpp
     recorder.cpp
+    scale.cpp
     scheduler.cpp
     smf.cpp
     smf_export.cpp

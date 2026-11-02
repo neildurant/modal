@@ -205,6 +205,85 @@ Transformed transpose(const EventList& events, std::span<const std::size_t> whic
     return finish(events, which, changed, false);
 }
 
+namespace
+{
+
+Transformed repitched(const EventList& events, std::span<const std::size_t> which,
+                      const std::function<int(int)>& to)
+{
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        auto* note = std::get_if<Note>(&event.data);
+        if (note == nullptr)
+        {
+            continue;
+        }
+        const int pitch = to(note->pitch);
+        if (pitch > 127 || pitch < 0)
+        {
+            return Refusal{pitch > 127 ? Refusal::Reason::AboveHighest
+                                       : Refusal::Reason::BelowLowest,
+                           event, std::nullopt};
+        }
+        note->pitch = static_cast<std::uint8_t>(pitch);
+    }
+    return finish(events, which, changed, false);
+}
+
+} // namespace
+
+Transformed transposeInKey(const EventList& events, std::span<const std::size_t> which,
+                           const Key& key, int degrees)
+{
+    return repitched(events, which,
+                     [&](int pitch)
+                     {
+                         const auto at = key.place(pitch);
+                         return key.pitchOf(at.degree + degrees) + at.above;
+                     });
+}
+
+Transformed invertInKey(const EventList& events, std::span<const std::size_t> which, const Key& key,
+                        int pivot)
+{
+    const auto about = key.place(pivot).degree;
+    return repitched(events, which,
+                     [&](int pitch)
+                     {
+                         const auto at = key.place(pitch);
+                         return key.pitchOf(2 * about - at.degree) + at.above;
+                     });
+}
+
+Transformed invert(const EventList& events, std::span<const std::size_t> which, int pivot)
+{
+    return repitched(events, which, [&](int pitch) { return 2 * pivot - pitch; });
+}
+
+Transformed retrograde(const EventList& events, std::span<const std::size_t> which)
+{
+    std::optional<Tick> first;
+    std::optional<Tick> last;
+    for (const auto i : which)
+    {
+        if (events[i].isNote())
+        {
+            first = std::min(first.value_or(events[i].tick), events[i].tick);
+            last = std::max(last.value_or(endOf(events[i])), endOf(events[i]));
+        }
+    }
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        if (event.isNote())
+        {
+            event.tick = *first + *last - endOf(event);
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
 Transformed shift(const EventList& events, std::span<const std::size_t> which, Tick by, Tick end,
                   bool notesOnly)
 {

@@ -134,3 +134,13 @@ TEST_CASE("a query finds pitches above, below or between others, and numbers in 
     CHECK(error("vel=60-") == "vel takes a comparison and a velocity, such as vel<60 or vel=60-90");
     CHECK(error("C3 >A3") == "Only one of each kind of term: \">A3\" is a second");
 }
+
+TEST_CASE("inside and outside a key match the notes in its scale, or not")
+{
+    CHECK(found("outside D dorian", Note{61, 100, 10}));
+    CHECK_FALSE(found("outside D dorian", Note{62, 100, 10}));
+    CHECK(found("inside Eb", Note{63, 100, 10}));
+    CHECK_FALSE(found("inside Eb", Note{64, 100, 10}));
+    CHECK(found("outside D dorian vel>50", Note{61, 100, 10}));
+    CHECK(error("outside") == "outside takes a key, such as outside D dorian or outside Eb");
+}

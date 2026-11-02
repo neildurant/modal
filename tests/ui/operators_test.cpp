@@ -1328,3 +1328,65 @@ TEST_CASE("A transform's question shows the options not yet given, and Tab compl
     o.press(NamedKey::Enter);
     CHECK(o.velocities() == std::vector<int>{84, 92, 50, 100, 70});
 }
+
+TEST_CASE("Transforms in a key ask for it, the last offered again, with Up for those before")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto line = [&] { return o.ws.commandLine().text(); };
+    // Bar 1's chord: G1 and E1.
+    o.type(U"gr,xkib");
+    CHECK(o.ws.mode() == Mode::CommandLine);
+    o.type(U"D lyd");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"D lydian ");
+    o.press(NamedKey::Backspace);
+    for (int i = 0; i < 6; ++i)
+    {
+        o.press(NamedKey::Backspace);
+    }
+    o.type(U"dorian");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.mode() == Mode::CommandLine); // then how far
+    o.type(U"+1");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes()[0] == std::pair{core::Tick{0}, 33}); // G1 to A1
+    CHECK(o.notes()[1] == std::pair{core::Tick{0}, 29}); // E1 to F1
+    // The key offered again, Enter taking it; Up recalls it as typed.
+    o.type(U"!!k");
+    o.press(NamedKey::Up);
+    CHECK(line() == U"D dorian");
+    o.press(NamedKey::Enter);
+    o.type(U"-1");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes()[0] == std::pair{core::Tick{0}, 31});
+    // At the : prompt, with key= and the amount: nothing asked.
+    o.ws.setLineHandler([&](const std::string& text) { o.registry.runLine(text); });
+    o.type(U":transpose-key +7 key=C major");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.notes()[0] == std::pair{core::Tick{0}, 43}); // G2
+}
+
+TEST_CASE("Inverting goes about the first note, at Enter, and retrograde reverses the notes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    o.type(U"gr!!i");
+    o.press(NamedKey::Enter);                            // about E1, the lowest of the first chord
+    CHECK(o.notes()[0] == std::pair{core::Tick{0}, 25}); // G1 to C#1
+    CHECK(o.notes()[1] == std::pair{core::Tick{0}, 28});
+    o.type(U"u2!!R"); // bars 1 and 2: the chord's eighth and the A2's quarter
+    CHECK(o.notes()[0] == std::pair{core::Tick{0}, 45});
+    CHECK(o.notes()[1].first == 4 * q + q / 2);
+}
+
+TEST_CASE("Searching outside a key finds the notes not in its scale")
+{
+    Operating o;
+    o.type(U"gr");
+    search(o, U"outside D major"); // the C2 alone
+    CHECK(o.ws.pianoRoll().cursor().tick == 16 * o.q + o.q / 16);
+    CHECK(o.ws.pianoRoll().matchStatus(*o.ws.searchQuery()) == "match 1/1");
+}

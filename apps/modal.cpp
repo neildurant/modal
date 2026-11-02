@@ -547,6 +547,7 @@ int main(int argc, char* argv[])
     }
 
     ui::Workspace view{commands, document, config.keymap};
+    view.setScales(config.scales);
     view.setPlayer(&playback.player());
     // What's remembered between sessions, read from the state directory and written back there
     // after each change: a file that may be missing, or deleted, at any time.
@@ -671,6 +672,7 @@ int main(int argc, char* argv[])
         {
             const auto result = commands.runLine(line);
             view.setKeymap(config.keymap);
+            view.setScales(config.scales);
             auto message = result.message;
             bool warning = result.warning;
             if (auto error = apply(settings, window, view, document, playback); !error.empty())

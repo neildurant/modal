@@ -123,7 +123,7 @@ bool EventQuery::Condition::holds(int actual) const
                                        : compared(compare, actual, value);
 }
 
-ParsedQuery parseQuery(std::string_view text)
+ParsedQuery parseQuery(std::string_view text, std::span<const Scale> scales)
 {
     EventQuery query;
     std::optional<EventQuery::Kind> kind;
@@ -148,7 +148,42 @@ ParsedQuery parseQuery(std::string_view text)
 
         EventQuery::Kind termKind = EventQuery::Kind::Note;
         bool twice = false;
-        if (word.starts_with("vel"))
+        if (word == "inside" || word == "outside")
+        {
+            // The key's tonic, and its scale if the next word names one.
+            const auto next = [&]
+            {
+                while (text.starts_with(' '))
+                {
+                    text.remove_prefix(1);
+                }
+                const auto end = std::min(text.find(' '), text.size());
+                return text.substr(0, end);
+            };
+            const auto tonic = next();
+            text.remove_prefix(tonic.size());
+            auto keyText = std::string{tonic};
+            if (const auto scale = next(); !scale.empty() && findScale(scale, scales) != nullptr)
+            {
+                keyText += " " + std::string{scale};
+                text.remove_prefix(scale.size());
+            }
+            const auto key = parseKey(keyText, scales);
+            if (!key)
+            {
+                return fail(std::string{word} + " takes a key, such as " + std::string{word} +
+                            " D dorian or " + std::string{word} + " Eb");
+            }
+            twice = query.keyClasses.has_value();
+            std::uint16_t classes = 0;
+            for (const auto step : key->scale.steps)
+            {
+                classes = static_cast<std::uint16_t>(classes | (1U << ((key->tonic + step) % 12)));
+            }
+            query.keyClasses = classes;
+            query.outsideKey = word == "outside";
+        }
+        else if (word.starts_with("vel"))
         {
             const auto velocity = condition(word.substr(3), 0, 127);
             if (!velocity)
@@ -268,6 +303,8 @@ bool matches(const EventQuery& query, const EventData& data, Ppqn ppqn)
                (!query.pitchClass || note->pitch % 12 == *query.pitchClass) &&
                (!query.pitches || query.pitches->holds(note->pitch)) &&
                (!query.velocity || query.velocity->holds(note->velocity)) &&
+               (!query.keyClasses ||
+                (((*query.keyClasses >> (note->pitch % 12)) & 1U) != 0) != query.outsideKey) &&
                (!query.length || compared(query.length->compare, note->duration,
                                           query.length->length.toTicks(ppqn)));
     }

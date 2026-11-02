@@ -367,3 +367,32 @@ TEST_CASE("the chord tools change each chord's velocities, leaving single notes 
     CHECK(with(ChordVelocity::Compress, {.from = 50}) == std::vector{70, 65, 75, 90});
     CHECK(with(ChordVelocity::Expand, {.from = 50}) == std::vector{70, 55, 85, 90});
 }
+
+TEST_CASE("transposing and inverting in a key go by its degrees, notes outside it keeping their "
+          "distance above the scale's")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto key = *parseKey("D dorian", builtInScales());
+    const auto list = listOf({note(0, 62, q), note(q, 66, q), pedal(q, 127), note(2 * q, 72, q)});
+    CHECK(eventsOf(transposeInKey(list, allOf(list), key, 2)) ==
+          std::vector{note(0, 65, q), pedal(q, 127), note(q, 70, q), note(2 * q, 76, q)});
+    CHECK(eventsOf(transposeInKey(list, allOf(list), key, -7)) ==
+          std::vector{note(0, 50, q), pedal(q, 127), note(q, 54, q), note(2 * q, 60, q)});
+    // About D4: F#4, F4 and one above, goes to B3 and one above.
+    CHECK(eventsOf(invertInKey(list, allOf(list), key, 62)) ==
+          std::vector{note(0, 62, q), pedal(q, 127), note(q, 60, q), note(2 * q, 52, q)});
+    CHECK(eventsOf(invert(list, allOf(list), 62)) ==
+          std::vector{note(0, 62, q), pedal(q, 127), note(q, 58, q), note(2 * q, 52, q)});
+    CHECK(refusalOf(transposeInKey(list, allOf(list), key, 70)).reason ==
+          Refusal::Reason::AboveHighest);
+}
+
+TEST_CASE("retrograde reverses the notes' order, mirroring the rhythm")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(0, 60, q), note(q, 64, 2 * q), pedal(q, 127)});
+    CHECK(eventsOf(retrograde(list, allOf(list))) ==
+          std::vector{note(0, 64, 2 * q), pedal(q, 127), note(2 * q, 60, q)});
+}

@@ -462,9 +462,170 @@ bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& ta
         { return core::chordVelocity(events, part.events, together, how, amount, limits); });
 }
 
+std::vector<core::Scale> Workspace::scales() const
+{
+    std::vector<core::Scale> all{core::builtInScales().begin(), core::builtInScales().end()};
+    all.insert(all.end(), userScales_.begin(), userScales_.end());
+    return all;
+}
+
+std::string Workspace::firstPitch(const OperatorTarget& target) const
+{
+    // The earliest note's, the lowest of a chord, for inverting about by default.
+    std::optional<std::pair<core::Tick, int>> first;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = document_.song().events(part.track);
+        for (const auto i : part.events)
+        {
+            if (const auto* note = std::get_if<core::Note>(&events[i].data))
+            {
+                first = std::min(first.value_or(std::pair{events[i].tick, int{note->pitch}}),
+                                 std::pair{events[i].tick, int{note->pitch}});
+            }
+        }
+    }
+    return core::pitchName(static_cast<std::uint8_t>(first ? first->second : 60));
+}
+
+void Workspace::askKey(const OperatorTarget& target, std::function<void(const core::Key&)> then)
+{
+    // In a line of its own, so Up and Down go through the keys used before.
+    std::swap(line_, keyLine_);
+    askFor(
+        "Key for " + target.what + " (" + lastKey_ + "): ",
+        [this, then = std::move(then)](const std::string& text)
+        {
+            const auto key = core::parseKey(text, scales());
+            if (!key)
+            {
+                setMessage("Not a key: " + text +
+                               "; type a tonic and a scale, as D dorian, or a tonic alone for "
+                               "major, as Eb",
+                           MessageKind::Warning);
+                return;
+            }
+            lastKey_ = key->text();
+            then(*key);
+        },
+        lastKey_);
+    keyPrompt_ = true;
+}
+
+void Workspace::askKeyed(const std::string& op, const OperatorTarget& target, const core::Key& key)
+{
+    const bool invert = op == "transform-invert-key";
+    const auto first = firstPitch(target);
+    askFor((invert ? "Invert " : "Transpose ") + target.what + " in " + key.text() +
+               (invert ? " about (" + first + "): " : " by how many degrees (+2, -3): "),
+           [this, op, target, key](const std::string& text) { applyKeyed(op, target, key, text); },
+           invert ? first : std::string{});
+}
+
+bool Workspace::applyKeyed(std::string_view op, const OperatorTarget& target, const core::Key& key,
+                           const std::string& text)
+{
+    if (op == "transform-invert-key")
+    {
+        const auto pivot = core::parsePitch(trimmed(text));
+        if (!pivot)
+        {
+            setMessage("Not a note: " + text + "; type one to invert about, as E4",
+                       MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot) + " in " +
+                                key.text(),
+                            target, [&](const core::EventList& events, const auto& part)
+                            { return core::invertInKey(events, part.events, key, *pivot); });
+    }
+    const auto by = semitones(text);
+    if (!by)
+    {
+        setMessage("Not a number of degrees: " + text + "; type +2, -3 or 7", MessageKind::Warning);
+        return true;
+    }
+    return changeEvents("Transpose " + target.what + (*by >= 0 ? " up " : " down ") +
+                            times(std::abs(*by), "a degree", "degrees") + " in " + key.text(),
+                        target, [&](const core::EventList& events, const auto& part)
+                        { return core::transposeInKey(events, part.events, key, *by); });
+}
+
 bool Workspace::applyTransform(std::string_view name, const OperatorTarget& target,
                                const std::string& text)
 {
+    if (name == "transform-transpose-key" || name == "transform-invert-key")
+    {
+        // key= with a tonic, and a scale if the next word names one; asking for it if not
+        // given, and then for the amount if that isn't either.
+        std::string rest = text;
+        std::optional<core::Key> key;
+        if (const auto at = rest.find("key="); at != std::string::npos)
+        {
+            const auto tonicEnd = std::min(rest.find(' ', at), rest.size());
+            auto keyText = rest.substr(at + 4, tonicEnd - at - 4);
+            auto end = tonicEnd;
+            const auto scaleStart = rest.find_first_not_of(' ', tonicEnd);
+            if (scaleStart != std::string::npos)
+            {
+                const auto scaleEnd = std::min(rest.find(' ', scaleStart), rest.size());
+                const auto scale = rest.substr(scaleStart, scaleEnd - scaleStart);
+                const auto all = scales();
+                if (core::findScale(scale, all) != nullptr)
+                {
+                    keyText += " " + scale;
+                    end = scaleEnd;
+                }
+            }
+            key = core::parseKey(keyText, scales());
+            if (!key)
+            {
+                setMessage("Not a key: " + keyText +
+                               "; type key= and a tonic and a scale, as "
+                               "key=D dorian",
+                           MessageKind::Warning);
+                return true;
+            }
+            lastKey_ = key->text();
+            rest.erase(at, end - at);
+        }
+        const auto amount = std::string{trimmed(rest)};
+        const auto then = [this, op = std::string{name}, target, amount](const core::Key& k)
+        {
+            if (amount.empty())
+            {
+                askKeyed(op, target, k);
+                return;
+            }
+            applyKeyed(op, target, k, amount);
+        };
+        if (key)
+        {
+            then(*key);
+            return true;
+        }
+        askKey(target, then);
+        return true;
+    }
+    if (name == "transform-invert")
+    {
+        const auto pivot = core::parsePitch(trimmed(text));
+        if (!pivot)
+        {
+            setMessage("Not a note: " + text + "; type one to invert about, as E4",
+                       MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot), target,
+                            [&](const core::EventList& events, const auto& part)
+                            { return core::invert(events, part.events, *pivot); });
+    }
+    if (name == "transform-retrograde")
+    {
+        return changeEvents("Retrograde " + target.what, target,
+                            [](const core::EventList& events, const auto& part)
+                            { return core::retrograde(events, part.events); });
+    }
     // A transform with what it's been told: the answer to its question, or what follows its
     // name at the : prompt.
     if (name == "transform-transpose")
@@ -570,6 +731,25 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     if (op == "operator-transform")
     {
         return openTransformMenu(std::move(*target));
+    }
+    if (op == "transform-retrograde")
+    {
+        return applyTransform(op, *target, {});
+    }
+    if (op == "transform-invert")
+    {
+        const auto first = firstPitch(*target);
+        askFor(
+            "Invert " + target->what + " about (" + first + "): ",
+            [this, target = *target](const std::string& text)
+            { applyTransform("transform-invert", target, text); }, first);
+        return true;
+    }
+    if (op == "transform-transpose-key" || op == "transform-invert-key")
+    {
+        askKey(*target, [this, op = std::string{op}, target = *target](const core::Key& key)
+               { askKeyed(op, target, key); });
+        return true;
     }
     if (const auto question = std::ranges::find(kQuestions, op, &Asking::op);
         question != kQuestions.end())

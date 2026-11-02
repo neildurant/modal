@@ -230,6 +230,28 @@ std::string ConfigReader::runCommand(std::string_view line, const std::filesyste
         }
         return {};
     }
+    if (command == "scale")
+    {
+        if (arguments.size() < 2)
+        {
+            return "scale needs NAME DEGREES, as scale hijaz 1 b2 3 4 5 b6 b7";
+        }
+        std::string degrees;
+        for (auto it = arguments.begin() + 1; it != arguments.end(); ++it)
+        {
+            degrees += *it + " ";
+        }
+        auto parsed = core::parseDegrees(degrees);
+        if (auto* error = std::get_if<std::string>(&parsed))
+        {
+            return *error;
+        }
+        auto name = arguments[0];
+        std::ranges::transform(name, name.begin(),
+                               [](char c) { return static_cast<char>(std::tolower(c)); });
+        config_.scales.push_back({name, std::get<std::vector<int>>(parsed)});
+        return {};
+    }
     if (command == "source")
     {
         return source(arguments, directory);
@@ -426,6 +448,8 @@ constexpr std::array kConfigCommands{
     bindingCommand("iunmap", "Unbind keys in Insert mode", "KEYS"),
     bindingCommand("ounmap", "Unbind keys in operator-pending mode", "KEYS"),
     bindingCommand("cunmap", "Unbind keys in command-line mode", "KEYS"),
+    configCommand("scale", "Define a scale by its degrees, for the keys transforms ask for",
+                  "NAME DEGREES..."),
     configCommand("source", "Run a command file; at the : prompt, modalrc again if none", "FILE",
                   {Choices::ConfigFile}),
 };

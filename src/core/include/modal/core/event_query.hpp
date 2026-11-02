@@ -4,6 +4,7 @@
 
 #include <modal/core/event.hpp>
 #include <modal/core/note_fraction.hpp>
+#include <modal/core/scale.hpp>
 #include <modal/core/tick.hpp>
 
 #include <cstdint>
@@ -19,7 +20,8 @@ namespace modal::core
 // one (>A3, <=C4) or in a range (A3-A5, ends included, a - before a letter marking it, so
 // C-1-G2 is C-1 to G2); vel<60, vel>110, vel=100, vel=60-90; len<1/32, len>1/4, in note
 // fractions; a controller, cc1 or cc01, with a value, a comparison or a range (cc1=127,
-// cc64>63, cc7=20-40); bend, with one too (bend>0). Comparisons are <, <=, =, >= and >.
+// cc64>63, cc7=20-40); bend, with one too (bend>0); notes in a key or not (inside D dorian,
+// outside Eb). Comparisons are <, <=, =, >= and >.
 // Keywords are read in either case.
 struct EventQuery
 {
@@ -61,6 +63,9 @@ struct EventQuery
     std::optional<LengthCondition> length = {};
     std::optional<std::uint8_t> controller = {};
     std::optional<Condition> value = {}; // a controller's or a bend's
+    // In or outside a key (inside D dorian, outside Eb): the scale's pitch classes, a bit each.
+    std::optional<std::uint16_t> keyClasses = {};
+    bool outsideKey = false;
 
     friend bool operator==(const EventQuery&, const EventQuery&) = default;
 };
@@ -71,7 +76,8 @@ struct ParsedQuery
     std::optional<EventQuery> query;
     std::string error;
 };
-ParsedQuery parseQuery(std::string_view text);
+// inside KEY and outside KEY take a key as parseKey() reads it, among those scales.
+ParsedQuery parseQuery(std::string_view text, std::span<const Scale> scales = builtInScales());
 
 // Whether an event matches, lengths in ticks at this resolution.
 bool matches(const EventQuery& query, const EventData& data, Ppqn ppqn);

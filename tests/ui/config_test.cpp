@@ -388,3 +388,17 @@ TEST_CASE("the config text has what's changed as commands, and reads back the sa
         CHECK(again.settings.find(setting.name)->value == setting.value);
     }
 }
+
+TEST_CASE("scale defines a scale by its degrees, for keys")
+{
+    Config config;
+    ConfigReader reader{config, kRegistry};
+    CHECK(reader.runCommand("scale Hijaz 1 b2 3 4 5 b6 b7", {}).empty());
+    REQUIRE(config.scales.size() == 1);
+    CHECK(config.scales[0].name == "hijaz");
+    CHECK(config.scales[0].steps == std::vector{0, 1, 4, 5, 7, 8, 10});
+    CHECK(reader.runCommand("scale odd 1 3 2", {}) ==
+          "a scale's degrees start at 1 and rise within the octave");
+    CHECK(reader.runCommand("scale lonely", {}) ==
+          "scale needs NAME DEGREES, as scale hijaz 1 b2 3 4 5 b6 b7");
+}

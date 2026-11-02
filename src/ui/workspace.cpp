@@ -199,6 +199,41 @@ constexpr std::array kSharedCommands{
         .usage = "[PERCENT]",
         .count = true,
         .range = true},
+    CommandInfo{.name = "transform-transpose-key",
+                .description = "Transpose the notes a range or object takes by degrees of a key's "
+                               "scale, asking for the "
+                               "key (the last used, at Enter) and how many (+2, -3); notes "
+                               "outside the scale keep their distance above its note below",
+                .aliases = "transpose-key",
+                .usage = "[DEGREES] [key=KEY]",
+                .count = true,
+                .range = true},
+    CommandInfo{
+        .name = "transform-invert",
+        .description =
+            "Invert the notes a range or object takes, mirroring their pitches about a pivot, "
+            "chromatically, asking which (the first note, at Enter)",
+        .aliases = "invert",
+        .usage = "[PIVOT]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-invert-key",
+        .description =
+            "Invert the notes a range or object takes within a key's scale, mirroring them by its "
+            "degrees about a pivot, asking for the key and the pivot",
+        .aliases = "invert-key",
+        .usage = "[PIVOT] [key=KEY]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-retrograde",
+        .description =
+            "Reverse the order in time of the notes a range or object takes, mirroring their "
+            "rhythm",
+        .aliases = "retrograde",
+        .count = true,
+        .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -602,7 +637,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 111> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 115> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -623,6 +658,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-lower", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-transpose-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-invert", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-invert-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-retrograde", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-compress", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-expand", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-shape", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -1462,7 +1501,7 @@ bool Workspace::search(const std::string& text)
         search_.reset();
         return true;
     }
-    const auto parsed = core::parseQuery(text);
+    const auto parsed = core::parseQuery(text, scales());
     if (!parsed.query)
     {
         setMessage(parsed.error, MessageKind::Warning);
@@ -3901,7 +3940,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     }
     if (command == "command-line-next" || command == "command-line-previous")
     {
-        const bool options = answer_ && !transformOptions(answerCommand_).empty();
+        const bool options = answer_ && (keyPrompt_ || !transformOptions(answerCommand_).empty());
         return (!answer_ || options) && !searchPrompt_ &&
                complete(command == "command-line-next" ? 1 : -1);
     }
@@ -3947,10 +3986,16 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     completing_.reset();
     if (command == "command-line-run" && answer_)
     {
-        // An answer to a question, kept out of the : prompt's history.
+        // An answer to a question, kept out of the : prompt's history; a key in its own.
         mode_ = Mode::Normal;
         auto text = encodeUtf8(line_.text());
         line_.clear();
+        if (std::exchange(keyPrompt_, false))
+        {
+            line_.open(decodeUtf8(text));
+            line_.take();
+            std::swap(line_, keyLine_);
+        }
         if (text.find_first_not_of(' ') == std::string::npos)
         {
             text = std::exchange(answerDefault_, {});
@@ -3994,6 +4039,11 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         mode_ = Mode::Normal;
         answer_ = {};
+        if (std::exchange(keyPrompt_, false))
+        {
+            line_.clear();
+            std::swap(line_, keyLine_);
+        }
         endVisual(); // a selection the question or the line was about
         return true;
     }
@@ -4071,6 +4121,28 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
     case Choices::Length:
         return {"1/1",  "1/2",  "1/4",  "1/8",  "1/16",  "1/32", "1/2.",
                 "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
+    case Choices::Key:
+    {
+        // The tonic first, then the scale.
+        const auto before = encodeUtf8(line_.text().substr(0, line_.cursor()));
+        const auto start = before.find_first_not_of(' ');
+        if (start == std::string::npos || before.find(' ', start) == std::string::npos)
+        {
+            for (const auto name : core::tonicNames())
+            {
+                found.emplace_back(name);
+            }
+            return found;
+        }
+        for (const auto& scale : scales())
+        {
+            if (std::ranges::find(found, scale.name) == found.end())
+            {
+                found.push_back(scale.name);
+            }
+        }
+        return found;
+    }
     case Choices::Option:
     {
         // The names, NAME= to go on with, and then the values of the one named.
@@ -4139,8 +4211,8 @@ Workspace::CompletingWord Workspace::completingWord() const
                           Choices::Command};
     if (answer_)
     {
-        // A transform's question: its options, wherever they're typed.
-        result.kind = Choices::Option;
+        // A transform's question: its options, wherever they're typed; or a key.
+        result.kind = keyPrompt_ ? Choices::Key : Choices::Option;
         return result;
     }
     if (word.index > 0)

@@ -4,6 +4,7 @@
 
 #include <modal/core/event.hpp>
 #include <modal/core/meter_map.hpp>
+#include <modal/core/scale.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
 
@@ -51,6 +52,21 @@ Transformed transpose(const EventList& events, std::span<const std::size_t> whic
 
 // Events later or earlier by some ticks, only the notes if notesOnly is set; none at or after
 // the end.
+// Pitches changed in a key (decided November 2026): moved by degrees of its scale, or mirrored
+// about a pivot's degree; a note outside the scale keeps its distance above the scale's note
+// below it, so a chromatic passing note stays one. Refused as transpose() is.
+Transformed transposeInKey(const EventList& events, std::span<const std::size_t> which,
+                           const Key& key, int degrees);
+Transformed invertInKey(const EventList& events, std::span<const std::size_t> which, const Key& key,
+                        int pivot);
+
+// Pitches mirrored about a pivot, chromatically: a note 3 above it goes 3 below.
+Transformed invert(const EventList& events, std::span<const std::size_t> which, int pivot);
+
+// The notes' order in time reversed, each starting as far before the last note's end as it
+// ended after the first note's start, so the rhythm is mirrored too.
+Transformed retrograde(const EventList& events, std::span<const std::size_t> which);
+
 Transformed shift(const EventList& events, std::span<const std::size_t> which, Tick by, Tick end,
                   bool notesOnly);
 

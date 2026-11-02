@@ -135,6 +135,9 @@ public:
         humanizeVelocity_ = velocity;
     }
     bool rewind() const { return rewind_; }
+    // The modalrc's own scales, beside the built-in ones, for keys.
+    void setScales(std::vector<core::Scale> scales) { userScales_ = std::move(scales); }
+    std::vector<core::Scale> scales() const;
     // How far apart notes can start and still be a chord, for the chord tools.
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
     // How velocity changes keep within their limits: the velclip and velfloor settings.
@@ -580,6 +583,17 @@ private:
     bool velocityInChords(std::string_view name, const OperatorTarget& target,
                           const std::string& text);
     std::chrono::milliseconds chordWindow_{30};
+    // Keys, asked for each time (decided November 2026), the last used offered again, with a
+    // history of their own for Up and Down.
+    std::vector<core::Scale> userScales_;
+    std::string lastKey_ = "C major";
+    CommandLine keyLine_;
+    bool keyPrompt_ = false;
+    void askKey(const OperatorTarget& target, std::function<void(const core::Key&)> then);
+    void askKeyed(const std::string& op, const OperatorTarget& target, const core::Key& key);
+    bool applyKeyed(std::string_view op, const OperatorTarget& target, const core::Key& key,
+                    const std::string& text);
+    std::string firstPitch(const OperatorTarget& target) const;
     core::VelocityLimits velocityLimits_;
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
