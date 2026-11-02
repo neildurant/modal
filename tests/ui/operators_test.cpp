@@ -1335,7 +1335,7 @@ TEST_CASE("Transforms in a key ask for it, the last offered again, with Up for t
     Operating o{ppqn};
     const auto line = [&] { return o.ws.commandLine().text(); };
     // Bar 1's chord: G1 and E1.
-    o.type(U"gr,xkib");
+    o.type(U"gr,xTib");
     CHECK(o.ws.mode() == Mode::CommandLine);
     o.type(U"D lyd");
     o.press(NamedKey::Tab);
@@ -1353,7 +1353,7 @@ TEST_CASE("Transforms in a key ask for it, the last offered again, with Up for t
     CHECK(o.notes()[0] == std::pair{core::Tick{0}, 33}); // G1 to A1
     CHECK(o.notes()[1] == std::pair{core::Tick{0}, 29}); // E1 to F1
     // The key offered again, Enter taking it; Up recalls it as typed.
-    o.type(U"!!k");
+    o.type(U"!!T");
     o.press(NamedKey::Up);
     CHECK(line() == U"D dorian");
     o.press(NamedKey::Enter);
@@ -1446,7 +1446,7 @@ TEST_CASE("The key question offers the key the notes fit best, and Tab the best 
     Workspace ws{registry, document};
     ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
     ws.show(ViewKind::PianoRoll);
-    for (const char32_t key : std::u32string_view{U"3!!k"})
+    for (const char32_t key : std::u32string_view{U"3!!T"})
     {
         ws.handle(Key::typed(key), 0);
     }

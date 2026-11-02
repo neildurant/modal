@@ -390,7 +390,7 @@ Less frequent commands live behind a leader key, as in Doom Emacs: press the lea
 | --- | --- |
 | `, f s` / `, f o` | File: save / open |
 | `, t n` / `, t d` | Track: new / delete |
-| `, x i` / `, x k` | Transform: invert / transpose in key |
+| `, x i` / `, x T` | Transform: invert / transpose in key |
 | `, v a` / `, v p` | View: arrangement / piano roll |
 | `, p o` | Ports: choose output for this track |
 | `, l` … | Default note length (see Default note length) |
@@ -472,7 +472,7 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 
 - **The scales built in:** major (ionian) and minor (natural, aeolian), harmonic and melodic minor, dorian, phrygian, lydian, mixolydian and locrian, major and minor pentatonic, blues, whole tone, and the two diminished scales. Others are defined in the modalrc by their degrees, as `scale hijaz 1 b2 3 4 5 b6 b7`.
 - **Scales of any size:** a degree is a step of the scale, five to the octave in a pentatonic one.
-- **As built (November 2026):** `, x k` transposes in a key, `, x i` inverts chromatically and `, x I` in a key, about the range's first note at Enter (the lowest of a chord), and `, x R` retrogrades, mirroring the rhythm over the notes' own span, from the first's start to the last's end. A key in a question is a tonic, spelled as typed, and a scale's name or alias (`D dorian`, `F# aeolian`), a tonic alone for major and `Dm` for minor; its question comes first, the amount or pivot after it. The scales are named in one word each (`harmonic-minor`, `major-pentatonic`, `whole-tone`, `diminished` for whole-half and `dominant-diminished` for half-whole). The keys typed are kept for Up and Down for the session, not between sessions (decided November 2026). The key offered at Enter is the one the range's notes fit best, by Krumhansl and Schmuckler's key-finding (the time each pitch class sounds against the major and minor keys' profiles), or the last used where there are fewer than six notes to tell by; Tab on the empty line lists the best three and the other scales on the best one's tonic that hold as much of the notes, as dorian may, since the profiles can't tell a mode from its major (decided November 2026).
+- **As built (November 2026):** `, x T` transposes in a key (a capital, as the variant of `, x t`, decided November 2026 on trying `, x k`), `, x i` inverts chromatically and `, x I` in a key, about the range's first note at Enter (the lowest of a chord), and `, x R` retrogrades, mirroring the rhythm over the notes' own span, from the first's start to the last's end. A key in a question is a tonic, spelled as typed, and a scale's name or alias (`D dorian`, `F# aeolian`), a tonic alone for major and `Dm` for minor; its question comes first, the amount or pivot after it. The scales are named in one word each (`harmonic-minor`, `major-pentatonic`, `whole-tone`, `diminished` for whole-half and `dominant-diminished` for half-whole). The keys typed are kept for Up and Down for the session, not between sessions (decided November 2026). The key offered at Enter is the one the range's notes fit best, by Krumhansl and Schmuckler's key-finding (the time each pitch class sounds against the major and minor keys' profiles), or the last used where there are fewer than six notes to tell by; Tab on the empty line lists the best three and the other scales on the best one's tonic that hold as much of the notes, as dorian may, since the profiles can't tell a mode from its major (decided November 2026).
 - **The search prompt helps too (decided November 2026):** until something's typed, it shows dimmed what a search can look for (`C4 F# >A3 A3-A5 vel<60 len<1/16 cc1=127 bend inside KEY outside KEY`), and Tab completes the keywords, and tonics and scales after `inside` and `outside`.
 - **Searching by key (decided November 2026):** `/outside D dorian` matches the notes not in the key, and `/inside D dorian` those in it, so `n`, `, s T` and `^gn` find and fix wrong notes as other searches do.
 - **Notes outside the scale** keep their distance above the scale's note below them, so a chromatic passing note stays one, transposing in key and inverting in the scale alike.
@@ -697,7 +697,7 @@ set theme=dusk
 nmap q quantize
 nmap Q macro-record
 leader , x i  invert         "Invert"
-leader , x k  transpose-key  "Transpose in key"
+leader , x T  transpose-key  "Transpose in key"
 highlight cursor      #e0af68
 highlight cursor-text #1a1b26
 statusline left=mode,position,tempo right=key,loop,midi-in
