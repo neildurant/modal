@@ -1390,3 +1390,76 @@ TEST_CASE("Searching outside a key finds the notes not in its scale")
     CHECK(o.ws.pianoRoll().cursor().tick == 16 * o.q + o.q / 16);
     CHECK(o.ws.pianoRoll().matchStatus(*o.ws.searchQuery()) == "match 1/1");
 }
+
+TEST_CASE("The search prompt says what a search can look for, and Tab completes its keywords")
+{
+    Operating o;
+    const auto line = [&] { return o.ws.commandLine().text(); };
+    const auto hint = [&]
+    {
+        std::u32string dimmed;
+        const auto frame = o.ws.frame();
+        for (const auto& run : frame.back().text)
+        {
+            if (run.style.foreground == Role::Dim)
+            {
+                dimmed = run.text;
+            }
+        }
+        return dimmed;
+    };
+    o.type(U"gr/");
+    CHECK(hint() == U"C4 F# >A3 A3-A5 vel<60 len<1/16 cc1=127 bend inside KEY outside KEY");
+    o.type(U"ve");
+    CHECK(hint().empty());
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"vel"); // going on, with a comparison
+    o.type(U">90 out");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"vel>90 outside ");
+    o.type(U"D lyd");
+    o.press(NamedKey::Tab);
+    CHECK(line() == U"vel>90 outside D lydian ");
+}
+
+TEST_CASE("The key question offers the key the notes fit best, and Tab the best few")
+{
+    const auto q = core::kPpqn.quarter();
+    core::Song song{core::kPpqn};
+    const auto piano = song.addTrack("Piano");
+    song.updateEvents(
+        piano,
+        [&](core::EventList& events)
+        {
+            // In D major: D, F#, A, D, C#, E, D.
+            core::Tick at = 0;
+            for (const auto& [pitch, beats] : std::vector<std::pair<int, int>>{
+                     {62, 2}, {66, 1}, {69, 1}, {74, 2}, {73, 1}, {64, 1}, {62, 4}})
+            {
+                events.insert({at, core::Note{static_cast<std::uint8_t>(pitch), 80, beats * q}});
+                at += beats * q;
+            }
+        });
+    song.fitToContent();
+    core::Document document{std::move(song)};
+    CommandRegistry registry;
+    Workspace ws{registry, document};
+    ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
+    ws.show(ViewKind::PianoRoll);
+    for (const char32_t key : std::u32string_view{U"3!!k"})
+    {
+        ws.handle(Key::typed(key), 0);
+    }
+    ws.handle(Key::of(NamedKey::Tab), 0);
+    REQUIRE(ws.completions());
+    CHECK(ws.completions()->matches.front() == "D major");
+    ws.handle(Key::of(NamedKey::Enter), 0); // none chosen from the list: D major, offered
+    for (const char32_t key : std::u32string_view{U"+1"})
+    {
+        ws.handle(Key::typed(key), 0);
+    }
+    ws.handle(Key::of(NamedKey::Enter), 0);
+    // F#4 up a degree of D major: G4, where C major would make it G#4.
+    const auto& events = document.song().events(document.song().tracks()[0]->id());
+    CHECK(std::get<core::Note>(events[1].data).pitch == 67);
+}

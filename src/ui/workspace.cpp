@@ -3941,8 +3941,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     if (command == "command-line-next" || command == "command-line-previous")
     {
         const bool options = answer_ && (keyPrompt_ || !transformOptions(answerCommand_).empty());
-        return (!answer_ || options) && !searchPrompt_ &&
-               complete(command == "command-line-next" ? 1 : -1);
+        return (!answer_ || options) && complete(command == "command-line-next" ? 1 : -1);
     }
     if (searchPrompt_ && (command == "command-line-run" || command == "command-line-cancel" ||
                           (command == "command-line-backspace" && line_.text().empty())))
@@ -4123,9 +4122,13 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
                 "1/4.", "1/8.", "1/4t", "1/8t", "1/16t", "grid"};
     case Choices::Key:
     {
-        // The tonic first, then the scale.
+        // The keys suggested for the notes, at the start; then the tonic, then the scale.
         const auto before = encodeUtf8(line_.text().substr(0, line_.cursor()));
         const auto start = before.find_first_not_of(' ');
+        if (start == std::string::npos && !keySuggestions_.empty())
+        {
+            return keySuggestions_;
+        }
         if (start == std::string::npos || before.find(' ', start) == std::string::npos)
         {
             for (const auto name : core::tonicNames())
@@ -4142,6 +4145,55 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
             }
         }
         return found;
+    }
+    case Choices::Query:
+    {
+        // After inside or outside, a key's tonic and then its scale; otherwise the keywords.
+        std::vector<std::string> before;
+        {
+            const auto text = encodeUtf8(line_.text().substr(0, line_.cursor()));
+            std::size_t at = 0;
+            while (at < text.size())
+            {
+                const auto start = text.find_first_not_of(' ', at);
+                if (start == std::string::npos)
+                {
+                    break;
+                }
+                const auto end = std::min(text.find(' ', start), text.size());
+                before.push_back(text.substr(start, end - start));
+                at = end;
+            }
+            if (!text.empty() && text.back() != ' ' && !before.empty())
+            {
+                before.pop_back(); // the word being typed
+            }
+        }
+        const auto keyword = [&](std::size_t back)
+        {
+            return before.size() >= back && (before[before.size() - back] == "inside" ||
+                                             before[before.size() - back] == "outside");
+        };
+        if (keyword(1))
+        {
+            for (const auto name : core::tonicNames())
+            {
+                found.emplace_back(name);
+            }
+            return found;
+        }
+        if (keyword(2))
+        {
+            for (const auto& scale : scales())
+            {
+                if (std::ranges::find(found, scale.name) == found.end())
+                {
+                    found.push_back(scale.name);
+                }
+            }
+            return found;
+        }
+        return {"bend", "cc", "inside", "len", "outside", "vel"};
     }
     case Choices::Option:
     {
@@ -4215,6 +4267,11 @@ Workspace::CompletingWord Workspace::completingWord() const
         result.kind = keyPrompt_ ? Choices::Key : Choices::Option;
         return result;
     }
+    if (searchPrompt_)
+    {
+        result.kind = Choices::Query;
+        return result;
+    }
     if (word.index > 0)
     {
         const auto first = wordAt(text, 0);
@@ -4264,8 +4321,10 @@ bool Workspace::complete(int by)
     {
         const auto& only = found.front();
         // A setting's name goes on too, with =, ? or !.
-        const bool goesOn = only.ends_with('=') || only.ends_with('/') ||
-                            (word.kind == Choices::Setting && only.find('=') == std::string::npos);
+        const bool goesOn =
+            only.ends_with('=') || only.ends_with('/') ||
+            (word.kind == Choices::Setting && only.find('=') == std::string::npos) ||
+            (word.kind == Choices::Query && (only == "vel" || only == "len" || only == "cc"));
         replaceWord(word.start, only + (goesOn ? "" : " "));
         return true;
     }
@@ -5584,6 +5643,13 @@ std::string Workspace::argumentHint() const
             }
         }
         return hint;
+    }
+    if (searchPrompt_)
+    {
+        // What a search can look for, until something's typed (decided November 2026).
+        return line_.text().empty()
+                   ? "C4 F# >A3 A3-A5 vel<60 len<1/16 cc1=127 bend inside KEY outside KEY"
+                   : std::string{};
     }
     if (palette_ || view().typing())
     {

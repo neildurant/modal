@@ -44,8 +44,9 @@ enum class Choices : std::uint8_t
     Length,     // a note length, such as 1/8 or 1/16t
     Option,     // a transform's option, NAME=VALUE, with its values
     Key,        // a key: a tonic, then a scale
+    Query,      // a search's terms: keywords, and keys after inside and outside
 };
-inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Key) + 1;
+inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Query) + 1;
 
 struct CommandInfo
 {

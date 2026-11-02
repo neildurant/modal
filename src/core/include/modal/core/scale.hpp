@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -62,6 +63,19 @@ std::optional<Key> parseKey(std::string_view text, std::span<const Scale> scales
 
 // The scale of that name or alias, ignoring case, among those.
 const Scale* findScale(std::string_view name, std::span<const Scale> scales);
+
+// The keys a passage is most likely in, best first (decided November 2026): the 24 major and
+// minor keys ranked by how well the time each pitch class sounds matches their profiles
+// (Krumhansl and Kessler's, as Krumhansl and Schmuckler's key-finding uses), the best three of
+// them, then the other scales on the best one's tonic holding as much of the notes as it does,
+// as dorian may, which the profiles can't tell from its major. Each note counts for its length.
+// None for no notes.
+struct Sounding
+{
+    int pitch;
+    std::int64_t length;
+};
+std::vector<Key> suggestKeys(std::span<const Sounding> notes, std::span<const Scale> scales);
 
 // The tonics as offered for typing: C, C#, Db, D and so on.
 std::span<const std::string_view> tonicNames();

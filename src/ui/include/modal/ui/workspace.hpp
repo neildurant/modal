@@ -589,6 +589,7 @@ private:
     std::string lastKey_ = "C major";
     CommandLine keyLine_;
     bool keyPrompt_ = false;
+    std::vector<std::string> keySuggestions_; // for the range asked about, best first
     void askKey(const OperatorTarget& target, std::function<void(const core::Key&)> then);
     void askKeyed(const std::string& op, const OperatorTarget& target, const core::Key& key);
     bool applyKeyed(std::string_view op, const OperatorTarget& target, const core::Key& key,

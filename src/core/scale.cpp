@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
+#include <functional>
 
 namespace modal::core
 {
@@ -158,6 +160,98 @@ std::optional<Key> parseKey(std::string_view text, std::span<const Scale> scales
     std::string spelled{tonicName};
     spelled[0] = static_cast<char>(std::toupper(spelled[0]));
     return Key{*tonic, spelled, *scale};
+}
+
+std::vector<Key> suggestKeys(std::span<const Sounding> notes, std::span<const Scale> scales)
+{
+    std::array<double, 12> weight{};
+    for (const auto& note : notes)
+    {
+        weight[static_cast<std::size_t>(((note.pitch % 12) + 12) % 12)] +=
+            static_cast<double>(std::max<std::int64_t>(note.length, 1));
+    }
+    const auto* major = findScale("major", scales);
+    const auto* minor = findScale("minor", scales);
+    if (notes.empty() || major == nullptr || minor == nullptr)
+    {
+        return {};
+    }
+    constexpr std::array<double, 12> kMajor{6.35, 2.23, 3.48, 2.33, 4.38, 4.09,
+                                            2.52, 5.19, 2.39, 3.66, 2.29, 2.88};
+    constexpr std::array<double, 12> kMinor{6.33, 2.68, 3.52, 5.38, 2.60, 3.53,
+                                            2.54, 4.75, 3.98, 2.69, 3.34, 3.17};
+    const auto correlation = [&](const std::array<double, 12>& profile, int tonic)
+    {
+        double meanX = 0;
+        double meanY = 0;
+        for (std::size_t i = 0; i < 12; ++i)
+        {
+            meanX += weight[i] / 12;
+            meanY += profile[i] / 12;
+        }
+        double xy = 0;
+        double xx = 0;
+        double yy = 0;
+        for (std::size_t i = 0; i < 12; ++i)
+        {
+            const double x = weight[(i + static_cast<std::size_t>(tonic)) % 12] - meanX;
+            const double y = profile[i] - meanY;
+            xy += x * y;
+            xx += x * x;
+            yy += y * y;
+        }
+        return xx > 0 && yy > 0 ? xy / std::sqrt(xx * yy) : 0.0;
+    };
+    // Spelled as their key signatures spell them.
+    constexpr std::array<std::string_view, 12> kMajorNames{"C",  "Db", "D",  "Eb", "E",  "F",
+                                                           "F#", "G",  "Ab", "A",  "Bb", "B"};
+    constexpr std::array<std::string_view, 12> kMinorNames{"C",  "C#", "D",  "Eb", "E",  "F",
+                                                           "F#", "G",  "G#", "A",  "Bb", "B"};
+    struct Fit
+    {
+        double score;
+        Key key;
+    };
+    std::vector<Fit> fits;
+    for (int tonic = 0; tonic < 12; ++tonic)
+    {
+        const auto t = static_cast<std::size_t>(tonic);
+        fits.push_back(
+            {correlation(kMajor, tonic), Key{tonic, std::string{kMajorNames[t]}, *major}});
+        fits.push_back(
+            {correlation(kMinor, tonic), Key{tonic, std::string{kMinorNames[t]}, *minor}});
+    }
+    std::ranges::stable_sort(fits, std::ranges::greater{}, &Fit::score);
+    std::vector<Key> found;
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        found.push_back(fits[i].key);
+    }
+    // How much of the notes' time a key's scale holds.
+    const auto held = [&](const Key& key)
+    {
+        double in = 0;
+        for (std::size_t i = 0; i < 12; ++i)
+        {
+            if (key.holds(static_cast<int>(i) + 60))
+            {
+                in += weight[i];
+            }
+        }
+        return in;
+    };
+    const auto best = found.front(); // a copy, as found grows
+    const double bestHeld = held(best);
+    for (const auto& scale : scales)
+    {
+        const Key other{best.tonic, best.tonicName, scale};
+        if (scale.name != "major" && scale.name != "minor" && held(other) >= bestHeld &&
+            std::ranges::find(found, other) == found.end())
+        {
+            found.push_back(other);
+        }
+    }
+    return found;
 }
 
 std::span<const std::string_view> tonicNames()

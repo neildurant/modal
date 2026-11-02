@@ -52,3 +52,30 @@ TEST_CASE("a scale's degrees are read as a modalrc writes them")
     CHECK(std::holds_alternative<std::string>(parseDegrees("1 x")));
     CHECK(std::holds_alternative<std::string>(parseDegrees("1")));
 }
+
+TEST_CASE("keys are suggested by how well the notes fit, best first")
+{
+    const auto scales = builtInScales();
+    // A C major scale up and down, C held longest: C major.
+    std::vector<Sounding> notes;
+    for (const int pitch : {60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62})
+    {
+        notes.push_back({pitch, 1});
+    }
+    notes.push_back({60, 8});
+    auto keys = suggestKeys(notes, scales);
+    REQUIRE(keys.size() >= 3);
+    CHECK(keys[0].text() == "C major");
+    // An A minor arpeggio and its leading note: A minor.
+    keys = suggestKeys(std::vector<Sounding>{{57, 4}, {60, 2}, {64, 2}, {69, 4}, {68, 1}, {57, 4}},
+                       scales);
+    CHECK(keys[0].text() == "A minor");
+    // A tune in D dorian: D minor, and D dorian among the rest, holding every note.
+    keys = suggestKeys(
+        std::vector<Sounding>{
+            {62, 4}, {64, 1}, {65, 2}, {67, 1}, {69, 3}, {71, 2}, {72, 1}, {74, 4}, {62, 4}},
+        scales);
+    CHECK(keys[0].text() == "D minor");
+    CHECK(std::ranges::find(keys, std::string{"D dorian"}, &Key::text) != keys.end());
+    CHECK(suggestKeys({}, scales).empty());
+}

@@ -490,10 +490,34 @@ std::string Workspace::firstPitch(const OperatorTarget& target) const
 
 void Workspace::askKey(const OperatorTarget& target, std::function<void(const core::Key&)> then)
 {
-    // In a line of its own, so Up and Down go through the keys used before.
+    // In a line of its own, so Up and Down go through the keys used before. The key the notes
+    // fit best offered at Enter, unless they're too few to tell, then the last used; Tab at
+    // the start lists the best few (decided November 2026).
+    constexpr std::size_t kEnoughToTell = 6;
+    std::vector<core::Sounding> notes;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = document_.song().events(part.track);
+        for (const auto i : part.events)
+        {
+            if (const auto* note = std::get_if<core::Note>(&events[i].data))
+            {
+                notes.push_back({note->pitch, note->duration});
+            }
+        }
+    }
+    keySuggestions_.clear();
+    if (notes.size() >= kEnoughToTell)
+    {
+        for (const auto& key : core::suggestKeys(notes, scales()))
+        {
+            keySuggestions_.push_back(key.text());
+        }
+    }
+    const auto offered = keySuggestions_.empty() ? lastKey_ : keySuggestions_.front();
     std::swap(line_, keyLine_);
     askFor(
-        "Key for " + target.what + " (" + lastKey_ + "): ",
+        "Key for " + target.what + " (" + offered + "): ",
         [this, then = std::move(then)](const std::string& text)
         {
             const auto key = core::parseKey(text, scales());
@@ -508,7 +532,7 @@ void Workspace::askKey(const OperatorTarget& target, std::function<void(const co
             lastKey_ = key->text();
             then(*key);
         },
-        lastKey_);
+        offered);
     keyPrompt_ = true;
 }
 
