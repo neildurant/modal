@@ -74,14 +74,13 @@ std::string times(int count, std::string_view one, std::string_view many)
 }
 
 // The transforms asking how: the default in brackets taken by Enter, or examples where
-// there's none, and the options' defaults after it.
+// there's none; those with several settings asking for them in turn after it.
 struct Asking
 {
     std::string_view op;
     std::string_view label;
     std::string_view examples;
     std::string_view answer;
-    std::string_view options = {};
 };
 
 constexpr std::array<Asking, 12> kQuestions{{
@@ -90,9 +89,9 @@ constexpr std::array<Asking, 12> kQuestions{{
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
     {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
     {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
-    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%", " window=1bar"},
-    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%", " window=1bar"},
-    {"transform-velocity-shape", "Shape the velocities of {}", "", "130%", " window=1bar"},
+    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%"},
+    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%"},
+    {"transform-velocity-phrase", "Scale the phrase dynamics of {}", "", "130%"},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -201,28 +200,81 @@ bool isOperator(std::string_view command)
            std::ranges::find(kOperators, command) != kOperators.end();
 }
 
-std::vector<TransformOption> transformOptions(std::string_view command)
+std::vector<TransformSetting> transformSettings(std::string_view command)
 {
-    const TransformOption window{.name = "window",
-                                 .form = "1bar|2bars|1/2",
-                                 .values = {"1bar", "2bars", "4bars"},
-                                 .lengths = true};
+    const TransformSetting window{.name = "window",
+                                  .question = "over a window of",
+                                  .answer = "1bar",
+                                  .form = "1bar|2bars|1/2",
+                                  .values = {"1bar", "2bars", "4bars"},
+                                  .lengths = true};
     if (command == "transform-velocity-compress" || command == "transform-velocity-expand")
     {
-        return {window,
-                {.name = "centre", .form = "local|average|N", .values = {"local", "average"}},
-                {.name = "threshold", .form = ">N|<N"}};
+        const bool compress = command == "transform-velocity-compress";
+        return {{.name = "", .question = "by how much", .answer = "50%"},
+                window,
+                {.name = "centre",
+                 .question = compress ? "towards" : "away from",
+                 .answer = "local",
+                 .form = "local|average|N",
+                 .values = {"local", "average"}},
+                {.name = "threshold",
+                 .question = "only those",
+                 .answer = "all",
+                 .form = "all|>N|<N",
+                 .values = {"all"}}};
     }
-    if (command == "transform-velocity-shape")
+    if (command == "transform-velocity-phrase")
     {
-        return {window};
+        return {{.name = "", .question = "by how much", .answer = "130%"}, window};
     }
     return {};
 }
 
+void Workspace::askSettings(const std::string& op, const OperatorTarget& target, Answers answers)
+{
+    // The first setting not yet given asked for, its default at Enter; an answer may give
+    // others as NAME=VALUE, which aren't then asked for. Once all are given, done.
+    const auto settings = transformSettings(op);
+    for (std::size_t i = 0; i < settings.size(); ++i)
+    {
+        const std::string name{settings[i].name};
+        if (std::ranges::find(answers, name, &Answers::value_type::first) != answers.end())
+        {
+            continue;
+        }
+        const auto question = std::ranges::find(kQuestions, op, &Asking::op);
+        auto label = std::string{question->label};
+        label.replace(label.find("{}"), 2, target.what);
+        label += ", " + std::string{settings[i].question} + " (" + std::string{settings[i].answer} +
+                 "): ";
+        askFor(
+            std::move(label),
+            [this, op, target, answers, name](const std::string& text) mutable
+            {
+                for (const auto& [option, given] : told(text, {}).options)
+                {
+                    answers.emplace_back(option, given);
+                }
+                answers.emplace_back(name, told(text, {}).amount);
+                askSettings(op, target, std::move(answers));
+            },
+            std::string{settings[i].answer});
+        answerCommand_ = op;
+        answerSetting_ = i;
+        return;
+    }
+    std::string text;
+    for (const auto& [name, value] : answers)
+    {
+        text += (name.empty() ? value : name + "=" + value) + " ";
+    }
+    velocityOverTime(op, target, text);
+}
+
 std::string Workspace::optionsCommand() const
 {
-    // The transform asking, or the one on the : line.
+    // The transform asking, or the one on the : line, for its settings.
     if (answer_)
     {
         return answerCommand_;
@@ -313,7 +365,7 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
                                                  : Kind::Shape;
     const auto word = kind == Kind::Compress ? std::string{"Compress"}
                       : kind == Kind::Expand ? std::string{"Expand"}
-                                             : std::string{"Shape"};
+                                             : std::string{"Phrase"};
     const auto said = told(text, name);
     const auto percent = percentUpTo(said.amount, kind == Kind::Compress ? 100 : 1000);
     if (!percent)
@@ -348,12 +400,17 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
                        MessageKind::Warning);
             return true;
         }
+        else if (option == "threshold" && value == "all")
+        {
+            continue;
+        }
         else if (option == "threshold")
         {
             const auto level = value.size() > 1 ? percentUpTo(value.substr(1), 127) : std::nullopt;
             if (!level || (value[0] != '>' && value[0] != '<'))
             {
-                setMessage("Not a threshold: " + value + "; type >90 or <30", MessageKind::Warning);
+                setMessage("Not a threshold: " + value + "; type all, >90 or <30",
+                           MessageKind::Warning);
                 return true;
             }
             (value[0] == '>' ? dynamics.above : dynamics.below) = *level;
@@ -384,20 +441,22 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
     }
     const auto& song = document_.song();
     const auto limits = velocityLimits_;
-    return changeEvents(
-        word + " the velocities of " + target.what + " by " + std::to_string(*percent) + "%",
-        target,
-        [&](const core::EventList& events, const auto& part)
-        {
-            auto those = dynamics;
-            const auto& meter = song.meter(part.track);
-            those.window = [&](core::Tick tick)
-            {
-                return bars ? *bars * meter.signatureAt(tick).barLength().toTicks(song.ppqn())
-                            : length->toTicks(song.ppqn());
-            };
-            return core::velocityDynamics(events, part.events, those, limits);
-        });
+    return changeEvents((kind == Kind::Shape ? "Scale the phrase dynamics of " + target.what
+                                             : word + " the velocities of " + target.what) +
+                            " by " + std::to_string(*percent) + "%",
+                        target,
+                        [&](const core::EventList& events, const auto& part)
+                        {
+                            auto those = dynamics;
+                            const auto& meter = song.meter(part.track);
+                            those.window = [&](core::Tick tick)
+                            {
+                                return bars ? *bars * meter.signatureAt(tick).barLength().toTicks(
+                                                          song.ppqn())
+                                            : length->toTicks(song.ppqn());
+                            };
+                            return core::velocityDynamics(events, part.events, those, limits);
+                        });
 }
 
 bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& target,
@@ -709,10 +768,21 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
             target, [&](const core::EventList& events, const auto& part)
             { return core::limitVelocity(events, part.events, range->from, range->to, limits); });
     }
-    if (name == "transform-velocity-compress" || name == "transform-velocity-expand" ||
-        name == "transform-velocity-shape")
+    if (!transformSettings(name).empty())
     {
-        return velocityOverTime(name, target, text);
+        // What the : line gave, the rest asked for.
+        Answers answers;
+        const auto said = told(text, {});
+        for (const auto& option : said.options)
+        {
+            answers.push_back(option);
+        }
+        if (!said.amount.empty())
+        {
+            answers.emplace_back("", said.amount);
+        }
+        askSettings(std::string{name}, target, std::move(answers));
+        return true;
     }
     if (name.starts_with("transform-chord-"))
     {
@@ -775,6 +845,11 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
                { askKeyed(op, target, key); });
         return true;
     }
+    if (!transformSettings(op).empty())
+    {
+        askSettings(std::string{op}, *target, {});
+        return true;
+    }
     if (const auto question = std::ranges::find(kQuestions, op, &Asking::op);
         question != kQuestions.end())
     {
@@ -782,7 +857,7 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
         label.replace(label.find("{}"), 2, target->what);
         label += " (" +
                  std::string{question->answer.empty() ? question->examples : question->answer} +
-                 std::string{question->options} + "): ";
+                 "): ";
         askFor(
             std::move(label),
             [this, name = std::string{op}, target = *target](const std::string& text)

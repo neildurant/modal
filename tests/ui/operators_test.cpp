@@ -1264,36 +1264,48 @@ TEST_CASE("Relative velocity changes ease off near 127, or clip with velclip har
     CHECK(o.velocities() == std::vector<int>{120, 127, 50, 100, 70});
 }
 
-TEST_CASE("Compressing velocities takes a percentage and options, and the chord tools a chord's "
-          "notes")
+TEST_CASE("Compressing velocities asks for its settings in turn, and the chord tools take a "
+          "chord's notes")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Operating o{ppqn};
+    const auto enter = [&](int times)
+    {
+        for (int i = 0; i < times; ++i)
+        {
+            o.press(NamedKey::Enter);
+        }
+    };
     o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
     // Bar 1's chord: G1 at 80, E1 at 96; the A2 in bar 2 at 50 is outside a bar's window.
     o.type(U"gr2!!c");
-    o.press(NamedKey::Enter); // 50%
+    enter(4); // 50%, over a bar, towards the local average, all of them
     CHECK(o.velocities() == std::vector<int>{84, 92, 50, 100, 70});
+    // Those the : line gives aren't asked for.
     o.type(U"u:vel-compress 100% threshold=>90");
-    o.press(NamedKey::Enter);
+    enter(1);
+    CHECK(o.ws.mode() == Mode::CommandLine);
+    enter(2); // the window and the centre
     CHECK(o.velocities() == std::vector<int>{80, 88, 50, 100, 70});
     o.type(U"u:vel-compress 50% speed=2");
-    o.press(NamedKey::Enter);
+    enter(4);
     CHECK(o.ws.message() == "Compress takes window=, centre= and threshold=, not speed=");
-    o.type(U"2!!cwindow=2bars");
-    o.press(NamedKey::Enter); // the default amount, the A2 now in the chord's window
+    o.type(U"2!!c");
+    enter(1);
+    o.type(U"2bars"); // the A2 now in the chord's window
+    enter(3);
     CHECK(o.velocities()[2] > 50);
     o.type(U"u");
     // The top note up and the others down; then a slope from the bottom.
     o.type(U"!!a");
-    o.press(NamedKey::Enter);
+    enter(1);
     CHECK(o.velocities() == std::vector<int>{90, 86, 50, 100, 70});
     o.type(U"u,xbib");
-    o.press(NamedKey::Enter);
+    enter(1);
     CHECK(o.velocities() == std::vector<int>{95, 70, 50, 100, 70});
 }
 
-TEST_CASE("A transform's question shows the options not yet given, and Tab completes them")
+TEST_CASE("Each setting a transform asks for shows how it's written, and Tab its choices")
 {
     Operating o;
     const auto hint = [&]
@@ -1311,21 +1323,27 @@ TEST_CASE("A transform's question shows the options not yet given, and Tab compl
     };
     const auto line = [&] { return o.ws.commandLine().text(); };
     o.type(U"gr!!c");
-    CHECK(hint() == U"window=1bar|2bars|1/2 centre=local|average|N threshold=>N|<N");
-    o.type(U"60% ce");
+    CHECK(hint().empty()); // how much: its default says how it's written
+    o.press(NamedKey::Enter);
+    CHECK(hint() == U"1bar|2bars|1/2");
+    o.type(U"2");
     o.press(NamedKey::Tab);
-    CHECK(line() == U"60% centre=");
-    CHECK(hint() == U"window=1bar|2bars|1/2 threshold=>N|<N");
+    CHECK(line() == U"2bars ");
+    o.press(NamedKey::Enter);
+    CHECK(hint() == U"local|average|N");
     o.type(U"a");
     o.press(NamedKey::Tab);
-    CHECK(line() == U"60% centre=average ");
-    o.type(U"window=2");
-    o.press(NamedKey::Tab);
-    CHECK(line() == U"60% centre=average window=2bars ");
-    // As the brackets once showed them, with a comma.
-    o.press(NamedKey::Escape);
-    o.type(U"!!c50%, window=1bar");
+    CHECK(line() == U"average ");
     o.press(NamedKey::Enter);
+    CHECK(hint() == U"all|>N|<N");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.mode() == Mode::Normal);
+    // Others given as NAME=VALUE with an answer aren't asked for, a comma between them taken.
+    o.type(U"u!!c50%, window=1bar");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.mode() == Mode::Normal);
     CHECK(o.velocities() == std::vector<int>{84, 92, 50, 100, 70});
 }
 

@@ -40,17 +40,21 @@ class Settings;
 // Whether a command is an operator, waiting for a range or object: d, y, > and the others.
 bool isOperator(std::string_view command);
 
-// A transform's options, NAME=VALUE after its amount: how each is written, for the hint under
-// its question, and the values Tab offers, note lengths too where it takes one.
-struct TransformOption
+// A transform's settings, each asked for in turn (decided November 2026): its name, as NAME=VALUE
+// at the : prompt (none for the amount, which comes first there), the question, the default
+// Enter takes, how it's written, dimmed after the answer, and the values Tab offers, note
+// lengths too where it takes one.
+struct TransformSetting
 {
     std::string_view name;
-    std::string_view form;
+    std::string_view question;
+    std::string_view answer;
+    std::string_view form = {};
     std::vector<std::string_view> values = {};
     bool lengths = false;
 };
 
-std::vector<TransformOption> transformOptions(std::string_view command);
+std::vector<TransformSetting> transformSettings(std::string_view command);
 
 // The window's contents: the views of the song, one shown at a time, with what they share
 // (decided for milestone 5). The workspace handles keys through the keymap, with counts and
@@ -532,7 +536,10 @@ private:
     void askFor(std::string label, std::function<void(const std::string&)> answer,
                 std::string defaultAnswer = {});
     std::string answerDefault_;
-    std::string answerCommand_; // the transform asking, for its options
+    std::string answerCommand_;     // the transform asking, for its settings
+    std::size_t answerSetting_ = 0; // and which it's asking for
+    using Answers = std::vector<std::pair<std::string, std::string>>;
+    void askSettings(const std::string& op, const OperatorTarget& target, Answers answers);
     std::string optionsCommand() const;
     std::string answerLabel_;
     std::function<void(const std::string&)> answer_;
