@@ -425,6 +425,14 @@ Transformed quantize(const EventList& events, std::span<const std::size_t> which
             const auto steps = std::max<Tick>((note.duration + step / 2) / step, 1);
             finish = start + note.duration + (steps * step - note.duration) * how.strength / 100;
         }
+        if (finish <= start && how.step)
+        {
+            // Too short to keep an end of its own: a step long, from its start with both, to
+            // the next line with ends.
+            const auto step = std::max<Tick>(how.step(event.tick), 1);
+            const auto line = nearest(start);
+            finish = how.move == Move::Both ? start + step : (line > start ? line : line + step);
+        }
         if (finish <= start)
         {
             continue; // left as it was

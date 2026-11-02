@@ -463,3 +463,18 @@ TEST_CASE("legato holds each note or chord until the next, but for the last; len
           std::vector{note(0, 60, q / 2), note(1, 64, q / 2), note(q, 67, q / 2),
                       note(2 * q, 72, q / 4)});
 }
+
+TEST_CASE("quantising a short note's start and end makes it a step long, not nothing")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(q + q / 8, 60, q / 8)});
+    const auto nearest = [&](Tick tick) { return (tick + q / 2) / q * q; };
+    const auto step = [&](Tick) { return q; };
+    using Move = QuantizeHow::Move;
+    CHECK(eventsOf(quantize(list, allOf(list), nearest, false,
+                            {.move = Move::Both, .step = step})) == std::vector{note(q, 60, q)});
+    CHECK(
+        eventsOf(quantize(list, allOf(list), nearest, false, {.move = Move::Ends, .step = step})) ==
+        std::vector{note(q + q / 8, 60, q - q / 8)});
+}

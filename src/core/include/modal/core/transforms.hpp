@@ -105,7 +105,9 @@ bool hasPedals(const EventList& events, std::span<const std::size_t> which);
 // How, for the transform menu's quantise (decided November 2026): how far towards the line
 // (100% onto it, 50% halfway), and what's moved: starts, as q does; ends, keeping starts;
 // both; or lengths, rounded to whole steps, keeping starts. A note whose end would come at or
-// before its start is left as it was.
+// before its start, as a short one's would, is a step long instead: from its start with both, to
+// the next line after its start with ends (decided November 2026, after use); without the step,
+// it's left as it was.
 struct QuantizeHow
 {
     enum class Move : std::uint8_t
@@ -118,7 +120,7 @@ struct QuantizeHow
 
     int strength = 100;
     Move move = Move::Starts;
-    std::function<Tick(Tick)> step = {}; // the grid step at a tick, for lengths
+    std::function<Tick(Tick)> step = {}; // the grid step at a tick, for lengths and short notes
 };
 
 Transformed quantize(const EventList& events, std::span<const std::size_t> which,
