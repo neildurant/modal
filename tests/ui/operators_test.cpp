@@ -1530,3 +1530,40 @@ TEST_CASE("The menu's quantise asks for the grid, strength, swing and what to mo
     enter(2);
     CHECK(o.ws.message() == "Not a swing: 90; type 25% to 75%, 50% straight");
 }
+
+TEST_CASE("Stretch asks for a ratio, and note lengths for legato, a length or a percentage")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto lengths = [&]
+    {
+        std::vector<core::Tick> found;
+        const auto& song = o.document.song();
+        for (const auto& event : song.events(song.tracks()[0]->id()).all())
+        {
+            if (const auto* note = std::get_if<core::Note>(&event.data))
+            {
+                found.push_back(note->duration);
+            }
+        }
+        return found;
+    };
+    // Bars 1 and 2: the chord, eighths at the start, and the A2, a quarter at bar 2's.
+    o.type(U"gr2!!s2");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes()[2] == std::pair{core::Tick{8 * q}, 45});
+    CHECK(lengths()[0] == q);
+    o.type(U"u2!!nlegato");
+    o.press(NamedKey::Enter);
+    CHECK(lengths() == std::vector<core::Tick>{4 * q, 4 * q, q, q / 4, 4 * q});
+    o.type(U"u!!n1/8");
+    o.press(NamedKey::Enter);
+    CHECK(lengths() == std::vector<core::Tick>{q / 2, q / 2, q, q / 4, 4 * q});
+    o.type(U"u!!n200%");
+    o.press(NamedKey::Enter);
+    CHECK(lengths() == std::vector<core::Tick>{q, q, q, q / 4, 4 * q});
+    o.type(U"u!!s0");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message().starts_with("Not a ratio: 0"));
+}

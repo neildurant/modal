@@ -244,6 +244,34 @@ constexpr std::array kSharedCommands{
                 .count = true,
                 .range = true,
                 .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-stretch",
+        .description =
+            "Stretch the time of the events a range or object takes about the first, asking by "
+            "how much: 2 for half time, 1/2 for double time, or a percentage "
+            "(150%); the notes alone in the piano roll",
+        .aliases = "stretch",
+        .usage = "[RATIO]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-length",
+        .description =
+            "Set the lengths of the notes a range or object takes, asking how: legato, each held "
+            "until the next but for the last, a length (1/8) or a "
+            "percentage of their own (80%)",
+        .aliases = "length",
+        .usage = "[LENGTH]",
+        .count = true,
+        .range = true},
+    CommandInfo{
+        .name = "transform-legato",
+        .description =
+            "Make the notes a range or object takes legato, each note or chord held until the "
+            "next starts, but for the last, which keeps its length",
+        .aliases = "legato",
+        .count = true,
+        .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -647,7 +675,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 116> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 119> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -669,6 +697,9 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-stretch", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-length", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-legato", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-transpose-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-invert", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-invert-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},

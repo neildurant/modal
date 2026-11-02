@@ -70,6 +70,27 @@ Transformed retrograde(const EventList& events, std::span<const std::size_t> whi
 Transformed shift(const EventList& events, std::span<const std::size_t> which, Tick by, Tick end,
                   bool notesOnly);
 
+// Time stretched by a ratio (numerator over denominator: 2/1 half time, 1/2 double time) about
+// the first event taken (decided November 2026): each event's distance from it and each note's
+// length scaled; notes only, with notesOnly. Not rippling: what it runs into, it overlaps, a
+// note onto another of its pitch refused, as is an event past the end.
+Transformed stretch(const EventList& events, std::span<const std::size_t> which,
+                    std::int64_t numerator, std::int64_t denominator, Tick end, bool notesOnly);
+
+// Notes' lengths (decided November 2026): legato, each note or chord held until the next one
+// starts, but for the last, which keeps its length, as there's nothing to say how long; a
+// fixed length; or scaled by a percentage, never shorter than a tick.
+enum class LengthChange : std::uint8_t
+{
+    Legato,
+    Fixed,
+    Percent,
+};
+
+Transformed changeLengths(const EventList& events, std::span<const std::size_t> which,
+                          LengthChange how, Tick amount,
+                          const std::function<bool(Tick first, Tick tick)>& together);
+
 // The pedals that follow quantised notes: sustain, sostenuto and soft (CC 64, 66 and 67).
 bool isPedal(const Event& event);
 

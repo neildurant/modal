@@ -83,7 +83,7 @@ struct Asking
     std::string_view answer;
 };
 
-constexpr std::array<Asking, 13> kQuestions{{
+constexpr std::array<Asking, 15> kQuestions{{
     {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
     {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
@@ -93,6 +93,8 @@ constexpr std::array<Asking, 13> kQuestions{{
     {"transform-velocity-expand", "Expand the velocities of {}", "", "50%"},
     {"transform-velocity-phrase", "Scale the phrase dynamics of {}", "", "130%"},
     {"transform-quantize", "Quantise {}", "", "grid"},
+    {"transform-stretch", "Stretch {} by", "2 half time, 1/2 double time, 150%", ""},
+    {"transform-length", "Set the lengths of {} to", "legato, 1/8, 80%", ""},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -735,6 +737,97 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
                             [&](const core::EventList& events, const auto& part)
                             { return core::invert(events, part.events, *pivot); });
     }
+    if (name == "transform-stretch")
+    {
+        // A ratio: 2, 1/2, 3/2 or 150%.
+        auto ratio = std::string{trimmed(text)};
+        std::int64_t numerator = 0;
+        std::int64_t denominator = 1;
+        const auto whole = [](std::string_view digits, std::int64_t& value)
+        {
+            const auto [end, error] =
+                std::from_chars(digits.data(), digits.data() + digits.size(), value);
+            return !digits.empty() && error == std::errc{} && end == digits.data() + digits.size();
+        };
+        bool read = false;
+        if (ratio.ends_with('%'))
+        {
+            denominator = 100;
+            read = whole(std::string_view{ratio}.substr(0, ratio.size() - 1), numerator);
+        }
+        else if (const auto slash = ratio.find('/'); slash != std::string::npos)
+        {
+            read = whole(std::string_view{ratio}.substr(0, slash), numerator) &&
+                   whole(std::string_view{ratio}.substr(slash + 1), denominator);
+        }
+        else
+        {
+            read = whole(ratio, numerator);
+        }
+        if (!read || numerator < 1 || denominator < 1 || numerator > 64 * denominator ||
+            denominator > 64 * numerator)
+        {
+            setMessage("Not a ratio: " + text +
+                           "; type 2 for half time, 1/2 for double time, or a percentage, as "
+                           "150%",
+                       MessageKind::Warning);
+            return true;
+        }
+        const auto end = document_.song().end();
+        return changeEvents("Stretch " + target.what + " by " + ratio, target,
+                            [&](const core::EventList& events, const auto& part)
+                            {
+                                return core::stretch(events, part.events, numerator, denominator,
+                                                     end, target.notesOnly);
+                            });
+    }
+    if (name == "transform-length" || name == "transform-legato")
+    {
+        // legato, a length (1/8) or a percentage (80%).
+        const auto said =
+            name == "transform-legato" ? std::string{"legato"} : std::string{trimmed(text)};
+        const auto& song = document_.song();
+        auto how = core::LengthChange::Legato;
+        core::Tick amount = 0;
+        std::string title = "Make " + target.what + " legato";
+        if (said.ends_with('%'))
+        {
+            const auto percent = percentUpTo(said, 1000);
+            if (!percent || *percent < 1)
+            {
+                setMessage("Not a percentage: " + said + "; type one from 1% up, as 80%",
+                           MessageKind::Warning);
+                return true;
+            }
+            how = core::LengthChange::Percent;
+            amount = *percent;
+            title = "Scale the lengths of " + target.what + " to " + said;
+        }
+        else if (said != "legato")
+        {
+            const auto length = core::parseNoteFraction(said);
+            if (!length)
+            {
+                setMessage("Not a length: " + said +
+                               "; type legato, a length, as 1/8, or a "
+                               "percentage, as 80%",
+                           MessageKind::Warning);
+                return true;
+            }
+            how = core::LengthChange::Fixed;
+            amount = length->toTicks(song.ppqn());
+            title = "Set the lengths of " + target.what + " to " + core::toString(*length);
+        }
+        const auto window = chordWindow_;
+        const auto together = [&](core::Tick first, core::Tick tick)
+        {
+            const auto& tempo = song.tempo();
+            return tempo.toTime(tick) - tempo.toTime(first) <= window;
+        };
+        return changeEvents(
+            title, target, [&](const core::EventList& events, const auto& part)
+            { return core::changeLengths(events, part.events, how, amount, together); });
+    }
     if (name == "transform-retrograde")
     {
         return changeEvents("Retrograde " + target.what, target,
@@ -858,7 +951,7 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     {
         return openTransformMenu(std::move(*target));
     }
-    if (op == "transform-retrograde")
+    if (op == "transform-retrograde" || op == "transform-legato")
     {
         return applyTransform(op, *target, {});
     }

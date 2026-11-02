@@ -432,3 +432,34 @@ TEST_CASE("swing moves every second grid line within its pair")
     CHECK(nearestGridLine(meter, q - q / 16, eighth, 66) == q);
     CHECK(nearestGridLine(meter, q / 2, eighth, 40) == q * 40 / 100);
 }
+
+TEST_CASE("stretching scales time and lengths about the first event taken")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(q, 60, q), note(2 * q, 64, q / 2), pedal(3 * q, 127)});
+    CHECK(eventsOf(stretch(list, allOf(list), 2, 1, 100 * q, false)) ==
+          std::vector{note(q, 60, 2 * q), note(3 * q, 64, q), pedal(5 * q, 127)});
+    CHECK(eventsOf(stretch(list, allOf(list), 1, 2, 100 * q, true)) ==
+          std::vector{note(q, 60, q / 2), note(q + q / 2, 64, q / 4), pedal(3 * q, 127)});
+    CHECK(refusalOf(stretch(list, allOf(list), 4, 1, 6 * q, false)).reason ==
+          Refusal::Reason::PastEnd);
+}
+
+TEST_CASE("legato holds each note or chord until the next, but for the last; lengths can be set or "
+          "scaled")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf(
+        {note(0, 60, q / 4), note(1, 64, q / 4), note(q, 67, q / 4), note(2 * q, 72, q / 8)});
+    const auto together = [](Tick first, Tick tick) { return tick - first <= 2; };
+    CHECK(eventsOf(changeLengths(list, allOf(list), LengthChange::Legato, 0, together)) ==
+          std::vector{note(0, 60, q), note(1, 64, q - 1), note(q, 67, q), note(2 * q, 72, q / 8)});
+    CHECK(eventsOf(changeLengths(list, allOf(list), LengthChange::Fixed, q / 2, together)) ==
+          std::vector{note(0, 60, q / 2), note(1, 64, q / 2), note(q, 67, q / 2),
+                      note(2 * q, 72, q / 2)});
+    CHECK(eventsOf(changeLengths(list, allOf(list), LengthChange::Percent, 200, together)) ==
+          std::vector{note(0, 60, q / 2), note(1, 64, q / 2), note(q, 67, q / 2),
+                      note(2 * q, 72, q / 4)});
+}

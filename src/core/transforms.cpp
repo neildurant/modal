@@ -305,6 +305,81 @@ Transformed shift(const EventList& events, std::span<const std::size_t> which, T
     return finish(events, which, changed, true);
 }
 
+Transformed stretch(const EventList& events, std::span<const std::size_t> which,
+                    std::int64_t numerator, std::int64_t denominator, Tick end, bool notesOnly)
+{
+    std::optional<Tick> from;
+    for (const auto i : which)
+    {
+        if (!notesOnly || events[i].isNote())
+        {
+            from = std::min(from.value_or(events[i].tick), events[i].tick);
+        }
+    }
+    const auto scaled = [&](Tick ticks) { return ticks * numerator / denominator; };
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        if (notesOnly && !event.isNote())
+        {
+            continue;
+        }
+        const auto was = event;
+        event.tick = *from + scaled(event.tick - *from);
+        if (auto* note = std::get_if<Note>(&event.data))
+        {
+            note->duration = std::max<Tick>(scaled(note->duration), 1);
+        }
+        if (event.tick >= end)
+        {
+            return Refusal{Refusal::Reason::PastEnd, was, std::nullopt};
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
+Transformed changeLengths(const EventList& events, std::span<const std::size_t> which,
+                          LengthChange how, Tick amount,
+                          const std::function<bool(Tick first, Tick tick)>& together)
+{
+    // Each note's new length by its index.
+    std::vector<std::pair<std::size_t, Tick>> to;
+    if (how == LengthChange::Legato)
+    {
+        const auto chords = chordsOf(events, which, together);
+        for (std::size_t c = 0; c + 1 < chords.size(); ++c)
+        {
+            const auto next = events[chords[c + 1].front()].tick;
+            for (const auto i : chords[c])
+            {
+                to.emplace_back(i, std::max<Tick>(next - events[i].tick, 1));
+            }
+        }
+    }
+    else
+    {
+        for (const auto i : which)
+        {
+            if (const auto* note = std::get_if<Note>(&events[i].data))
+            {
+                to.emplace_back(i, how == LengthChange::Fixed
+                                       ? std::max<Tick>(amount, 1)
+                                       : std::max<Tick>(note->duration * amount / 100, 1));
+            }
+        }
+    }
+    auto changed = takenEvents(events, which);
+    for (std::size_t n = 0; n < which.size(); ++n)
+    {
+        const auto found = std::ranges::find(to, which[n], &std::pair<std::size_t, Tick>::first);
+        if (found != to.end())
+        {
+            std::get<Note>(changed[n].data).duration = found->second;
+        }
+    }
+    return finish(events, which, changed, true);
+}
+
 bool isPedal(const Event& event)
 {
     const auto* change = std::get_if<ControlChange>(&event.data);
