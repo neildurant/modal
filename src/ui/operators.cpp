@@ -83,7 +83,7 @@ struct Asking
     std::string_view answer;
 };
 
-constexpr std::array<Asking, 12> kQuestions{{
+constexpr std::array<Asking, 13> kQuestions{{
     {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
     {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
@@ -92,6 +92,7 @@ constexpr std::array<Asking, 12> kQuestions{{
     {"transform-velocity-compress", "Compress the velocities of {}", "", "50%"},
     {"transform-velocity-expand", "Expand the velocities of {}", "", "50%"},
     {"transform-velocity-phrase", "Scale the phrase dynamics of {}", "", "130%"},
+    {"transform-quantize", "Quantise {}", "", "grid"},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -228,6 +229,31 @@ std::vector<TransformSetting> transformSettings(std::string_view command)
     {
         return {{.name = "", .question = "by how much", .answer = "130%"}, window};
     }
+    if (command == "transform-quantize")
+    {
+        // The grid's default is the tracks' own, as q's (see askSettings).
+        return {{.name = "",
+                 .question = "to a grid of",
+                 .answer = "grid",
+                 .form = "1/16|1/8t|grid",
+                 .values = {"grid"},
+                 .lengths = true},
+                {.name = "strength",
+                 .question = "how far onto it",
+                 .answer = "100%",
+                 .form = "0%-100%",
+                 .values = {"100%", "75%", "50%", "25%"}},
+                {.name = "swing",
+                 .question = "with a swing of",
+                 .answer = "50%",
+                 .form = "25%-75%, 50% straight",
+                 .values = {"50%", "55%", "60%", "66%"}},
+                {.name = "move",
+                 .question = "moving",
+                 .answer = "starts",
+                 .form = "starts|ends|both|lengths",
+                 .values = {"starts", "ends", "both", "lengths"}}};
+    }
     return {};
 }
 
@@ -246,8 +272,9 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         const auto question = std::ranges::find(kQuestions, op, &Asking::op);
         auto label = std::string{question->label};
         label.replace(label.find("{}"), 2, target.what);
-        label += ", " + std::string{settings[i].question} + " (" + std::string{settings[i].answer} +
-                 "): ";
+        const auto answer =
+            settings[i].answer == "grid" ? gridOf(target) : std::string{settings[i].answer};
+        label += ", " + std::string{settings[i].question} + " (" + answer + "): ";
         askFor(
             std::move(label),
             [this, op, target, answers, name](const std::string& text) mutable
@@ -259,7 +286,7 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
                 answers.emplace_back(name, told(text, {}).amount);
                 askSettings(op, target, std::move(answers));
             },
-            std::string{settings[i].answer});
+            answer);
         answerCommand_ = op;
         answerSetting_ = i;
         return;
@@ -268,6 +295,11 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
     for (const auto& [name, value] : answers)
     {
         text += (name.empty() ? value : name + "=" + value) + " ";
+    }
+    if (op == "transform-quantize")
+    {
+        quantizeAsked(target, text);
+        return;
     }
     velocityOverTime(op, target, text);
 }
@@ -953,23 +985,136 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     return false;
 }
 
-bool Workspace::quantize(const OperatorTarget& target, bool pedals)
+bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quantizing& how)
 {
+    using Move = core::QuantizeHow::Move;
     const auto& song = document_.song();
-    return changeEvents("Quantise " + target.what + (pedals ? ", with its pedalling" : ""), target,
-                        [&](const core::EventList& events, const auto& part)
-                        {
-                            const auto& meter = song.meter(part.track);
-                            const auto step = std::max<core::Tick>(
-                                song.track(part.track)->grid.toTicks(song.ppqn()), 1);
-                            const auto nearest = [&](core::Tick tick)
-                            {
-                                // Not onto the song's end, where nothing can start.
-                                const auto to = core::nearestGridLine(meter, tick, step);
-                                return to < song.end() ? to : tick;
-                            };
-                            return core::quantize(events, part.events, nearest, pedals);
-                        });
+    std::string title = "Quantise " + target.what;
+    if (how.grid)
+    {
+        title += " to " + core::toString(*how.grid);
+    }
+    if (how.move != Move::Starts)
+    {
+        title += how.move == Move::Ends   ? ", their ends"
+                 : how.move == Move::Both ? ", their starts and ends"
+                                          : ", their lengths";
+    }
+    if (how.strength != 100)
+    {
+        title += ", " + std::to_string(how.strength) + "% of the way";
+    }
+    if (how.swing != 50)
+    {
+        title += ", swung " + std::to_string(how.swing) + "%";
+    }
+    title += pedals ? ", with its pedalling" : "";
+    return changeEvents(
+        title, target,
+        [&](const core::EventList& events, const auto& part)
+        {
+            const auto& meter = song.meter(part.track);
+            const auto step = std::max<core::Tick>(
+                how.grid.value_or(song.track(part.track)->grid).toTicks(song.ppqn()), 1);
+            const auto nearest = [&](core::Tick tick)
+            {
+                // Not onto the song's end, where nothing can start.
+                const auto to = core::nearestGridLine(meter, tick, step, how.swing);
+                return to < song.end() || how.move != Move::Starts ? to : tick;
+            };
+            return core::quantize(events, part.events, nearest, pedals,
+                                  {.strength = how.strength,
+                                   .move = how.move,
+                                   .step = [step](core::Tick) { return step; }});
+        });
+}
+
+std::string Workspace::gridOf(const OperatorTarget& target) const
+{
+    // The tracks' grid, if they share one, or else each its own.
+    const auto& song = document_.song();
+    std::optional<core::NoteFraction> shared;
+    for (const auto& part : target.parts)
+    {
+        const auto grid = song.track(part.track)->grid;
+        if (shared && *shared != grid)
+        {
+            return "grid";
+        }
+        shared = grid;
+    }
+    return shared ? core::toString(*shared) : std::string{"grid"};
+}
+
+bool Workspace::quantizeAsked(const OperatorTarget& target, const std::string& text)
+{
+    using Move = core::QuantizeHow::Move;
+    const auto said = told(text, {});
+    Quantizing how;
+    if (said.amount != "grid")
+    {
+        how.grid = core::parseNoteFraction(said.amount);
+        if (!how.grid)
+        {
+            setMessage("Not a grid: " + said.amount + "; type a note length, as 1/16, or grid",
+                       MessageKind::Warning);
+            return true;
+        }
+    }
+    for (const auto& [option, value] : said.options)
+    {
+        if (option == "strength" || option == "swing")
+        {
+            const bool strength = option == "strength";
+            const auto percent = percentUpTo(value, 100);
+            if (!percent || (!strength && (*percent < 25 || *percent > 75)))
+            {
+                setMessage(strength ? "Not a strength: " + value + "; type 0% to 100%"
+                                    : "Not a swing: " + value + "; type 25% to 75%, 50% straight",
+                           MessageKind::Warning);
+                return true;
+            }
+            (strength ? how.strength : how.swing) = *percent;
+        }
+        else if (option == "move")
+        {
+            const std::array<std::pair<std::string_view, Move>, 4> kMoves{
+                {{"starts", Move::Starts},
+                 {"ends", Move::Ends},
+                 {"both", Move::Both},
+                 {"lengths", Move::Lengths}}};
+            const auto found =
+                std::ranges::find(kMoves, value, &std::pair<std::string_view, Move>::first);
+            if (found == kMoves.end())
+            {
+                setMessage("Not what to move: " + value + "; type starts, ends, both or lengths",
+                           MessageKind::Warning);
+                return true;
+            }
+            how.move = found->second;
+        }
+        else
+        {
+            setMessage("Quantise takes strength=, swing= and move=, not " + option + "=",
+                       MessageKind::Warning);
+            return true;
+        }
+    }
+    // With pedals there and starts moving, asking whether they go with their notes, as q does.
+    const auto& song = document_.song();
+    const bool starts = how.move == Move::Starts || how.move == Move::Both;
+    const bool pedalled =
+        starts &&
+        std::ranges::any_of(target.parts, [&](const OperatorTarget::Part& part)
+                            { return core::hasPedals(song.events(part.track), part.events); });
+    if (!pedalled)
+    {
+        return quantize(target, false, how);
+    }
+    ask(
+        "Move the pedalling with its notes?", [this, target, how] { quantize(target, true, how); },
+        [this, target, how] { quantize(target, false, how); });
+    return true;
 }
 
 bool Workspace::changeEvents(std::string title, const OperatorTarget& target,

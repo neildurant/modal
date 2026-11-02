@@ -80,12 +80,35 @@ bool hasPedals(const EventList& events, std::span<const std::size_t> which);
 // pedal taken moved as far as the latest note at or before it moved, so it stays as far from
 // the note (decided October 2026), those before any note staying put. A pedal moved past the
 // next of its pedal is refused.
+//
+// How, for the transform menu's quantise (decided November 2026): how far towards the line
+// (100% onto it, 50% halfway), and what's moved: starts, as q does; ends, keeping starts;
+// both; or lengths, rounded to whole steps, keeping starts. A note whose end would come at or
+// before its start is left as it was.
+struct QuantizeHow
+{
+    enum class Move : std::uint8_t
+    {
+        Starts,
+        Ends,
+        Both,
+        Lengths,
+    };
+
+    int strength = 100;
+    Move move = Move::Starts;
+    std::function<Tick(Tick)> step = {}; // the grid step at a tick, for lengths
+};
+
 Transformed quantize(const EventList& events, std::span<const std::size_t> which,
-                     const std::function<Tick(Tick)>& nearest, bool pedals);
+                     const std::function<Tick(Tick)>& nearest, bool pedals,
+                     const QuantizeHow& how = {});
 
 // The grid line nearest a tick, the lines a step apart from each bar line, which is one too.
-// Halfway between two, the later.
-Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step);
+// Halfway between two, the later. With swing, the line between each pair of steps from the
+// bar line is moved to that percentage of the pair (50% straight, 66% a triplet feel, under
+// 50% early).
+Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step, int swing = 50);
 
 // A change to velocities, as typed after ^: a value (80), a change (+10, -10) or a percentage
 // (80%). Velocities stay between 1 and 127.

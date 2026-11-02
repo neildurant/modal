@@ -234,6 +234,16 @@ constexpr std::array kSharedCommands{
         .aliases = "retrograde",
         .count = true,
         .range = true},
+    CommandInfo{.name = "transform-quantize",
+                .description = "Quantise the notes a range or object takes, asking in turn for "
+                               "the grid (the track's, at Enter), how far onto it, the swing and "
+                               "what to move (starts, ends, both or lengths); Enter throughout "
+                               "does what q does",
+                .aliases = "quantize quantise",
+                .usage = "[GRID] [strength=100%] [swing=50%] [move=starts]",
+                .count = true,
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -637,7 +647,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 115> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 116> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -658,6 +668,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-lower", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-transpose-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-invert", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-invert-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},

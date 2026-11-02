@@ -318,19 +318,45 @@ bool hasPedals(const EventList& events, std::span<const std::size_t> which)
 }
 
 Transformed quantize(const EventList& events, std::span<const std::size_t> which,
-                     const std::function<Tick(Tick)>& nearest, bool pedals)
+                     const std::function<Tick(Tick)>& nearest, bool pedals, const QuantizeHow& how)
 {
+    using Move = QuantizeHow::Move;
+    const auto towards = [&](Tick from, Tick to)
+    { return from + (to - from) * how.strength / 100; };
     auto changed = takenEvents(events, which);
     // Each note's start, and how far it moved, in tick order.
     std::vector<std::pair<Tick, Tick>> moves;
     for (auto& event : changed)
     {
-        if (event.isNote())
+        if (!event.isNote())
         {
-            const auto to = nearest(event.tick);
-            moves.emplace_back(event.tick, to - event.tick);
-            event.tick = to;
+            continue;
         }
+        auto& note = std::get<Note>(event.data);
+        const auto end = event.tick + note.duration;
+        auto start = event.tick;
+        if (how.move == Move::Starts || how.move == Move::Both)
+        {
+            start = towards(event.tick, nearest(event.tick));
+        }
+        auto finish = how.move == Move::Starts ? start + note.duration : end;
+        if (how.move == Move::Ends || how.move == Move::Both)
+        {
+            finish = towards(end, nearest(end));
+        }
+        if (how.move == Move::Lengths && how.step)
+        {
+            const auto step = std::max<Tick>(how.step(event.tick), 1);
+            const auto steps = std::max<Tick>((note.duration + step / 2) / step, 1);
+            finish = start + note.duration + (steps * step - note.duration) * how.strength / 100;
+        }
+        if (finish <= start)
+        {
+            continue; // left as it was
+        }
+        moves.emplace_back(event.tick, start - event.tick);
+        event.tick = start;
+        note.duration = finish - start;
     }
     std::ranges::sort(moves);
     if (pedals)
@@ -377,15 +403,31 @@ Transformed quantize(const EventList& events, std::span<const std::size_t> which
     return finish(events, which, changed, true);
 }
 
-Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step)
+Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step, int swing)
 {
     step = std::max<Tick>(step, 1);
     const auto bar = meter.toBarBeatTick(tick).bar;
     const auto start = meter.barStart(bar);
     const auto next = meter.barStart(bar + 1);
-    const auto before = start + (tick - start) / step * step;
-    const auto after = std::min(before + step, next);
-    return tick - before >= after - tick ? after : before;
+    if (swing == 50)
+    {
+        const auto before = start + (tick - start) / step * step;
+        const auto after = std::min(before + step, next);
+        return tick - before >= after - tick ? after : before;
+    }
+    // The pair's lines: its start, the swung one, and the next pair's start.
+    const auto pair = start + (tick - start) / (2 * step) * (2 * step);
+    const std::array<Tick, 3> lines{pair, pair + 2 * step * swing / 100,
+                                    std::min(pair + 2 * step, next)};
+    Tick best = lines[0];
+    for (const auto line : lines)
+    {
+        if (line <= next && std::abs(tick - line) <= std::abs(tick - best))
+        {
+            best = line;
+        }
+    }
+    return best;
 }
 
 std::optional<VelocityChange> parseVelocityChange(std::string_view text)

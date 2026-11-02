@@ -1481,3 +1481,52 @@ TEST_CASE("The key question offers the key the notes fit best, and Tab the best 
     const auto& events = document.song().events(document.song().tracks()[0]->id());
     CHECK(std::get<core::Note>(events[1].data).pitch == 67);
 }
+
+TEST_CASE("The menu's quantise asks for the grid, strength, swing and what to move, Enter "
+          "throughout doing what q does")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto enter = [&](int times)
+    {
+        for (int i = 0; i < times; ++i)
+        {
+            o.press(NamedKey::Enter);
+        }
+    };
+    const auto label = [&]
+    {
+        const auto frame = o.ws.frame();
+        return frame.back().text.front().text;
+    };
+    // The C2 a sixty-fourth after bar 5's start, the pedal just after it.
+    o.type(U"gr4]b!!q");
+    CHECK(label() == U"Quantise C2 in Bass, to a grid of (1/16): ");
+    enter(4);
+    CHECK(o.ws.message() == "Move the pedalling with its notes? (y/n)");
+    o.type(U"n");
+    CHECK(o.notes()[3] == std::pair{core::Tick{16 * q}, 36});
+    o.type(U"u!!q");
+    enter(1);
+    o.type(U"50%");
+    enter(3);
+    o.type(U"n");
+    CHECK(o.notes()[3] == std::pair{core::Tick{16 * q + q / 32}, 36});
+    // Its end onto the grid, its start kept: no question about the pedalling.
+    o.type(U"u!!q");
+    enter(3);
+    o.type(U"ends");
+    enter(1);
+    const auto& events = o.document.song().events(o.document.song().tracks()[0]->id());
+    const auto c2 = std::ranges::find_if(events.all(), [&](const core::Event& e)
+                                         { return e.tick == 16 * q + q / 16; });
+    REQUIRE(c2 != events.all().end());
+    CHECK(std::get<core::Note>(c2->data).duration == 3 * q / 16);
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U"u:quantize 1/8 swing=90");
+    enter(1);
+    // Given the grid and the swing, asking for the strength and what to move.
+    enter(2);
+    CHECK(o.ws.message() == "Not a swing: 90; type 25% to 75%, 50% straight");
+}

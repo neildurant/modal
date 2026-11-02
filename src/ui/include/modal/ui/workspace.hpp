@@ -310,7 +310,18 @@ private:
     // or saying why it can't be.
     bool transform(std::string_view op, int amount, std::string_view motion, int count);
     // Quantises the notes' starts, and the pedals with them if asked.
-    bool quantize(const OperatorTarget& target, bool pedals);
+    // How the transform menu's quantise was answered: a grid (or each track's own), how far,
+    // the swing and what's moved.
+    struct Quantizing
+    {
+        std::optional<core::NoteFraction> grid = std::nullopt;
+        int swing = 50;
+        core::QuantizeHow::Move move = core::QuantizeHow::Move::Starts;
+        int strength = 100;
+    };
+    bool quantize(const OperatorTarget& target, bool pedals, const Quantizing& how = {});
+    bool quantizeAsked(const OperatorTarget& target, const std::string& text);
+    std::string gridOf(const OperatorTarget& target) const;
     using EventsChange =
         std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)>;
     bool changeEvents(std::string title, const OperatorTarget& target, const EventsChange& change);

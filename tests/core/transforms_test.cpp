@@ -396,3 +396,39 @@ TEST_CASE("retrograde reverses the notes' order, mirroring the rhythm")
     CHECK(eventsOf(retrograde(list, allOf(list))) ==
           std::vector{note(0, 64, 2 * q), pedal(q, 127), note(2 * q, 60, q)});
 }
+
+TEST_CASE("quantising can go part of the way, and move ends or lengths instead of starts")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(q / 8, 60, q + q / 2), note(2 * q, 64, q - q / 8)});
+    const auto nearest = [&](Tick tick) { return (tick + q / 2) / q * q; };
+    const auto step = [&](Tick) { return q; };
+    using Move = QuantizeHow::Move;
+    CHECK(eventsOf(quantize(list, allOf(list), nearest, false, {.strength = 50})) ==
+          std::vector{note(q / 16, 60, q + q / 2), note(2 * q, 64, q - q / 8)});
+    // Ends: onto the grid, starts kept.
+    CHECK(eventsOf(quantize(list, allOf(list), nearest, false, {.move = Move::Ends})) ==
+          std::vector{note(q / 8, 60, 2 * q - q / 8), note(2 * q, 64, q)});
+    // Both.
+    CHECK(eventsOf(quantize(list, allOf(list), nearest, false, {.move = Move::Both})) ==
+          std::vector{note(0, 60, 2 * q), note(2 * q, 64, q)});
+    // Lengths, in whole steps, starts kept: 1.5 steps rounds to 2.
+    CHECK(eventsOf(
+              quantize(list, allOf(list), nearest, false, {.move = Move::Lengths, .step = step})) ==
+          std::vector{note(q / 8, 60, 2 * q), note(2 * q, 64, q)});
+}
+
+TEST_CASE("swing moves every second grid line within its pair")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const MeterMap meter{ppqn};
+    const auto eighth = q / 2;
+    CHECK(nearestGridLine(meter, q / 2, eighth) == q / 2);
+    CHECK(nearestGridLine(meter, q / 2, eighth, 66) == q * 66 / 100);
+    CHECK(nearestGridLine(meter, q / 2 - q / 16, eighth, 66) == q * 66 / 100);
+    CHECK(nearestGridLine(meter, q / 8, eighth, 66) == 0);
+    CHECK(nearestGridLine(meter, q - q / 16, eighth, 66) == q);
+    CHECK(nearestGridLine(meter, q / 2, eighth, 40) == q * 40 / 100);
+}
