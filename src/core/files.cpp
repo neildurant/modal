@@ -10,19 +10,37 @@
 namespace modal::core
 {
 
+namespace
+{
+
+// A path as UTF-8 text for a message, which converting to the system's code page could throw.
+std::string textOf(const std::filesystem::path& path)
+{
+    const auto text = path.u8string();
+    return {reinterpret_cast<const char*>(text.data()), text.size()};
+}
+
+} // namespace
+
 std::string writeFileAtomically(const std::filesystem::path& path,
                                 std::span<const std::uint8_t> bytes)
 {
-    // A name of its own beside the file, so it can't be one already there or another save's.
+    // A short name of its own beside the file, whatever the file's name, so it can't be one
+    // already there or another save's, nor too long for the file system; and nothing that
+    // throws, so a failure is an error to report (found in a code review, November 2026).
     std::random_device random;
     std::filesystem::path temporary;
-    do
+    std::error_code error;
+    for (int tries = 0; tries < 16; ++tries)
     {
-        char tag[24];
-        std::snprintf(tag, sizeof tag, ".%08x%08x.tmp", random(), random());
-        temporary = path;
-        temporary += tag;
-    } while (std::filesystem::exists(temporary));
+        char name[32];
+        std::snprintf(name, sizeof name, ".modal-%08x%08x.tmp", random(), random());
+        temporary = path.parent_path() / name;
+        if (!std::filesystem::exists(temporary, error) && !error)
+        {
+            break;
+        }
+    }
     {
         std::ofstream stream{temporary, std::ios::binary | std::ios::trunc};
         stream.write(reinterpret_cast<const char*>(bytes.data()),
@@ -32,16 +50,15 @@ std::string writeFileAtomically(const std::filesystem::path& path,
         {
             std::error_code ignored;
             std::filesystem::remove(temporary, ignored);
-            return "can't write " + temporary.string();
+            return "can't write " + textOf(path);
         }
     }
-    std::error_code error;
     std::filesystem::rename(temporary, path, error);
     if (error)
     {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
-        return "can't write " + path.string() + ": " + error.message();
+        return "can't write " + textOf(path) + ": " + error.message();
     }
     return {};
 }

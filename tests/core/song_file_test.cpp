@@ -351,6 +351,9 @@ TEST_CASE("a song file is written whole, or not at all")
     CHECK(*back.song == song);
 
     CHECK_FALSE(writeSongFile(song, directory / "missing" / "song.modal").empty());
+    // A name as long as names go: written, or an error to report, never thrown.
+    std::string written;
+    CHECK_NOTHROW(written = writeSongFile(song, directory / (std::string(240, 'a') + ".modal")));
     const auto missing = readSongFile(directory / "nothing.modal");
     CHECK_FALSE(missing.song);
     CHECK(missing.error.find("can't read") != std::string::npos);
