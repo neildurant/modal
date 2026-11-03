@@ -35,6 +35,7 @@ add_library(modal_ui STATIC
     view_parts.cpp
     window_commands.cpp
     workspace.cpp
+    workspace_commands.cpp
 )
 modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/config/modalrc"
