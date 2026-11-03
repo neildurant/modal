@@ -1081,6 +1081,8 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Later milestones**
 
+- [ ] From a code review (November 2026), deferred until there's a need or a measurement: the engine taking input in bounded batches, turn about between ports, so a flood of controller data can't hold up playback; sending SysEx on Windows off the engine thread, as WinMM blocks while it sends; a heap for the scheduler's note-offs, for very dense polyphony; the command-line tools waiting for keys without polling every 20-50 ms; separate test programs for core, ui, platform and SDL; and measuring edits on large songs (`Song::updateEvents` copying a track's events, the whole playback plan compiled after every change) before skipping or coalescing plan rebuilds. Splitting `Workspace`, one definition for each transform, a command outcome apart from its message, and named view state in undo come before milestone 6's key map review; separating design.md's current specification from its dated decisions is for milestone 6's wrap-up.
+
 - [ ] A jump list, as Vim's `Ctrl-o` / `Ctrl-i`, beyond the one place `''` goes back to (noted October 2026).
 - [ ] Files between versions of Modal: how a newer song format is read by an older Modal and the reverse, and when the format version starts to count; it stays at 1 while Modal is experimental (noted October 2026).
 
