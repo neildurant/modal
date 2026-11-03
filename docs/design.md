@@ -459,7 +459,7 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 | Thin | Thin out dense controller, pitch bend and aftertouch data, as Sequencer Plus Gold's did |
 | Filter | Delete events matching a condition, e.g. velocity below 20 |
 | Split | Move notes above or below a pitch to another track |
-| Remap | Change channel, CC number or note mapping |
+| Remap | Change a CC number or a note (events carry no channel: the track's applies) |
 
 **How transforms are reached and set (decided November 2026, for milestone 6's step 10).**
 
@@ -484,6 +484,8 @@ SPG-style transforms are first-class operators: each applies to any motion, obje
 
 - **Thin** thins out dense continuous data, as Sequencer Plus Gold's did: hundreds of mod wheel (CC 1) events from one gesture, or pitch bend or aftertouch, down to what's needed. `only=` says which (`only=cc1`, `only=bend`; by default every kind of continuous data in the range, but never the switch controllers such as the pedals), `per=` the most kept in a quarter note (16), and `step=` the smallest change in value worth keeping (2). The first and last events of each gesture are always kept, so it ends where it did.
 - **Filter** deletes the events matching a query, written as `/`'s are (`:filter vel<20`, `:filter cc7`); from `!` it takes the search's query, if there is one, filled in.
+- **Thin is for continuous data alone (decided November 2026):** controllers that aren't switches, pitch bend and aftertouch, never the switch controllers (sustain, sostenuto, soft, legato, portamento), even with `all`, where thinning by density could drop a change that matters; `only=cc64` is refused, pointing to the pedals' clean-up. Repeated pedal events are the pedalling tools' Clean up's (10g): exact repeats only (so half-pedalling's values are kept), flicker merged, and the first and last events in the range always kept.
+- **10f as decided (November 2026),** each asking its settings in turn: Thin, `, x h`, which data (`all`, `cc1`, `bend`, `aftertouch`), the most a quarter note (16) and the smallest change (2), each gesture's first and last kept; Filter, `, x f`, the query, the search's at Enter; Split, `, x y`, the pitch (C4), which side moves (`up`, it and those above, or `down`, those below) and the track to move them to, Tab listing the tracks and a new name making a new track (so a piano part splits into hands); Remap, `, x m`, what (`cc1`, or a note, `C1`) and what to (`cc11`, `D1`), limiting velocities moving to `, x M`. Channels aren't remapped, as events carry none.
 
 **Velocity without clipping (decided October 2026)**
 
