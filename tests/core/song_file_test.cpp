@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -335,8 +336,16 @@ TEST_CASE("a song file is written whole, or not at all")
     const auto path = directory / "song.modal";
 
     const auto song = everything(kPpqn);
+    // A file there named as a temporary file might be isn't touched, and none is left behind.
+    {
+        std::ofstream{directory / "song.modal.tmp"} << "mine";
+    }
     CHECK(writeSongFile(song, path).empty());
-    CHECK_FALSE(std::filesystem::exists(directory / "song.modal.tmp"));
+    CHECK(std::distance(std::filesystem::directory_iterator{directory},
+                        std::filesystem::directory_iterator{}) == 2);
+    std::string mine;
+    std::ifstream{directory / "song.modal.tmp"} >> mine;
+    CHECK(mine == "mine");
     const auto back = readSongFile(path);
     REQUIRE(back.song);
     CHECK(*back.song == song);

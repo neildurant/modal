@@ -2,7 +2,9 @@
 
 #include "files.hpp"
 
+#include <cstdio>
 #include <fstream>
+#include <random>
 #include <system_error>
 
 namespace modal::core
@@ -11,8 +13,16 @@ namespace modal::core
 std::string writeFileAtomically(const std::filesystem::path& path,
                                 std::span<const std::uint8_t> bytes)
 {
-    auto temporary = path;
-    temporary += ".tmp";
+    // A name of its own beside the file, so it can't be one already there or another save's.
+    std::random_device random;
+    std::filesystem::path temporary;
+    do
+    {
+        char tag[24];
+        std::snprintf(tag, sizeof tag, ".%08x%08x.tmp", random(), random());
+        temporary = path;
+        temporary += tag;
+    } while (std::filesystem::exists(temporary));
     {
         std::ofstream stream{temporary, std::ios::binary | std::ios::trunc};
         stream.write(reinterpret_cast<const char*>(bytes.data()),

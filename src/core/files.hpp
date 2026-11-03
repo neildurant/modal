@@ -14,8 +14,9 @@
 namespace modal::core
 {
 
-// Writes a file by writing a temporary file beside it first and then renaming it, so a failed
-// write never leaves half a file. Returns an error message, or an empty string.
+// Writes a file by writing a temporary file beside it first, named at random so it's no file
+// there already, and then renaming it, so a failed write never leaves half a file. Returns an
+// error message, or an empty string.
 std::string writeFileAtomically(const std::filesystem::path& path,
                                 std::span<const std::uint8_t> bytes);
 
