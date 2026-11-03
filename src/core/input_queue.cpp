@@ -46,22 +46,22 @@ InputQueue::Result InputQueue::push(std::span<const std::uint8_t> message,
     {
         return Result::Ignored;
     }
+    // A long SysEx's chunks are pushed together, so the engine never takes in part of one and
+    // the rest later (found in a code review, November 2026).
     const auto chunks = (message.size() + InputChunk::kMaxBytes - 1) / InputChunk::kMaxBytes;
-    if (chunks > chunks_.space())
-    {
-        return Result::Dropped;
-    }
-    while (!message.empty())
-    {
-        InputChunk chunk;
-        chunk.time = time;
-        chunk.size = static_cast<std::uint8_t>(std::min(message.size(), InputChunk::kMaxBytes));
-        std::copy_n(message.begin(), chunk.size, chunk.bytes.begin());
-        message = message.subspan(chunk.size);
-        chunk.more = !message.empty();
-        chunks_.tryPush(std::move(chunk)); // room was checked above, and only we push
-    }
-    return Result::Pushed;
+    const auto pushed = chunks_.tryPushAll(
+        chunks,
+        [&](std::size_t i)
+        {
+            const auto part = message.subspan(i * InputChunk::kMaxBytes);
+            InputChunk chunk;
+            chunk.time = time;
+            chunk.size = static_cast<std::uint8_t>(std::min(part.size(), InputChunk::kMaxBytes));
+            std::copy_n(part.begin(), chunk.size, chunk.bytes.begin());
+            chunk.more = part.size() > chunk.size;
+            return chunk;
+        });
+    return pushed ? Result::Pushed : Result::Dropped;
 }
 
 } // namespace modal::core

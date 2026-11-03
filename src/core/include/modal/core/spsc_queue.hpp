@@ -54,6 +54,24 @@ public:
         return tryPush(std::move(copy));
     }
 
+    // Producer only: count values, made by make(0) to make(count - 1), pushed together, so the
+    // consumer sees all of them or none of them; none pushed if there isn't room for them all.
+    template <typename Make>
+    bool tryPushAll(std::size_t count, Make&& make) noexcept
+    {
+        const auto tail = tail_.load(std::memory_order_relaxed);
+        if (Capacity - (tail - head_.load(std::memory_order_acquire)) < count)
+        {
+            return false;
+        }
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            slots_[(tail + i) & kMask] = make(i);
+        }
+        tail_.store(tail + count, std::memory_order_release);
+        return true;
+    }
+
     // Producer only: whether a push would fail now.
     bool full() const noexcept { return space() == 0; }
 

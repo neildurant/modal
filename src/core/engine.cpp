@@ -221,7 +221,7 @@ void Engine::takeInput() noexcept
     std::size_t unreported = 0;
     for (std::uint32_t i = 0; i < kMaxInputs; ++i)
     {
-        // Pushes are all or nothing, so a SysEx's chunks come together.
+        // Pushes are all or nothing (see InputQueue::push), so a SysEx's chunks come together.
         bool continuing = false;
         bool dropping = false; // the rest of a SysEx that couldn't all be passed back
         while (const auto chunk = (*inputs_)[i].pop())

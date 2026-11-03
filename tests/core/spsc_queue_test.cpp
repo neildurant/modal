@@ -119,3 +119,43 @@ TEST_CASE("an SPSC queue passes values between threads in order")
     CHECK(inOrder);
     CHECK(queue.empty());
 }
+
+TEST_CASE("values pushed together are seen together, or not at all")
+{
+    SpscQueue<int, 8> queue;
+    CHECK(queue.tryPushAll(3, [](std::size_t i) { return static_cast<int>(i); }));
+    CHECK_FALSE(queue.tryPushAll(6, [](std::size_t) { return 9; })); // room for 5
+    for (int i = 0; i < 3; ++i)
+    {
+        CHECK(queue.tryPop() == i);
+    }
+    CHECK(queue.empty());
+
+    // Across threads: whenever a batch's first is popped, the rest are there too.
+    constexpr int kBatches = 20000;
+    SpscQueue<int, 64> shared;
+    std::thread producer{[&]
+                         {
+                             for (int b = 0; b < kBatches;)
+                             {
+                                 if (shared.tryPushAll(3, [&](std::size_t i)
+                                                       { return b * 3 + static_cast<int>(i); }))
+                                 {
+                                     ++b;
+                                 }
+                             }
+                         }};
+    bool together = true;
+    for (int b = 0; b < kBatches;)
+    {
+        if (const auto first = shared.tryPop())
+        {
+            const auto second = shared.tryPop();
+            const auto third = shared.tryPop();
+            together = together && second == *first + 1 && third == *first + 2;
+            ++b;
+        }
+    }
+    producer.join();
+    CHECK(together);
+}
