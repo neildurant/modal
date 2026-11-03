@@ -1635,3 +1635,47 @@ TEST_CASE("The pedalling tools act on the range's time in the piano roll, where 
     o.press(NamedKey::Enter);
     CHECK(o.pedals() == std::vector<core::Tick>{20 * q});
 }
+
+TEST_CASE("Every transform takes the defaults it offers, Enter throughout")
+{
+    for (const auto& spec : Workspace::transformSpecs())
+    {
+        Operating o;
+        o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+        o.type(U"gr:");
+        o.type(decodeUtf8(spec.name));
+        o.press(NamedKey::Enter);
+        for (int i = 0; i < 8 && o.ws.mode() == Mode::CommandLine; ++i)
+        {
+            o.press(NamedKey::Enter);
+        }
+        INFO(spec.name << ": " << o.ws.message());
+        CHECK(o.ws.mode() == Mode::Normal);
+        CHECK(o.ws.messageKind() != MessageKind::Warning);
+    }
+}
+
+TEST_CASE("No two commands share a name or an alias")
+{
+    Operating o;
+    std::map<std::string, std::string> taken;
+    for (const auto& info : o.registry.all())
+    {
+        std::vector<std::string> names{std::string{info.name}};
+        for (std::size_t at = 0; at < info.aliases.size();)
+        {
+            const auto end = std::min(info.aliases.find(' ', at), info.aliases.size());
+            if (end > at)
+            {
+                names.emplace_back(info.aliases.substr(at, end - at));
+            }
+            at = end + 1;
+        }
+        for (const auto& name : names)
+        {
+            const auto [it, added] = taken.emplace(name, std::string{info.name});
+            INFO(name << " is " << it->second << "'s and " << info.name << "'s");
+            CHECK(added);
+        }
+    }
+}

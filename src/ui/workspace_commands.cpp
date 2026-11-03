@@ -71,296 +71,6 @@ constexpr std::array kSharedCommands{
                                "transform from the menu then shown (!ib, then a key); on a "
                                "selection, at once",
                 .count = true},
-    CommandInfo{.name = "transform-transpose",
-                .description = "Transpose the notes a range or object takes by a number of "
-                               "semitones, asking how many (+12, -3); :transpose N those of the "
-                               "selection, or else of the cursor's bar",
-                .aliases = "transpose",
-                .usage = "[SEMITONES]",
-                .count = true,
-                .range = true},
-    CommandInfo{.name = "transform-velocity-lift",
-                .description = "Lift the velocities of the notes a range or object takes a "
-                               "percentage of the way towards 127, keeping their order and "
-                               "proportions, asking how far (25%); :vel-lift N% those of the "
-                               "selection, or else of the cursor's bar",
-                .aliases = "vel-lift",
-                .usage = "[PERCENT]",
-                .count = true,
-                .range = true},
-    CommandInfo{.name = "transform-velocity-lower",
-                .description = "Lower the velocities of the notes a range or object takes a "
-                               "percentage of the way towards the floor (velfloor), keeping "
-                               "their order and proportions, asking how far (25%)",
-                .aliases = "vel-lower",
-                .usage = "[PERCENT]",
-                .count = true,
-                .range = true},
-    CommandInfo{.name = "transform-velocity-limit",
-                .description = "Keep the velocities of the notes a range or object takes "
-                               "between two values, asking which (20-110)",
-                .aliases = "vel-limit",
-                .usage = "[LOW-HIGH]",
-                .count = true,
-                .range = true},
-    CommandInfo{.name = "transform-velocity-ramp",
-                .description = "A crescendo or diminuendo over the notes a range or object "
-                               "takes, by time: velocities set from one value to another "
-                               "(60-100), or their own scaled from one percentage to another "
-                               "(80%-120%)",
-                .aliases = "vel-ramp",
-                .usage = "[FROM-TO]",
-                .count = true,
-                .range = true},
-    CommandInfo{.name = "transform-velocity-compress",
-                .description =
-                    "Compress the velocities of the notes a range or object takes, pulling each a "
-                    "percentage of the way towards the average of those around it "
-                    "(50%): evens out the playing, keeping its swells; window= how "
-                    "far around (1bar, 2bars, 1/2), centre= local, average or a "
-                    "velocity, threshold= only those above (>90) or below (<30)",
-                .aliases = "vel-compress",
-                .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-velocity-expand",
-                .description =
-                    "Expand the velocities of the notes a range or object takes, pushing each a "
-                    "percentage further from the average of those around it (50%): "
-                    "sharpens accents; takes compress's options",
-                .aliases = "vel-expand",
-                .usage = "[PERCENT] [window=1bar] [centre=local] [threshold=>N]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-velocity-phrase",
-        .description =
-            "Scale the phrase dynamics of the notes a range or object takes: the contour of "
-            "their velocities' averages over a window (130% bigger swells, 70% flatter), each "
-            "note keeping its place on it; asking how much and the window",
-        .aliases = "vel-phrase",
-        .usage = "[PERCENT] [window=1bar]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-chord-accent",
-        .description =
-            "Accent the top note of each chord a range or object takes, up by an amount and the "
-            "others down by it (10), to bring out a melody",
-        .aliases = "chord-accent",
-        .usage = "[AMOUNT]",
-        .count = true,
-        .range = true},
-    CommandInfo{.name = "transform-chord-balance",
-                .description =
-                    "Balance each chord a range or object takes by pitch: a straight slope of "
-                    "velocities from its lowest note to its highest (70-95), or "
-                    "reversed to bring out the bass (95-70)",
-                .aliases = "chord-balance",
-                .usage = "[BOTTOM-TOP]",
-                .count = true,
-                .range = true},
-    CommandInfo{
-        .name = "transform-chord-compress",
-        .description =
-            "Compress each chord a range or object takes, pulling its velocities a percentage of "
-            "the way together about their average (50%)",
-        .aliases = "chord-compress",
-        .usage = "[PERCENT]",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-chord-expand",
-        .description =
-            "Expand each chord a range or object takes, pushing its velocities a percentage "
-            "further apart about their average (50%)",
-        .aliases = "chord-expand",
-        .usage = "[PERCENT]",
-        .count = true,
-        .range = true},
-    CommandInfo{.name = "transform-transpose-key",
-                .description = "Transpose the notes a range or object takes by degrees of a key's "
-                               "scale, asking for the "
-                               "key (the last used, at Enter) and how many (+2, -3); notes "
-                               "outside the scale keep their distance above its note below",
-                .aliases = "transpose-key",
-                .usage = "[DEGREES] [key=KEY]",
-                .count = true,
-                .range = true},
-    CommandInfo{
-        .name = "transform-invert",
-        .description =
-            "Invert the notes a range or object takes, mirroring their pitches about a pivot, "
-            "chromatically, asking which (the first note, at Enter)",
-        .aliases = "invert",
-        .usage = "[PIVOT]",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-invert-key",
-        .description =
-            "Invert the notes a range or object takes within a key's scale, mirroring them by its "
-            "degrees about a pivot, asking for the key and the pivot",
-        .aliases = "invert-key",
-        .usage = "[PIVOT] [key=KEY]",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-retrograde",
-        .description =
-            "Reverse the order in time of the notes a range or object takes, mirroring their "
-            "rhythm",
-        .aliases = "retrograde",
-        .count = true,
-        .range = true},
-    CommandInfo{.name = "transform-quantize",
-                .description = "Quantise the notes a range or object takes, asking in turn for "
-                               "the grid (the track's, at Enter), how far onto it, the swing and "
-                               "what to move (starts, ends, both or lengths); Enter throughout "
-                               "does what q does",
-                .aliases = "quantize quantise",
-                .usage = "[GRID] [strength=100%] [swing=50%] [move=starts]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-stretch",
-        .description =
-            "Stretch the time of the events a range or object takes about the first, asking by "
-            "how much: 2 for half time, 1/2 for double time, or a percentage "
-            "(150%); the notes alone in the piano roll",
-        .aliases = "stretch",
-        .usage = "[RATIO]",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-length",
-        .description =
-            "Set the lengths of the notes a range or object takes, asking how: legato, each held "
-            "until the next but for the last, a length (1/8) or a "
-            "percentage of their own (80%)",
-        .aliases = "length",
-        .usage = "[LENGTH]",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-legato",
-        .description =
-            "Make the notes a range or object takes legato, each note or chord held until the "
-            "next starts, but for the last, which keeps its length",
-        .aliases = "legato",
-        .count = true,
-        .range = true},
-    CommandInfo{
-        .name = "transform-thin",
-        .description =
-            "Thin out dense controller, pitch bend and aftertouch data in a range or object, "
-            "asking which, the most to keep a quarter note (16) and the "
-            "smallest change kept (2); each gesture's first and last kept, "
-            "and never the pedals or other switches",
-        .aliases = "thin",
-        .usage = "[all|ccN|bend|aftertouch] [per=16] [step=2]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-filter",
-        .description =
-            "Delete the events a range or object takes that match a query, as / writes them "
-            "(vel<20, cc7), asking which, the search's at Enter",
-        .aliases = "filter",
-        .usage = "[QUERY]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-split",
-        .description =
-            "Split the notes a range or object takes at a note, moving it and those above, or "
-            "those below, to another track, asking at which note, which side "
-            "and which track; a new name makes a new track",
-        .aliases = "split",
-        .usage = "[NOTE] [side=above] [to=TRACK]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-remap",
-                .description =
-                    "Remap a controller (cc1 to cc11) or a note (C1 to D1) in a range or object, "
-                    "asking which and to what",
-                .aliases = "remap",
-                .usage = "[ccN|NOTE] [to=ccN|NOTE]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-pedal-repedal",
-        .description =
-            "Re-pedal the range: its sustain replaced by a pedal down just after its first chord, "
-            "lifted and pressed again around each chord change, and lifted as "
-            "its last notes end; asking how long before and after",
-        .aliases = "repedal",
-        .usage = "[lift=10ms] [down=60ms]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-pedal-each",
-                .description = "Pedal the range afresh on each bar or beat, its sustain replaced; "
-                               "asking which, and how "
-                               "long before and after each line",
-                .aliases = "pedal-each",
-                .usage = "[bar|beat] [lift=10ms] [down=60ms]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-pedal-retime",
-                .description = "Re-time the range's performed sustain: each lift and press near a "
-                               "chord change moved to "
-                               "just before and after it, the rest left as played",
-                .aliases = "retime",
-                .usage = "[lift=10ms] [down=60ms] [near=200ms]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-pedal-clean",
-        .description =
-            "Clean up the range's pedalling: exact repeats removed and flicker, a lift and a press "
-            "again within a few milliseconds, merged; the first and last "
-            "events kept",
-        .aliases = "pedal-clean",
-        .usage = "[flicker=30ms]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-pedal-clear",
-                .description = "Clear a pedal from the range, lifting it at the start if it's down "
-                               "there and pressing it "
-                               "again at the end if it was down there",
-                .aliases = "pedal-clear",
-                .usage = "[sustain|sostenuto|soft|all]",
-                .count = true,
-                .range = true,
-                .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{
-        .name = "transform-pedal-offset",
-        .description =
-            "Move every pedal change in the range later by some milliseconds, or earlier (-20ms)",
-        .aliases = "pedal-offset",
-        .usage = "[MS]",
-        .count = true,
-        .range = true,
-        .choices = {Choices::Option, Choices::Option, Choices::Option}},
-    CommandInfo{.name = "transform-pedal-bake",
-                .description = "Bake the range's sustain into its notes: each note held by the "
-                               "pedal lengthened to where it "
-                               "lifts, and the sustain then cleared",
-                .aliases = "pedal-bake",
-                .count = true,
-                .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -707,10 +417,25 @@ std::span<const CommandInfo> Workspace::commands()
         add(ArrangeView::commands());
         add(PianoRollView::commands());
         add(kSharedCommands);
+        // The transforms', from their table, in every view.
+        for (const auto& spec : transformSpecs())
+        {
+            result.push_back(CommandInfo{
+                .name = spec.name,
+                .description = spec.description,
+                .aliases = spec.aliases,
+                .usage = spec.usage,
+                .count = true,
+                .range = true,
+                .where = onlyIn({Where::Tracks, Where::Strip, Where::PianoRoll, Where::EventList}),
+                .choices = spec.settings.empty()
+                               ? std::array<Choices, 3>{}
+                               : std::array{Choices::Option, Choices::Option, Choices::Option}});
+        }
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 130> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 99> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -726,37 +451,6 @@ std::span<const CommandInfo> Workspace::commands()
             {"operator-shift-earlier", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-transform", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-transpose", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-lift", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-lower", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-repedal", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-each", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-retime", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-clean", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-clear", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-offset", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-pedal-bake", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-thin", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-filter", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-split", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-remap", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-stretch", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-length", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-legato", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-transpose-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-invert", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-invert-key", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-retrograde", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-compress", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-expand", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-velocity-phrase", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-chord-accent", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-chord-balance", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-chord-compress", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"transform-chord-expand", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"change", onlyIn({Strip})},
             {"insert-before", onlyIn({Strip})},
             {"insert-after", onlyIn({Strip})},

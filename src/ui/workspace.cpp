@@ -48,8 +48,10 @@ char32_t lowerLetter(char32_t letter)
 
 bool isShared(std::string_view name)
 {
+    // The transforms are too, from their table.
     const auto shared = sharedCommands();
-    return std::ranges::find(shared, name, &CommandInfo::name) != shared.end();
+    return std::ranges::find(shared, name, &CommandInfo::name) != shared.end() ||
+           Workspace::findTransform(name) != nullptr;
 }
 
 // The kind of selection v, V and Ctrl-v make.

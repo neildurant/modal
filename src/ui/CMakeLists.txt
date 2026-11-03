@@ -24,6 +24,7 @@ add_library(modal_ui STATIC
     grid_cursor.cpp
     layout.cpp
     operators.cpp
+    transform_specs.cpp
     prompt.cpp
     settings.cpp
     style.cpp

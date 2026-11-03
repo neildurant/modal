@@ -75,44 +75,6 @@ std::string times(int count, std::string_view one, std::string_view many)
     return count == 1 ? std::string{one} : std::to_string(count) + " " + std::string{many};
 }
 
-// The transforms asking how: the default in brackets taken by Enter, or examples where
-// there's none; those with several settings asking for them in turn after it.
-struct Asking
-{
-    std::string_view op;
-    std::string_view label;
-    std::string_view examples;
-    std::string_view answer;
-};
-
-constexpr std::array<Asking, 25> kQuestions{{
-    {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
-    {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
-    {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
-    {"transform-velocity-limit", "Keep the velocities of {} between", "20-110", ""},
-    {"transform-velocity-ramp", "Ramp the velocities of {}", "60-100, 80%-120%", ""},
-    {"transform-velocity-compress", "Compress the velocities of {}", "", "50%"},
-    {"transform-velocity-expand", "Expand the velocities of {}", "", "50%"},
-    {"transform-velocity-phrase", "Scale the phrase dynamics of {}", "", "130%"},
-    {"transform-quantize", "Quantise {}", "", "grid"},
-    {"transform-stretch", "Stretch {} by", "2 half time, 1/2 double time, 150%", ""},
-    {"transform-length", "Set the lengths of {} to", "legato, 1/8, 80%", ""},
-    {"transform-thin", "Thin the controllers, bends and aftertouch of {}", "", "all"},
-    {"transform-filter", "Delete the events of {} matching", "vel<20, cc7", ""},
-    {"transform-split", "Split {}", "", "C4"},
-    {"transform-remap", "Remap {}", "cc1, C1", ""},
-    {"transform-pedal-repedal", "Re-pedal {} at its chord changes", "", ""},
-    {"transform-pedal-each", "Pedal {} afresh", "", ""},
-    {"transform-pedal-retime", "Re-time the pedalling of {}", "", ""},
-    {"transform-pedal-clean", "Clean up the pedalling of {}", "", ""},
-    {"transform-pedal-clear", "Clear the pedalling of {}", "", ""},
-    {"transform-pedal-offset", "Offset the pedalling of {}", "", ""},
-    {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
-    {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
-    {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
-    {"transform-chord-expand", "Expand the chords in {}", "", "50%"},
-}};
-
 // What a transform's told: its amount, the first word not NAME=VALUE (or its default), and
 // its options.
 struct Told
@@ -148,10 +110,13 @@ Told told(std::string_view text, std::string_view name)
         }
         at = end;
     }
-    if (result.amount.empty())
+    if (result.amount.empty() && !name.empty())
     {
-        const auto question = std::ranges::find(kQuestions, name, &Asking::op);
-        result.amount = question != kQuestions.end() ? question->answer : "";
+        // Its default: the first setting's, or its question's.
+        if (const auto* spec = Workspace::findTransform(name))
+        {
+            result.amount = spec->settings.empty() ? spec->answer : spec->settings.front().answer;
+        }
     }
     return result;
 }
@@ -215,147 +180,6 @@ bool isOperator(std::string_view command)
            std::ranges::find(kOperators, command) != kOperators.end();
 }
 
-std::vector<TransformSetting> transformSettings(std::string_view command)
-{
-    const TransformSetting window{.name = "window",
-                                  .question = "over a window of",
-                                  .answer = "1bar",
-                                  .form = "1bar|2bars|1/2",
-                                  .values = {"1bar", "2bars", "4bars"},
-                                  .lengths = true};
-    if (command == "transform-velocity-compress" || command == "transform-velocity-expand")
-    {
-        const bool compress = command == "transform-velocity-compress";
-        return {{.name = "", .question = "by how much", .answer = "50%"},
-                window,
-                {.name = "centre",
-                 .question = compress ? "towards" : "away from",
-                 .answer = "local",
-                 .form = "local|average|N",
-                 .values = {"local", "average"}},
-                {.name = "threshold",
-                 .question = "only those",
-                 .answer = "all",
-                 .form = "all|>N|<N",
-                 .values = {"all"}}};
-    }
-    if (command == "transform-velocity-phrase")
-    {
-        return {{.name = "", .question = "by how much", .answer = "130%"}, window};
-    }
-    if (command == "transform-thin")
-    {
-        return {{.name = "",
-                 .question = "which",
-                 .answer = "all",
-                 .form = "all|cc1|bend|aftertouch",
-                 .values = {"all", "bend", "aftertouch", "cc1", "cc2", "cc7", "cc10", "cc11"}},
-                {.name = "per",
-                 .question = "keeping at most this many a quarter note",
-                 .answer = "16",
-                 .form = "1-96"},
-                {.name = "step",
-                 .question = "and changes of at least",
-                 .answer = "2",
-                 .form = "0-64, in value"}};
-    }
-    if (command == "transform-split")
-    {
-        // The track's default is a new one after the first's (see askSettings).
-        return {{.name = "", .question = "at", .answer = "C4", .form = "a note"},
-                {.name = "side",
-                 .question = "moving",
-                 .answer = "above",
-                 .form = "above|below",
-                 .values = {"above", "below"}},
-                {.name = "to",
-                 .question = "to the track",
-                 .answer = "track",
-                 .form = "a track, or a new one's name",
-                 .tracks = true}};
-    }
-    // The pedalling tools' times, in milliseconds, the lift and press from their settings.
-    const TransformSetting lift{.name = "lift",
-                                .question = "lifting it before each change by",
-                                .answer = "{lift}",
-                                .form = "ms"};
-    const TransformSetting press{
-        .name = "down", .question = "and pressing it after by", .answer = "{press}", .form = "ms"};
-    if (command == "transform-pedal-repedal")
-    {
-        return {lift, press};
-    }
-    if (command == "transform-pedal-each")
-    {
-        return {{.name = "",
-                 .question = "on each",
-                 .answer = "bar",
-                 .form = "bar|beat",
-                 .values = {"bar", "beat"}},
-                lift,
-                press};
-    }
-    if (command == "transform-pedal-retime")
-    {
-        return {lift,
-                press,
-                {.name = "near",
-                 .question = "moving those within",
-                 .answer = "200ms",
-                 .form = "ms of a change"}};
-    }
-    if (command == "transform-pedal-clean")
-    {
-        return {{.name = "flicker",
-                 .question = "merging flicker within",
-                 .answer = "30ms",
-                 .form = "ms between a lift and a press"}};
-    }
-    if (command == "transform-pedal-clear")
-    {
-        return {{.name = "",
-                 .question = "which pedal",
-                 .answer = "sustain",
-                 .form = "sustain|sostenuto|soft|all",
-                 .values = {"sustain", "sostenuto", "soft", "all"}}};
-    }
-    if (command == "transform-pedal-offset")
-    {
-        return {{.name = "", .question = "by", .answer = "20ms", .form = "ms, -20ms earlier"}};
-    }
-    if (command == "transform-remap")
-    {
-        return {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1"},
-                {.name = "to", .question = "to", .answer = "", .form = "cc11|D1"}};
-    }
-    if (command == "transform-quantize")
-    {
-        // The grid's default is the tracks' own, as q's (see askSettings).
-        return {{.name = "",
-                 .question = "to a grid of",
-                 .answer = "grid",
-                 .form = "1/16|1/8t|grid",
-                 .values = {"grid"},
-                 .lengths = true},
-                {.name = "strength",
-                 .question = "how far onto it",
-                 .answer = "100%",
-                 .form = "0%-100%",
-                 .values = {"100%", "75%", "50%", "25%"}},
-                {.name = "swing",
-                 .question = "with a swing of",
-                 .answer = "50%",
-                 .form = "25%-75%, 50% straight",
-                 .values = {"50%", "55%", "60%", "66%"}},
-                {.name = "move",
-                 .question = "moving",
-                 .answer = "starts",
-                 .form = "starts|ends|both|lengths",
-                 .values = {"starts", "ends", "both", "lengths"}}};
-    }
-    return {};
-}
-
 void Workspace::askSettings(const std::string& op, const OperatorTarget& target, Answers answers)
 {
     // The first setting not yet given asked for, its default at Enter; an answer may give
@@ -368,25 +192,9 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         {
             continue;
         }
-        const auto question = std::ranges::find(kQuestions, op, &Asking::op);
-        auto label = std::string{question->label};
+        auto label = std::string{findTransform(op)->label};
         label.replace(label.find("{}"), 2, target.what);
-        auto answer =
-            settings[i].answer == "grid" ? gridOf(target) : std::string{settings[i].answer};
-        if (answer == "{lift}" || answer == "{press}")
-        {
-            answer = std::to_string((answer == "{lift}" ? pedalLift_ : pedalPress_).count()) + "ms";
-        }
-        if (settings[i].tracks)
-        {
-            // A new track, named after the first's and the side moved.
-            const auto side =
-                std::ranges::find(answers, std::string{"side"}, &Answers::value_type::first);
-            const auto* first =
-                target.parts.empty() ? nullptr : document_.song().track(target.parts[0].track);
-            answer = (first != nullptr ? first->name : std::string{"Track"}) +
-                     (side != answers.end() && side->second == "below" ? " low" : " high");
-        }
+        const auto answer = defaultAnswer(settings[i].answer, target, answers);
         label += ", " + std::string{settings[i].question} + " (" +
                  (answer.empty() ? std::string{settings[i].form} : answer) + "): ";
         askFor(
@@ -424,32 +232,68 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
             text += name + "=" + value + " ";
         }
     }
-    if (op == "transform-quantize")
+    (this->*findTransform(op)->apply)(op, target, text);
+}
+
+std::string Workspace::defaultAnswer(std::string_view answer, const OperatorTarget& target,
+                                     const Answers& answers) const
+{
+    // A default worked out as it's asked: the tracks' grid, the pedalling settings, a new track
+    // named after the first's and the side moved, the range's first note or the search's query.
+    if (answer == "{grid}")
     {
-        quantizeAsked(target, text);
-        return;
+        return gridOf(target);
     }
-    if (op == "transform-thin")
+    if (answer == "{lift}" || answer == "{press}")
     {
-        thinAsked(target, text);
-        return;
+        return std::to_string((answer == "{lift}" ? pedalLift_ : pedalPress_).count()) + "ms";
     }
-    if (op == "transform-split")
+    if (answer == "{track}")
     {
-        splitAsked(target, text);
-        return;
+        const auto side =
+            std::ranges::find(answers, std::string{"side"}, &Answers::value_type::first);
+        const auto* first =
+            target.parts.empty() ? nullptr : document_.song().track(target.parts[0].track);
+        return (first != nullptr ? first->name : std::string{"Track"}) +
+               (side != answers.end() && side->second == "below" ? " low" : " high");
     }
-    if (op == "transform-remap")
+    if (answer == "{first}")
     {
-        remapAsked(target, text);
-        return;
+        return firstPitch(target);
     }
-    if (op.starts_with("transform-pedal-"))
+    if (answer == "{search}")
     {
-        pedalAsked(op, target, text);
-        return;
+        return search_ ? searchText_ : std::string{};
     }
-    velocityOverTime(op, target, text);
+    return std::string{answer};
+}
+
+bool Workspace::askTransform(const TransformSpec& spec, const OperatorTarget& target)
+{
+    // As it asks: nothing, a key and then the rest, its settings in turn, or one question.
+    switch (spec.asks)
+    {
+    case TransformSpec::Asks::Nothing:
+        return (this->*spec.apply)(spec.name, target, {});
+    case TransformSpec::Asks::Key:
+        askKey(target, [this, op = std::string{spec.name}, target](const core::Key& key)
+               { askKeyed(op, target, key); });
+        return true;
+    case TransformSpec::Asks::InTurn:
+        askSettings(std::string{spec.name}, target, {});
+        return true;
+    case TransformSpec::Asks::Once:
+        break;
+    }
+    const auto answer = defaultAnswer(spec.answer, target, {});
+    auto label = std::string{spec.label};
+    label.replace(label.find("{}"), 2, target.what);
+    label += " (" + (answer.empty() ? std::string{spec.examples} : answer) + "): ";
+    askFor(
+        std::move(label), [this, name = std::string{spec.name}, target](const std::string& text)
+        { applyTransform(name, target, text); }, answer);
+    answerCommand_ = spec.name;
+    return true;
 }
 
 std::string Workspace::optionsCommand() const
@@ -822,253 +666,15 @@ bool Workspace::applyKeyed(std::string_view op, const OperatorTarget& target, co
 bool Workspace::applyTransform(std::string_view name, const OperatorTarget& target,
                                const std::string& text)
 {
-    if (name == "transform-transpose-key" || name == "transform-invert-key")
+    // A transform with what it's been told, the answer to its question or what follows its
+    // name at the : prompt: those asking in turn asked for the rest; the others done.
+    const auto* spec = findTransform(name);
+    if (spec == nullptr)
     {
-        // key= with a tonic, and a scale if the next word names one; asking for it if not
-        // given, and then for the amount if that isn't either.
-        std::string rest = text;
-        std::optional<core::Key> key;
-        if (const auto at = rest.find("key="); at != std::string::npos)
-        {
-            const auto tonicEnd = std::min(rest.find(' ', at), rest.size());
-            auto keyText = rest.substr(at + 4, tonicEnd - at - 4);
-            auto end = tonicEnd;
-            const auto scaleStart = rest.find_first_not_of(' ', tonicEnd);
-            if (scaleStart != std::string::npos)
-            {
-                const auto scaleEnd = std::min(rest.find(' ', scaleStart), rest.size());
-                const auto scale = rest.substr(scaleStart, scaleEnd - scaleStart);
-                const auto all = scales();
-                if (core::findScale(scale, all) != nullptr)
-                {
-                    keyText += " " + scale;
-                    end = scaleEnd;
-                }
-            }
-            key = core::parseKey(keyText, scales());
-            if (!key)
-            {
-                setMessage("Not a key: " + keyText +
-                               "; type key= and a tonic and a scale, as "
-                               "key=D dorian",
-                           MessageKind::Warning);
-                return true;
-            }
-            lastKey_ = key->text();
-            rest.erase(at, end - at);
-        }
-        const auto amount = std::string{trimmed(rest)};
-        const auto then = [this, op = std::string{name}, target, amount](const core::Key& k)
-        {
-            if (amount.empty())
-            {
-                askKeyed(op, target, k);
-                return;
-            }
-            applyKeyed(op, target, k, amount);
-        };
-        if (key)
-        {
-            then(*key);
-            return true;
-        }
-        askKey(target, then);
-        return true;
+        return false;
     }
-    if (name == "transform-invert")
+    if (spec->asks == TransformSpec::Asks::InTurn)
     {
-        const auto pivot = core::parsePitch(trimmed(text));
-        if (!pivot)
-        {
-            setMessage("Not a note: " + text + "; type one to invert about, as E4",
-                       MessageKind::Warning);
-            return true;
-        }
-        return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot), target,
-                            [&](const core::EventList& events, const auto& part)
-                            { return core::invert(events, part.events, *pivot); });
-    }
-    if (name == "transform-stretch")
-    {
-        // A ratio: 2, 1/2, 3/2 or 150%.
-        auto ratio = std::string{trimmed(text)};
-        std::int64_t numerator = 0;
-        std::int64_t denominator = 1;
-        const auto whole = [](std::string_view digits, std::int64_t& value)
-        {
-            const auto [end, error] =
-                std::from_chars(digits.data(), digits.data() + digits.size(), value);
-            return !digits.empty() && error == std::errc{} && end == digits.data() + digits.size();
-        };
-        bool read = false;
-        if (ratio.ends_with('%'))
-        {
-            denominator = 100;
-            read = whole(std::string_view{ratio}.substr(0, ratio.size() - 1), numerator);
-        }
-        else if (const auto slash = ratio.find('/'); slash != std::string::npos)
-        {
-            read = whole(std::string_view{ratio}.substr(0, slash), numerator) &&
-                   whole(std::string_view{ratio}.substr(slash + 1), denominator);
-        }
-        else
-        {
-            read = whole(ratio, numerator);
-        }
-        if (!read || numerator < 1 || denominator < 1 || numerator > 64 * denominator ||
-            denominator > 64 * numerator)
-        {
-            setMessage("Not a ratio: " + text +
-                           "; type 2 for half time, 1/2 for double time, or a percentage, as "
-                           "150%",
-                       MessageKind::Warning);
-            return true;
-        }
-        const auto end = document_.song().end();
-        return changeEvents("Stretch " + target.what + " by " + ratio, target,
-                            [&](const core::EventList& events, const auto& part)
-                            {
-                                return core::stretch(events, part.events, numerator, denominator,
-                                                     end, target.notesOnly);
-                            });
-    }
-    if (name == "transform-length" || name == "transform-legato")
-    {
-        // legato, a length (1/8) or a percentage (80%).
-        const auto said =
-            name == "transform-legato" ? std::string{"legato"} : std::string{trimmed(text)};
-        const auto& song = document_.song();
-        auto how = core::LengthChange::Legato;
-        core::Tick amount = 0;
-        std::string title = "Make " + target.what + " legato";
-        if (said.ends_with('%'))
-        {
-            const auto percent = percentUpTo(said, 1000);
-            if (!percent || *percent < 1)
-            {
-                setMessage("Not a percentage: " + said + "; type one from 1% up, as 80%",
-                           MessageKind::Warning);
-                return true;
-            }
-            how = core::LengthChange::Percent;
-            amount = *percent;
-            title = "Scale the lengths of " + target.what + " to " + said;
-        }
-        else if (said != "legato")
-        {
-            const auto length = core::parseNoteFraction(said);
-            if (!length)
-            {
-                setMessage("Not a length: " + said +
-                               "; type legato, a length, as 1/8, or a "
-                               "percentage, as 80%",
-                           MessageKind::Warning);
-                return true;
-            }
-            how = core::LengthChange::Fixed;
-            amount = length->toTicks(song.ppqn());
-            title = "Set the lengths of " + target.what + " to " + core::toString(*length);
-        }
-        const auto window = chordWindow_;
-        const auto together = [&](core::Tick first, core::Tick tick)
-        {
-            const auto& tempo = song.tempo();
-            return tempo.toTime(tick) - tempo.toTime(first) <= window;
-        };
-        return changeEvents(
-            title, target, [&](const core::EventList& events, const auto& part)
-            { return core::changeLengths(events, part.events, how, amount, together); });
-    }
-    if (name == "transform-filter")
-    {
-        const auto parsed = core::parseQuery(text, scales());
-        if (!parsed.query)
-        {
-            setMessage(parsed.error, MessageKind::Warning);
-            return true;
-        }
-        const auto ppqn = document_.song().ppqn();
-        return changeEvents(
-            "Delete the events of " + target.what + " matching " + std::string{trimmed(text)},
-            target,
-            [&](const core::EventList& events, const auto& part)
-            {
-                return core::removed(events, part.events, [&](const core::Event& event)
-                                     { return core::matches(*parsed.query, event.data, ppqn); });
-            });
-    }
-    if (name == "transform-pedal-bake")
-    {
-        return pedalAsked(name, target, {});
-    }
-    if (name == "transform-retrograde")
-    {
-        return changeEvents("Retrograde " + target.what, target,
-                            [](const core::EventList& events, const auto& part)
-                            { return core::retrograde(events, part.events); });
-    }
-    // A transform with what it's been told: the answer to its question, or what follows its
-    // name at the : prompt.
-    if (name == "transform-transpose")
-    {
-        const auto by = semitones(text);
-        if (!by)
-        {
-            setMessage("Not a number of semitones: " + text + "; type +12, -3 or 7",
-                       MessageKind::Warning);
-            return true;
-        }
-        if (*by == 0)
-        {
-            setMessage("Transposing by 0 semitones changes nothing", MessageKind::Information);
-            return true;
-        }
-        return changeEvents("Transpose " + target.what + (*by > 0 ? " up " : " down ") +
-                                times(std::abs(*by), "a semitone", "semitones"),
-                            target, [by = *by](const core::EventList& events, const auto& part)
-                            { return core::transpose(events, part.events, by); });
-    }
-    const auto limits = velocityLimits_;
-    if (name == "transform-velocity-lift" || name == "transform-velocity-lower")
-    {
-        const bool lift = name == "transform-velocity-lift";
-        const auto percent = core::parsePercent(text);
-        if (!percent)
-        {
-            setMessage("Not a percentage: " + text + "; type 0% to 100%, as 25%",
-                       MessageKind::Warning);
-            return true;
-        }
-        return changeEvents(
-            (lift ? "Lift the velocities of " : "Lower the velocities of ") + target.what + " by " +
-                std::to_string(*percent) + "%",
-            target,
-            [&](const core::EventList& events, const auto& part)
-            {
-                return lift ? core::liftVelocity(events, part.events, *percent, limits)
-                            : core::lowerVelocity(events, part.events, *percent, limits);
-            });
-    }
-    if (name == "transform-velocity-limit")
-    {
-        const auto range = core::parseVelocityRange(text, false);
-        if (!range || range->from > range->to)
-        {
-            setMessage("Not a range of velocities: " + text +
-                           "; type the lowest and the "
-                           "highest, as 20-110",
-                       MessageKind::Warning);
-            return true;
-        }
-        return changeEvents(
-            "Keep the velocities of " + target.what + " between " + std::to_string(range->from) +
-                " and " + std::to_string(range->to),
-            target, [&](const core::EventList& events, const auto& part)
-            { return core::limitVelocity(events, part.events, range->from, range->to, limits); });
-    }
-    if (!transformSettings(name).empty())
-    {
-        // What the : line gave, the rest asked for.
         Answers answers;
         const auto said = told(text, {});
         for (const auto& option : said.options)
@@ -1082,29 +688,283 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
         askSettings(std::string{name}, target, std::move(answers));
         return true;
     }
-    if (name.starts_with("transform-chord-"))
+    return (this->*spec->apply)(name, target, text);
+}
+
+bool Workspace::applyKeyLine(std::string_view name, const OperatorTarget& target,
+                             const std::string& text)
+{
+    // key= with a tonic, and a scale if the next word names one; asking for it if not
+    // given, and then for the amount if that isn't either.
+    std::string rest = text;
+    std::optional<core::Key> key;
+    if (const auto at = rest.find("key="); at != std::string::npos)
     {
-        return velocityInChords(name, target, text);
-    }
-    if (name == "transform-velocity-ramp")
-    {
-        const auto ramp = core::parseVelocityRange(text, true);
-        if (!ramp)
+        const auto tonicEnd = std::min(rest.find(' ', at), rest.size());
+        auto keyText = rest.substr(at + 4, tonicEnd - at - 4);
+        auto end = tonicEnd;
+        const auto scaleStart = rest.find_first_not_of(' ', tonicEnd);
+        if (scaleStart != std::string::npos)
         {
-            setMessage("Not a ramp: " + text +
-                           "; type the velocities at its start and end, as "
-                           "60-100, or percentages, as 80%-120%",
+            const auto scaleEnd = std::min(rest.find(' ', scaleStart), rest.size());
+            const auto scale = rest.substr(scaleStart, scaleEnd - scaleStart);
+            const auto all = scales();
+            if (core::findScale(scale, all) != nullptr)
+            {
+                keyText += " " + scale;
+                end = scaleEnd;
+            }
+        }
+        key = core::parseKey(keyText, scales());
+        if (!key)
+        {
+            setMessage("Not a key: " + keyText +
+                           "; type key= and a tonic and a scale, as "
+                           "key=D dorian",
                        MessageKind::Warning);
             return true;
         }
-        const auto unit = ramp->percent ? std::string{"%"} : std::string{};
-        return changeEvents("Ramp the velocities of " + target.what + " from " +
-                                std::to_string(ramp->from) + unit + " to " +
-                                std::to_string(ramp->to) + unit,
-                            target, [&](const core::EventList& events, const auto& part)
-                            { return core::rampVelocity(events, part.events, *ramp, limits); });
+        lastKey_ = key->text();
+        rest.erase(at, end - at);
     }
-    return false;
+    const auto amount = std::string{trimmed(rest)};
+    const auto then = [this, op = std::string{name}, target, amount](const core::Key& k)
+    {
+        if (amount.empty())
+        {
+            askKeyed(op, target, k);
+            return;
+        }
+        applyKeyed(op, target, k, amount);
+    };
+    if (key)
+    {
+        then(*key);
+        return true;
+    }
+    askKey(target, then);
+    return true;
+}
+
+bool Workspace::applyInvert(std::string_view /*name*/, const OperatorTarget& target,
+                            const std::string& text)
+{
+    const auto pivot = core::parsePitch(trimmed(text));
+    if (!pivot)
+    {
+        setMessage("Not a note: " + text + "; type one to invert about, as E4",
+                   MessageKind::Warning);
+        return true;
+    }
+    return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot), target,
+                        [&](const core::EventList& events, const auto& part)
+                        { return core::invert(events, part.events, *pivot); });
+}
+
+bool Workspace::applyStretch(std::string_view /*name*/, const OperatorTarget& target,
+                             const std::string& text)
+{
+    // A ratio: 2, 1/2, 3/2 or 150%.
+    auto ratio = std::string{trimmed(text)};
+    std::int64_t numerator = 0;
+    std::int64_t denominator = 1;
+    const auto whole = [](std::string_view digits, std::int64_t& value)
+    {
+        const auto [end, error] =
+            std::from_chars(digits.data(), digits.data() + digits.size(), value);
+        return !digits.empty() && error == std::errc{} && end == digits.data() + digits.size();
+    };
+    bool read = false;
+    if (ratio.ends_with('%'))
+    {
+        denominator = 100;
+        read = whole(std::string_view{ratio}.substr(0, ratio.size() - 1), numerator);
+    }
+    else if (const auto slash = ratio.find('/'); slash != std::string::npos)
+    {
+        read = whole(std::string_view{ratio}.substr(0, slash), numerator) &&
+               whole(std::string_view{ratio}.substr(slash + 1), denominator);
+    }
+    else
+    {
+        read = whole(ratio, numerator);
+    }
+    if (!read || numerator < 1 || denominator < 1 || numerator > 64 * denominator ||
+        denominator > 64 * numerator)
+    {
+        setMessage("Not a ratio: " + text +
+                       "; type 2 for half time, 1/2 for double time, or a percentage, as "
+                       "150%",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto end = document_.song().end();
+    return changeEvents("Stretch " + target.what + " by " + ratio, target,
+                        [&](const core::EventList& events, const auto& part)
+                        {
+                            return core::stretch(events, part.events, numerator, denominator, end,
+                                                 target.notesOnly);
+                        });
+}
+
+bool Workspace::applyLength(std::string_view name, const OperatorTarget& target,
+                            const std::string& text)
+{
+    // legato, a length (1/8) or a percentage (80%).
+    const auto said =
+        name == "transform-legato" ? std::string{"legato"} : std::string{trimmed(text)};
+    const auto& song = document_.song();
+    auto how = core::LengthChange::Legato;
+    core::Tick amount = 0;
+    std::string title = "Make " + target.what + " legato";
+    if (said.ends_with('%'))
+    {
+        const auto percent = percentUpTo(said, 1000);
+        if (!percent || *percent < 1)
+        {
+            setMessage("Not a percentage: " + said + "; type one from 1% up, as 80%",
+                       MessageKind::Warning);
+            return true;
+        }
+        how = core::LengthChange::Percent;
+        amount = *percent;
+        title = "Scale the lengths of " + target.what + " to " + said;
+    }
+    else if (said != "legato")
+    {
+        const auto length = core::parseNoteFraction(said);
+        if (!length)
+        {
+            setMessage("Not a length: " + said +
+                           "; type legato, a length, as 1/8, or a "
+                           "percentage, as 80%",
+                       MessageKind::Warning);
+            return true;
+        }
+        how = core::LengthChange::Fixed;
+        amount = length->toTicks(song.ppqn());
+        title = "Set the lengths of " + target.what + " to " + core::toString(*length);
+    }
+    const auto window = chordWindow_;
+    const auto together = [&](core::Tick first, core::Tick tick)
+    {
+        const auto& tempo = song.tempo();
+        return tempo.toTime(tick) - tempo.toTime(first) <= window;
+    };
+    return changeEvents(
+        title, target, [&](const core::EventList& events, const auto& part)
+        { return core::changeLengths(events, part.events, how, amount, together); });
+}
+
+bool Workspace::applyFilter(std::string_view /*name*/, const OperatorTarget& target,
+                            const std::string& text)
+{
+    const auto parsed = core::parseQuery(text, scales());
+    if (!parsed.query)
+    {
+        setMessage(parsed.error, MessageKind::Warning);
+        return true;
+    }
+    const auto ppqn = document_.song().ppqn();
+    return changeEvents(
+        "Delete the events of " + target.what + " matching " + std::string{trimmed(text)}, target,
+        [&](const core::EventList& events, const auto& part)
+        {
+            return core::removed(events, part.events, [&](const core::Event& event)
+                                 { return core::matches(*parsed.query, event.data, ppqn); });
+        });
+}
+
+bool Workspace::applyRetrograde(std::string_view /*name*/, const OperatorTarget& target,
+                                const std::string& /*text*/)
+{
+    return changeEvents("Retrograde " + target.what, target,
+                        [](const core::EventList& events, const auto& part)
+                        { return core::retrograde(events, part.events); });
+}
+
+bool Workspace::applyTranspose(std::string_view /*name*/, const OperatorTarget& target,
+                               const std::string& text)
+{
+    const auto by = semitones(text);
+    if (!by)
+    {
+        setMessage("Not a number of semitones: " + text + "; type +12, -3 or 7",
+                   MessageKind::Warning);
+        return true;
+    }
+    if (*by == 0)
+    {
+        setMessage("Transposing by 0 semitones changes nothing", MessageKind::Information);
+        return true;
+    }
+    return changeEvents("Transpose " + target.what + (*by > 0 ? " up " : " down ") +
+                            times(std::abs(*by), "a semitone", "semitones"),
+                        target, [by = *by](const core::EventList& events, const auto& part)
+                        { return core::transpose(events, part.events, by); });
+}
+
+bool Workspace::applyLift(std::string_view name, const OperatorTarget& target,
+                          const std::string& text)
+{
+    const auto limits = velocityLimits_;
+    const bool lift = name == "transform-velocity-lift";
+    const auto percent = core::parsePercent(text);
+    if (!percent)
+    {
+        setMessage("Not a percentage: " + text + "; type 0% to 100%, as 25%", MessageKind::Warning);
+        return true;
+    }
+    return changeEvents((lift ? "Lift the velocities of " : "Lower the velocities of ") +
+                            target.what + " by " + std::to_string(*percent) + "%",
+                        target,
+                        [&](const core::EventList& events, const auto& part)
+                        {
+                            return lift
+                                       ? core::liftVelocity(events, part.events, *percent, limits)
+                                       : core::lowerVelocity(events, part.events, *percent, limits);
+                        });
+}
+
+bool Workspace::applyLimit(std::string_view /*name*/, const OperatorTarget& target,
+                           const std::string& text)
+{
+    const auto limits = velocityLimits_;
+    const auto range = core::parseVelocityRange(text, false);
+    if (!range || range->from > range->to)
+    {
+        setMessage("Not a range of velocities: " + text +
+                       "; type the lowest and the "
+                       "highest, as 20-110",
+                   MessageKind::Warning);
+        return true;
+    }
+    return changeEvents(
+        "Keep the velocities of " + target.what + " between " + std::to_string(range->from) +
+            " and " + std::to_string(range->to),
+        target, [&](const core::EventList& events, const auto& part)
+        { return core::limitVelocity(events, part.events, range->from, range->to, limits); });
+}
+
+bool Workspace::applyRamp(std::string_view /*name*/, const OperatorTarget& target,
+                          const std::string& text)
+{
+    const auto limits = velocityLimits_;
+    const auto ramp = core::parseVelocityRange(text, true);
+    if (!ramp)
+    {
+        setMessage("Not a ramp: " + text +
+                       "; type the velocities at its start and end, as "
+                       "60-100, or percentages, as 80%-120%",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto unit = ramp->percent ? std::string{"%"} : std::string{};
+    return changeEvents("Ramp the velocities of " + target.what + " from " +
+                            std::to_string(ramp->from) + unit + " to " + std::to_string(ramp->to) +
+                            unit,
+                        target, [&](const core::EventList& events, const auto& part)
+                        { return core::rampVelocity(events, part.events, *ramp, limits); });
 }
 
 bool Workspace::transform(std::string_view op, int amount, std::string_view motion, int count)
@@ -1131,54 +991,9 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     {
         return openTransformMenu(std::move(*target));
     }
-    if (op == "transform-retrograde" || op == "transform-legato" || op == "transform-pedal-bake")
+    if (const auto* spec = findTransform(op))
     {
-        return applyTransform(op, *target, {});
-    }
-    if (op == "transform-filter")
-    {
-        askFor(
-            "Delete the events of " + target->what + " matching (" +
-                (search_ ? searchText_ : std::string{"vel<20, cc7"}) + "): ",
-            [this, target = *target](const std::string& text)
-            { applyTransform("transform-filter", target, text); },
-            search_ ? searchText_ : std::string{});
-        return true;
-    }
-    if (op == "transform-invert")
-    {
-        const auto first = firstPitch(*target);
-        askFor(
-            "Invert " + target->what + " about (" + first + "): ",
-            [this, target = *target](const std::string& text)
-            { applyTransform("transform-invert", target, text); }, first);
-        return true;
-    }
-    if (op == "transform-transpose-key" || op == "transform-invert-key")
-    {
-        askKey(*target, [this, op = std::string{op}, target = *target](const core::Key& key)
-               { askKeyed(op, target, key); });
-        return true;
-    }
-    if (!transformSettings(op).empty())
-    {
-        askSettings(std::string{op}, *target, {});
-        return true;
-    }
-    if (const auto question = std::ranges::find(kQuestions, op, &Asking::op);
-        question != kQuestions.end())
-    {
-        auto label = std::string{question->label};
-        label.replace(label.find("{}"), 2, target->what);
-        label += " (" +
-                 std::string{question->answer.empty() ? question->examples : question->answer} +
-                 "): ";
-        askFor(
-            std::move(label),
-            [this, name = std::string{op}, target = *target](const std::string& text)
-            { applyTransform(name, target, text); }, std::string{question->answer});
-        answerCommand_ = op;
-        return true;
+        return askTransform(*spec, *target);
     }
     const auto& song = document_.song();
     if (op == "operator-transpose-up" || op == "operator-transpose-down")
@@ -1312,7 +1127,8 @@ bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quanti
         });
 }
 
-bool Workspace::thinAsked(const OperatorTarget& target, const std::string& text)
+bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& target,
+                          const std::string& text)
 {
     const auto said = told(text, {});
     core::ThinWhat what;
@@ -1376,7 +1192,8 @@ bool Workspace::thinAsked(const OperatorTarget& target, const std::string& text)
                         });
 }
 
-bool Workspace::splitAsked(const OperatorTarget& target, const std::string& given)
+bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& target,
+                           const std::string& given)
 {
     // The track's name is the rest of the line after to=, spaces and all.
     auto text = given;
@@ -1506,7 +1323,8 @@ bool Workspace::splitAsked(const OperatorTarget& target, const std::string& give
     return true;
 }
 
-bool Workspace::remapAsked(const OperatorTarget& target, const std::string& text)
+bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& target,
+                           const std::string& text)
 {
     const auto said = told(text, {});
     std::string to;
@@ -1803,7 +1621,8 @@ std::string Workspace::gridOf(const OperatorTarget& target) const
     return shared ? core::toString(*shared) : std::string{"grid"};
 }
 
-bool Workspace::quantizeAsked(const OperatorTarget& target, const std::string& text)
+bool Workspace::quantizeAsked(std::string_view /*name*/, const OperatorTarget& target,
+                              const std::string& text)
 {
     using Move = core::QuantizeHow::Move;
     const auto said = told(text, {});

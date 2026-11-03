@@ -82,6 +82,37 @@ public:
     // and the window's (see windowCommands).
     static Keymap defaultKeymap();
 
+    // One definition for each transform (decided November 2026, after a code review): its
+    // command; how it asks, for nothing, a key and the rest, its settings in turn or one
+    // thing (the question's start, {} for what it takes, examples when it has no default, and
+    // the default, {first} for the range's first note and {search} for the search's query);
+    // and the function that does it.
+    struct TransformSpec
+    {
+        enum class Asks : std::uint8_t
+        {
+            Nothing,
+            Once,
+            InTurn,
+            Key,
+        };
+        using Apply = bool (Workspace::*)(std::string_view name, const OperatorTarget& target,
+                                          const std::string& text);
+
+        std::string_view name;
+        std::string_view aliases;
+        std::string_view usage;
+        std::string_view description;
+        Asks asks = Asks::Once;
+        std::string_view label = {};
+        std::string_view examples = {};
+        std::string_view answer = {};
+        std::vector<TransformSetting> settings = {};
+        Apply apply = nullptr;
+    };
+    static std::span<const TransformSpec> transformSpecs();
+    static const TransformSpec* findTransform(std::string_view name);
+
     // Shows the document's song, in the event list from track 1 (or the conductor's list, if
     // there are no tracks), until another view is shown. Gives the registry what runs the commands,
     // which keys then run through it with the registry's others, such as the window's. The registry
@@ -272,6 +303,7 @@ public:
         macroFailed_ = macroFailed_ || (kind == MessageKind::Warning && macroDepth_ > 0);
     }
     const std::string& message() const { return message_; }
+    MessageKind messageKind() const { return messageKind_; }
 
 private:
     void startTyping() override { mode_ = Mode::CommandLine; }
@@ -328,10 +360,27 @@ private:
     bool transform(std::string_view op, int amount, std::string_view motion, int count);
     // Quantises the notes' starts, and the pedals with them if asked.
     bool quantize(const OperatorTarget& target, bool pedals, const Quantizing& how = {});
-    bool quantizeAsked(const OperatorTarget& target, const std::string& text);
-    bool thinAsked(const OperatorTarget& target, const std::string& text);
-    bool splitAsked(const OperatorTarget& target, const std::string& given);
-    bool remapAsked(const OperatorTarget& target, const std::string& text);
+    using Answers = std::vector<std::pair<std::string, std::string>>;
+    bool quantizeAsked(std::string_view name, const OperatorTarget& target,
+                       const std::string& text);
+    bool thinAsked(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool splitAsked(std::string_view name, const OperatorTarget& target, const std::string& given);
+    bool remapAsked(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyKeyLine(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyInvert(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyStretch(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyLength(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyFilter(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyRetrograde(std::string_view name, const OperatorTarget& target,
+                         const std::string& text);
+    bool applyTranspose(std::string_view name, const OperatorTarget& target,
+                        const std::string& text);
+    bool applyLift(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyLimit(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool applyRamp(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool askTransform(const TransformSpec& spec, const OperatorTarget& target);
+    std::string defaultAnswer(std::string_view answer, const OperatorTarget& target,
+                              const Answers& answers) const;
     bool pedalAsked(std::string_view op, const OperatorTarget& target, const std::string& text);
     std::chrono::milliseconds pedalLift_{10};
     std::chrono::milliseconds pedalPress_{60};
@@ -563,7 +612,6 @@ private:
     std::string answerDefault_;
     std::string answerCommand_;     // the transform asking, for its settings
     std::size_t answerSetting_ = 0; // and which it's asking for
-    using Answers = std::vector<std::pair<std::string, std::string>>;
     void askSettings(const std::string& op, const OperatorTarget& target, Answers answers);
     std::string optionsCommand() const;
     std::string answerLabel_;
