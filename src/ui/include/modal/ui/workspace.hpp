@@ -287,8 +287,8 @@ public:
     const std::vector<core::Event>& registerEvents() const;
 
     // Shows a message in the status line until the next key.
-    std::optional<core::EventQuery> findQuery() const override { return findQuery_; }
-    std::optional<core::EventQuery> searchQuery() const override { return search_; }
+    std::optional<core::EventQuery> findQuery() const override { return finding_.query; }
+    std::optional<core::EventQuery> searchQuery() const override { return searching_.query; }
     void searchWrapped(bool forward) override;
     std::optional<core::Tick> jumpTime() const override
     {
@@ -549,12 +549,16 @@ private:
         bool failed = false;
         std::optional<Redo> redo = {};
     };
-    std::optional<Naming> naming_;
-    std::optional<core::EventQuery> findQuery_;
-    std::string findName_;
-    bool findForward_ = true;
-    bool findRepeats_ = false;
-    bool findKept_ = false;
+    struct FindState
+    {
+        std::optional<Naming> naming;
+        std::optional<core::EventQuery> query;
+        std::string name;
+        bool forward = true;
+        bool repeats = false;
+        bool kept = false;
+    };
+    FindState finding_;
     bool startFind(bool forward, int count);
     // The operator over the find's range, to its note named so far, saying so if there's none;
     // whether it found one.
@@ -610,11 +614,20 @@ private:
                 std::string defaultAnswer = {});
     void askSettings(const std::string& op, const OperatorTarget& target, Answers answers);
     std::string optionsCommand() const;
-    // Search (/C1): what the last looks for, as typed and as read, whether it went forwards (*
-    // or /) or back (#), which n keeps to, as in Vim, and whether the prompt is for one.
-    std::optional<core::EventQuery> search_;
-    std::string searchText_;
-    bool searchForward_ = true;
+    // Search (/C1): what the last looks for, as read and as typed, and whether it went
+    // forwards (* or /) or back (#), which n keeps to, as in Vim; and gn's run through matches
+    // (see operateOnMatch): where its last change was, whether the run goes on, and whether
+    // the key being handled kept it going.
+    struct SearchState
+    {
+        std::optional<core::EventQuery> query;
+        std::string text;
+        bool forward = true;
+        std::optional<SongCursor> gnLast;
+        bool gnRun = false;
+        bool gnKept = false;
+    };
+    SearchState searching_;
     // Searching for what's typed, / and Enter alone clearing the matches; going to the next
     // match in the search's direction, or the one before; and searching for what's under the
     // cursor (* and #).
@@ -639,9 +652,6 @@ private:
     bool operateOnMatch(std::string_view op, int amount);
     bool selectMatch();
     bool toMatchForGn();
-    std::optional<SongCursor> gnLast_;
-    bool gnRun_ = false;
-    bool gnKept_ = false;
     // A target an operator takes rather than asking the view, as gn's.
     std::optional<OperatorTarget> presetTarget_;
     // The transforms: ! and a range keeps the range while the transform menu waits for a key.

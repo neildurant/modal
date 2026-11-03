@@ -263,7 +263,7 @@ std::string Workspace::defaultAnswer(std::string_view answer, const OperatorTarg
     }
     if (answer == "{search}")
     {
-        return search_ ? searchText_ : std::string{};
+        return searching_.query ? searching_.text : std::string{};
     }
     return std::string{answer};
 }
