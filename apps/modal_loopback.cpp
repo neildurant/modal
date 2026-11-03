@@ -703,8 +703,11 @@ int run(const Options& options)
         const std::lock_guard lock{mutex};
         received.clear(); // anything that arrived before the stream
     }
-    engine.setPlan(plan);
-    engine.play(0);
+    if (!engine.setPlan(plan) || !engine.play(0))
+    {
+        std::cerr << "error: the engine didn't take the plan\n";
+        return 1;
+    }
     const auto play = engine.lastPlay();
     std::optional<core::Recorder> recorder;
     if (stream)
@@ -742,7 +745,10 @@ int run(const Options& options)
         }
         std::this_thread::sleep_for(10ms);
     }
-    engine.stop();
+    while (!engine.stop())
+    {
+        std::this_thread::sleep_for(1ms);
+    }
     std::optional<core::Tick> stoppedAt;
     while (!(stoppedAt = engine.stoppedAt(play)))
     {

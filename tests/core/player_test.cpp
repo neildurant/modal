@@ -86,7 +86,7 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
 
     Playing p{song};
     CHECK(p.player.missingPorts() == std::vector<std::string>{"gone"});
-    p.player.play();
+    CHECK(p.player.play());
     p.runFor(1ms);
     REQUIRE_FALSE(p.sink.sent.empty());
     CHECK(p.sink.sent.front().destination == DestinationId{2});
@@ -112,17 +112,17 @@ TEST_CASE("playback starts from the marker, which stays put with rewind")
     CHECK(p.player.rewind());
 
     p.player.setMarker(q);
-    p.player.toggle();
+    CHECK(p.player.toggle());
     CHECK(p.player.playing());
     p.runFor(750ms); // a quarter and a half on
     CHECK(p.player.position() == q + q + q / 2);
-    p.player.toggle();
+    CHECK(p.player.toggle());
     CHECK_FALSE(p.player.playing());
     CHECK(p.player.position() == std::nullopt);
     p.runFor(1ms);
     CHECK_FALSE(p.player.stopping());
     CHECK(p.player.marker() == q);
-    p.player.toggle();
+    CHECK(p.player.toggle());
     p.runFor(1ms);
     CHECK(p.player.position() >= q);
     CHECK(p.player.position() < q + q / 10);
@@ -135,9 +135,9 @@ TEST_CASE("without rewind, the marker moves to where playback stops")
     const Tick q = ppqn.quarter();
     p.player.setRewind(false);
     p.player.setMarker(q);
-    p.player.play();
+    CHECK(p.player.play());
     p.runFor(750ms);
-    p.player.stop();
+    CHECK(p.player.stop());
     CHECK(p.player.marker() == q + q + q / 2); // where it was last seen, until...
     CHECK(p.player.stopping());
     p.runFor(1ms);
@@ -156,7 +156,7 @@ TEST_CASE("playback stops by itself at the song's end")
 
     SECTION("with rewind, the marker stays put")
     {
-        p.player.play();
+        CHECK(p.player.play());
         CHECK_FALSE(p.runFor(1s));
         CHECK(p.player.playing());
         CHECK(p.runFor(2s));
@@ -167,7 +167,7 @@ TEST_CASE("playback stops by itself at the song's end")
     SECTION("without, it goes back to the start, since resuming at the end would play nothing")
     {
         p.player.setRewind(false);
-        p.player.play();
+        CHECK(p.player.play());
         CHECK(p.runFor(3s));
         CHECK_FALSE(p.runFor(1s));
         CHECK(p.player.marker() == 0);
@@ -178,10 +178,10 @@ TEST_CASE("playing while playing starts again from the marker")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
-    p.player.play();
+    CHECK(p.player.play());
     p.runFor(600ms);
     p.player.setMarker(3 * ppqn.quarter());
-    p.player.play();
+    CHECK(p.player.play());
     CHECK(p.player.playing());
     p.runFor(1ms);
     const auto position = p.player.position(); // a millisecond or so on
@@ -194,9 +194,9 @@ TEST_CASE("panic stops playback and resets every channel")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     Playing p{fourNotes(ppqn)};
-    p.player.play();
+    CHECK(p.player.play());
     p.runFor(100ms);
-    p.player.panic();
+    CHECK(p.player.panic());
     CHECK_FALSE(p.player.playing());
     p.sink.sent.clear();
     p.runFor(1ms);
@@ -208,7 +208,7 @@ TEST_CASE("an edit during playback carries on playing the new song")
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = fourNotes(ppqn);
     Playing p{song};
-    p.player.play();
+    CHECK(p.player.play());
     p.runFor(100ms);
     song.updateEvents(song.tracks()[0]->id(), [&](EventList& events)
                       { events.insert({2 * ppqn.quarter() + 1, Note{72, 100, 1}}); });
@@ -218,4 +218,53 @@ TEST_CASE("an edit during playback carries on playing the new song")
     CHECK(p.player.playing());
     const auto messages = p.sink.messages();
     CHECK(std::ranges::find(messages, std::vector<std::uint8_t>{0x90, 72, 100}) != messages.end());
+}
+
+TEST_CASE("a plan the engine can't take yet is kept and handed over later, the newest")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
+    // With the engine not running, its queue fills.
+    auto later = song;
+    for (int i = 0; i < 1000 && !p.player.planWaiting(); ++i)
+    {
+        later = fourNotes(ppqn);
+        later.updateEvents(
+            later.tracks()[0]->id(), [&](EventList& events)
+            { events.insert({0, Note{static_cast<std::uint8_t>(70 + i % 10), 100, 1}}); });
+        p.player.update(later);
+    }
+    REQUIRE(p.player.planWaiting());
+    auto last = fourNotes(ppqn);
+    last.updateEvents(last.tracks()[0]->id(),
+                      [&](EventList& events) { events.insert({0, Note{90, 100, 1}}); });
+    p.player.update(last); // replaces the one waiting
+    p.runFor(1ms);
+    CHECK_FALSE(p.player.planWaiting());
+    CHECK(p.player.play());
+    p.runFor(1ms);
+    bool heard = false;
+    for (const auto& sent : p.sink.sent)
+    {
+        heard = heard || (sent.bytes.size() == 3 && sent.bytes[1] == 90);
+    }
+    CHECK(heard);
+}
+
+TEST_CASE("a play or stop the engine can't take changes nothing")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Playing p{fourNotes(ppqn)};
+    for (int i = 0; i < 1000; ++i)
+    {
+        const bool was = p.player.playing();
+        if (!p.player.toggle())
+        {
+            CHECK(p.player.playing() == was);
+            return;
+        }
+        CHECK(p.player.playing() != was);
+    }
+    FAIL("the engine's queue never filled");
 }

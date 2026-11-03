@@ -86,8 +86,8 @@ TEST_CASE("the engine wakes for its next event, or within 1 ms to look for comma
     Engine engine{sink, clock};
     CHECK(engine.step() == EngineWake{kStart + 1ms, std::nullopt}); // stopped
 
-    engine.setPlan(fourNotes(ppqn));
-    engine.play(0);
+    CHECK(engine.setPlan(fourNotes(ppqn)));
+    CHECK(engine.play(0));
     engine.step();
     clock.time = kStart + 499'500us;
     CHECK(engine.step() == EngineWake{kStart + 500ms, kStart + 500ms});
@@ -99,12 +99,12 @@ TEST_CASE("commands are carried out in the order given")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
+    CHECK(engine.setPlan(fourNotes(ppqn)));
 
     SECTION("play then stop sends nothing")
     {
-        engine.play(0);
-        engine.stop();
+        CHECK(engine.play(0));
+        CHECK(engine.stop());
         engine.step();
         CHECK(sink.sent.empty());
         CHECK_FALSE(engine.status().playing);
@@ -112,8 +112,8 @@ TEST_CASE("commands are carried out in the order given")
 
     SECTION("stop then play plays")
     {
-        engine.stop();
-        engine.play(0);
+        CHECK(engine.stop());
+        CHECK(engine.play(0));
         engine.step();
         CHECK(sink.sent.size() == 1);
         CHECK(engine.status().playing);
@@ -121,8 +121,8 @@ TEST_CASE("commands are carried out in the order given")
 
     SECTION("of two plays, the later one wins")
     {
-        engine.play(0);
-        engine.play(2 * ppqn.quarter());
+        CHECK(engine.play(0));
+        CHECK(engine.play(2 * ppqn.quarter()));
         engine.step();
         CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x90, 64, 100}});
     }
@@ -134,14 +134,14 @@ TEST_CASE("a new plan during playback applies from the current position")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
-    engine.play(0);
+    CHECK(engine.setPlan(fourNotes(ppqn)));
+    CHECK(engine.play(0));
     runUntil(engine, clock, kStart + 750ms);
 
     Song song = songAt(ppqn);
     addTrack(song, 2,
              [&](EditTrack& track) { track.events.insert({3 * ppqn.quarter(), Note{72, 90, 1}}); });
-    engine.setPlan(std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName)));
+    CHECK(engine.setPlan(std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName))));
     sink.sent.clear();
     runUntil(engine, clock, kStart + 2s);
 
@@ -159,14 +159,14 @@ TEST_CASE("panic and quit end the notes sounding")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
-    engine.play(0);
+    CHECK(engine.setPlan(fourNotes(ppqn)));
+    CHECK(engine.play(0));
     engine.step();
     sink.sent.clear();
 
     SECTION("panic")
     {
-        engine.panic();
+        CHECK(engine.panic());
         engine.step();
         CHECK(sink.sent.size() == 1 + 16 * 2);
         CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x80, 60, 64});
@@ -175,8 +175,8 @@ TEST_CASE("panic and quit end the notes sounding")
 
     SECTION("quit")
     {
-        engine.quit();
-        engine.stop(); // after quit: never carried out
+        CHECK(engine.quit());
+        CHECK(engine.stop()); // after quit: taken, but never carried out
         engine.step();
         CHECK(engine.quitRequested());
         CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x80, 60, 64}});
@@ -207,8 +207,8 @@ TEST_CASE("lateness is measured from each message's due time, in two parts")
     FakeClock clock;
     SlowSink sink{clock};
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
-    engine.play(0);
+    CHECK(engine.setPlan(fourNotes(ppqn)));
+    CHECK(engine.play(0));
     engine.step(); // woken on time; sent by 0.2 ms
 
     // Woken 3 ms late for a note-off and a note-on; the note-on waits for the note-off.
@@ -339,7 +339,7 @@ TEST_CASE("the engine sends input thru to the armed tracks, playing or not")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(armedPlan(ppqn));
+    CHECK(engine.setPlan(armedPlan(ppqn)));
     engine.step();
 
     REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart - 2ms));
@@ -363,7 +363,7 @@ TEST_CASE("with thru off, the engine takes input in but doesn't send it on")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(armedPlan(ppqn));
+    CHECK(engine.setPlan(armedPlan(ppqn)));
     engine.setThru(false);
     engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart);
     engine.step();
@@ -377,15 +377,15 @@ TEST_CASE("stop leaves held thru notes alone; panic ends them")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(armedPlan(ppqn));
-    engine.play(0);
+    CHECK(engine.setPlan(armedPlan(ppqn)));
+    CHECK(engine.play(0));
     engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart);
     engine.step();
-    engine.stop();
+    CHECK(engine.stop());
     engine.step();
     CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x91, 60, 100}});
 
-    engine.panic();
+    CHECK(engine.panic());
     engine.step();
     const auto messages = sink.messages();
     REQUIRE(messages.size() > 2);
@@ -413,7 +413,7 @@ TEST_CASE("the engine passes input back, with the play, tick and song time it ar
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
+    CHECK(engine.setPlan(fourNotes(ppqn)));
     const std::vector<std::uint8_t> note{0x90, 60, 100};
 
     engine.receive(InputId{2}, note, kStart - 1ms);
@@ -425,7 +425,7 @@ TEST_CASE("the engine passes input back, with the play, tick and song time it ar
     CHECK(received[0].first);
     CHECK(received[0].play == 0); // stopped
 
-    engine.play(ppqn.quarter());
+    CHECK(engine.play(ppqn.quarter()));
     engine.step(); // starts playing at kStart
     CHECK(engine.lastPlay() != 0);
     engine.receive(InputId{2}, note, kStart + 250ms);
@@ -439,7 +439,7 @@ TEST_CASE("the engine passes input back, with the play, tick and song time it ar
 
     // Input that arrived before a stop took effect belongs to the play, even if the stop was
     // given first; input after it doesn't.
-    engine.stop();
+    CHECK(engine.stop());
     engine.receive(InputId{2}, note, kStart + 400ms);
     clock.time = kStart + 500ms;
     engine.step(); // stops at 500 ms
@@ -516,12 +516,12 @@ TEST_CASE("the engine plays a count-in, and input during it is stamped before th
     FakeClock clock;
     Engine engine{sink, clock};
     const auto plan = fourNotes(ppqn);
-    engine.setPlan(plan);
+    CHECK(engine.setPlan(plan));
     Song song = songAt(ppqn);
     song.countIn.beats = 2;
     auto start = planRecordStart(song, ppqn.quarter(), DestinationId{9});
 
-    engine.play(start.playFrom, std::move(start.countIn));
+    CHECK(engine.play(start.playFrom, std::move(start.countIn)));
     engine.step(); // the first click, 1000 ms before the record point
     engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart + 750ms);
     runUntil(engine, clock, kStart + 1100ms);
@@ -545,25 +545,25 @@ TEST_CASE("the engine reports where each play stopped")
     RecordingSink sink;
     FakeClock clock;
     Engine engine{sink, clock};
-    engine.setPlan(fourNotes(ppqn));
+    CHECK(engine.setPlan(fourNotes(ppqn)));
 
-    engine.play(q);
+    CHECK(engine.play(q));
     engine.step();
     const auto first = engine.lastPlay();
     CHECK(engine.stoppedAt(first) == std::nullopt); // still playing
     clock.time = kStart + 750ms;
-    engine.stop();
+    CHECK(engine.stop());
     engine.step();
     CHECK(engine.stoppedAt(first) == q + q + q / 2);
 
     // Stopped in a count-in: before the record point.
     Song song = songAt(ppqn);
     auto start = planRecordStart(song, q, DestinationId{9});
-    engine.play(start.playFrom, std::move(start.countIn));
+    CHECK(engine.play(start.playFrom, std::move(start.countIn)));
     engine.step();
     const auto second = engine.lastPlay();
     clock.time += 500ms;
-    engine.stop();
+    CHECK(engine.stop());
     engine.step();
     REQUIRE(engine.stoppedAt(second));
     CHECK(*engine.stoppedAt(second) < q);

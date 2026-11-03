@@ -571,8 +571,11 @@ int record(const Options& options, Prepared prepared)
               << ") from " << barBeat(meter, *recordPoint) << ".\n"
               << "space: stop and save   Esc: stop without saving   !: panic\n";
 
-    engine.setPlan(plan);
-    engine.play(start.playFrom, std::move(start.countIn));
+    if (!engine.setPlan(plan) || !engine.play(start.playFrom, std::move(start.countIn)))
+    {
+        std::cerr << "error: the engine didn't take the plan\n";
+        return 1;
+    }
     const auto play = engine.lastPlay();
     const auto countInEnds = platform::now() + countInLength;
     core::Recorder recorder{song, play, *recordPoint,
@@ -626,13 +629,9 @@ int record(const Options& options, Prepared prepared)
         }
     }
 
-    if (ending == Ending::Panic)
+    while (!(ending == Ending::Panic ? engine.panic() : engine.stop()))
     {
-        engine.panic();
-    }
-    else
-    {
-        engine.stop();
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
     std::optional<Tick> stoppedAt;
     while (!(stoppedAt = engine.stoppedAt(play)))

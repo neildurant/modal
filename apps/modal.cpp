@@ -130,7 +130,10 @@ public:
 
     ~Playback()
     {
-        engine_.stop();
+        while (!engine_.stop())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
         while (!engine_.quit())
         {
             std::this_thread::sleep_for(std::chrono::milliseconds{1});

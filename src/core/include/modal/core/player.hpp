@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -32,8 +33,13 @@ public:
     Player(Engine& engine, PortResolver resolvePort);
 
     // Compiles the song and hands the plan to the engine, in playback too. Each port's name is
-    // looked up once, until forgetPorts().
+    // looked up once, until forgetPorts(). A plan the engine can't take yet, its queue full, is
+    // kept and handed over again by poll() until it's taken, the newest replacing it (found in
+    // a code review, November 2026).
     void update(const Song& song);
+
+    // Whether a plan is waiting for the engine to take it, so poll() should be called.
+    bool planWaiting() const { return waiting_ != nullptr; }
 
     // Looks every port up again at the next update, as when ports have come or gone.
     void forgetPorts() { ports_.clear(); }
@@ -50,15 +56,16 @@ public:
     void setRewind(bool rewind) { rewind_ = rewind; }
     bool rewind() const { return rewind_; }
 
-    // Plays from the marker, starting again there if already playing.
-    void play();
-    void stop();
+    // Plays from the marker, starting again there if already playing. Each returns whether the
+    // engine took the request; if not, its queue full, nothing changes here either.
+    [[nodiscard]] bool play();
+    [[nodiscard]] bool stop();
 
     // Space: stops if playing, and otherwise plays.
-    void toggle();
+    [[nodiscard]] bool toggle();
 
     // Stops, and sends All Notes Off and Reset All Controllers (see Engine::panic).
-    void panic();
+    [[nodiscard]] bool panic();
 
     // Called now and then by the editor: notices where the engine stopped, and stops at the
     // song's end. Returns whether playback stopped by itself.
@@ -84,6 +91,7 @@ private:
     PortResolver resolvePort_;
     std::map<std::string, std::optional<DestinationId>, std::less<>> ports_;
     std::vector<std::string> missingPorts_;
+    std::shared_ptr<const PlaybackPlan> waiting_; // a plan the engine hasn't taken yet
     Tick marker_ = 0;
     bool rewind_ = true;
     bool playing_ = false;

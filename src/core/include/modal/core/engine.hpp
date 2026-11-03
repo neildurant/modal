@@ -129,11 +129,11 @@ public:
     // dropped; the caller can try again.
 
     // Replaces the plan, in playback too (see Scheduler::setPlan).
-    bool setPlan(std::shared_ptr<const PlaybackPlan> plan);
+    [[nodiscard]] bool setPlan(std::shared_ptr<const PlaybackPlan> plan);
 
     // Starts playing the current plan from a tick, chasing what's before it, after the
     // count-in if there is one (see planRecordStart). Does nothing without a plan.
-    bool play(Tick start, std::optional<PlannedCountIn> countIn = std::nullopt);
+    [[nodiscard]] bool play(Tick start, std::optional<PlannedCountIn> countIn = std::nullopt);
 
     // The id of the last play() request, as StampedInput::play gives it.
     std::uint64_t lastPlay() const noexcept { return playRequests_; }
@@ -142,7 +142,7 @@ public:
     // the order taken in (each input in arrival order). Only one thread may call this.
     std::optional<StampedInput> nextReceived() noexcept { return stamped_->tryPop(); }
 
-    bool stop();
+    [[nodiscard]] bool stop();
 
     // Where a play stopped (by stop, panic, quit or another play), once the engine has done
     // so: before its start tick if stopped during a count-in or lead-in. For the last play
@@ -151,14 +151,14 @@ public:
 
     // Stops, sends All Notes Off and Reset All Controllers (see Scheduler::panic), and ends
     // every held thru note and pedal.
-    bool panic();
+    [[nodiscard]] bool panic();
 
     // Turns MIDI thru on or off for every track (on to begin with). Notes and pedals already
     // held still end where they went.
     void setThru(bool on) { thruOn_.store(on, std::memory_order_relaxed); }
 
     // Ends run() once the commands before it have been carried out.
-    bool quit();
+    [[nodiscard]] bool quit();
 
     EngineStatus status() const;
 

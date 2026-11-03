@@ -282,7 +282,7 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     CHECK(window->saveFrame(base + "-playing.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-playing-light.bmp"));
-    player.stop();
+    CHECK(player.stop());
     view.wake(*view.deadline());
     for (const char32_t key : std::u32string_view{U"6km j"}) // the marker a row above the cursor
     {

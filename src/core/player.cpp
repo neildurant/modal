@@ -32,50 +32,61 @@ std::optional<DestinationId> Player::destination(const std::string& port)
 void Player::update(const Song& song)
 {
     missingPorts_.clear();
-    engine_.setPlan(std::make_shared<const PlaybackPlan>(
-        compilePlan(song, [&](const Track& track) { return destination(track.port); })));
+    auto plan = std::make_shared<const PlaybackPlan>(
+        compilePlan(song, [&](const Track& track) { return destination(track.port); }));
+    waiting_ = engine_.setPlan(plan) ? nullptr : std::move(plan);
 }
 
-void Player::play()
+bool Player::play()
 {
+    if (waiting_ && engine_.setPlan(waiting_))
+    {
+        waiting_.reset();
+    }
+    if (!engine_.play(marker_))
+    {
+        return false;
+    }
     if (playing_)
     {
         noteStopped();
     }
-    engine_.play(marker_);
     play_ = engine_.lastPlay();
     playing_ = true;
     started_ = marker_;
+    return true;
 }
 
-void Player::stop()
+bool Player::stop()
 {
+    if (!playing_)
+    {
+        return true;
+    }
+    if (!engine_.stop())
+    {
+        return false;
+    }
+    noteStopped();
+    return true;
+}
+
+bool Player::toggle()
+{
+    return playing_ ? stop() : play();
+}
+
+bool Player::panic()
+{
+    if (!engine_.panic())
+    {
+        return false;
+    }
     if (playing_)
     {
-        engine_.stop();
         noteStopped();
     }
-}
-
-void Player::toggle()
-{
-    if (playing_)
-    {
-        stop();
-    }
-    else
-    {
-        play();
-    }
-}
-
-void Player::panic()
-{
-    engine_.panic();
-    if (playing_)
-    {
-        noteStopped();
-    }
+    return true;
 }
 
 void Player::noteStopped()
@@ -95,6 +106,10 @@ void Player::stoppedAt(Tick tick)
 
 bool Player::poll()
 {
+    if (waiting_ && engine_.setPlan(waiting_))
+    {
+        waiting_.reset();
+    }
     if (!stopExact_)
     {
         if (const auto at = engine_.stoppedAt(play_))
@@ -105,8 +120,9 @@ bool Player::poll()
     }
     if (playing_ && engine_.status().finished)
     {
-        // Resuming from the end would play nothing, so without rewind, back to the start.
-        engine_.stop();
+        // Resuming from the end would play nothing, so without rewind, back to the start. The
+        // engine has finished, so if it can't take the stop now, nothing more sounds anyway.
+        static_cast<void>(engine_.stop());
         playing_ = false;
         stopExact_ = true;
         stoppedAt(0);

@@ -315,8 +315,11 @@ int play(const Options& options, const core::SmfImportResult& imported,
                   << '\n';
     }
 
-    engine.setPlan(plan);
-    engine.play(*start);
+    if (!engine.setPlan(plan) || !engine.play(*start))
+    {
+        std::cerr << "error: the engine didn't take the plan\n";
+        return 1;
+    }
     bool playing = true;
     Tick stoppedAt = *start;
 
@@ -333,19 +336,22 @@ int play(const Options& options, const core::SmfImportResult& imported,
                 switch (*key)
                 {
                 case ' ':
-                    if (playing)
+                    // Only what the engine took; its queue full, the key does nothing.
+                    if (playing && engine.stop())
                     {
-                        engine.stop();
                         stoppedAt = status.position.value_or(stoppedAt);
+                        playing = false;
                     }
-                    else
+                    else if (!playing && engine.play(stoppedAt))
                     {
-                        engine.play(stoppedAt);
+                        playing = true;
                     }
-                    playing = !playing;
                     break;
                 case '!':
-                    engine.panic();
+                    if (!engine.panic())
+                    {
+                        break;
+                    }
                     stoppedAt = status.position.value_or(stoppedAt);
                     playing = false;
                     break;

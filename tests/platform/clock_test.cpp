@@ -185,13 +185,13 @@ TEST_CASE("how late the engine sends a steady stream", "[.timing]")
                                const modal::platform::RealtimePriority priority;
                                engine.run();
                            }};
-        engine.setPlan(std::make_shared<const PlaybackPlan>(std::move(plan)));
-        engine.play(0);
+        CHECK(engine.setPlan(std::make_shared<const PlaybackPlan>(std::move(plan))));
+        CHECK(engine.play(0));
         while (!engine.status().finished)
         {
             std::this_thread::sleep_for(10ms);
         }
-        engine.quit();
+        CHECK(engine.quit());
         thread.join();
 
         const auto waking = engine.status().wakeLateness;

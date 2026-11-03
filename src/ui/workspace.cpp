@@ -3195,7 +3195,7 @@ std::optional<std::int64_t> Workspace::deadline() const
         const auto shown = *waitingSince_ + hintDelay_;
         deadline = deadline ? std::min(*deadline, shown) : shown;
     }
-    if (wasPlaying_)
+    if (wasPlaying_ || (player_ != nullptr && player_->planWaiting()))
     {
         const auto frame = lastTime_ + kFrameInterval;
         deadline = deadline ? std::min(*deadline, frame) : frame;
@@ -3227,6 +3227,10 @@ bool Workspace::wake(std::int64_t now)
         player_->poll();
         showPlayhead();
         changed = true;
+    }
+    else if (player_ != nullptr && player_->planWaiting())
+    {
+        player_->poll(); // handing the engine the plan it couldn't take
     }
     return changed || keys_.pending() != before;
 }
@@ -4692,27 +4696,35 @@ bool Workspace::transport(std::string_view command)
         setMessage("Nothing to play to", MessageKind::Warning);
         return true;
     }
+    // The engine refuses only while its queue is full, for an instant; then nothing's changed,
+    // and the key can be pressed again.
+    bool taken = true;
     if (command == "play-toggle")
     {
-        player_->toggle();
+        taken = player_->toggle();
     }
     else if (command == "play-stop-back")
     {
-        returning_ = player_->playing();
-        player_->toggle();
+        const bool was = player_->playing();
+        taken = player_->toggle();
+        returning_ = taken ? was : returning_;
     }
     else if (command == "play-cursor" || command == "marker-set")
     {
         player_->setMarker(view().cursor().tick);
         if (command == "play-cursor")
         {
-            player_->play();
-            following_ = true;
+            taken = player_->play();
+            following_ = following_ || taken;
         }
     }
     else
     {
-        player_->panic();
+        taken = player_->panic();
+    }
+    if (!taken)
+    {
+        setMessage("The engine is busy and didn't take that: try again", MessageKind::Warning);
     }
     showPlayhead();
     return true;
@@ -5336,7 +5348,11 @@ void Workspace::playFrom(core::Tick tick)
         return;
     }
     player_->setMarker(tick);
-    player_->play();
+    if (!player_->play())
+    {
+        setMessage("The engine is busy and didn't take that: try again", MessageKind::Warning);
+        return;
+    }
     following_ = true;
     showPlayhead();
 }
