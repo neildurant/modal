@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/temp_directory.hpp"
+
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/settings.hpp>
@@ -54,8 +56,8 @@ TEST_CASE("the word under the cursor, and which word of the line it is")
 
 TEST_CASE("files and folders complete from a folder, the word's folder before them")
 {
-    const auto folder = std::filesystem::temp_directory_path() / "modal-completion-test";
-    std::filesystem::remove_all(folder);
+    const modal::test::TempDirectory temporary{"modal-completion-test"};
+    const auto& folder = temporary.path();
     std::filesystem::create_directories(folder / "songs");
     std::ofstream{folder / "songs" / "verse.modal"};
     std::ofstream{folder / "song.mid"};
@@ -64,7 +66,6 @@ TEST_CASE("files and folders complete from a folder, the word's folder before th
     CHECK(fileChoices(folder, "songs/v") == Strings{"songs/verse.modal"});
     CHECK(fileChoices(folder, ".h") == Strings{".hidden", "song.mid", "songs/"});
     CHECK(fileChoices(folder, "nowhere/x").empty());
-    std::filesystem::remove_all(folder);
 }
 
 TEST_CASE("set completes settings' names, and then their values")

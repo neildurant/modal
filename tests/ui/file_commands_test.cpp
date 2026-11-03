@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/temp_directory.hpp"
+
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/ui/config.hpp>
@@ -53,14 +55,7 @@ public:
 // The commands on a document, in a fresh directory of their own.
 struct Files
 {
-    Files()
-        : directory{std::filesystem::temp_directory_path() / "modal-file-commands-test"}
-    {
-        std::filesystem::remove_all(directory);
-        std::filesystem::create_directories(directory);
-        addFileCommands(registry, document, host);
-    }
-    ~Files() { std::filesystem::remove_all(directory); }
+    Files() { addFileCommands(registry, document, host); }
 
     CommandResult run(const std::string& line) { return registry.runLine(line); }
     std::string path(const std::string& name) const { return utf8Text(directory / name); }
@@ -71,7 +66,8 @@ struct Files
         document.edit("Rename", {}, [](core::Song& song) { song.title = "Changed"; });
     }
 
-    std::filesystem::path directory;
+    test::TempDirectory temporary{"modal-file-commands-test"};
+    std::filesystem::path directory = temporary.path();
     core::Document document{newSong()};
     Host host;
     CommandRegistry registry;

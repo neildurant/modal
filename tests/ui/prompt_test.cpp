@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/temp_directory.hpp"
+
 #include <modal/ui/prompt.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -81,9 +83,8 @@ TEST_CASE("prompt commands can't go in a config file, nor be bound unless they'r
 
 TEST_CASE("source with no file runs modalrc again, reporting its errors")
 {
-    const auto directory = std::filesystem::temp_directory_path() / "modal-prompt-test";
-    std::filesystem::remove_all(directory);
-    std::filesystem::create_directories(directory);
+    const modal::test::TempDirectory temporary{"modal-prompt-test"};
+    const auto& directory = temporary.path();
     Prompt prompt{directory};
 
     CHECK(prompt.run("source").message.starts_with("there's no modalrc in "));
@@ -101,13 +102,13 @@ TEST_CASE("source with no file runs modalrc again, reporting its errors")
     std::ofstream{directory / "more"} << "set fontsize=bad\n";
     CHECK(prompt.run("source more") ==
           CommandResult::error("more:1: fontsize must be a number from 4 to 72"));
-    std::filesystem::remove_all(directory);
 }
 
 TEST_CASE("write-config writes the config, relative to the config directory")
 {
-    const auto directory = std::filesystem::temp_directory_path() / "modal-write-config-test";
-    std::filesystem::remove_all(directory);
+    // A config directory not there yet, which writing makes.
+    const modal::test::TempDirectory temporary{"modal-write-config-test"};
+    const auto directory = temporary / "config";
     Prompt prompt{directory};
     prompt.run("set fontsize=15");
 

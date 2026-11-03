@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/temp_directory.hpp"
+
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/style.hpp>
@@ -19,6 +21,7 @@
 #include <vector>
 
 using namespace modal::ui;
+using modal::test::TempDirectory;
 
 namespace
 {
@@ -38,36 +41,6 @@ CommandRegistry registryOf(std::span<const CommandInfo> infos)
 }
 
 const CommandRegistry kRegistry = registryOf(kCommands);
-
-// A directory of its own for a test's files, removed afterwards.
-class TempDirectory
-{
-public:
-    explicit TempDirectory(std::string_view name)
-        : path_(std::filesystem::temp_directory_path() / utf8Path(name))
-    {
-        std::filesystem::remove_all(path_);
-        std::filesystem::create_directories(path_);
-    }
-
-    ~TempDirectory() { std::filesystem::remove_all(path_); }
-
-    TempDirectory(const TempDirectory&) = delete;
-    TempDirectory& operator=(const TempDirectory&) = delete;
-
-    const std::filesystem::path& path() const { return path_; }
-
-    std::filesystem::path write(std::string_view name, std::string_view text) const
-    {
-        const auto file = path_ / utf8Path(name);
-        std::filesystem::create_directories(file.parent_path());
-        std::ofstream{file, std::ios::binary} << text;
-        return file;
-    }
-
-private:
-    std::filesystem::path path_;
-};
 
 const Binding* binding(const Config& config, Mode mode, std::vector<Key> keys)
 {

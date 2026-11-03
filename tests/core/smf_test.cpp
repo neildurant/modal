@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "support/smf_builder.hpp"
+#include "support/temp_directory.hpp"
 
 #include <modal/core/smf.hpp>
 
@@ -437,7 +438,8 @@ TEST_CASE("importing from a file")
     track.event(0, {0x90, 60, 100}).event(96, {0x80, 60, 0}).end();
     const auto bytes = makeSmf(0, 96, {track});
 
-    const auto path = std::filesystem::temp_directory_path() / "modal_smf_test.mid";
+    const modal::test::TempDirectory directory{"modal-smf-test"};
+    const auto path = directory / "song.mid";
     {
         std::ofstream out{path, std::ios::binary};
         out.write(reinterpret_cast<const char*>(bytes.data()),

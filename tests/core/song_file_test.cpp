@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "support/ppqn.hpp"
+#include "support/temp_directory.hpp"
 
 #include <modal/core/song_file.hpp>
 
@@ -330,9 +331,8 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
 
 TEST_CASE("a song file is written whole, or not at all")
 {
-    const auto directory = std::filesystem::temp_directory_path() / "modal_song_file_test";
-    std::filesystem::remove_all(directory);
-    std::filesystem::create_directories(directory);
+    const modal::test::TempDirectory temporary{"modal-song-file-test"};
+    const auto& directory = temporary.path();
     const auto path = directory / "song.modal";
 
     const auto song = everything(kPpqn);
@@ -360,5 +360,4 @@ TEST_CASE("a song file is written whole, or not at all")
     }
     const auto bad = readSongFile(directory / "bad.modal");
     CHECK(bad.error.find("bad.modal, line 3: unknown line") != std::string::npos);
-    std::filesystem::remove_all(directory);
 }

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/env.hpp"
+
 #include <modal/platform/paths.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -37,42 +39,18 @@ TEST_CASE("the state directory is Modal's own, apart from the config directory")
 #ifndef _WIN32
 TEST_CASE("on Linux the state directory follows XDG_STATE_HOME, if it's absolute")
 {
-    const char* old = std::getenv("XDG_STATE_HOME");
-    const std::string saved = old != nullptr ? old : "";
-
-    setenv("XDG_STATE_HOME", "/tmp/modal-test-state", 1);
+    modal::test::ScopedEnv state{"XDG_STATE_HOME", "/tmp/modal-test-state"};
     CHECK(stateDirectory() == std::filesystem::path{"/tmp/modal-test-state/modal"});
-    setenv("XDG_STATE_HOME", "relative", 1); // ignored
+    state.set("relative"); // ignored
     CHECK(stateDirectory()->parent_path() ==
           std::filesystem::path{std::getenv("HOME")} / ".local" / "state");
-
-    if (old != nullptr)
-    {
-        setenv("XDG_STATE_HOME", saved.c_str(), 1);
-    }
-    else
-    {
-        unsetenv("XDG_STATE_HOME");
-    }
 }
 
 TEST_CASE("on Linux the config directory follows XDG_CONFIG_HOME, if it's absolute")
 {
-    const char* old = std::getenv("XDG_CONFIG_HOME");
-    const std::string saved = old != nullptr ? old : "";
-
-    setenv("XDG_CONFIG_HOME", "/tmp/modal-test-config", 1);
+    modal::test::ScopedEnv config{"XDG_CONFIG_HOME", "/tmp/modal-test-config"};
     CHECK(configDirectory() == std::filesystem::path{"/tmp/modal-test-config/modal"});
-    setenv("XDG_CONFIG_HOME", "relative", 1); // ignored
+    config.set("relative"); // ignored
     CHECK(configDirectory()->parent_path().filename() == ".config");
-
-    if (old != nullptr)
-    {
-        setenv("XDG_CONFIG_HOME", saved.c_str(), 1);
-    }
-    else
-    {
-        unsetenv("XDG_CONFIG_HOME");
-    }
 }
 #endif

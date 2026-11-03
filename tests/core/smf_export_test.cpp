@@ -2,6 +2,7 @@
 
 #include "support/edit_track.hpp"
 #include "support/ppqn.hpp"
+#include "support/temp_directory.hpp"
 
 #include <modal/core/smf.hpp>
 
@@ -342,8 +343,8 @@ TEST_CASE("export clamps tempos too slow for a MIDI file, and refuses what won't
 
 TEST_CASE("exporting to a file replaces it whole")
 {
-    const auto directory = std::filesystem::temp_directory_path();
-    const auto path = directory / "modal_smf_export_test.mid";
+    const TempDirectory directory{"modal-smf-export-test"};
+    const auto path = directory / "export.mid";
     {
         std::ofstream old{path, std::ios::binary};
         old << "an older, longer file that the export replaces";
