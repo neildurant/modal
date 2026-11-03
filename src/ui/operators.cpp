@@ -209,8 +209,8 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
                 askSettings(op, target, std::move(answers));
             },
             answer);
-        answerCommand_ = op;
-        answerSetting_ = i;
+        prompt_.answerCommand = op;
+        prompt_.answerSetting = i;
         return;
     }
     // In the settings' order, so the last (a track's name, which may have spaces) comes last;
@@ -292,18 +292,18 @@ bool Workspace::askTransform(const TransformSpec& spec, const OperatorTarget& ta
     askFor(
         std::move(label), [this, name = std::string{spec.name}, target](const std::string& text)
         { applyTransform(name, target, text); }, answer);
-    answerCommand_ = spec.name;
+    prompt_.answerCommand = spec.name;
     return true;
 }
 
 std::string Workspace::optionsCommand() const
 {
     // The transform asking, or the one on the : line, for its settings.
-    if (answer_)
+    if (prompt_.answer)
     {
-        return answerCommand_;
+        return prompt_.answerCommand;
     }
-    const auto text = encodeUtf8(line_.text());
+    const auto text = encodeUtf8(prompt_.line.text());
     const auto start = text.find_first_not_of(' ');
     if (start == std::string::npos)
     {
@@ -603,7 +603,7 @@ void Workspace::askKey(const OperatorTarget& target, std::function<void(const co
         }
     }
     const auto offered = keySuggestions_.empty() ? lastKey_ : keySuggestions_.front();
-    std::swap(line_, keyLine_);
+    std::swap(prompt_.line, prompt_.keyLine);
     askFor(
         "Key for " + target.what + " (" + offered + "): ",
         [this, then = std::move(then)](const std::string& text)
@@ -621,7 +621,7 @@ void Workspace::askKey(const OperatorTarget& target, std::function<void(const co
             then(*key);
         },
         offered);
-    keyPrompt_ = true;
+    prompt_.keyPrompt = true;
 }
 
 void Workspace::askKeyed(const std::string& op, const OperatorTarget& target, const core::Key& key)

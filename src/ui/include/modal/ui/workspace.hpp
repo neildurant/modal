@@ -276,7 +276,7 @@ public:
     // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
     // prompt, or while a view takes typing, as when editing a field in place.
     Mode mode() const { return mode_; }
-    const CommandLine& commandLine() const { return line_; }
+    const CommandLine& commandLine() const { return prompt_.line; }
     std::string pending() const; // the operator, count and keys typed so far
     // What a listing (:registers) shows, a name and what it is a line, until the next key.
     const std::vector<std::pair<std::string, std::string>>& listing() const { return listing_; }
@@ -458,7 +458,6 @@ private:
         std::optional<std::size_t> chosen; // among the matches, 0 the best; none at first
     };
     static constexpr std::ptrdiff_t kPaletteRows = 12;
-    std::optional<PaletteState> palette_;
     Remembered remembered_;
     const Settings* settings_ = nullptr;
     std::function<void(const Remembered&)> rememberedChanged_;
@@ -609,19 +608,13 @@ private:
     // An answer given nothing takes the default, if there's one, as a transform's does.
     void askFor(std::string label, std::function<void(const std::string&)> answer,
                 std::string defaultAnswer = {});
-    std::string answerDefault_;
-    std::string answerCommand_;     // the transform asking, for its settings
-    std::size_t answerSetting_ = 0; // and which it's asking for
     void askSettings(const std::string& op, const OperatorTarget& target, Answers answers);
     std::string optionsCommand() const;
-    std::string answerLabel_;
-    std::function<void(const std::string&)> answer_;
     // Search (/C1): what the last looks for, as typed and as read, whether it went forwards (*
     // or /) or back (#), which n keeps to, as in Vim, and whether the prompt is for one.
     std::optional<core::EventQuery> search_;
     std::string searchText_;
     bool searchForward_ = true;
-    bool searchPrompt_ = false;
     // Searching for what's typed, / and Enter alone clearing the matches; going to the next
     // match in the search's direction, or the one before; and searching for what's under the
     // cursor (* and #).
@@ -667,8 +660,6 @@ private:
     // history of their own for Up and Down.
     std::vector<core::Scale> userScales_;
     std::string lastKey_ = "C major";
-    CommandLine keyLine_;
-    bool keyPrompt_ = false;
     std::vector<std::string> keySuggestions_; // for the range asked about, best first
     void askKey(const OperatorTarget& target, std::function<void(const core::Key&)> then);
     void askKeyed(const std::string& op, const OperatorTarget& target, const core::Key& key);
@@ -701,10 +692,6 @@ private:
     LineHandler lineHandler_;
     PortFinder portFinder_;
     Mode mode_ = Mode::Normal;
-    CommandLine line_;
-    // The / prompt's line, with its own history, as Vim keeps searches apart from commands; it
-    // takes line_'s place while searching.
-    CommandLine searchLine_;
     int width_ = 0;
     int height_ = 0;
     CellSize cell_{1, 1};
@@ -739,7 +726,27 @@ private:
         std::u32string line;
         std::size_t scroll = 0; // the first column shown, when they don't all fit across
     };
-    std::optional<Completing> completing_;
+    // The prompt's state, together (gathered November 2026, after a code review): the : line,
+    // and the lines that take its place for a search and a key, each with its own history, as
+    // Vim keeps searches apart from commands; the question being answered, if any, its label
+    // shown in place of the :, its default for an empty answer, and the transform asking and
+    // which of its settings; the palette, while open; and completion, while it shows.
+    struct PromptState
+    {
+        CommandLine line;
+        CommandLine searchLine;
+        CommandLine keyLine;
+        bool searchPrompt = false;
+        bool keyPrompt = false;
+        std::string answerLabel;
+        std::function<void(const std::string&)> answer;
+        std::string answerDefault;
+        std::string answerCommand;
+        std::size_t answerSetting = 0;
+        std::optional<PaletteState> palette;
+        std::optional<Completing> completing;
+    };
+    PromptState prompt_;
     // The word at the prompt's cursor to complete: where it starts, what's typed of it, and
     // the kind of thing it is, None if nothing completes there.
     struct CompletingWord
