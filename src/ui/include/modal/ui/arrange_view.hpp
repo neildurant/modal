@@ -43,6 +43,7 @@ public:
     std::optional<CutRange> cutRange(std::string_view motion, int count) override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::size_t> selectionIndex() const override { return page_.stripCursor(); }
+    void selectObject(std::string_view object, int count, Selection& selection) override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
                                                                 int count) override;
     std::vector<int> topHeights(CellSize cell) const override;

@@ -429,6 +429,11 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
             const auto area = selectionArea();
             return area ? targetIn(*area, *selectionStatus() + " on every track") : std::nullopt;
         }
+        if (motion == "object-song")
+        {
+            // ie: every section on every track (decided November 2026).
+            return targetIn(*areaFor(motion, count), "the whole song");
+        }
         if (!isSectionObject(motion))
         {
             host_.setMessage("On the section strip, operators take is, this section's events on "
@@ -629,10 +634,22 @@ std::optional<std::string> ArrangeView::selectionStatus() const
     return barsText(meter(), area->from, area->to) + " on every track";
 }
 
+void ArrangeView::selectObject(std::string_view object, int count, Selection& selection)
+{
+    // On the strip, ie selects every section; the rest as any view's.
+    if (page_.stripCursor() && object == "object-song")
+    {
+        selection.index = 0;
+        page_.setStripCursor(document_.song().sections().size() - 1);
+        return;
+    }
+    View::selectObject(object, count, selection);
+}
+
 std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::objectSpan(std::string_view object,
                                                                          int count)
 {
-    if (page_.stripCursor())
+    if (page_.stripCursor() && object != "object-song")
     {
         host_.setMessage("On the strip, h and l select sections", MessageKind::Information);
         return std::nullopt;
@@ -1133,6 +1150,13 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
         page_.setStripCursor(section);
         return done;
     }
+    if (motion == "object-song")
+    {
+        // ie: every section's events, on every track.
+        const bool done = operateOn(op, *areaFor(motion, count), false, "the whole song");
+        page_.setStripCursor(section);
+        return done;
+    }
     if (motion == "object-section")
     {
         motion = "this-section";
@@ -1324,6 +1348,10 @@ std::optional<std::string> ArrangeView::describeRange(std::string_view op,
         if (motion == "object-section-contents")
         {
             return "this section's events on every track";
+        }
+        if (motion == "object-song")
+        {
+            return "the whole song, every track";
         }
         if (op != "operator-delete" && op != "operator-yank")
         {

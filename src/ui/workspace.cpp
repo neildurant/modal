@@ -1018,6 +1018,27 @@ Where Workspace::where() const
     return Where::EventList;
 }
 
+bool Workspace::refuseObject(std::string_view command)
+{
+    // Where the object is, rather than doing something wider or narrower than it says
+    // (decided November 2026).
+    std::string keys{command};
+    for (const auto& [sequence, binding] : keymap_.bindings(Mode::OperatorPending))
+    {
+        if (binding.command == command)
+        {
+            keys = shownKeys(sequence);
+            break;
+        }
+    }
+    setMessage(command == "object-track"
+                   ? keys + " takes a track: use it on the track, not the section strip"
+                   : keys + " takes every track: use it on the section strip",
+               MessageKind::Information);
+    macros_.failed = macros_.depth > 0;
+    return true;
+}
+
 bool Workspace::offered(std::string_view command) const
 {
     const auto* info = commands_.find(command);
@@ -1531,15 +1552,13 @@ bool Workspace::runOperator(std::string_view command, int count)
             return true;
         }
     }
+    if (!offered(command))
+    {
+        return refuseObject(command);
+    }
     if (command == "object-match")
     {
         return operateOnMatch(op.name, std::max(op.count, 1));
-    }
-    if ((op.name == "operator-delete" || op.name == "operator-yank") &&
-        command == "object-section" && where() != Where::Strip)
-    {
-        // das and yas: the section itself, as on the strip, from anywhere.
-        return operateOnSections(op.name, std::max(op.count, 1) * std::max(count, 1));
     }
     // Those with no "how far" multiply the counts, as d and y do: 2qq quantises two bars
     // (decided November 2026).
@@ -1722,6 +1741,10 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
     }
     if (const auto* info = commands_.find(command); info != nullptr && info->object)
     {
+        if (!offered(command))
+        {
+            return refuseObject(command);
+        }
         view().selectObject(command, count, *selection_);
         return true;
     }

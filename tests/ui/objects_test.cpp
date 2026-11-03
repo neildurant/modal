@@ -189,11 +189,15 @@ TEST_CASE("is takes this section's events on the cursor's track, in every view")
     CHECK(o.sections() == std::vector<std::string>{"A", "B", "C"});
 }
 
-TEST_CASE("das and yas take the section itself, from any view; to the other operators as is is")
+TEST_CASE("as takes the section itself on the section strip, and on a track says it's there")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Objects o{ppqn};
+    // On a track, as reaches beyond it: refused, saying where it is.
     o.type(U"3ldas");
+    CHECK(o.ws.message() == "as takes every track: use it on the section strip");
+    CHECK(o.sections() == std::vector<std::string>{"A", "B", "C"});
+    o.type(U"gsdas");
     CHECK(o.sections() == std::vector<std::string>{"A", "C"});
     CHECK(o.pitches(0) == Pitches{40, 41, 45, 46, 47});
     CHECK(o.pitches(1) == Pitches{60, 61, 65, 66, 67});
@@ -202,26 +206,24 @@ TEST_CASE("das and yas take the section itself, from any view; to the other oper
     CHECK(o.ws.message() == "Undid: Delete section B");
     CHECK(o.sections() == std::vector<std::string>{"A", "B", "C"});
 
-    // Yanked in the piano roll, and put back on the strip.
+    // Not in the piano roll, which shows one track; yanked on the strip, and put back.
     o.type(U"gryas");
-    CHECK(o.ws.message() == "B yanked; p on the section strip puts it back");
-    o.type(U"gagsp");
+    CHECK(o.ws.message() == "as takes every track: use it on the section strip");
+    o.type(U"gagsyas");
+    CHECK(o.ws.message() == "B yanked");
+    o.type(U"p");
     CHECK(o.sections().size() == 4);
     o.type(U"u");
 
-    // To the other operators it's is.
-    o.type(U"j");
+    // The hint menu offers it on the strip alone.
     o.ws.setHints(true, 0);
-    o.type(U"d");
-    CHECK(o.hint("is") == "this section's events");
-    CHECK(o.hint("as") == "this section, taken out of the song");
-    o.ws.handle(Key::of(NamedKey::Escape), 0);
-    o.type(U">");
+    o.type(U"jd");
     CHECK(o.hint("is") == "this section's events");
     CHECK(o.hint("as") == "(none)");
-    o.type(U"as");
-    CHECK(o.pitches(0) == Pitches{40, 41, 43, 44, 45, 45, 46, 47});
-    CHECK(o.sections() == std::vector<std::string>{"A", "B", "C"});
+    o.ws.handle(Key::of(NamedKey::Escape), 0);
+    o.type(U"gsd");
+    CHECK(o.hint("as") == "this section");
+    o.ws.handle(Key::of(NamedKey::Escape), 0);
 }
 
 TEST_CASE("a song keeps at least one section")
@@ -230,7 +232,7 @@ TEST_CASE("a song keeps at least one section")
     o.type(U"gs");
     o.type(U"d2l"); // A and B, leaving C
     REQUIRE(o.sections() == std::vector<std::string>{"C"});
-    o.type(U"jdas");
+    o.type(U"das");
     CHECK(o.ws.message() == "A song keeps at least one section");
     CHECK(o.sections() == std::vector<std::string>{"C"});
 }
@@ -339,8 +341,7 @@ TEST_CASE("it takes the track's events, keeping the track, and in the arrangemen
     CHECK(o.ws.message() ==
           "it isn't on the conductor's list, whose tempo and meter changes the song needs");
     o.type(U"gags>it");
-    CHECK(o.ws.message() ==
-          "On the section strip, operators take is, this section's events on every track");
+    CHECK(o.ws.message() == "it takes a track: use it on the track, not the section strip");
     CHECK(o.pitches(0) == bass);
     CHECK(o.pitches(1) == lead);
 }

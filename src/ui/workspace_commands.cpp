@@ -239,9 +239,9 @@ constexpr std::array kSharedCommands{
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-section",
-                .description = "After an operator, this section itself (as), which d takes out "
-                               "of the song and y yanks as a section; or {count} sections from "
-                               "it",
+                .description = "On the section strip, after an operator, this section itself, "
+                               "on every track (as), which d takes out of the song and y yanks "
+                               "as a section; or {count} sections from it",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
@@ -252,14 +252,15 @@ constexpr std::array kSharedCommands{
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-track",
-                .description = "After an operator, this track's events (it), from the start to "
-                               "the end; in the arrangement, or {count} tracks' from it",
+                .description = "On a track, after an operator, this track's events (it), from "
+                               "the start to the end; in the arrangement, or {count} tracks' "
+                               "from it",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-song",
-                .description = "After an operator, the whole song (ie): every track in the "
-                               "arrangement, this track's events elsewhere",
+                .description = "On the section strip, after an operator, the whole song (ie), "
+                               "every section on every track",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .object = true},
     CommandInfo{.name = "object-note",
@@ -435,7 +436,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 99> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 102> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -501,6 +502,11 @@ std::span<const CommandInfo> Workspace::commands()
             {"select-visible", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-bar", onlyIn({Tracks, PianoRoll, EventList})},
             {"object-match", onlyIn({Tracks, PianoRoll, EventList})},
+            // An object never reaches beyond the cursor's place: a track, or on the strip
+            // every track (decided November 2026).
+            {"object-section", onlyIn({Strip})},
+            {"object-song", onlyIn({Strip})},
+            {"object-track", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-match", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-section", onlyIn({Tracks, PianoRoll, EventList})},
             {"select-matches-track", onlyIn({Tracks, PianoRoll, EventList})},

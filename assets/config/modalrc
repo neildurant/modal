@@ -78,9 +78,10 @@ nmap <leader>n  default-note-set          "Default note from this one"
 " y take a range, up to a boundary its key names (d]b up to the next bar line, d]s the next
 " section, dG the end, dj this event and the next), or an object: ib this bar's events, ab
 " this bar as time, which d takes out, closing the gap up to the section's end, in the note
-" or event under the cursor, ic its chord, is this section's events, as the section itself,
-" which d takes out of the song, and it the track's events. On the section strip, is is the
-" section's events on every track. dd and yy are this bar's events; x deletes the note or
+" or event under the cursor, ic its chord, is this section's events, and it the track's
+" events. An object never reaches beyond the cursor's place: on the section strip, is is the
+" section's events on every track, as the section itself, which d takes out of the song, and
+" ie the whole song. dd and yy are this bar's events; x deletes the note or
 " event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
 " cursor's bar. "a before a yank, delete or put uses register a ("A adds to it); u and Ctrl-R

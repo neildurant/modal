@@ -543,11 +543,14 @@ TEST_CASE("V in the event list and on the strip selects as v does there")
     CHECK(sections(s.document) == std::vector<std::string>{"C"});
 }
 
-TEST_CASE("ie takes the whole song: every track in the arrangement, the track elsewhere")
+TEST_CASE("ie takes the whole song on the section strip, every track; on a track it's refused")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Selecting s{ppqn};
     s.type(U"3ldie");
+    CHECK(s.ws.message() == "ie takes every track: use it on the section strip");
+    CHECK(pitches(s.document, 0).size() == 8);
+    s.type(U"gsdie");
     CHECK(pitches(s.document, 0).empty());
     CHECK(pitches(s.document, 1).empty());
     s.type(U"u");
@@ -555,11 +558,13 @@ TEST_CASE("ie takes the whole song: every track in the arrangement, the track el
 
     // vie selects it all.
     s.type(U"vie");
-    CHECK(s.selected() == s.bars(1, 8));
+    CHECK(s.selected() == "3 sections from A");
     s.press(NamedKey::Escape);
 
-    // In the piano roll, the track's notes.
+    // Not in the piano roll, which shows one track: it takes it.
     s.type(U"gr>ie");
+    CHECK(s.ws.message() == "ie takes every track: use it on the section strip");
+    s.type(U">it");
     CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 44, 45, 46, 47, 48});
     CHECK(pitches(s.document, 1).front() == 60);
 }

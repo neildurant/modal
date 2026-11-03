@@ -272,6 +272,8 @@ public:
     // offers it.
     Where where() const;
     bool offered(std::string_view command) const;
+    // An object not offered where the cursor is, saying where it is.
+    bool refuseObject(std::string_view command);
 
     // Normal; OperatorPending after d or y, waiting for a motion; or CommandLine at the :
     // prompt, or while a view takes typing, as when editing a field in place.

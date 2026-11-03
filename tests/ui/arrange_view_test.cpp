@@ -943,7 +943,7 @@ TEST_CASE(":label-to-section on a selection goes through its labels, asking abou
         a.type(line);
         a.press(Key::of(NamedKey::Enter));
     };
-    a.type(U"lvie"); // the whole song, the cursor at its end, where it comes back to
+    a.type(U"lggvG"); // the whole song, the cursor at its end, where it comes back to
     const auto back = a.page().bar();
     CHECK(a.ws.commandLine().text().empty());
     run(U"label-to-section");

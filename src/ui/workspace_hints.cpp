@@ -265,7 +265,7 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
         const auto* info = commands_.find(command);
         const bool line = isOperator(command);
         if (sequence.size() > 2 || info == nullptr || !(line || info->motion || info->object) ||
-            std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
+            std::ranges::find(kMovesOnly, command) != kMovesOnly.end() || !offered(command))
         {
             continue;
         }
