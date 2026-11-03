@@ -364,6 +364,12 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selected() const
         // V: the page's time when it started, or an object's.
         return selection->span.value_or(std::pair{page().start, page().end});
     }
+    if (selection->kind == SelectionKind::Box && selection->span)
+    {
+        // A note's or a chord's, as an object selected it, its time; takes() keeps to its
+        // starts.
+        return selection->span;
+    }
     const auto from = std::min(selection->anchor.tick, time_);
     const auto last = std::max(selection->anchor.tick, time_);
     return std::pair{from, std::max(gridAfter(last), last + 1)};
@@ -386,7 +392,9 @@ bool PianoRollView::takes(core::Tick tick, std::uint8_t pitch) const
 {
     const auto span = selected();
     const auto pitches = selectedPitches();
-    return span && tick >= span->first && tick < span->second &&
+    const auto selection = host_.selection();
+    const auto starts = selection && selection->starts ? selection->starts : span;
+    return starts && tick >= starts->first && tick < starts->second &&
            (!pitches || (pitch >= pitches->first && pitch <= pitches->second));
 }
 
@@ -505,6 +513,59 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::objectSpan(std::
         end = std::max(end, events[i].tick + std::get<core::Note>(events[i].data).duration);
     }
     return std::pair{events[taken.front()].tick, end};
+}
+
+void PianoRollView::selectObject(std::string_view object, int count, Selection& selection)
+{
+    // in and ic select what an operator takes with them, their notes and only those: a box of
+    // their pitches over their starts (decided November 2026, so vind is dind); the other
+    // objects their time, on every pitch, as their operators take it.
+    if (object != "object-note" && object != "object-chord")
+    {
+        View::selectObject(object, count, selection);
+        return;
+    }
+    const auto id = trackId();
+    if (!id)
+    {
+        return;
+    }
+    std::vector<std::size_t> taken;
+    if (object == "object-note")
+    {
+        if (const auto index = noteHere("select"))
+        {
+            taken.push_back(*index);
+        }
+    }
+    else
+    {
+        taken = chordHere(count);
+    }
+    if (taken.empty())
+    {
+        return;
+    }
+    const auto& events = document_.song().events(*id);
+    auto low = std::uint8_t{127};
+    auto high = std::uint8_t{0};
+    auto first = events[taken.front()].tick;
+    auto last = first;
+    core::Tick end = 0;
+    for (const auto i : taken)
+    {
+        const auto& note = std::get<core::Note>(events[i].data);
+        low = std::min(low, note.pitch);
+        high = std::max(high, note.pitch);
+        first = std::min(first, events[i].tick);
+        last = std::max(last, events[i].tick);
+        end = std::max(end, events[i].tick + std::max<core::Tick>(note.duration, 1));
+    }
+    selection.kind = SelectionKind::Box;
+    selection.anchor = SongCursor{*id, first, low};
+    selection.span = std::pair{first, end};
+    selection.starts = std::pair{first, last + 1};
+    setCursor(SongCursor{*id, first, high});
 }
 
 std::vector<std::size_t> PianoRollView::chordHere(int count) const

@@ -643,6 +643,16 @@ void ArrangeView::selectObject(std::string_view object, int count, Selection& se
         page_.setStripCursor(document_.song().sections().size() - 1);
         return;
     }
+    // On a track, a time selection made by an object takes what its operators take there,
+    // this track's (decided November 2026, so visd is disd): a box on the track, or for it,
+    // the track's row. A selection already widened to more tracks keeps them.
+    if (!page_.stripCursor() && selection.kind == SelectionKind::Range &&
+        object != "object-visible")
+    {
+        const auto track = cursor().track;
+        selection.kind = object == "object-track" ? SelectionKind::Rows : SelectionKind::Box;
+        selection.anchor.track = track;
+    }
     View::selectObject(object, count, selection);
 }
 

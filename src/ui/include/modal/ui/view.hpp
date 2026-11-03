@@ -108,6 +108,9 @@ struct Selection
     // The time whole rows (V) take, once an object has set it (Vis); until then the whole
     // song's, or in the piano roll the page's when V was pressed.
     std::optional<std::pair<core::Tick, core::Tick>> span;
+    // The starts it takes, within its span, where an object set them: a chord's (vic), so
+    // a note starting while the chord sounds isn't taken with it.
+    std::optional<std::pair<core::Tick, core::Tick>> starts = std::nullopt;
     bool cut = false; // cutting at its edges (|)
     // Only the events a search matches in it (, s S, decided November 2026), which operators
     // take; D and p, which take its time, are refused.

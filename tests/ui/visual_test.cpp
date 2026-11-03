@@ -129,20 +129,20 @@ TEST_CASE("v in the arrangement selects bars on every track, following the curso
     CHECK(s.ws.mode() == Mode::Normal);
 }
 
-TEST_CASE("an object in Visual mode selects what it takes")
+TEST_CASE("an object in Visual mode selects what an operator takes with it, on this track")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Selecting s{ppqn};
     s.type(U"3lv"); // bar 4, in B
     s.type(U"is");
-    CHECK(s.selected() == s.bars(3, 5));
+    CHECK(s.selected() == "bars 3–5 of Bass");
     s.type(U"l"); // and on from its end
-    CHECK(s.selected() == s.bars(3, 6));
+    CHECK(s.selected() == "bars 3–6 of Bass");
     s.type(U"ib");
-    CHECK(s.selected() == s.bars(6, 6));
+    CHECK(s.selected() == "bar 6 of Bass");
     s.type(U"in");
     CHECK(s.ws.message() == "There's no single note or chord here to select");
-    CHECK(s.selected() == s.bars(6, 6));
+    CHECK(s.selected() == "bar 6 of Bass");
 }
 
 TEST_CASE("the selection is drawn across every track, in place of the cursor's bar")
@@ -250,11 +250,6 @@ TEST_CASE("D takes a selection on every track out of the song, as :bar-delete do
     CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
     s.type(U"u");
     CHECK(s.document.song().end() == 8 * s.bar);
-
-    // A whole section goes.
-    s.type(U"gg3lvisD"); // bar 4, in B
-    CHECK(sections(s.document) == std::vector<std::string>{"A", "C"});
-    CHECK(pitches(s.document, 1) == Pitches{60, 61, 65, 66, 67});
 }
 
 TEST_CASE("p puts the register in the selection's place, as one undo step")
@@ -898,4 +893,32 @@ TEST_CASE("The leader's groups in Visual mode have Normal mode's titles where th
     const auto toggles = std::ranges::find(*hints, std::string{"t"}, &Workspace::Hint::keys);
     REQUIRE(toggles != hints->end());
     CHECK(toggles->title == "Toggles");
+}
+
+TEST_CASE("Selecting with an object and then an operator takes what the operator and object do")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"3ldis"); // bar 4, in B, on Bass
+    const auto bass = pitches(s.document, 0);
+    const auto lead = pitches(s.document, 1);
+    s.type(U"u");
+    s.type(U"gg3lvisd");
+    CHECK(pitches(s.document, 0) == bass);
+    CHECK(pitches(s.document, 1) == lead);
+}
+
+TEST_CASE("In the piano roll, vin then d takes the note din takes, and no other")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    s.type(U"gr");
+    const auto bass = s.document.song().tracks()[0]->id();
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"din");
+    const auto after = pitches(s.document, 0);
+    s.type(U"u");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"vind");
+    CHECK(pitches(s.document, 0) == after);
 }
