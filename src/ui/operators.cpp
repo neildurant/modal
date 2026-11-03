@@ -6,6 +6,7 @@
 #include <modal/core/controllers.hpp>
 #include <modal/core/event_query.hpp>
 #include <modal/core/note_fraction.hpp>
+#include <modal/core/pedalling.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/event_text.hpp>
@@ -84,7 +85,7 @@ struct Asking
     std::string_view answer;
 };
 
-constexpr std::array<Asking, 19> kQuestions{{
+constexpr std::array<Asking, 25> kQuestions{{
     {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
     {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
@@ -100,6 +101,12 @@ constexpr std::array<Asking, 19> kQuestions{{
     {"transform-filter", "Delete the events of {} matching", "vel<20, cc7", ""},
     {"transform-split", "Split {}", "", "C4"},
     {"transform-remap", "Remap {}", "cc1, C1", ""},
+    {"transform-pedal-repedal", "Re-pedal {} at its chord changes", "", ""},
+    {"transform-pedal-each", "Pedal {} afresh", "", ""},
+    {"transform-pedal-retime", "Re-time the pedalling of {}", "", ""},
+    {"transform-pedal-clean", "Clean up the pedalling of {}", "", ""},
+    {"transform-pedal-clear", "Clear the pedalling of {}", "", ""},
+    {"transform-pedal-offset", "Offset the pedalling of {}", "", ""},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -267,6 +274,55 @@ std::vector<TransformSetting> transformSettings(std::string_view command)
                  .form = "a track, or a new one's name",
                  .tracks = true}};
     }
+    // The pedalling tools' times, in milliseconds, the lift and press from their settings.
+    const TransformSetting lift{.name = "lift",
+                                .question = "lifting it before each change by",
+                                .answer = "{lift}",
+                                .form = "ms"};
+    const TransformSetting press{
+        .name = "down", .question = "and pressing it after by", .answer = "{press}", .form = "ms"};
+    if (command == "transform-pedal-repedal")
+    {
+        return {lift, press};
+    }
+    if (command == "transform-pedal-each")
+    {
+        return {{.name = "",
+                 .question = "on each",
+                 .answer = "bar",
+                 .form = "bar|beat",
+                 .values = {"bar", "beat"}},
+                lift,
+                press};
+    }
+    if (command == "transform-pedal-retime")
+    {
+        return {lift,
+                press,
+                {.name = "near",
+                 .question = "moving those within",
+                 .answer = "200ms",
+                 .form = "ms of a change"}};
+    }
+    if (command == "transform-pedal-clean")
+    {
+        return {{.name = "flicker",
+                 .question = "merging flicker within",
+                 .answer = "30ms",
+                 .form = "ms between a lift and a press"}};
+    }
+    if (command == "transform-pedal-clear")
+    {
+        return {{.name = "",
+                 .question = "which pedal",
+                 .answer = "sustain",
+                 .form = "sustain|sostenuto|soft|all",
+                 .values = {"sustain", "sostenuto", "soft", "all"}}};
+    }
+    if (command == "transform-pedal-offset")
+    {
+        return {{.name = "", .question = "by", .answer = "20ms", .form = "ms, -20ms earlier"}};
+    }
     if (command == "transform-remap")
     {
         return {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1"},
@@ -317,6 +373,10 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         label.replace(label.find("{}"), 2, target.what);
         auto answer =
             settings[i].answer == "grid" ? gridOf(target) : std::string{settings[i].answer};
+        if (answer == "{lift}" || answer == "{press}")
+        {
+            answer = std::to_string((answer == "{lift}" ? pedalLift_ : pedalPress_).count()) + "ms";
+        }
         if (settings[i].tracks)
         {
             // A new track, named after the first's and the side moved.
@@ -382,6 +442,11 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
     if (op == "transform-remap")
     {
         remapAsked(target, text);
+        return;
+    }
+    if (op.starts_with("transform-pedal-"))
+    {
+        pedalAsked(op, target, text);
         return;
     }
     velocityOverTime(op, target, text);
@@ -450,10 +515,15 @@ CommandResult Workspace::transformLine(std::string_view name, std::string_view a
 {
     // At the : prompt, the selection's events, or else the cursor's bar's, as a doubled
     // operator takes it; asking, as the keys do, when it's given nothing.
-    auto target = view().target(selection_ ? "visual" : "operator-line", 0);
+    const auto motion = selection_ ? "visual" : "operator-line";
+    auto target = view().target(motion, 0);
     if (!target)
     {
         return {true};
+    }
+    if (const auto range = view().cutRange(motion, 0))
+    {
+        target->span = std::pair{range->from, range->to};
     }
     if (selection_ && selection_->filter && !onlyMatches(*target))
     {
@@ -927,6 +997,10 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
                                      { return core::matches(*parsed.query, event.data, ppqn); });
             });
     }
+    if (name == "transform-pedal-bake")
+    {
+        return pedalAsked(name, target, {});
+    }
     if (name == "transform-retrograde")
     {
         return changeEvents("Retrograde " + target.what, target,
@@ -1046,11 +1120,18 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
         return true;
     }
     target->cut = cutting_;
+    if (!target->span && motion != "preset")
+    {
+        if (const auto range = view().cutRange(motion, count))
+        {
+            target->span = std::pair{range->from, range->to};
+        }
+    }
     if (op == "operator-transform")
     {
         return openTransformMenu(std::move(*target));
     }
-    if (op == "transform-retrograde" || op == "transform-legato")
+    if (op == "transform-retrograde" || op == "transform-legato" || op == "transform-pedal-bake")
     {
         return applyTransform(op, *target, {});
     }
@@ -1473,6 +1554,236 @@ bool Workspace::remapAsked(const OperatorTarget& target, const std::string& text
                             core::pitchName(*b),
                         target, [&](const core::EventList& events, const auto& part)
                         { return core::remapPitch(events, part.events, *a, *b); });
+}
+
+bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
+                           const std::string& text)
+{
+    // Milliseconds, as typed: 10ms, 10, -20ms.
+    const auto ms = [](std::string_view word) -> std::optional<std::chrono::milliseconds>
+    {
+        if (word.ends_with("ms"))
+        {
+            word.remove_suffix(2);
+        }
+        int value = 0;
+        const auto [end, error] = std::from_chars(word.data(), word.data() + word.size(), value);
+        if (word.empty() || error != std::errc{} || end != word.data() + word.size() ||
+            std::abs(value) > 10000)
+        {
+            return std::nullopt;
+        }
+        return std::chrono::milliseconds{value};
+    };
+    const auto said = told(text, {});
+    auto liftBy = pedalLift_;
+    auto pressBy = pedalPress_;
+    std::chrono::milliseconds near{200};
+    std::chrono::milliseconds flicker{30};
+    for (const auto& [option, value] : said.options)
+    {
+        const auto time = ms(value);
+        if (!time || (*time).count() < 0)
+        {
+            setMessage("Not a time: " + value + "; type milliseconds, as 30ms",
+                       MessageKind::Warning);
+            return true;
+        }
+        if (option == "lift")
+        {
+            liftBy = *time;
+        }
+        else if (option == "down")
+        {
+            pressBy = *time;
+        }
+        else if (option == "near")
+        {
+            near = *time;
+        }
+        else if (option == "flicker")
+        {
+            flicker = *time;
+        }
+        else
+        {
+            setMessage("The pedalling tools don't take " + option + "=", MessageKind::Warning);
+            return true;
+        }
+    }
+    const auto& song = document_.song();
+    const auto& tempo = song.tempo();
+    const auto shifted = [&](core::Tick tick, std::chrono::milliseconds by)
+    {
+        const auto time = tempo.toTime(tick) + by;
+        return time.count() < 0 ? core::Tick{0} : tempo.toTickExtended(time);
+    };
+    const core::PedalTiming timing{[&](core::Tick tick) { return shifted(tick, -liftBy); },
+                                   [&](core::Tick tick) { return shifted(tick, pressBy); }};
+    const auto window = chordWindow_;
+    const auto together = [&](core::Tick first, core::Tick tick)
+    { return tempo.toTime(tick) - tempo.toTime(first) <= window; };
+    // The stretch: the range's time, or else from its first event to its last note's end.
+    const auto stretchOf = [&](const core::EventList& events, const OperatorTarget::Part& part)
+    {
+        if (target.span)
+        {
+            return *target.span;
+        }
+        core::Tick from = song.end();
+        core::Tick to = 0;
+        for (const auto i : part.events)
+        {
+            const auto* note = std::get_if<core::Note>(&events[i].data);
+            from = std::min(from, events[i].tick);
+            to = std::max(to, events[i].tick + (note != nullptr ? note->duration : 0) + 1);
+        }
+        return std::pair{from, std::max(from, to)};
+    };
+    // What it does, for the undo step, and to each track's events.
+    std::string title;
+    std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)> change;
+    if (op == "transform-pedal-repedal" || op == "transform-pedal-each")
+    {
+        const bool each = op == "transform-pedal-each";
+        const bool beats = each && said.amount == "beat";
+        if (each && said.amount != "bar" && !beats)
+        {
+            setMessage("Not bar or beat: " + said.amount, MessageKind::Warning);
+            return true;
+        }
+        title = each ? "Pedal " + target.what + " afresh on each " + (beats ? "beat" : "bar")
+                     : "Re-pedal " + target.what + " at its chord changes";
+        change = [&, each, beats](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            std::vector<core::Tick> changes;
+            core::Tick end = to;
+            if (each)
+            {
+                const auto& meter = song.meter(part.track);
+                auto line = beats ? meter.beatAtOrAfter(from)
+                                  : meter.barStart(meter.toBarBeatTick(from).bar);
+                if (line < from)
+                {
+                    line = meter.barStart(meter.toBarBeatTick(from).bar + 1);
+                }
+                while (line < to)
+                {
+                    changes.push_back(line);
+                    line = beats ? meter.beatAtOrAfter(line + 1)
+                                 : meter.barStart(meter.toBarBeatTick(line).bar + 1);
+                }
+                end = timing.lift(to);
+            }
+            else
+            {
+                std::vector<std::size_t> notes;
+                end = from;
+                for (const auto i : part.events)
+                {
+                    if (const auto* note = std::get_if<core::Note>(&events[i].data))
+                    {
+                        notes.push_back(i);
+                        end = std::max(end, events[i].tick + note->duration);
+                    }
+                }
+                for (const auto& chord : core::chordsOf(events, notes, together))
+                {
+                    changes.push_back(events[chord.front()].tick);
+                }
+            }
+            return core::repedal(events, from, to, changes, end, timing);
+        };
+    }
+    else if (op == "transform-pedal-retime")
+    {
+        title = "Re-time the pedalling of " + target.what;
+        change = [&](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            std::vector<std::size_t> notes;
+            for (const auto i : part.events)
+            {
+                if (events[i].isNote())
+                {
+                    notes.push_back(i);
+                }
+            }
+            std::vector<core::Tick> changes;
+            for (const auto& chord : core::chordsOf(events, notes, together))
+            {
+                changes.push_back(events[chord.front()].tick);
+            }
+            return core::retimePedal(events, from, to, changes, timing,
+                                     [&](core::Tick tick) { return shifted(tick, near) - tick; });
+        };
+    }
+    else if (op == "transform-pedal-clean")
+    {
+        title = "Clean up the pedalling of " + target.what;
+        change = [&](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            return core::cleanPedals(events, from, to, [&](core::Tick tick)
+                                     { return shifted(tick, flicker) - tick; });
+        };
+    }
+    else if (op == "transform-pedal-clear")
+    {
+        const std::array<std::pair<std::string_view, int>, 3> kNames{
+            {{"sustain", 64}, {"sostenuto", 66}, {"soft", 67}}};
+        std::vector<int> controllers;
+        for (const auto& [name, controller] : kNames)
+        {
+            if (said.amount == name || said.amount == "all")
+            {
+                controllers.push_back(controller);
+            }
+        }
+        if (controllers.empty())
+        {
+            setMessage("Not a pedal: " + said.amount + "; type sustain, sostenuto, soft or all",
+                       MessageKind::Warning);
+            return true;
+        }
+        title = "Clear the " + (said.amount == "all" ? std::string{"pedalling"} : said.amount) +
+                " of " + target.what;
+        change = [&, controllers](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            return core::clearPedals(events, from, to, controllers);
+        };
+    }
+    else if (op == "transform-pedal-offset")
+    {
+        const auto by = ms(said.amount);
+        if (!by)
+        {
+            setMessage("Not a time: " + said.amount + "; type milliseconds, as 20ms or -20ms",
+                       MessageKind::Warning);
+            return true;
+        }
+        title =
+            "Offset the pedalling of " + target.what + " by " + std::to_string(by->count()) + "ms";
+        change = [&, by](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            return core::offsetPedals(
+                events, from, to, [&](core::Tick tick) { return shifted(tick, *by) - tick; },
+                song.end());
+        };
+    }
+    else
+    {
+        title = "Bake the sustain of " + target.what + " into its notes";
+        change = [&](const core::EventList& events, const OperatorTarget::Part& part)
+        {
+            const auto [from, to] = stretchOf(events, part);
+            return core::bakePedal(events, from, to);
+        };
+    }
+    return changeEvents(title, target, change);
 }
 
 std::string Workspace::gridOf(const OperatorTarget& target) const

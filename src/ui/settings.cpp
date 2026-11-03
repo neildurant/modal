@@ -118,6 +118,14 @@ Settings::Settings()
                   "or hard, clipping",
                   std::string{"soft"}),
           setting("velfloor", "The lowest velocity a change makes a note", std::int64_t{1}, 1, 127),
+          setting("pedallift",
+                  "How long, in milliseconds, the pedalling tools lift the sustain pedal before "
+                  "a change",
+                  std::int64_t{10}, 0, 1000),
+          setting("pedaldown",
+                  "How long, in milliseconds, the pedalling tools press the sustain pedal again "
+                  "after a change",
+                  std::int64_t{60}, 0, 1000),
           setting("undolevels", "How many changes can be undone",
                   std::int64_t{core::Document::kDefaultUndoLevels}, 0, 100000),
           setting("ownports",

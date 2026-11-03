@@ -314,6 +314,71 @@ constexpr std::array kSharedCommands{
                 .count = true,
                 .range = true,
                 .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-pedal-repedal",
+        .description =
+            "Re-pedal the range: its sustain replaced by a pedal down just after its first chord, "
+            "lifted and pressed again around each chord change, and lifted as "
+            "its last notes end; asking how long before and after",
+        .aliases = "repedal",
+        .usage = "[lift=10ms] [down=60ms]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{.name = "transform-pedal-each",
+                .description = "Pedal the range afresh on each bar or beat, its sustain replaced; "
+                               "asking which, and how "
+                               "long before and after each line",
+                .aliases = "pedal-each",
+                .usage = "[bar|beat] [lift=10ms] [down=60ms]",
+                .count = true,
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{.name = "transform-pedal-retime",
+                .description = "Re-time the range's performed sustain: each lift and press near a "
+                               "chord change moved to "
+                               "just before and after it, the rest left as played",
+                .aliases = "retime",
+                .usage = "[lift=10ms] [down=60ms] [near=200ms]",
+                .count = true,
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-pedal-clean",
+        .description =
+            "Clean up the range's pedalling: exact repeats removed and flicker, a lift and a press "
+            "again within a few milliseconds, merged; the first and last "
+            "events kept",
+        .aliases = "pedal-clean",
+        .usage = "[flicker=30ms]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{.name = "transform-pedal-clear",
+                .description = "Clear a pedal from the range, lifting it at the start if it's down "
+                               "there and pressing it "
+                               "again at the end if it was down there",
+                .aliases = "pedal-clear",
+                .usage = "[sustain|sostenuto|soft|all]",
+                .count = true,
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-pedal-offset",
+        .description =
+            "Move every pedal change in the range later by some milliseconds, or earlier (-20ms)",
+        .aliases = "pedal-offset",
+        .usage = "[MS]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{.name = "transform-pedal-bake",
+                .description = "Bake the range's sustain into its notes: each note held by the "
+                               "pedal lengthened to where it "
+                               "lifts, and the sustain then cleared",
+                .aliases = "pedal-bake",
+                .count = true,
+                .range = true},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -717,7 +782,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 123> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 130> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -739,6 +804,13 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-repedal", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-each", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-retime", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-clean", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-clear", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-offset", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-pedal-bake", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-thin", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-filter", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-split", onlyIn({Tracks, Strip, PianoRoll, EventList})},

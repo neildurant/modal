@@ -7,6 +7,7 @@ add_library(modal_core STATIC
     input_queue.cpp
     meter_map.cpp
     note_fraction.cpp
+    pedalling.cpp
     controllers.cpp
     count_in.cpp
     document.cpp

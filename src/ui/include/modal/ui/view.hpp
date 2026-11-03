@@ -148,6 +148,9 @@ struct OperatorTarget
     // Cutting at the range's edges first, in the same change; the parts' events are then those
     // starting in it once cut.
     std::optional<CutRange> cut = std::nullopt;
+    // The stretch of time it covers, where the view can say, for the pedalling tools, which act
+    // on the time and not only the notes a range takes in the piano roll.
+    std::optional<std::pair<core::Tick, core::Tick>> span = std::nullopt;
 };
 
 // What a view asks of the workspace that shows it.

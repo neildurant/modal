@@ -528,12 +528,15 @@ Switch controllers (sustain CC 64, sostenuto CC 66, soft CC 67, legato and porta
 
 | Tool | Effect |
 | --- | --- |
-| Re-pedal at chord changes | Pedal down just after each chord change and up just before the next, with a configurable gap (legato pedalling) |
+| Re-pedal at chord changes | Pedal down just after each chord change and up just before the next, with a configurable gap (legato pedalling), replacing the range's sustain |
+| Re-time | Keep the performed pedalling, moving each lift and press near a chord change to just before and after it, the rest left as played (added November 2026, as not every chord wants pedalling) |
 | Pedal per bar / beat | A fresh pedal on each bar or beat across a range |
 | Clean up | Merge overlapping or flickering pedal events |
 | Clear | Remove the pedalling from a range |
 | Offset | Move every pedal change in a range slightly later |
 | Bake | Turn pedalling into longer notes, for instruments that ignore sustain |
+
+As decided and built (November 2026), in the transform menu's `, x P` group, each asking its settings in turn: re-pedal `r` (lift before, 10 ms, and press after, 60 ms, from `pedallift` and `pedaldown`), re-time `t` (the same, and how near a change counts, 200 ms), each bar or beat `b`, clean up `c` (exact repeats, so half-pedalling's values are kept, and flicker within 30 ms, the first and last events in the range kept), clear `x` (sustain, sostenuto, soft or all), offset `o` (20 ms, `-20ms` earlier) and bake `k`. They act on the range's time on each of its tracks, in the piano roll too, where a range takes only notes. A pedal down as the range starts is lifted there and one down as it ends pressed again there, so what's around the range is as it was. Re-pedal, re-time, each bar or beat and bake are for sustain alone; clean up and offset take all three pedals.
 
 **Adjusting by ear** (moved to milestone 8, decided November 2026, to be built into looping's design rather than added beside it)
 

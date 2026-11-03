@@ -385,6 +385,8 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.eventList().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.pianoRoll().setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
     view.setChordWindow(std::chrono::milliseconds{settings.integer("chordwindow")});
+    view.setPedalTiming(std::chrono::milliseconds{settings.integer("pedallift")},
+                        std::chrono::milliseconds{settings.integer("pedaldown")});
     view.pianoRoll().setNudge(std::chrono::milliseconds{settings.integer("nudge")});
     view.pianoRoll().setGridAdvance(settings.flag("gridadvance"));
     view.setHumanize(std::chrono::milliseconds{settings.integer("humanizetime")},

@@ -153,6 +153,12 @@ public:
     // The modalrc's own scales, beside the built-in ones, for keys.
     void setScales(std::vector<core::Scale> scales) { userScales_ = std::move(scales); }
     std::vector<core::Scale> scales() const;
+    // How long before a change the pedalling tools lift the pedal, and after it press it.
+    void setPedalTiming(std::chrono::milliseconds lift, std::chrono::milliseconds press)
+    {
+        pedalLift_ = lift;
+        pedalPress_ = press;
+    }
     // How far apart notes can start and still be a chord, for the chord tools.
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
     // How velocity changes keep within their limits: the velclip and velfloor settings.
@@ -326,6 +332,9 @@ private:
     bool thinAsked(const OperatorTarget& target, const std::string& text);
     bool splitAsked(const OperatorTarget& target, const std::string& given);
     bool remapAsked(const OperatorTarget& target, const std::string& text);
+    bool pedalAsked(std::string_view op, const OperatorTarget& target, const std::string& text);
+    std::chrono::milliseconds pedalLift_{10};
+    std::chrono::milliseconds pedalPress_{60};
     std::string gridOf(const OperatorTarget& target) const;
     using EventsChange =
         std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)>;

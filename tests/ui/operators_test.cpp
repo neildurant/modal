@@ -1611,3 +1611,27 @@ TEST_CASE("Filter deletes the search's matches, split moves notes to a track, ne
     o.press(NamedKey::Enter);
     CHECK(o.ws.message().starts_with("cc64 is a switch"));
 }
+
+TEST_CASE("The pedalling tools act on the range's time in the piano roll, where it takes notes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    // Bars 1 and 2: down just after the chord, lifted and pressed again around the A2, lifted
+    // as it ends.
+    o.type(U"gr2!!Pr");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    const auto pedals = o.pedals();
+    REQUIRE(pedals.size() == 5);
+    CHECK(pedals[0] > 0);
+    CHECK(pedals[1] < 4 * q);
+    CHECK(pedals[2] > 4 * q);
+    CHECK(pedals[3] == 5 * q);
+    CHECK(pedals[4] == 16 * q + q / 8); // bar 5's, outside the range
+    o.type(U"u");
+    // Bar 5's pedal cleared; pressed again at the bar's end, as it was down there.
+    o.type(U"4]b!!Px");
+    o.press(NamedKey::Enter);
+    CHECK(o.pedals() == std::vector<core::Tick>{20 * q});
+}
