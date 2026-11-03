@@ -5,6 +5,7 @@
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/view_parts.hpp>
+#include <modal/ui/view_state.hpp>
 
 #include <algorithm>
 #include <array>
@@ -1520,12 +1521,11 @@ void ArrangeView::setCursor(const SongCursor& cursor)
 
 core::EditPlace ArrangeView::place() const
 {
-    const auto strip = page_.stripCursor();
-    return {trackId(),
-            page_.time(),
-            {static_cast<std::int64_t>(page_.topTrack()), page_.leftTick(),
-             static_cast<std::int64_t>(page_.zoom()),
-             strip ? static_cast<std::int64_t>(*strip) : -1}};
+    return placeWith(trackId(), page_.time(),
+                     ArrangeState{.topTrack = page_.topTrack(),
+                                  .leftTick = page_.leftTick(),
+                                  .zoom = page_.zoom(),
+                                  .strip = page_.stripCursor()});
 }
 
 void ArrangeView::restore(const core::EditPlace& place)
@@ -1533,15 +1533,13 @@ void ArrangeView::restore(const core::EditPlace& place)
     refresh();
     setCursor({.track = place.track, .tick = place.tick, .pitch = cursor().pitch});
     // The view as it was, when the change was made in the arrangement, on the strip if it was.
-    if (place.view.size() == 4)
+    if (const auto state = arrangeStateOf(place))
     {
-        page_.setView(static_cast<std::size_t>(std::max<std::int64_t>(place.view[0], 0)),
-                      place.view[1],
-                      static_cast<std::size_t>(std::max<std::int64_t>(place.view[2], 0)));
-        if (place.view[3] >= 0)
+        page_.setView(state->topTrack, state->leftTick, state->zoom);
+        if (state->strip)
         {
             enterStrip();
-            page_.setStripCursor(static_cast<std::size_t>(place.view[3]));
+            page_.setStripCursor(*state->strip);
         }
     }
 }

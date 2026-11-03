@@ -9,6 +9,7 @@
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/view_parts.hpp>
+#include <modal/ui/view_state.hpp>
 
 #include <algorithm>
 #include <array>
@@ -2618,10 +2619,12 @@ void PianoRollView::openBars(const SongCursor& cursor, core::Tick from, core::Ti
 
 core::EditPlace PianoRollView::place() const
 {
-    return {trackId(),
-            time_,
-            {pitch_, topPitch_, static_cast<std::int64_t>(pageSize_), viewStart_,
-             viewLength_.value_or(0)}};
+    return placeWith(trackId(), time_,
+                     PianoRollState{.pitch = pitch_,
+                                    .topPitch = topPitch_,
+                                    .pageSize = pageSize_,
+                                    .viewStart = viewStart_,
+                                    .viewLength = viewLength_});
 }
 
 void PianoRollView::restore(const core::EditPlace& place)
@@ -2629,14 +2632,13 @@ void PianoRollView::restore(const core::EditPlace& place)
     refresh();
     setCursor({.track = place.track, .tick = place.tick, .pitch = std::nullopt});
     // The view as it was, when the change was made in the piano roll.
-    if (place.view.size() == 5)
+    if (const auto state = pianoRollStateOf(place))
     {
-        pitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[0], 0, 127));
-        topPitch_ = static_cast<std::uint8_t>(std::clamp<std::int64_t>(place.view[1], 0, 127));
-        pageSize_ = static_cast<std::size_t>(std::clamp<std::int64_t>(
-            place.view[2], 0, static_cast<std::int64_t>(kPageSizes.size()) - 1));
-        viewStart_ = std::max<core::Tick>(place.view[3], 0);
-        viewLength_ = place.view[4] > 0 ? std::optional{place.view[4]} : std::nullopt;
+        pitch_ = state->pitch;
+        topPitch_ = state->topPitch;
+        pageSize_ = std::min(state->pageSize, kPageSizes.size() - 1);
+        viewStart_ = state->viewStart;
+        viewLength_ = state->viewLength;
         turn(time_);
         follow();
     }

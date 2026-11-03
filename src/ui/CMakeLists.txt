@@ -34,6 +34,7 @@ add_library(modal_ui STATIC
     themes.cpp
     time_motions.cpp
     view_parts.cpp
+    view_state.cpp
     window_commands.cpp
     workspace.cpp
     workspace_commands.cpp

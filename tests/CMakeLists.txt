@@ -66,6 +66,7 @@ add_executable(modal_tests
     ui/event_list_view_test.cpp
     ui/objects_test.cpp
     ui/operators_test.cpp
+    ui/view_state_test.cpp
     ui/visual_test.cpp
     ui/piano_roll_view_test.cpp
     ui/transport_test.cpp

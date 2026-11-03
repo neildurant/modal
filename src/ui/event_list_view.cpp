@@ -9,6 +9,7 @@
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/view_parts.hpp>
+#include <modal/ui/view_state.hpp>
 #include <modal/ui/window_commands.hpp>
 
 #include <algorithm>
@@ -1474,13 +1475,12 @@ void EventListView::restore(const core::EditPlace& place)
     }
     list_ = listOf(track_);
     row_ = list_.rowAt(place.tick);
-    const auto& view = place.view;
-    if (view.size() == 2)
+    if (const auto state = eventListStateOf(place))
     {
-        top_ = static_cast<std::size_t>(std::max<std::int64_t>(view[0], 0));
+        top_ = state->top;
         const auto rows = list_.rows();
-        for (std::int64_t i = 0;
-             i < view[1] && row_ + 1 < rows.size() && rows[row_ + 1].tick == place.tick; ++i)
+        for (std::size_t i = 0;
+             i < state->down && row_ + 1 < rows.size() && rows[row_ + 1].tick == place.tick; ++i)
         {
             ++row_;
         }
@@ -1499,9 +1499,8 @@ core::EditPlace EventListView::place() const
 {
     // The view's state: the top row, and how far down the rows at the cursor's time it is.
     const auto tick = list_.rows()[row_].tick;
-    return {list_.track(),
-            tick,
-            {static_cast<std::int64_t>(top_), static_cast<std::int64_t>(row_ - list_.rowAt(tick))}};
+    return placeWith(list_.track(), tick,
+                     EventListState{.top = top_, .down = row_ - list_.rowAt(tick)});
 }
 
 std::string EventListView::trackName() const

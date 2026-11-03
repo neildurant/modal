@@ -21,12 +21,15 @@ namespace modal::core
 
 // Where an edit was made, for undo and redo to go back to: the cursor's track (none for the
 // conductor) and position, and the view's state (its scroll and zoom, or page), kept as the
-// view gives it. Moving and scrolling aren't undo steps themselves.
+// view gives it, with a tag saying which view's it is (0 for none), so a view reads only its
+// own (named structures in the ui library, see view_state.hpp; tagged after a code review,
+// November 2026). Moving and scrolling aren't undo steps themselves.
 struct EditPlace
 {
     std::optional<TrackId> track;
     Tick tick = 0;
     std::vector<std::int64_t> view = {};
+    std::uint8_t viewKind = 0;
 
     friend bool operator==(const EditPlace&, const EditPlace&) = default;
 };
