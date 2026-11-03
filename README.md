@@ -11,10 +11,11 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 3. **Grid renderer:** the window, font and grid, keys and key bindings, settings and themes, and a `:` prompt.
 4. **The event list,** the first real view. Songs made of sections, opened, saved and exported in a plain-text format or as MIDI files, with undo; Vim-style motions and operators; editing events in place; an inspector; and playback from a play-from marker.
 5. **The arrangement and the piano roll.** The arrangement as the home view, with its section strip; the piano roll, for writing and editing notes; one cursor shared by the views; and an editing grammar of ranges and objects, with bars taken out and put in across the tracks.
+6. **The full grammar,** under way: the leader key and its hint menu, Visual mode, the operators and objects, the command palette, `.` repeat, registers, macros, marks and labels, `f` and `F`, search, and the MIDI transforms (velocity, pitch, keys and scales, quantising, lengths, thinning, splitting and the pedalling tools). Still to come in it: a review of the key map, and a wrap-up.
 
 ![The event list, playing](docs/screenshot.png)
 
-Next comes the full grammar across all three views (milestone 6): the leader key and its hint menu first, then Visual mode, the other operators and transforms, search and the command palette. The plan for the rest is in [docs/design.md](docs/design.md).
+After milestone 6 come more for the views (the outline, ghost notes, controller lanes, drum maps and several songs at once), then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
