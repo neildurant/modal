@@ -30,7 +30,7 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
     assert(plan);
     Snapshot next = latest_ ? *latest_ : Snapshot{};
     next.plan = std::move(plan);
-    return publish(std::move(next));
+    return publish(std::move(next)) && woken(true);
 }
 
 bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
@@ -53,22 +53,22 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
         return false;
     }
     ++playRequests_;
-    return commands_.tryPush({Command::Kind::Play, playRequests_});
+    return woken(commands_.tryPush({Command::Kind::Play, playRequests_}));
 }
 
 bool Engine::stop()
 {
-    return commands_.tryPush({Command::Kind::Stop});
+    return woken(commands_.tryPush({Command::Kind::Stop}));
 }
 
 bool Engine::panic()
 {
-    return commands_.tryPush({Command::Kind::Panic});
+    return woken(commands_.tryPush({Command::Kind::Panic}));
 }
 
 bool Engine::quit()
 {
-    return commands_.tryPush({Command::Kind::Quit});
+    return woken(commands_.tryPush({Command::Kind::Quit}));
 }
 
 EngineStatus Engine::status() const
@@ -108,6 +108,17 @@ bool Engine::receive(InputId input, std::span<const std::uint8_t> message,
         return false;
     }
     return true;
+}
+
+bool Engine::woken(bool taken) noexcept
+{
+    // Woken at once for what it's been given, rather than at its next look for commands, up
+    // to 1 ms later (found in a code review, November 2026).
+    if (taken)
+    {
+        clock_.wake();
+    }
+    return taken;
 }
 
 bool Engine::publish(Snapshot snapshot)

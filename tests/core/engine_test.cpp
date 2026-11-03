@@ -569,3 +569,17 @@ TEST_CASE("the engine reports where each play stopped")
     CHECK(*engine.stoppedAt(second) < q);
     CHECK(engine.stoppedAt(first) == std::nullopt); // only the last play's is kept
 }
+
+TEST_CASE("a plan, play, stop or panic wakes the engine at once")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const int before = clock.wakes;
+    CHECK(engine.setPlan(fourNotes(ppqn)));
+    CHECK(engine.play(0));
+    CHECK(engine.stop());
+    CHECK(engine.panic());
+    CHECK(clock.wakes == before + 4);
+}

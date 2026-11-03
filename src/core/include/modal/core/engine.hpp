@@ -219,6 +219,7 @@ private:
     };
 
     bool publish(Snapshot snapshot);
+    bool woken(bool taken) noexcept;
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
     void takeInput() noexcept;
     void publishStatus(std::chrono::nanoseconds now) noexcept;
