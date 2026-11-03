@@ -55,7 +55,7 @@ struct TransformSetting
     bool tracks = false; // the tracks' names, offered too
 };
 
-std::vector<TransformSetting> transformSettings(std::string_view command);
+std::span<const TransformSetting> transformSettings(std::string_view command);
 
 // How the transform menu's quantise was answered: a grid (or each track's own), how far, the
 // swing and what's moved.
