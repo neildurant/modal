@@ -431,7 +431,9 @@ std::optional<CutRange> PianoRollView::cutRange(std::string_view motion, int cou
 
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::rowsSpan() const
 {
-    return std::pair{page().start, page().end};
+    // The whole track, as v takes every pitch, rather than the page's, which would make what V
+    // takes depend on what's shown (decided November 2026); , s v selects what's shown.
+    return std::pair{core::Tick{0}, document_.song().end()};
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selectionSpan() const

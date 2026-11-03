@@ -1018,6 +1018,17 @@ Where Workspace::where() const
     return Where::EventList;
 }
 
+void Workspace::sayWholeRows()
+{
+    // In the piano roll, V takes its pitches across the whole track, which is more than is
+    // shown, so the status line says so.
+    if (selection_ && selection_->kind == SelectionKind::Rows && where() == Where::PianoRoll)
+    {
+        setMessage("These pitches across the whole track: is or ib narrows the time",
+                   MessageKind::Information);
+    }
+}
+
 bool Workspace::refuseObject(std::string_view command)
 {
     // Where the object is, rather than doing something wider or narrower than it says
@@ -1330,6 +1341,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                       .span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt,
                       .cut = false};
         mode_ = Mode::Visual;
+        sayWholeRows();
         return true;
     }
     if (command == "visual-again")
@@ -1697,6 +1709,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         {
             selection_->kind = kind;
             selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
+            sayWholeRows();
         }
         return true;
     }
@@ -1774,14 +1787,8 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
         }
         if (command == "visual-delete-time")
         {
-            if (selection.kind == SelectionKind::Range && selection.where == Where::Tracks && span)
-            {
-                // On every track: out of the song, as :bar-delete takes bars.
-                const auto result = deleteBars(span->first, span->second);
-                setMessage(result.message,
-                           result.warning ? MessageKind::Warning : MessageKind::Information);
-                return true;
-            }
+            // Closing up within each section, whatever made the selection; taking bars out of
+            // the song is :bar-delete's (decided November 2026).
             return view().operate("operator-delete", "visual-time", 0);
         }
         if (command == "event-delete" || command == "operator-delete")

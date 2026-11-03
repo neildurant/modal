@@ -240,14 +240,23 @@ TEST_CASE("d, y and the other operators act on the selection at once, ending Vis
     CHECK(s.ws.mode() == Mode::Normal);
 }
 
-TEST_CASE("D takes a selection on every track out of the song, as :bar-delete does")
+TEST_CASE("D closes up within each section whatever made the selection; :bar-delete takes bars "
+          "out of the song")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Selecting s{ppqn};
-    s.type(U"lvlD"); // bars 2-3, across A's end and B's start
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    s.type(U"lvlD"); // bars 2-3, across A's end and B's start, on every track
+    CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
+    CHECK(s.document.song().end() == 8 * s.bar); // the song as long as it was
+    CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
+    s.type(U"u");
+
+    // Out of the song: the bars go, and it's two shorter.
+    s.type(U"gglvl:bar-delete");
+    s.press(NamedKey::Enter);
     CHECK(pitches(s.document, 0) == Pitches{40, 43, 44, 45, 46, 47});
     CHECK(s.document.song().end() == 6 * s.bar);
-    CHECK(sections(s.document) == std::vector<std::string>{"A", "B", "C"});
     s.type(U"u");
     CHECK(s.document.song().end() == 8 * s.bar);
 }
@@ -484,22 +493,23 @@ TEST_CASE("D on whole rows closes up within each section the selection crosses")
     CHECK(pitches(s.document, 0).size() == 8);
 }
 
-TEST_CASE("V in the piano roll selects pitch rows across the page it started on")
+TEST_CASE("V in the piano roll selects pitch rows across the whole track, saying so")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Selecting s{ppqn};
     const auto bass = s.document.song().tracks()[0]->id();
     s.type(U"gr");
     s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
-    const auto page = s.ws.pianoRoll().page();
+    const std::pair whole{core::Tick{0}, s.document.song().end()};
     s.type(U"V");
+    CHECK(s.ws.message() == "These pitches across the whole track: is or ib narrows the time");
     CHECK(s.ws.pianoRoll().selectionStatus().value_or("").starts_with("E2, "));
-    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{page.start, page.end});
+    CHECK(s.ws.pianoRoll().selectionSpan() == whole);
     s.type(U"k"); // and F2
     CHECK(s.ws.pianoRoll().selectionStatus().value_or("").starts_with("E2 to F2, "));
-    // The time stays the page's as the cursor moves on, the view turning.
+    // The time stays the track's as the cursor moves on, whatever the page.
     s.type(U"4}");
-    CHECK(s.ws.pianoRoll().selectionSpan() == std::pair{page.start, page.end});
+    CHECK(s.ws.pianoRoll().selectionSpan() == whole);
     s.type(U"d");
     CHECK(pitches(s.document, 0) == Pitches{42, 43, 44, 45, 46, 47});
     s.type(U"u");
