@@ -300,7 +300,7 @@ public:
         message_ = std::move(message);
         messageKind_ = kind;
         // A warning in a macro is a command failing, which stops it.
-        macroFailed_ = macroFailed_ || (kind == MessageKind::Warning && macroDepth_ > 0);
+        macros_.failed = macros_.failed || (kind == MessageKind::Warning && macros_.depth > 0);
     }
     const std::string& message() const { return message_; }
     MessageKind messageKind() const { return messageKind_; }
@@ -491,12 +491,16 @@ private:
     // where the keys of the binding being typed began, the last played, how deep in macros
     // the keys being run are, and whether a command among them failed, stopping them.
     static constexpr int kMaxMacroDepth = 20;
-    char32_t recording_ = 0;
-    std::vector<Key> recorded_;
-    std::size_t recordedBefore_ = 0;
-    char32_t lastMacro_ = 0;
-    int macroDepth_ = 0;
-    bool macroFailed_ = false;
+    struct MacroState
+    {
+        char32_t recording = 0;
+        std::vector<Key> recorded;
+        std::size_t recordedBefore = 0;
+        char32_t last = 0;
+        int depth = 0;
+        bool failed = false;
+    };
+    MacroState macros_;
     static std::string macroName(char32_t name);
     bool endRecording();
     bool playMacro(char32_t name, int count);
@@ -582,11 +586,18 @@ private:
     std::vector<std::pair<std::string, std::string>> listing_;
     Region listingRegion() const;
     bool sayRegisters();
-    std::vector<Key> changeKeys_; // typed since Normal mode was last idle
-    std::vector<Key> lastChange_;
-    std::uint64_t versionBefore_ = 0;
-    bool notAChange_ = false; // undo, redo or . ran among them
-    bool replaying_ = false;
+    // The change . repeats: the keys typed since Normal mode was last idle, the last change's,
+    // the song's version before them, whether undo, redo or . ran among them, and whether . or
+    // a macro is replaying keys, which aren't recorded again.
+    struct RepeatState
+    {
+        std::vector<Key> changeKeys;
+        std::vector<Key> lastChange;
+        std::uint64_t versionBefore = 0;
+        bool notAChange = false;
+        bool replaying = false;
+    };
+    RepeatState repeat_;
     Region paletteRegion() const;
     bool operateOnSelection(std::string_view command, int count);
     // Cutting at the edges (|): an operator run after cutting the notes crossing its range's

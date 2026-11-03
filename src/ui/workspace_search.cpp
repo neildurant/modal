@@ -43,7 +43,7 @@ bool Workspace::search(const std::string& text)
     if (!parsed.query)
     {
         setMessage(parsed.error, MessageKind::Warning);
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
         return true;
     }
     searching_.query = parsed.query;
@@ -60,7 +60,7 @@ bool Workspace::searchHere(bool forward, int count)
     if (!query)
     {
         setMessage("No note or controller here to search for", MessageKind::Information);
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
         return true;
     }
     searching_.query = query;
@@ -94,7 +94,7 @@ bool Workspace::goToMatch(bool next, int count)
         setMessage(on ? "This is the only match for " + searching_.text
                       : "No match for " + searching_.text + " on this track",
                    MessageKind::Information);
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
         return true;
     }
     if (mode_ != Mode::Visual)
@@ -191,7 +191,7 @@ bool Workspace::toMatchForGn()
     if (!searching_.query)
     {
         setMessage("No search yet: " + keysOf("search") + " searches", MessageKind::Information);
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
         return false;
     }
     if (!view().matchesHere(*searching_.query) ||
@@ -313,7 +313,7 @@ bool Workspace::startFind(bool forward, int count)
     {
         if (!goToFound(forward, count))
         {
-            macroFailed_ = macroDepth_ > 0;
+            macros_.failed = macros_.depth > 0;
         }
         return true;
     }
@@ -345,7 +345,7 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
         setMessage(keysOf(command) + " takes a note name after it, such as " + keysOf(command) +
                        "E, " + keysOf(command) + "F# or " + keysOf(command) + "Bb",
                    MessageKind::Information);
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
         if (operator_)
         {
             operator_.reset();
@@ -404,12 +404,12 @@ bool Workspace::finishNaming(std::optional<char32_t> accidental)
             mode_ = Mode::OperatorPending;
             if (!operateToFound(naming.forward, naming.count))
             {
-                macroFailed_ = macroDepth_ > 0;
+                macros_.failed = macros_.depth > 0;
             }
         }
-        else if (naming.failed && macroDepth_ > 0)
+        else if (naming.failed && macros_.depth > 0)
         {
-            macroFailed_ = true;
+            macros_.failed = true;
         }
         document_.endGroup();
         refresh();
@@ -419,7 +419,7 @@ bool Workspace::finishNaming(std::optional<char32_t> accidental)
     view().setCursor(naming.from);
     if (!goToFound(naming.forward, naming.count))
     {
-        macroFailed_ = macroDepth_ > 0;
+        macros_.failed = macros_.depth > 0;
     }
     return true;
 }
@@ -437,9 +437,9 @@ void Workspace::settleNaming()
         finishNaming(std::nullopt);
         return;
     }
-    if (finding_.naming->failed && macroDepth_ > 0)
+    if (finding_.naming->failed && macros_.depth > 0)
     {
-        macroFailed_ = true;
+        macros_.failed = true;
     }
     finding_.naming.reset();
 }
