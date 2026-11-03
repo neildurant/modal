@@ -272,6 +272,48 @@ constexpr std::array kSharedCommands{
         .aliases = "legato",
         .count = true,
         .range = true},
+    CommandInfo{
+        .name = "transform-thin",
+        .description =
+            "Thin out dense controller, pitch bend and aftertouch data in a range or object, "
+            "asking which, the most to keep a quarter note (16) and the "
+            "smallest change kept (2); each gesture's first and last kept, "
+            "and never the pedals or other switches",
+        .aliases = "thin",
+        .usage = "[all|ccN|bend|aftertouch] [per=16] [step=2]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-filter",
+        .description =
+            "Delete the events a range or object takes that match a query, as / writes them "
+            "(vel<20, cc7), asking which, the search's at Enter",
+        .aliases = "filter",
+        .usage = "[QUERY]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{
+        .name = "transform-split",
+        .description =
+            "Split the notes a range or object takes at a note, moving it and those above, or "
+            "those below, to another track, asking at which note, which side "
+            "and which track; a new name makes a new track",
+        .aliases = "split",
+        .usage = "[NOTE] [side=up] [to=TRACK]",
+        .count = true,
+        .range = true,
+        .choices = {Choices::Option, Choices::Option, Choices::Option}},
+    CommandInfo{.name = "transform-remap",
+                .description =
+                    "Remap a controller (cc1 to cc11) or a note (C1 to D1) in a range or object, "
+                    "asking which and to what",
+                .aliases = "remap",
+                .usage = "[ccN|NOTE] [to=ccN|NOTE]",
+                .count = true,
+                .range = true,
+                .choices = {Choices::Option, Choices::Option, Choices::Option}},
     CommandInfo{.name = "visual",
                 .description = "Visual mode: select from here as the cursor moves, a range of "
                                "time on every track; v again or Escape ends it"},
@@ -675,7 +717,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 119> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 123> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -697,6 +739,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"transform-velocity-limit", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-velocity-ramp", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-thin", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-filter", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-split", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"transform-remap", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-stretch", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-length", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"transform-legato", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -4264,6 +4310,13 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
                 if (setting.lengths)
                 {
                     addLengths({});
+                }
+                if (setting.tracks)
+                {
+                    for (const auto& track : document_.song().tracks())
+                    {
+                        found.push_back(track->name);
+                    }
                 }
             }
             return found;

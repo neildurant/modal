@@ -91,6 +91,43 @@ Transformed changeLengths(const EventList& events, std::span<const std::size_t> 
                           LengthChange how, Tick amount,
                           const std::function<bool(Tick first, Tick tick)>& together);
 
+// The switch controllers, on or off rather than a curve: sustain, sostenuto, soft, legato and
+// portamento (CC 64 to 68).
+bool isSwitchController(int controller);
+
+// Thinning dense continuous data (decided November 2026): of each controller's events (not
+// the switches'), pitch bend's, channel aftertouch's or each note's poly aftertouch, a gesture
+// being those with no gap longer than gestureGap, the first and last of each kept, and of the
+// rest those at least spacing after the last kept and changed from it by step or more.
+struct ThinWhat
+{
+    enum class Kind : std::uint8_t
+    {
+        All,
+        Controller,
+        Bend,
+        Aftertouch,
+    };
+
+    Kind kind = Kind::All;
+    int controller = 0;
+
+    friend bool operator==(const ThinWhat&, const ThinWhat&) = default;
+};
+
+Transformed thin(const EventList& events, std::span<const std::size_t> which, ThinWhat what,
+                 Tick spacing, int step, Tick gestureGap);
+
+// The events taken for which drop says so, removed.
+Transformed removed(const EventList& events, std::span<const std::size_t> which,
+                    const std::function<bool(const Event&)>& drop);
+
+// A controller's events made another's, or a pitch's notes another pitch's.
+Transformed remapController(const EventList& events, std::span<const std::size_t> which, int from,
+                            int to);
+Transformed remapPitch(const EventList& events, std::span<const std::size_t> which, int from,
+                       int to);
+
 // The pedals that follow quantised notes: sustain, sostenuto and soft (CC 64, 66 and 67).
 bool isPedal(const Event& event);
 

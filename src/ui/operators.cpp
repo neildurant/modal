@@ -4,6 +4,7 @@
 // object takes, and the workspace changes those events the same way in every view.
 
 #include <modal/core/controllers.hpp>
+#include <modal/core/event_query.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/core/transforms.hpp>
@@ -83,7 +84,7 @@ struct Asking
     std::string_view answer;
 };
 
-constexpr std::array<Asking, 15> kQuestions{{
+constexpr std::array<Asking, 19> kQuestions{{
     {"transform-transpose", "Transpose {} by how many semitones", "+12, -3", ""},
     {"transform-velocity-lift", "Lift the velocities of {} towards 127 by", "", "25%"},
     {"transform-velocity-lower", "Lower the velocities of {} towards the floor by", "", "25%"},
@@ -95,6 +96,10 @@ constexpr std::array<Asking, 15> kQuestions{{
     {"transform-quantize", "Quantise {}", "", "grid"},
     {"transform-stretch", "Stretch {} by", "2 half time, 1/2 double time, 150%", ""},
     {"transform-length", "Set the lengths of {} to", "legato, 1/8, 80%", ""},
+    {"transform-thin", "Thin the controllers, bends and aftertouch of {}", "", "all"},
+    {"transform-filter", "Delete the events of {} matching", "vel<20, cc7", ""},
+    {"transform-split", "Split {}", "", "C4"},
+    {"transform-remap", "Remap {}", "cc1, C1", ""},
     {"transform-chord-accent", "Accent the top notes of the chords in {} by", "", "10"},
     {"transform-chord-balance", "Balance the chords in {} from bottom to top", "", "70-95"},
     {"transform-chord-compress", "Compress the chords in {}", "", "50%"},
@@ -231,6 +236,42 @@ std::vector<TransformSetting> transformSettings(std::string_view command)
     {
         return {{.name = "", .question = "by how much", .answer = "130%"}, window};
     }
+    if (command == "transform-thin")
+    {
+        return {{.name = "",
+                 .question = "which",
+                 .answer = "all",
+                 .form = "all|cc1|bend|aftertouch",
+                 .values = {"all", "bend", "aftertouch", "cc1", "cc2", "cc7", "cc10", "cc11"}},
+                {.name = "per",
+                 .question = "keeping at most this many a quarter note",
+                 .answer = "16",
+                 .form = "1-96"},
+                {.name = "step",
+                 .question = "and changes of at least",
+                 .answer = "2",
+                 .form = "0-64, in value"}};
+    }
+    if (command == "transform-split")
+    {
+        // The track's default is a new one after the first's (see askSettings).
+        return {{.name = "", .question = "at", .answer = "C4", .form = "a note"},
+                {.name = "side",
+                 .question = "moving",
+                 .answer = "up",
+                 .form = "up, it and those above, or down, those below",
+                 .values = {"up", "down"}},
+                {.name = "to",
+                 .question = "to the track",
+                 .answer = "track",
+                 .form = "a track, or a new one's name",
+                 .tracks = true}};
+    }
+    if (command == "transform-remap")
+    {
+        return {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1"},
+                {.name = "to", .question = "to", .answer = "", .form = "cc11|D1"}};
+    }
     if (command == "transform-quantize")
     {
         // The grid's default is the tracks' own, as q's (see askSettings).
@@ -274,9 +315,20 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         const auto question = std::ranges::find(kQuestions, op, &Asking::op);
         auto label = std::string{question->label};
         label.replace(label.find("{}"), 2, target.what);
-        const auto answer =
+        auto answer =
             settings[i].answer == "grid" ? gridOf(target) : std::string{settings[i].answer};
-        label += ", " + std::string{settings[i].question} + " (" + answer + "): ";
+        if (settings[i].tracks)
+        {
+            // A new track, named after the first's and the side moved.
+            const auto side =
+                std::ranges::find(answers, std::string{"side"}, &Answers::value_type::first);
+            const auto* first =
+                target.parts.empty() ? nullptr : document_.song().track(target.parts[0].track);
+            answer = (first != nullptr ? first->name : std::string{"Track"}) +
+                     (side != answers.end() && side->second == "down" ? " low" : " high");
+        }
+        label += ", " + std::string{settings[i].question} + " (" +
+                 (answer.empty() ? std::string{settings[i].form} : answer) + "): ";
         askFor(
             std::move(label),
             [this, op, target, answers, name](const std::string& text) mutable
@@ -293,14 +345,43 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         answerSetting_ = i;
         return;
     }
+    // In the settings' order, so the last (a track's name, which may have spaces) comes last;
+    // then any others given.
     std::string text;
+    for (const auto& setting : settings)
+    {
+        const auto given =
+            std::ranges::find(answers, std::string{setting.name}, &Answers::value_type::first);
+        text += (setting.name.empty() ? given->second
+                                      : std::string{setting.name} + "=" + given->second) +
+                " ";
+    }
     for (const auto& [name, value] : answers)
     {
-        text += (name.empty() ? value : name + "=" + value) + " ";
+        if (std::ranges::find(settings, std::string_view{name}, &TransformSetting::name) ==
+            settings.end())
+        {
+            text += name + "=" + value + " ";
+        }
     }
     if (op == "transform-quantize")
     {
         quantizeAsked(target, text);
+        return;
+    }
+    if (op == "transform-thin")
+    {
+        thinAsked(target, text);
+        return;
+    }
+    if (op == "transform-split")
+    {
+        splitAsked(target, text);
+        return;
+    }
+    if (op == "transform-remap")
+    {
+        remapAsked(target, text);
         return;
     }
     velocityOverTime(op, target, text);
@@ -828,6 +909,24 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
             title, target, [&](const core::EventList& events, const auto& part)
             { return core::changeLengths(events, part.events, how, amount, together); });
     }
+    if (name == "transform-filter")
+    {
+        const auto parsed = core::parseQuery(text, scales());
+        if (!parsed.query)
+        {
+            setMessage(parsed.error, MessageKind::Warning);
+            return true;
+        }
+        const auto ppqn = document_.song().ppqn();
+        return changeEvents(
+            "Delete the events of " + target.what + " matching " + std::string{trimmed(text)},
+            target,
+            [&](const core::EventList& events, const auto& part)
+            {
+                return core::removed(events, part.events, [&](const core::Event& event)
+                                     { return core::matches(*parsed.query, event.data, ppqn); });
+            });
+    }
     if (name == "transform-retrograde")
     {
         return changeEvents("Retrograde " + target.what, target,
@@ -954,6 +1053,16 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     if (op == "transform-retrograde" || op == "transform-legato")
     {
         return applyTransform(op, *target, {});
+    }
+    if (op == "transform-filter")
+    {
+        askFor(
+            "Delete the events of " + target->what + " matching (" +
+                (search_ ? searchText_ : std::string{"vel<20, cc7"}) + "): ",
+            [this, target = *target](const std::string& text)
+            { applyTransform("transform-filter", target, text); },
+            search_ ? searchText_ : std::string{});
+        return true;
     }
     if (op == "transform-invert")
     {
@@ -1120,6 +1229,250 @@ bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quanti
                                    .move = how.move,
                                    .step = [step](core::Tick) { return step; }});
         });
+}
+
+bool Workspace::thinAsked(const OperatorTarget& target, const std::string& text)
+{
+    const auto said = told(text, {});
+    core::ThinWhat what;
+    const auto& which = said.amount;
+    if (which == "bend")
+    {
+        what.kind = core::ThinWhat::Kind::Bend;
+    }
+    else if (which == "aftertouch")
+    {
+        what.kind = core::ThinWhat::Kind::Aftertouch;
+    }
+    else if (which.starts_with("cc"))
+    {
+        const auto controller = percentUpTo(std::string_view{which}.substr(2), 127);
+        if (!controller || which.ends_with('%'))
+        {
+            setMessage("Not a controller: " + which + "; type cc and its number, as cc1",
+                       MessageKind::Warning);
+            return true;
+        }
+        if (core::isSwitchController(*controller))
+        {
+            setMessage(which + " is a switch, as the pedals are, which thinning leaves alone; "
+                               "the pedalling tools clean them up",
+                       MessageKind::Warning);
+            return true;
+        }
+        what = {core::ThinWhat::Kind::Controller, *controller};
+    }
+    else if (which != "all")
+    {
+        setMessage("Not what to thin: " + which + "; type all, bend, aftertouch or cc1",
+                   MessageKind::Warning);
+        return true;
+    }
+    int per = 16;
+    int step = 2;
+    for (const auto& [option, value] : said.options)
+    {
+        const auto number = percentUpTo(value, option == "per" ? 96 : 64);
+        if ((option != "per" && option != "step") || !number || value.ends_with('%') ||
+            (option == "per" && *number < 1))
+        {
+            setMessage(option == "per" ? "Not how many a quarter note: " + value + "; type 1 to 96"
+                       : option == "step" ? "Not a change: " + value + "; type 0 to 64"
+                                          : "Thin takes per= and step=, not " + option + "=",
+                       MessageKind::Warning);
+            return true;
+        }
+        (option == "per" ? per : step) = *number;
+    }
+    const auto q = document_.song().ppqn().quarter();
+    return changeEvents("Thin the " + (which == "all" ? std::string{"controllers"} : which) +
+                            " of " + target.what + " to " + std::to_string(per) + " a quarter note",
+                        target,
+                        [&](const core::EventList& events, const auto& part)
+                        {
+                            return core::thin(events, part.events, what,
+                                              std::max<core::Tick>(q / per, 1), step, q);
+                        });
+}
+
+bool Workspace::splitAsked(const OperatorTarget& target, const std::string& given)
+{
+    // The track's name is the rest of the line after to=, spaces and all.
+    auto text = given;
+    std::string to;
+    if (const auto at = text.find("to="); at != std::string::npos)
+    {
+        to = std::string{trimmed(std::string_view{text}.substr(at + 3))};
+        text.erase(at);
+    }
+    const auto said = told(text, {});
+    const auto at = core::parsePitch(trimmed(said.amount));
+    if (!at)
+    {
+        setMessage("Not a note: " + said.amount + "; type one to split at, as C4",
+                   MessageKind::Warning);
+        return true;
+    }
+    bool up = true;
+    for (const auto& [option, value] : said.options)
+    {
+        if (option == "side" && (value == "up" || value == "down"))
+        {
+            up = value == "up";
+        }
+        else
+        {
+            setMessage(option == "side" ? "Not a side: " + value + "; type up or down"
+                                        : "Split takes side= and to=, not " + option + "=",
+                       MessageKind::Warning);
+            return true;
+        }
+    }
+    if (to.empty())
+    {
+        setMessage("Split needs a track to move the notes to", MessageKind::Warning);
+        return true;
+    }
+    // The track of that name, ignoring case, or a new one after the first's, playing as it does.
+    const auto& song = document_.song();
+    const auto lower = [](std::string text)
+    {
+        std::ranges::transform(text, text.begin(),
+                               [](char c) { return static_cast<char>(std::tolower(c)); });
+        return text;
+    };
+    std::optional<core::TrackId> existing;
+    std::size_t position = 0;
+    for (std::size_t i = 0; i < song.tracks().size(); ++i)
+    {
+        const auto& track = *song.tracks()[i];
+        if (lower(track.name) == lower(to))
+        {
+            existing = track.id();
+        }
+        if (!target.parts.empty() && track.id() == target.parts[0].track)
+        {
+            position = i + 1;
+        }
+    }
+    if (existing && std::ranges::any_of(target.parts, [&](const OperatorTarget::Part& part)
+                                        { return part.track == *existing; }))
+    {
+        setMessage("The notes are on " + to + " already: split them to another track",
+                   MessageKind::Warning);
+        return true;
+    }
+    const auto moves = [&](const core::Event& event)
+    {
+        const auto* note = std::get_if<core::Note>(&event.data);
+        return note != nullptr && (up ? note->pitch >= *at : note->pitch < *at);
+    };
+    std::size_t count = 0;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = song.events(part.track);
+        count += static_cast<std::size_t>(
+            std::ranges::count_if(part.events, [&](std::size_t i) { return moves(events[i]); }));
+    }
+    if (count == 0)
+    {
+        setMessage(std::string{"No notes "} + (up ? "at or above " : "below ") +
+                       core::pitchName(*at) + " to move",
+                   MessageKind::Information);
+        return true;
+    }
+    const auto what = count == 1 ? std::string{"1 note"} : std::to_string(count) + " notes";
+    const auto title = "Move " + what + (up ? " at or above " : " below ") + core::pitchName(*at) +
+                       " to " + (existing ? song.track(*existing)->name : to);
+    document_.edit(title, view().place(),
+                   [&](core::Song& edited)
+                   {
+                       auto into = existing;
+                       if (!into)
+                       {
+                           into = edited.addTrack(position, to);
+                           const auto* first = song.track(target.parts[0].track);
+                           edited.updateTrack(*into,
+                                              [&](core::Track& track)
+                                              {
+                                                  track.port = first->port;
+                                                  track.channel = first->channel;
+                                                  track.grid = first->grid;
+                                              });
+                       }
+                       std::vector<core::Event> moving;
+                       for (const auto& part : target.parts)
+                       {
+                           edited.updateEvents(part.track,
+                                               [&](core::EventList& events)
+                                               {
+                                                   for (auto it = part.events.rbegin();
+                                                        it != part.events.rend(); ++it)
+                                                   {
+                                                       if (moves(events[*it]))
+                                                       {
+                                                           moving.push_back(events[*it]);
+                                                           events.erase(*it);
+                                                       }
+                                                   }
+                                               });
+                       }
+                       edited.updateEvents(*into, [&](core::EventList& events)
+                                           { events = core::merged(events, std::move(moving)); });
+                   });
+    refresh();
+    setMessage(title, MessageKind::Information);
+    return true;
+}
+
+bool Workspace::remapAsked(const OperatorTarget& target, const std::string& text)
+{
+    const auto said = told(text, {});
+    std::string to;
+    for (const auto& [option, value] : said.options)
+    {
+        if (option != "to")
+        {
+            setMessage("Remap takes to=, not " + option + "=", MessageKind::Warning);
+            return true;
+        }
+        to = value;
+    }
+    const auto controller = [](std::string_view word) -> std::optional<int>
+    {
+        if (!word.starts_with("cc") || word.ends_with('%'))
+        {
+            return std::nullopt;
+        }
+        return percentUpTo(word.substr(2), 127);
+    };
+    const auto from = said.amount;
+    if (const auto a = controller(from))
+    {
+        const auto b = controller(to);
+        if (!b)
+        {
+            setMessage("Not a controller: " + to + "; remap " + from + " to another, as cc11",
+                       MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Remap " + from + " of " + target.what + " to " + to, target,
+                            [&](const core::EventList& events, const auto& part)
+                            { return core::remapController(events, part.events, *a, *b); });
+    }
+    const auto a = core::parsePitch(trimmed(from));
+    const auto b = core::parsePitch(trimmed(to));
+    if (!a || !b)
+    {
+        setMessage(!a ? "Not a controller or a note: " + from + "; type cc1 or C1"
+                      : "Not a note: " + to + "; remap " + from + " to another, as D1",
+                   MessageKind::Warning);
+        return true;
+    }
+    return changeEvents("Remap the " + core::pitchName(*a) + "s of " + target.what + " to " +
+                            core::pitchName(*b),
+                        target, [&](const core::EventList& events, const auto& part)
+                        { return core::remapPitch(events, part.events, *a, *b); });
 }
 
 std::string Workspace::gridOf(const OperatorTarget& target) const

@@ -1243,7 +1243,7 @@ TEST_CASE("Lifting and lowering velocities take their default at Enter, and limi
     o.type(U"u:vel-limit 85-90");
     o.press(NamedKey::Enter);
     CHECK(o.velocities() == std::vector<int>{85, 90, 50, 100, 70});
-    o.type(U"u!!m90-85");
+    o.type(U"u!!M90-85");
     o.press(NamedKey::Enter);
     CHECK(o.ws.message() ==
           "Not a range of velocities: 90-85; type the lowest and the highest, as 20-110");
@@ -1566,4 +1566,48 @@ TEST_CASE("Stretch asks for a ratio, and note lengths for legato, a length or a 
     o.type(U"u!!s0");
     o.press(NamedKey::Enter);
     CHECK(o.ws.message().starts_with("Not a ratio: 0"));
+}
+
+TEST_CASE("Filter deletes the search's matches, split moves notes to a track, new or not, and "
+          "remap changes a note")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto& song = o.document.song();
+    o.type(U"gr");
+    search(o, U"a"); // the A2 in bar 2 and the A1 in bar 8
+    o.type(U"gg4!!f");
+    o.press(NamedKey::Enter); // the search's, at Enter
+    CHECK(o.notes().size() == 4);
+    CHECK(o.notes()[2].second == 36);
+    o.type(U"u");
+    // Bar 1's chord: G1 up, to a new track after the bass, named after it.
+    o.type(U"!!yG1");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter); // up
+    o.press(NamedKey::Enter); // Bass high
+    REQUIRE(song.tracks().size() == 3);
+    CHECK(song.tracks()[1]->name == "Bass high");
+    CHECK(song.events(song.tracks()[1]->id()).size() == 1);
+    CHECK(o.notes().front().second == 28);
+    o.type(U"u");
+    CHECK(song.tracks().size() == 2);
+    // To a track there is, both notes, naming it as an option.
+    o.type(U"!!yE1 to=lead");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    CHECK(song.events(song.tracks()[1]->id()).size() == 2);
+    o.type(U"u");
+    // A note made another.
+    o.type(U"!!mG1");
+    o.press(NamedKey::Enter);
+    o.type(U"A1");
+    o.press(NamedKey::Enter);
+    CHECK(o.notes().front().second == 33);
+    // The pedals aren't thinned.
+    o.type(U"!!dcc64");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message().starts_with("cc64 is a switch"));
 }

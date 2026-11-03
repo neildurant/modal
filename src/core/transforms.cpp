@@ -380,6 +380,138 @@ Transformed changeLengths(const EventList& events, std::span<const std::size_t> 
     return finish(events, which, changed, true);
 }
 
+bool isSwitchController(int controller)
+{
+    return controller >= 64 && controller <= 68;
+}
+
+namespace
+{
+
+// The events with those marked dropped left out.
+EventList without(const EventList& events, const std::vector<bool>& dropped)
+{
+    EventList kept;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (!dropped[i])
+        {
+            kept.insert(events[i]);
+        }
+    }
+    return kept;
+}
+
+} // namespace
+
+Transformed thin(const EventList& events, std::span<const std::size_t> which, ThinWhat what,
+                 Tick spacing, int step, Tick gestureGap)
+{
+    using Kind = ThinWhat::Kind;
+    // Each event's stream (a kind and a number) and value, if it's one to thin.
+    struct Point
+    {
+        std::size_t index;
+        int stream;
+        int value;
+    };
+    std::vector<Point> points;
+    for (const auto i : which)
+    {
+        const auto& data = events[i].data;
+        if (const auto* change = std::get_if<ControlChange>(&data))
+        {
+            if (!isSwitchController(change->controller) &&
+                (what.kind == Kind::All ||
+                 (what.kind == Kind::Controller && change->controller == what.controller)))
+            {
+                points.push_back({i, change->controller, change->value});
+            }
+        }
+        else if (const auto* bend = std::get_if<PitchBend>(&data))
+        {
+            if (what.kind == Kind::All || what.kind == Kind::Bend)
+            {
+                points.push_back({i, 1000, bend->value});
+            }
+        }
+        else if (const auto* pressure = std::get_if<ChannelPressure>(&data))
+        {
+            if (what.kind == Kind::All || what.kind == Kind::Aftertouch)
+            {
+                points.push_back({i, 1001, pressure->value});
+            }
+        }
+        else if (const auto* poly = std::get_if<PolyPressure>(&data))
+        {
+            if (what.kind == Kind::All || what.kind == Kind::Aftertouch)
+            {
+                points.push_back({i, 2000 + poly->pitch, poly->value});
+            }
+        }
+    }
+    std::ranges::stable_sort(points, {}, &Point::stream);
+    std::vector<bool> dropped(events.size(), false);
+    for (std::size_t start = 0; start < points.size();)
+    {
+        auto end = start;
+        while (end < points.size() && points[end].stream == points[start].stream)
+        {
+            ++end;
+        }
+        // One stream, in time order, in gestures.
+        std::optional<std::size_t> kept;
+        for (auto n = start; n < end; ++n)
+        {
+            const auto tick = events[points[n].index].tick;
+            const bool first = n == start || tick - events[points[n - 1].index].tick > gestureGap;
+            const bool last = n + 1 == end || events[points[n + 1].index].tick - tick > gestureGap;
+            const bool enough = kept && tick - events[points[*kept].index].tick >= spacing &&
+                                std::abs(points[n].value - points[*kept].value) >= step;
+            if (first || last || enough)
+            {
+                kept = n;
+                continue;
+            }
+            dropped[points[n].index] = true;
+        }
+        start = end;
+    }
+    return without(events, dropped);
+}
+
+Transformed removed(const EventList& events, std::span<const std::size_t> which,
+                    const std::function<bool(const Event&)>& drop)
+{
+    std::vector<bool> dropped(events.size(), false);
+    for (const auto i : which)
+    {
+        dropped[i] = drop(events[i]);
+    }
+    return without(events, dropped);
+}
+
+Transformed remapController(const EventList& events, std::span<const std::size_t> which, int from,
+                            int to)
+{
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        if (auto* change = std::get_if<ControlChange>(&event.data);
+            change != nullptr && change->controller == from)
+        {
+            change->controller = static_cast<std::uint8_t>(to);
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
+Transformed remapPitch(const EventList& events, std::span<const std::size_t> which, int from,
+                       int to)
+{
+    return repitched(events, which, [&](int pitch) { return pitch == from ? to : pitch; });
+}
+
 bool isPedal(const Event& event)
 {
     const auto* change = std::get_if<ControlChange>(&event.data);

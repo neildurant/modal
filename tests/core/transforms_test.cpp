@@ -7,7 +7,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <numeric>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -50,11 +52,11 @@ Event pedal(Tick tick, std::uint8_t value, std::uint8_t controller = 64)
     return {tick, ControlChange{controller, value}};
 }
 
-const std::vector<std::size_t> kAll{0, 1, 2, 3, 4, 5, 6, 7};
-
 std::vector<std::size_t> allOf(const EventList& list)
 {
-    return {kAll.begin(), kAll.begin() + static_cast<std::ptrdiff_t>(list.size())};
+    std::vector<std::size_t> all(list.size());
+    std::iota(all.begin(), all.end(), std::size_t{0});
+    return all;
 }
 
 } // namespace
@@ -477,4 +479,46 @@ TEST_CASE("quantising a short note's start and end makes it a step long, not not
     CHECK(
         eventsOf(quantize(list, allOf(list), nearest, false, {.move = Move::Ends, .step = step})) ==
         std::vector{note(q + q / 8, 60, q - q / 8)});
+}
+
+TEST_CASE("thinning keeps each gesture's ends and events far enough apart and changed enough, "
+          "never the switches'")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick tick = q / 48;
+    std::vector<Event> all;
+    for (int n = 0; n <= 20; ++n)
+    {
+        all.push_back({n * tick, ControlChange{1, static_cast<std::uint8_t>(n)}});
+        all.push_back({n * tick, ControlChange{64, static_cast<std::uint8_t>(n % 2 * 127)}});
+    }
+    // A second gesture, long after: two events, both kept.
+    all.push_back({10 * q, ControlChange{1, 50}});
+    all.push_back({10 * q + tick, ControlChange{1, 50}});
+    const auto list = listOf(all);
+    const auto count = [](const Transformed& result, int controller)
+    {
+        return std::ranges::count_if(
+            eventsOf(result), [&](const Event& event)
+            { return std::get<ControlChange>(event.data).controller == controller; });
+    };
+    const auto thinned = thin(list, allOf(list), {}, 4 * tick, 2, q);
+    CHECK(count(thinned, 1) == 8); // 0, 4, 8, 12, 16, 20 and the second gesture's two
+    CHECK(count(thinned, 64) == 21);
+    // Only another controller: none thinned.
+    CHECK(count(thin(list, allOf(list), {ThinWhat::Kind::Controller, 7}, 4 * tick, 2, q), 1) == 23);
+}
+
+TEST_CASE("remapping changes a controller or a pitch, and removing drops the events chosen")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(0, 36, q), pedal(0, 127, 1), note(q, 38, q)});
+    CHECK(eventsOf(remapController(list, allOf(list), 1, 11)) ==
+          std::vector{pedal(0, 127, 11), note(0, 36, q), note(q, 38, q)});
+    CHECK(eventsOf(remapPitch(list, allOf(list), 36, 35)) ==
+          std::vector{pedal(0, 127, 1), note(0, 35, q), note(q, 38, q)});
+    CHECK(eventsOf(removed(list, allOf(list), [](const Event& e) { return e.isNote(); })) ==
+          std::vector{pedal(0, 127, 1)});
 }

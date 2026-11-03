@@ -52,6 +52,7 @@ struct TransformSetting
     std::string_view form = {};
     std::vector<std::string_view> values = {};
     bool lengths = false;
+    bool tracks = false; // the tracks' names, offered too
 };
 
 std::vector<TransformSetting> transformSettings(std::string_view command);
@@ -322,6 +323,9 @@ private:
     // Quantises the notes' starts, and the pedals with them if asked.
     bool quantize(const OperatorTarget& target, bool pedals, const Quantizing& how = {});
     bool quantizeAsked(const OperatorTarget& target, const std::string& text);
+    bool thinAsked(const OperatorTarget& target, const std::string& text);
+    bool splitAsked(const OperatorTarget& target, const std::string& given);
+    bool remapAsked(const OperatorTarget& target, const std::string& text);
     std::string gridOf(const OperatorTarget& target) const;
     using EventsChange =
         std::function<core::Transformed(const core::EventList&, const OperatorTarget::Part&)>;
