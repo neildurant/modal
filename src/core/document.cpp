@@ -22,9 +22,10 @@ void Document::replace(Song song, std::optional<std::filesystem::path> file,
     file_ = std::move(file);
     importedFrom_ = std::move(importedFrom);
     states_.clear();
-    states_.push_back({song_.parts(), nextId_++, std::nullopt});
+    songId_ = nextId_++;
+    states_.push_back({song_.parts(), songId_, std::nullopt});
     current_ = 0;
-    savedId_ = states_.front().id;
+    savedId_ = songId_;
     groupDepth_ = 0;
     group_.reset();
     mergeKey_.clear();
@@ -47,6 +48,7 @@ bool Document::edit(std::string title, const EditPlace& place,
         return false;
     }
     song_ = std::move(edited);
+    songId_ = nextId_++;
     const bool merging = !mergeKey.empty() && mergeKey == mergeKey_ && groupDepth_ == 0 &&
                          current_ > 0 && !canRedo() && states_[current_].id != savedId_;
     if (merging && Song{states_[current_ - 1].parts} == song_)
@@ -54,13 +56,14 @@ bool Document::edit(std::string title, const EditPlace& place,
         // Back where the step started: no step.
         states_.pop_back();
         --current_;
+        songId_ = states_[current_].id;
         mergeKey_.clear();
     }
     else if (merging)
     {
         auto& state = states_[current_];
         state.parts = song_.parts();
-        state.id = nextId_++;
+        state.id = songId_;
         state.step->title = std::move(title);
     }
     else if (groupDepth_ == 0)
@@ -103,6 +106,10 @@ void Document::endGroup()
     {
         record(std::move(*group_));
     }
+    else
+    {
+        songId_ = states_[current_].id; // back as it was
+    }
     group_.reset();
 }
 
@@ -131,7 +138,7 @@ std::optional<EditStep> Document::redo()
 
 void Document::markSaved(std::optional<std::filesystem::path> file)
 {
-    savedId_ = states_[current_].id;
+    savedId_ = songId_;
     if (file)
     {
         file_ = std::move(file);
@@ -148,7 +155,7 @@ void Document::setUndoLevels(std::size_t levels)
 void Document::record(EditStep step)
 {
     states_.erase(states_.begin() + static_cast<std::ptrdiff_t>(current_) + 1, states_.end());
-    states_.push_back({song_.parts(), nextId_++, std::move(step)});
+    states_.push_back({song_.parts(), songId_, std::move(step)});
     current_ = states_.size() - 1;
     trim();
 }
@@ -160,6 +167,7 @@ void Document::restore(std::size_t index)
     parts.nextTrackId = std::max(parts.nextTrackId, song_.parts().nextTrackId);
     song_ = Song{std::move(parts)};
     current_ = index;
+    songId_ = states_[index].id;
     trim();
     changed();
 }

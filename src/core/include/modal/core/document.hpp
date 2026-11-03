@@ -89,13 +89,16 @@ public:
 
     bool canUndo() const { return current_ > 0; }
 
-    // Which version of the song this is: another after every change, undo and redo included.
-    std::uint64_t version() const { return states_[current_].id; }
+    // Which version of the song this is: another after every change, undo and redo included,
+    // and edits in a group before it ends.
+    std::uint64_t version() const { return songId_; }
     bool canRedo() const { return current_ + 1 < states_.size(); }
 
     // Whether the song differs from the version last saved or loaded; undoing back to that
     // version makes it unmodified again.
-    bool modified() const { return states_[current_].id != savedId_; }
+    // Edits in a group count at once, so a macro that edits and then quits is asked about them
+    // (found in a code review, November 2026).
+    bool modified() const { return songId_ != savedId_; }
 
     // Records that the song as it is now has been saved, to a file if given.
     void markSaved(std::optional<std::filesystem::path> file = std::nullopt);
@@ -132,6 +135,7 @@ private:
     std::deque<State> states_;
     std::size_t current_ = 0;
     std::uint64_t nextId_ = 0;
+    std::uint64_t songId_ = 0; // the song as it is now, a version's or one in a group
     std::uint64_t savedId_ = 0;
     std::size_t undoLevels_ = kDefaultUndoLevels;
     int groupDepth_ = 0;

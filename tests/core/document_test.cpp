@@ -320,3 +320,30 @@ TEST_CASE("edits made one after another with the same merge key are one step")
     CHECK(grid() == NoteFraction{1, 8});
     CHECK_FALSE(e.document.modified());
 }
+
+TEST_CASE("edits in a group count as changes at once, and a save in a group as saving them")
+{
+    Edited e;
+    const auto before = e.document.version();
+    e.document.beginGroup("Macro", {});
+    e.addNote(0);
+    CHECK(e.document.modified());
+    CHECK(e.document.version() != before);
+    e.document.markSaved("song.modal");
+    CHECK_FALSE(e.document.modified());
+    e.document.endGroup();
+    CHECK_FALSE(e.document.modified()); // the group's step is the song saved
+    e.document.undo();
+    CHECK(e.document.modified());
+
+    // A group whose edits undo each other leaves the song as it was, as saved.
+    e.document.redo();
+    CHECK_FALSE(e.document.modified());
+    e.document.beginGroup("Macro", {});
+    e.addNote(4);
+    CHECK(e.document.modified());
+    e.document.edit("Delete a note in Bass", {}, [&](Song& song)
+                    { song.updateEvents(e.bass(), [](EventList& events) { events.erase(1); }); });
+    e.document.endGroup();
+    CHECK_FALSE(e.document.modified());
+}
