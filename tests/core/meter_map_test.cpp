@@ -12,6 +12,7 @@ using modal::core::BarBeatTick;
 using modal::core::MeterChange;
 using modal::core::MeterMap;
 using modal::core::parseBarBeat;
+using modal::core::parseTimeSignature;
 using modal::core::Tick;
 using modal::core::TimeSignature;
 
@@ -266,4 +267,17 @@ TEST_CASE("the metronome's beats follow the meter, remainder bars included")
     CHECK(map.beatAtOrAfter(5 * q + 1) == 6 * q); // the end of the remainder bar
     CHECK(map.beatAtOrAfter(6 * q + 1) == 6 * q + e);
     CHECK(map.beatAtOrAfter(6 * q + e) == 6 * q + e);
+}
+
+TEST_CASE("a time signature is read as written, digits over digits, valid")
+{
+    CHECK(parseTimeSignature("3/4") == TimeSignature{3, 4});
+    CHECK(parseTimeSignature("255/64") == TimeSignature{255, 64});
+    CHECK_FALSE(parseTimeSignature("3/5")); // not a power of two
+    CHECK_FALSE(parseTimeSignature("0/4"));
+    CHECK_FALSE(parseTimeSignature("256/4"));
+    CHECK_FALSE(parseTimeSignature("+3/4"));
+    CHECK_FALSE(parseTimeSignature("3 /4"));
+    CHECK_FALSE(parseTimeSignature("3/"));
+    CHECK_FALSE(parseTimeSignature("34"));
 }

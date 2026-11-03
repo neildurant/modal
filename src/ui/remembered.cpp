@@ -31,20 +31,7 @@ std::optional<std::int64_t> number(std::string_view text)
 
 std::optional<core::TimeSignature> meterOf(std::string_view text)
 {
-    const auto slash = text.find('/');
-    if (slash == std::string_view::npos)
-    {
-        return std::nullopt;
-    }
-    const auto top = number(text.substr(0, slash));
-    const auto bottom = number(text.substr(slash + 1));
-    if (!top || !bottom)
-    {
-        return std::nullopt;
-    }
-    const core::TimeSignature meter{static_cast<std::int32_t>(*top),
-                                    static_cast<std::int32_t>(*bottom)};
-    return meter.isValid() ? std::optional{meter} : std::nullopt;
+    return core::parseTimeSignature(text);
 }
 
 std::vector<std::string_view> words(std::string_view line)

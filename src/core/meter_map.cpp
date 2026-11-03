@@ -11,6 +11,33 @@
 namespace modal::core
 {
 
+std::optional<TimeSignature> parseTimeSignature(std::string_view text)
+{
+    const auto slash = text.find('/');
+    if (slash == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    const auto number = [](std::string_view part) -> std::optional<std::int32_t>
+    {
+        std::int32_t value = 0;
+        const auto [end, error] = std::from_chars(part.data(), part.data() + part.size(), value);
+        if (part.empty() || error != std::errc{} || end != part.data() + part.size())
+        {
+            return std::nullopt;
+        }
+        return value;
+    };
+    const auto numerator = number(text.substr(0, slash));
+    const auto denominator = number(text.substr(slash + 1));
+    if (!numerator || !denominator)
+    {
+        return std::nullopt;
+    }
+    const TimeSignature signature{*numerator, *denominator};
+    return signature.isValid() ? std::optional{signature} : std::nullopt;
+}
+
 std::optional<BarBeatTick> parseBarBeat(std::string_view text)
 {
     const auto number = [](std::string_view part) -> std::optional<std::int64_t>

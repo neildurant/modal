@@ -39,6 +39,11 @@ struct TimeSignature
 
 inline constexpr TimeSignature kDefaultTimeSignature{4, 4};
 
+// A time signature as written, 3/4: digits, a slash and digits, nothing else, valid as
+// isValid() says; or none. Whether its beat is a whole number of ticks at a PPQN is the
+// caller's to say, and so is what's wrong.
+std::optional<TimeSignature> parseTimeSignature(std::string_view text);
+
 struct MeterChange
 {
     Tick tick;

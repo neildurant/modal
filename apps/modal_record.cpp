@@ -125,27 +125,6 @@ std::optional<int> parseInt(std::optional<std::string_view> text, int min, int m
     return value;
 }
 
-std::optional<core::TimeSignature> parseMeter(std::string_view text)
-{
-    const auto slash = text.find('/');
-    if (slash == std::string_view::npos)
-    {
-        return std::nullopt;
-    }
-    const auto numerator = parseNumber<std::int32_t>(text.substr(0, slash));
-    const auto denominator = parseNumber<std::int32_t>(text.substr(slash + 1));
-    if (!numerator || !denominator)
-    {
-        return std::nullopt;
-    }
-    const core::TimeSignature signature{*numerator, *denominator};
-    if (!signature.isValid())
-    {
-        return std::nullopt;
-    }
-    return signature;
-}
-
 // The options, or why they're wrong.
 std::variant<Options, std::string> parseOptions(int argc, char** argv)
 {
@@ -255,7 +234,7 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv)
         else if (arg == "--meter")
         {
             const auto text = value();
-            options.meter = text ? parseMeter(*text) : std::nullopt;
+            options.meter = text ? core::parseTimeSignature(*text) : std::nullopt;
             if (!options.meter)
             {
                 return "--meter needs a time signature such as 3/4 or 7/8";

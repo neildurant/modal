@@ -1312,20 +1312,13 @@ std::optional<Tick> Reader::tickAt(const MeterMap& meter, std::string_view text)
 
 std::optional<TimeSignature> Reader::signature(std::string_view text)
 {
-    const auto slash = text.find('/');
-    const auto numerator = parseInteger(text.substr(0, slash), 1, TimeSignature::kMaxNumerator);
-    const auto denominator =
-        slash == std::string_view::npos
-            ? std::nullopt
-            : parseInteger(text.substr(slash + 1), 1, TimeSignature::kMaxDenominator);
-    const TimeSignature result{static_cast<std::int32_t>(numerator.value_or(0)),
-                               static_cast<std::int32_t>(denominator.value_or(0))};
-    if (!numerator || !denominator || !result.isValid() || text.find('+') != std::string_view::npos)
+    const auto result = parseTimeSignature(text);
+    if (!result)
     {
         fail("a time signature should be as 4/4, up to 255 over a power of two up to 64");
         return std::nullopt;
     }
-    if (!result.beatLength().isExact(ppqn_))
+    if (!result->beatLength().isExact(ppqn_))
     {
         fail("a " + std::string{text} + " beat isn't a whole number of ticks at " +
              std::to_string(ppqn_.value) + " PPQN");
