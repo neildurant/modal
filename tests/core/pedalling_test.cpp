@@ -143,3 +143,19 @@ TEST_CASE("baking holds the notes under the sustain until it lifts, then clears 
     // The first C4 up to the next, the E4 and the second C4 to the lift.
     CHECK(lengths == std::vector<Tick>{q, 2 * q, q});
 }
+
+TEST_CASE("re-pedalling leaves out a press that wouldn't come before its lift")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick d = q / 8;
+    const PedalTiming timing{[&](Tick t) { return t - d / 4; }, [&](Tick t) { return t + d / 2; }};
+    const auto list = listOf({note(0, 60, q), note(q, 62, d / 4)});
+    // A short last note: no press after its change, as it would come after the lift at its end.
+    CHECK(sustainOf(repedal(list, 0, 4 * q, std::vector<Tick>{0, q}, q + d / 4, timing)) ==
+          Changes{{d / 2, true}, {q - d / 4, false}});
+    // Changes closer than the lift and press: the first's press would come after the second's
+    // lift.
+    CHECK(sustainOf(repedal(list, 0, 4 * q, std::vector<Tick>{0, d / 8}, 2 * q, timing)) ==
+          Changes{{d / 8 + d / 2, true}, {2 * q, false}});
+}

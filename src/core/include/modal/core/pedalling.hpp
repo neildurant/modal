@@ -29,7 +29,8 @@ struct PedalTiming
 };
 
 // The sustain in the stretch replaced: down just after the first change, lifted and pressed
-// again around each one after it, and lifted at end; a pedal down as the stretch starts lifted
+// again around each one after it, and lifted at end, a press that wouldn't come before the
+// lift after it left out; a pedal down as the stretch starts lifted
 // there, and one down as it ends pressed again there, so what's around it is as it was.
 // Re-pedalling at chord changes passes the chords' starts and the last notes' end; pedalling
 // per bar or beat, the lines and the stretch's end.

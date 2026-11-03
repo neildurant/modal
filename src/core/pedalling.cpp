@@ -90,16 +90,21 @@ bool pedalDown(const EventList& events, int controller, Tick tick)
 Transformed repedal(const EventList& events, Tick from, Tick to, std::span<const Tick> changes,
                     Tick end, const PedalTiming& timing)
 {
+    // Each press with the lift after it, before the next change or at the end; a press that
+    // wouldn't come before its lift, after a short last note or between changes closer than
+    // the lift and press, left out, so the pedal is always lifted again (found in a code
+    // review, November 2026).
     auto kept = withoutPedal(events, from, to, kSustain);
-    if (!changes.empty())
+    for (std::size_t i = 0; i < changes.size(); ++i)
     {
-        kept.push_back(pedal(std::max(timing.press(changes.front()), from), kSustain, true));
-        for (const auto change : changes.subspan(1))
+        const auto press = std::max(timing.press(changes[i]), from);
+        const auto lift =
+            std::max(i + 1 < changes.size() ? timing.lift(changes[i + 1]) : end, from);
+        if (press < lift)
         {
-            kept.push_back(pedal(std::max(timing.lift(change), from), kSustain, false));
-            kept.push_back(pedal(timing.press(change), kSustain, true));
+            kept.push_back(pedal(press, kSustain, true));
+            kept.push_back(pedal(lift, kSustain, false));
         }
-        kept.push_back(pedal(std::max(end, from), kSustain, false));
     }
     std::ranges::stable_sort(kept, {}, &Event::tick);
     return listOf(kept);
