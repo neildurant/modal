@@ -38,7 +38,8 @@ Transformed repedal(const EventList& events, Tick from, Tick to, std::span<const
                     Tick end, const PedalTiming& timing);
 
 // The performed sustain kept, but each lift within near of where one would be for a change
-// moved there, and each press the same; those near no change left where they were.
+// moved there, and each press the same, within the stretch; those near no change left where
+// they were. Refused if a lift and a press would change places.
 Transformed retimePedal(const EventList& events, Tick from, Tick to, std::span<const Tick> changes,
                         const PedalTiming& timing, const std::function<Tick(Tick)>& near);
 
@@ -57,8 +58,9 @@ Transformed clearPedals(const EventList& events, Tick from, Tick to,
 Transformed offsetPedals(const EventList& events, Tick from, Tick to,
                          const std::function<Tick(Tick)>& by, Tick songEnd);
 
-// Notes held by the sustain pedal lengthened to where it lifts, and the sustain then cleared
-// from the stretch as clearPedals() clears it.
+// Notes the sustain holds into the stretch, those starting before it too, lengthened to where
+// it lifts, or to the stretch's end if it doesn't, and the sustain then cleared from the
+// stretch as clearPedals() clears it.
 Transformed bakePedal(const EventList& events, Tick from, Tick to);
 
 } // namespace modal::core

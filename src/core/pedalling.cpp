@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <numeric>
 #include <optional>
 #include <vector>
 
@@ -43,8 +44,27 @@ EventList listOf(const std::vector<Event>& events)
     return list;
 }
 
+// A pedal's value just before a tick, by its last event before it.
+std::optional<std::uint8_t> valueBefore(const EventList& events, int controller, Tick tick)
+{
+    std::optional<std::uint8_t> value;
+    for (const auto& event : events.all())
+    {
+        if (event.tick >= tick)
+        {
+            break;
+        }
+        if (const auto* change = pedalOf(event, controller))
+        {
+            value = change->value;
+        }
+    }
+    return value;
+}
+
 // The events but a pedal's in the stretch, and that pedal's state kept at its edges: lifted at
-// its start if down there, pressed again at its end if down there.
+// its start if down there, and set again at its end to its value there, if down, a half
+// pedal's too (found in a code review, November 2026).
 std::vector<Event> withoutPedal(const EventList& events, Tick from, Tick to, int controller)
 {
     std::vector<Event> kept;
@@ -63,7 +83,8 @@ std::vector<Event> withoutPedal(const EventList& events, Tick from, Tick to, int
         std::ranges::none_of(events.all(), [&](const Event& event)
                              { return event.tick == to && pedalOf(event, controller); }))
     {
-        kept.push_back(pedal(to, controller, true));
+        kept.push_back({to, ControlChange{static_cast<std::uint8_t>(controller),
+                                          valueBefore(events, controller, to).value_or(127)}});
     }
     return kept;
 }
@@ -134,8 +155,26 @@ Transformed retimePedal(const EventList& events, Tick from, Tick to, std::span<c
         }
         if (best)
         {
-            event.tick = std::max<Tick>(*best, 0);
+            event.tick = std::clamp<Tick>(*best, from, std::max(from, to - 1));
         }
+    }
+    // A lift and a press changing places would leave the pedal down where it was up, or the
+    // reverse: refused (found in a code review, November 2026).
+    std::vector<std::size_t> order(all.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::ranges::stable_sort(order, {}, [&](std::size_t i) { return all[i].tick; });
+    std::optional<std::size_t> last; // the sustain's last event, by index, in its new order
+    for (const auto i : order)
+    {
+        if (pedalOf(all[i], kSustain) == nullptr)
+        {
+            continue;
+        }
+        if (last && *last > i)
+        {
+            return Refusal{Refusal::Reason::Order, all[i], all[*last]};
+        }
+        last = i;
     }
     std::ranges::stable_sort(all, {}, &Event::tick);
     return listOf(all);
@@ -161,7 +200,9 @@ Transformed cleanPedals(const EventList& events, Tick from, Tick to,
         // Flicker first: a lift and a press soon after, neither at the stretch's ends.
         for (std::size_t n = 1; n + 2 < those.size(); ++n)
         {
-            if (!dropped[those[n]] && value(n) < 64 && value(n + 1) >= 64 &&
+            // Only where the pedal was down before the lift, so a lift repeated and then a press
+            // isn't taken for one (found in a code review, November 2026).
+            if (!dropped[those[n]] && value(n - 1) >= 64 && value(n) < 64 && value(n + 1) >= 64 &&
                 events[those[n + 1]].tick - events[those[n]].tick <= flicker(events[those[n]].tick))
             {
                 dropped[those[n]] = true;
@@ -247,11 +288,26 @@ Transformed offsetPedals(const EventList& events, Tick from, Tick to,
 
 Transformed bakePedal(const EventList& events, Tick from, Tick to)
 {
+    // Every note the sustain holds into the stretch, those starting before it too, held to
+    // where the pedal lifts after it, or to the stretch's end if it doesn't, so clearing the
+    // sustain from the stretch releases nothing early (found in a code review, November 2026).
     std::vector<Event> all{events.all().begin(), events.all().end()};
+    const auto nextLift = [&](Tick after) -> std::optional<Tick>
+    {
+        for (const auto& event : events.all())
+        {
+            if (const auto* change = pedalOf(event, kSustain);
+                change != nullptr && change->value < 64 && event.tick > after)
+            {
+                return event.tick;
+            }
+        }
+        return std::nullopt;
+    };
     for (std::size_t i = 0; i < all.size(); ++i)
     {
         auto* note = std::get_if<Note>(&all[i].data);
-        if (note == nullptr || all[i].tick < from || all[i].tick >= to)
+        if (note == nullptr || all[i].tick >= to)
         {
             continue;
         }
@@ -260,27 +316,23 @@ Transformed bakePedal(const EventList& events, Tick from, Tick to)
         {
             continue;
         }
-        // To the next lift, but not past the next note of its pitch.
-        std::optional<Tick> lift;
+        const auto held = nextLift(end).value_or(to);
+        if (held <= from || held <= end)
+        {
+            continue; // released before the stretch, which baking leaves alone
+        }
+        // Not past the next note of its pitch.
         std::optional<Tick> again;
         for (std::size_t j = 0; j < all.size(); ++j)
         {
-            if (const auto* change = pedalOf(all[j], kSustain);
-                change != nullptr && change->value < 64 && all[j].tick > end && !lift)
-            {
-                lift = all[j].tick;
-            }
             if (const auto* other = std::get_if<Note>(&all[j].data);
                 other != nullptr && j != i && other->pitch == note->pitch &&
-                all[j].tick > all[i].tick && !again)
+                all[j].tick > all[i].tick && (!again || all[j].tick < *again))
             {
                 again = all[j].tick;
             }
         }
-        if (lift)
-        {
-            note->duration = std::min(*lift, again.value_or(*lift)) - all[i].tick;
-        }
+        note->duration = std::min(held, again.value_or(held)) - all[i].tick;
     }
     return listOf(withoutPedal(listOf(all), from, to, kSustain));
 }

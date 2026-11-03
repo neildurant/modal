@@ -159,3 +159,40 @@ TEST_CASE("re-pedalling leaves out a press that wouldn't come before its lift")
     CHECK(sustainOf(repedal(list, 0, 4 * q, std::vector<Tick>{0, d / 8}, 2 * q, timing)) ==
           Changes{{d / 8 + d / 2, true}, {2 * q, false}});
 }
+
+TEST_CASE("cleaning takes a lift and press for flicker only where the pedal was down before")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick d = q / 8;
+    const auto list =
+        listOf({sustain(0, false), sustain(q, false), sustain(q + 1, true), sustain(2 * q, false)});
+    CHECK(sustainOf(cleanPedals(list, 0, 4 * q, [&](Tick) { return d; })) ==
+          Changes{{0, false}, {q + 1, true}, {2 * q, false}});
+}
+
+TEST_CASE("re-timing is refused where a lift and press would change places")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick d = q / 8;
+    const PedalTiming timing{[&](Tick t) { return t - d / 4; }, [&](Tick t) { return t + d / 2; }};
+    const auto list = listOf({sustain(q - d, true), sustain(q, false)});
+    CHECK(std::holds_alternative<Refusal>(
+        retimePedal(list, 0, 4 * q, std::vector<Tick>{q}, timing, [&](Tick) { return 2 * d; })));
+}
+
+TEST_CASE("clearing a half pedal sets it again to its value, and baking holds notes from before")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto half = listOf({{0, ControlChange{64, 80}}, note(0, 60, q)});
+    const std::vector<int> sustainOnly{64};
+    const auto cleared = std::get<EventList>(clearPedals(half, 0, q, sustainOnly));
+    CHECK(cleared.all().back() == Event{q, ControlChange{64, 80}});
+
+    // A note before the stretch, held by the pedal into it, held to the lift as it was.
+    const auto held = listOf({note(0, 60, q / 4), sustain(q / 8, true), sustain(3 * q, false)});
+    const auto baked = std::get<EventList>(bakePedal(held, q, 2 * q));
+    CHECK(std::get<Note>(baked.all().front().data).duration == 3 * q);
+}
