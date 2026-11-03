@@ -347,3 +347,17 @@ TEST_CASE("edits in a group count as changes at once, and a save in a group as s
     e.document.endGroup();
     CHECK_FALSE(e.document.modified());
 }
+
+TEST_CASE("a group whose edits undo each other, saved before it ends, is still saved")
+{
+    Edited e;
+    e.addNote(0);
+    e.document.markSaved("song.modal");
+    e.document.beginGroup("Macro", {});
+    e.addNote(4);
+    e.document.edit("Delete a note in Bass", {}, [&](Song& song)
+                    { song.updateEvents(e.bass(), [](EventList& events) { events.erase(1); }); });
+    e.document.markSaved("song.modal");
+    e.document.endGroup();
+    CHECK_FALSE(e.document.modified());
+}

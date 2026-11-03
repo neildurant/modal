@@ -108,7 +108,13 @@ void Document::endGroup()
     }
     else
     {
-        songId_ = states_[current_].id; // back as it was
+        // Back as it was; saved as it is now, if saved since its last edit, as it then was
+        // the same song (found in a code review, November 2026).
+        if (savedId_ == songId_)
+        {
+            savedId_ = states_[current_].id;
+        }
+        songId_ = states_[current_].id;
     }
     group_.reset();
 }
