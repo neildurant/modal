@@ -301,7 +301,7 @@ constexpr std::array kSharedCommands{
             "those below, to another track, asking at which note, which side "
             "and which track; a new name makes a new track",
         .aliases = "split",
-        .usage = "[NOTE] [side=up] [to=TRACK]",
+        .usage = "[NOTE] [side=above] [to=TRACK]",
         .count = true,
         .range = true,
         .choices = {Choices::Option, Choices::Option, Choices::Option}},

@@ -258,9 +258,9 @@ std::vector<TransformSetting> transformSettings(std::string_view command)
         return {{.name = "", .question = "at", .answer = "C4", .form = "a note"},
                 {.name = "side",
                  .question = "moving",
-                 .answer = "up",
-                 .form = "up, it and those above, or down, those below",
-                 .values = {"up", "down"}},
+                 .answer = "above",
+                 .form = "above|below",
+                 .values = {"above", "below"}},
                 {.name = "to",
                  .question = "to the track",
                  .answer = "track",
@@ -325,7 +325,7 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
             const auto* first =
                 target.parts.empty() ? nullptr : document_.song().track(target.parts[0].track);
             answer = (first != nullptr ? first->name : std::string{"Track"}) +
-                     (side != answers.end() && side->second == "down" ? " low" : " high");
+                     (side != answers.end() && side->second == "below" ? " low" : " high");
         }
         label += ", " + std::string{settings[i].question} + " (" +
                  (answer.empty() ? std::string{settings[i].form} : answer) + "): ";
@@ -1316,13 +1316,13 @@ bool Workspace::splitAsked(const OperatorTarget& target, const std::string& give
     bool up = true;
     for (const auto& [option, value] : said.options)
     {
-        if (option == "side" && (value == "up" || value == "down"))
+        if (option == "side" && (value == "above" || value == "below"))
         {
-            up = value == "up";
+            up = value == "above";
         }
         else
         {
-            setMessage(option == "side" ? "Not a side: " + value + "; type up or down"
+            setMessage(option == "side" ? "Not a side: " + value + "; type above or below"
                                         : "Split takes side= and to=, not " + option + "=",
                        MessageKind::Warning);
             return true;

@@ -1584,7 +1584,7 @@ TEST_CASE("Filter deletes the search's matches, split moves notes to a track, ne
     // Bar 1's chord: G1 up, to a new track after the bass, named after it.
     o.type(U"!!yG1");
     o.press(NamedKey::Enter);
-    o.press(NamedKey::Enter); // up
+    o.press(NamedKey::Enter); // above
     o.press(NamedKey::Enter); // Bass high
     REQUIRE(song.tracks().size() == 3);
     CHECK(song.tracks()[1]->name == "Bass high");
