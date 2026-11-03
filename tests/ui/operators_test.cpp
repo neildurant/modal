@@ -1679,3 +1679,52 @@ TEST_CASE("No two commands share a name or an alias")
         }
     }
 }
+
+TEST_CASE("Transforms at their edges: across tracks, names with spaces, before the start, the end")
+{
+    Operating o;
+    const auto q = o.q;
+    auto& song = o.document;
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    const auto lead = song.song().tracks()[1]->id();
+    song.edit("Add a note", {},
+              [&](core::Song& s)
+              {
+                  s.updateEvents(lead, [&](core::EventList& e)
+                                 { e.insert({4 * q, core::Note{60, 90, q}}); });
+              });
+
+    // Two tracks stretched together, about the first event of both: the lead's note at bar 2
+    // goes to bar 3, keeping time with the bass.
+    o.type(U"vl:stretch 2"); // bars 1 and 2, on every track
+    o.press(NamedKey::Enter);
+    CHECK(song.song().events(lead)[0].tick == 8 * q);
+    o.type(U"u");
+
+    // A track's name with a space in it, at the : prompt.
+    o.type(U"gr:split C1 side=above to=Right Hand");
+    o.press(NamedKey::Enter);
+    REQUIRE(song.song().tracks().size() == 3);
+    CHECK(song.song().tracks()[1]->name == "Right Hand");
+    o.type(U"u");
+
+    // A pedal offset that would go before the song's start is refused, not put at it.
+    o.type(U"gg4]b:pedal-offset -9000ms"); // bar 5
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.message().ends_with("would go before the song's start"));
+    CHECK(o.pedals() == std::vector<core::Tick>{16 * q + q / 8});
+
+    // Quantising starts and ends never puts a start on the song's end.
+    song.edit("Add a note", {},
+              [&](core::Song& s)
+              {
+                  s.updateEvents(s.tracks()[0]->id(), [&](core::EventList& e)
+                                 { e.insert({32 * q - q / 64, core::Note{80, 90, q / 128}}); });
+              });
+    const auto end = song.song().end();
+    o.type(U"G:quantize 1/16 move=both");
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    o.press(NamedKey::Enter);
+    CHECK(song.song().end() == end);
+}

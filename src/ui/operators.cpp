@@ -18,6 +18,7 @@
 #include <charconv>
 #include <cstdint>
 #include <cstdlib>
+#include <numeric>
 #include <random>
 #include <string>
 #include <utility>
@@ -675,8 +676,22 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
     }
     if (spec->asks == TransformSpec::Asks::InTurn)
     {
+        // A track's name, which may have spaces, is the rest of the line after its NAME= (found
+        // in a code review, November 2026).
         Answers answers;
-        const auto said = told(text, {});
+        auto rest = text;
+        for (const auto& setting : spec->settings)
+        {
+            const auto at =
+                setting.tracks ? rest.find(std::string{setting.name} + "=") : std::string::npos;
+            if (at != std::string::npos)
+            {
+                answers.emplace_back(setting.name, trimmed(std::string_view{rest}.substr(
+                                                       at + setting.name.size() + 1)));
+                rest.erase(at);
+            }
+        }
+        const auto said = told(rest, {});
         for (const auto& option : said.options)
         {
             answers.push_back(option);
@@ -789,8 +804,17 @@ bool Workspace::applyStretch(std::string_view /*name*/, const OperatorTarget& ta
     {
         read = whole(ratio, numerator);
     }
-    if (!read || numerator < 1 || denominator < 1 || numerator > 64 * denominator ||
-        denominator > 64 * numerator)
+    // In its lowest terms, checked before anything's multiplied (found overflowing in a code
+    // review, November 2026).
+    if (read && numerator >= 1 && denominator >= 1)
+    {
+        const auto divisor = std::gcd(numerator, denominator);
+        numerator /= divisor;
+        denominator /= divisor;
+    }
+    if (!read || numerator < 1 || denominator < 1 || numerator > core::kMaxStretchTerm ||
+        denominator > core::kMaxStretchTerm || numerator > core::kMaxStretch * denominator ||
+        denominator > core::kMaxStretch * numerator)
     {
         setMessage("Not a ratio: " + text +
                        "; type 2 for half time, 1/2 for double time, or a percentage, as "
@@ -798,12 +822,32 @@ bool Workspace::applyStretch(std::string_view /*name*/, const OperatorTarget& ta
                    MessageKind::Warning);
         return true;
     }
-    const auto end = document_.song().end();
+    // About the range's first event, on every track alike, so the tracks keep in time with
+    // each other (found in a code review, November 2026).
+    const auto& song = document_.song();
+    std::optional<core::Tick> about;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = song.events(part.track);
+        for (const auto i : part.events)
+        {
+            if (!target.notesOnly || events[i].isNote())
+            {
+                about = std::min(about.value_or(events[i].tick), events[i].tick);
+            }
+        }
+    }
+    if (!about)
+    {
+        setMessage("Nothing to stretch in " + target.what, MessageKind::Information);
+        return true;
+    }
+    const auto end = song.end();
     return changeEvents("Stretch " + target.what + " by " + ratio, target,
                         [&](const core::EventList& events, const auto& part)
                         {
-                            return core::stretch(events, part.events, numerator, denominator, end,
-                                                 target.notesOnly);
+                            return core::stretch(events, part.events, numerator, denominator,
+                                                 *about, end, target.notesOnly);
                         });
 }
 
@@ -1118,12 +1162,17 @@ bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quanti
             {
                 // Not onto the song's end, where nothing can start.
                 const auto to = core::nearestGridLine(meter, tick, step, how.swing);
-                return to < song.end() || how.move != Move::Starts ? to : tick;
+                return to < song.end() ? to : tick;
             };
+            // An end may go onto it, as a note can end there; a start may not, whatever moves
+            // (found in a code review, November 2026).
+            const auto nearestEnd = [&](core::Tick tick)
+            { return core::nearestGridLine(meter, tick, step, how.swing); };
             return core::quantize(events, part.events, nearest, pedals,
                                   {.strength = how.strength,
                                    .move = how.move,
-                                   .step = [step](core::Tick) { return step; }});
+                                   .step = [step](core::Tick) { return step; },
+                                   .nearestEnd = nearestEnd});
         });
 }
 
@@ -1508,7 +1557,7 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
                 }
                 for (const auto& chord : core::chordsOf(events, notes, together))
                 {
-                    changes.push_back(events[chord.front()].tick);
+                    changes.push_back(core::chordStart(events, chord));
                 }
             }
             return core::repedal(events, from, to, changes, end, timing);
@@ -1531,7 +1580,7 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
             std::vector<core::Tick> changes;
             for (const auto& chord : core::chordsOf(events, notes, together))
             {
-                changes.push_back(events[chord.front()].tick);
+                changes.push_back(core::chordStart(events, chord));
             }
             return core::retimePedal(events, from, to, changes, timing,
                                      [&](core::Tick tick) { return shifted(tick, near) - tick; });
@@ -1588,7 +1637,14 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         {
             const auto [from, to] = stretchOf(events, part);
             return core::offsetPedals(
-                events, from, to, [&](core::Tick tick) { return shifted(tick, *by) - tick; },
+                events, from, to,
+                [&](core::Tick tick)
+                {
+                    // Before the song's start, as far before it as to be refused, not put at it
+                    // (found in a code review, November 2026).
+                    const auto time = tempo.toTime(tick) + *by;
+                    return time.count() < 0 ? -tick - 1 : tempo.toTickExtended(time) - tick;
+                },
                 song.end());
         };
     }

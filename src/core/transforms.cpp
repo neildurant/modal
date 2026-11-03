@@ -4,9 +4,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <charconv>
 #include <cmath>
 #include <iterator>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -306,16 +308,18 @@ Transformed shift(const EventList& events, std::span<const std::size_t> which, T
 }
 
 Transformed stretch(const EventList& events, std::span<const std::size_t> which,
-                    std::int64_t numerator, std::int64_t denominator, Tick end, bool notesOnly)
+                    std::int64_t numerator, std::int64_t denominator, Tick about, Tick end,
+                    bool notesOnly)
 {
-    std::optional<Tick> from;
-    for (const auto i : which)
-    {
-        if (!notesOnly || events[i].isNote())
-        {
-            from = std::min(from.value_or(events[i].tick), events[i].tick);
-        }
-    }
+    // In its lowest terms and bounded, so the scaling can't overflow (found in a code review,
+    // November 2026).
+    const auto divisor = std::gcd(numerator, denominator);
+    numerator /= divisor;
+    denominator /= divisor;
+    assert(numerator >= 1 && denominator >= 1 && numerator <= kMaxStretchTerm &&
+           denominator <= kMaxStretchTerm && numerator <= kMaxStretch * denominator &&
+           denominator <= kMaxStretch * numerator);
+    const std::optional<Tick> from = about;
     const auto scaled = [&](Tick ticks) { return ticks * numerator / denominator; };
     auto changed = takenEvents(events, which);
     for (auto& event : changed)
@@ -349,7 +353,7 @@ Transformed changeLengths(const EventList& events, std::span<const std::size_t> 
         const auto chords = chordsOf(events, which, together);
         for (std::size_t c = 0; c + 1 < chords.size(); ++c)
         {
-            const auto next = events[chords[c + 1].front()].tick;
+            const auto next = chordStart(events, chords[c + 1]);
             for (const auto i : chords[c])
             {
                 to.emplace_back(i, std::max<Tick>(next - events[i].tick, 1));
@@ -383,6 +387,12 @@ Transformed changeLengths(const EventList& events, std::span<const std::size_t> 
 bool isSwitchController(int controller)
 {
     return controller >= 64 && controller <= 68;
+}
+
+bool isThinnable(int controller)
+{
+    const auto in = [&](int low, int high) { return controller >= low && controller <= high; };
+    return in(1, 5) || in(7, 31) || in(70, 79) || in(85, 95) || in(102, 119);
 }
 
 namespace
@@ -421,7 +431,7 @@ Transformed thin(const EventList& events, std::span<const std::size_t> which, Th
         const auto& data = events[i].data;
         if (const auto* change = std::get_if<ControlChange>(&data))
         {
-            if (!isSwitchController(change->controller) &&
+            if (isThinnable(change->controller) &&
                 (what.kind == Kind::All ||
                  (what.kind == Kind::Controller && change->controller == what.controller)))
             {
@@ -549,7 +559,7 @@ Transformed quantize(const EventList& events, std::span<const std::size_t> which
         auto finish = how.move == Move::Starts ? start + note.duration : end;
         if (how.move == Move::Ends || how.move == Move::Both)
         {
-            finish = towards(end, nearest(end));
+            finish = towards(end, how.nearestEnd ? how.nearestEnd(end) : nearest(end));
         }
         if (how.move == Move::Lengths && how.step)
         {
@@ -873,6 +883,16 @@ chordsOf(const EventList& events, std::span<const std::size_t> which,
                                  { return std::get<Note>(events[i].data).pitch; });
     }
     return chords;
+}
+
+Tick chordStart(const EventList& events, std::span<const std::size_t> chord)
+{
+    Tick start = events[chord.front()].tick;
+    for (const auto i : chord)
+    {
+        start = std::min(start, events[i].tick);
+    }
+    return start;
 }
 
 Transformed chordVelocity(const EventList& events, std::span<const std::size_t> which,

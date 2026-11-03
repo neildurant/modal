@@ -71,11 +71,16 @@ Transformed shift(const EventList& events, std::span<const std::size_t> which, T
                   bool notesOnly);
 
 // Time stretched by a ratio (numerator over denominator: 2/1 half time, 1/2 double time) about
-// the first event taken (decided November 2026): each event's distance from it and each note's
-// length scaled; notes only, with notesOnly. Not rippling: what it runs into, it overlaps, a
-// note onto another of its pitch refused, as is an event past the end.
+// a tick, the first event of the whole range taken, on every track of it (decided November
+// 2026): each event's distance from it and each note's length scaled; notes only, with
+// notesOnly. Not rippling: what it runs into, it overlaps, a note onto another of its pitch
+// refused, as is an event past the end. The ratio is at most kMaxStretch either way, and in its
+// lowest terms neither is more than kMaxStretchTerm, so the scaling can't overflow.
+inline constexpr std::int64_t kMaxStretch = 64;
+inline constexpr std::int64_t kMaxStretchTerm = 10000;
 Transformed stretch(const EventList& events, std::span<const std::size_t> which,
-                    std::int64_t numerator, std::int64_t denominator, Tick end, bool notesOnly);
+                    std::int64_t numerator, std::int64_t denominator, Tick about, Tick end,
+                    bool notesOnly);
 
 // Notes' lengths (decided November 2026): legato, each note or chord held until the next one
 // starts, but for the last, which keeps its length, as there's nothing to say how long; a
@@ -94,6 +99,16 @@ Transformed changeLengths(const EventList& events, std::span<const std::size_t> 
 // The switch controllers, on or off rather than a curve: sustain, sostenuto, soft, legato and
 // portamento (CC 64 to 68).
 bool isSwitchController(int controller);
+
+// The controllers thinning may thin, those whose values are a curve (decided November 2026,
+// after a code review): modulation, breath, foot, portamento time, volume, balance, pan,
+// expression, the effect controls and general purpose controllers, the sound controllers
+// (70 to 79), the effects depths (91 to 95), and the undefined ones (3, 9, 14, 15, 20 to 31, 85
+// to 90, 102 to 119), as knobs and faders are often set to send. Not the switches, nor bank
+// select, data entry and increment, the RPNs and NRPNs, portamento control or channel mode
+// messages, each of which is an action or part of one, nor the least significant halves
+// (32 to 63).
+bool isThinnable(int controller);
 
 // Thinning dense continuous data (decided November 2026): of each controller's events (not
 // the switches'), pitch bend's, channel aftertouch's or each note's poly aftertouch, a gesture
@@ -158,6 +173,7 @@ struct QuantizeHow
     int strength = 100;
     Move move = Move::Starts;
     std::function<Tick(Tick)> step = {}; // the grid step at a tick, for lengths and short notes
+    std::function<Tick(Tick)> nearestEnd = {}; // the line for an end, if not as for a start
 };
 
 Transformed quantize(const EventList& events, std::span<const std::size_t> which,
@@ -275,10 +291,12 @@ Transformed velocityDynamics(const EventList& events, std::span<const std::size_
                              const VelocityDynamics& dynamics, VelocityLimits limits = {});
 
 // The chords among the notes taken, by index, each with its notes from lowest to highest:
-// notes starting together, within the window from the chord's first, as together() says.
+// notes starting together, within the window from the chord's first, as together() says; and
+// where a chord starts, its earliest note's start, not its lowest's.
 std::vector<std::vector<std::size_t>>
 chordsOf(const EventList& events, std::span<const std::size_t> which,
          const std::function<bool(Tick first, Tick tick)>& together);
+Tick chordStart(const EventList& events, std::span<const std::size_t> chord);
 
 // Within each chord of two notes or more (decided October 2026): accenting the top note up by
 // an amount and the others down by it; balancing by pitch, a straight slope of velocities from

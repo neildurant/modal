@@ -435,16 +435,16 @@ TEST_CASE("swing moves every second grid line within its pair")
     CHECK(nearestGridLine(meter, q / 2, eighth, 40) == q * 40 / 100);
 }
 
-TEST_CASE("stretching scales time and lengths about the first event taken")
+TEST_CASE("stretching scales time and lengths about a tick, the range's first event")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick q = ppqn.quarter();
     const auto list = listOf({note(q, 60, q), note(2 * q, 64, q / 2), pedal(3 * q, 127)});
-    CHECK(eventsOf(stretch(list, allOf(list), 2, 1, 100 * q, false)) ==
+    CHECK(eventsOf(stretch(list, allOf(list), 2, 1, q, 100 * q, false)) ==
           std::vector{note(q, 60, 2 * q), note(3 * q, 64, q), pedal(5 * q, 127)});
-    CHECK(eventsOf(stretch(list, allOf(list), 1, 2, 100 * q, true)) ==
+    CHECK(eventsOf(stretch(list, allOf(list), 1, 2, q, 100 * q, true)) ==
           std::vector{note(q, 60, q / 2), note(q + q / 2, 64, q / 4), pedal(3 * q, 127)});
-    CHECK(refusalOf(stretch(list, allOf(list), 4, 1, 6 * q, false)).reason ==
+    CHECK(refusalOf(stretch(list, allOf(list), 4, 1, q, 6 * q, false)).reason ==
           Refusal::Reason::PastEnd);
 }
 
@@ -521,4 +521,46 @@ TEST_CASE("remapping changes a controller or a pitch, and removing drops the eve
           std::vector{pedal(0, 127, 1), note(0, 35, q), note(q, 38, q)});
     CHECK(eventsOf(removed(list, allOf(list), [](const Event& e) { return e.isNote(); })) ==
           std::vector{pedal(0, 127, 1)});
+}
+
+TEST_CASE("stretching about a tick before the track's first event moves it too, in lowest terms")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto list = listOf({note(q, 60, q)});
+    CHECK(eventsOf(stretch(list, allOf(list), 2, 1, 0, 100 * q, false)) ==
+          std::vector{note(2 * q, 60, 2 * q)});
+    CHECK(eventsOf(stretch(list, allOf(list), 7000, 7000, 0, 100 * q, false)) ==
+          std::vector{note(q, 60, q)});
+}
+
+TEST_CASE("thinning leaves alone controllers that aren't curves")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    std::vector<Event> all;
+    for (const int controller : {6, 69, 96, 0, 101, 7})
+    {
+        for (int n = 0; n < 4; ++n)
+        {
+            all.push_back({n, ControlChange{static_cast<std::uint8_t>(controller), 10}});
+        }
+    }
+    const auto list = listOf(all);
+    const auto kept = eventsOf(thin(list, allOf(list), {}, q, 2, q));
+    CHECK(kept.size() == 22); // the volume's four down to its first and last, the rest kept
+    CHECK_FALSE(isThinnable(6));
+    CHECK_FALSE(isThinnable(38));
+    CHECK_FALSE(isThinnable(69));
+    CHECK(isThinnable(1));
+    CHECK(isThinnable(11));
+    CHECK(isThinnable(74));
+}
+
+TEST_CASE("legato holds a note until the next chord's earliest note, not its lowest")
+{
+    const auto list = listOf({note(0, 60, 10), note(100, 64, 10), note(120, 60, 10)});
+    const auto together = [](Tick first, Tick tick) { return tick - first <= 30; };
+    CHECK(eventsOf(changeLengths(list, allOf(list), LengthChange::Legato, 0, together)).front() ==
+          note(0, 60, 100));
 }
