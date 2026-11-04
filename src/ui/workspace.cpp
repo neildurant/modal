@@ -1769,7 +1769,6 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     // d and x delete what's in it, y and Y yank it, D takes its time out, and the other
     // operators change it, the count before them saying how far; then Visual mode ends.
     const auto selection = *selection_;
-    const auto span = view().selectionSpan();
     if (selection.filter && command == "visual-delete-time")
     {
         endVisual();
