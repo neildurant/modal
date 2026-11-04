@@ -842,7 +842,9 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     finding_.kept = false;
     searching_.gnKept = false;
+    widenSelection(); // a key run at a pause may have moved the cursor
     const bool changed = takeKey(key, now);
+    widenSelection();
     if (!finding_.kept && keys_.pending().empty())
     {
         finding_.repeats = false;
@@ -1716,6 +1718,8 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         {
             selection_->kind = kind;
             selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
+            selection_->starts.reset();
+            selection_->object.reset();
             sayWholeRows();
         }
         return true;
@@ -1748,6 +1752,10 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         selection_->anchor = view().cursor();
         selection_->index = view().selectionIndex();
         view().setCursor(other);
+        if (selection_->object)
+        {
+            selection_->object->after = view().place(); // still the object's
+        }
         return true;
     }
     if (isOperator(command) || command == "event-delete" || command == "yank-this" ||
@@ -1765,10 +1773,65 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         {
             return refuseObject(command);
         }
-        view().selectObject(command, count, *selection_);
+        selectObject(command, count);
         return true;
     }
     return std::nullopt;
+}
+
+void Workspace::selectObject(std::string_view command, int count)
+{
+    // What the object takes, from where the cursor was when the selection began or the last
+    // object was chosen, so vinib is vib: another object replaces one, rather than adding to it.
+    // One that finds nothing to take, saying so, leaves the selection as it was.
+    const auto previous = *selection_;
+    const auto previousPlace = view().place();
+    const auto previousBefore = beforeObject_;
+    if (selection_->object && beforeObject_)
+    {
+        const auto at = selection_->object->at;
+        *selection_ = *beforeObject_;
+        view().restore(at);
+    }
+    else
+    {
+        beforeObject_ = *selection_;
+    }
+    const auto at = view().place();
+    const auto base = *selection_;
+    message_.clear();
+    view().selectObject(command, count, *selection_);
+    const auto& now = *selection_;
+    if (!message_.empty() && view().place() == at && now.anchor == base.anchor &&
+        now.kind == base.kind && now.span == base.span && now.starts == base.starts &&
+        now.index == base.index)
+    {
+        *selection_ = previous;
+        view().restore(previousPlace);
+        beforeObject_ = previousBefore;
+        return;
+    }
+    // Taking a v selection's place, it's the object's; with V or Ctrl-v, which chose the rows, it
+    // sets only their time, and operators take the selection.
+    if (base.kind == SelectionKind::Range)
+    {
+        selection_->object = Selection::Object{std::string{command}, count, at, view().place()};
+    }
+}
+
+void Workspace::widenSelection()
+{
+    // Once the cursor moves, the selection is from its anchor to the cursor again, as v's, the
+    // object's exact time and starts let go: V's whole rows, or the rest's ends.
+    if (mode_ != Mode::Visual || !selection_ || !selection_->object ||
+        view().place() == selection_->object->after)
+    {
+        return;
+    }
+    selection_->object.reset();
+    selection_->starts.reset();
+    selection_->span = selection_->kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
+    beforeObject_.reset();
 }
 
 bool Workspace::operateOnSelection(std::string_view command, int count)
@@ -1776,6 +1839,15 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     // d and x delete what's in it, y and Y yank it, D takes its time out, and the other
     // operators change it, the count before them saying how far; then Visual mode ends.
     const auto selection = *selection_;
+    // Made by an object, and not widened since: as the operator with that object, from where
+    // it was chosen.
+    const bool byObject = selection.object && !selection.filter && command != "visual-delete-time";
+    const std::string range = byObject ? selection.object->name : std::string{"visual"};
+    const int rangeCount = byObject ? selection.object->count : 0;
+    if (byObject)
+    {
+        view().restore(selection.object->at);
+    }
     if (selection.filter && command == "visual-delete-time")
     {
         endVisual();
@@ -1799,18 +1871,18 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
         }
         if (command == "event-delete" || command == "operator-delete")
         {
-            return view().operate("operator-delete", "visual", 0);
+            return view().operate("operator-delete", range, rangeCount);
         }
         if (command == "yank-this" || command == "operator-yank")
         {
-            return view().operate("operator-yank", "visual", 0);
+            return view().operate("operator-yank", range, rangeCount);
         }
-        return transform(command, std::max(count, 1), "visual", 0);
+        return transform(command, std::max(count, 1), range, rangeCount);
     };
     const auto op = command == "event-delete" ? std::string_view{"operator-delete"}
                     : command == "yank-this"  ? std::string_view{"operator-yank"}
                                               : command;
-    const bool done = selection.cut ? cutThen(op, "visual", 0, run) : run();
+    const bool done = selection.cut ? cutThen(op, range, rangeCount, run) : run();
     // Ended once the view has taken it; while the operator asks something, at the prompt as ^
     // does or yes or no as q does about pedalling, it stays shown until the answer or Escape,
     // though what's changed is already taken (decided October 2026).
@@ -1887,6 +1959,7 @@ void Workspace::endVisual()
         lastSelection_ = std::pair{*selection_, view().cursor()};
     }
     selection_.reset();
+    beforeObject_.reset();
     if (mode_ == Mode::Visual) // not once an operator has asked at the prompt, as ^ does
     {
         mode_ = Mode::Normal;

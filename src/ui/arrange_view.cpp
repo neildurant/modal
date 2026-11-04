@@ -619,10 +619,18 @@ std::optional<std::string> ArrangeView::selectionStatus() const
     if (const auto sections = selectedSections())
     {
         const auto& song = document_.song();
-        return sectionsText(song, SectionRange{.first = sections->first,
-                                               .count = sections->second - sections->first + 1,
-                                               .from = 0,
-                                               .to = 0});
+        const auto text =
+            sectionsText(song, SectionRange{.first = sections->first,
+                                            .count = sections->second - sections->first + 1,
+                                            .from = 0,
+                                            .to = 0});
+        // Their events, when is or ie made it.
+        const auto selection = host_.selection();
+        const auto& object = selection->object;
+        return object &&
+                       (object->name == "object-section-contents" || object->name == "object-song")
+                   ? "events in " + text + " on every track"
+                   : text;
     }
     const auto area = selectionArea();
     if (!area)
@@ -638,22 +646,42 @@ std::optional<std::string> ArrangeView::selectionStatus() const
 
 void ArrangeView::selectObject(std::string_view object, int count, Selection& selection)
 {
-    // On the strip, ie selects every section; the rest as any view's.
+    // On the strip, ie selects every section, and is and as this one and as many after it as
+    // the count says less one: is their events on every track and as the sections themselves,
+    // as their operators take them, the workspace keeping which; the rest as any view's.
+    const auto sections = document_.song().sections().size();
     if (page_.stripCursor() && object == "object-song")
     {
         selection.index = 0;
-        page_.setStripCursor(document_.song().sections().size() - 1);
+        page_.setStripCursor(sections - 1);
+        return;
+    }
+    if (const auto here = page_.stripCursor();
+        here && (object == "object-section" || object == "object-section-contents"))
+    {
+        selection.index = *here;
+        page_.setStripCursor(
+            std::min(*here + static_cast<std::size_t>(std::max(count, 1)) - 1, sections - 1));
         return;
     }
     // On a track, a time selection made by an object takes what its operators take there,
     // this track's (decided November 2026, so visd is disd): a box on the track, or for it,
     // the track's row. A selection already widened to more tracks keeps them.
     if (!page_.stripCursor() && selection.kind == SelectionKind::Range &&
-        object != "object-visible")
+        object != "object-visible" && objectSpan(object, count))
     {
         const auto track = cursor().track;
         selection.kind = object == "object-track" ? SelectionKind::Rows : SelectionKind::Box;
         selection.anchor.track = track;
+        View::selectObject(object, count, selection);
+        if (object == "object-track" && count > 1)
+        {
+            // 2it, this track and the next, as d2it takes them.
+            const auto last = std::min(page_.track() + static_cast<std::size_t>(count) - 1,
+                                       document_.song().tracks().size() - 1);
+            page_.setCursor(last, page_.time());
+        }
+        return;
     }
     View::selectObject(object, count, selection);
 }

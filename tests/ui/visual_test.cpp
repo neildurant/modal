@@ -563,7 +563,7 @@ TEST_CASE("ie takes the whole song on the section strip, every track; on a track
 
     // vie selects it all.
     s.type(U"vie");
-    CHECK(s.selected() == "3 sections from A");
+    CHECK(s.selected() == "events in 3 sections from A on every track");
     s.press(NamedKey::Escape);
 
     // Not in the piano roll, which shows one track: it takes it.
@@ -931,4 +931,120 @@ TEST_CASE("In the piano roll, vin then d takes the note din takes, and no other"
     s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
     s.type(U"vind");
     CHECK(pitches(s.document, 0) == after);
+}
+
+TEST_CASE("Visual mode with an object then an operator does as the operator with it, everywhere")
+{
+    // Selecting first is looking first (decided November 2026): for each place, object and
+    // count, v{count}{object}d leaves the song as d{count}{object} does; where the operator
+    // refuses the object, saying why, so does Visual mode, keeping v's selection, so that d
+    // then deletes what v alone would.
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto place = GENERATE(as<std::u32string>{}, U"]b]b", U"j]b]b]b", U"gsl", U"gsll",
+                                U"gr]b]b", U"gr]b]b]b<Tab>", U"ge]b]b");
+    const auto object =
+        GENERATE(as<std::u32string>{}, U"ib", U"ab", U"in", U"ic", U"it", U"ie", U"is", U"as");
+    const auto count = GENERATE(as<std::u32string>{}, U"", U"2");
+    const auto run = [&](std::u32string_view keys)
+    {
+        Selecting s{ppqn};
+        std::u32string typed{place};
+        if (const auto tab = typed.find(U"<Tab>"); tab != std::u32string::npos)
+        {
+            typed.erase(tab);
+            s.type(typed);
+            s.press(NamedKey::Tab);
+        }
+        else
+        {
+            s.type(typed);
+        }
+        s.type(keys);
+        return std::pair{s.document.song(), s.ws.message()};
+    };
+    const auto before = run(U"").first;
+    const auto [operated, operatorSaid] = run(U"d" + count + object);
+    const auto [selected, visualSaid] = run(U"v" + count + object + U"d");
+    const bool refused = operated == before && !operatorSaid.empty();
+    const auto ascii = [](std::u32string_view keys)
+    {
+        std::string text;
+        for (const char32_t key : keys)
+        {
+            text += static_cast<char>(key);
+        }
+        return text;
+    };
+    INFO("place " << ascii(place) << ", d" << ascii(count) << ascii(object) << " | op "
+                  << (operated == before ? "same" : "changed") << " [" << operatorSaid
+                  << "] | visual " << (selected == before ? "same" : "changed") << " ["
+                  << visualSaid << "]");
+    if (refused)
+    {
+        CHECK_FALSE(run(U"v" + count + object).second.empty());
+        CHECK(selected == run(U"vd").first);
+    }
+    else
+    {
+        CHECK(selected == operated);
+    }
+}
+
+TEST_CASE("After an object in Visual mode, moving or V or another object lets go of what it chose")
+{
+    // After vin, ib takes the bar and V the note's pitch across the track, not just the note
+    // (decided November 2026, after a review).
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    const auto q = ppqn.quarter();
+    s.document.edit("Add notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            bass,
+                            [&](core::EventList& events)
+                            {
+                                events.insert({2 * s.bar + q, core::Note{42, 100, q}});
+                                events.insert({6 * s.bar + q, core::Note{42, 100, q}});
+                            });
+                    });
+    const auto count42 = [&] { return std::ranges::count(pitches(s.document, 0), 42); };
+    REQUIRE(count42() == 3);
+    s.type(U"gr");
+    const auto onNote = [&]
+    { s.ws.pianoRoll().setCursor({.track = bass, .tick = 2 * s.bar, .pitch = 42}); };
+
+    onNote();
+    s.type(U"vinibd"); // bar 3's notes: both 42s there
+    CHECK(count42() == 1);
+    CHECK(pitches(s.document, 0).size() == 8);
+    s.type(U"u");
+
+    onNote();
+    s.type(U"vinVd"); // the 42s across the whole track
+    CHECK(count42() == 0);
+    s.type(U"u");
+
+    onNote();
+    s.type(U"vinld"); // moved on: from the note to the cursor, as v
+    CHECK(count42() == 2);
+}
+
+TEST_CASE("A count with an object in Visual mode takes as many as with an operator")
+{
+    Selecting s;
+    s.type(U"v2it");
+    CHECK(s.selected() == "bars 1–8 of Bass and Lead");
+    s.type(U"d");
+    CHECK(pitches(s.document, 0).empty());
+    CHECK(pitches(s.document, 1).empty());
+
+    // On the strip, is selects the sections' events, which d deletes, keeping the sections.
+    Selecting t;
+    t.type(U"gslv2is");
+    CHECK(t.selected() == "events in 2 sections from B on every track");
+    t.type(U"d");
+    CHECK(t.document.song().sections().size() == 3);
+    CHECK(pitches(t.document, 0) == Pitches{40, 41});
 }

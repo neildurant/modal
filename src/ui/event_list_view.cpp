@@ -839,8 +839,43 @@ std::optional<std::pair<core::Tick, core::Tick>> EventListView::selectionSpan() 
 
 void EventListView::selectObject(std::string_view object, int count, Selection& selection)
 {
-    // The rows the object takes, the cursor on the last.
-    const auto rows = rowsFor(object, count);
+    // The rows the object takes, the cursor on the last; refused as its operators refuse it.
+    if (object == "object-bar")
+    {
+        setMessage("ab isn't in the event list, which is for events rather than time",
+                   MessageKind::Information);
+        return;
+    }
+    if ((object == "object-track" || object == "object-song") && track_ == 0)
+    {
+        setMessage("it isn't on the conductor's list, whose tempo and meter changes the song "
+                   "needs",
+                   MessageKind::Information);
+        return;
+    }
+    std::optional<Rows> rows;
+    if (object == "object-chord")
+    {
+        // From the chord's first row to its last.
+        const auto chord = chordHere(count);
+        if (chord.empty())
+        {
+            return;
+        }
+        const auto& all = list_.rows();
+        for (std::size_t r = 0; r < all.size(); ++r)
+        {
+            if (all[r].kind == RowKind::Event &&
+                std::ranges::find(chord, all[r].index) != chord.end())
+            {
+                rows = rows ? Rows{rows->from, r} : Rows{r, r};
+            }
+        }
+    }
+    else
+    {
+        rows = rowsFor(object, count);
+    }
     if (!rows)
     {
         return;

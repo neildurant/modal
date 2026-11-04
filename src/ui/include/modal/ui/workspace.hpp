@@ -462,9 +462,13 @@ private:
     std::optional<PendingOperator> operator_;
     // The Visual selection, and the last one with the cursor at its end, for gv.
     std::optional<Selection> selection_;
+    // The selection as it was before an object made it, which another object starts from.
+    std::optional<Selection> beforeObject_;
     std::optional<std::pair<Selection, SongCursor>> lastSelection_;
     // A command in Visual mode, or nothing to run it as in Normal mode; and ending it.
     std::optional<bool> runVisual(std::string_view command, int count);
+    void selectObject(std::string_view command, int count);
+    void widenSelection();
     // What the prompt shows before the line.
     std::u32string promptLabel() const;
     // The arguments of the command at the prompt not yet typed, as a hint after the line.

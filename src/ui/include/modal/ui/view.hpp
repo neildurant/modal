@@ -115,6 +115,17 @@ struct Selection
     // Only the events a search matches in it (, s S, decided November 2026), which operators
     // take; D and p, which take its time, are refused.
     std::optional<core::EventQuery> filter = {};
+    // The object that made it from v's, its count and the view's place then and after, until
+    // the cursor moves or it changes kind: operators take it as they would that object, so vXd
+    // is always dX (decided November 2026, after a review).
+    struct Object
+    {
+        std::string name;
+        int count = 0;
+        core::EditPlace at;
+        core::EditPlace after;
+    };
+    std::optional<Object> object = std::nullopt;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
