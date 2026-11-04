@@ -64,7 +64,7 @@ source more-keys
 
 - `set NAME=VALUE ...` sets settings. Several can go on one line. A setting that's on or off can also be set as in Vim: `set rewind` turns it on, `set norewind` off, and `set rewind!` the other way.
 - `nmap KEYS COMMAND ["HINT"]` binds keys in Normal mode to a command, with an optional hint. `vmap`, `imap`, `omap` and `cmap` do the same for Visual, Insert, operator-pending and command-line mode (for later milestones). Keys can be bound to several commands, each doing something in places of its own (the built-in `J` is `join` on the section strip and `octave-down` in the piano roll): they mean the one that does something where the cursor is, the latest bound where more than one does, so your binding of keys to a command that works where a built-in one does takes its place. `nunmap KEYS` (and `vunmap` and so on) removes every binding of the keys.
-- `ngroup KEYS "TITLE"` gives keys that start longer bindings a title for the hint menu, such as `ngroup <leader>t "Toggles"`; `vgroup` and the rest are for the other modes.
+- `ngroup KEYS "TITLE"` gives keys that start longer bindings a title for the hint menu, such as `ngroup <leader>T "Toggles"`; `vgroup` and the rest are for the other modes.
 - `keysection "TITLE"` starts a group of keys in the list of keys (`, ?`): the bindings after it in the same file are listed under it.
 - `highlight ROLE #rrggbb` sets the colour of a theme role.
 - `source FILE` runs another command file, found relative to the file running it.
@@ -79,7 +79,7 @@ When a sequence is bound as well as a longer one starting with it (such as `z` a
 
 After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the status line: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists the ranges and objects with what each would take in the view you're in. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
 
-`, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Changing events and so on), each command once with all its keys. A binding without a hint isn't listed beside one of the same command that has one, so giving only one of several keys a hint lists that one. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
+`, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Editing fields and so on), each command once with all its keys. Each group is kept whole in one column: one that doesn't fit below the last starts the next column, and only a group longer than a whole column goes on in the next, its title repeated as continued. A binding without a hint isn't listed beside one of the same command that has one, so giving only one of several keys a hint lists that one. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
 
 ## Text size
 
@@ -98,7 +98,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `hints` | `on` | Whether the hint menu shows, after a pause, the keys that can follow those typed |
 | `hintdelay` | `400` | How long to wait, in milliseconds, before the hint menu shows (0 to 10000; 0 shows it at once) |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
-| `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, t a` turns it on and off |
+| `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, T a` turns it on and off |
 | `nudge` | `5` | How far, in milliseconds, `Alt-H` / `Alt-L` nudge a note in the piano roll and `+` / `_` lengthen or shorten it (1 to 1000) |
 | `humanizetime` | `10` | How far, in milliseconds, `~` moves a note in time at most, either way (0 to 1000) |
 | `humanizevel` | `8` | How far `~` changes a note's velocity at most, either way (0 to 127) |

@@ -900,7 +900,7 @@ TEST_CASE("The leader's groups in Visual mode have Normal mode's titles where th
     }
     const auto hints = ws.hints();
     REQUIRE(hints);
-    const auto toggles = std::ranges::find(*hints, std::string{"t"}, &Workspace::Hint::keys);
+    const auto toggles = std::ranges::find(*hints, std::string{"T"}, &Workspace::Hint::keys);
     REQUIRE(toggles != hints->end());
     CHECK(toggles->title == "Toggles");
 }

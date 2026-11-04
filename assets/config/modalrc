@@ -22,7 +22,8 @@ nmap G          go-last           "End, or bar {count}"
 
 " Moving in time, to the event at or after where each lands, in the track's bars: the same
 " place a bar on, a bar line, a chord (events starting within chordwindow of each other), a
-" section's start, a label
+" section's start, a label. In the arrangement, Tab and Shift-Tab go past empty bars to the
+" next bar with events on the track and the one before.
 keysection "Moving in time"
 nmap }          cursor-bar-next           "Same place, next bar"
 nmap {          cursor-bar-previous       "Same place, bar before"
@@ -34,12 +35,17 @@ nmap ]s         cursor-section-next       "Next section"
 nmap [s         cursor-section-previous   "Section before"
 nmap ]l         cursor-label-next         "Next label"
 nmap [l         cursor-label-previous     "Label before"
-" f and a note name (fE, fF#, fBb) go to the next note of that pitch class, any octave, and F to
-" the one before; then f and F go on to the next and the one before, until another key.
+nmap <Tab>      bar-events-next           "Next bar with events"
+nmap <S-Tab>    bar-events-previous       "Bar with events before"
+
+" Finding and searching: f and a note name (fE, fF#, fBb) go to the next note of that pitch
+" class, any octave, and F to the one before; then f and F go on to the next and the one
+" before, until another key. / searches the track (/C1 vel<60, /cc64), and n and N go to the
+" next match and the one before, round past the ends; * and # search for the pitch under the
+" cursor.
+keysection "Finding and searching"
 nmap f          find-next                 "Find a note"
 nmap F          find-previous             "Find a note back"
-" / searches the track (/C1 vel<60, /cc64), and n and N go to the next match
-" and the one before, round past the ends; * and # search for the pitch under the cursor.
 nmap /          search                    "Search"
 nmap n          search-next               "Next match"
 nmap N          search-previous           "Match before"
@@ -48,130 +54,43 @@ nmap #          search-here-back          "Search back for this pitch"
 
 " The piano roll: k and j move a semitone, K and J an octave, and Tab and Shift-Tab go to
 " the next note's start at any pitch and the one before, notes starting together low to high.
-" In the arrangement, Tab and Shift-Tab go past empty bars to the next bar with events on the
-" track and the one before. Keys may be bound to several commands, each meaning the one that
-" does something where the cursor is (J here is join on the section strip).
+" Keys may be bound to several commands, each meaning the one that does something where the
+" cursor is (Tab is the arrangement's above, and J join on the section strip).
 keysection "Pitch in the piano roll"
 nmap K          octave-up                 "Up an octave"
 nmap J          octave-down               "Down an octave"
 nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
-nmap <Tab>      bar-events-next           "Next bar with events"
-nmap <S-Tab>    bar-events-previous       "Bar with events before"
-
-" The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
-" with Left and Right) make the grid finer and coarser, its steps narrower and wider as h and l
-" go left and right; Ctrl-T turns triplets on and off; and
-" , n takes the current note's length and velocity as the default note, which o adds. :grid
-" and :len set them by length, such as 1/8 or 1/16t.
-keysection "The grid and default note"
-nmap zh         grid-finer                "Finer grid"
-nmap z<Left>    grid-finer                "Finer grid"
-nmap zl         grid-coarser              "Coarser grid"
-nmap z<Right>   grid-coarser              "Coarser grid"
-nmap <C-t>      grid-triplets             "Triplets on or off"
-nmap <leader>n  default-note-set          "Default note from this one"
-
-" Changing events: Enter edits the field under the cursor, typing a value or a change such
-" as +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it,
-" with counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity. d and
-" y take a range, up to a boundary its key names (d]b up to the next bar line, d]s the next
-" section, dG the end, dj this event and the next), or an object: ib this bar's events, ab
-" this bar as time, which d takes out, closing the gap up to the section's end, in the note
-" or event under the cursor, ic its chord, is this section's events, and it the track's
-" events. An object never reaches beyond the cursor's place: on the section strip, is is the
-" section's events on every track, as the section itself, which d takes out of the song, and
-" ie the whole song. dd and yy are this bar's events; x deletes the note or
-" event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
-" there, and P puts it in, moving the rest of the section later; bars go to the start of the
-" cursor's bar. "a before a yank, delete or put uses register a ("A adds to it); u and Ctrl-R
-" undo and redo, and . repeats the last change. Qa records the keys typed into macro a until
-" Q again (QA adds to it), @a plays it, @@ the last again, and 3@a three times. ma marks the
-" cursor's place with a letter, saved with the song; 'a (or `a) goes there, and after an
-" operator is the range to it (d'a); '' goes back to before the last jump.
-"
-" The other operators take the same ranges and objects, a count before them saying how far:
-" > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
-" the grid step (in the piano roll, its notes), q quantises notes' starts to the grid, asking
-" whether the pedals go with them, ^ sets or changes velocity, asking how (80, +10, 80%), and
-" ~ humanises notes, moving each a little at random in time and velocity (humanizetime and
-" humanizevel say how far).
-" Doubled (>>, qq), they take this bar. To them ab is ib and as is is, since they change
-" events in place.
-keysection "Changing events"
-nmap <CR>       field-edit        "Edit this field"
-nmap +          field-increase-fine "Step up"
-nmap =          field-increase    "Step up"
-nmap <C-a>      number-increase   "Step up"
-nmap -          field-decrease    "Step down"
-nmap _          field-decrease-fine "Step down"
-nmap <C-x>      number-decrease   "Step down"
-nmap =          note-lengthen     "Lengthen to the grid"
-nmap -          note-shorten      "Shorten to the grid"
-nmap +          note-lengthen-fine "Lengthen by a nudge"
-nmap _          note-shorten-fine "Shorten by a nudge"
-nmap <C-a>      velocity-up       "Velocity up"
-nmap <C-x>      velocity-down     "Velocity down"
-nmap d          operator-delete   "Delete"
-nmap y          operator-yank     "Yank"
-nmap >          operator-transpose-up "Transpose up"
-nmap <lt>       operator-transpose-down "Transpose down"
-nmap t          operator-shift-later "Shift later by a grid step"
-nmap T          operator-shift-earlier "Shift earlier by a grid step"
-nmap q          operator-quantize "Quantise"
-nmap ^          operator-velocity "Velocity"
-nmap ~          operator-humanize "Humanise"
-nmap x          event-delete      "Delete this event"
-nmap p          register-put      "Put"
-nmap P          register-put-before "Put before"
-nmap Y          yank-this         "Yank this"
-nmap "          register-use      "Register"
-nmap Q          macro-record      "Record a macro"
-nmap m          mark-set          "Mark"
-nmap '          mark-go           "Go to a mark"
-nmap `          mark-go           "Go to a mark"
-nmap @          macro-play        "Play a macro"
-
-" Visual mode: v selects from the cursor as it moves, a range of time on every track, and v
-" again or Escape ends it; V selects whole rows: tracks at every time, or in the piano roll
-" pitches across the page, until an object sets the time (in the event list and on the
-" strip, as v); Ctrl-v selects a box, tracks by bars or pitches by grid steps. An object
-" selects what it takes (vis this section; in a box, its time), o goes to the selection's
-" other end, and gv selects the last selection again. d and x delete what's selected, y and
-" Y yank it, D takes its time out (from the song, when it's on every track), p and P put the
-" register in its place, and the other operators change it at once.
-" | cuts the notes crossing the edges, so operators take only the parts inside: in Visual
-" mode on or off for the selection, or before an operator for it alone (|d]b).
-keysection "Visual mode"
-nmap v          visual            "Visual"
-nmap V          visual-rows       "Visual rows"
-nmap <C-v>      visual-box        "Visual box"
-nmap gv         visual-again      "Last selection"
-nmap gn         select-match      "Select the next match"
-nmap |          cut-at-edges      "Cut at the edges"
-vmap o          visual-other-end  "Other end"
-vmap D          visual-delete-time "Take the time out"
-keysection "After an operator"
-omap ib         object-bar-contents "This bar's events"
-omap ab         object-bar        "This bar, as time"
-omap in         object-note       "This note"
-omap ic         object-chord      "This chord"
-omap it         object-track      "This track"
-omap ie         object-song       "The whole song"
-omap is         object-section-contents "This section's events"
-omap as         object-section    "This section"
-omap gn         object-match      "The next match"
-keysection "Changing events"
-nmap o          note-add          "Add a note"
-nmap O          note-add-advance  "Add a note and move on"
-nmap u          undo              "Undo"
-nmap .          repeat            "Repeat the last change"
-nmap <C-r>      redo              "Redo"
 
 " Tracks: the conductor's list is track 0, before track 1
 keysection "Tracks"
 nmap gt         track-next        "Next track, or track {count}"
 nmap gT         track-previous    "Track before"
+
+" Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
+" there, and after an operator is the range to it (d'a); '' goes back to before the last jump.
+keysection "Marks"
+nmap m          mark-set          "Mark"
+nmap '          mark-go           "Go to a mark"
+nmap `          mark-go           "Go to a mark"
+
+" Views: the arrangement, the piano roll and the event list, each at the cursor, and
+" Backspace back to the view before; zooming, and following the playhead again after moving
+" away from it while playing.
+keysection "Views"
+nmap ga         view-arrangement  "Arrangement"
+nmap gr         view-piano-roll   "Piano roll"
+nmap ge         view-events       "Event list"
+nmap gc         view-conductor    "Conductor's list"
+nmap <BS>       view-back         "Back"
+ngroup <leader>v "Views"
+nmap <leader>va  view-arrangement  "Arrangement"
+nmap <leader>vp  view-piano-roll   "Piano roll"
+nmap <leader>ve  view-events       "Event list"
+nmap zi         zoom-in           "Zoom in"
+nmap zo         zoom-out          "Zoom out"
+nmap z0         zoom-reset        "Zoom as at the start"
+nmap zf         playhead-follow   "Follow the playhead again"
 
 " Scrolling. Ctrl with a direction moves the cursor and scrolls with it, so it stays in
 " place on screen, until the view can't scroll further; in the arrangement and the piano roll,
@@ -200,19 +119,6 @@ nmap <PageDown> scroll-page-down  "A page down"
 nmap <C-b>      scroll-page-up    "A page up"
 nmap <PageUp>   scroll-page-up    "A page up"
 nmap zz         scroll-centre     "Centre the cursor"
-nmap zi         zoom-in           "Zoom in"
-nmap zo         zoom-out          "Zoom out"
-nmap z0         zoom-reset        "Zoom as at the start"
-nmap zf         playhead-follow   "Follow the playhead again"
-
-" Views: the arrangement, the piano roll and the event list, each at the cursor, and
-" Backspace back to the view before
-keysection "Views"
-nmap ga         view-arrangement  "Arrangement"
-nmap gr         view-piano-roll   "Piano roll"
-nmap ge         view-events       "Event list"
-nmap gc         view-conductor    "Conductor's list"
-nmap <BS>       view-back         "Back"
 
 " The section strip, above the arrangement's tracks: gs goes to it (or k from the first
 " track), j back. There, h and l go between sections, x, d, y, Y, p and P delete, yank and
@@ -229,15 +135,35 @@ nmap <C-a>      section-lengthen  "A bar longer"
 nmap -          section-shorten   "A bar shorter"
 nmap _          section-shorten   "A bar shorter"
 nmap <C-x>      section-shorten   "A bar shorter"
+nmap i          insert-before     "Insert before"
+nmap a          insert-after      "Insert after"
+nmap c          change            "Rename"
+
+" The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
+" with Left and Right) make the grid finer and coarser, its steps narrower and wider as h and l
+" go left and right; Ctrl-T turns triplets on and off; , n takes the current note's length and
+" velocity as the default note, which o adds; and , T a turns gridadvance on and off. :grid
+" and :len set them by length, such as 1/8 or 1/16t.
+keysection "The grid and default note"
+nmap zh         grid-finer                "Finer grid"
+nmap z<Left>    grid-finer                "Finer grid"
+nmap zl         grid-coarser              "Coarser grid"
+nmap z<Right>   grid-coarser              "Coarser grid"
+nmap <C-t>      grid-triplets             "Triplets on or off"
+nmap <leader>n  default-note-set          "Default note from this one"
+ngroup <leader>T "Toggles"
+nmap <leader>Ta grid-advance-toggle "O by grid step or note length"
 
 " Adding notes in the piano roll: o adds the track's default note at the cursor, and O adds
-" it and moves on, past its end, or with gridadvance (, t a) to the next grid step; 8O adds
+" it and moves on, past its end, or with gridadvance (, T a) to the next grid step; 8O adds
 " eight one after another.
 " Moving notes in the piano roll: Alt-h and Alt-l to the grid steps either side, Alt-H and
 " Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j
 " a semitone, Alt-K and Alt-J an octave, or Alt and Alt-Shift with the arrow keys. = and -
 " move its end to the grid steps either side, + and _ a nudge.
-keysection "Moving notes"
+keysection "Adding and moving notes"
+nmap o          note-add          "Add a note"
+nmap O          note-add-advance  "Add a note and move on"
 nmap <A-Left>   move-left         "Move earlier"
 nmap <A-Right>  move-right        "Move later"
 nmap <A-S-Left> move-left-fine    "Nudge earlier"
@@ -256,33 +182,184 @@ nmap <A-k>      move-up           "Up a semitone"
 nmap <A-j>      move-down         "Down a semitone"
 nmap <A-S-k>    move-octave-up    "Up an octave"
 nmap <A-S-j>    move-octave-down  "Down an octave"
-nmap i          insert-before     "Insert before"
-nmap a          insert-after      "Insert after"
-nmap c          change            "Rename"
+nmap =          note-lengthen     "Lengthen to the grid"
+nmap -          note-shorten      "Shorten to the grid"
+nmap +          note-lengthen-fine "Lengthen by a nudge"
+nmap _          note-shorten-fine "Shorten by a nudge"
 
+" Editing fields: Enter edits the field under the cursor, typing a value or a change such as
+" +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it, with
+" counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity.
 " The inspector: e edits the fields of the note under the cursor in the piano roll, or the
 " section on the section strip, starting on the one it was last on; in the event list it
 " edits the field under the cursor in place, as Enter does. Tab and Shift-Tab set the field
 " and go to the next or the one before, round from the last to the first; Enter sets it and
 " leaves, Escape leaves it; Up and Down step it.
-keysection "The inspector"
+keysection "Editing fields"
+nmap <CR>       field-edit        "Edit this field"
+nmap +          field-increase-fine "Step up"
+nmap =          field-increase    "Step up"
+nmap <C-a>      number-increase   "Step up"
+nmap -          field-decrease    "Step down"
+nmap _          field-decrease-fine "Step down"
+nmap <C-x>      number-decrease   "Step down"
+nmap <C-a>      velocity-up       "Velocity up"
+nmap <C-x>      velocity-down     "Velocity down"
 nmap e          inspector-edit    "Edit in the inspector"
 
-" The leader key, comma unless the leader setting names another, starts the commands used now
-" and then. After a pause, the hint menu shows what can follow it, as it does after any keys
-" that start longer bindings; ngroup gives such keys their title there. <leader><leader> is
-" kept free, for a command used often enough to earn it.
-keysection "The leader"
-ngroup <leader>  "Leader"
-nmap <leader>?   keys-show         "The keys here"
-ngroup <leader>v "Views"
-nmap <leader>va  view-arrangement  "Arrangement"
-nmap <leader>vp  view-piano-roll   "Piano roll"
-nmap <leader>ve  view-events       "Event list"
-ngroup g         "Go"
-ngroup z         "View"
-ngroup ]         "Next"
-ngroup [         "Before"
+" Deleting, yanking and putting: d and y take a range, up to a boundary its key names (d]b up
+" to the next bar line, d]s the next section, dG the end, dj this event and the next), or an
+" object: ib this bar's events, ab this bar as time, which d takes out, closing the gap up to
+" the section's end, in the note or event under the cursor, ic its chord, is this section's
+" events, and it the track's events. An object never reaches beyond the cursor's place: on the
+" section strip, is is the section's events on every track, as the section itself, which d
+" takes out of the song, and ie the whole song. dd and yy are this bar's events; x deletes the
+" note or event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
+" there, and P puts it in, moving the rest of the section later; bars go to the start of the
+" cursor's bar. "a before a yank, delete or put uses register a ("A adds to it).
+keysection "Deleting, yanking and putting"
+nmap d          operator-delete   "Delete"
+nmap y          operator-yank     "Yank"
+nmap x          event-delete      "Delete this event"
+nmap Y          yank-this         "Yank this"
+nmap p          register-put      "Put"
+nmap P          register-put-before "Put before"
+nmap "          register-use      "Register"
+
+" The other operators take the same ranges and objects, a count before them saying how far:
+" > and < transpose notes a semitone (3>ib three), t and T move events later and earlier by
+" the grid step (in the piano roll, its notes), q quantises notes' starts to the grid, asking
+" whether the pedals go with them, ^ sets or changes velocity, asking how (80, +10, 80%), ~
+" humanises notes, moving each a little at random in time and velocity (humanizetime and
+" humanizevel say how far), and ! transforms them, the transform's key following.
+" Doubled (>>, qq), they take this bar. To them ab is ib and as is is, since they change
+" events in place.
+keysection "Operators"
+nmap >          operator-transpose-up "Transpose up"
+nmap <lt>       operator-transpose-down "Transpose down"
+nmap t          operator-shift-later "Shift later by a grid step"
+nmap T          operator-shift-earlier "Shift earlier by a grid step"
+nmap q          operator-quantize "Quantise"
+nmap ^          operator-velocity "Velocity"
+nmap ~          operator-humanize "Humanise"
+nmap !          operator-transform "Transform"
+
+" Undo, repeating and macros: u and Ctrl-R undo and redo, and . repeats the last change. Qa
+" records the keys typed into macro a until Q again (QA adds to it), @a plays it, @@ the last
+" again, and 3@a three times.
+keysection "Undo, repeat and macros"
+nmap u          undo              "Undo"
+nmap <C-r>      redo              "Redo"
+nmap .          repeat            "Repeat the last change"
+nmap Q          macro-record      "Record a macro"
+nmap @          macro-play        "Play a macro"
+
+keysection "After an operator"
+omap ib         object-bar-contents "This bar's events"
+omap ab         object-bar        "This bar, as time"
+omap in         object-note       "This note"
+omap ic         object-chord      "This chord"
+omap it         object-track      "This track"
+omap ie         object-song       "The whole song"
+omap is         object-section-contents "This section's events"
+omap as         object-section    "This section"
+omap gn         object-match      "The next match"
+
+" Visual mode: v selects from the cursor as it moves, a range of time on every track, and v
+" again or Escape ends it; V selects whole rows: tracks at every time, or in the piano roll
+" pitches across the page, until an object sets the time (in the event list and on the
+" strip, as v); Ctrl-v selects a box, tracks by bars or pitches by grid steps. An object
+" selects what it takes (vis this section; in a box, its time), and o goes to the selection's
+" other end. d and x delete what's selected, y and Y yank it, D takes its time out (from the
+" song, when it's on every track), p and P put the register in its place, and the other
+" operators change it at once.
+" | cuts the notes crossing the edges, so operators take only the parts inside: in Visual
+" mode on or off for the selection, or before an operator for it alone (|d]b).
+keysection "Visual mode"
+nmap v          visual            "Visual columns"
+nmap V          visual-rows       "Visual rows"
+nmap <C-v>      visual-box        "Visual box"
+nmap |          cut-at-edges      "Cut at the edges"
+vmap o          visual-other-end  "Other end"
+vmap D          visual-delete-time "Take the time out"
+
+" Selecting (decided November 2026): gv selects the last selection again, and gn the match of
+" the last search at the cursor, or the next; , s selects the bar, section, track or what's
+" shown, and with a capital only the matches of the last search in it, which operators then
+" take; in Visual mode , s m keeps only the matches in what's selected.
+keysection "Selecting"
+nmap gv         visual-again      "Last selection"
+nmap gn         select-match      "Select the next match"
+ngroup <leader>s "Select"
+nmap <leader>sb  select-bar               "This bar"
+nmap <leader>sB  select-matches-bar       "The matches in this bar"
+nmap <leader>ss  select-section           "This section"
+nmap <leader>sS  select-matches-section   "The matches in this section"
+nmap <leader>st  select-track             "This track"
+nmap <leader>sT  select-matches-track     "The matches on this track"
+nmap <leader>sv  select-visible           "What's shown"
+nmap <leader>sV  select-matches-visible   "The matches shown"
+nmap <leader>sc  search-clear             "Clear the matches"
+vgroup <leader>s "Select"
+vmap <leader>sm  select-matches           "Only the matches in it"
+
+" The transforms: ! and a range, then one of these keys, or these keys and then a range.
+" Those in a key ask for it each time; a scale of your own is defined by its degrees, as
+" scale hijaz 1 b2 3 4 5 b6 b7, and is then a key's scale as the built-in ones are.
+keysection "Transforms: pitch and time"
+ngroup <leader>x "Transforms"
+vgroup <leader>x "Transforms"
+nmap <leader>xt  transform-transpose   "Transpose by semitones"
+nmap <leader>xT  transform-transpose-key "Transpose in a key"
+nmap <leader>xi  transform-invert        "Invert"
+nmap <leader>xI  transform-invert-key    "Invert in a key"
+nmap <leader>xR  transform-retrograde    "Retrograde"
+nmap <leader>xq  transform-quantize    "Quantise, asking how"
+nmap <leader>xs  transform-stretch     "Stretch time"
+nmap <leader>xn  transform-length      "Note lengths"
+nmap <leader>xh  operator-humanize     "Humanise"
+nmap <leader>xy  transform-split         "Split at a note to a track"
+keysection "Transforms: velocity"
+nmap <leader>xv  operator-velocity     "Velocity"
+nmap <leader>xl  transform-velocity-lift  "Lift velocities"
+nmap <leader>xL  transform-velocity-lower "Lower velocities"
+nmap <leader>xM  transform-velocity-limit "Limit velocities"
+nmap <leader>xr  transform-velocity-ramp  "Velocity ramp"
+nmap <leader>xc  transform-velocity-compress "Compress velocities"
+nmap <leader>xe  transform-velocity-expand   "Expand velocities"
+nmap <leader>xp  transform-velocity-phrase   "Phrase dynamics"
+keysection "Transforms: chords and controllers"
+nmap <leader>xa  transform-chord-accent      "Accent chords' top notes"
+nmap <leader>xb  transform-chord-balance     "Balance chords by pitch"
+nmap <leader>xC  transform-chord-compress    "Compress chords"
+nmap <leader>xE  transform-chord-expand      "Expand chords"
+nmap <leader>xm  transform-remap         "Remap a controller or note"
+nmap <leader>xd  transform-thin          "Thin controller density"
+nmap <leader>xf  transform-filter        "Filter: delete matches"
+keysection "Pedalling"
+ngroup <leader>xP "Pedalling"
+nmap <leader>xPr transform-pedal-repedal "Re-pedal at chord changes"
+nmap <leader>xPt transform-pedal-retime  "Re-time the pedalling to the chords"
+nmap <leader>xPb transform-pedal-each    "Pedal each bar or beat"
+nmap <leader>xPc transform-pedal-clean   "Clean up repeats and flicker"
+nmap <leader>xPx transform-pedal-clear   "Clear a pedal"
+nmap <leader>xPo transform-pedal-offset  "Offset the pedalling"
+nmap <leader>xPk transform-pedal-bake    "Bake the sustain into notes"
+
+" Playing: Space plays from the play-from marker (the ▶ in the margin), or stops where it is,
+" the cursor landing there; Shift-Space stops and goes back to where the cursor was when it
+" started. m Space puts the marker at the cursor, and Ctrl-Space puts it there and plays.
+" With rewind (on by default) the marker stays put, so Space plays the same again; without,
+" it moves to where playback stops, so Space carries on. , T Space turns rewind on or off.
+" Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
+keysection "Playing"
+nmap <Space>    play-toggle       "Play or stop"
+nmap <S-Space>  play-stop-back    "Stop and go back"
+nmap <C-Space>  play-cursor       "Play from the cursor"
+nmap m<Space>   marker-set        "Play from here"
+nmap <leader>T<Space> rewind-toggle "Rewind on or off"
+nmap <C-.>      panic             "Panic"
+cmap <C-.>      panic             "Panic"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too. Those without a hint aren't listed
@@ -328,73 +405,15 @@ cmap <PageUp>   command-line-page-up    "A screen back"
 
 nmap <Esc>      cancel            "Cancel"
 
-" Playing: Space plays from the play-from marker (the ▶ in the margin), or stops where it is,
-" the cursor landing there; Shift-Space stops and goes back to where the cursor was when it
-" started. m Space puts the marker at the cursor, and Ctrl-Space puts it there and plays.
-" With rewind (on by default) the marker stays put, so Space plays the same again; without,
-" it moves to where playback stops, so Space carries on. , t Space turns rewind on or off.
-" Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
-keysection "Playing"
-nmap <Space>    play-toggle       "Play or stop"
-nmap <S-Space>  play-stop-back    "Stop and go back"
-nmap <C-Space>  play-cursor       "Play from the cursor"
-nmap m<Space>   marker-set        "Play from here"
-ngroup <leader>t "Toggles"
-" Selecting (decided November 2026): the bar, section, track or what's shown, and with a capital
-" only the matches of the last search in it, which operators then take; in Visual mode , s m
-" keeps only the matches in what's selected.
-" The transforms: ! and a range, then one of these keys, or these keys and then a range.
-" Those in a key ask for it each time; a scale of your own is defined by its degrees, as
-" scale hijaz 1 b2 3 4 5 b6 b7, and is then a key's scale as the built-in ones are.
-ngroup <leader>x "Transforms"
-nmap !           operator-transform    "Transform"
-nmap <leader>xt  transform-transpose   "Transpose by semitones"
-nmap <leader>xT  transform-transpose-key "Transpose in a key"
-nmap <leader>xi  transform-invert        "Invert"
-nmap <leader>xI  transform-invert-key    "Invert in a key"
-nmap <leader>xR  transform-retrograde    "Retrograde"
-nmap <leader>xl  transform-velocity-lift  "Lift velocities (25%)"
-nmap <leader>xL  transform-velocity-lower "Lower velocities (25%)"
-nmap <leader>xM  transform-velocity-limit "Limit velocities"
-nmap <leader>xm  transform-remap         "Remap a controller or note"
-nmap <leader>xd  transform-thin          "Thin controller density (16 a quarter)"
-nmap <leader>xf  transform-filter        "Filter: delete matches"
-nmap <leader>xy  transform-split         "Split at a note to a track"
-nmap <leader>xr  transform-velocity-ramp  "Velocity ramp"
-nmap <leader>xc  transform-velocity-compress "Compress velocities (50%)"
-nmap <leader>xe  transform-velocity-expand   "Expand velocities (50%)"
-nmap <leader>xp  transform-velocity-phrase   "Phrase dynamics (130%)"
-nmap <leader>xa  transform-chord-accent      "Accent chords' top notes (10)"
-nmap <leader>xb  transform-chord-balance     "Balance chords by pitch (70-95)"
-nmap <leader>xC  transform-chord-compress    "Compress chords (50%)"
-nmap <leader>xE  transform-chord-expand      "Expand chords (50%)"
-nmap <leader>xv  operator-velocity     "Velocity"
-nmap <leader>xq  transform-quantize    "Quantise, asking how"
-nmap <leader>xs  transform-stretch     "Stretch time (2, 1/2)"
-nmap <leader>xn  transform-length      "Note lengths (legato, 1/8, 80%)"
-nmap <leader>xh  operator-humanize     "Humanise"
-ngroup <leader>xP "Pedalling"
-nmap <leader>xPr transform-pedal-repedal "Re-pedal at chord changes"
-nmap <leader>xPt transform-pedal-retime  "Re-time the pedalling to the chords"
-nmap <leader>xPb transform-pedal-each    "Pedal each bar or beat"
-nmap <leader>xPc transform-pedal-clean   "Clean up repeats and flicker"
-nmap <leader>xPx transform-pedal-clear   "Clear a pedal"
-nmap <leader>xPo transform-pedal-offset  "Offset the pedalling (20ms)"
-nmap <leader>xPk transform-pedal-bake    "Bake the sustain into notes"
-vgroup <leader>x "Transforms"
-ngroup <leader>s "Select"
-nmap <leader>sb  select-bar               "This bar"
-nmap <leader>sB  select-matches-bar       "The matches in this bar"
-nmap <leader>ss  select-section           "This section"
-nmap <leader>sS  select-matches-section   "The matches in this section"
-nmap <leader>st  select-track             "This track"
-nmap <leader>sT  select-matches-track     "The matches on this track"
-nmap <leader>sv  select-visible           "What's shown"
-nmap <leader>sV  select-matches-visible   "The matches shown"
-nmap <leader>sc  search-clear             "Clear the matches"
-vgroup <leader>s "Select"
-vmap <leader>sm  select-matches           "Only the matches in it"
-nmap <leader>t<Space> rewind-toggle "Rewind on or off"
-nmap <leader>ta  grid-advance-toggle "O by grid step or note length"
-nmap <C-.>      panic             "Panic"
-cmap <C-.>      panic             "Panic"
+" The leader key, comma unless the leader setting names another, starts the commands used now
+" and then: , v the views, , s selecting, , x the transforms and , T the toggles, with , t kept
+" for the tracks' commands to come. After a pause, the hint menu shows what can follow it, as it
+" does after any keys that start longer bindings; ngroup gives such keys their title there.
+" <leader><leader> is kept free, for a command used often enough to earn it.
+keysection "Help"
+ngroup <leader>  "Leader"
+nmap <leader>?   keys-show         "The keys here"
+ngroup g         "Go"
+ngroup z         "View"
+ngroup ]         "Next"
+ngroup [         "Before"

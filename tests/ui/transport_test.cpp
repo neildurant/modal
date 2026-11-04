@@ -251,12 +251,12 @@ TEST_CASE("playback stopping by itself at the song's end goes back to the cursor
 TEST_CASE("the leader then t and Space turns rewind on and off")
 {
     Playing p;
-    p.type(U",t ");
+    p.type(U",T ");
     CHECK_FALSE(p.ws.rewind());
     CHECK(p.ws.message() == "Rewind off: the play-from marker moves to where playback stops");
     CHECK_FALSE(p.player.rewind());
     CHECK_FALSE(p.player.playing());
-    p.type(U",t ");
+    p.type(U",T ");
     CHECK(p.ws.rewind());
 }
 

@@ -1131,7 +1131,7 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     CHECK(bassNotes(r).size() == before + 1);
 
     // By the grid step, the notes overlapping a little: another pitch each time.
-    r.type(U",ta");
+    r.type(U",Ta");
     CHECK(r.ws.message() == "O moves on by the grid step");
     r.type(U"5GkO");
     CHECK(r.view().time() == t.bar(5) + t.sixteenth());
@@ -1141,7 +1141,7 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     r.type(U"3O");
     CHECK(r.ws.message() == "There's a note here already");
     CHECK(bassNotes(r).size() == before + 3);
-    r.type(U",ta");
+    r.type(U",Ta");
     CHECK(r.ws.message() == "O moves on by the note's length");
 
     // o stays put.
@@ -1428,13 +1428,13 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
     CHECK(has("Moving the cursor", {"G", "End, or bar N", false}));
     CHECK(has("Pitch in the piano roll", {"K", "Up an octave", false}));
     CHECK(has("After an operator", {"ib", "This bar's events", false}));
-    CHECK(has("The leader", {",?", "The keys here", false}));
-    CHECK(has("Moving notes", {"<A-h>/<A-Left>", "Move earlier", false}));
+    CHECK(has("Help", {",?", "The keys here", false}));
+    CHECK(has("Adding and moving notes", {"<A-h>/<A-Left>", "Move earlier", false}));
     CHECK(has("Pitch in the piano roll", {"J", "Down an octave", false}));
     // What the step keys do here, each once; and one key for bigger text, the others unlisted.
-    CHECK(has("Changing events", {"=", "Lengthen to the grid", false}));
-    CHECK(has("Changing events", {"<C-a>", "Velocity up", false}));
-    CHECK(has("Changing events", {"<", "Transpose down", false})); // not as <lt>
+    CHECK(has("Adding and moving notes", {"=", "Lengthen to the grid", false}));
+    CHECK(has("Editing fields", {"<C-a>", "Velocity up", false}));
+    CHECK(has("Operators", {"<", "Transpose down", false})); // not as <lt>
     CHECK(has("Text size", {"<C-+>", "Bigger text", false}));
     CHECK(
         std::ranges::none_of(groups, [](const auto& g) { return g.title == "The section strip"; }));
@@ -1462,7 +1462,7 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
     // In the event list, the keys that step a field do the same, so show as one.
     r.type(U"ge,?");
     const auto list = r.ws.keyList();
-    const auto changing = std::ranges::find(list, "Changing events", &Workspace::KeyGroup::title);
+    const auto changing = std::ranges::find(list, "Editing fields", &Workspace::KeyGroup::title);
     REQUIRE(changing != list.end());
     CHECK(std::ranges::count(changing->keys, Workspace::Hint{"+/=/<C-a>", "Step up", false}) == 1);
 }

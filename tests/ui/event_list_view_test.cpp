@@ -1058,10 +1058,10 @@ TEST_CASE("the hint menu shows what can follow keys that start longer bindings, 
     // The leader's, groups with their titles; going on into a group keeps it showing.
     v.ws.handle(Key::typed(U','), 2000);
     v.ws.wake(2400);
-    CHECK(find("t") == Workspace::Hint{"t", "Toggles", true});
+    CHECK(find("T") == Workspace::Hint{"T", "Toggles", true});
     CHECK(find("v") == Workspace::Hint{"v", "Views", true});
     CHECK_FALSE(find("n")); // the default note is the piano roll's
-    v.ws.handle(Key::typed(U't'), 2500);
+    v.ws.handle(Key::typed(U'T'), 2500);
     CHECK(find("<Space>") == Workspace::Hint{"<Space>", "Rewind on or off", false});
     v.ws.handle(Key::of(NamedKey::Escape), 2600);
     CHECK_FALSE(v.ws.hints());
