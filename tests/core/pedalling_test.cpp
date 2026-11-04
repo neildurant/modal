@@ -78,6 +78,28 @@ TEST_CASE("re-pedalling replaces the sustain, lifting and pressing around each c
           Changes{{0, true}, {q, false}, {q + d / 2, true}, {2 * q, false}, {4 * q, true}});
 }
 
+TEST_CASE("re-pedalling changes nothing at or past the end of what it takes")
+{
+    // Found in a second review, November 2026: the pedal's state outside the stretch takes over
+    // at its end, rather than a lift there or after it.
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick bar = 4 * q;
+    const Tick d = q / 8;
+    const PedalTiming timing{[&](Tick t) { return t - d / 4; }, [&](Tick t) { return t + d / 2; }};
+    // Held down through two bars; a note ending just at the first bar's end.
+    const auto held = listOf({sustain(0, true), note(0, 60, bar), sustain(2 * bar, false)});
+    CHECK(sustainOf(repedal(held, 0, bar, std::vector<Tick>{0}, bar, timing)) ==
+          Changes{{d / 2, true}, {bar, true}, {2 * bar, false}});
+    // A note running past the end: no lift after it, the pedal staying down into what's held.
+    CHECK(sustainOf(repedal(held, 0, bar, std::vector<Tick>{0}, bar + q, timing)) ==
+          Changes{{d / 2, true}, {bar, true}, {2 * bar, false}});
+    // Lifted outside: the lift comes at the end at the latest.
+    const auto lifted = listOf({note(0, 60, bar + q)});
+    CHECK(sustainOf(repedal(lifted, 0, bar, std::vector<Tick>{0}, bar + q, timing)) ==
+          Changes{{d / 2, true}, {bar, false}});
+}
+
 TEST_CASE("re-timing moves the lifts and presses near a change to it, leaving the rest")
 {
     const auto ppqn = MODAL_ANY_PPQN();

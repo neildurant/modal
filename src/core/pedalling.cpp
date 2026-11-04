@@ -114,17 +114,39 @@ Transformed repedal(const EventList& events, Tick from, Tick to, std::span<const
     // Each press with the lift after it, before the next change or at the end; a press that
     // wouldn't come before its lift, after a short last note or between changes closer than
     // the lift and press, left out, so the pedal is always lifted again (found in a code
-    // review, November 2026).
+    // review, November 2026). Nothing goes at or past the stretch's end, where the pedal's
+    // state outside it takes over (found in a second review): held down there, or set by an
+    // event there, a lift at or past it is left out, the pedal running on into it; otherwise
+    // the lift comes at the end at the latest.
     auto kept = withoutPedal(events, from, to, kSustain);
+    const bool setAtEnd =
+        pedalDown(events, kSustain, to) ||
+        std::ranges::any_of(events.all(), [&](const Event& event)
+                            { return event.tick == to && pedalOf(event, kSustain) != nullptr; });
     for (std::size_t i = 0; i < changes.size(); ++i)
     {
         const auto press = std::max(timing.press(changes[i]), from);
-        const auto lift =
-            std::max(i + 1 < changes.size() ? timing.lift(changes[i + 1]) : end, from);
-        if (press < lift)
+        auto lift = std::max(i + 1 < changes.size() ? timing.lift(changes[i + 1]) : end, from);
+        if (press >= to)
         {
-            kept.push_back(pedal(press, kSustain, true));
+            break;
+        }
+        if (press >= lift)
+        {
+            continue;
+        }
+        kept.push_back(pedal(press, kSustain, true));
+        if (lift < to)
+        {
             kept.push_back(pedal(lift, kSustain, false));
+        }
+        else if (!setAtEnd)
+        {
+            kept.push_back(pedal(to, kSustain, false));
+        }
+        else
+        {
+            break;
         }
     }
     std::ranges::stable_sort(kept, {}, &Event::tick);
