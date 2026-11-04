@@ -251,7 +251,7 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
     return hints;
 }
 
-std::vector<Workspace::Hint> Workspace::operatorHints() const
+std::vector<Workspace::Hint> Workspace::operatorHints(std::size_t* objects) const
 {
     // After an operator, the ranges and objects it can take, as whole keys (]b, ib), with what
     // each would take in this view: the cursor's bar first, then the objects, then the ranges.
@@ -303,6 +303,11 @@ std::vector<Workspace::Hint> Workspace::operatorHints() const
     for (auto& [rank, hint] : ranked)
     {
         hints.push_back(std::move(hint));
+    }
+    if (objects != nullptr)
+    {
+        *objects = static_cast<std::size_t>(
+            std::ranges::count_if(ranked, [](const auto& r) { return r.first < 2; }));
     }
     return hints;
 }
@@ -543,8 +548,190 @@ Region Workspace::keysRegion() const
     return region;
 }
 
+std::string Workspace::hintHeading() const
+{
+    // The keys typed and their group's title; after an operator, its key's hint, Delete or Yank.
+    const auto mode = keys_.mode();
+    const auto& keymap =
+        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymapHere() : keymapHere();
+    auto heading = pending();
+    if (keys_.keys().empty() && operator_)
+    {
+        for (const auto& [keys, binding] : keymapHere().bindings(Mode::Normal))
+        {
+            if (binding.command == operator_->name && !binding.hint.empty())
+            {
+                heading += "  " + binding.hint;
+                break;
+            }
+        }
+    }
+    else if (const auto title = keymap.groupTitle(mode, keys_.keys()); !title.empty())
+    {
+        heading += "  " + title;
+    }
+    return heading;
+}
+
+Region Workspace::operatorHintRegion(const std::vector<Hint>& hints, std::size_t objects) const
+{
+    // After an operator (decided November 2026): the objects, the operator's own key first (d,
+    // for dd), and the motions, each under its heading, a faint rule between them, each filling
+    // its columns top to bottom, in as few rows as let both fit across; in a window too narrow
+    // for that, one column, the headings in it.
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
+    const int most = std::max(layout_.main.height / cell_.height - 3, 1);
+    const std::span<const Hint> all{hints};
+    const auto firsts = all.first(std::min(objects, all.size()));
+    const auto seconds = all.subspan(firsts.size());
+    struct Column
+    {
+        std::span<const Hint> hints;
+        int keys = 0;
+        int width = 0;
+    };
+    const auto columnsOf = [&](std::span<const Hint> group, int rows)
+    {
+        std::vector<Column> columns;
+        for (std::size_t from = 0; from < group.size(); from += static_cast<std::size_t>(rows))
+        {
+            Column column{
+                group.subspan(from, std::min(static_cast<std::size_t>(rows), group.size() - from))};
+            for (const auto& hint : column.hints)
+            {
+                column.keys = std::max(column.keys, static_cast<int>(decodeUtf8(hint.keys).size()));
+                column.width =
+                    std::max(column.width, static_cast<int>(decodeUtf8(hint.title).size()));
+            }
+            column.width += column.keys + 3; // " : "
+            columns.push_back(column);
+        }
+        return columns;
+    };
+    const auto widthOf = [](const std::vector<Column>& columns, std::string_view heading)
+    {
+        int total = 0;
+        for (const auto& column : columns)
+        {
+            total += column.width + 4;
+        }
+        return std::max(total - 4, static_cast<int>(heading.size()));
+    };
+    constexpr std::string_view kObjects = "Objects";
+    constexpr std::string_view kMotions = "Motions";
+    const auto fewest =
+        std::max<std::size_t>({(firsts.size() + 1) / 2,
+                               std::min<std::size_t>(6, std::max(firsts.size(), seconds.size()))});
+    int rows = std::min(static_cast<int>(std::max<std::size_t>(fewest, 1)), most);
+    std::vector<Column> left;
+    std::vector<Column> right;
+    bool across = false;
+    for (; rows <= most; ++rows)
+    {
+        left = columnsOf(firsts, rows);
+        right = columnsOf(seconds, rows);
+        if (widthOf(left, kObjects) + 3 + widthOf(right, kMotions) <= room)
+        {
+            across = true;
+            break;
+        }
+    }
+    const int lines = across ? rows + 1
+                             : static_cast<int>(hints.size()) + (firsts.empty() ? 0 : 1) +
+                                   (seconds.empty() ? 0 : 1);
+    const int shown = std::min(lines, most + 1);
+    const int pad = cell_.height / 4;
+    const int height = (shown + 1) * cell_.height + 2 * pad;
+    const auto& status = layout_.bottom[0];
+    Region region{.bounds = {status.x, status.y - height, status.width, height},
+                  .background = Role::Panel,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    const Style keyStyle{Role::HintKey, Role::Panel, kPlain};
+    const Style colonStyle{Role::Dim, Role::Panel, kPlain};
+    const Style titleStyle{Role::Text, Role::Panel, kPlain};
+    const Style headingStyle{Role::Dim, Role::Panel, kPlain};
+    const Style groupStyle{Role::Accent, Role::Panel, kBold};
+    const Style ruleStyle{Role::Dim, Role::Panel, kPlain};
+    const auto x = [&](int column) { return margin + column * cell_.width; };
+    const auto y = [&](int line) { return pad + line * cell_.height; };
+    region.text.push_back({x(0), pad, decodeUtf8(hintHeading()), headingStyle});
+    const auto put = [&](const Hint& hint, int at, int keys, int line)
+    {
+        const auto typed = decodeUtf8(hint.keys);
+        region.text.push_back(
+            {x(at + keys - static_cast<int>(typed.size())), y(line), typed, keyStyle});
+        region.text.push_back({x(at + keys), y(line), U" : ", colonStyle});
+        region.text.push_back({x(at + keys + 3), y(line), decodeUtf8(hint.title), titleStyle});
+    };
+    if (!across)
+    {
+        int line = 1;
+        int keys = 0;
+        for (const auto& hint : hints)
+        {
+            keys = std::max(keys, static_cast<int>(decodeUtf8(hint.keys).size()));
+        }
+        for (const auto& [group, heading] :
+             {std::pair{firsts, kObjects}, std::pair{seconds, kMotions}})
+        {
+            if (group.empty() || line > shown)
+            {
+                continue;
+            }
+            region.text.push_back({x(0), y(line++), decodeUtf8(heading), groupStyle});
+            for (const auto& hint : group)
+            {
+                if (line > shown)
+                {
+                    break;
+                }
+                put(hint, 0, keys, line++);
+            }
+        }
+        return region;
+    }
+    int at = 0;
+    const auto draw = [&](const std::vector<Column>& columns, std::string_view heading)
+    {
+        region.text.push_back({x(at), y(1), decodeUtf8(heading), groupStyle});
+        for (const auto& column : columns)
+        {
+            int line = 2;
+            for (const auto& hint : column.hints)
+            {
+                put(hint, at, column.keys, line++);
+            }
+            at += column.width + 4;
+        }
+    };
+    if (!firsts.empty())
+    {
+        draw(left, kObjects);
+        at = widthOf(left, kObjects) + 1;
+        for (int line = 1; line <= rows + 1 && !seconds.empty(); ++line)
+        {
+            region.text.push_back({x(at), y(line), U"│", ruleStyle});
+        }
+        at += 2;
+    }
+    if (!seconds.empty())
+    {
+        draw(right, kMotions);
+    }
+    return region;
+}
+
 Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 {
+    if (keys_.keys().empty() && operator_ && !awaiting_ && !findWaiting())
+    {
+        std::size_t objects = 0;
+        operatorHints(&objects);
+        return operatorHintRegion(hints, objects);
+    }
     // On a panel above the status line, after Doom Emacs's (decided October 2026): the keys
     // typed and their group's title, then each key that can follow, right-aligned in its
     // column, a colon, and its title, groups marked + in a colour of their own. Columns go down
@@ -603,27 +790,7 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
     const Style groupStyle{Role::HintGroup, Role::Panel, kPlain};
     const Style headingStyle{Role::Dim, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell_.width; };
-    const auto mode = keys_.mode();
-    const auto& keymap =
-        mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymapHere() : keymapHere();
-    auto heading = pending();
-    if (keys_.keys().empty() && operator_)
-    {
-        // After an operator: its key's hint, Delete or Yank.
-        for (const auto& [keys, binding] : keymapHere().bindings(Mode::Normal))
-        {
-            if (binding.command == operator_->name && !binding.hint.empty())
-            {
-                heading += "  " + binding.hint;
-                break;
-            }
-        }
-    }
-    else if (const auto title = keymap.groupTitle(mode, keys_.keys()); !title.empty())
-    {
-        heading += "  " + title;
-    }
-    region.text.push_back({x(0), pad, decodeUtf8(heading), headingStyle});
+    region.text.push_back({x(0), pad, decodeUtf8(hintHeading()), headingStyle});
     int left = 0;
     for (std::size_t c = 0; c < columns.size(); ++c)
     {

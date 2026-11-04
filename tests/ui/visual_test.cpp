@@ -1048,3 +1048,56 @@ TEST_CASE("A count with an object in Visual mode takes as many as with an operat
     CHECK(t.document.song().sections().size() == 3);
     CHECK(pitches(t.document, 0) == Pitches{40, 41});
 }
+
+TEST_CASE("After an operator the hint menu shows the objects and the motions apart")
+{
+    // Objects (the operator's own key first) left of a faint rule and motions right of it,
+    // each under its heading (decided November 2026); one column in a narrow window.
+    for (const int width : {120, 60})
+    {
+        Selecting s;
+        s.ws.resize(width * kCell.width, 40 * kCell.height, kCell);
+        s.ws.setHints(true, 0);
+        s.type(U"d");
+        const auto frame = s.ws.frame();
+        const auto menu = std::ranges::find_if(
+            frame, [](const Region& region)
+            { return region.text.size() > 0 && region.text.front().text == U"d  Delete"; });
+        REQUIRE(menu != frame.end());
+        const auto at = [&](std::u32string_view text) -> std::optional<std::pair<int, int>>
+        {
+            for (const auto& run : menu->text)
+            {
+                if (run.text == text)
+                {
+                    return std::pair{run.x, run.y};
+                }
+            }
+            return std::nullopt;
+        };
+        const auto objects = at(U"Objects");
+        const auto motions = at(U"Motions");
+        const auto own = at(U"this bar's events");
+        const auto next = at(U"to the next bar line");
+        REQUIRE(objects);
+        REQUIRE(motions);
+        REQUIRE(own);
+        REQUIRE(next);
+        const bool rule = at(U"│").has_value();
+        if (width == 120)
+        {
+            CHECK(rule);
+            CHECK(objects->second == motions->second); // side by side
+            CHECK(own->first < motions->first);
+            CHECK(next->first > motions->first);
+        }
+        else
+        {
+            CHECK_FALSE(rule);
+            CHECK(objects->first == motions->first); // one column
+            CHECK(objects->second < own->second);
+            CHECK(own->second < motions->second);
+            CHECK(motions->second < next->second);
+        }
+    }
+}

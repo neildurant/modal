@@ -754,7 +754,9 @@ private:
     bool hintsShown_ = false;
     void noteWaiting(std::int64_t now);
     std::vector<Hint> hintsAfter(const Keymap& keymap, Mode mode, std::span<const Key> keys) const;
-    std::vector<Hint> operatorHints() const;
+    // After an operator: its own key and the objects, then the motions, and how many are the
+    // first.
+    std::vector<Hint> operatorHints(std::size_t* objects = nullptr) const;
     // A find waiting for its note name (f), or after an operator for a sharp or flat (dfB),
     // which the hint menu shows.
     bool findWaiting() const;
@@ -820,6 +822,8 @@ private:
     Region completionRegion(const Completions& shown) const;
     Region keysRegion() const;
     Region hintRegion(const std::vector<Hint>& hints) const;
+    Region operatorHintRegion(const std::vector<Hint>& hints, std::size_t objects) const;
+    std::string hintHeading() const;
 };
 
 } // namespace modal::ui
