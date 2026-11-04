@@ -582,11 +582,13 @@ private:
         std::optional<core::EventQuery> query;
         std::string name;
         bool forward = true;
-        bool repeats = false;
-        bool kept = false;
     };
     FindState finding_;
     bool startFind(bool forward, int count);
+    // ; and Alt-; (decided November 2026): the last find again, its way or the other.
+    bool repeatFind(bool same, int count);
+    // Escape after an operator's find (dfC): undone, the song, registers and cursor as before.
+    void cancelNaming();
     // The operator over the find's range, to its note named so far, saying so if there's none;
     // whether it found one.
     bool operateToFound(bool forward, int count);

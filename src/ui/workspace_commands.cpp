@@ -113,14 +113,24 @@ constexpr std::array kSharedCommands{
                 .palette = false},
     CommandInfo{.name = "find-next",
                 .description = "Go to the next note of the pitch class named after it, any "
-                               "octave (fE, fF#, fBb), {count} times; after a find, the next "
-                               "again; after an operator, the range to it and through it",
+                               "octave (fE, fF#, fBb), {count} times; after an operator, the "
+                               "range to it and through it",
                 .count = true,
                 .motion = true},
     CommandInfo{.name = "find-previous",
                 .description = "Go to the note before of the pitch class named after it, any "
-                               "octave (FE, FF#, FBb), {count} times; after a find, the one "
-                               "before again; after an operator, the range from it",
+                               "octave (FE, FF#, FBb), {count} times; after an operator, the "
+                               "range from it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "find-repeat",
+                .description = "The last find again, the way it went, {count} times; after an "
+                               "operator, the range to it",
+                .count = true,
+                .motion = true},
+    CommandInfo{.name = "find-repeat-back",
+                .description = "The last find again, the other way, {count} times; after an "
+                               "operator, the range to it",
                 .count = true,
                 .motion = true},
     CommandInfo{.name = "search",
@@ -437,7 +447,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 102> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 104> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -520,6 +530,8 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-match-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-match-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"find-previous", onlyIn({Tracks, PianoRoll, EventList})},
+            {"find-repeat", onlyIn({Tracks, PianoRoll, EventList})},
+            {"find-repeat-back", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-find-next", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-find-previous", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-label-previous", onlyIn({Tracks, PianoRoll, EventList})},

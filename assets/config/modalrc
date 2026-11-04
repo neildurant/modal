@@ -39,13 +39,14 @@ nmap <Tab>      bar-events-next           "Next bar with events"
 nmap <S-Tab>    bar-events-previous       "Bar with events before"
 
 " Finding and searching: f and a note name (fE, fF#, fBb) go to the next note of that pitch
-" class, any octave, and F to the one before; then f and F go on to the next and the one
-" before, until another key. / searches the track (/C1 vel<60, /cc64), and n and N go to the
-" next match and the one before, round past the ends; * and # search for the pitch under the
-" cursor.
+" class, any octave, and F to the one before; ; finds it again the same way, and Alt-; the
+" other way. / searches the track (/C1 vel<60, /cc64), and n and N go to the next match and
+" the one before, round past the ends; * and # search for the pitch under the cursor.
 keysection "Finding and searching"
 nmap f          find-next                 "Find a note"
 nmap F          find-previous             "Find a note back"
+nmap ;          find-repeat               "Find again"
+nmap <A-;>      find-repeat-back          "Find again, the other way"
 nmap /          search                    "Search"
 nmap n          search-next               "Next match"
 nmap N          search-previous           "Match before"

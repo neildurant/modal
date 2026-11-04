@@ -307,18 +307,56 @@ void Workspace::searchWrapped(bool forward)
 
 bool Workspace::startFind(bool forward, int count)
 {
-    // After a find, f and F go to its next and previous match, as Doom Emacs's evil-snipe does
-    // (decided October 2026); otherwise, and after an operator, they take a note name.
-    if (finding_.repeats && mode_ != Mode::OperatorPending)
-    {
-        if (!goToFound(forward, count))
-        {
-            macros_.failed = macros_.depth > 0;
-        }
-        return true;
-    }
+    // f and F always take a note name and start a find (decided November 2026, replacing their
+    // repeating it as Doom Emacs's evil-snipe does, which suited letters better than notes);
+    // ; and Alt-; repeat it.
     awaiting_ = Awaiting{forward ? "find-next" : "find-previous", count};
     return true;
+}
+
+bool Workspace::repeatFind(bool same, int count)
+{
+    if (!finding_.query)
+    {
+        if (operator_)
+        {
+            operator_.reset();
+            mode_ = Mode::Normal;
+        }
+        setMessage("No find yet: " + keysOf("find-next") + " and a note name finds one",
+                   MessageKind::Information);
+        macros_.failed = macros_.depth > 0;
+        return true;
+    }
+    const bool forward = same == finding_.forward;
+    const bool found = operator_ ? operateToFound(forward, count) : goToFound(forward, count);
+    if (!found)
+    {
+        macros_.failed = macros_.depth > 0;
+    }
+    return true;
+}
+
+void Workspace::cancelNaming()
+{
+    auto naming = *std::exchange(finding_.naming, std::nullopt);
+    if (!naming.redo)
+    {
+        return;
+    }
+    auto& redo = *naming.redo;
+    document_.edit({}, view().place(), [&](core::Song& song) { song = redo.song; });
+    register_ = std::move(redo.unnamed);
+    registers_ = std::move(redo.registers);
+    registerName_ = redo.registerName;
+    registerBefore_ = std::move(redo.registerBefore);
+    cutNext_ = false;
+    document_.endGroup();
+    refresh();
+    view().setCursor(naming.from);
+    operator_.reset();
+    mode_ = Mode::Normal;
+    setMessage("Nothing done", MessageKind::Information);
 }
 
 bool Workspace::operateToFound(bool forward, int count)
@@ -355,6 +393,7 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
     }
     finding_.naming =
         Naming{.letter = upper, .forward = forward, .count = count, .from = view().cursor()};
+    finding_.forward = forward;
     finding_.query =
         core::EventQuery{.pitchClass = core::parsePitchClass(encodeUtf8(std::u32string(1, upper)))};
     finding_.name = encodeUtf8(std::u32string(1, upper));
@@ -449,13 +488,9 @@ bool Workspace::goToFound(bool forward, int count)
     // Not a jump, as Vim's f isn't, so '' stays where it was.
     const auto command = forward ? "cursor-find-next" : "cursor-find-previous";
     const auto before = view().cursor();
-    finding_.forward = forward;
-    finding_.repeats = true;
-    finding_.kept = true;
     const auto moved = view().run(command, count);
     if (!moved)
     {
-        finding_.repeats = false;
         sayWhereFor(command);
         return false;
     }

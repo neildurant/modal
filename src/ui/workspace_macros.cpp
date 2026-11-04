@@ -40,10 +40,18 @@ bool Workspace::recordChange(const Key& key, std::int64_t now)
         return handleKey(key, now);
     }
     // An operator's find that a sharp or flat may yet change (dfB) is done at any other key,
-    // the change with it, the key not being part of it.
+    // the change with it, the key not being part of it; Escape undoes it (decided November
+    // 2026), leaving nothing to repeat.
     bool changed = false;
     const bool accidental = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0 &&
                             (key.character == U'#' || key.character == U'b');
+    if (finding_.naming && finding_.naming->redo && key.named == NamedKey::Escape)
+    {
+        lastTime_ = now;
+        cancelNaming();
+        repeat_.changeKeys.clear();
+        return true;
+    }
     if (finding_.naming && finding_.naming->redo && !accidental)
     {
         lastTime_ = now;

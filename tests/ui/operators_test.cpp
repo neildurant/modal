@@ -673,36 +673,42 @@ void addFlats(Operating& o)
 
 } // namespace
 
-TEST_CASE("f and a note name go to the next note of that pitch class, and f and F then repeat it")
+TEST_CASE("f and a note name go to the next note of that pitch class, and ; and Alt-; repeat it")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Operating o{ppqn};
     const auto q = o.q;
     const auto bass = o.document.song().tracks()[0]->id();
+    const auto back = [&] { o.ws.handle(Key::typed(U';', kAlt), 0); };
+    o.type(U";"); // nothing to repeat yet
+    CHECK(o.ws.message() == "No find yet: f and a note name finds one");
     o.type(U"gr"); // the piano roll, at the start
     const auto at = [&] { return o.ws.pianoRoll().cursor(); };
     o.type(U"fa");
     CHECK(at() == SongCursor{bass, 4 * q, 45}); // A2, any octave
-    CHECK(o.ws.pending() == "fA");
-    o.type(U"f");
+    o.type(U";");
     CHECK(at() == SongCursor{bass, 28 * q, 33}); // A1
-    o.type(U"f");
+    o.type(U";");
     CHECK(o.ws.message() == "No A after here in Bass");
     CHECK(at().tick == 28 * q);
-    o.type(U"F");
+    back(); // the other way
     CHECK(at().tick == 4 * q);
-    // Any other key ends it: f then takes a name again, in either case.
+    // f always takes a name, in either case, and other keys between don't end it.
     o.type(U"jfC");
     CHECK(at() == SongCursor{bass, 16 * q + q / 16, 36});
-    o.type(U"j");
-    CHECK(o.ws.pending().empty());
     o.type(U"Fa");
     CHECK(at() == SongCursor{bass, 4 * q, 45});
+    // F's ; goes back, and Alt-; on.
+    o.type(U";");
+    CHECK(o.ws.message() == "No A before here in Bass");
+    CHECK(at().tick == 4 * q);
+    back();
+    CHECK(at().tick == 28 * q);
     // A count goes as many on.
     o.type(U"gg2fa");
     CHECK(at().tick == 28 * q);
-    o.type(U"2F");
-    CHECK(at().tick == 28 * q); // only one before it
+    o.type(U"gg2;");
+    CHECK(at().tick == 28 * q);
     // Anything but a note name is refused.
     o.type(U"jfh");
     CHECK(o.ws.message() == "f takes a note name after it, such as fE, fF# or fBb");
@@ -717,14 +723,12 @@ TEST_CASE("a sharp or flat after a find's letter goes again from where it starte
     o.type(U"gr4l");
     o.type(U"fa"); // A2, in bar 2
     REQUIRE(o.ws.pianoRoll().cursor().tick == 4 * o.q);
-    o.press(NamedKey::Escape); // or f would find the next A
     o.type(U"fb");
     CHECK(o.ws.pianoRoll().cursor().tick == 12 * q); // B1
     o.type(U"b");
     CHECK(o.ws.pianoRoll().cursor().tick == 8 * q); // Bb1, from bar 2 again
     CHECK(o.ws.pianoRoll().cursor().pitch == 34);
-    CHECK(o.ws.pending() == "fBb");
-    o.type(U"f");
+    o.type(U";");
     CHECK(o.ws.message() == "No Bb after here in Bass");
     o.type(U"}Fa"); // from bar 4, A2 in bar 2
     CHECK(o.ws.pianoRoll().cursor().tick == 4 * q);
@@ -768,15 +772,29 @@ TEST_CASE("after an operator, a find takes the range through the note it finds")
     // A yank done again takes what the new range does, not both.
     o.type(U"yfa#");
     CHECK(o.ws.registerEvents().size() == 4);
-    // Another key, Escape among them, leaves it as it is, and is a key of its own, not part of
-    // the change . repeats.
+    // Escape undoes it, the cursor where it was (decided November 2026), leaving nothing for .
+    // to repeat; another key leaves it as it is, and is a key of its own, not part of the change
+    // . repeats.
     o.type(U"dfa");
     o.press(NamedKey::Escape);
+    CHECK(o.notes().size() == 7);
+    CHECK(o.ws.message() == "Nothing done");
+    CHECK(o.ws.mode() == Mode::Normal);
+    CHECK(o.ws.pianoRoll().cursor().tick == 0);
+    o.type(U".");
+    CHECK(o.notes() == afterBb); // the last change, dfa#, still
+    o.type(U"u");
+    o.type(U"dfal");
     CHECK(o.notes() == afterA);
     o.type(U"#");
     CHECK(o.notes() == afterA);
     o.type(U"u");
-    o.type(U"}}dFaj");
+    // ; after an operator is the find again, as f's: from A2 through A1.
+    o.type(U"fad;");
+    CHECK(o.notes().size() == 2);
+    CHECK(std::ranges::none_of(o.notes(), [&](const auto& note) { return note.first >= 4 * q; }));
+    o.type(U"u");
+    o.type(U"gg}}dFaj");
     CHECK(o.notes().size() == 6); // from A2 in bar 2 to the cursor in bar 3
     const auto pitch = o.ws.pianoRoll().cursor().pitch;
     o.type(U"}.");
@@ -798,12 +816,12 @@ TEST_CASE("in the arrangement a find goes to the next bar with the note, and in 
     const auto q = o.q;
     o.type(U"fa");
     CHECK(o.ws.arrangement().cursor().tick == 4 * q); // bar 2
-    o.type(U"f");
+    o.type(U";");
     CHECK(o.ws.arrangement().cursor().tick == 28 * q); // bar 8
     o.type(U"jfa");
     CHECK(o.ws.message() == "No A after here in Lead");
-    // In Visual mode, the selection follows, and f repeats.
-    o.type(U"kggvfaf");
+    // In Visual mode, the selection follows, and ; repeats.
+    o.type(U"kggvfa;");
     CHECK(o.ws.mode() == Mode::Visual);
     CHECK(o.ws.arrangement().cursor().tick == 28 * q);
     o.press(NamedKey::Escape);

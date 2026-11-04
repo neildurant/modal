@@ -143,6 +143,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return {startFind(name == "find-next", call.count)};
                          }
+                         if (name == "find-repeat" || name == "find-repeat-back")
+                         {
+                             return {repeatFind(name == "find-repeat", call.count)};
+                         }
                          if (name == "search-next" || name == "search-previous")
                          {
                              const bool next = name == "search-next";
@@ -283,10 +287,6 @@ std::string Workspace::pending() const
                                                  : std::string{}) +
             keysOf(finding_.naming->redo->op.name) +
             keysOf(finding_.naming->forward ? "find-next" : "find-previous") + finding_.name;
-    }
-    if (text.empty() && finding_.repeats)
-    {
-        text = keysOf(finding_.forward ? "find-next" : "find-previous") + finding_.name;
     }
     return text;
 }
@@ -840,15 +840,10 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
 {
     // f and F repeat a find while it's the last thing done, any other key ending that, but for
     // a count or keys waiting for more.
-    finding_.kept = false;
     searching_.gnKept = false;
     widenSelection(); // a key run at a pause may have moved the cursor
     const bool changed = takeKey(key, now);
     widenSelection();
-    if (!finding_.kept && keys_.pending().empty())
-    {
-        finding_.repeats = false;
-    }
     // gn's run through matches, the same; . and n keep it, and the keys of an answer to ^.
     if (!searching_.gnKept && keys_.pending().empty() && mode_ != Mode::CommandLine && !operator_)
     {
@@ -935,6 +930,11 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
             const bool done = finishNaming(key.character);
             noteWaiting(now);
             return done;
+        }
+        if (key.named == NamedKey::Escape && finding_.naming->redo)
+        {
+            cancelNaming();
+            return true;
         }
         settleNaming();
         if (macros_.failed)
