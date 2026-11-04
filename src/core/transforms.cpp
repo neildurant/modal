@@ -392,7 +392,7 @@ bool isSwitchController(int controller)
 bool isThinnable(int controller)
 {
     const auto in = [&](int low, int high) { return controller >= low && controller <= high; };
-    return in(1, 5) || in(7, 31) || in(70, 79) || in(85, 95) || in(102, 119);
+    return in(1, 5) || in(7, 31) || in(70, 79) || in(85, 87) || in(89, 95) || in(102, 119);
 }
 
 namespace

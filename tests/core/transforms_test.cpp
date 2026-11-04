@@ -557,6 +557,24 @@ TEST_CASE("thinning leaves alone controllers that aren't curves")
     CHECK(isThinnable(74));
 }
 
+TEST_CASE("thinning leaves the high resolution velocity prefix with its note")
+{
+    // CC88 gives the next note's velocity its low bits, so it's part of that note.
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    std::vector<Event> all;
+    for (int n = 0; n < 3; ++n)
+    {
+        all.push_back({n * q, ControlChange{88, static_cast<std::uint8_t>(10 * n)}});
+        all.push_back(note(n * q, 60, q / 2));
+    }
+    const auto list = listOf(all);
+    CHECK(eventsOf(thin(list, allOf(list), {}, 4 * q, 2, q)).size() == 6);
+    CHECK_FALSE(isThinnable(88));
+    CHECK(isThinnable(87));
+    CHECK(isThinnable(89));
+}
+
 TEST_CASE("legato holds a note until the next chord's earliest note, not its lowest")
 {
     const auto list = listOf({note(0, 60, 10), note(100, 64, 10), note(120, 60, 10)});

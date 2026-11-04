@@ -104,10 +104,10 @@ bool isSwitchController(int controller);
 // after a code review): modulation, breath, foot, portamento time, volume, balance, pan,
 // expression, the effect controls and general purpose controllers, the sound controllers
 // (70 to 79), the effects depths (91 to 95), and the undefined ones (3, 9, 14, 15, 20 to 31, 85
-// to 90, 102 to 119), as knobs and faders are often set to send. Not the switches, nor bank
-// select, data entry and increment, the RPNs and NRPNs, portamento control or channel mode
-// messages, each of which is an action or part of one, nor the least significant halves
-// (32 to 63).
+// to 87, 89, 90, 102 to 119), as knobs and faders are often set to send. Not the switches, nor
+// bank select, data entry and increment, the RPNs and NRPNs, portamento control, the high
+// resolution velocity prefix (88, which belongs to the note after it) or channel mode messages,
+// each of which is an action or part of one, nor the least significant halves (32 to 63).
 bool isThinnable(int controller);
 
 // Thinning dense continuous data (decided November 2026): of each controller's events (not
