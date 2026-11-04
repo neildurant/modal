@@ -77,7 +77,8 @@ std::string times(int count, std::string_view one, std::string_view many)
 }
 
 // What a transform's told: its amount, the first word not NAME=VALUE (or its default), and
-// its options.
+// its options. to= takes the rest of the line, as a track's name may have spaces, whether typed
+// on the command line or in answer to a question.
 struct Told
 {
     std::string amount;
@@ -93,6 +94,14 @@ Told told(std::string_view text, std::string_view name)
         const auto start = text.find_first_not_of(" \t,", at);
         if (start == std::string_view::npos)
         {
+            break;
+        }
+        if (text.substr(start).starts_with("to="))
+        {
+            auto track = text.substr(start + 3);
+            track.remove_suffix(track.size() -
+                                std::min(track.find_last_not_of(" \t") + 1, track.size()));
+            result.options.emplace_back("to", track);
             break;
         }
         const auto end = std::min(text.find_first_of(" \t,", start), text.size());
@@ -1244,15 +1253,8 @@ bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& targe
 bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& target,
                            const std::string& given)
 {
-    // The track's name is the rest of the line after to=, spaces and all.
-    auto text = given;
+    const auto said = told(given, {});
     std::string to;
-    if (const auto at = text.find("to="); at != std::string::npos)
-    {
-        to = std::string{trimmed(std::string_view{text}.substr(at + 3))};
-        text.erase(at);
-    }
-    const auto said = told(text, {});
     const auto at = core::parsePitch(trimmed(said.amount));
     if (!at)
     {
@@ -1266,6 +1268,10 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
         if (option == "side" && (value == "above" || value == "below"))
         {
             up = value == "above";
+        }
+        else if (option == "to")
+        {
+            to = value;
         }
         else
         {

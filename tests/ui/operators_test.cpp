@@ -1707,6 +1707,14 @@ TEST_CASE("Transforms at their edges: across tracks, names with spaces, before t
     REQUIRE(song.song().tracks().size() == 3);
     CHECK(song.song().tracks()[1]->name == "Right Hand");
     o.type(U"u");
+    // And the same typed in answer to split's first question.
+    o.type(U"gr:split");
+    o.press(NamedKey::Enter);
+    o.type(U"C1 side=above to=Right Hand");
+    o.press(NamedKey::Enter);
+    REQUIRE(song.song().tracks().size() == 3);
+    CHECK(song.song().tracks()[1]->name == "Right Hand");
+    o.type(U"u");
 
     // A pedal offset that would go before the song's start is refused, not put at it.
     o.type(U"gg4]b:pedal-offset -9000ms"); // bar 5
