@@ -1466,3 +1466,64 @@ TEST_CASE("the list of keys, , ?, shows those that do something here, in modalrc
     REQUIRE(changing != list.end());
     CHECK(std::ranges::count(changing->keys, Workspace::Hint{"+/=/<C-a>", "Step up", false}) == 1);
 }
+
+TEST_CASE("the list of keys keeps each group whole in one column")
+{
+    Rolling r;
+    // Small groups that don't fit below the last start the next column; one longer than a whole
+    // column goes on in the next, its title again, continued.
+    const auto keys = [](int count)
+    {
+        std::vector<Workspace::Hint> hints;
+        for (int i = 0; i < count; ++i)
+        {
+            hints.push_back({std::to_string(i), "Key " + std::to_string(i), false});
+        }
+        return hints;
+    };
+    r.ws.resize(120 * kCell.width, 14 * kCell.height, kCell);
+    const std::vector<Workspace::KeyGroup> groups{
+        {"First", keys(3)}, {"Second", keys(4)}, {"Long", keys(30)}, {"Last", keys(2)}};
+    const auto pages = r.ws.keyPages(groups);
+    std::vector<const Workspace::KeyColumn*> columns;
+    for (const auto& page : pages)
+    {
+        for (const auto& column : page)
+        {
+            columns.push_back(&column);
+        }
+    }
+    REQUIRE(columns.size() >= 4);
+    const auto titles = [](const Workspace::KeyColumn& column)
+    {
+        std::vector<std::string> found;
+        for (const auto& line : column.lines)
+        {
+            if (line.key == nullptr && line.group != nullptr)
+            {
+                found.push_back(line.group->title + (line.continued ? "+" : ""));
+            }
+        }
+        return found;
+    };
+    CHECK(titles(*columns[0]) == std::vector<std::string>{"First"});
+    CHECK(titles(*columns[1]) == std::vector<std::string>{"Second"});
+    CHECK(titles(*columns[2]) == std::vector<std::string>{"Long"});
+    CHECK(titles(*columns[3]) == std::vector<std::string>{"Long+"});
+    for (const auto* column : columns)
+    {
+        // Each group's keys are under its title, in the same column.
+        const Workspace::KeyGroup* group = nullptr;
+        for (const auto& line : column->lines)
+        {
+            if (line.key == nullptr)
+            {
+                group = line.group;
+            }
+            else
+            {
+                CHECK(line.group == group);
+            }
+        }
+    }
+}

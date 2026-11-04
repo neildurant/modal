@@ -267,6 +267,21 @@ public:
     };
     std::vector<KeyGroup> keyList() const;
     bool showingKeys() const { return keysPage_.has_value(); }
+    // The list laid out in pages of columns, each a run of lines: a group's title (continued,
+    // when a group too long for a whole column goes on in the next), or a key and its title.
+    struct KeyLine
+    {
+        const KeyGroup* group;
+        const Hint* key; // or null for the group's title
+        bool continued = false;
+    };
+    struct KeyColumn
+    {
+        std::vector<KeyLine> lines;
+        int keys = 0;
+        int width = 0;
+    };
+    std::vector<std::vector<KeyColumn>> keyPages(const std::vector<KeyGroup>& groups) const;
 
     // Where the cursor is, and whether a command does something there, so the hint menu
     // offers it.
@@ -799,20 +814,6 @@ private:
     MatchColumns matchColumns(const std::vector<std::string>& matches) const;
     std::size_t columnsShown(const MatchColumns& columns, std::size_t first) const;
     Region completionRegion(const Completions& shown) const;
-    // The list of keys laid out in pages of columns, each a run of lines: a group's title, or
-    // a key and its title.
-    struct KeyLine
-    {
-        const KeyGroup* group;
-        const Hint* key; // or null for the group's title
-    };
-    struct KeyColumn
-    {
-        std::vector<KeyLine> lines;
-        int keys = 0;
-        int width = 0;
-    };
-    std::vector<std::vector<KeyColumn>> keyPages(const std::vector<KeyGroup>& groups) const;
     Region keysRegion() const;
     Region hintRegion(const std::vector<Hint>& hints) const;
 };

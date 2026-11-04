@@ -410,33 +410,48 @@ std::vector<Workspace::KeyGroup> Workspace::keyList() const
     return result;
 }
 
+namespace
+{
+
+std::string keyGroupTitle(const Workspace::KeyLine& line)
+{
+    return line.continued ? line.group->title + " (continued)" : line.group->title;
+}
+
+} // namespace
+
 std::vector<std::vector<Workspace::KeyColumn>>
 Workspace::keyPages(const std::vector<KeyGroup>& groups) const
 {
-    // Down each column and then across, a group's title never last in a column, as many
-    // columns to a page as fit across, each as wide as what's in it.
+    // Down each column and then across, each group whole in one column (decided November
+    // 2026): one that doesn't fit below the last starts the next column, leaving a gap, and
+    // only one longer than a whole column goes on in the next, its title again, continued. As
+    // many columns to a page as fit across, each as wide as what's in it.
     const int margin = BarSpacing::forCell(cell_).margin;
     const int room = std::max((width_ - 2 * margin) / cell_.width, 1);
     const int rows = std::max(layout_.main.height / cell_.height - 3, 2);
     std::vector<KeyColumn> columns(1);
     for (const auto& group : groups)
     {
-        if (static_cast<int>(columns.back().lines.size()) + 2 > rows)
+        const auto used = static_cast<int>(columns.back().lines.size());
+        const auto needed = 1 + static_cast<int>(group.keys.size());
+        if (used > 0 && used + 1 + needed > rows)
         {
             columns.emplace_back();
         }
         if (!columns.back().lines.empty())
         {
-            columns.back().lines.push_back({nullptr, nullptr}); // a line between groups
+            columns.back().lines.push_back({nullptr, nullptr, false}); // a line between groups
         }
-        columns.back().lines.push_back({&group, nullptr});
+        columns.back().lines.push_back({&group, nullptr, false});
         for (const auto& key : group.keys)
         {
             if (static_cast<int>(columns.back().lines.size()) >= rows)
             {
                 columns.emplace_back();
+                columns.back().lines.push_back({&group, nullptr, true});
             }
-            columns.back().lines.push_back({&group, &key});
+            columns.back().lines.push_back({&group, &key, false});
         }
     }
     for (auto& column : columns)
@@ -456,8 +471,8 @@ Workspace::keyPages(const std::vector<KeyGroup>& groups) const
         {
             if (line.key == nullptr && line.group != nullptr)
             {
-                column.width =
-                    std::max(column.width, static_cast<int>(decodeUtf8(line.group->title).size()));
+                column.width = std::max(column.width,
+                                        static_cast<int>(decodeUtf8(keyGroupTitle(line)).size()));
             }
         }
     }
@@ -519,7 +534,7 @@ Region Workspace::keysRegion() const
             }
             else if (line.group != nullptr)
             {
-                region.text.push_back({x(left), y, decodeUtf8(line.group->title), groupStyle});
+                region.text.push_back({x(left), y, decodeUtf8(keyGroupTitle(line)), groupStyle});
             }
             ++row;
         }
