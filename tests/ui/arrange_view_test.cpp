@@ -1000,6 +1000,13 @@ TEST_CASE(":label-to-section on a selection goes through its labels, asking abou
     a.type(U"ggv");
     run(U"bar-delete");
     CHECK(song.end() == end - kBar);
+    a.type(U"u");
+
+    // On the strip, vie is the whole song, its labels with it.
+    a.type(U"gsvie");
+    run(U"label-to-section");
+    CHECK(a.ws.message() ==
+          "Start a section at 5:1:000 from the label Fill at 5:2:000? (y/n, Escape stops)");
 }
 
 TEST_CASE("Tab and Shift-Tab go past empty bars to the bars with events on the track")
