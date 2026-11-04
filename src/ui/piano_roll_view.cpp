@@ -1848,7 +1848,7 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::timeSpan(std::st
     }
     // From the cursor up to where it lands, as Vim's character motions go; with G and gg, the
     // grid step landed on too.
-    const bool inclusive = motion == "go-first" || motion == "go-last";
+    const bool inclusive = motion == "go-first" || motion == "go-last" || motion == "cursor-last";
     const auto from = std::min(time, landed);
     auto to = std::max(time, landed);
     if (inclusive)

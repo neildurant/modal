@@ -1563,6 +1563,12 @@ bool Workspace::runOperator(std::string_view command, int count)
                        MessageKind::Information);
             return true;
         }
+        if (where() == Where::EventList && (command == "cursor-first" || command == "cursor-last"))
+        {
+            setMessage(keysOf(command) + " goes to a field, not a time, in the event list",
+                       MessageKind::Information);
+            return true;
+        }
     }
     if (!offered(command))
     {

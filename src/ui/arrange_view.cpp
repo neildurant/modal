@@ -748,8 +748,9 @@ std::optional<ArrangeView::Area> ArrangeView::areaFor(std::string_view motion, i
     }
     // Across bars: up to the bar landed on, as Vim's character motions go, or with G and gg
     // the bar landed on too, as its line motions do, and a find the bar it finds (dfE).
-    const bool inclusive =
-        motion == "go-first" || motion == "go-last" || motion == "cursor-find-next";
+    const bool inclusive = motion == "go-first" || motion == "go-last" ||
+                           motion == "cursor-first" || motion == "cursor-last" ||
+                           motion == "cursor-find-next";
     const auto landed = m.toBarBeatTick(landedTime).bar;
     if (landed > bar)
     {

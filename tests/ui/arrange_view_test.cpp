@@ -339,20 +339,26 @@ TEST_CASE("operators take bars across to where a motion goes, or tracks down")
         a.type(U"2ldG");
         CHECK(ticksOf(a.document, 0) == std::vector<core::Tick>{0, kBar + 2 * kQuarter});
     }
+    SECTION("$ and 0 are ranges to the last and first bars, those too, and } to the next bar")
+    {
+        Arranging a{operatorSong()};
+        a.type(U"2ldG");
+        const auto toEnd = ticksOf(a.document, 0);
+        a.type(U"ugg2ld$");
+        CHECK(ticksOf(a.document, 0) == toEnd);
+        a.type(U"uggdd");
+        const auto thisBar = ticksOf(a.document, 0);
+        a.type(U"uggd}");
+        CHECK(ticksOf(a.document, 0) == thisBar);
+    }
     SECTION("keys that only move aren't ranges, and say what is")
     {
         Arranging a{operatorSong()};
         const auto before = ticksOf(a.document, 0);
-        for (const auto* keys : {U"d$", U"d}", U"y0", U"d)"})
-        {
-            a.type(keys);
-            CHECK(a.ws.message().ends_with(
-                "only moves the cursor; for a range, use ]b or ]s, or an object such as ib"));
-            CHECK(ticksOf(a.document, 0) == before);
-        }
-        a.type(U"d}");
+        a.type(U"d)");
         CHECK(a.ws.message() ==
-              "} only moves the cursor; for a range, use ]b or ]s, or an object such as ib");
+              ") only moves the cursor; for a range, use ]b or ]s, or an object such as ib");
+        CHECK(ticksOf(a.document, 0) == before);
     }
     SECTION("dgg: from the first bar, this one too")
     {

@@ -1728,3 +1728,23 @@ TEST_CASE("Transforms at their edges: across tracks, names with spaces, before t
     o.press(NamedKey::Enter);
     CHECK(song.song().end() == end);
 }
+
+TEST_CASE("In the piano roll, d0 and d$ take from the bar's start, and to its end")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto q = o.q;
+    const auto bass = o.document.song().tracks()[0]->id();
+    o.type(U"gr");
+    // Bar 2 holds the A2, at its start: from a beat in, d0 takes it, d$ doesn't.
+    o.ws.pianoRoll().setCursor({.track = bass, .tick = 5 * q, .pitch = 45});
+    o.type(U"d$");
+    CHECK(o.notes().size() == 5);
+    o.ws.pianoRoll().setCursor({.track = bass, .tick = 5 * q, .pitch = 45});
+    o.type(U"d0");
+    CHECK(o.notes().size() == 4);
+    o.type(U"u");
+    o.ws.pianoRoll().setCursor({.track = bass, .tick = 4 * q, .pitch = 45});
+    o.type(U"d$");
+    CHECK(o.notes().size() == 4);
+}
