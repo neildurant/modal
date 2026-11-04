@@ -111,6 +111,66 @@ Frame Workspace::frame() const
     return frame;
 }
 
+std::string Workspace::operatorAbout() const
+{
+    // "Transpose up 3 semitones · then a range or object; >> this bar's notes" (decided
+    // November 2026, after a review of the grammar): a count before an operator with a how far
+    // of its own is how far; before the others it's how many bars, as before d.
+    const auto& name = operator_->name;
+    const int n = std::max(operator_->count, 1);
+    const auto count = [&](std::string_view one, std::string_view many)
+    { return n == 1 ? std::string{one} : std::to_string(n) + " " + std::string{many}; };
+    std::string what;
+    bool bars = true;
+    if (name == "operator-transpose-up" || name == "operator-transpose-down")
+    {
+        what = std::string{"Transpose "} + (name.ends_with("up") ? "up " : "down ") +
+               count("a semitone", "semitones");
+        bars = false;
+    }
+    else if (name == "operator-shift-later" || name == "operator-shift-earlier")
+    {
+        what = std::string{"Shift "} + (name.ends_with("later") ? "later" : "earlier") + " by " +
+               count("a grid step", "grid steps");
+        bars = false;
+    }
+    else if (const auto* spec = findTransform(name))
+    {
+        what = std::string{spec->label.substr(0, spec->label.find(" {}"))};
+    }
+    else
+    {
+        const std::array<std::pair<std::string_view, std::string_view>, 6> kVerbs{{
+            {"operator-delete", "Delete"},
+            {"operator-yank", "Yank"},
+            {"operator-quantize", "Quantise"},
+            {"operator-velocity", "Change the velocity of"},
+            {"operator-humanize", "Humanise"},
+            {"operator-transform", "Transform"},
+        }};
+        const auto found =
+            std::ranges::find(kVerbs, name, &std::pair<std::string_view, std::string_view>::first);
+        what = found != kVerbs.end() ? std::string{found->second} : std::string{name};
+    }
+    if (what.empty())
+    {
+        what = std::string{name};
+    }
+    auto text = what + " · then a range or object";
+    if (const auto keys = keysOf(name); decodeUtf8(keys).size() == 1)
+    {
+        if (const auto line = view().describeRange(name, "operator-line"))
+        {
+            text += "; " + keys + keys + " " + *line;
+            if (bars && operator_->count > 1)
+            {
+                text += ", and " + std::to_string(operator_->count - 1) + " more";
+            }
+        }
+    }
+    return text;
+}
+
 Region Workspace::statusRegion() const
 {
     // A message too long for it is shown above it alone, not cut short here as well.
@@ -209,6 +269,11 @@ Bar Workspace::statusBar(bool withMessage) const
     {
         // While playing, where the playhead is.
         bottom.left.push_back({"  ▶ " + view().timeStatus(*at), {Role::Accent, Role::Bar, kBold}});
+    }
+    else if (operator_ && mode_ == Mode::OperatorPending)
+    {
+        // What the operator waiting will do, and what its doubled key takes.
+        bottom.left.push_back({"  " + operatorAbout(), kBarText});
     }
     else if (const auto selected = mode_ == Mode::Visual ? view().selectionStatus() : std::nullopt)
     {

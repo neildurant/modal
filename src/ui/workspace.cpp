@@ -1033,15 +1033,7 @@ bool Workspace::refuseObject(std::string_view command)
 {
     // Where the object is, rather than doing something wider or narrower than it says
     // (decided November 2026).
-    std::string keys{command};
-    for (const auto& [sequence, binding] : keymap_.bindings(Mode::OperatorPending))
-    {
-        if (binding.command == command)
-        {
-            keys = shownKeys(sequence);
-            break;
-        }
-    }
+    const auto keys = keysOf(command);
     setMessage(command == "object-track"
                    ? keys + " takes a track: use it on the track, not the section strip"
                    : keys + " takes every track: use it on the section strip",
@@ -1576,6 +1568,15 @@ bool Workspace::runOperator(std::string_view command, int count)
     }
     if (command == "object-match")
     {
+        // One match; a count after the operator would be lost, so it's refused (decided
+        // November 2026, after a review of the grammar).
+        if (count > 0)
+        {
+            setMessage(keysOf(command) + " takes the one match; . does the next",
+                       MessageKind::Information);
+            macros_.failed = macros_.depth > 0;
+            return true;
+        }
         return operateOnMatch(op.name, std::max(op.count, 1));
     }
     // Those with no "how far" multiply the counts, as d and y do: 2qq quantises two bars
@@ -1921,16 +1922,24 @@ bool Workspace::operateOnSections(std::string_view op, int count)
 
 std::string Workspace::keysOf(std::string_view command) const
 {
+    // Its shortest keys in Normal mode, or after an operator for an object (gn, is).
     std::string shortest;
-    for (const auto& [keys, binding] : keymapHere().bindings(Mode::Normal))
+    for (const auto mode : {Mode::Normal, Mode::OperatorPending})
     {
-        if (binding.command == command)
+        for (const auto& [keys, binding] : keymapHere().bindings(mode))
         {
-            auto text = shownKeys(keys);
-            if (shortest.empty() || text.size() < shortest.size())
+            if (binding.command == command)
             {
-                shortest = std::move(text);
+                auto text = shownKeys(keys);
+                if (shortest.empty() || text.size() < shortest.size())
+                {
+                    shortest = std::move(text);
+                }
             }
+        }
+        if (!shortest.empty())
+        {
+            break;
         }
     }
     return shortest.empty() ? std::string{command} : shortest;

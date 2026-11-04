@@ -1054,7 +1054,7 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
         // By each track's grid step.
         const bool later = op == "operator-shift-later";
         return changeEvents(
-            "Move " + target->what + (later ? " later" : " earlier") + " by " +
+            "Shift " + target->what + (later ? " later" : " earlier") + " by " +
                 times(amount, "a grid step", "grid steps"),
             *target,
             [&](const core::EventList& events, const auto& part)

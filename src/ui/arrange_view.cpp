@@ -27,10 +27,12 @@ constexpr std::array kCommands{
                 .description = "Put the yanked or deleted events in at the cursor, moving the "
                                "rest of the section later, or sections before this one"},
     CommandInfo{.name = "move-left",
-                .description = "Move this section or note earlier, {count} places or steps",
+                .description = "Move this section a place earlier, or this note onto the grid "
+                               "line before it; {count} places or lines",
                 .count = true},
     CommandInfo{.name = "move-right",
-                .description = "Move this section or note later, {count} places or steps",
+                .description = "Move this section a place later, or this note onto the next "
+                               "grid line; {count} places or lines",
                 .count = true},
     CommandInfo{.name = "join", .description = "Join this section with the next"},
     CommandInfo{.name = "section-lengthen",

@@ -44,13 +44,14 @@ constexpr std::array kSharedCommands{
                                "(<ib), or {count} semitones; << this bar's",
                 .count = true},
     CommandInfo{.name = "operator-shift-later",
-                .description = "Move the events a range or object takes later by the grid step "
-                               "(t]b), or {count} steps; tt this bar's. In the piano roll, its "
-                               "notes",
+                .description = "Shift the events a range or object takes later by a grid step, "
+                               "keeping how far each is off the grid (t]b), or {count} steps; tt "
+                               "this bar's. In the piano roll, its notes",
                 .count = true},
     CommandInfo{.name = "operator-shift-earlier",
-                .description = "Move the events a range or object takes earlier by the grid "
-                               "step (T]b), or {count} steps; TT this bar's",
+                .description = "Shift the events a range or object takes earlier by a grid step, "
+                               "keeping how far each is off the grid (T]b), or {count} steps; TT "
+                               "this bar's",
                 .count = true},
     CommandInfo{.name = "operator-quantize",
                 .description = "Quantise the starts of the notes a range or object takes to the "

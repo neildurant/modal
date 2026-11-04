@@ -154,7 +154,7 @@ TEST_CASE("> and < transpose the notes a range or object takes, the count before
     o.press(NamedKey::Escape);
 }
 
-TEST_CASE("t and T move events later and earlier by the grid step")
+TEST_CASE("t and T shift events later and earlier by the grid step")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Operating o{ppqn};
@@ -168,7 +168,7 @@ TEST_CASE("t and T move events later and earlier by the grid step")
     o.type(U"TT");
     CHECK(o.notes().front() == std::pair{core::Tick{0}, 31});
     o.type(U"u");
-    CHECK(o.ws.message() == "Undid: Move 2 notes in Bass earlier by a grid step");
+    CHECK(o.ws.message() == "Undid: Shift 2 notes in Bass earlier by a grid step");
 
     // In the arrangement, controllers move with the notes; in the piano roll only notes move.
     o.type(U"ga4l"); // bar 5
@@ -1747,4 +1747,38 @@ TEST_CASE("In the piano roll, d0 and d$ take from the bar's start, and to its en
     o.ws.pianoRoll().setCursor({.track = bass, .tick = 4 * q, .pitch = 45});
     o.type(U"d$");
     CHECK(o.notes().size() == 4);
+}
+
+TEST_CASE("While an operator waits, the status line says what it will do, and what doubled takes")
+{
+    Operating o;
+    const auto status = [&]
+    {
+        std::string text;
+        const auto frame = o.ws.frame();
+        for (const auto& run : frame.back().text)
+        {
+            text += encodeUtf8(run.text);
+        }
+        return text;
+    };
+    o.type(U"gr3>");
+    INFO(status());
+    CHECK(status().find("Transpose up 3 semitones · then a range or object; >> ") !=
+          std::string::npos);
+    o.press(NamedKey::Escape);
+    o.type(U"2q");
+    INFO(status());
+    CHECK(status().find("Quantise · then a range or object; qq ") != std::string::npos);
+    CHECK(status().find(", and 1 more") != std::string::npos);
+}
+
+TEST_CASE("A count after an operator isn't for gn, which takes one match, and says so")
+{
+    Operating o;
+    o.type(U"gr");
+    search(o, U"a");
+    o.type(U"d2gn");
+    CHECK(o.ws.message() == "gn takes the one match; . does the next");
+    CHECK(o.notes().size() == 5);
 }

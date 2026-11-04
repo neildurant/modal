@@ -421,6 +421,7 @@ private:
 
     Region promptRegion() const;
     Region statusRegion() const;
+    std::string operatorAbout() const;
     // The status line, without the message when it is shown above it instead.
     Bar statusBar(bool withMessage = true) const;
     // A message too long for the status line, shown whole, wrapped, in a panel above it until
