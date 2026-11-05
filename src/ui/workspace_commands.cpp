@@ -73,14 +73,32 @@ constexpr std::array kSharedCommands{
                                "selection, at once",
                 .count = true},
     CommandInfo{.name = "visual",
-                .description = "Visual mode: select from here as the cursor moves, a range of "
-                               "time on every track; v again or Escape ends it"},
+                .description = "Visual mode: select from here as the cursor moves; v again or "
+                               "Escape ends it",
+                .here = {"Visual mode: select bars from here as the cursor moves, on every "
+                         "track; v again or Escape ends it",
+                         "Visual mode: select sections from here as the cursor moves; v again or "
+                         "Escape ends it",
+                         "Visual mode: select grid steps from here as the cursor moves, at every "
+                         "pitch; v again or Escape ends it",
+                         "Visual mode: select events from here as the cursor moves; v again or "
+                         "Escape ends it"}},
     CommandInfo{.name = "visual-rows",
-                .description = "Visual mode by whole rows: tracks in the arrangement, at every "
-                               "time until an object sets it (Vis); V again or Escape ends it"},
+                .description = "Visual mode by whole rows; V again or Escape ends it",
+                .here = {"Visual mode by whole tracks, at every time until an object sets it "
+                         "(Vis); V again or Escape ends it",
+                         "Visual mode, as v on the strip; V again or Escape ends it",
+                         "Visual mode by pitch rows across the whole track, until an object sets "
+                         "the time (Vis); V again or Escape ends it",
+                         "Visual mode, as v in the event list; V again or Escape ends it"}},
     CommandInfo{.name = "visual-box",
-                .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
-                               "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
+                .description = "Visual mode by a box; Ctrl-v again or Escape ends it",
+                .here = {"Visual mode by a box of tracks by bars; Ctrl-v again or Escape ends "
+                         "it",
+                         "Visual mode, as v on the strip; Ctrl-v again or Escape ends it",
+                         "Visual mode by a box of pitches by grid steps; Ctrl-v again or Escape "
+                         "ends it",
+                         {}}},
     CommandInfo{.name = "visual-again",
                 .description = "Go back to the last Visual selection, selecting it again"},
     CommandInfo{.name = "register-use",
@@ -245,12 +263,19 @@ constexpr std::array kSharedCommands{
                 .count = true,
                 .object = true},
     CommandInfo{.name = "object-section-contents",
-                .description = "After an operator, this section's events on this track (is), "
-                               "or on every track on the section strip; or {count} sections' "
-                               "from it",
+                .description = "After an operator, this section's events (is); or {count} "
+                               "sections' from it",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
-                .object = true},
+                .object = true,
+                .here = {"After an operator, this section's events on this track (is); or "
+                         "{count} sections' from it",
+                         "After an operator, this section's events on every track (is); or "
+                         "{count} sections' from it",
+                         "After an operator, this section's notes on this track (is); or "
+                         "{count} sections' from it",
+                         "After an operator, this section's events on this track (is); or "
+                         "{count} sections' from it"}},
     CommandInfo{.name = "object-section",
                 .description = "On the section strip, after an operator, this section itself, "
                                "on every track (as), which d takes out of the song and y yanks "
@@ -266,11 +291,15 @@ constexpr std::array kSharedCommands{
                 .object = true},
     CommandInfo{.name = "object-track",
                 .description = "On a track, after an operator, this track's events (it), from "
-                               "the start to the end; in the arrangement, or {count} tracks' "
-                               "from it",
+                               "the start to the end",
                 .modes = modeBit(Mode::OperatorPending) | modeBit(Mode::Visual),
                 .count = true,
-                .object = true},
+                .object = true,
+                .here = {"After an operator, this track's events (it), from the start to the "
+                         "end, or {count} tracks' from it",
+                         {},
+                         "After an operator, this track's notes (it), from the start to the end",
+                         {}}},
     CommandInfo{.name = "object-song",
                 .description = "On the section strip, after an operator, the whole song (ie), "
                                "every section on every track",

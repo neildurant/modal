@@ -71,6 +71,13 @@ constexpr CommandInfo motion(std::string_view name, std::string_view description
     return {.name = name, .description = description, .count = true, .motion = true};
 }
 
+// A command that reads differently in the event list, saying what it does there.
+constexpr CommandInfo inList(CommandInfo info, std::string_view there)
+{
+    info.here[static_cast<std::size_t>(Where::EventList)] = there;
+    return info;
+}
+
 constexpr std::array kCommands{
     motion("cursor-left", "Move to the field before, or the bar before"),
     motion("cursor-right", "Move to the next field, or the next bar"),
@@ -82,14 +89,14 @@ constexpr std::array kCommands{
     CommandInfo{.name = "cursor-last",
                 .description = "Move to the last field, or the last bar",
                 .motion = true},
-    motion("cursor-bar-next", "Move to the same place a bar on (in the event list, the event at "
-                              "or after it)"),
-    motion("cursor-bar-previous", "Move to the same place a bar back (in the event list, the "
-                                  "event at or after it)"),
-    motion("cursor-bar-line-next", "Move to the next bar line (in the event list, the event at "
-                                   "or after it)"),
-    motion("cursor-bar-line-previous", "Move to the bar line before (in the event list, the "
-                                       "event at or after it)"),
+    inList(motion("cursor-bar-next", "Move to the same place a bar on"),
+           "Move to the event at or after the same place a bar on"),
+    inList(motion("cursor-bar-previous", "Move to the same place a bar back"),
+           "Move to the event at or after the same place a bar back"),
+    inList(motion("cursor-bar-line-next", "Move to the next bar line"),
+           "Move to the event at or after the next bar line"),
+    inList(motion("cursor-bar-line-previous", "Move to the bar line before"),
+           "Move to the event at or after the bar line before"),
     motion("cursor-chord-next", "Move to the next chord, or event"),
     motion("cursor-chord-previous", "Move to the chord, or event, before"),
     motion("cursor-section-next", "Move to the next section's start"),
@@ -98,12 +105,10 @@ constexpr std::array kCommands{
     motion("cursor-label-previous", "Move to the label before"),
     motion("go-first", "Go to the first event, or bar {count}"),
     motion("go-last", "Go to the end, or bar {count}"),
-    counted("cursor-left-scroll",
-            "Move left, scrolling to keep the cursor in place (in the event list, to the field "
-            "before)"),
-    counted("cursor-right-scroll",
-            "Move right, scrolling to keep the cursor in place (in the event list, to the next "
-            "field)"),
+    inList(counted("cursor-left-scroll", "Move left, scrolling to keep the cursor in place"),
+           "Move to the field before, scrolling to keep the cursor in place"),
+    inList(counted("cursor-right-scroll", "Move right, scrolling to keep the cursor in place"),
+           "Move to the next field, scrolling to keep the cursor in place"),
     counted("cursor-down-scroll", "Move down, scrolling to keep the cursor in place"),
     counted("cursor-up-scroll", "Move up, scrolling to keep the cursor in place"),
     counted("scroll-half-down", "Scroll down half a page"),
@@ -118,16 +123,10 @@ constexpr std::array kCommands{
     CommandInfo{.name = "note-add", .description = "Add a note at the cursor"},
     counted("field-increase", "Step the field under the cursor up, {count} steps"),
     counted("field-decrease", "Step the field under the cursor down, {count} steps"),
-    counted(
-        "field-increase-fine",
-        "Step the field under the cursor up, or lengthen the note by a nudge in the piano roll"),
-    counted(
-        "field-decrease-fine",
-        "Step the field under the cursor down, or shorten the note by a nudge in the piano roll"),
-    counted("number-increase",
-            "Step the field under the cursor up, or the note's velocity in the piano roll"),
-    counted("number-decrease",
-            "Step the field under the cursor down, or the note's velocity in the piano roll"),
+    counted("field-increase-fine", "Step the field under the cursor up, {count} steps"),
+    counted("field-decrease-fine", "Step the field under the cursor down, {count} steps"),
+    counted("number-increase", "Step the field under the cursor up, {count} steps"),
+    counted("number-decrease", "Step the field under the cursor down, {count} steps"),
     counted("event-delete", "Delete this event, or {count} events from it"),
     CommandInfo{.name = "inspector-edit",
                 .description = "Edit the fields in the inspector: Tab and Shift-Tab go between "

@@ -485,3 +485,27 @@ TEST_CASE("the : prompt shows the arguments a command takes, and the palette ask
     CHECK(p.document.song().end() == end); // nothing yet
     p.press(Key::of(NamedKey::Escape));
 }
+
+TEST_CASE("the palette says what a command does in the view the cursor is in")
+{
+    // Decided October 2026, built November 2026: not one sentence covering every view.
+    Paletting p;
+    const auto shows = [&](std::u32string_view text)
+    {
+        const auto frame = p.ws.frame();
+        return std::ranges::any_of(frame,
+                                   [&](const Region& region)
+                                   {
+                                       return std::ranges::any_of(region.text, [&](const auto& run)
+                                                                  { return run.text == text; });
+                                   });
+    };
+    p.open();
+    p.type(U"cursor-left-scroll");
+    CHECK(shows(U"Move left, scrolling to keep the cursor in place"));
+    p.press(Key::of(NamedKey::Escape));
+    p.type(U"ge");
+    p.open();
+    p.type(U"cursor-left-scroll");
+    CHECK(shows(U"Move to the field before, scrolling to keep the cursor in place"));
+}

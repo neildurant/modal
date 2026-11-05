@@ -69,6 +69,10 @@ struct CommandInfo
     // The kinds of its arguments, for completion: the first, second and third, the third for
     // any after it too, as set takes settings one after another.
     std::array<Choices, 3> choices = {};
+    // What it does in each place, by Where, where that reads differently from description
+    // (decided October 2026, built November 2026): the palette says what it does where the
+    // cursor is, rather than one sentence covering every view.
+    std::array<std::string_view, 4> here = {};
 };
 
 // Where a command does something, for the hint menu and the palette to offer only what works
@@ -80,6 +84,13 @@ enum class Where : std::uint8_t
     PianoRoll,
     EventList,
 };
+
+// What a command does in a place: its description there, or its description.
+inline std::string_view describedIn(const CommandInfo& info, Where where)
+{
+    const auto& here = info.here[static_cast<std::size_t>(where)];
+    return here.empty() ? info.description : here;
+}
 
 constexpr std::uint8_t whereBit(Where where)
 {

@@ -662,7 +662,7 @@ std::vector<PaletteItem> Workspace::paletteItems() const
         }
         items.push_back({.name = std::string{info.name},
                          .title = titleOf(info),
-                         .description = std::string{info.description},
+                         .description = std::string{describedIn(info, where())},
                          .aliases = std::string{info.aliases},
                          .offered = offered(info.name),
                          .keys = {},
