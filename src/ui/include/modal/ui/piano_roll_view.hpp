@@ -204,7 +204,7 @@ private:
     bool addNote(int count, bool advance);
     bool operateOn(std::string_view op, const std::vector<std::size_t>& notes, core::Tick from,
                    core::Tick span);
-    bool put(bool insert);
+    bool put(bool insert, bool ending = false);
     // Makes the current note what an inspector field set it to, or says why it can't be.
     std::optional<std::string> setNote(const std::string& heading, const core::Event& changed);
     // The track's notes starting in a span of time, by index.

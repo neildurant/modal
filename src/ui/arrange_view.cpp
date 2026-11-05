@@ -26,6 +26,10 @@ constexpr std::array kCommands{
     CommandInfo{.name = "put-insert",
                 .description = "Put the yanked or deleted events in at the cursor, moving the "
                                "rest of the section later"},
+    CommandInfo{.name = "put-ending",
+                .description = "Put the yanked or deleted events over what's there, so they end "
+                               "at the cursor, or at its bar line when taken as bars: a sweep "
+                               "ending on a downbeat"},
     CommandInfo{.name = "put-after",
                 .description = "Put the yanked or deleted sections after this one"},
     CommandInfo{.name = "put-before",
@@ -318,9 +322,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     {
         return toBarWithEvents(command == "bar-events-next" ? n : -n);
     }
-    else if (command == "put-merge" || command == "put-insert")
+    else if (command == "put-merge" || command == "put-insert" || command == "put-ending")
     {
-        return put(command == "put-insert");
+        return put(command == "put-insert", command == "put-ending");
     }
     else if (command == "event-delete")
     {
@@ -881,7 +885,7 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, s
     return true;
 }
 
-bool ArrangeView::put(bool insert)
+bool ArrangeView::put(bool insert, bool ending)
 {
     const auto& reg = host_.eventRegister();
     if (reg.empty())
@@ -899,9 +903,17 @@ bool ArrangeView::put(bool insert)
     {
         return false;
     }
-    // At the start of the cursor's bar, onto its track and those after it.
+    // At the start of the cursor's bar, onto its track and those after it; or ending there.
     const auto& m = meter();
-    const auto at = m.barStart(m.toBarBeatTick(page_.time()).bar);
+    const auto bar = m.barStart(m.toBarBeatTick(page_.time()).bar);
+    const auto starts = ending ? startToEnd(reg, bar) : std::optional{bar};
+    if (!starts)
+    {
+        host_.refuse("Ending at " + putPlace(m, bar, true) + ", it would start before the song",
+                     MessageKind::Warning);
+        return true;
+    }
+    const auto at = *starts;
     const auto track = page_.track();
     std::size_t total = 0;
     for (const auto& events : reg.tracks)
@@ -912,7 +924,9 @@ bool ArrangeView::put(bool insert)
     const auto name =
         tracks[track]->name.empty() ? "track " + std::to_string(track + 1) : tracks[track]->name;
     const auto where = name + (reg.tracks.size() > 1 ? " and the tracks after it" : "");
-    const auto said = "Put " + eventCount(total) + " in " + where + " at " + putPlace(m, at, true);
+    const auto said =
+        "Put " + eventCount(total) + " in " + where +
+        (ending ? ", ending at " + putPlace(m, bar, true) : " at " + putPlace(m, at, true));
     if (!insert)
     {
         edit("Put " + eventCount(total) + " in " + where,

@@ -678,7 +678,7 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
     return true;
 }
 
-bool PianoRollView::put(bool insert)
+bool PianoRollView::put(bool insert, bool ending)
 {
     const auto& reg = host_.eventRegister();
     if (reg.empty())
@@ -699,7 +699,16 @@ bool PianoRollView::put(bool insert)
     const auto& song = document_.song();
     const auto tracks = song.tracks();
     const auto& m = meter();
-    const auto at = reg.bars ? m.barStart(m.toBarBeatTick(time_).bar) : time_;
+    const auto here = reg.bars ? m.barStart(m.toBarBeatTick(time_).bar) : time_;
+    const auto starts = ending ? startToEnd(reg, here) : std::optional{here};
+    if (!starts)
+    {
+        host_.refuse("Ending at " + putPlace(m, here, reg.bars) +
+                         ", it would start before the song",
+                     MessageKind::Warning);
+        return true;
+    }
+    const auto at = *starts;
     std::size_t total = 0;
     for (std::size_t i = 0; i < reg.tracks.size() && track_ + i < tracks.size(); ++i)
     {
@@ -718,8 +727,9 @@ bool PianoRollView::put(bool insert)
     }
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
-    const auto said =
-        "Put " + eventCount(total) + " in " + where + " at " + putPlace(m, at, reg.bars);
+    const auto said = "Put " + eventCount(total) + " in " + where +
+                      (ending ? ", ending at " + putPlace(m, here, reg.bars)
+                              : " at " + putPlace(m, at, reg.bars));
     if (!insert)
     {
         document_.edit("Put " + eventCount(total) + " in " + where, place(),
@@ -1489,9 +1499,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return operate("operator-delete", "object-note", count);
     }
-    else if (command == "put-merge" || command == "put-insert")
+    else if (command == "put-merge" || command == "put-insert" || command == "put-ending")
     {
-        return put(command == "put-insert");
+        return put(command == "put-insert", command == "put-ending");
     }
     else if (command == "inspector-edit")
     {

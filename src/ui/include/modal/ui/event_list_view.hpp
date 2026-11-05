@@ -144,7 +144,7 @@ private:
     // The notes of the chord holding the note on the cursor's row and as many chords after it
     // as the count says less one (ic), or none, saying so, if it isn't a note's.
     std::vector<std::size_t> chordHere(int count);
-    bool put();
+    bool put(bool ending = false);
 
     // Starts editing the field under the cursor in place, with its value in it; then sets it
     // from what's typed, or steps it.

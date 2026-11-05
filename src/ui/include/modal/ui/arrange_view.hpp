@@ -104,7 +104,7 @@ private:
     std::optional<OperatorTarget> targetIn(const Area& area, std::string what) const;
     // Puts the register at the start of the cursor's bar, over what's there, or with insert
     // moving what's after it in the section later (P), asking first if the section must grow.
-    bool put(bool insert);
+    bool put(bool insert, bool ending = false);
     // D on a selection of some tracks: their time out of each section it crosses, closing up
     // within each.
     bool deleteTime();

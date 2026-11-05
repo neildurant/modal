@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/ui/event_text.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -1139,4 +1140,45 @@ TEST_CASE("Each put is a command named for what it does, and says what it put an
     CHECK(s.ws.message() == "Put A after B");
     s.type(U"uP");
     CHECK(s.ws.message() == "Put A before B");
+}
+
+TEST_CASE("put-ending puts the register so it ends at the cursor, or its bar line when bars")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    const auto starting = [&](core::Tick tick)
+    {
+        std::vector<int> found;
+        for (const auto& event : s.document.song().events(bass).all())
+        {
+            if (event.isNote() && event.tick == tick)
+            {
+                found.push_back(std::get<core::Note>(event.data).pitch);
+            }
+        }
+        std::ranges::sort(found);
+        return found;
+    };
+    // Bar 1's bass note, taken as a bar, ending at bar 5's line: in bar 4.
+    s.type(U"yy4l");
+    s.registry.runLine("put-ending");
+    CHECK(s.ws.message() == "Put 1 event in Bass, ending at bar 5, over what's there");
+    CHECK(starting(3 * s.bar) == std::vector{40, 43});
+    s.type(U"u");
+    // Not before the song's start.
+    s.type(U"gg");
+    s.registry.runLine("put-ending");
+    CHECK(s.ws.message() == "Ending at bar 1, it would start before the song");
+    CHECK(s.ws.refused());
+
+    // In the piano roll a note yanked alone, a quarter long, ends at the cursor.
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"Y]b]b");
+    s.registry.runLine("put-ending");
+    CHECK(s.ws.message() == "Put 1 event in Bass, ending at " +
+                                positionText(s.document.song().meter(), 2 * s.bar) +
+                                ", over what's there");
+    CHECK(starting(2 * s.bar - ppqn.quarter()) == std::vector{40});
 }

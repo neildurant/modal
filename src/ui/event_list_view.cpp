@@ -674,9 +674,9 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     {
         return operate("operator-delete", "object-note", count);
     }
-    else if (command == "put-merge")
+    else if (command == "put-merge" || command == "put-ending")
     {
-        return put();
+        return put(command == "put-ending");
     }
     else if (command == "field-edit" || command == "inspector-edit")
     {
@@ -1034,7 +1034,7 @@ bool EventListView::operateEvents(std::string_view op, const std::vector<std::si
     return true;
 }
 
-bool EventListView::put()
+bool EventListView::put(bool ending)
 {
     if (track_ == 0)
     {
@@ -1055,7 +1055,15 @@ bool EventListView::put()
     const auto& reg = host_.eventRegister();
     const auto& meter = list_.meter();
     const auto tick = list_.rows()[row_].tick;
-    const auto at = reg.bars ? meter.barStart(meter.toBarBeatTick(tick).bar) : tick;
+    const auto here = reg.bars ? meter.barStart(meter.toBarBeatTick(tick).bar) : tick;
+    const auto starts = ending ? startToEnd(reg, here) : std::optional{here};
+    if (!starts)
+    {
+        refuse("Ending at " + putPlace(meter, here, reg.bars) + ", it would start before the song",
+               MessageKind::Warning);
+        return true;
+    }
+    const auto at = *starts;
     std::size_t total = 0;
     for (const auto& events : reg.tracks)
     {
@@ -1064,8 +1072,10 @@ bool EventListView::put()
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
     // Said before the change, which makes the list again.
-    const auto said = "Put " + eventCount(total) + " in " + where + " at " +
-                      putPlace(meter, at, reg.bars) + ", over what's there";
+    const auto said = "Put " + eventCount(total) + " in " + where +
+                      (ending ? ", ending at " + putPlace(meter, here, reg.bars)
+                              : " at " + putPlace(meter, at, reg.bars)) +
+                      ", over what's there";
     edit("Put " + eventCount(total) + " in " + where,
          [&](core::Song& song) { putRegister(song, reg, track_ - 1, at); });
     setMessage(said, MessageKind::Information);

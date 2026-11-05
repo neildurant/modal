@@ -182,5 +182,8 @@ std::string eventCount(std::size_t events);
 // Where a register put at a time goes, for the message after a put (decided November 2026):
 // "bar 3" for one taken as bars, else its position, "3:2:120".
 std::string putPlace(const core::MeterMap& meter, core::Tick at, bool bars);
+// Where a register starts to end at a time (put-ending), or nothing if that's before the
+// song's start.
+std::optional<core::Tick> startToEnd(const EventRegister& reg, core::Tick end);
 
 } // namespace modal::ui
