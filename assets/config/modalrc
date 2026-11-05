@@ -198,6 +198,8 @@ nmap _          note-shorten-fine "Shorten by a nudge"
 " leaves, Escape leaves it; Up and Down step it.
 keysection "Editing fields"
 nmap <CR>       field-edit        "Edit this field"
+nmap <CR>       bar-open          "Open the bar in the piano roll"
+nmap <CR>       section-play      "Play from this section"
 nmap +          field-increase-fine "Step up"
 nmap =          field-increase    "Step up"
 nmap <C-a>      number-increase   "Step up"

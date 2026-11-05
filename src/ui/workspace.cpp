@@ -247,9 +247,13 @@ void Workspace::buildOperatorKeymap()
             operatorKeymap_.bind(Mode::Visual, keys, binding);
         }
     }
+    // Every command a key is bound to, as in Normal mode, so the one that does something where
+    // the cursor is runs (Enter opens bars on the tracks): free as Visual mode was before them.
+    const auto before = operatorKeymap_;
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
-        if (free(keys))
+        const auto match = before.match(Mode::Visual, keys);
+        if (match.binding == nullptr && !match.longer)
         {
             operatorKeymap_.bind(Mode::Visual, keys, binding);
         }
@@ -1742,7 +1746,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         selection_->cut = !selection_->cut;
         return true;
     }
-    if (command == "field-edit" && selection_->where == Where::Tracks)
+    if (command == "bar-open" && selection_->where == Where::Tracks)
     {
         // Enter on bars in the arrangement opens exactly those in the piano roll, on the
         // cursor's track; whole tracks open as Enter does.

@@ -30,6 +30,9 @@ constexpr std::array kCommands{
                 .description = "Put the yanked or deleted events over what's there, so they end "
                                "at the cursor, or at its bar line when taken as bars: a sweep "
                                "ending on a downbeat"},
+    CommandInfo{.name = "bar-open",
+                .description = "Open the cursor's bar in the piano roll, or the bars selected"},
+    CommandInfo{.name = "section-play", .description = "Play from the start of this section"},
     CommandInfo{.name = "put-merge-at-pitch",
                 .description = "Put the yanked or deleted notes over what's there, at the "
                                "cursor's time and pitch, keeping their intervals to the pitch "
@@ -345,7 +348,7 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
                      "section on the section strip",
                      MessageKind::Information);
     }
-    else if (command == "field-edit")
+    else if (command == "bar-open")
     {
         // Enter opens the bar in the piano roll, the cursor at its start.
         const auto& m = meter();
@@ -1194,7 +1197,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         host_.openPrompt("section-rename " + name(section));
         return true;
     }
-    if (command == "field-edit")
+    if (command == "section-play")
     {
         host_.playFrom(song.sectionStart(section));
         return true;
