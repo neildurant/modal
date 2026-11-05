@@ -35,8 +35,8 @@ Some keys mean different commands in different places: `J` joins sections on the
 | --- | --- |
 | `h` `l` (or arrows) | A grid step in the piano roll (off a note at the cursor's pitch in one), a bar in the arrangement, a field in the event list, a section on the strip |
 | `j` `k` | A pitch step in the piano roll, a track in the arrangement, a row in the event list |
-| `0` `$` | The first and last field, or the start and end of the bar |
-| `gg` `G` | The start and end of the song; `12G` bar 12 |
+| `0` `$` | The first and last positions listed for each view below |
+| `gg` `G` | The start and end of the song (the first and last sections on the strip); `12G` bar 12, or section 12 on the strip |
 | `{` `}` | The same place a bar back or on (`4}`) |
 | `[b` `]b` | The bar line before, the next bar line |
 | `(` `)` | The chord before, the next chord (events starting within `chordwindow` of each other) |
@@ -44,7 +44,18 @@ Some keys mean different commands in different places: `J` joins sections on the
 | `[l` `]l` | The label before, the next |
 | `Tab` `Shift-Tab` | The next note's start at any pitch, and the one before (piano roll); past empty bars to the next bar with events, and the one before (arrangement) |
 
-Counts go on every motion: `3l`, `2]b`. In the event list, the time motions go to the event at or after where they land. A bar motion into a shorter bar remembers where it wanted to be, as Vim does with columns.
+The ends that `0` and `$` go to depend on the view:
+
+| Where | `0` | `$` |
+| --- | --- | --- |
+| Arrangement, on a track | The song's first bar | The song's last bar |
+| Section strip | The first section | The last section |
+| Piano roll | The current bar's start | The current bar's last grid step |
+| Event list | The first field in the row | The last field in the row |
+
+On an arrangement track, `d$` takes the events from the cursor's bar through the song's last bar on that track. `dib` takes just the current bar's contents. In the event list, `0` and `$` move between fields and aren't ranges after an operator.
+
+Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose a bar, or a section on the strip. In the event list, the time motions go to the event at or after where they land. A bar motion into a shorter bar remembers where it wanted to be, as Vim does with columns.
 
 ### Pitch (piano roll)
 
@@ -92,7 +103,7 @@ A find or search counts (`3fE`, `3n`). After an operator, `f` takes the range th
 
 ## Ranges
 
-After an operator, a motion that lands on a boundary it names is a range, from the cursor up to that boundary: `d]b` the rest of the bar, `d[b` from the bar line before, `d]s`, `d]l`, `dG` to the end, `dgg` from the start, `dj` this event and the next, `d'a` to a mark, `dfE` through the next E, `dn` up to the next match. `0`, `$`, `{` and `}` are ranges too, each ending where it says. `Tab`, `(` and `)` only move, and say so.
+After an operator, a motion that lands on a boundary it names is a range, from the cursor up to that boundary: `d]b` the rest of the bar, `d[b` from the bar line before, `d]s`, `d]l`, `dG` to the end, `dgg` from the start, `dj` this event and the next, `d'a` to a mark, `dfE` through the next E, `dn` up to the next match. `{` and `}` are ranges too, as are `0` and `$` where they move in time; in the event list those two only move between fields. `Tab`, `(` and `)` only move, and say so.
 
 ## Objects
 
@@ -126,7 +137,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 - Its own key again, or Escape, ends it; another of them changes to it. `o` goes to the other end; `gv` selects the last selection again.
 - **An object selects exactly what an operator would take with it,** so `v` then an object then an operator does what the operator does with the object: `visd` is `dis`, `v2itd` is `d2it`. Moving the cursor, or `V`, `v` or `Ctrl-v`, lets go of the object; another object replaces it. After `V` or `Ctrl-v`, which chose the rows, an object sets only their time (`Vjis`).
 - **Operators act at once** on the selection: `d` and `x` delete what's selected, `y` and `Y` yank it, the others change it, a count before them saying how far.
-- **`D` takes the selection's time out,** closing up within each section.
+- **`D` takes the selection's time out,** closing up within each section. The event list refuses it, as does a piano-roll selection restricted to some pitches; use `v` in the piano roll to select time at every pitch.
 - **`p` and `P` put** the register in place of the selection, as one change.
 - **`|` cuts notes crossing the edges** for the selection, so operators take only the parts inside; before an operator in Normal mode, for that one (`|d]b`).
 - **`:` on a selection** runs a command that takes a range over it (`gsvie:label-to-section` for the whole song).
