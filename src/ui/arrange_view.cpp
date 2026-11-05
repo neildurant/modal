@@ -49,15 +49,19 @@ constexpr std::array kCommands{
     CommandInfo{.name = "put-replace",
                 .description = "Put the yanked or deleted events in place of the selection, "
                                "or sections in place of the sections selected"},
+    CommandInfo{.name = "section-move-earlier",
+                .description = "Move this section a place earlier, or {count} places",
+                .count = true},
+    CommandInfo{.name = "section-move-later",
+                .description = "Move this section a place later, or {count} places",
+                .count = true},
     CommandInfo{.name = "move-left",
-                .description = "Move this section a place earlier, or this note onto the grid "
-                               "line before it; {count} places or lines",
+                .description = "Move this note onto the grid line before it, or {count} lines",
                 .count = true},
     CommandInfo{.name = "move-right",
-                .description = "Move this section a place later, or this note onto the next "
-                               "grid line; {count} places or lines",
+                .description = "Move this note onto the next grid line, or {count} lines",
                 .count = true},
-    CommandInfo{.name = "join", .description = "Join this section with the next"},
+    CommandInfo{.name = "section-join", .description = "Join this section with the next"},
     CommandInfo{.name = "section-lengthen",
                 .description = "Lengthen this section by a bar, or {count} bars, the rest of the "
                                "song moving on",
@@ -73,13 +77,14 @@ constexpr std::array kCommands{
     CommandInfo{.name = "bar-events-previous",
                 .description = "Past empty bars to the bar with events before, {count} times",
                 .count = true},
-    CommandInfo{.name = "insert-before",
+    CommandInfo{.name = "section-rename-strip",
+                .description = "Rename this section, its name there to edit"},
+    CommandInfo{.name = "section-insert-before",
                 .description = "Insert a new section before this one, of {count} bars (4)",
                 .count = true},
-    CommandInfo{.name = "insert-after",
+    CommandInfo{.name = "section-insert-after",
                 .description = "Insert a new section after this one, of {count} bars (4)",
                 .count = true},
-    CommandInfo{.name = "change", .description = "Rename this section"},
     CommandInfo{.name = "zoom-in", .description = "Zoom in, by {count} steps", .count = true},
     CommandInfo{.name = "zoom-out", .description = "Zoom out, by {count} steps", .count = true},
     CommandInfo{.name = "zoom-reset", .description = "Go back to the zoom the view starts at"},
@@ -1126,7 +1131,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         }
         return true;
     }
-    if (command == "event-delete" || command == "yank-this")
+    if (command == "event-delete" || command == "event-yank")
     {
         return operateOnStrip(section,
                               command == "event-delete" ? "operator-delete" : "operator-yank",
@@ -1136,16 +1141,16 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     {
         return putSections(section, command == "put-before");
     }
-    if (command == "move-left" || command == "move-right")
+    if (command == "section-move-earlier" || command == "section-move-later")
     {
-        const auto by = command == "move-left" ? -n : n;
+        const auto by = command == "section-move-earlier" ? -n : n;
         std::size_t to = section;
         edit("Move " + name(section) + (by < 0 ? " earlier" : " later"),
              [&](core::Song& s) { to = s.moveSection(section, by); });
         page_.setStripCursor(to);
         return true;
     }
-    if (command == "join")
+    if (command == "section-join")
     {
         if (section == last)
         {
@@ -1181,10 +1186,10 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(section);
         return true;
     }
-    if (command == "insert-before" || command == "insert-after")
+    if (command == "section-insert-before" || command == "section-insert-after")
     {
         // A new section of 4 bars, or the count, named for now and then to be named.
-        const auto at = command == "insert-before" ? section : section + 1;
+        const auto at = command == "section-insert-before" ? section : section + 1;
         const auto newName = song.newSectionName();
         edit("Insert " + newName,
              [&](core::Song& s) { s.insertEmptySection(at, newName, count > 0 ? count : 4); });
@@ -1192,7 +1197,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         host_.openPrompt("section-rename " + newName);
         return true;
     }
-    if (command == "change")
+    if (command == "section-rename-strip")
     {
         host_.openPrompt("section-rename " + name(section));
         return true;

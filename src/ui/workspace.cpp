@@ -1501,7 +1501,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         keysPage_ = 0;
         return true;
     }
-    if (command == "yank-this")
+    if (command == "event-yank")
     {
         // The section strip yanks its section; everywhere else it's yin.
         if (const auto done = view().run(command, count))
@@ -1779,7 +1779,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         }
         return true;
     }
-    if (isOperator(command) || command == "event-delete" || command == "yank-this" ||
+    if (isOperator(command) || command == "event-delete" || command == "event-yank" ||
         command == "visual-delete-time")
     {
         return operateOnSelection(command, count);
@@ -1878,7 +1878,7 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     const auto run = [&]
     {
         if (selection.filter && (command == "event-delete" || command == "operator-delete" ||
-                                 command == "yank-this" || command == "operator-yank"))
+                                 command == "event-yank" || command == "operator-yank"))
         {
             return operateOnMatches(command == "event-delete" || command == "operator-delete"
                                         ? "operator-delete"
@@ -1894,14 +1894,14 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
         {
             return view().operate("operator-delete", range, rangeCount);
         }
-        if (command == "yank-this" || command == "operator-yank")
+        if (command == "event-yank" || command == "operator-yank")
         {
             return view().operate("operator-yank", range, rangeCount);
         }
         return transform(command, std::max(count, 1), range, rangeCount);
     };
     const auto op = command == "event-delete" ? std::string_view{"operator-delete"}
-                    : command == "yank-this"  ? std::string_view{"operator-yank"}
+                    : command == "event-yank" ? std::string_view{"operator-yank"}
                                               : command;
     const bool done = selection.cut ? cutThen(op, range, rangeCount, run) : run();
     // What Alt-p puts at the cursor's pitch is placed by the selection's start, the pitch it

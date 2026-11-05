@@ -374,7 +374,7 @@ constexpr std::array kSharedCommands{
                 .usage = "[NAME]",
                 .keys = false,
                 .choices = {Choices::Section}},
-    CommandInfo{.name = "yank-this",
+    CommandInfo{.name = "event-yank",
                 .description = "Yank the note or event under the cursor, as yin does, or the "
                                "section on the section strip",
                 .count = true},
@@ -477,7 +477,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 112> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 114> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -493,11 +493,11 @@ std::span<const CommandInfo> Workspace::commands()
             {"operator-shift-earlier", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-transform", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"change", onlyIn({Strip})},
-            {"insert-before", onlyIn({Strip})},
-            {"insert-after", onlyIn({Strip})},
+            {"section-rename-strip", onlyIn({Strip})},
+            {"section-insert-before", onlyIn({Strip})},
+            {"section-insert-after", onlyIn({Strip})},
             {"go-section-strip", onlyIn({Tracks, Strip})},
-            {"join", onlyIn({Strip})},
+            {"section-join", onlyIn({Strip})},
             {"octave-down", onlyIn({PianoRoll})},
             {"note-lengthen", onlyIn({PianoRoll})},
             {"note-shorten", onlyIn({PianoRoll})},
@@ -509,8 +509,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"section-shorten", onlyIn({Strip})},
             {"bar-events-next", onlyIn({Tracks})},
             {"bar-events-previous", onlyIn({Tracks})},
-            {"move-left", onlyIn({Strip, PianoRoll})},
-            {"move-right", onlyIn({Strip, PianoRoll})},
+            {"move-left", onlyIn({PianoRoll})},
+            {"move-right", onlyIn({PianoRoll})},
+            {"section-move-earlier", onlyIn({Strip})},
+            {"section-move-later", onlyIn({Strip})},
             {"put-merge", onlyIn({Tracks, PianoRoll, EventList})},
             {"put-insert", onlyIn({Tracks, PianoRoll})},
             {"put-ending", onlyIn({Tracks, PianoRoll, EventList})},
