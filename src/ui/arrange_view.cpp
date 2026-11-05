@@ -61,7 +61,7 @@ constexpr std::array kCommands{
     CommandInfo{.name = "move-right",
                 .description = "Move this note onto the next grid line, or {count} lines",
                 .count = true},
-    CommandInfo{.name = "section-join", .description = "Join this section with the next"},
+    CommandInfo{.name = "section-join-strip", .description = "Join this section with the next"},
     CommandInfo{.name = "section-lengthen",
                 .description = "Lengthen this section by a bar, or {count} bars, the rest of the "
                                "song moving on",
@@ -79,10 +79,10 @@ constexpr std::array kCommands{
                 .count = true},
     CommandInfo{.name = "section-rename-strip",
                 .description = "Rename this section, its name there to edit"},
-    CommandInfo{.name = "section-insert-before",
+    CommandInfo{.name = "section-insert-before-strip",
                 .description = "Insert a new section before this one, of {count} bars (4)",
                 .count = true},
-    CommandInfo{.name = "section-insert-after",
+    CommandInfo{.name = "section-insert-after-strip",
                 .description = "Insert a new section after this one, of {count} bars (4)",
                 .count = true},
     CommandInfo{.name = "zoom-in", .description = "Zoom in, by {count} steps", .count = true},
@@ -1150,7 +1150,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(to);
         return true;
     }
-    if (command == "section-join")
+    if (command == "section-join-strip")
     {
         if (section == last)
         {
@@ -1186,10 +1186,10 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
         page_.setStripCursor(section);
         return true;
     }
-    if (command == "section-insert-before" || command == "section-insert-after")
+    if (command == "section-insert-before-strip" || command == "section-insert-after-strip")
     {
         // A new section of 4 bars, or the count, named for now and then to be named.
-        const auto at = command == "section-insert-before" ? section : section + 1;
+        const auto at = command == "section-insert-before-strip" ? section : section + 1;
         const auto newName = song.newSectionName();
         edit("Insert " + newName,
              [&](core::Song& s) { s.insertEmptySection(at, newName, count > 0 ? count : 4); });

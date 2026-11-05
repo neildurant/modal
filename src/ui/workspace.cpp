@@ -87,6 +87,11 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return port(call.arguments);
                          }
+                         if (name == "section-insert-before" || name == "section-insert-after" ||
+                             name == "section-join")
+                         {
+                             return sectionHere(name, call.count);
+                         }
                          if (name == "section-split")
                          {
                              return section(call.arguments);
@@ -2288,6 +2293,45 @@ CommandResult Workspace::port(std::string_view name)
                    { song.updateTrack(*id, [&](core::Track& t) { t.port = full; }); });
     view().refresh();
     return {true, who + " plays to " + full, false};
+}
+
+CommandResult Workspace::sectionHere(std::string_view command, int count)
+{
+    // On the cursor's section, from any view (, s, decided November 2026), as the strip's i, a
+    // and J do there.
+    const auto& song = document_.song();
+    const auto section = song.sectionAt(view().cursor().tick);
+    const auto last = song.sections().size() - 1;
+    const auto name = [&](std::size_t i) { return song.sections()[i]->name(); };
+    if (command == "section-join")
+    {
+        if (section == last)
+        {
+            return CommandResult::error(name(section) +
+                                        " is the last section, with none after to join");
+        }
+        const auto joins = std::min<std::size_t>(
+            static_cast<std::size_t>(std::max(std::max(count, 1) - 1, 1)), last - section);
+        document_.edit("Join " + name(section) + " with " + name(section + 1) +
+                           (joins > 1 ? " and the next " + std::to_string(joins - 1) : ""),
+                       view().place(),
+                       [&](core::Song& s)
+                       {
+                           for (std::size_t i = 0; i < joins; ++i)
+                           {
+                               s.joinSections(section);
+                           }
+                       });
+        refresh();
+        return {true};
+    }
+    const auto at = command == "section-insert-before" ? section : section + 1;
+    const auto newName = song.newSectionName();
+    document_.edit("Insert " + newName, view().place(), [&](core::Song& s)
+                   { s.insertEmptySection(at, newName, count > 0 ? count : 4); });
+    refresh();
+    openPrompt("section-rename " + newName);
+    return {true};
 }
 
 CommandResult Workspace::section(std::string_view name)

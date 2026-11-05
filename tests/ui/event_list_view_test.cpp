@@ -783,8 +783,10 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
         CAPTURE(command.name);
         const auto result = v.ws.run(command.name, 0);
         // Commands only for the : line, such as port, may want what this view lacks; and the
-        // bars' commands what this song does, a one-bar song at its end.
-        const bool songs = command.name == "bar-delete" || command.name == "bar-insert";
+        // bars' and sections' commands what this song does: a one-bar song at its end, a
+        // section starting there and no labels.
+        const bool songs = command.name == "bar-delete" || command.name == "bar-insert" ||
+                           command.name == "section-split" || command.name == "label-to-section";
         CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
                !command.keys || songs));
     }

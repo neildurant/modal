@@ -1266,3 +1266,29 @@ TEST_CASE("The hint menu says what a key waiting for a letter wants")
                                {"' `", "back to before the last jump", false}});
     CHECK(after(U"`") == after(U"'"));
 }
+
+TEST_CASE("The leader's Sections group works on the cursor's section from any view")
+{
+    // , s (decided November 2026), Select moving to , S.
+    Selecting s;
+    const auto& song = s.document.song();
+    s.type(U"gr]b]b"); // bar 3, in B, in the piano roll
+    s.type(U",sj");
+    CHECK(song.sections().size() == 2); // B and C, one
+    s.type(U"u");
+    s.type(U"},ss"); // a new section at bar 4, asking for its name
+    REQUIRE(song.sections().size() == 4);
+    CHECK(s.ws.commandLine().text().starts_with(U"section-rename "));
+    s.press(NamedKey::Escape);
+    s.type(U"u,sr");
+    CHECK(s.ws.commandLine().text() == U"section-rename B");
+    s.press(NamedKey::Escape);
+    s.type(U",si");
+    CHECK(song.sections().size() == 4);
+    CHECK(song.sections()[1]->name() != "B"); // the new one, before B
+    s.press(NamedKey::Escape);
+    s.type(U"u");
+    // And Select is on , S.
+    s.type(U",Sb");
+    CHECK(s.ws.mode() == Mode::Visual);
+}

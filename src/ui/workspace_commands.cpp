@@ -335,12 +335,23 @@ constexpr std::array kSharedCommands{
                 .usage = "[NAME]",
                 .keys = false,
                 .choices = {Choices::Port}},
+    CommandInfo{.name = "section-insert-before",
+                .description = "Insert a new section before the cursor's, of {count} bars (4), "
+                               "asking for its name",
+                .count = true},
+    CommandInfo{.name = "section-insert-after",
+                .description = "Insert a new section after the cursor's, of {count} bars (4), "
+                               "asking for its name",
+                .count = true},
+    CommandInfo{.name = "section-join",
+                .description = "Join the cursor's section with the next, or {count} sections "
+                               "into one",
+                .count = true},
     CommandInfo{.name = "section-split",
                 .description = "Start a new section at the cursor's bar line, splitting the "
                                "section it's in; with no name, named Section and a number, then "
                                "asking for a name, as i on the section strip does",
-                .usage = "[NAME]",
-                .keys = false},
+                .usage = "[NAME]"},
     CommandInfo{.name = "bar-delete",
                 .description = "Delete the cursor's bar, or {count} bars from it, on every track, "
                                "closing up; they go in the register as a section",
@@ -366,13 +377,13 @@ constexpr std::array kSharedCommands{
                                "after it, at the bar line of its bar; the label goes. On a "
                                "selection, at every label in it (vie, the whole song), asking "
                                "about those off a bar line, as one undo step",
-                .keys = false,
+
                 .range = true},
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor; with no name, asking for one, "
                                "with its name to edit",
                 .usage = "[NAME]",
-                .keys = false,
+
                 .choices = {Choices::Section}},
     CommandInfo{.name = "event-yank",
                 .description = "Yank the note or event under the cursor, as yin does, or the "
@@ -494,10 +505,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"operator-quantize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-transform", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"section-rename-strip", onlyIn({Strip})},
-            {"section-insert-before", onlyIn({Strip})},
-            {"section-insert-after", onlyIn({Strip})},
+            {"section-insert-before-strip", onlyIn({Strip})},
+            {"section-insert-after-strip", onlyIn({Strip})},
             {"go-section-strip", onlyIn({Tracks, Strip})},
-            {"section-join", onlyIn({Strip})},
+            {"section-join-strip", onlyIn({Strip})},
             {"octave-down", onlyIn({PianoRoll})},
             {"note-lengthen", onlyIn({PianoRoll})},
             {"note-shorten", onlyIn({PianoRoll})},

@@ -129,15 +129,15 @@ keysection "The section strip"
 nmap gs         go-section-strip  "Section strip"
 nmap <A-h>      section-move-earlier "Move a place earlier"
 nmap <A-l>      section-move-later "Move a place later"
-nmap J          section-join      "Join with the next"
+nmap J          section-join-strip "Join with the next"
 nmap +          section-lengthen  "A bar longer"
 nmap =          section-lengthen  "A bar longer"
 nmap <C-a>      section-lengthen  "A bar longer"
 nmap -          section-shorten   "A bar shorter"
 nmap _          section-shorten   "A bar shorter"
 nmap <C-x>      section-shorten   "A bar shorter"
-nmap i          section-insert-before "Insert before"
-nmap a          section-insert-after "Insert after"
+nmap i          section-insert-before-strip "Insert before"
+nmap a          section-insert-after-strip "Insert after"
 nmap c          section-rename-strip "Rename"
 
 " The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
@@ -297,24 +297,24 @@ vmap o          visual-other-end  "Other end"
 vmap D          visual-delete-time "Take the time out"
 
 " Selecting (decided November 2026): gv selects the last selection again, and gn the match of
-" the last search at the cursor, or the next; , s selects the bar, section, track or what's
+" the last search at the cursor, or the next; , S selects the bar, section, track or what's
 " shown, and with a capital only the matches of the last search in it, which operators then
-" take; in Visual mode , s m keeps only the matches in what's selected.
+" take; in Visual mode , S m keeps only the matches in what's selected.
 keysection "Selecting"
 nmap gv         visual-again      "Go back to the last selection"
 nmap gn         select-match      "Go to the next match, selected"
-ngroup <leader>s "Select"
-nmap <leader>sb  select-bar               "This bar"
-nmap <leader>sB  select-matches-bar       "The matches in this bar"
-nmap <leader>ss  select-section           "This section"
-nmap <leader>sS  select-matches-section   "The matches in this section"
-nmap <leader>st  select-track             "This track"
-nmap <leader>sT  select-matches-track     "The matches on this track"
-nmap <leader>sv  select-visible           "What's shown"
-nmap <leader>sV  select-matches-visible   "The matches shown"
-nmap <leader>sc  search-clear             "Clear the matches"
-vgroup <leader>s "Select"
-vmap <leader>sm  select-matches           "Only the matches in it"
+ngroup <leader>S "Select"
+nmap <leader>Sb  select-bar               "This bar"
+nmap <leader>SB  select-matches-bar       "The matches in this bar"
+nmap <leader>Ss  select-section           "This section"
+nmap <leader>SS  select-matches-section   "The matches in this section"
+nmap <leader>St  select-track             "This track"
+nmap <leader>ST  select-matches-track     "The matches on this track"
+nmap <leader>Sv  select-visible           "What's shown"
+nmap <leader>SV  select-matches-visible   "The matches shown"
+nmap <leader>Sc  search-clear             "Clear the matches"
+vgroup <leader>S "Select"
+vmap <leader>Sm  select-matches           "Only the matches in it"
 
 " The transforms: ! and a range, then one of these keys, or these keys and then a range.
 " Those in a key ask for it each time; a scale of your own is defined by its degrees, as
@@ -373,6 +373,19 @@ nmap m<Space>   play-from-set     "Play from here"
 nmap <leader>T<Space> rewind-toggle "Rewind on or off"
 nmap <C-.>      panic             "Panic"
 cmap <C-.>      panic             "Panic"
+
+" Sections, from any view, on the cursor's section (decided November 2026): , s r renames it,
+" asking with its name to edit; , s i and , s a insert a new one before or after it; , s j
+" joins it with the next; , s s starts a new section at the cursor's bar line; and , s l
+" starts one at the label at or before the cursor. The strip's own keys do the same there.
+keysection "Sections"
+ngroup <leader>s "Sections"
+nmap <leader>sr section-rename     "Rename this section"
+nmap <leader>si section-insert-before "Insert a section before"
+nmap <leader>sa section-insert-after "Insert a section after"
+nmap <leader>sj section-join       "Join with the next"
+nmap <leader>ss section-split      "Start a section here"
+nmap <leader>sl label-to-section   "A section from the label"
 
 " Bars on every track, taking time out of the song or putting it in, the conductor's tempo and
 " meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping
