@@ -1182,3 +1182,47 @@ TEST_CASE("put-ending puts the register so it ends at the cursor, or its bar lin
                                 ", over what's there");
     CHECK(starting(2 * s.bar - ppqn.quarter()) == std::vector{40});
 }
+
+TEST_CASE("Alt-p and Alt-P put at the cursor's pitch too, keeping the notes' intervals")
+{
+    // To the pitch the cursor was on when they were taken (decided November 2026), in the piano
+    // roll only.
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    const auto bass = s.document.song().tracks()[0]->id();
+    const auto alt = [&](char32_t key, Modifiers more = kNoModifiers)
+    { s.ws.handle(Key::typed(key, kAlt | more), 0); };
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40});
+    s.type(U"Y"); // E2, taken at E2
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 2 * s.bar, .pitch = 47});
+    alt(U'p');
+    CHECK(s.ws.message() == "Put 1 event in Bass at " +
+                                positionText(s.document.song().meter(), 2 * s.bar) +
+                                ", from B2, over what's there");
+    CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 47, 43, 44, 45, 46, 47});
+    s.type(U"u");
+
+    // Taken a fifth below the cursor's pitch: put a fifth above the cursor.
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 33});
+    s.type(U"yy");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 4 * s.bar, .pitch = 50});
+    alt(U'p', kShift);
+    CHECK(s.ws.message() == "Lengthen B by a bar to make room? (y/n)");
+    s.type(U"y");
+    CHECK(s.ws.message().starts_with("Put 1 event in Bass at bar 5, from D3, moving the rest of"));
+    CHECK(std::ranges::count(pitches(s.document, 0), 57) == 1);
+    s.type(U"u");
+
+    // Out of range, refused, naming the note.
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 4 * s.bar, .pitch = 127});
+    alt(U'p');
+    CHECK(s.ws.message() == "E2 would go out of range, above G9");
+    CHECK(s.ws.refused());
+
+    // Not in the arrangement.
+    s.type(U"ga");
+    alt(U'p');
+    CHECK(s.ws.refused());
+    CHECK(pitches(s.document, 0).size() == 8);
+}

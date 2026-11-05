@@ -78,6 +78,10 @@ struct EventRegister
     // Taken as bars (ib, ab, dd, or the arrangement's bars), its ticks from a bar line, so it's
     // put at the start of the cursor's bar rather than at the cursor (decided October 2026).
     bool bars = false;
+    // The cursor's pitch when it was taken in the piano roll, which Alt-p puts at the cursor's
+    // pitch then, the notes keeping their intervals to it (decided November 2026); taken
+    // elsewhere, the lowest note is.
+    std::optional<std::uint8_t> pitch = std::nullopt;
 
     bool empty() const
     {

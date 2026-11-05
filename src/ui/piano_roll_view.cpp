@@ -654,6 +654,7 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
         taken.push_back(std::move(event));
     }
     reg.span = span;
+    reg.pitch = cursor().pitch;
     const auto what = notes.size() == 1
                           ? core::pitchName(std::get<core::Note>(events[notes.front()].data).pitch)
                           : std::to_string(notes.size()) + " notes";
@@ -678,9 +679,47 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
     return true;
 }
 
-bool PianoRollView::put(bool insert, bool ending)
+bool PianoRollView::put(bool insert, bool ending, bool atPitch)
 {
-    const auto& reg = host_.eventRegister();
+    // At the cursor's pitch too (Alt-p, Alt-P): its notes moved by as many semitones as take
+    // the pitch the cursor was on when they were taken, or their lowest, to the cursor's,
+    // refused where one would go out of range.
+    auto moved = host_.eventRegister();
+    const auto here = cursor().pitch;
+    if (atPitch && here && !moved.empty() && moved.sections.empty())
+    {
+        auto from = moved.pitch;
+        for (const auto& events : moved.tracks)
+        {
+            for (const auto& event : events)
+            {
+                if (const auto* note = std::get_if<core::Note>(&event.data); note && !moved.pitch)
+                {
+                    from = std::min(from.value_or(note->pitch), note->pitch);
+                }
+            }
+        }
+        const int by = from ? int{*here} - int{*from} : 0;
+        for (auto& events : moved.tracks)
+        {
+            for (auto& event : events)
+            {
+                if (auto* note = std::get_if<core::Note>(&event.data))
+                {
+                    const int pitch = note->pitch + by;
+                    if (pitch < 0 || pitch > 127)
+                    {
+                        host_.refuse(core::pitchName(note->pitch) + " would go out of range, " +
+                                         (by > 0 ? "above G9" : "below C-1"),
+                                     MessageKind::Warning);
+                        return true;
+                    }
+                    note->pitch = static_cast<std::uint8_t>(pitch);
+                }
+            }
+        }
+    }
+    const auto& reg = moved;
     if (reg.empty())
     {
         host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
@@ -699,12 +738,11 @@ bool PianoRollView::put(bool insert, bool ending)
     const auto& song = document_.song();
     const auto tracks = song.tracks();
     const auto& m = meter();
-    const auto here = reg.bars ? m.barStart(m.toBarBeatTick(time_).bar) : time_;
-    const auto starts = ending ? startToEnd(reg, here) : std::optional{here};
+    const auto bar = reg.bars ? m.barStart(m.toBarBeatTick(time_).bar) : time_;
+    const auto starts = ending ? startToEnd(reg, bar) : std::optional{bar};
     if (!starts)
     {
-        host_.refuse("Ending at " + putPlace(m, here, reg.bars) +
-                         ", it would start before the song",
+        host_.refuse("Ending at " + putPlace(m, bar, reg.bars) + ", it would start before the song",
                      MessageKind::Warning);
         return true;
     }
@@ -728,8 +766,9 @@ bool PianoRollView::put(bool insert, bool ending)
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
     const auto said = "Put " + eventCount(total) + " in " + where +
-                      (ending ? ", ending at " + putPlace(m, here, reg.bars)
-                              : " at " + putPlace(m, at, reg.bars));
+                      (ending ? ", ending at " + putPlace(m, bar, reg.bars)
+                              : " at " + putPlace(m, at, reg.bars)) +
+                      (atPitch && here ? ", from " + core::pitchName(*here) : std::string{});
     if (!insert)
     {
         document_.edit("Put " + eventCount(total) + " in " + where, place(),
@@ -1502,6 +1541,10 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     else if (command == "put-merge" || command == "put-insert" || command == "put-ending")
     {
         return put(command == "put-insert", command == "put-ending");
+    }
+    else if (command == "put-merge-at-pitch" || command == "put-insert-at-pitch")
+    {
+        return put(command == "put-insert-at-pitch", false, true);
     }
     else if (command == "inspector-edit")
     {

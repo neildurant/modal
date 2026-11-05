@@ -30,6 +30,15 @@ constexpr std::array kCommands{
                 .description = "Put the yanked or deleted events over what's there, so they end "
                                "at the cursor, or at its bar line when taken as bars: a sweep "
                                "ending on a downbeat"},
+    CommandInfo{.name = "put-merge-at-pitch",
+                .description = "Put the yanked or deleted notes over what's there, at the "
+                               "cursor's time and pitch, keeping their intervals to the pitch "
+                               "the cursor was on when they were taken, or their lowest"},
+    CommandInfo{.name = "put-insert-at-pitch",
+                .description = "Put the yanked or deleted notes in at the cursor's time and "
+                               "pitch, moving the rest of the section later, keeping their "
+                               "intervals to the pitch the cursor was on when they were taken, "
+                               "or their lowest"},
     CommandInfo{.name = "put-after",
                 .description = "Put the yanked or deleted sections after this one"},
     CommandInfo{.name = "put-before",

@@ -217,7 +217,9 @@ nmap e          inspector-edit    "Edit in the inspector"
 " takes out of the song, and ie the whole song. dd and yy are this bar's events; x deletes the
 " note or event under the cursor and Y yanks it. p lays what was yanked or deleted over what's
 " there, and P puts it in, moving the rest of the section later; bars go to the start of the
-" cursor's bar. "a before a yank, delete or put uses register a ("A adds to it).
+" cursor's bar. Alt-p and Alt-P put the same at the cursor's pitch too, in the piano roll, the
+" notes keeping their intervals to the pitch the cursor was on when they were taken (or to
+" their lowest). "a before a yank, delete or put uses register a ("A adds to it).
 keysection "Deleting, yanking and putting"
 nmap d          operator-delete   "Delete"
 nmap y          operator-yank     "Yank"
@@ -227,6 +229,8 @@ nmap p          put-merge         "Put over what's there"
 nmap p          put-after         "Put after this section"
 nmap P          put-insert        "Put in, moving the rest later"
 nmap P          put-before        "Put before this section"
+nmap <A-p>      put-merge-at-pitch "Put at the cursor's pitch, over what's there"
+nmap <A-S-p>    put-insert-at-pitch "Put in at the cursor's pitch, moving the rest later"
 vmap p          put-replace       "Put in place of the selection"
 vmap P          put-replace       "Put in place of the selection"
 nmap "          register-use      "Register"
