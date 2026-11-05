@@ -316,13 +316,12 @@ constexpr std::array kSharedCommands{
                 .description = "Delete the cursor's bar, or {count} bars from it, on every track, "
                                "closing up; they go in the register as a section",
                 .count = true,
-                .keys = false,
                 .range = true},
     CommandInfo{.name = "bar-insert",
                 .description = "Insert an empty bar, or N, before the cursor's bar on every "
                                "track, in the meter there or one given (2 3/4)",
                 .usage = "[N] [METER]",
-                .keys = false,
+                .count = true,
                 .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
     CommandInfo{.name = "label",
                 .description = "Put a label named NAME at the cursor, or rename the one there; "

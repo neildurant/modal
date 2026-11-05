@@ -372,6 +372,15 @@ nmap <leader>T<Space> rewind-toggle "Rewind on or off"
 nmap <C-.>      panic             "Panic"
 cmap <C-.>      panic             "Panic"
 
+" Bars on every track, taking time out of the song or putting it in, the conductor's tempo and
+" meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping
+" them in the register as a section, and , b i inserts an empty bar before it, as :bar-delete
+" and :bar-insert do.
+keysection "Bars"
+ngroup <leader>b "Bars"
+nmap <leader>bd bar-delete        "Delete bars on every track"
+nmap <leader>bi bar-insert        "Insert empty bars on every track"
+
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too. Those without a hint aren't listed
 " in the list of keys (, ?) beside the one with it.

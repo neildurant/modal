@@ -1062,3 +1062,19 @@ TEST_CASE("Tab and Shift-Tab go past empty bars to the bars with events on the t
     CHECK(a.ws.message() == "<Tab> isn't a range or object after d");
     CHECK(a.document.song().events(a.document.song().tracks()[0]->id()).size() == 3);
 }
+
+TEST_CASE("The leader's Bars group deletes and inserts bars on every track, with counts")
+{
+    // The Bars group under the leader (decided November 2026), as :bar-delete and :bar-insert.
+    Arranging a{labelSong()};
+    const auto& song = a.document.song();
+    const auto end = song.end();
+    a.type(U",bd");
+    CHECK(song.end() == end - kBar);
+    a.type(U"u2,bd");
+    CHECK(song.end() == end - 2 * kBar);
+    a.type(U"u,bi");
+    CHECK(song.end() == end + kBar);
+    a.type(U"u3,bi");
+    CHECK(song.end() == end + 3 * kBar);
+}

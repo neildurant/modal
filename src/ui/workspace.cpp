@@ -113,7 +113,11 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          }
                          if (name == "bar-insert")
                          {
-                             return barInsert(call.arguments);
+                             // From keys, a count says how many (3, b i).
+                             const auto counted = std::to_string(call.count);
+                             return barInsert(call.arguments.empty() && call.count > 0
+                                                  ? std::string_view{counted}
+                                                  : call.arguments);
                          }
                          if (name == "section-rename")
                          {
