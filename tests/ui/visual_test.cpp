@@ -1241,3 +1241,28 @@ TEST_CASE("A selection's notes go to the cursor's pitch by the pitch it was star
     s.ws.handle(Key::typed(U'p', kAlt), 0);
     CHECK(std::ranges::count(pitches(s.document, 0), 50) == 1); // E2 to D3, not A2's place
 }
+
+TEST_CASE("The hint menu says what a key waiting for a letter wants")
+{
+    // Noted November 2026, as f does: Q, @, ", m, ' and `.
+    using Hints = std::vector<Workspace::Hint>;
+    const auto after = [](std::u32string_view keys)
+    {
+        Selecting s;
+        s.ws.setHints(true, 0);
+        s.type(keys);
+        return s.ws.hints().value_or(Hints{});
+    };
+    CHECK(after(U"Q") ==
+          Hints{{"a–z", "the macro to record into", false}, {"A–Z", "the macro to add to", false}});
+    CHECK(after(U"@") ==
+          Hints{{"a–z", "the macro to play", false}, {"@", "the last again", false}});
+    CHECK(after(U"\"") == Hints{{"a–z", "the register for the next yank, delete or put", false},
+                                {"A–Z", "the register to add to", false}});
+    // m starts m Space too, so both.
+    CHECK(after(U"m") ==
+          Hints{{"a–z", "the mark to set here", false}, {"<Space>", "Play from here", false}});
+    CHECK(after(U"'") == Hints{{"a–z", "the mark to go to", false},
+                               {"' `", "back to before the last jump", false}});
+    CHECK(after(U"`") == after(U"'"));
+}

@@ -131,10 +131,41 @@ void Workspace::noteWaiting(std::int64_t now)
     }
 }
 
+std::vector<Workspace::Hint> Workspace::characterHints(std::string_view command)
+{
+    // What a command waiting for a character after it takes.
+    if (command == "macro-record")
+    {
+        return {{.keys = "a–z", .title = "the macro to record into"},
+                {.keys = "A–Z", .title = "the macro to add to"}};
+    }
+    if (command == "macro-play")
+    {
+        return {{.keys = "a–z", .title = "the macro to play"},
+                {.keys = "@", .title = "the last again"}};
+    }
+    if (command == "register-use")
+    {
+        return {{.keys = "a–z", .title = "the register for the next yank, delete or put"},
+                {.keys = "A–Z", .title = "the register to add to"}};
+    }
+    if (command == "mark-set")
+    {
+        return {{.keys = "a–z", .title = "the mark to set here"}};
+    }
+    if (command == "mark-go")
+    {
+        return {{.keys = "a–z", .title = "the mark to go to"},
+                {.keys = "' `", .title = "back to before the last jump"}};
+    }
+    return {};
+}
+
 bool Workspace::findWaiting() const
 {
-    return (awaiting_ && awaiting_->command.starts_with("find-")) ||
-           (finding_.naming && finding_.naming->redo);
+    // Any key waiting for a character after it (f, m, ', ", Q, @), or after an operator's
+    // find for a sharp or flat, which the hint menu says what it wants.
+    return awaiting_ || (finding_.naming && finding_.naming->redo);
 }
 
 std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
@@ -150,6 +181,14 @@ std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
         return std::vector<Hint>{{.keys = "c d e f g a b", .title = "a note name, any octave"},
                                  {.keys = "# b", .title = "then sharp or flat"}};
     }
+    // The others' letters (noted November 2026, as f does).
+    if (awaiting_)
+    {
+        if (auto letters = characterHints(awaiting_->command); !letters.empty())
+        {
+            return letters;
+        }
+    }
     if (findWaiting())
     {
         return std::vector<Hint>{{.keys = "#", .title = "sharp"}, {.keys = "b", .title = "flat"}};
@@ -163,6 +202,13 @@ std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
     const auto& keymap =
         mode == Mode::OperatorPending || mode == Mode::Visual ? operatorKeymapHere() : keymapHere();
     auto hints = hintsAfter(keymap, mode, keys_.keys());
+    if (const auto match = keymap.match(mode, keys_.keys()); match.binding != nullptr)
+    {
+        // Keys bound to a command waiting for a letter that also start longer bindings, as m
+        // does m Space: the letters too.
+        auto letters = characterHints(match.binding->command);
+        hints.insert(hints.begin(), letters.begin(), letters.end());
+    }
     if (hints.empty())
     {
         return std::nullopt;
