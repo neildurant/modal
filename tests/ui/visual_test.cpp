@@ -277,6 +277,73 @@ TEST_CASE("p puts the register in the selection's place, as one undo step")
     CHECK(pitches(s.document, 0) == Pitches{40, 41, 42, 43, 44, 45, 46, 47});
 }
 
+TEST_CASE("A refused Visual put preserves notes, registers and undo history")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto put = GENERATE(as<std::u32string>{}, U"p", U"P");
+    const bool cut = GENERATE(false, true);
+    const auto q = ppqn.quarter();
+    core::Song song{ppqn};
+    const auto track = song.addTrack("Piano");
+    song.updateEvents(track,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{60, 100, q / 2}});
+                          events.insert({q, core::Note{60, 100, q}});
+                          events.insert({q, core::Note{62, 100, q}});
+                      });
+    Selecting s{ppqn};
+    s.document.replace(song, std::nullopt);
+    s.ws.showSong();
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = track, .tick = 0, .pitch = 60});
+    s.type(U"Y>>");
+    const auto redone = s.document.song();
+    s.type(U"u");
+    REQUIRE(s.document.canRedo());
+    REQUIRE_FALSE(s.document.modified());
+    const auto reg = s.ws.registerArea();
+
+    s.ws.pianoRoll().setCursor({.track = track, .tick = cut ? q + q / 4 : q, .pitch = 62});
+    if (cut)
+    {
+        s.ws.handle(Key::typed(U'v', kCtrl), 0);
+        s.type(U"|"); // cutting D4 must also be undone when C4 cannot be put
+    }
+    else
+    {
+        s.type(U"vin");
+    }
+    const auto at = s.ws.pianoRoll().place();
+    s.type(put);
+    CHECK(s.ws.refused());
+    CHECK(s.ws.message().find("C4") != std::string::npos);
+    CHECK_FALSE(s.ws.message().starts_with("Put "));
+    CHECK(s.document.song() == song);
+    CHECK(s.ws.registerArea() == reg);
+    CHECK(s.ws.pianoRoll().place() == at);
+    CHECK_FALSE(s.document.modified());
+    CHECK_FALSE(s.document.canUndo());
+    REQUIRE(s.document.canRedo());
+    s.document.redo();
+    CHECK(s.document.song() == redone);
+}
+
+TEST_CASE("A Visual put stops if its deletion is refused")
+{
+    Selecting s;
+    const auto before = s.document.song();
+    s.type(U"gsY");
+    const auto reg = s.ws.registerArea();
+    s.type(U"viep"); // deleting every section would leave no section
+    CHECK(s.ws.refused());
+    CHECK(s.ws.message() == "A song keeps at least one section");
+    CHECK(s.document.song() == before);
+    CHECK(s.ws.registerArea() == reg);
+    CHECK_FALSE(s.document.canUndo());
+    CHECK_FALSE(s.document.modified());
+}
+
 TEST_CASE("v in the piano roll selects time at every pitch, on the cursor's track")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

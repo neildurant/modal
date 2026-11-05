@@ -1958,9 +1958,13 @@ bool Workspace::putOverSelection()
         return true;
     }
     const auto saved = register_;
+    const auto before = document_.song();
+    const auto place = view().place();
+    const auto selected = SavedSelection{*selection_, view().cursor(), beforeObject_};
     const auto first = span ? document_.song().sectionAt(span->first) : 0;
     const auto cut = selection_->cut ? view().cutRange("visual", 0) : std::nullopt;
-    document_.beginGroup("Put over " + what, view().place());
+    const auto title = "Put over " + what;
+    document_.beginGroup(title, place);
     if (cut)
     {
         cutSong(*cut);
@@ -1968,12 +1972,12 @@ bool Workspace::putOverSelection()
     view().operate("operator-delete", "visual", 0);
     register_ = saved;
     endVisual();
-    if (strip)
+    if (!refused_ && strip)
     {
         // Before what followed them, or after the last.
         view().run(first < document_.song().sections().size() ? "put-before" : "put-after", 1);
     }
-    else
+    else if (!refused_)
     {
         if (span)
         {
@@ -1982,6 +1986,17 @@ bool Workspace::putOverSelection()
             view().setCursor(at);
         }
         view().run("put-merge", 1);
+    }
+    if (refused_)
+    {
+        // Deleting or cutting may already have changed the song. Restore it within the
+        // group, so a refused replacement leaves no undo step and keeps any redo history.
+        document_.edit(title, place, [&](core::Song& song) { song = before; });
+        document_.endGroup();
+        refresh();
+        view().restore(place);
+        lastSelection_ = selected;
+        return true;
     }
     document_.endGroup();
     refresh();
