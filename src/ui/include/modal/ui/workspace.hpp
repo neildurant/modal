@@ -483,7 +483,13 @@ private:
     std::optional<Selection> selection_;
     // The selection as it was before an object made it, which another object starts from.
     std::optional<Selection> beforeObject_;
-    std::optional<std::pair<Selection, SongCursor>> lastSelection_;
+    struct SavedSelection
+    {
+        Selection selection;
+        SongCursor cursor;
+        std::optional<Selection> beforeObject;
+    };
+    std::optional<SavedSelection> lastSelection_;
     // A command in Visual mode, or nothing to run it as in Normal mode; and ending it.
     std::optional<bool> runVisual(std::string_view command, int count);
     void selectObject(std::string_view command, int count);

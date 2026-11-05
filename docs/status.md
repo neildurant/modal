@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 5 November 2026, after setting up the Linux contribution environment at `887c49d`.*
+*Last updated 5 November 2026, while addressing the review findings after the handoff push `fd81caa`.*
 
 ## Milestones
 
@@ -20,13 +20,13 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ## Pending
 
-- **Five findings from the completed review of `30f6301..64c0fce`.** All six findings from the preceding review passed their reproductions. The new findings below remain open; `64c0fce..887c49d` only changed the handoff documents. Address these before starting milestone 7.
+- **Five findings from the completed review of `30f6301..64c0fce`, tracked below.** All six findings from the preceding review passed their reproductions. Address the remaining findings before starting milestone 7. Local fixes still need the final Linux checks and a UI trial before pushing.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, and the views. Neil runs these.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
-## Open review findings
+## Review findings
 
-1. **`gv` does not restore all object-selection state.** In the arrangement, `vit<Esc>gvibd` deletes the whole track instead of the first bar, while `vitibd` works. `lastSelection_` retains the object but `endVisual()` clears `beforeObject_`; replacing the restored object can leave the old track target attached. See `Workspace::selectObject()` and `Workspace::endVisual()` in `src/ui/workspace.cpp`.
+1. **Fixed locally: `gv` restores the state needed to replace an object.** It now remembers the selection before its object as well as the selection and cursor. A regression test first reproduced whole-track deletion with `vit<Esc>gvibd` and `v2it<Esc>gvibd`, and after yanking instead of Escape; all now delete only the first bar's contents on the original track. The focused GCC Debug test passes at both PPQNs and checks undo.
 2. **A refused Visual put can delete the selection and report success.** Yank C4, then put over a selected D4 where an unselected C4 already occupies the destination. The selection is deleted before the paste is refused for overlap. `Workspace::putOverSelection()` needs to validate the whole replacement or roll it back, and preserve the refusal message. The partial edit predates the reviewed changes; the unconditional success message is new.
 3. **Colon transforms do not use the exact object selected.** In the event list, select a chord whose note rows surround a controller row. `vic!f`, answering `cc1`, leaves that controller alone; `vic:filter cc1` deletes it. `Workspace::transformLine()` uses the bounding Visual rows instead of the remembered object, and the displayed selection includes the intervening row too.
 4. **A successful warning can still stop a macro.** A section split on a track's bar line that cuts a conductor bar short succeeds with `CommandResult::warning`, which is still treated as a refusal. For example, `:section-split Middle<Enter>4l` stops after the split when it produces that warning. Command outcome still needs separating from message severity in `CommandResult` and its consumers.

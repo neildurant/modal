@@ -1373,8 +1373,9 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             refuse("No selection yet to select again", MessageKind::Information);
             return true;
         }
-        selection_ = lastSelection_->first;
-        view().setCursor(lastSelection_->second);
+        selection_ = lastSelection_->selection;
+        beforeObject_ = lastSelection_->beforeObject;
+        view().setCursor(lastSelection_->cursor);
         mode_ = Mode::Visual;
         return true;
     }
@@ -2002,7 +2003,7 @@ void Workspace::endVisual()
 {
     if (selection_)
     {
-        lastSelection_ = std::pair{*selection_, view().cursor()};
+        lastSelection_ = SavedSelection{*selection_, view().cursor(), beforeObject_};
     }
     selection_.reset();
     beforeObject_.reset();

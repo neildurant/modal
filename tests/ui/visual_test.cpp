@@ -1051,6 +1051,31 @@ TEST_CASE("A count with an object in Visual mode takes as many as with an operat
     CHECK(pitches(t.document, 0) == Pitches{40, 41});
 }
 
+TEST_CASE("gv restores an object selection so another object replaces it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto object = GENERATE(as<std::u32string>{}, U"vit", U"v2it");
+    const bool yank = GENERATE(false, true);
+    Selecting s{ppqn};
+    const auto before = s.document.song();
+    s.type(object);
+    if (yank)
+    {
+        s.type(U"y");
+    }
+    else
+    {
+        s.press(NamedKey::Escape);
+    }
+    s.type(U"lgvib");
+    CHECK(s.selected() == "bar 1 of Bass");
+    s.type(U"d");
+    CHECK(pitches(s.document, 0) == Pitches{41, 42, 43, 44, 45, 46, 47});
+    CHECK(pitches(s.document, 1) == Pitches{60, 61, 62, 63, 64, 65, 66, 67});
+    s.type(U"u");
+    CHECK(s.document.song() == before);
+}
+
 TEST_CASE("After an operator the hint menu shows the objects and the motions apart")
 {
     // Objects (the operator's own key first) left of a faint rule and motions right of it,
