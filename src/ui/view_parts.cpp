@@ -130,15 +130,18 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
                       static_cast<int>(text.size()) + (edited ? 1 : 0), widthOf(field.heading)});
         if (edited)
         {
-            // In a box as wide as the column, what's typed and its cursor; longer text scrolls
-            // to keep the cursor in it, as in the event list's cells.
+            // In a box as wide as the column, what's typed and its cursor, against its right
+            // edge as a spreadsheet's cell is (decided November 2026, after use); longer text
+            // scrolls to keep the cursor in it, as in the event list's cells.
             const auto box = static_cast<std::size_t>(std::max(std::min(wide, room), 2));
             const auto typed = editor->line().cursor();
             const std::size_t first = typed + 1 > box ? typed + 1 - box : 0;
-            auto visible = text.substr(first, box);
+            const auto shown = text.substr(first, box);
+            const auto pad = first == 0 && text.size() + 1 <= box ? box - text.size() - 1 : 0;
+            auto visible = std::u32string(pad, U' ') + shown;
             visible.resize(box, U' ');
             region.text.push_back({x(at), top + cell.height, visible, editing});
-            const auto c = static_cast<int>(typed - first);
+            const auto c = static_cast<int>(pad + typed - first);
             region.text.push_back({x(at + c), top + cell.height,
                                    std::u32string(1, typed < text.size() ? text[typed] : U' '),
                                    cursor});

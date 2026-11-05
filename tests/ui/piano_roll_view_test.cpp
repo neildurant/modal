@@ -1527,3 +1527,26 @@ TEST_CASE("the list of keys keeps each group whole in one column")
         }
     }
 }
+
+TEST_CASE("A value being edited in the inspector sits against the right of its box")
+{
+    // As a spreadsheet's cell does (decided November 2026, after use), left again once set.
+    Rolling r;
+    r.type(U"8je"); // the E1's position
+    r.press(Key::of(NamedKey::Tab));
+    REQUIRE(r.view().inspectorEditor().heading() == "Pitch");
+    std::u32string box;
+    for (const auto& region : r.ws.frame())
+    {
+        for (const auto& run : region.text)
+        {
+            if (run.style.background == Role::Selection &&
+                run.text.find(U"E1") != std::u32string::npos)
+            {
+                box = run.text;
+            }
+        }
+    }
+    CHECK(box.ends_with(U"E1 ")); // the cursor's place after it
+    CHECK(box.starts_with(U" "));
+}
