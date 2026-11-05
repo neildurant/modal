@@ -252,7 +252,7 @@ An independent setting for the length of new notes, after Sequencer Plus Gold's 
 | `~` | Humanise (small random time and velocity changes) |
 | `c` | Change: delete the range and start Insert mode there (milestone 8) |
 
-Examples: `d2]b` deletes from the cursor to the second bar line on, `>ib` transposes this bar up a semitone, `5.` repeats the last change five times.
+Examples: `d2]b` deletes from the cursor to the second bar line on, `>ib` transposes this bar up a semitone, `5.` repeats the last change with a count of five in place of its own (after `>ib`, `5.` transposes five bars).
 
 - **The velocity operator is `^` (decided October 2026),** an upside-down `v` and the marcato accent sign, since `v` is Visual mode. Vim's `^` (first non-blank) has no use in Modal. `%` is kept for something else.
 - **`!` is the general transform operator (decided October 2026),** with an imperative feel: `!` and a motion open the transform menu for that range. Velocity, the most common transform, keeps its own key.
@@ -280,7 +280,7 @@ Examples: `d2]b` deletes from the cursor to the second bar line on, `>ib` transp
 - **No capitals for time.** `D` is unbound: Shift doesn't mean "in time", and Vim's `D`, to the end of the line, has no one end here. `P` is `p`'s partner, putting in as Vim's puts before; `Y` is `x`'s, for the note.
 - **Taught by the hint menu.** After an operator, the hint menu lists the ranges and objects with what each would do in the current view (see Leader key and hint menu).
 
-**In milestone 4 (decided for milestone 4).** The operators `d`, `y` and `p` work over the motions, with counts, on rows of the event list as Vim's do on lines (`d}` deletes from this event up to the one `}` lands on); `dd` deletes the event under the cursor (`3dd` it and the next two) and `yy` yanks it; `x` deletes the event and `o` adds a note at the cursor. There is one unnamed register, and linear undo and redo. Visual mode, named registers, `.`, marks, `f` / `F` and searches come in milestone 6. (Revised in milestone 5: see Ranges, objects and putting.)
+**In milestone 4 (decided for milestone 4).** The operators `d`, `y` and `p` work over the motions, with counts, on rows of the event list as Vim's do on lines (`d}` deletes from this event up to the one `}` lands on); `dd` deletes the event under the cursor (`3dd` it and the next two) and `yy` yanks it; `x` deletes the event and `o` adds a note at the cursor. *(Revised October 2026: `dd` and `yy` take the cursor's bar's events, and `x` and `Y` the event; see Ranges, objects and putting.)* There is one unnamed register, and linear undo and redo. Visual mode, named registers, `.`, marks, `f` / `F` and searches come in milestone 6. (Revised in milestone 5: see Ranges, objects and putting.)
 
 **Sections in milestone 4 (decided October 2026).** The section model and the song format, the flattened timeline, SMF import and export with sections, the section shown in the event list (with markers, dimmed) and in the status line, `]s` / `[s`, `:section NAME` to split at the cursor's bar line (with the warning when a bar is split). As built: `:section` works in every view, the bar line being that of the cursor's bar in the view's own bars (the conductor's in its list, a track's own where it has its own meter); with no name, the new section is called `Section` and the next number, so a new song's sections go Section 1, Section 2; a name another section has is numbered; at a section's start, or past the song's end, it's refused; and when the bar line falls inside a bar of the conductor (and the tracks following it) or of a track with its own meter, the new section still starts there, the bar it cuts ending short as a remainder bar, and the message says which ("Bridge starts at 2:1:000; this cuts a bar short in Lead"). Each split is one undo step. `D` / `P`, rippling to the end of the section with the question when an insert would overflow it, come in milestone 5 with the time-based views (decided in milestone 4): the event list is for exact tweaking of events, not editing in time, and its cursor is always on an event, so time spans there would do odd things or need workarounds. The section strip comes with the views in milestone 5, section operations with the full grammar in milestone 6, the outline view in milestone 7, and looping, takes and cueing in milestone 8.
 
@@ -398,7 +398,7 @@ As in Vim, search matches are a layer separate from the selection.
 
 **Leader key and hint menu**
 
-Less frequent commands live behind a leader key, as in Doom Emacs: press the leader (comma in Normal and Visual modes, leaving Space for play/stop; Ctrl-Space works as an alternative leader in every mode, including Insert), then a short mnemonic sequence. After a brief pause a hint menu appears at the bottom of the window listing the next available keys and what they do, so commands are discoverable without being memorised first.
+Less frequent commands live behind a leader key, as in Doom Emacs: press the leader (comma in Normal and Visual modes, leaving Space for play/stop; Ctrl-Space as an alternative leader in Insert mode, milestone 8, where comma is typed; in Normal mode `Ctrl-Space` plays from the cursor, as decided in milestone 6), then a short mnemonic sequence. After a brief pause a hint menu appears at the bottom of the window listing the next available keys and what they do, so commands are discoverable without being memorised first.
 
 | Sequence | Command |
 | --- | --- |
@@ -1114,7 +1114,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 - [x] Most important from SPG: a fast, stable key-binding model that builds muscle memory.
 - [x] Vim-like modal editing, plus a Doom Emacs-style leader key with a hint menu.
-- [x] Leader key is `,`, with Ctrl-Space as an alternative leader in every mode; Space stays play/stop.
+- [x] Leader key is `,`, with Ctrl-Space as an alternative leader in Insert mode (milestone 8; in Normal mode it plays from the cursor, decided in milestone 6); Space stays play/stop.
 - [x] `q` is quantise; macros move to another key (`Q` proposed).
 - [x] 960 PPQN, fixed internally, matching the common DAW editing resolution; kept as one constant so it can be raised later.
 - [x] Arrangement is the home view; piano roll for editing a track.
