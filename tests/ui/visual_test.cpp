@@ -437,6 +437,7 @@ TEST_CASE("a selection stays shown while an operator asks about it, as q does ab
                             bass, [&](core::EventList& events)
                             { events.insert({s.bar / 8, core::ControlChange{64, 127}}); });
                     });
+    s.ws.setQuantizePedal(Workspace::QuantizePedal::Ask);
     s.type(U"grv}q");
     CHECK(s.ws.message().starts_with("Move the pedalling with its notes?"));
     CHECK(s.ws.pianoRoll().selectionSpan());

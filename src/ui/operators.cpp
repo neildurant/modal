@@ -1120,13 +1120,14 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     }
     if (op == "operator-quantize")
     {
-        // With pedals there, asking whether they go with their notes (decided October 2026).
+        // With pedals there, as quantizepedal says: going with their notes, staying where they
+        // are, or asking (decided October 2026; the setting November 2026).
         const bool pedalled =
             std::ranges::any_of(target->parts, [&](const OperatorTarget::Part& part)
                                 { return core::hasPedals(song.events(part.track), part.events); });
-        if (!pedalled)
+        if (!pedalled || quantizePedal_ != QuantizePedal::Ask)
         {
-            return quantize(*target, false);
+            return quantize(*target, pedalled && quantizePedal_ == QuantizePedal::Follow);
         }
         ask(
             "Move the pedalling with its notes?", [this, target = *target]

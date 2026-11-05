@@ -401,6 +401,14 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     }
     view.setVelocityLimits(
         {.soft = clip != "hard", .floor = static_cast<int>(settings.integer("velfloor"))});
+    const auto pedal = settings.text("quantizepedal");
+    if (pedal != "follow" && pedal != "keep" && pedal != "ask" && error.empty())
+    {
+        error = "quantizepedal is follow, keep or ask";
+    }
+    view.setQuantizePedal(pedal == "keep"  ? ui::Workspace::QuantizePedal::Keep
+                          : pedal == "ask" ? ui::Workspace::QuantizePedal::Ask
+                                           : ui::Workspace::QuantizePedal::Follow);
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
     if (auto own = playback.openOwnPorts(); error.empty())

@@ -194,6 +194,15 @@ public:
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }
     // How velocity changes keep within their limits: the velclip and velfloor settings.
     void setVelocityLimits(core::VelocityLimits limits) { velocityLimits_ = limits; }
+    // Whether q moves the pedalling with its notes, keeps it where it is, or asks (the
+    // quantizepedal setting, decided November 2026); the menu's quantise always asks.
+    enum class QuantizePedal
+    {
+        Follow,
+        Keep,
+        Ask,
+    };
+    void setQuantizePedal(QuantizePedal pedal) { quantizePedal_ = pedal; }
 
     // What a port name given to :port refers to: the output port's full name, or else the
     // ports it could be when several match equally well (none when none match); and every
@@ -713,6 +722,7 @@ private:
                     const std::string& text);
     std::string firstPitch(const OperatorTarget& target) const;
     core::VelocityLimits velocityLimits_;
+    QuantizePedal quantizePedal_ = QuantizePedal::Follow;
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

@@ -187,7 +187,20 @@ TEST_CASE("q quantises notes' starts to the grid, and the event list and arrange
 {
     Operating o;
     const auto q = o.q;
+    // By default the pedalling goes with its notes, unasked; kept, it stays.
     o.type(U"4l"); // bar 5, in the arrangement, with the sustain pedal down after the C2
+    o.type(U"qq");
+    CHECK(o.notes()[3] == std::pair{16 * q, 36});
+    CHECK(o.pedals() == std::vector{16 * q + q / 16});
+    CHECK(o.ws.message().empty());
+    o.type(U"u");
+    o.ws.setQuantizePedal(Workspace::QuantizePedal::Keep);
+    o.type(U"qq");
+    CHECK(o.notes()[3] == std::pair{16 * q, 36});
+    CHECK(o.pedals() == std::vector{16 * q + q / 8});
+    o.type(U"u");
+    // Or it asks.
+    o.ws.setQuantizePedal(Workspace::QuantizePedal::Ask);
     o.type(U"qq");
     CHECK(o.ws.message() == "Move the pedalling with its notes? (y/n)");
     o.type(U"n"); // only the notes

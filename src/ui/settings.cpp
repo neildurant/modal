@@ -117,6 +117,10 @@ Settings::Settings()
                   "How velocity changes keep within their limits: soft, easing off near them, "
                   "or hard, clipping",
                   std::string{"soft"}),
+          setting("quantizepedal",
+                  "What q does with the pedalling of the notes it quantises: follow, moving it "
+                  "with them; keep, leaving it where it is; or ask",
+                  std::string{"follow"}),
           setting("velfloor", "The lowest velocity a change makes a note", std::int64_t{1}, 1, 127),
           setting("pedallift",
                   "How long, in milliseconds, the pedalling tools lift the sustain pedal before "
