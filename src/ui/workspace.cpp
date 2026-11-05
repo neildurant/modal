@@ -1135,7 +1135,7 @@ CommandResult Workspace::run(std::string_view command, int count)
     const char32_t named = command != "register-use" ? registerName_.value_or(0) : 0;
     const char32_t letter = lowerLetter(named);
     const auto letterText = encodeUtf8(std::u32string(1, letter));
-    const bool put = command == "register-put" || command == "register-put-before";
+    const bool put = command.starts_with("put-");
     std::optional<EventRegister> unnamed;
     if (named != 0 && put)
     {
@@ -1776,7 +1776,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
     {
         return operateOnSelection(command, count);
     }
-    if (command == "register-put" || command == "register-put-before")
+    if (command.starts_with("put-"))
     {
         return putOverSelection();
     }
@@ -1947,8 +1947,7 @@ bool Workspace::putOverSelection()
     if (strip)
     {
         // Before what followed them, or after the last.
-        view().run(
-            first < document_.song().sections().size() ? "register-put-before" : "register-put", 1);
+        view().run(first < document_.song().sections().size() ? "put-before" : "put-after", 1);
     }
     else
     {
@@ -1958,10 +1957,21 @@ bool Workspace::putOverSelection()
             at.tick = span->first;
             view().setCursor(at);
         }
-        view().run("register-put", 1);
+        view().run("put-merge", 1);
     }
     document_.endGroup();
     refresh();
+    std::size_t total = 0;
+    for (const auto& events : saved.tracks)
+    {
+        total += events.size();
+    }
+    const auto put =
+        !saved.sections.empty()
+            ? (saved.sections.size() == 1 ? saved.sections.front()->name()
+                                          : std::to_string(saved.sections.size()) + " sections")
+            : eventCount(total);
+    setMessage("Put " + put + " in place of " + what, MessageKind::Information);
     return true;
 }
 

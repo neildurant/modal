@@ -447,7 +447,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 104> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 107> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -481,7 +481,10 @@ std::span<const CommandInfo> Workspace::commands()
             {"bar-events-previous", onlyIn({Tracks})},
             {"move-left", onlyIn({Strip, PianoRoll})},
             {"move-right", onlyIn({Strip, PianoRoll})},
-            {"register-put-before", onlyIn({Tracks, Strip, PianoRoll})},
+            {"put-merge", onlyIn({Tracks, PianoRoll, EventList})},
+            {"put-insert", onlyIn({Tracks, PianoRoll})},
+            {"put-after", onlyIn({Strip})},
+            {"put-before", onlyIn({Strip})},
             {"zoom-in", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},

@@ -23,9 +23,16 @@ namespace
 
 constexpr std::array kCommands{
     CommandInfo{.name = "go-section-strip", .description = "Go to the section strip"},
-    CommandInfo{.name = "register-put-before",
+    CommandInfo{.name = "put-insert",
                 .description = "Put the yanked or deleted events in at the cursor, moving the "
-                               "rest of the section later, or sections before this one"},
+                               "rest of the section later"},
+    CommandInfo{.name = "put-after",
+                .description = "Put the yanked or deleted sections after this one"},
+    CommandInfo{.name = "put-before",
+                .description = "Put the yanked or deleted sections before this one"},
+    CommandInfo{.name = "put-replace",
+                .description = "Put the yanked or deleted events in place of the selection, "
+                               "or sections in place of the sections selected"},
     CommandInfo{.name = "move-left",
                 .description = "Move this section a place earlier, or this note onto the grid "
                                "line before it; {count} places or lines",
@@ -311,9 +318,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     {
         return toBarWithEvents(command == "bar-events-next" ? n : -n);
     }
-    else if (command == "register-put" || command == "register-put-before")
+    else if (command == "put-merge" || command == "put-insert")
     {
-        return put(command == "register-put-before");
+        return put(command == "put-insert");
     }
     else if (command == "event-delete")
     {
@@ -905,24 +912,29 @@ bool ArrangeView::put(bool insert)
     const auto name =
         tracks[track]->name.empty() ? "track " + std::to_string(track + 1) : tracks[track]->name;
     const auto where = name + (reg.tracks.size() > 1 ? " and the tracks after it" : "");
+    const auto said = "Put " + eventCount(total) + " in " + where + " at " + putPlace(m, at, true);
     if (!insert)
     {
         edit("Put " + eventCount(total) + " in " + where,
              [&](core::Song& song) { putRegister(song, reg, track, at); });
+        host_.setMessage(said + ", over what's there", MessageKind::Information);
         return true;
     }
-    insertRegister(reg, track, at, "Insert " + eventCount(total) + " in " + where);
+    insertRegister(reg, track, at, "Insert " + eventCount(total) + " in " + where,
+                   said + ", moving the rest of " +
+                       document_.song().sections()[document_.song().sectionAt(at)]->name() +
+                       " later");
     return true;
 }
 
 void ArrangeView::insertRegister(const EventRegister& reg, std::size_t track, core::Tick at,
-                                 const std::string& title)
+                                 const std::string& title, const std::string& said)
 {
     // Asking first, if the section must grow to make room, by whole bars on every track.
     const auto& song = document_.song();
     const auto bars = barsToInsert(song, reg, track, at);
     const auto section = song.sectionAt(at);
-    const auto insert = [this, reg, track, at, bars, section, title]
+    const auto insert = [this, reg, track, at, bars, section, title, said]
     {
         edit(title,
              [&](core::Song& s)
@@ -933,6 +945,7 @@ void ArrangeView::insertRegister(const EventRegister& reg, std::size_t track, co
                  }
                  rippleInsert(s, reg, track, at);
              });
+        host_.setMessage(said, MessageKind::Information);
     };
     if (bars == 0)
     {
@@ -1093,9 +1106,9 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
                               command == "event-delete" ? "operator-delete" : "operator-yank",
                               "this-section", count);
     }
-    if (command == "register-put" || command == "register-put-before")
+    if (command == "put-after" || command == "put-before")
     {
-        return putSections(section, command == "register-put-before");
+        return putSections(section, command == "put-before");
     }
     if (command == "move-left" || command == "move-right")
     {
@@ -1291,9 +1304,11 @@ bool ArrangeView::putSections(std::size_t section, bool before)
     const auto what = reg.sections.size() == 1 ? reg.sections.front()->name()
                                                : std::to_string(reg.sections.size()) + " sections";
     const auto& song = document_.song();
-    edit("Put " + what + (before ? " before " : " after ") + song.sections()[section]->name(),
-         [&](core::Song& s) { s.insertSections(at, reg.sections); });
+    const auto title =
+        "Put " + what + (before ? " before " : " after ") + song.sections()[section]->name();
+    edit(title, [&](core::Song& s) { s.insertSections(at, reg.sections); });
     page_.setStripCursor(at);
+    host_.setMessage(title, MessageKind::Information);
     return true;
 }
 

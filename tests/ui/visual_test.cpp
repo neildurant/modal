@@ -1102,3 +1102,41 @@ TEST_CASE("After an operator the hint menu shows the objects and the motions apa
         }
     }
 }
+
+TEST_CASE("Each put is a command named for what it does, and says what it put and where")
+{
+    // Decided November 2026: put-merge and put-insert on tracks, put-after and put-before on
+    // the strip, and put-replace in Visual mode, p and P keeping their places.
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Selecting s{ppqn};
+    for (const auto* name : {"put-merge", "put-insert", "put-after", "put-before", "put-replace"})
+    {
+        CHECK(s.registry.find(name) != nullptr);
+    }
+    CHECK(s.registry.find("register-put") == nullptr);
+
+    s.type(U"yylp"); // bar 1's bass note over bar 2
+    CHECK(s.ws.message() == "Put 1 event in Bass at bar 2, over what's there");
+    s.type(U"u");
+    s.type(U"Gyy4hP"); // bar 8's into bar 4, in B, which has room to its end
+    CHECK(s.ws.message().starts_with("Lengthen B by a bar to make room?"));
+    s.type(U"y");
+    CHECK(s.ws.message() == "Put 1 event in Bass at bar 4, moving the rest of B later");
+    s.type(U"u");
+
+    // In the piano roll, at the cursor's bar, as taken.
+    s.type(U"gggryy]bp");
+    CHECK(s.ws.message() == "Put 1 event in Bass at bar 2, over what's there");
+    s.type(U"u");
+
+    // In Visual mode, in place of what's selected.
+    s.type(U"gaggyylvp");
+    CHECK(s.ws.message() == "Put 1 event in place of bar 2 on every track");
+    s.type(U"u");
+
+    // On the strip, sections after or before this one.
+    s.type(U"gsYlp");
+    CHECK(s.ws.message() == "Put A after B");
+    s.type(U"uP");
+    CHECK(s.ws.message() == "Put A before B");
+}

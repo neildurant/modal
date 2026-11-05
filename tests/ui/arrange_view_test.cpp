@@ -711,7 +711,9 @@ TEST_CASE("P inserts what was yanked, moving the rest of the section later, aski
     a.type(U"gg3lyy"); // bar 4
     a.type(U"dd");     // now empty
     a.type(U"ggyyP");
-    CHECK(a.ws.message().empty());
+    CHECK(a.ws.message().starts_with("Put 1 event in "));
+    CHECK(a.ws.message().ends_with(" at bar 1, moving the rest of " +
+                                   song.sections()[0]->name() + " later"));
     CHECK(notesByBar(a, 0) ==
           BarNotes{{1, 61}, {2, 61}, {3, 62}, {4, 63}, {5, 65}, {6, 66}, {7, 67}, {8, 68}});
 }

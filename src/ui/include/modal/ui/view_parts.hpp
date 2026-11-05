@@ -179,4 +179,8 @@ std::optional<std::string> describeTimeRange(std::string_view motion);
 // How many events, as words: "1 event", "3 events".
 std::string eventCount(std::size_t events);
 
+// Where a register put at a time goes, for the message after a put (decided November 2026):
+// "bar 3" for one taken as bars, else its position, "3:2:120".
+std::string putPlace(const core::MeterMap& meter, core::Tick at, bool bars);
+
 } // namespace modal::ui

@@ -466,6 +466,11 @@ std::optional<std::string> describeTimeRange(std::string_view motion)
     return it == kRanges.end() ? std::nullopt : std::optional{std::string{it->second}};
 }
 
+std::string putPlace(const core::MeterMap& meter, core::Tick at, bool bars)
+{
+    return bars ? "bar " + std::to_string(meter.toBarBeatTick(at).bar) : positionText(meter, at);
+}
+
 std::string eventCount(std::size_t events)
 {
     return events == 1 ? std::string{"1 event"} : std::to_string(events) + " events";

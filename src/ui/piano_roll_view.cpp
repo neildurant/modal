@@ -718,17 +718,22 @@ bool PianoRollView::put(bool insert)
     }
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
+    const auto said =
+        "Put " + eventCount(total) + " in " + where + " at " + putPlace(m, at, reg.bars);
     if (!insert)
     {
         document_.edit("Put " + eventCount(total) + " in " + where, place(),
                        [&](core::Song& s) { putRegister(s, reg, track_, at); });
         refresh();
+        host_.setMessage(said + ", over what's there", MessageKind::Information);
         return true;
     }
     const auto bars = barsToInsert(song, reg, track_, at);
     const auto section = song.sectionAt(at);
     const auto title = "Insert " + eventCount(total) + " in " + where;
-    const auto insertIt = [this, reg, bars, section, title, at, track = track_]
+    const auto moving =
+        said + ", moving the rest of " + song.sections()[section]->name() + " later";
+    const auto insertIt = [this, reg, bars, section, title, moving, at, track = track_]
     {
         document_.edit(title, place(),
                        [&](core::Song& s)
@@ -740,6 +745,7 @@ bool PianoRollView::put(bool insert)
                            rippleInsert(s, reg, track, at);
                        });
         refresh();
+        host_.setMessage(moving, MessageKind::Information);
     };
     if (bars == 0)
     {
@@ -1483,9 +1489,9 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return operate("operator-delete", "object-note", count);
     }
-    else if (command == "register-put" || command == "register-put-before")
+    else if (command == "put-merge" || command == "put-insert")
     {
-        return put(command == "register-put-before");
+        return put(command == "put-insert");
     }
     else if (command == "inspector-edit")
     {

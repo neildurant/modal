@@ -132,9 +132,9 @@ constexpr std::array kCommands{
     CommandInfo{.name = "inspector-edit",
                 .description = "Edit the fields in the inspector: Tab and Shift-Tab go between "
                                "them, Enter sets one and Escape leaves it"},
-    CommandInfo{.name = "register-put",
+    CommandInfo{.name = "put-merge",
                 .description = "Put the yanked or deleted events over what's there, the first at "
-                               "the cursor's time, or sections after this one"},
+                               "the cursor's time"},
 };
 
 // Text to show in a cell of a width, without control characters, cut short with an
@@ -674,7 +674,7 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     {
         return operate("operator-delete", "object-note", count);
     }
-    else if (command == "register-put")
+    else if (command == "put-merge")
     {
         return put();
     }
@@ -1063,8 +1063,12 @@ bool EventListView::put()
     }
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
+    // Said before the change, which makes the list again.
+    const auto said = "Put " + eventCount(total) + " in " + where + " at " +
+                      putPlace(meter, at, reg.bars) + ", over what's there";
     edit("Put " + eventCount(total) + " in " + where,
          [&](core::Song& song) { putRegister(song, reg, track_ - 1, at); });
+    setMessage(said, MessageKind::Information);
     return true;
 }
 

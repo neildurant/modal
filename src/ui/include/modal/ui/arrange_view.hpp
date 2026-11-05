@@ -131,7 +131,7 @@ private:
     void edit(std::string title, const std::function<void(core::Song&)>& change);
     // Inserts the register at a time onto a track and those after it, as P does.
     void insertRegister(const EventRegister& reg, std::size_t track, core::Tick at,
-                        const std::string& title);
+                        const std::string& title, const std::string& said);
 
     // An area's bars, in the cursor's track's bars, and its tracks, as words: "bars 3–4 of Bass".
     std::string describe(const Area& area) const;
