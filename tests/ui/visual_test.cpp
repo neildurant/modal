@@ -408,6 +408,64 @@ TEST_CASE("v in the event list selects rows of events")
     CHECK(pitches(s.document, 0) == Pitches{40, 41, 43, 44, 45, 45, 46, 47});
 }
 
+TEST_CASE("Chord selections show and transform only their notes through keys or the colon line")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto count = GENERATE(as<std::u32string>{}, U"", U"2");
+    const auto query = GENERATE(as<std::u32string>{}, U"cc1", U"vel>0");
+    const auto q = ppqn.quarter();
+    core::Song song{ppqn};
+    const auto track = song.addTrack("Chords");
+    song.updateEvents(track,
+                      [&](core::EventList& events)
+                      {
+                          for (const auto at : {core::Tick{0}, q})
+                          {
+                              events.insert({at, core::Note{60, 100, q / 4}});
+                              events.insert({at + q / 96, core::ControlChange{1, 127}});
+                              events.insert({at + q / 48, core::Note{64, 100, q / 4}});
+                          }
+                      });
+    const auto run = [&](bool colon)
+    {
+        Selecting s{ppqn};
+        s.document.replace(song, std::nullopt);
+        s.ws.showSong();
+        s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+        s.type(U"ge");
+        auto& list = s.ws.eventList();
+        list.setCursor({.track = track, .tick = 0, .pitch = 60});
+        s.type(U"v" + count + U"ic");
+        CHECK(list.selectionStatus() ==
+              (count.empty() ? "2 events in Chords" : "4 events in Chords"));
+
+        Frame frame;
+        list.addRegions(frame);
+        const auto rows = list.list().rows();
+        for (auto row = list.top(); row < rows.size(); ++row)
+        {
+            if (rows[row].kind != RowKind::Event)
+            {
+                continue;
+            }
+            const int y = static_cast<int>(row - list.top() + 1) * kCell.height;
+            const bool selected = std::ranges::any_of(
+                frame.front().text, [y](const TextRun& text)
+                { return text.y == y && text.style.background == Role::Selection; });
+            const auto& event = song.events(track)[rows[row].index];
+            CHECK(selected == (event.isNote() && (!count.empty() || event.tick < q)));
+        }
+
+        s.type(colon ? U":filter " : U"!f");
+        s.type(query);
+        s.press(NamedKey::Enter);
+        const std::size_t expected = query == U"cc1" ? 6 : count.empty() ? 4 : 2;
+        CHECK(s.document.song().events(track).size() == expected);
+        return s.document.song();
+    };
+    CHECK(run(true) == run(false));
+}
+
 TEST_CASE("v on the section strip selects sections, and the operators take them")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

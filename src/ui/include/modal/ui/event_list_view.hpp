@@ -131,6 +131,8 @@ private:
     std::optional<Rows> rowsFor(std::string_view motion, int count);
     // The Visual selection's rows, first and last, or nothing if there's none here.
     std::optional<std::pair<std::size_t, std::size_t>> selectedRows() const;
+    // A chord object's exact notes among those rows; controllers between them aren't selected.
+    std::optional<std::vector<std::size_t>> selectedChord() const;
 
     // Deletes or yanks the track's own events among some rows, which may be in either order.
     // Deletes or yanks the track's events among rows; with a bar's start, taken as bars, their

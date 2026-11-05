@@ -1863,6 +1863,17 @@ void Workspace::widenSelection()
     beforeObject_.reset();
 }
 
+std::pair<std::string, int> Workspace::selectionRange(std::string_view command)
+{
+    if (selection_->object && !selection_->filter && command != "visual-delete-time")
+    {
+        const auto& object = *selection_->object;
+        view().restore(object.at);
+        return {object.name, object.count};
+    }
+    return {"visual", 0};
+}
+
 bool Workspace::operateOnSelection(std::string_view command, int count)
 {
     // d and x delete what's in it, y and Y yank it, D takes its time out, and the other
@@ -1870,13 +1881,8 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     const auto selection = *selection_;
     // Made by an object, and not widened since: as the operator with that object, from where
     // it was chosen.
-    const bool byObject = selection.object && !selection.filter && command != "visual-delete-time";
-    const std::string range = byObject ? selection.object->name : std::string{"visual"};
-    const int rangeCount = byObject ? selection.object->count : 0;
-    if (byObject)
-    {
-        view().restore(selection.object->at);
-    }
+    const auto [range, rangeCount] = selectionRange(command);
+    const bool byObject = range != "visual";
     if (selection.filter && command == "visual-delete-time")
     {
         endVisual();

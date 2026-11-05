@@ -702,6 +702,13 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
 
 bool EventListView::operate(std::string_view op, std::string_view motion, int count)
 {
+    if (motion == "visual")
+    {
+        if (const auto chord = selectedChord())
+        {
+            return chord->empty() || operateEvents(op, *chord, selectedRows()->first);
+        }
+    }
     if (motion == "visual-time")
     {
         refuse("D takes time out, which the event list, being events, doesn't hold; d "
@@ -764,9 +771,10 @@ std::optional<OperatorTarget> EventListView::target(std::string_view motion, int
     const auto id = *list_.track();
     OperatorTarget result{.parts = {{id, {}}}, .what = {}, .notesOnly = false};
     auto& taken = result.parts.front().events;
-    if (motion == "object-chord")
+    const auto selected = motion == "visual" ? selectedChord() : std::nullopt;
+    if (motion == "object-chord" || selected)
     {
-        taken = chordHere(count);
+        taken = selected ? *selected : chordHere(count);
         if (taken.empty())
         {
             return std::nullopt;
@@ -818,12 +826,35 @@ std::optional<std::string> EventListView::selectionStatus() const
     {
         return std::nullopt;
     }
+    if (const auto chord = selectedChord())
+    {
+        return eventCount(chord->size()) + " in " + trackName();
+    }
     std::size_t events = 0;
     for (auto r = selected->first; r <= selected->second; ++r)
     {
         events += list_.rows()[r].kind == RowKind::Event ? 1 : 0;
     }
     return eventCount(events) + " in " + trackName();
+}
+
+std::optional<std::vector<std::size_t>> EventListView::selectedChord() const
+{
+    const auto selection = host_.selection();
+    const auto rows = selectedRows();
+    if (!selection || !rows || !selection->object || selection->object->name != "object-chord" ||
+        !list_.track())
+    {
+        return std::nullopt;
+    }
+    const auto& first = list_.rows()[rows->first];
+    if (first.kind != RowKind::Event)
+    {
+        return std::vector<std::size_t>{};
+    }
+    const auto& song = document_.song();
+    return chordNotes(song, song.events(*list_.track()), first.index, selection->object->count,
+                      chordWindow_);
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> EventListView::selectionSpan() const
@@ -1704,6 +1735,7 @@ Region EventListView::listRegion() const
     }
     const auto cursorField = field();
     const auto selected = selectedRows();
+    const auto chord = selectedChord();
     // A search's matches, their text in a colour of their own, as Vim's are.
     const auto search = host_.searchQuery();
     const auto matched = search ? matchRows(*search) : std::vector<std::size_t>{};
@@ -1734,7 +1766,10 @@ Region EventListView::listRegion() const
             style.background = Role::Playhead;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});
         }
-        else if (!isAdded && selected && row >= selected->first && row <= selected->second &&
+        else if (!isAdded &&
+                 (chord ? list_.rows()[row].kind == RowKind::Event &&
+                              std::ranges::binary_search(*chord, list_.rows()[row].index)
+                        : selected && row >= selected->first && row <= selected->second) &&
                  (filtered.empty() || std::ranges::binary_search(filtered, row)))
         {
             style.background = Role::Selection;

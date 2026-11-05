@@ -494,6 +494,8 @@ private:
     std::optional<bool> runVisual(std::string_view command, int count);
     void selectObject(std::string_view command, int count);
     void widenSelection();
+    // The range a selection names, restoring an object's original place before resolving it.
+    std::pair<std::string, int> selectionRange(std::string_view command);
     // What the prompt shows before the line.
     std::u32string promptLabel() const;
     // The arguments of the command at the prompt not yet typed, as a hint after the line.

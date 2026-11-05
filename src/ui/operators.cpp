@@ -369,13 +369,14 @@ CommandResult Workspace::transformLine(std::string_view name, std::string_view a
 {
     // At the : prompt, the selection's events, or else the cursor's bar's, as a doubled
     // operator takes it; asking, as the keys do, when it's given nothing.
-    const auto motion = selection_ ? "visual" : "operator-line";
-    auto target = view().target(motion, 0);
+    const auto [motion, count] =
+        selection_ ? selectionRange(name) : std::pair{std::string{"operator-line"}, 0};
+    auto target = view().target(motion, count);
     if (!target)
     {
         return {true};
     }
-    if (const auto range = view().cutRange(motion, 0))
+    if (const auto range = view().cutRange(motion, count))
     {
         target->span = std::pair{range->from, range->to};
     }
