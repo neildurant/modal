@@ -614,6 +614,20 @@ TEST_CASE("i and a ask a new section's name and then insert it named, as c renam
     s.type(U"c");
     CHECK(s.ws.commandLine().text() == U"section-rename Section 1");
     s.press(Key::of(NamedKey::Escape));
+
+    // Backspace on an empty line does nothing, so a press too many leaves the question there
+    // (decided November 2026, after use); Escape gives it up.
+    s.type(U"a");
+    for (int i = 0; i < 12; ++i)
+    {
+        s.press(Key::of(NamedKey::Backspace));
+    }
+    CHECK(s.ws.mode() == Mode::CommandLine);
+    CHECK(s.ws.commandLine().text().empty());
+    CHECK(s.ws.shown() == ViewKind::Arrangement);
+    s.press(Key::of(NamedKey::Escape));
+    CHECK(s.ws.mode() == Mode::Normal);
+    CHECK(s.names().size() == 5);
 }
 
 TEST_CASE("Enter on a section plays from its start")

@@ -103,9 +103,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
                                                 !transformSettings(prompt_.answerCommand).empty());
         return (!prompt_.answer || options) && complete(command == "command-line-next" ? 1 : -1);
     }
-    if (prompt_.searchPrompt &&
-        (command == "command-line-run" || command == "command-line-cancel" ||
-         (command == "command-line-backspace" && prompt_.line.text().empty())))
+    if (prompt_.searchPrompt && (command == "command-line-run" || command == "command-line-cancel"))
     {
         // Back to Normal mode, or Visual mode if searching from it, the cursor moving with
         // the selection; Escape leaves the matches as they were.
@@ -194,8 +192,10 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         endVisual();
         return true;
     }
-    if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && prompt_.line.text().empty())) // as in Vim
+    // Escape gives it up. Backspace on an empty line does nothing, rather than closing it as
+    // in Vim, so a press too many when clearing what's there can't throw it away, nor the next
+    // go back a view (decided November 2026, after use); the same in every line typed into.
+    if (command == "command-line-cancel")
     {
         mode_ = Mode::Normal;
         prompt_.answer = {};
@@ -845,8 +845,7 @@ bool Workspace::runPalette(std::string_view command)
     // Ctrl-n, go up and down the list; Escape closes it; the rest edit what's typed.
     const auto shown = paletteShown();
     const auto last = shown.empty() ? 0 : shown.size() - 1;
-    if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && prompt_.line.text().empty()))
+    if (command == "command-line-cancel")
     {
         // Back to the mode it was opened from, a selection kept.
         prompt_.palette.reset();

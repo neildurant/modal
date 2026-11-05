@@ -1618,8 +1618,7 @@ std::optional<bool> EventListView::runTyping(std::string_view command)
         stepFieldBy(command == "command-line-older" ? 1 : -1);
         return openField();
     }
-    if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && fieldLine_.text().empty())) // as in Vim
+    if (command == "command-line-cancel") // Backspace on an empty line does nothing
     {
         field_.reset();
         host_.stopTyping();

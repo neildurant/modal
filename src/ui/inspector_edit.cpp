@@ -125,8 +125,7 @@ std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& hos
         move(hooks.inspection(), command == "command-line-next" ? 1 : -1);
         return true;
     }
-    if (command == "command-line-cancel" ||
-        (command == "command-line-backspace" && line_.text().empty())) // as in Vim
+    if (command == "command-line-cancel") // Backspace on an empty line does nothing
     {
         return leave();
     }
