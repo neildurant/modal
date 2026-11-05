@@ -175,6 +175,10 @@ public:
 
     // Shows a message in the status line until the next key.
     virtual void setMessage(std::string message, MessageKind kind) = 0;
+    // A command not doing what was asked, refused or given up, saying why: a macro stops at
+    // it, whatever its message's kind (decided November 2026), and only then; a warning from a
+    // command that did what was asked doesn't stop one.
+    virtual void refuse(std::string message, MessageKind kind = MessageKind::Warning) = 0;
 
     // A view starts or stops taking typed keys itself, as the event list does when a field is
     // edited in place: the mode is the command line's while it does.

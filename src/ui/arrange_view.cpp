@@ -321,9 +321,9 @@ std::optional<bool> ArrangeView::run(std::string_view command, int count)
     }
     else if (command == "inspector-edit")
     {
-        host_.setMessage("Nothing to edit in a bar here; e edits a note in the piano roll, or a "
-                         "section on the section strip",
-                         MessageKind::Information);
+        host_.refuse("Nothing to edit in a bar here; e edits a note in the piano roll, or a "
+                     "section on the section strip",
+                     MessageKind::Information);
     }
     else if (command == "field-edit")
     {
@@ -351,10 +351,10 @@ bool ArrangeView::operate(std::string_view op, std::string_view motion, int coun
     }
     if (motion == "object-note" || motion == "object-chord")
     {
-        host_.setMessage(std::string{"There's no single "} +
-                             (motion == "object-note" ? "note" : "chord") +
-                             " here; dd takes this bar's events",
-                         MessageKind::Information);
+        host_.refuse(std::string{"There's no single "} +
+                         (motion == "object-note" ? "note" : "chord") +
+                         " here; dd takes this bar's events",
+                     MessageKind::Information);
         return true;
     }
     if (motion == "visual-time")
@@ -438,9 +438,9 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
         }
         if (!isSectionObject(motion))
         {
-            host_.setMessage("On the section strip, operators take is, this section's events on "
-                             "every track",
-                             MessageKind::Information);
+            host_.refuse("On the section strip, operators take is, this section's events on "
+                         "every track",
+                         MessageKind::Information);
             return std::nullopt;
         }
         auto [area, what] = stripContents(*section, count);
@@ -448,10 +448,10 @@ std::optional<OperatorTarget> ArrangeView::target(std::string_view motion, int c
     }
     if (motion == "object-note" || motion == "object-chord")
     {
-        host_.setMessage(std::string{"There's no single "} +
-                             (motion == "object-note" ? "note" : "chord") +
-                             " here; ib takes this bar's events",
-                         MessageKind::Information);
+        host_.refuse(std::string{"There's no single "} +
+                         (motion == "object-note" ? "note" : "chord") +
+                         " here; ib takes this bar's events",
+                     MessageKind::Information);
         return std::nullopt;
     }
     const auto area = areaFor(motion, count);
@@ -483,7 +483,7 @@ std::optional<OperatorTarget> ArrangeView::targetIn(const Area& area, std::strin
     }
     if (!any)
     {
-        host_.setMessage("Nothing there in " + result.what, MessageKind::Information);
+        host_.refuse("Nothing there in " + result.what, MessageKind::Information);
         return std::nullopt;
     }
     return result;
@@ -691,13 +691,12 @@ std::optional<std::pair<core::Tick, core::Tick>> ArrangeView::objectSpan(std::st
 {
     if (page_.stripCursor() && object != "object-song")
     {
-        host_.setMessage("On the strip, h and l select sections", MessageKind::Information);
+        host_.refuse("On the strip, h and l select sections", MessageKind::Information);
         return std::nullopt;
     }
     if (object == "object-note" || object == "object-chord")
     {
-        host_.setMessage("There's no single note or chord here to select",
-                         MessageKind::Information);
+        host_.refuse("There's no single note or chord here to select", MessageKind::Information);
         return std::nullopt;
     }
     const auto area = areaFor(object, count);
@@ -849,7 +848,7 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, s
     }
     if (total == 0)
     {
-        host_.setMessage("Nothing to delete in " + what, MessageKind::Information);
+        host_.refuse("Nothing to delete in " + what, MessageKind::Information);
         return true;
     }
     edit("Delete " + what,
@@ -880,13 +879,13 @@ bool ArrangeView::put(bool insert)
     const auto& reg = host_.eventRegister();
     if (reg.empty())
     {
-        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     if (!reg.sections.empty())
     {
-        host_.setMessage("The register holds sections: put them on the section strip",
-                         MessageKind::Warning);
+        host_.refuse("The register holds sections: put them on the section strip",
+                     MessageKind::Warning);
         return true;
     }
     if (document_.song().tracks().empty())
@@ -1111,8 +1110,8 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     {
         if (section == last)
         {
-            host_.setMessage(name(section) + " is the last section, with none after to join",
-                             MessageKind::Warning);
+            host_.refuse(name(section) + " is the last section, with none after to join",
+                         MessageKind::Warning);
             return true;
         }
         // As Vim's J: a count joins that many sections into one.
@@ -1138,7 +1137,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
              [&](core::Song& s) { changed = s.resizeSection(section, bars); });
         if (!changed)
         {
-            host_.setMessage(name(section) + " can't be shorter than a bar", MessageKind::Warning);
+            host_.refuse(name(section) + " can't be shorter than a bar", MessageKind::Warning);
         }
         page_.setStripCursor(section);
         return true;
@@ -1166,8 +1165,8 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     }
     if (command == "scroll-page-left" || command == "scroll-page-right")
     {
-        host_.setMessage("Paging is for the tracks' bars: j goes back to them",
-                         MessageKind::Information);
+        host_.refuse("Paging is for the tracks' bars: j goes back to them",
+                     MessageKind::Information);
         return true;
     }
     return std::nullopt;
@@ -1204,9 +1203,9 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
     }
     else if (motion == "operator-line" || motion.starts_with("object-"))
     {
-        host_.setMessage("The strip holds sections, not bars or notes: as takes this section, "
-                         "and is its events on every track",
-                         MessageKind::Information);
+        host_.refuse("The strip holds sections, not bars or notes: as takes this section, "
+                     "and is its events on every track",
+                     MessageKind::Information);
         return true;
     }
     const auto& song = document_.song();
@@ -1265,7 +1264,7 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
     }
     if (taking > last)
     {
-        host_.setMessage("A song keeps at least one section", MessageKind::Warning);
+        host_.refuse("A song keeps at least one section", MessageKind::Warning);
         return true;
     }
     edit("Delete " + (taking == 1 ? "section " : std::string{}) + what,
@@ -1279,13 +1278,13 @@ bool ArrangeView::putSections(std::size_t section, bool before)
     const auto& reg = host_.eventRegister();
     if (reg.empty())
     {
-        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     if (reg.sections.empty())
     {
-        host_.setMessage("The register holds bars of tracks: put them on the tracks",
-                         MessageKind::Warning);
+        host_.refuse("The register holds bars of tracks: put them on the tracks",
+                     MessageKind::Warning);
         return true;
     }
     const auto at = before ? section : section + 1;
@@ -1363,12 +1362,11 @@ bool ArrangeView::toBarWithEvents(int count)
             if (i == 0)
             {
                 const auto& track = *document_.song().tracks()[page_.track()];
-                host_.setMessage(std::string{"No bars with events "} +
-                                     (count > 0 ? "after" : "before") + " this on " +
-                                     (track.name.empty()
-                                          ? "track " + std::to_string(page_.track() + 1)
-                                          : track.name),
-                                 MessageKind::Information);
+                host_.refuse(std::string{"No bars with events "} +
+                                 (count > 0 ? "after" : "before") + " this on " +
+                                 (track.name.empty() ? "track " + std::to_string(page_.track() + 1)
+                                                     : track.name),
+                             MessageKind::Information);
                 return true;
             }
             break;

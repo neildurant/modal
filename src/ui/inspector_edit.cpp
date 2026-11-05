@@ -114,7 +114,7 @@ std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& hos
             const auto text = encodeUtf8(line_.text());
             if (auto why = hooks.set(*heading_, text))
             {
-                host.setMessage(std::move(*why), MessageKind::Warning);
+                host.refuse(std::move(*why), MessageKind::Warning);
                 return true;
             }
         }
@@ -135,7 +135,7 @@ std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& hos
         // A step of the value as it is, what was typed left aside.
         if (auto why = hooks.step(*heading_, command == "command-line-older" ? 1 : -1))
         {
-            host.setMessage(std::move(*why), MessageKind::Warning);
+            host.refuse(std::move(*why), MessageKind::Warning);
             return true;
         }
         const auto inspection = hooks.inspection();

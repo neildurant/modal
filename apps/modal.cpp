@@ -332,10 +332,13 @@ public:
 
     void report(const ui::CommandResult& result) override
     {
-        if (!result.message.empty())
+        if (result.warning)
         {
-            view_.setMessage(result.message, result.warning ? ui::MessageKind::Warning
-                                                            : ui::MessageKind::Information);
+            view_.refuse(result.message);
+        }
+        else if (!result.message.empty())
+        {
+            view_.setMessage(result.message, ui::MessageKind::Information);
         }
     }
 

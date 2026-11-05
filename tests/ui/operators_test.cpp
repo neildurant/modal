@@ -1826,3 +1826,28 @@ TEST_CASE("A count after an operator isn't for gn, which takes one match, and sa
     CHECK(o.ws.message() == "gn takes the one match; . does the next");
     CHECK(o.notes().size() == 5);
 }
+
+TEST_CASE("A macro stops where a command is refused, whatever its message, and only there")
+{
+    // A command's outcome apart from its message (decided November 2026).
+    Operating o;
+    // u with nothing to undo is refused, though its message isn't a warning: j isn't reached.
+    o.type(U"QaujQ");
+    REQUIRE(o.ws.arrangement().page().track() == 1);
+    o.type(U"k@a");
+    CHECK(o.ws.message() == "Nothing to undo");
+    CHECK(o.ws.refused());
+    CHECK(o.ws.arrangement().page().track() == 0);
+
+    // A question, shown as a warning, is answered by the macro's next key and it goes on.
+    const auto q = o.q;
+    o.ws.setQuantizePedal(Workspace::QuantizePedal::Ask);
+    o.type(U"4lQbqqyjQ"); // bar 5, the C2 and its pedal, then down a track
+    o.type(U"u");         // back on the first track, at bar 5
+    REQUIRE(o.notes()[3] == std::pair{16 * q + q / 16, 36});
+    o.type(U"@b");
+    CHECK(o.notes()[3] == std::pair{16 * q, 36});
+    CHECK(o.pedals() == std::vector{16 * q + q / 16});
+    CHECK(o.ws.arrangement().page().track() == 1);
+    CHECK_FALSE(o.ws.refused());
+}

@@ -114,14 +114,14 @@ bool Workspace::playMacro(char32_t name, int count)
     const auto* keys = remembered_.macro(name);
     if (keys == nullptr)
     {
-        setMessage(macroName(name) + " is empty", MessageKind::Information);
+        refuse(macroName(name) + " is empty", MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         return true;
     }
     if (macros_.depth >= kMaxMacroDepth)
     {
-        setMessage("Macros playing macros stopped, " + std::to_string(kMaxMacroDepth) + " deep",
-                   MessageKind::Warning);
+        refuse("Macros playing macros stopped, " + std::to_string(kMaxMacroDepth) + " deep",
+               MessageKind::Warning);
         return true;
     }
     macros_.last = name;
@@ -191,7 +191,7 @@ bool Workspace::repeatChange(int count)
     repeat_.notAChange = true;
     if (repeat_.lastChange.empty())
     {
-        setMessage("No change yet to repeat", MessageKind::Information);
+        refuse("No change yet to repeat", MessageKind::Information);
         return true;
     }
     std::vector<Key> keys = repeat_.lastChange;

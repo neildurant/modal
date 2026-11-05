@@ -705,15 +705,15 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
 {
     if (motion == "visual-time")
     {
-        setMessage("D takes time out, which the event list, being events, doesn't hold; d "
-                   "deletes the events",
-                   MessageKind::Information);
+        refuse("D takes time out, which the event list, being events, doesn't hold; d "
+               "deletes the events",
+               MessageKind::Information);
         return true;
     }
     if (motion == "object-bar")
     {
-        setMessage("ab isn't in the event list, which is for events rather than time",
-                   MessageKind::Information);
+        refuse("ab isn't in the event list, which is for events rather than time",
+               MessageKind::Information);
         return true;
     }
     if (motion == "object-chord")
@@ -723,9 +723,9 @@ bool EventListView::operate(std::string_view op, std::string_view motion, int co
     }
     if ((motion == "object-track" || motion == "object-song") && track_ == 0)
     {
-        setMessage("it isn't on the conductor's list, whose tempo and meter changes the song "
-                   "needs",
-                   MessageKind::Information);
+        refuse("it isn't on the conductor's list, whose tempo and meter changes the song "
+               "needs",
+               MessageKind::Information);
         return true;
     }
     const auto rows = rowsFor(motion, count);
@@ -740,7 +740,7 @@ std::vector<std::size_t> EventListView::chordHere(int count)
     if (track_ == 0 || !id || row.kind != RowKind::Event ||
         !document_.song().events(*id)[row.index].isNote())
     {
-        setMessage("No chord here", MessageKind::Warning);
+        refuse("No chord here", MessageKind::Warning);
         return {};
     }
     const auto& song = document_.song();
@@ -752,14 +752,14 @@ std::optional<OperatorTarget> EventListView::target(std::string_view motion, int
     // The track's events among the rows a range or object takes.
     if (track_ == 0)
     {
-        setMessage("The conductor's tempo and meter changes aren't changed this way",
-                   MessageKind::Information);
+        refuse("The conductor's tempo and meter changes aren't changed this way",
+               MessageKind::Information);
         return std::nullopt;
     }
     if (motion == "object-bar")
     {
-        setMessage("ab isn't in the event list, which is for events rather than time",
-                   MessageKind::Information);
+        refuse("ab isn't in the event list, which is for events rather than time",
+               MessageKind::Information);
         return std::nullopt;
     }
     const auto id = *list_.track();
@@ -790,7 +790,7 @@ std::optional<OperatorTarget> EventListView::target(std::string_view motion, int
     }
     if (taken.empty())
     {
-        setMessage("None of " + trackName() + "'s own events there", MessageKind::Information);
+        refuse("None of " + trackName() + "'s own events there", MessageKind::Information);
         return std::nullopt;
     }
     std::ranges::sort(taken);
@@ -842,15 +842,15 @@ void EventListView::selectObject(std::string_view object, int count, Selection& 
     // The rows the object takes, the cursor on the last; refused as its operators refuse it.
     if (object == "object-bar")
     {
-        setMessage("ab isn't in the event list, which is for events rather than time",
-                   MessageKind::Information);
+        refuse("ab isn't in the event list, which is for events rather than time",
+               MessageKind::Information);
         return;
     }
     if ((object == "object-track" || object == "object-song") && track_ == 0)
     {
-        setMessage("it isn't on the conductor's list, whose tempo and meter changes the song "
-                   "needs",
-                   MessageKind::Information);
+        refuse("it isn't on the conductor's list, whose tempo and meter changes the song "
+               "needs",
+               MessageKind::Information);
         return;
     }
     std::optional<Rows> rows;
@@ -966,7 +966,7 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     {
         if (op == "operator-yank")
         {
-            setMessage("Only a track's events can be yanked", MessageKind::Warning);
+            refuse("Only a track's events can be yanked", MessageKind::Warning);
             return true;
         }
         return deleteConductor(std::min(from, to), std::max(from, to));
@@ -1038,18 +1038,17 @@ bool EventListView::put()
 {
     if (track_ == 0)
     {
-        setMessage("Only a track's events can be put", MessageKind::Warning);
+        refuse("Only a track's events can be put", MessageKind::Warning);
         return true;
     }
     if (host_.eventRegister().empty())
     {
-        setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     if (!host_.eventRegister().sections.empty())
     {
-        setMessage("The register holds sections: put them on the section strip",
-                   MessageKind::Warning);
+        refuse("The register holds sections: put them on the section strip", MessageKind::Warning);
         return true;
     }
     // At the cursor's time, or taken as bars at the start of the cursor's bar.
@@ -1112,17 +1111,17 @@ bool EventListView::openField()
     const auto& row = list_.rows()[row_];
     if (row.kind == RowKind::End)
     {
-        setMessage("Nothing to edit here", MessageKind::Information);
+        refuse("Nothing to edit here", MessageKind::Information);
         return true;
     }
     if (row.dim)
     {
-        setMessage("That's the conductor's: edit it in its list (gT)", MessageKind::Warning);
+        refuse("That's the conductor's: edit it in its list (gT)", MessageKind::Warning);
         return true;
     }
     if (track_ == 0 && field() != Column::Data)
     {
-        setMessage("Moving the conductor's changes comes later", MessageKind::Warning);
+        refuse("Moving the conductor's changes comes later", MessageKind::Warning);
         return true;
     }
     // The value as shown, less any note value or note number after it in brackets.
@@ -1139,7 +1138,7 @@ bool EventListView::addNote()
 {
     if (track_ == 0)
     {
-        setMessage("The conductor's list has no notes", MessageKind::Warning);
+        refuse("The conductor's list has no notes", MessageKind::Warning);
         return true;
     }
     // At the cursor's time, with the velocity and length of the note before, if any.
@@ -1192,7 +1191,7 @@ bool EventListView::finishField()
         }
         if (error)
         {
-            setMessage(*error, MessageKind::Warning);
+            refuse(*error, MessageKind::Warning);
             fieldLine_.open(decodeUtf8(text));
             return true;
         }
@@ -1237,7 +1236,7 @@ bool EventListView::finishField()
     if (error)
     {
         // The prompt stays open, with what was typed, to put right.
-        setMessage(*error, MessageKind::Warning);
+        refuse(*error, MessageKind::Warning);
         fieldLine_.open(decodeUtf8(text));
         field_->fresh = false;
         return true;
@@ -1254,15 +1253,15 @@ bool EventListView::stepFieldBy(int steps)
     {
         if (auto error = stepConductor(row_, steps))
         {
-            setMessage(*error, MessageKind::Warning);
+            refuse(*error, MessageKind::Warning);
         }
         return true;
     }
     if (row.kind != RowKind::Event)
     {
-        setMessage(row.dim ? "That's the conductor's: edit it in its list (gT)"
-                           : "Nothing to change here",
-                   MessageKind::Warning);
+        refuse(row.dim ? "That's the conductor's: edit it in its list (gT)"
+                       : "Nothing to change here",
+               MessageKind::Warning);
         return true;
     }
     const auto column = field();
@@ -1279,7 +1278,7 @@ bool EventListView::stepFieldBy(int steps)
     }
     if (error)
     {
-        setMessage(*error, MessageKind::Warning);
+        refuse(*error, MessageKind::Warning);
     }
     return true;
 }
@@ -1421,9 +1420,9 @@ bool EventListView::deleteConductor(std::size_t from, std::size_t to)
     {
         if (kept)
         {
-            setMessage("Every section keeps its tempo and meter at its start, and sections are "
-                       "joined, not deleted",
-                       MessageKind::Warning);
+            refuse("Every section keeps its tempo and meter at its start, and sections are "
+                   "joined, not deleted",
+                   MessageKind::Warning);
         }
         return kept;
     }

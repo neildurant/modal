@@ -575,7 +575,7 @@ std::vector<std::size_t> PianoRollView::chordHere(int count) const
     const auto index = currentNote();
     if (!index)
     {
-        host_.setMessage("No chord here", MessageKind::Warning);
+        host_.refuse("No chord here", MessageKind::Warning);
         return {};
     }
     const auto& song = document_.song();
@@ -587,7 +587,7 @@ std::optional<std::size_t> PianoRollView::noteHere(std::string_view what) const
     const auto index = currentNote();
     if (!index)
     {
-        host_.setMessage("No note here to " + std::string{what}, MessageKind::Warning);
+        host_.refuse("No note here to " + std::string{what}, MessageKind::Warning);
     }
     return index;
 }
@@ -604,7 +604,7 @@ bool PianoRollView::addNote(int count, bool advance)
     }
     if (currentNote())
     {
-        host_.setMessage("There's a note here already", MessageKind::Warning);
+        host_.refuse("There's a note here already", MessageKind::Warning);
         return true;
     }
     const auto& song = document_.song();
@@ -619,7 +619,7 @@ bool PianoRollView::addNote(int count, bool advance)
         const core::Event note{tick, core::Note{pitch_, track.noteVelocity, length}};
         if (auto why = overlap(events, std::nullopt, note, meter()))
         {
-            host_.setMessage(std::move(*why), MessageKind::Warning);
+            host_.refuse(std::move(*why), MessageKind::Warning);
             break;
         }
         events.insert(note);
@@ -664,7 +664,7 @@ bool PianoRollView::operateOn(std::string_view op, const std::vector<std::size_t
     }
     if (notes.empty())
     {
-        host_.setMessage("No notes there to delete", MessageKind::Information);
+        host_.refuse("No notes there to delete", MessageKind::Information);
         return true;
     }
     editEvents("Delete " + what + " in " + trackName(),
@@ -683,13 +683,13 @@ bool PianoRollView::put(bool insert)
     const auto& reg = host_.eventRegister();
     if (reg.empty())
     {
-        host_.setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     if (!reg.sections.empty())
     {
-        host_.setMessage("The register holds sections: put them on the section strip",
-                         MessageKind::Warning);
+        host_.refuse("The register holds sections: put them on the section strip",
+                     MessageKind::Warning);
         return true;
     }
     // At the cursor's time, or taken as bars at the start of the cursor's bar, at the notes'
@@ -710,7 +710,7 @@ bool PianoRollView::put(bool insert)
             const auto why = overlap(song.events(id), std::nullopt, event, song.meter(id));
             if (why && !insert)
             {
-                host_.setMessage(*why, MessageKind::Warning);
+                host_.refuse(*why, MessageKind::Warning);
                 return true;
             }
             ++total;
@@ -850,7 +850,7 @@ bool PianoRollView::changeNote(std::string_view verb,
     }
     if (auto why = overlap(song.events(id), *index, changed, meter()))
     {
-        host_.setMessage(std::move(*why), MessageKind::Warning);
+        host_.refuse(std::move(*why), MessageKind::Warning);
         return true;
     }
     const auto pitch = std::get<core::Note>(changed.data).pitch;
@@ -1568,8 +1568,8 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                               end = std::max(end, event.tick + gridTicks());
                               if (!longer && end >= event.tick + note.duration)
                               {
-                                  host_.setMessage("A note can't be shortened below a grid step",
-                                                   MessageKind::Warning);
+                                  host_.refuse("A note can't be shortened below a grid step",
+                                               MessageKind::Warning);
                                   return false;
                               }
                               note.duration = end - event.tick;
@@ -1580,22 +1580,21 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         // The end a nudge on or back, never shorter than a nudge.
         const bool longer = command == "note-lengthen-fine";
-        return changeNote(longer ? "Lengthen" : "Shorten",
-                          [&](core::Event& event)
-                          {
-                              auto& note = std::get<core::Note>(event.data);
-                              const auto end =
-                                  std::max(nudged(event.tick + note.duration, longer ? n : -n),
-                                           nudged(event.tick, 1));
-                              if (!longer && end >= event.tick + note.duration)
-                              {
-                                  host_.setMessage("A note can't be shortened below a nudge",
-                                                   MessageKind::Warning);
-                                  return false;
-                              }
-                              note.duration = end - event.tick;
-                              return true;
-                          });
+        return changeNote(
+            longer ? "Lengthen" : "Shorten",
+            [&](core::Event& event)
+            {
+                auto& note = std::get<core::Note>(event.data);
+                const auto end = std::max(nudged(event.tick + note.duration, longer ? n : -n),
+                                          nudged(event.tick, 1));
+                if (!longer && end >= event.tick + note.duration)
+                {
+                    host_.refuse("A note can't be shortened below a nudge", MessageKind::Warning);
+                    return false;
+                }
+                note.duration = end - event.tick;
+                return true;
+            });
     }
     else if (command == "velocity-up" || command == "velocity-down")
     {
@@ -1635,7 +1634,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         const auto index = currentNote();
         if (!index)
         {
-            host_.setMessage("No note here to take as the default", MessageKind::Warning);
+            host_.refuse("No note here to take as the default", MessageKind::Warning);
             return true;
         }
         const auto note = std::get<core::Note>(song.events(*trackId())[*index].data);
@@ -1744,9 +1743,9 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         }
         if (selectedPitches())
         {
-            host_.setMessage("D takes time out of the whole track, not some of its pitches; v "
-                             "selects every pitch",
-                             MessageKind::Information);
+            host_.refuse("D takes time out of the whole track, not some of its pitches; v "
+                         "selects every pitch",
+                         MessageKind::Information);
             return true;
         }
         const auto& song = document_.song();
@@ -1820,7 +1819,7 @@ bool PianoRollView::acrossPitches(std::string_view motion) const
                         motion == "octave-down";
     if (across)
     {
-        host_.setMessage("Ranges across pitches come with Visual mode", MessageKind::Information);
+        host_.refuse("Ranges across pitches come with Visual mode", MessageKind::Information);
     }
     return across;
 }
@@ -1967,7 +1966,7 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
     }
     if (notes == 0)
     {
-        host_.setMessage("No notes there", MessageKind::Information);
+        host_.refuse("No notes there", MessageKind::Information);
         return std::nullopt;
     }
     result.what = (notes == 1 ? core::pitchName(std::get<core::Note>(events[*only].data).pitch)

@@ -326,9 +326,15 @@ public:
     {
         message_ = std::move(message);
         messageKind_ = kind;
-        // A warning in a macro is a command failing, which stops it.
-        macros_.failed = macros_.failed || (kind == MessageKind::Warning && macros_.depth > 0);
     }
+    void refuse(std::string message, MessageKind kind = MessageKind::Warning) override
+    {
+        setMessage(std::move(message), kind);
+        refused_ = true;
+        macros_.failed = macros_.failed || macros_.depth > 0;
+    }
+    // Whether the last key's command was refused or given up, rather than done.
+    bool refused() const { return refused_; }
     const std::string& message() const { return message_; }
     MessageKind messageKind() const { return messageKind_; }
 
@@ -725,6 +731,7 @@ private:
     std::string firstPitch(const OperatorTarget& target) const;
     core::VelocityLimits velocityLimits_;
     QuantizePedal quantizePedal_ = QuantizePedal::Follow;
+    bool refused_ = false; // the last key's command, refused or given up
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

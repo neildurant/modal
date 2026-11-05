@@ -154,8 +154,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                              {
                                  operator_.reset();
                                  mode_ = mode_ == Mode::OperatorPending ? Mode::Normal : mode_;
-                                 setMessage("No search yet: " + keysOf("search") + " searches",
-                                            MessageKind::Information);
+                                 refuse("No search yet: " + keysOf("search") + " searches",
+                                        MessageKind::Information);
                                  return {true};
                              }
                              if (mode_ == Mode::OperatorPending)
@@ -434,9 +434,9 @@ bool Workspace::characterAfter(std::string_view command, const Key& key, int cou
     }
     if (key.named != NamedKey::None || (key.modifiers & (kCtrl | kAlt)) != 0)
     {
-        setMessage(keysFor(command) + (command.starts_with("find-") ? " takes a note name after it"
-                                                                    : " takes a letter after it"),
-                   MessageKind::Information);
+        refuse(keysFor(command) + (command.starts_with("find-") ? " takes a note name after it"
+                                                                : " takes a letter after it"),
+               MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         if (operator_)
         {
@@ -469,7 +469,7 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
         {
             if (macros_.last == 0)
             {
-                setMessage("No macro played yet to play again", MessageKind::Information);
+                refuse("No macro played yet to play again", MessageKind::Information);
                 macros_.failed = macros_.depth > 0;
                 return true;
             }
@@ -477,9 +477,9 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
         }
         if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
         {
-            setMessage(play ? "Macros are named by letters, @a to @z, or @@ plays the last again"
-                            : "Macros are named by letters, Qa to Qz, a capital adding to one",
-                       MessageKind::Information);
+            refuse(play ? "Macros are named by letters, @a to @z, or @@ plays the last again"
+                        : "Macros are named by letters, Qa to Qz, a capital adding to one",
+                   MessageKind::Information);
             macros_.failed = macros_.depth > 0;
             return true;
         }
@@ -498,8 +498,8 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
     {
         if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
         {
-            setMessage("Registers are named by letters, \"a to \"z, a capital adding to one",
-                       MessageKind::Information);
+            refuse("Registers are named by letters, \"a to \"z, a capital adding to one",
+                   MessageKind::Information);
             return true;
         }
         registerName_ = character;
@@ -605,7 +605,7 @@ bool Workspace::setMark(char32_t character)
     }
     if (character < U'a' || character > U'z')
     {
-        setMessage("Marks are named by letters, a to z", MessageKind::Information);
+        refuse("Marks are named by letters, a to z", MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         return true;
     }
@@ -635,7 +635,7 @@ bool Workspace::goToMark(char32_t character, int count)
     {
         if (!jumpedFrom_)
         {
-            setMessage("No jump yet to go back from", MessageKind::Information);
+            refuse("No jump yet to go back from", MessageKind::Information);
             macros_.failed = macros_.depth > 0;
             return true;
         }
@@ -648,10 +648,10 @@ bool Workspace::goToMark(char32_t character, int count)
                                : nullptr;
         if (mark == nullptr)
         {
-            setMessage(character >= U'a' && character <= U'z'
-                           ? "Mark " + encodeUtf8(std::u32string(1, character)) + " isn't set"
-                           : std::string{"Marks are named by letters, a to z"},
-                       MessageKind::Information);
+            refuse(character >= U'a' && character <= U'z'
+                       ? "Mark " + encodeUtf8(std::u32string(1, character)) + " isn't set"
+                       : std::string{"Marks are named by letters, a to z"},
+                   MessageKind::Information);
             macros_.failed = macros_.depth > 0;
             if (operator_)
             {
@@ -841,6 +841,7 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // f and F repeat a find while it's the last thing done, any other key ending that, but for
     // a count or keys waiting for more.
     searching_.gnKept = false;
+    refused_ = false;
     widenSelection(); // a key run at a pause may have moved the cursor
     const bool changed = takeKey(key, now);
     widenSelection();
@@ -896,7 +897,7 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
         }
         else
         {
-            setMessage("Nothing done", MessageKind::Information);
+            refuse("Nothing done", MessageKind::Information);
         }
         if (!question_)
         {
@@ -996,8 +997,8 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
     {
         if (!unbound.empty())
         {
-            setMessage(unbound + " isn't a range or object after " + keysOf(operator_->name),
-                       MessageKind::Information);
+            refuse(unbound + " isn't a range or object after " + keysOf(operator_->name),
+                   MessageKind::Information);
             macros_.failed = macros_.depth > 0;
         }
         operator_.reset();
@@ -1005,7 +1006,7 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
     }
     else if ((typedIn == Mode::Normal || typedIn == Mode::Visual) && !unbound.empty())
     {
-        setMessage(unbound + " isn't a key here", MessageKind::Information);
+        refuse(unbound + " isn't a key here", MessageKind::Information);
         macros_.failed = macros_.depth > 0;
     }
     const bool hinted = hints().has_value();
@@ -1045,10 +1046,10 @@ bool Workspace::refuseObject(std::string_view command)
     // Where the object is, rather than doing something wider or narrower than it says
     // (decided November 2026).
     const auto keys = keysOf(command);
-    setMessage(command == "object-track"
-                   ? keys + " takes a track: use it on the track, not the section strip"
-                   : keys + " takes every track: use it on the section strip",
-               MessageKind::Information);
+    refuse(command == "object-track"
+               ? keys + " takes a track: use it on the track, not the section strip"
+               : keys + " takes every track: use it on the section strip",
+           MessageKind::Information);
     macros_.failed = macros_.depth > 0;
     return true;
 }
@@ -1142,16 +1143,19 @@ CommandResult Workspace::run(std::string_view command, int count)
         if (from.empty())
         {
             registerName_.reset();
-            setMessage("Register " + letterText + " is empty", MessageKind::Warning);
+            refuse("Register " + letterText + " is empty", MessageKind::Warning);
             return {true};
         }
         unnamed = std::exchange(register_, from);
     }
     auto result = commands_.run(command, count, mode_);
-    if (!result.message.empty())
+    if (result.warning)
     {
-        setMessage(result.message,
-                   result.warning ? MessageKind::Warning : MessageKind::Information);
+        refuse(result.message);
+    }
+    else if (!result.message.empty())
+    {
+        setMessage(result.message, MessageKind::Information);
     }
     if (named != 0 && put)
     {
@@ -1275,8 +1279,8 @@ bool Workspace::sayWhereFor(std::string_view command)
     {
         text += (i == 0 ? "" : i + 1 == places.size() ? " and " : ", ") + places[i];
     }
-    setMessage(places.empty() ? title + " does nothing here" : title + " is for " + text,
-               MessageKind::Information);
+    refuse(places.empty() ? title + " does nothing here" : title + " is for " + text,
+           MessageKind::Information);
     macros_.failed = macros_.depth > 0;
     return true;
 }
@@ -1351,7 +1355,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         if (!lastSelection_)
         {
-            setMessage("No selection yet to select again", MessageKind::Information);
+            refuse("No selection yet to select again", MessageKind::Information);
             return true;
         }
         selection_ = lastSelection_->first;
@@ -1519,7 +1523,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         if (history_.empty())
         {
-            setMessage("No view to go back to", MessageKind::Information);
+            refuse("No view to go back to", MessageKind::Information);
             return true;
         }
         auto* back = history_.back();
@@ -1545,8 +1549,8 @@ bool Workspace::runOperator(std::string_view command, int count)
         // Its own key again is the cursor's bar, as dd is.
         if (command != op.name)
         {
-            setMessage(keysOf(command) + " isn't a range or object after " + keysOf(op.name),
-                       MessageKind::Information);
+            refuse(keysOf(command) + " isn't a range or object after " + keysOf(op.name),
+                   MessageKind::Information);
             return true;
         }
         command = "operator-line";
@@ -1560,16 +1564,16 @@ bool Workspace::runOperator(std::string_view command, int count)
         }
         if (std::ranges::find(kMovesOnly, command) != kMovesOnly.end())
         {
-            setMessage(keysOf(command) + " only moves the cursor; for a range, use " +
-                           keysOf("cursor-bar-line-next") + " or " + keysOf("cursor-section-next") +
-                           ", or an object such as ib",
-                       MessageKind::Information);
+            refuse(keysOf(command) + " only moves the cursor; for a range, use " +
+                       keysOf("cursor-bar-line-next") + " or " + keysOf("cursor-section-next") +
+                       ", or an object such as ib",
+                   MessageKind::Information);
             return true;
         }
         if (where() == Where::EventList && (command == "cursor-first" || command == "cursor-last"))
         {
-            setMessage(keysOf(command) + " goes to a field, not a time, in the event list",
-                       MessageKind::Information);
+            refuse(keysOf(command) + " goes to a field, not a time, in the event list",
+                   MessageKind::Information);
             return true;
         }
     }
@@ -1583,8 +1587,8 @@ bool Workspace::runOperator(std::string_view command, int count)
         // November 2026, after a review of the grammar).
         if (count > 0)
         {
-            setMessage(keysOf(command) + " takes the one match; . does the next",
-                       MessageKind::Information);
+            refuse(keysOf(command) + " takes the one match; . does the next",
+                   MessageKind::Information);
             macros_.failed = macros_.depth > 0;
             return true;
         }
@@ -1625,8 +1629,8 @@ bool Workspace::cutThen(std::string_view op, std::string_view motion, int count,
     const auto range = view().cutRange(motion, count);
     if (!range)
     {
-        setMessage("Cutting at the edges is for the arrangement and the piano roll",
-                   MessageKind::Information);
+        refuse("Cutting at the edges is for the arrangement and the piano roll",
+               MessageKind::Information);
         return true;
     }
     if (op == "operator-yank")
@@ -1860,7 +1864,7 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
     if (selection.filter && command == "visual-delete-time")
     {
         endVisual();
-        setMessage("D takes out the selection's time, not its matches", MessageKind::Information);
+        refuse("D takes out the selection's time, not its matches", MessageKind::Information);
         return true;
     }
     const auto run = [&]
@@ -1911,22 +1915,22 @@ bool Workspace::putOverSelection()
     if (selection_->filter)
     {
         endVisual();
-        setMessage("p puts over the selection's time, not its matches", MessageKind::Information);
+        refuse("p puts over the selection's time, not its matches", MessageKind::Information);
         return true;
     }
     if (register_.empty())
     {
         endVisual();
-        setMessage("Nothing yanked or deleted to put", MessageKind::Warning);
+        refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
     const bool strip = selection_->where == Where::Strip;
     if (register_.sections.empty() == strip)
     {
         endVisual();
-        setMessage(strip ? "The register holds bars of tracks: put them on the tracks"
-                         : "The register holds sections: put them on the section strip",
-                   MessageKind::Warning);
+        refuse(strip ? "The register holds bars of tracks: put them on the tracks"
+                     : "The register holds sections: put them on the section strip",
+               MessageKind::Warning);
         return true;
     }
     const auto saved = register_;
@@ -1992,7 +1996,7 @@ bool Workspace::operateOnSections(std::string_view op, int count)
     }
     if (range.count >= song.sections().size())
     {
-        setMessage("A song keeps at least one section", MessageKind::Warning);
+        refuse("A song keeps at least one section", MessageKind::Warning);
         return true;
     }
     document_.edit("Delete " + (range.count == 1 ? "section " : std::string{}) + what,
@@ -2032,7 +2036,7 @@ bool Workspace::undoOrRedo(bool undo)
     const auto step = undo ? document_.undo() : document_.redo();
     if (!step)
     {
-        setMessage(undo ? "Nothing to undo" : "Nothing to redo", MessageKind::Information);
+        refuse(undo ? "Nothing to undo" : "Nothing to redo", MessageKind::Information);
         return true;
     }
     // Back where the change was made: its track, time and scroll.
@@ -2102,7 +2106,7 @@ bool Workspace::transport(std::string_view command)
 {
     if (player_ == nullptr)
     {
-        setMessage("Nothing to play to", MessageKind::Warning);
+        refuse("Nothing to play to", MessageKind::Warning);
         return true;
     }
     // The engine refuses only while its queue is full, for an instant; then nothing's changed,
@@ -2133,7 +2137,7 @@ bool Workspace::transport(std::string_view command)
     }
     if (!taken)
     {
-        setMessage("The engine is busy and didn't take that: try again", MessageKind::Warning);
+        refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
     }
     showPlayhead();
     return true;
@@ -2519,7 +2523,7 @@ void Workspace::runLabels(std::shared_ptr<LabelRun> run)
             [this, run]
             {
                 view().setCursor(run->from);
-                setMessage("Nothing done", MessageKind::Information);
+                refuse("Nothing done", MessageKind::Information);
             });
         return;
     }
@@ -2741,13 +2745,13 @@ void Workspace::playFrom(core::Tick tick)
 {
     if (player_ == nullptr)
     {
-        setMessage("Nothing to play to", MessageKind::Warning);
+        refuse("Nothing to play to", MessageKind::Warning);
         return;
     }
     player_->setMarker(tick);
     if (!player_->play())
     {
-        setMessage("The engine is busy and didn't take that: try again", MessageKind::Warning);
+        refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return;
     }
     following_ = true;

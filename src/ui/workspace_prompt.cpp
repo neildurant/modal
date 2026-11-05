@@ -183,7 +183,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
             if (info == nullptr || !info->range)
             {
                 endVisual();
-                setMessage(name + " doesn't take a selection", MessageKind::Warning);
+                refuse(name + " doesn't take a selection", MessageKind::Warning);
                 return true;
             }
         }

@@ -354,7 +354,7 @@ bool Workspace::openTransformMenu(OperatorTarget target)
     const auto keys = transformKeys();
     if (keys.empty())
     {
-        setMessage("No keys start the transforms, for a menu of them", MessageKind::Warning);
+        refuse("No keys start the transforms, for a menu of them", MessageKind::Warning);
         return true;
     }
     transformTarget_ = std::move(target);
@@ -409,10 +409,10 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
     const auto percent = percentUpTo(said.amount, kind == Kind::Compress ? 100 : 1000);
     if (!percent)
     {
-        setMessage("Not a percentage: " + said.amount +
-                       (kind == Kind::Compress ? "; type 0% to 100%, as 50%"
-                                               : "; type one up to 1000%, as 50%"),
-                   MessageKind::Warning);
+        refuse("Not a percentage: " + said.amount +
+                   (kind == Kind::Compress ? "; type 0% to 100%, as 50%"
+                                           : "; type one up to 1000%, as 50%"),
+               MessageKind::Warning);
         return true;
     }
     core::VelocityDynamics dynamics{.kind = kind, .percent = *percent};
@@ -435,8 +435,8 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
                 dynamics.fixed = fixed.value_or(64);
                 continue;
             }
-            setMessage("Not a centre: " + value + "; type local, average or a velocity",
-                       MessageKind::Warning);
+            refuse("Not a centre: " + value + "; type local, average or a velocity",
+                   MessageKind::Warning);
             return true;
         }
         else if (option == "threshold" && value == "all")
@@ -448,16 +448,16 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
             const auto level = value.size() > 1 ? percentUpTo(value.substr(1), 127) : std::nullopt;
             if (!level || (value[0] != '>' && value[0] != '<'))
             {
-                setMessage("Not a threshold: " + value + "; type all, >90 or <30",
-                           MessageKind::Warning);
+                refuse("Not a threshold: " + value + "; type all, >90 or <30",
+                       MessageKind::Warning);
                 return true;
             }
             (value[0] == '>' ? dynamics.above : dynamics.below) = *level;
         }
         else
         {
-            setMessage(word + " takes window=, centre= and threshold=, not " + option + "=",
-                       MessageKind::Warning);
+            refuse(word + " takes window=, centre= and threshold=, not " + option + "=",
+                   MessageKind::Warning);
             return true;
         }
     }
@@ -474,8 +474,8 @@ bool Workspace::velocityOverTime(std::string_view name, const OperatorTarget& ta
     }
     if ((bars && *bars < 1) || (!bars && !length))
     {
-        setMessage("Not a window: " + window + "; type 1bar, 2bars or a note length, as 1/2",
-                   MessageKind::Warning);
+        refuse("Not a window: " + window + "; type 1bar, 2bars or a note length, as 1/2",
+               MessageKind::Warning);
         return true;
     }
     const auto& song = document_.song();
@@ -504,8 +504,8 @@ bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& ta
     const auto said = told(text, name);
     if (!said.options.empty())
     {
-        setMessage("The chord tools take no options, as " + said.options.front().first + "=",
-                   MessageKind::Warning);
+        refuse("The chord tools take no options, as " + said.options.front().first + "=",
+               MessageKind::Warning);
         return true;
     }
     const auto how = name.ends_with("accent")     ? core::ChordVelocity::Accent
@@ -519,9 +519,9 @@ bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& ta
         const auto range = core::parseVelocityRange(said.amount, false);
         if (!range)
         {
-            setMessage("Not a range of velocities: " + said.amount +
-                           "; type the bottom's and the top's, as 70-95",
-                       MessageKind::Warning);
+            refuse("Not a range of velocities: " + said.amount +
+                       "; type the bottom's and the top's, as 70-95",
+                   MessageKind::Warning);
             return true;
         }
         amount = *range;
@@ -534,9 +534,9 @@ bool Workspace::velocityInChords(std::string_view name, const OperatorTarget& ta
         const auto value = accent ? semitones(said.amount) : percentUpTo(said.amount, 100);
         if (!value || *value < 0)
         {
-            setMessage(accent ? "Not an amount: " + said.amount + "; type one up to 127, as 10"
-                              : "Not a percentage: " + said.amount + "; type 0% to 100%, as 50%",
-                       MessageKind::Warning);
+            refuse(accent ? "Not an amount: " + said.amount + "; type one up to 127, as 10"
+                          : "Not a percentage: " + said.amount + "; type 0% to 100%, as 50%",
+                   MessageKind::Warning);
             return true;
         }
         amount.from = *value;
@@ -621,10 +621,10 @@ void Workspace::askKey(const OperatorTarget& target, std::function<void(const co
             const auto key = core::parseKey(text, scales());
             if (!key)
             {
-                setMessage("Not a key: " + text +
-                               "; type a tonic and a scale, as D dorian, or a tonic alone for "
-                               "major, as Eb",
-                           MessageKind::Warning);
+                refuse("Not a key: " + text +
+                           "; type a tonic and a scale, as D dorian, or a tonic alone for "
+                           "major, as Eb",
+                       MessageKind::Warning);
                 return;
             }
             lastKey_ = key->text();
@@ -652,8 +652,8 @@ bool Workspace::applyKeyed(std::string_view op, const OperatorTarget& target, co
         const auto pivot = core::parsePitch(trimmed(text));
         if (!pivot)
         {
-            setMessage("Not a note: " + text + "; type one to invert about, as E4",
-                       MessageKind::Warning);
+            refuse("Not a note: " + text + "; type one to invert about, as E4",
+                   MessageKind::Warning);
             return true;
         }
         return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot) + " in " +
@@ -664,7 +664,7 @@ bool Workspace::applyKeyed(std::string_view op, const OperatorTarget& target, co
     const auto by = semitones(text);
     if (!by)
     {
-        setMessage("Not a number of degrees: " + text + "; type +2, -3 or 7", MessageKind::Warning);
+        refuse("Not a number of degrees: " + text + "; type +2, -3 or 7", MessageKind::Warning);
         return true;
     }
     return changeEvents("Transpose " + target.what + (*by >= 0 ? " up " : " down ") +
@@ -742,10 +742,10 @@ bool Workspace::applyKeyLine(std::string_view name, const OperatorTarget& target
         key = core::parseKey(keyText, scales());
         if (!key)
         {
-            setMessage("Not a key: " + keyText +
-                           "; type key= and a tonic and a scale, as "
-                           "key=D dorian",
-                       MessageKind::Warning);
+            refuse("Not a key: " + keyText +
+                       "; type key= and a tonic and a scale, as "
+                       "key=D dorian",
+                   MessageKind::Warning);
             return true;
         }
         lastKey_ = key->text();
@@ -776,8 +776,7 @@ bool Workspace::applyInvert(std::string_view /*name*/, const OperatorTarget& tar
     const auto pivot = core::parsePitch(trimmed(text));
     if (!pivot)
     {
-        setMessage("Not a note: " + text + "; type one to invert about, as E4",
-                   MessageKind::Warning);
+        refuse("Not a note: " + text + "; type one to invert about, as E4", MessageKind::Warning);
         return true;
     }
     return changeEvents("Invert " + target.what + " about " + core::pitchName(*pivot), target,
@@ -825,10 +824,10 @@ bool Workspace::applyStretch(std::string_view /*name*/, const OperatorTarget& ta
         denominator > core::kMaxStretchTerm || numerator > core::kMaxStretch * denominator ||
         denominator > core::kMaxStretch * numerator)
     {
-        setMessage("Not a ratio: " + text +
-                       "; type 2 for half time, 1/2 for double time, or a percentage, as "
-                       "150%",
-                   MessageKind::Warning);
+        refuse("Not a ratio: " + text +
+                   "; type 2 for half time, 1/2 for double time, or a percentage, as "
+                   "150%",
+               MessageKind::Warning);
         return true;
     }
     // About the range's first event, on every track alike, so the tracks keep in time with
@@ -848,7 +847,7 @@ bool Workspace::applyStretch(std::string_view /*name*/, const OperatorTarget& ta
     }
     if (!about)
     {
-        setMessage("Nothing to stretch in " + target.what, MessageKind::Information);
+        refuse("Nothing to stretch in " + target.what, MessageKind::Information);
         return true;
     }
     const auto end = song.end();
@@ -875,8 +874,8 @@ bool Workspace::applyLength(std::string_view name, const OperatorTarget& target,
         const auto percent = percentUpTo(said, 1000);
         if (!percent || *percent < 1)
         {
-            setMessage("Not a percentage: " + said + "; type one from 1% up, as 80%",
-                       MessageKind::Warning);
+            refuse("Not a percentage: " + said + "; type one from 1% up, as 80%",
+                   MessageKind::Warning);
             return true;
         }
         how = core::LengthChange::Percent;
@@ -888,10 +887,10 @@ bool Workspace::applyLength(std::string_view name, const OperatorTarget& target,
         const auto length = core::parseNoteFraction(said);
         if (!length)
         {
-            setMessage("Not a length: " + said +
-                           "; type legato, a length, as 1/8, or a "
-                           "percentage, as 80%",
-                       MessageKind::Warning);
+            refuse("Not a length: " + said +
+                       "; type legato, a length, as 1/8, or a "
+                       "percentage, as 80%",
+                   MessageKind::Warning);
             return true;
         }
         how = core::LengthChange::Fixed;
@@ -915,7 +914,7 @@ bool Workspace::applyFilter(std::string_view /*name*/, const OperatorTarget& tar
     const auto parsed = core::parseQuery(text, scales());
     if (!parsed.query)
     {
-        setMessage(parsed.error, MessageKind::Warning);
+        refuse(parsed.error, MessageKind::Warning);
         return true;
     }
     const auto ppqn = document_.song().ppqn();
@@ -942,8 +941,7 @@ bool Workspace::applyTranspose(std::string_view /*name*/, const OperatorTarget& 
     const auto by = semitones(text);
     if (!by)
     {
-        setMessage("Not a number of semitones: " + text + "; type +12, -3 or 7",
-                   MessageKind::Warning);
+        refuse("Not a number of semitones: " + text + "; type +12, -3 or 7", MessageKind::Warning);
         return true;
     }
     if (*by == 0)
@@ -965,7 +963,7 @@ bool Workspace::applyLift(std::string_view name, const OperatorTarget& target,
     const auto percent = core::parsePercent(text);
     if (!percent)
     {
-        setMessage("Not a percentage: " + text + "; type 0% to 100%, as 25%", MessageKind::Warning);
+        refuse("Not a percentage: " + text + "; type 0% to 100%, as 25%", MessageKind::Warning);
         return true;
     }
     return changeEvents((lift ? "Lift the velocities of " : "Lower the velocities of ") +
@@ -986,10 +984,10 @@ bool Workspace::applyLimit(std::string_view /*name*/, const OperatorTarget& targ
     const auto range = core::parseVelocityRange(text, false);
     if (!range || range->from > range->to)
     {
-        setMessage("Not a range of velocities: " + text +
-                       "; type the lowest and the "
-                       "highest, as 20-110",
-                   MessageKind::Warning);
+        refuse("Not a range of velocities: " + text +
+                   "; type the lowest and the "
+                   "highest, as 20-110",
+               MessageKind::Warning);
         return true;
     }
     return changeEvents(
@@ -1006,10 +1004,10 @@ bool Workspace::applyRamp(std::string_view /*name*/, const OperatorTarget& targe
     const auto ramp = core::parseVelocityRange(text, true);
     if (!ramp)
     {
-        setMessage("Not a ramp: " + text +
-                       "; type the velocities at its start and end, as "
-                       "60-100, or percentages, as 80%-120%",
-                   MessageKind::Warning);
+        refuse("Not a ramp: " + text +
+                   "; type the velocities at its start and end, as "
+                   "60-100, or percentages, as 80%-120%",
+               MessageKind::Warning);
         return true;
     }
     const auto unit = ramp->percent ? std::string{"%"} : std::string{};
@@ -1082,10 +1080,10 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
                    const auto change = core::parseVelocityChange(text);
                    if (!change)
                    {
-                       setMessage("Not a velocity: " + text +
-                                      "; type a value (80), a change (+10, -10) or a "
-                                      "percentage (80%)",
-                                  MessageKind::Warning);
+                       refuse("Not a velocity: " + text +
+                                  "; type a value (80), a change (+10, -10) or a "
+                                  "percentage (80%)",
+                              MessageKind::Warning);
                        return;
                    }
                    using enum core::VelocityChange::Kind;
@@ -1205,23 +1203,23 @@ bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& targe
         const auto controller = percentUpTo(std::string_view{which}.substr(2), 127);
         if (!controller || which.ends_with('%'))
         {
-            setMessage("Not a controller: " + which + "; type cc and its number, as cc1",
-                       MessageKind::Warning);
+            refuse("Not a controller: " + which + "; type cc and its number, as cc1",
+                   MessageKind::Warning);
             return true;
         }
         if (core::isSwitchController(*controller))
         {
-            setMessage(which + " is a switch, as the pedals are, which thinning leaves alone; "
-                               "the pedalling tools clean them up",
-                       MessageKind::Warning);
+            refuse(which + " is a switch, as the pedals are, which thinning leaves alone; "
+                           "the pedalling tools clean them up",
+                   MessageKind::Warning);
             return true;
         }
         what = {core::ThinWhat::Kind::Controller, *controller};
     }
     else if (which != "all")
     {
-        setMessage("Not what to thin: " + which + "; type all, bend, aftertouch or cc1",
-                   MessageKind::Warning);
+        refuse("Not what to thin: " + which + "; type all, bend, aftertouch or cc1",
+               MessageKind::Warning);
         return true;
     }
     int per = 16;
@@ -1232,10 +1230,10 @@ bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& targe
         if ((option != "per" && option != "step") || !number || value.ends_with('%') ||
             (option == "per" && *number < 1))
         {
-            setMessage(option == "per" ? "Not how many a quarter note: " + value + "; type 1 to 96"
-                       : option == "step" ? "Not a change: " + value + "; type 0 to 64"
-                                          : "Thin takes per= and step=, not " + option + "=",
-                       MessageKind::Warning);
+            refuse(option == "per"    ? "Not how many a quarter note: " + value + "; type 1 to 96"
+                   : option == "step" ? "Not a change: " + value + "; type 0 to 64"
+                                      : "Thin takes per= and step=, not " + option + "=",
+                   MessageKind::Warning);
             return true;
         }
         (option == "per" ? per : step) = *number;
@@ -1259,8 +1257,8 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
     const auto at = core::parsePitch(trimmed(said.amount));
     if (!at)
     {
-        setMessage("Not a note: " + said.amount + "; type one to split at, as C4",
-                   MessageKind::Warning);
+        refuse("Not a note: " + said.amount + "; type one to split at, as C4",
+               MessageKind::Warning);
         return true;
     }
     bool up = true;
@@ -1276,15 +1274,15 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
         }
         else
         {
-            setMessage(option == "side" ? "Not a side: " + value + "; type above or below"
-                                        : "Split takes side= and to=, not " + option + "=",
-                       MessageKind::Warning);
+            refuse(option == "side" ? "Not a side: " + value + "; type above or below"
+                                    : "Split takes side= and to=, not " + option + "=",
+                   MessageKind::Warning);
             return true;
         }
     }
     if (to.empty())
     {
-        setMessage("Split needs a track to move the notes to", MessageKind::Warning);
+        refuse("Split needs a track to move the notes to", MessageKind::Warning);
         return true;
     }
     // The track of that name, ignoring case, or a new one after the first's, playing as it does.
@@ -1312,8 +1310,8 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
     if (existing && std::ranges::any_of(target.parts, [&](const OperatorTarget::Part& part)
                                         { return part.track == *existing; }))
     {
-        setMessage("The notes are on " + to + " already: split them to another track",
-                   MessageKind::Warning);
+        refuse("The notes are on " + to + " already: split them to another track",
+               MessageKind::Warning);
         return true;
     }
     const auto moves = [&](const core::Event& event)
@@ -1330,9 +1328,9 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
     }
     if (count == 0)
     {
-        setMessage(std::string{"No notes "} + (up ? "at or above " : "below ") +
-                       core::pitchName(*at) + " to move",
-                   MessageKind::Information);
+        refuse(std::string{"No notes "} + (up ? "at or above " : "below ") + core::pitchName(*at) +
+                   " to move",
+               MessageKind::Information);
         return true;
     }
     const auto what = count == 1 ? std::string{"1 note"} : std::to_string(count) + " notes";
@@ -1388,7 +1386,7 @@ bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& targ
     {
         if (option != "to")
         {
-            setMessage("Remap takes to=, not " + option + "=", MessageKind::Warning);
+            refuse("Remap takes to=, not " + option + "=", MessageKind::Warning);
             return true;
         }
         to = value;
@@ -1407,8 +1405,8 @@ bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& targ
         const auto b = controller(to);
         if (!b)
         {
-            setMessage("Not a controller: " + to + "; remap " + from + " to another, as cc11",
-                       MessageKind::Warning);
+            refuse("Not a controller: " + to + "; remap " + from + " to another, as cc11",
+                   MessageKind::Warning);
             return true;
         }
         return changeEvents("Remap " + from + " of " + target.what + " to " + to, target,
@@ -1419,9 +1417,9 @@ bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& targ
     const auto b = core::parsePitch(trimmed(to));
     if (!a || !b)
     {
-        setMessage(!a ? "Not a controller or a note: " + from + "; type cc1 or C1"
-                      : "Not a note: " + to + "; remap " + from + " to another, as D1",
-                   MessageKind::Warning);
+        refuse(!a ? "Not a controller or a note: " + from + "; type cc1 or C1"
+                  : "Not a note: " + to + "; remap " + from + " to another, as D1",
+               MessageKind::Warning);
         return true;
     }
     return changeEvents("Remap the " + core::pitchName(*a) + "s of " + target.what + " to " +
@@ -1459,8 +1457,7 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         const auto time = ms(value);
         if (!time || (*time).count() < 0)
         {
-            setMessage("Not a time: " + value + "; type milliseconds, as 30ms",
-                       MessageKind::Warning);
+            refuse("Not a time: " + value + "; type milliseconds, as 30ms", MessageKind::Warning);
             return true;
         }
         if (option == "lift")
@@ -1481,7 +1478,7 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         }
         else
         {
-            setMessage("The pedalling tools don't take " + option + "=", MessageKind::Warning);
+            refuse("The pedalling tools don't take " + option + "=", MessageKind::Warning);
             return true;
         }
     }
@@ -1523,7 +1520,7 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         const bool beats = each && said.amount == "beat";
         if (each && said.amount != "bar" && !beats)
         {
-            setMessage("Not bar or beat: " + said.amount, MessageKind::Warning);
+            refuse("Not bar or beat: " + said.amount, MessageKind::Warning);
             return true;
         }
         title = each ? "Pedal " + target.what + " afresh on each " + (beats ? "beat" : "bar")
@@ -1617,8 +1614,8 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         }
         if (controllers.empty())
         {
-            setMessage("Not a pedal: " + said.amount + "; type sustain, sostenuto, soft or all",
-                       MessageKind::Warning);
+            refuse("Not a pedal: " + said.amount + "; type sustain, sostenuto, soft or all",
+                   MessageKind::Warning);
             return true;
         }
         title = "Clear the " + (said.amount == "all" ? std::string{"pedalling"} : said.amount) +
@@ -1634,8 +1631,8 @@ bool Workspace::pedalAsked(std::string_view op, const OperatorTarget& target,
         const auto by = ms(said.amount);
         if (!by)
         {
-            setMessage("Not a time: " + said.amount + "; type milliseconds, as 20ms or -20ms",
-                       MessageKind::Warning);
+            refuse("Not a time: " + said.amount + "; type milliseconds, as 20ms or -20ms",
+                   MessageKind::Warning);
             return true;
         }
         title =
@@ -1695,8 +1692,8 @@ bool Workspace::quantizeAsked(std::string_view /*name*/, const OperatorTarget& t
         how.grid = core::parseNoteFraction(said.amount);
         if (!how.grid)
         {
-            setMessage("Not a grid: " + said.amount + "; type a note length, as 1/16, or grid",
-                       MessageKind::Warning);
+            refuse("Not a grid: " + said.amount + "; type a note length, as 1/16, or grid",
+                   MessageKind::Warning);
             return true;
         }
     }
@@ -1708,9 +1705,9 @@ bool Workspace::quantizeAsked(std::string_view /*name*/, const OperatorTarget& t
             const auto percent = percentUpTo(value, 100);
             if (!percent || (!strength && (*percent < 25 || *percent > 75)))
             {
-                setMessage(strength ? "Not a strength: " + value + "; type 0% to 100%"
-                                    : "Not a swing: " + value + "; type 25% to 75%, 50% straight",
-                           MessageKind::Warning);
+                refuse(strength ? "Not a strength: " + value + "; type 0% to 100%"
+                                : "Not a swing: " + value + "; type 25% to 75%, 50% straight",
+                       MessageKind::Warning);
                 return true;
             }
             (strength ? how.strength : how.swing) = *percent;
@@ -1726,16 +1723,16 @@ bool Workspace::quantizeAsked(std::string_view /*name*/, const OperatorTarget& t
                 std::ranges::find(kMoves, value, &std::pair<std::string_view, Move>::first);
             if (found == kMoves.end())
             {
-                setMessage("Not what to move: " + value + "; type starts, ends, both or lengths",
-                           MessageKind::Warning);
+                refuse("Not what to move: " + value + "; type starts, ends, both or lengths",
+                       MessageKind::Warning);
                 return true;
             }
             how.move = found->second;
         }
         else
         {
-            setMessage("Quantise takes strength=, swing= and move=, not " + option + "=",
-                       MessageKind::Warning);
+            refuse("Quantise takes strength=, swing= and move=, not " + option + "=",
+                   MessageKind::Warning);
             return true;
         }
     }
@@ -1784,7 +1781,7 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
             auto result = change(cut, inside);
             if (const auto* refusal = std::get_if<core::Refusal>(&result))
             {
-                setMessage(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
+                refuse(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
                 return true;
             }
             changed.push_back(std::move(std::get<core::EventList>(result)));
@@ -1793,7 +1790,7 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
         auto result = change(song.events(part.track), part);
         if (const auto* refusal = std::get_if<core::Refusal>(&result))
         {
-            setMessage(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
+            refuse(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
             return true;
         }
         changed.push_back(std::move(std::get<core::EventList>(result)));

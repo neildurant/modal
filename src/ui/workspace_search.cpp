@@ -42,7 +42,7 @@ bool Workspace::search(const std::string& text)
     const auto parsed = core::parseQuery(text, scales());
     if (!parsed.query)
     {
-        setMessage(parsed.error, MessageKind::Warning);
+        refuse(parsed.error, MessageKind::Warning);
         macros_.failed = macros_.depth > 0;
         return true;
     }
@@ -59,7 +59,7 @@ bool Workspace::searchHere(bool forward, int count)
     const auto query = view().queryHere();
     if (!query)
     {
-        setMessage("No note or controller here to search for", MessageKind::Information);
+        refuse("No note or controller here to search for", MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         return true;
     }
@@ -119,15 +119,15 @@ bool Workspace::select(std::string_view command)
     const bool matches = command.starts_with("select-matches");
     if (matches && !searching_.query)
     {
-        setMessage("No search to select the matches of: " + keysOf("search") + " searches first",
-                   MessageKind::Information);
+        refuse("No search to select the matches of: " + keysOf("search") + " searches first",
+               MessageKind::Information);
         return true;
     }
     if (command == "select-matches")
     {
         if (!selection_)
         {
-            setMessage("Nothing selected to keep the matches in", MessageKind::Information);
+            refuse("Nothing selected to keep the matches in", MessageKind::Information);
             return true;
         }
         selection_->filter = searching_.query;
@@ -165,7 +165,7 @@ bool Workspace::onlyMatches(OperatorTarget& target)
     }
     if (count == 0)
     {
-        setMessage("No matches in the selection", MessageKind::Information);
+        refuse("No matches in the selection", MessageKind::Information);
         return false;
     }
     target.what = count == 1 ? std::string{"1 match"} : std::to_string(count) + " matches";
@@ -190,7 +190,7 @@ bool Workspace::toMatchForGn()
     // The match at the cursor, unless gn has just changed it, or the next; whether there's one.
     if (!searching_.query)
     {
-        setMessage("No search yet: " + keysOf("search") + " searches", MessageKind::Information);
+        refuse("No search yet: " + keysOf("search") + " searches", MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         return false;
     }
@@ -323,8 +323,8 @@ bool Workspace::repeatFind(bool same, int count)
             operator_.reset();
             mode_ = Mode::Normal;
         }
-        setMessage("No find yet: " + keysOf("find-next") + " and a note name finds one",
-                   MessageKind::Information);
+        refuse("No find yet: " + keysOf("find-next") + " and a note name finds one",
+               MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         return true;
     }
@@ -356,7 +356,7 @@ void Workspace::cancelNaming()
     view().setCursor(naming.from);
     operator_.reset();
     mode_ = Mode::Normal;
-    setMessage("Nothing done", MessageKind::Information);
+    refuse("Nothing done", MessageKind::Information);
 }
 
 bool Workspace::operateToFound(bool forward, int count)
@@ -380,9 +380,9 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
     const char32_t upper = letter >= U'a' && letter <= U'g' ? letter - U'a' + U'A' : letter;
     if (upper < U'A' || upper > U'G')
     {
-        setMessage(keysOf(command) + " takes a note name after it, such as " + keysOf(command) +
-                       "E, " + keysOf(command) + "F# or " + keysOf(command) + "Bb",
-                   MessageKind::Information);
+        refuse(keysOf(command) + " takes a note name after it, such as " + keysOf(command) + "E, " +
+                   keysOf(command) + "F# or " + keysOf(command) + "Bb",
+               MessageKind::Information);
         macros_.failed = macros_.depth > 0;
         if (operator_)
         {
@@ -517,7 +517,7 @@ void Workspace::sayNotFound(bool forward)
     {
         text += " in " + track->name;
     }
-    setMessage(text, MessageKind::Information);
+    setMessage(text, MessageKind::Information); // a find fails a macro once its name is done
 }
 
 } // namespace modal::ui

@@ -94,6 +94,10 @@ public:
 private:
     // The row a mark is shown on, and lands on.
     std::size_t markRow(const core::Mark& mark) const;
+    void refuse(std::string message, MessageKind kind = MessageKind::Warning)
+    {
+        host_.refuse(std::move(message), kind);
+    }
     void setMessage(std::string message, MessageKind kind)
     {
         host_.setMessage(std::move(message), kind);
