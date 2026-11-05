@@ -867,23 +867,32 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
         return true;
     }
     const bool hadMessage = !std::exchange(message_, std::string{}).empty();
-    // A question asked takes the next key as its answer: y for yes, Escape to stop a run of
-    // them, any other for no.
-    if (auto question = std::exchange(question_, std::nullopt))
+    // A question asked takes only its answers: y for yes, n for no, and Escape to stop a run of
+    // them or give it up; any other key shows it again, rather than being taken for no (decided
+    // November 2026).
+    if (question_)
     {
         const bool escape = key.named == NamedKey::Escape;
-        if (key.named == NamedKey::None && key.character == U'y' &&
-            (key.modifiers & (kCtrl | kAlt)) == 0)
+        const bool plain = key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0;
+        const bool yes = plain && key.character == U'y';
+        const bool no = plain && key.character == U'n';
+        if (!yes && !no && !escape)
         {
-            question->yes();
+            setMessage(question_->text, MessageKind::Warning);
+            return true;
         }
-        else if (escape && question->stop)
+        auto question = *std::exchange(question_, std::nullopt);
+        if (yes)
         {
-            question->stop();
+            question.yes();
         }
-        else if (!escape && question->no)
+        else if (escape && question.stop)
         {
-            question->no();
+            question.stop();
+        }
+        else if (no && question.no)
+        {
+            question.no();
         }
         else
         {
@@ -2723,9 +2732,9 @@ void Workspace::openPrompt(std::string line)
 void Workspace::ask(std::string question, std::function<void()> yes, std::function<void()> no,
                     std::function<void()> stop)
 {
-    setMessage(std::move(question) + (stop ? " (y/n, Escape stops)" : " (y/n)"),
-               MessageKind::Warning);
-    question_ = Question{std::move(yes), std::move(no), std::move(stop)};
+    auto text = std::move(question) + (stop ? " (y/n, Escape stops)" : " (y/n)");
+    setMessage(text, MessageKind::Warning);
+    question_ = Question{std::move(yes), std::move(no), std::move(stop), std::move(text)};
 }
 
 void Workspace::playFrom(core::Tick tick)

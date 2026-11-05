@@ -203,6 +203,11 @@ TEST_CASE("q quantises notes' starts to the grid, and the event list and arrange
     o.ws.setQuantizePedal(Workspace::QuantizePedal::Ask);
     o.type(U"qq");
     CHECK(o.ws.message() == "Move the pedalling with its notes? (y/n)");
+    // Only y, n and Escape answer it; another key shows it again, doing nothing.
+    o.type(U"jx");
+    CHECK(o.ws.message() == "Move the pedalling with its notes? (y/n)");
+    CHECK(o.notes()[3] == std::pair{16 * q + q / 16, 36});
+    CHECK(o.ws.arrangement().page().bar() == 5);
     o.type(U"n"); // only the notes
     CHECK(o.notes()[3] == std::pair{16 * q, 36});
     CHECK(o.pedals() == std::vector{16 * q + q / 8});

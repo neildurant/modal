@@ -644,12 +644,14 @@ private:
     std::optional<CutRange> cutting_; // the range the operator running cuts, for its target
     bool putOverSelection();
     void endVisual();
-    // A question asked: what it runs for y, for another key, and for Escape.
+    // A question asked: what it runs for y, for n, and for Escape, and the question, shown
+    // again at any other key.
     struct Question
     {
         std::function<void()> yes;
         std::function<void()> no;
         std::function<void()> stop;
+        std::string text;
     };
     std::optional<Question> question_;
     // A question answered at the prompt, such as ^'s velocity: its label, shown in place of
