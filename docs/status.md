@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 5 November 2026, at commit `64c0fce` and the handoff after it.*
+*Last updated 5 November 2026, after setting up the Linux contribution environment at `887c49d`.*
 
 ## Milestones
 
@@ -20,13 +20,31 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ## Pending
 
-- **A code review** of milestone 6's last changes (the key map review, its fixes and the documentation work: `docs/grammar.md`, `docs/decisions.md`, the split of design.md's grammar section). Act on its findings before starting milestone 7. The two earlier reviews' findings were all acted on.
+- **Five findings from the completed review of `30f6301..64c0fce`.** All six findings from the preceding review passed their reproductions. The new findings below remain open; `64c0fce..887c49d` only changed the handoff documents. Address these before starting milestone 7.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, and the views. Neil runs these.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
+## Open review findings
+
+1. **`gv` does not restore all object-selection state.** In the arrangement, `vit<Esc>gvibd` deletes the whole track instead of the first bar, while `vitibd` works. `lastSelection_` retains the object but `endVisual()` clears `beforeObject_`; replacing the restored object can leave the old track target attached. See `Workspace::selectObject()` and `Workspace::endVisual()` in `src/ui/workspace.cpp`.
+2. **A refused Visual put can delete the selection and report success.** Yank C4, then put over a selected D4 where an unselected C4 already occupies the destination. The selection is deleted before the paste is refused for overlap. `Workspace::putOverSelection()` needs to validate the whole replacement or roll it back, and preserve the refusal message. The partial edit predates the reviewed changes; the unconditional success message is new.
+3. **Colon transforms do not use the exact object selected.** In the event list, select a chord whose note rows surround a controller row. `vic!f`, answering `cc1`, leaves that controller alone; `vic:filter cc1` deletes it. `Workspace::transformLine()` uses the bounding Visual rows instead of the remembered object, and the displayed selection includes the intervening row too.
+4. **A successful warning can still stop a macro.** A section split on a track's bar line that cuts a conductor bar short succeeds with `CommandResult::warning`, which is still treated as a refusal. For example, `:section-split Middle<Enter>4l` stops after the split when it produces that warning. Command outcome still needs separating from message severity in `CommandResult` and its consumers.
+5. **grammar.md describes `0` and `$` too broadly.** The arrangement uses the song's first and last bars, the section strip its first and last sections, the piano roll the current bar's bounds, and the event list its fields. The motion table should distinguish these, especially because the motions can follow destructive operators.
+
 ## Next
 
-Milestone 7: the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Start by proposing a plan, raising its "To decide" items in design.md (ghost note colours, split panes, folding, the drum map format, the outline's `J`) first.
+Resolve the open review findings. Then milestone 7: the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Start by proposing a plan, raising its "To decide" items in design.md (ghost note colours, split panes, folding, the drum map format, the outline's `J`) first.
+
+## Contribution environment checked on 5 November 2026
+
+- This session runs on Linux (Ubuntu 26.04), with GCC 15.2, Clang 21.1.8, CMake 4.2.3, Ninja 1.13.2, clang-format 22.1.8 and GitHub CLI 2.46.0. The required Linux development packages are installed.
+- vcpkg is installed at `/home/ndurant/vcpkg`, checked out at the manifest's baseline `357b1a6f8343064ca982a20771e420fcecfe7efc`. `VCPKG_ROOT` is set in `.zshenv` (including non-interactive Zsh sessions) and `.bashrc`. All four Linux configure presets are ready under `build/`, with the pinned dependencies installed.
+- **Validation passed:** GCC Debug and Release, Clang Debug and Release, ASan/UBSan and ThreadSanitizer, through `tools/check-linux.sh`, with four build and test jobs. Each configuration registers 703 tests; three platform/MIDI tests are skipped, with no failures. Whole-tree formatting also passes. Tests include SDL offscreen rendering; real desktop and MIDI hardware checks remain pending above.
+- **Sandbox details:** Catch2's discovery script prefers `XDG_RUNTIME_DIR` over `TMPDIR`; `/run/user/1001` is read-only in the sandbox. Clear `XDG_RUNTIME_DIR` and set `TMPDIR=/tmp` for build scratch files. Initial sandbox attempts also hit LeakSanitizer's restriction on running under tracing. The affected checks passed when rerun outside the sandbox; no sanitizer checks were disabled.
+- **Build policy agreed November 2026:** Codex runs native Linux builds and tests and skips local Windows builds. CI continues checking Windows. AGENTS.md now records this; a completed native Clang check satisfies the equivalent WSL check.
+- **GitHub access verified:** the repository API reports push permission, a dry-run push to `main` succeeded, and CI results are accessible through `gh`. CI for `887c49d` passed. No changes were pushed during setup.
+- The contribution setup changed only AGENTS.md and this status page. No product code changed. There are no outstanding Linux compiler or sanitizer checks for the code at `887c49d`.
 
 ## Things to know
 

@@ -6,7 +6,7 @@ These are the instructions for any AI coding agent working on Modal (Claude Code
 
 ## Starting a session
 
-1. Pull: another agent may have pushed since. `git log` from where you last were says what changed. Claude Code, coming after Codex, then runs the WSL Clang build (see Before pushing).
+1. Pull: another agent may have pushed since. `git log` from where you last were says what changed. Check the handoff for any build or test checks still outstanding (see Before pushing).
 2. Read `docs/status.md`: where things stand, what's pending and what's next.
 3. The full design is in `docs/design.md`, how each part of it was decided in `docs/decisions.md`, and the editing grammar as it is in `docs/grammar.md`. Read the parts the task touches before starting it, and follow them. If a task seems to require departing from the design, stop and ask rather than deciding alone.
 4. Keep `docs/status.md` up to date as work lands, so the next session, or the next agent, starts from it.
@@ -25,13 +25,12 @@ These are the instructions for any AI coding agent working on Modal (Claude Code
 
 ## Before pushing
 
-- Build and test on Windows (`windows-msvc-debug`), and run the whole-tree formatting check below, not just the files you remember touching.
-- MSVC misses some errors GCC and Clang refuse (an unused variable, a missing field initializer, a dangling temporary). When a change removes or moves code, adds struct fields or designated initializers, or changes interfaces, also build `linux-clang-debug` in WSL, with few jobs to spare memory: `wsl -d Ubuntu-24.04 --exec bash -c "cd /mnt/c/Users/neild/Src/modal && export VCPKG_ROOT=/opt/vcpkg && cmake --build --preset linux-clang-debug -j 4"`. The full Linux check (`tools/check-linux.sh`) only when a change warrants it.
-  - **Codex** can't run WSL, so it skips this build; CI's Linux jobs check its pushes, and it notes in `docs/status.md` which of its commits haven't had the Clang build.
-  - **Claude Code**, on resuming after Codex's commits, pulls and runs that Clang build (and the full Linux check if any of them warrant it) before starting anything else, fixing what it finds as a change of its own.
+- Run the whole-tree formatting check below, not just the files you remember touching.
+- **Codex on native Linux:** build and test `linux-gcc-debug` and `linux-clang-debug`. Run Linux checks directly, without WSL, and skip local Windows builds. CI still checks Windows. Run the full Linux check (`tools/check-linux.sh`) when a change warrants it, and record any outstanding checks in `docs/status.md`.
+- **Claude Code on Windows:** build and test `windows-msvc-debug`. MSVC misses some errors GCC and Clang refuse (an unused variable, a missing field initializer, a dangling temporary). When a change removes or moves code, adds struct fields or designated initializers, or changes interfaces, also build `linux-clang-debug` in WSL, with few jobs to spare memory: `wsl -d Ubuntu-24.04 --exec bash -c "cd /mnt/c/Users/neild/Src/modal && export VCPKG_ROOT=/opt/vcpkg && cmake --build --preset linux-clang-debug -j 4"`. Run the full Linux check when a change warrants it. On resuming after another agent, complete any outstanding checks from `docs/status.md` before starting new work; a recorded native Linux Clang pass satisfies the equivalent WSL check.
 - After pushing, watch the CI run (`gh run list`, `gh run watch <id> --exit-status`) until it finishes, and report its result; confirm a pass with `gh run list --json conclusion` rather than trusting an exit code through a pipe.
 - If `main` fails CI while untried local commits sit on top, fix it from a temporary worktree on `origin/main`, push that alone, and rebase the local work onto it.
-- Before saying `modal` is ready to try, check that `modal.exe`'s time is after the last change: it doesn't relink while Modal is running.
+- Before saying `modal` is ready to try, check that the executable (`modal` on Linux, `modal.exe` on Windows) is newer than the last change. On Windows it doesn't relink while Modal is running.
 
 ## Language and tooling
 
