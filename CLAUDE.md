@@ -41,7 +41,8 @@ The full design is in `docs/design.md`. Read it before starting any task, and fo
 CMakeLists.txt
 CMakePresets.json
 README.md
-docs/           design.md (the design), configuration.md and tools.md (for users)
+docs/           design.md (the design as it is), decisions.md (how it was decided, dated),
+                grammar.md, configuration.md and tools.md (for users)
 assets/         fonts, the built-in modalrc and themes, built into the program
 cmake/          the step that builds files from assets/ into the program
 src/core/       engine library: song model, scheduler, recorder, file I/O (no UI dependencies)
