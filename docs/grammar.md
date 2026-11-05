@@ -1,0 +1,220 @@
+# The editing grammar
+
+This is how editing in Modal works now: every key, what it takes and where. The reasons behind it, and how it got this way, are in [design.md](design.md) and [decisions.md](decisions.md).
+
+Editing follows Vim's model: an operator, then what it acts on, a range or an object, with counts. `d]b` deletes to the next bar line, `>ib` transposes this bar up a semitone, `3qq` quantises three bars. `.` repeats the last change.
+
+Every key here is a binding in the built-in `modalrc` and can be changed (see [configuration.md](configuration.md)). Two things teach the keys as you go. After any key that starts longer ones (`g`, `z`, `]`, the leader `,`, or an operator), a pause shows the **hint menu** of what can follow. `, ?` lists **every key that does something where the cursor is**, in groups.
+
+## Where the cursor is
+
+The cursor is one place in the song, a track, a time and in the piano roll a pitch, shown by each view in its own way. What a key does depends on where it is:
+
+- **The arrangement's tracks:** bars on tracks. `ga` shows the arrangement.
+- **The section strip,** above the arrangement's tracks: the song's sections. `gs` goes to it (or `k` from the first track), `j` back.
+- **The piano roll:** one track's notes, by time and pitch. `gr`, or Enter on a bar in the arrangement.
+- **The event list:** one track's events as rows. `ge`; `gc` shows the conductor's list (tempo and meter changes), as track 0.
+
+`Backspace` goes back to the view before. `gt` and `gT` go to the next track and the one before (`3gt` to track 3).
+
+Some keys mean different commands in different places: `J` joins sections on the strip and goes down an octave in the piano roll. A key that does nothing where the cursor is says where it does something.
+
+## Modes
+
+- **Normal:** moving and operating. The default.
+- **Visual:** selecting before acting (`v`, `V`, `Ctrl-v`).
+- **Operator-pending:** after an operator, waiting for what it takes.
+- **The command line:** `:` for named commands (`:quantize 1/16 swing=55`), and the questions commands ask.
+- **Insert:** step entry, to come with milestone 8.
+
+## Moving
+
+### The cursor and time
+
+| Keys | Moves |
+| --- | --- |
+| `h` `l` (or arrows) | A grid step in the piano roll (off a note at the cursor's pitch in one), a bar in the arrangement, a field in the event list, a section on the strip |
+| `j` `k` | A pitch step in the piano roll, a track in the arrangement, a row in the event list |
+| `0` `$` | The first and last field, or the start and end of the bar |
+| `gg` `G` | The start and end of the song; `12G` bar 12 |
+| `{` `}` | The same place a bar back or on (`4}`) |
+| `[b` `]b` | The bar line before, the next bar line |
+| `(` `)` | The chord before, the next chord (events starting within `chordwindow` of each other) |
+| `[s` `]s` | A section's start before, the next |
+| `[l` `]l` | The label before, the next |
+| `Tab` `Shift-Tab` | The next note's start at any pitch, and the one before (piano roll); past empty bars to the next bar with events, and the one before (arrangement) |
+
+Counts go on every motion: `3l`, `2]b`. In the event list, the time motions go to the event at or after where they land. A bar motion into a shorter bar remembers where it wanted to be, as Vim does with columns.
+
+### Pitch (piano roll)
+
+`k` and `j` move a semitone, `K` and `J` an octave.
+
+### Finding and searching
+
+| Keys | Does |
+| --- | --- |
+| `f` `F` and a note name | The next or previous note of that pitch class, any octave: `fE`, `fF#`, `fbb` (B flat); the letter in either case |
+| `;` / `Alt-;` | The last find again, the way it went / the other way |
+| `/` | Search the track: `/C1`, `/C`, `/>A3`, `/A3-A5`, `/vel<60`, `/len<1/32`, `/cc64>63`, `/bend`, terms together (`/C1 vel<60`); `/outside D dorian` and `/inside D dorian` |
+| `n` `N` | The next and previous match, round past the ends, keeping the search's way |
+| `*` `#` | Search forwards and back for the exact pitch under the cursor |
+| `/` Enter, `:noh`, `, S c` | Clear the matches |
+
+A find or search counts (`3fE`, `3n`). After an operator, `f` takes the range through the note it finds, `F` from it, and `n` up to the match. A `#` or `b` straight after a find's letter makes it a sharp or flat; after an operator it does the operator again to the sharp or flat, as one change, and Escape then undoes it.
+
+### Marks
+
+`ma` marks the cursor's place with a letter, saved with the song; `'a` (or `` `a ``) goes there, and after an operator is the range to it (`d'a`). `''` goes back to before the last jump. `:marks` lists them, `:mark-delete a` deletes one.
+
+### Views and scrolling
+
+`zi` `zo` `z0` zoom in, out and back; `zf` follows the playhead again after moving away from it while playing. `Ctrl` with `h` `j` `k` `l` or the arrows moves the cursor and scrolls with it; `Ctrl-Shift-h` / `l` a page; `Ctrl-d` `Ctrl-u` half a page; `Ctrl-f` `Ctrl-b` a page; `zz` centres the cursor.
+
+## Operators
+
+| Key | Does |
+| --- | --- |
+| `d` `y` | Delete, yank |
+| `>` `<` | Transpose up and down a semitone |
+| `t` `T` | Shift later and earlier by a grid step |
+| `q` | Quantise notes' starts to the grid; with pedalling there, as `quantizepedal` says (by default the pedalling goes with its notes) |
+| `^` | Velocity: asks for a value (`80`), a change (`+10`) or a percentage (`80%`) |
+| `~` | Humanise: a little at random in time (`humanizetime`) and velocity (`humanizevel`) |
+| `!` | Transform: then a transform's key (see Transforms) |
+
+- **Doubled, an operator takes this track's events in the cursor's bar:** `dd`, `yy`, `>>`, `qq`; `3dd` three bars.
+- **Counts.** A count before an operator with a "how far" of its own is how far (`3>ib` up three semitones, `2t]b` two grid steps); one after it is the range's (`>3ib` three bars). For `d`, `y`, `q`, `^`, `~` and `!`, counts before and after multiply.
+- **What each takes.** Transposing, velocity, quantising and humanising change notes only. Shifting moves every event in the range, so pedalling and controllers stay with their notes; in the piano roll, which shows only notes, it moves the notes.
+- **Refused whole.** A change that would put a note out of range, an event before the song's start, or a note onto another of its pitch is refused, naming the note, rather than made in part.
+- **While an operator waits,** the status line says what it will do ("Transpose up 3 semitones · then a range or object"), and the hint menu lists the objects and the motions apart, each with what it would take here.
+- **`x` and `Y`** delete and yank the note or event under the cursor.
+
+## Ranges
+
+After an operator, a motion that lands on a boundary it names is a range, from the cursor up to that boundary: `d]b` the rest of the bar, `d[b` from the bar line before, `d]s`, `d]l`, `dG` to the end, `dgg` from the start, `dj` this event and the next, `d'a` to a mark, `dfE` through the next E, `dn` up to the next match. `0`, `$`, `{` and `}` are ranges too, each ending where it says. `Tab`, `(` and `)` only move, and say so.
+
+## Objects
+
+An object is a whole thing at the cursor, named by its letter: `i` is its contents, `a` the thing itself.
+
+| Object | On a track (arrangement, piano roll, event list) | On the section strip |
+| --- | --- | --- |
+| `d` (doubled) | This track's events in the bar | — |
+| `ib` | This bar's events | — |
+| `ab` | This bar as time: `dab` takes it out, closing up to the section's end (not in the event list) | — |
+| `in` | The note or event under the cursor | — |
+| `ic` | Its chord (piano roll, event list) | — |
+| `is` | This section's events on this track | This section's events on every track |
+| `as` | — | This section itself: `das` takes it out of the song |
+| `it` | This track's events (`2it` two tracks in the arrangement) | — |
+| `ie` | — | The whole song, every track |
+| `gn` | The match at the cursor, or the next | — |
+
+An object never reaches beyond the cursor's place: on a track, that track; on the strip, every track. One not offered where the cursor is says where it is. A count takes more (`d2is`, `>3ic`). To the operators that change events in place, `ab` is `ib` and `as` is `is`.
+
+With `gn`, an operator changes the next match and moves on to the one after; `.` changes it too and `n` skips it.
+
+## Visual mode
+
+| Key | Selects |
+| --- | --- |
+| `v` | From here as the cursor moves: bars on every track (arrangement), grid steps at every pitch (piano roll), events (event list), sections (strip) |
+| `V` | Whole rows: tracks at every time (arrangement), pitch rows across the whole track (piano roll); in the event list and on the strip, as `v` |
+| `Ctrl-v` | A box: tracks by bars (arrangement), pitches by grid steps (piano roll) |
+
+- Its own key again, or Escape, ends it; another of them changes to it. `o` goes to the other end; `gv` selects the last selection again.
+- **An object selects exactly what an operator would take with it,** so `v` then an object then an operator does what the operator does with the object: `visd` is `dis`, `v2itd` is `d2it`. Moving the cursor, or `V`, `v` or `Ctrl-v`, lets go of the object; another object replaces it. After `V` or `Ctrl-v`, which chose the rows, an object sets only their time (`Vjis`).
+- **Operators act at once** on the selection: `d` and `x` delete what's selected, `y` and `Y` yank it, the others change it, a count before them saying how far.
+- **`D` takes the selection's time out,** closing up within each section.
+- **`p` and `P` put** the register in place of the selection, as one change.
+- **`|` cuts notes crossing the edges** for the selection, so operators take only the parts inside; before an operator in Normal mode, for that one (`|d]b`).
+- **`:` on a selection** runs a command that takes a range over it (`gsvie:label-to-section` for the whole song).
+- **Selecting from the leader,** `, S`: `b` the bar, `s` the section, `t` the track, `v` what's shown; with a capital (`, S B`, `S`, `T`, `V`) only the search's matches in it, which operators then take; `, S m` in Visual mode keeps only the matches in what's selected; `gn` selects the match at the cursor or the next.
+
+## Putting and registers
+
+| Key | On tracks and in the piano roll | On the strip | In Visual mode |
+| --- | --- | --- | --- |
+| `p` | Over what's there (`put-merge`) | Sections after this one | In place of the selection |
+| `P` | In, moving the rest of the section later (`put-insert`), asking to lengthen it if it must | Sections before this one | In place of the selection |
+| `Alt-p` `Alt-P` | As `p` and `P`, at the cursor's pitch too (piano roll only) | — | — |
+
+- What was taken as bars (`dd`, `ib`, `ab`, the arrangement's bars) goes to the start of the cursor's bar; anything else to the cursor. The event list has `p` but not `P`.
+- **At the cursor's pitch,** the notes keep their intervals to the pitch the cursor was on when they were taken (in Visual mode, the pitch the selection was started on; taken outside the piano roll, their lowest), so a riff or chord shape moves to another pitch.
+- **`:put-ending`** (no key) puts the register over what's there so it ends at the cursor, or at its bar line for bars: a sweep ending on a downbeat.
+- After a put the status line says what, how and where ("Put 4 events in Bass at bar 3, over what's there").
+- **Registers:** `"a` before a yank, delete or put uses register a; `"A` adds to it. `:registers` lists them.
+
+## Time and ripple
+
+- `dib` deletes and leaves silence; `dab` takes the bar out, the rest of the section closing up, silence gathering at the section's end. `P` puts in, moving the rest of the section later. Ripple stays inside the section, so the rest of the song stays aligned.
+- **Bars on every track,** changing the song's length: `, b d` (`:bar-delete`) deletes the cursor's bar (`2, b d` two), keeping them in the register as a section; `, b i` (`:bar-insert`) inserts empty bars before it, asking how many and in what meter, Enter taking one bar in the meter there.
+
+## Notes in the piano roll
+
+| Keys | Does |
+| --- | --- |
+| `o` | Add the track's default note at the cursor |
+| `O` | Add it and move on, past its end, or with `gridadvance` (`, T a`) to the next grid step; `8O` eight in a row |
+| `Alt-h` `Alt-l` | Move the note onto the grid line before, the next |
+| `Alt-H` `Alt-L` | Nudge it earlier, later (the `nudge` setting, in milliseconds) |
+| `Alt-{` `Alt-}` | Move it a bar |
+| `Alt-k` `Alt-j`, `Alt-K` `Alt-J` | Move it a semitone, an octave (or Alt with the arrows) |
+| `=` `-` | Move its end to the grid step after, before |
+| `+` `_` | Lengthen, shorten it by a nudge |
+| `Ctrl-a` `Ctrl-x` | Velocity up, down |
+| `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |
+
+**The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
+
+## Sections
+
+- **On the strip:** `h` `l` go between sections; `x` and `Y` delete and yank one; `p` and `P` put after and before; `Alt-h` `Alt-l` move one a place; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert one before and after; `c` renames it; `e` edits its name and length in the inspector; Enter plays from it.
+- **From any view, on the cursor's section,** `, s`: `r` rename, `i` and `a` insert one before and after, `j` join with the next, `s` start one at the cursor's bar line, `l` start one at the label before.
+- A new section's name is asked first, with "Section N" to edit; Enter puts it in named, as one change, and Escape puts none.
+
+## Repeating, undo and macros
+
+- `u` and `Ctrl-r` undo and redo, going back to where each change was made. Each change is one step.
+- `.` repeats the last change, with its range and answers; `5.` with a count of five in place of its own.
+- `Qa` records keys into macro a until `Q` (`QA` adds to it); `@a` plays it, `@@` the last again, `3@a` three times. A macro stops where a command is refused, whatever its message, and only there. `:macros` lists them.
+
+## Transforms
+
+`!` then a range and a key, or the leader's `, x` and a key then a range, or `:` and the transform's name. Those that ask, ask each setting in turn, Enter taking the default shown.
+
+- **Pitch and time:** `t` transpose by semitones, `T` in a key, `i` invert, `I` in a key, `R` retrograde, `q` quantise (asking how), `s` stretch, `n` note lengths, `h` humanise, `y` split at a note to a track.
+- **Velocity:** `v` velocity, `l` lift, `L` lower, `M` limit, `r` ramp, `c` compress, `e` expand, `p` phrase.
+- **Chords and controllers:** `a` accent chords' top notes, `b` balance chords, `C` compress chords, `E` expand chords, `m` remap a controller or note, `d` thin controller density, `f` filter (delete matches).
+- **Pedalling,** `, x P`: `r` re-pedal at chord changes, `t` re-time the pedalling, `b` pedal each bar or beat, `c` clean up, `x` clear a pedal, `o` offset, `k` bake the sustain into notes.
+
+`2!!` transforms this bar and the next.
+
+## The leader
+
+The leader is `,` (the `leader` setting). Its groups:
+
+| Keys | Group |
+| --- | --- |
+| `, b` | Bars on every track: `d` delete, `i` insert |
+| `, s` | Sections, on the cursor's section |
+| `, t` | Kept for tracks' commands, to come |
+| `, S` | Select |
+| `, x` | Transforms |
+| `, v` | Views: `a` arrangement, `p` piano roll, `e` event list |
+| `, T` | Toggles: `Space` rewind, `a` grid advance |
+| `, n` | Default note from this one |
+| `, :` | The command palette (also `Ctrl-p`) |
+| `, ?` | The keys here |
+
+## Playing
+
+`Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics.
+
+## Questions and lines typed into
+
+- **A yes-or-no question** takes `y`, `n` or Escape; any other key shows it again.
+- **A question at the prompt** shows its default in brackets, which Enter takes ("how many (1)").
+- **In any line typed into,** Escape gives it up; Backspace on an empty line does nothing, so a press too many can't throw away what's being asked.
+- **`Ctrl-p`** opens the command palette: type part of a command's name or what it does. A first `@`, `#`, `'` or `?` searches sections, tracks, labels and marks, or settings.
