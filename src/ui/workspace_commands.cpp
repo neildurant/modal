@@ -81,7 +81,8 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "visual-box",
                 .description = "Visual mode by a box: tracks by bars in the arrangement, pitches "
                                "by grid steps in the piano roll; Ctrl-v again or Escape ends it"},
-    CommandInfo{.name = "visual-again", .description = "Select the last Visual selection again"},
+    CommandInfo{.name = "visual-again",
+                .description = "Go back to the last Visual selection, selecting it again"},
     CommandInfo{.name = "register-use",
                 .description = "Name the register for the next yank, delete or put by a letter "
                                "after it (\"ayy, \"ap); a capital adds to it (\"Ayy)"},
@@ -176,7 +177,8 @@ constexpr std::array kSharedCommands{
                                "an operator changes it, then . does the next and n skips one",
                 .object = true},
     CommandInfo{.name = "select-match",
-                .description = "Select the match of the last search at the cursor, or the next"},
+                .description = "Go to the match of the last search at the cursor, or the next, "
+                               "and select it"},
     CommandInfo{.name = "search-clear",
                 .description = "Clear the matches of the last search",
                 .aliases = "noh nohlsearch"},
