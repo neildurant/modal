@@ -330,17 +330,7 @@ public:
         }
     }
 
-    void report(const ui::CommandResult& result) override
-    {
-        if (result.warning)
-        {
-            view_.refuse(result.message);
-        }
-        else if (!result.message.empty())
-        {
-            view_.setMessage(result.message, ui::MessageKind::Information);
-        }
-    }
+    void report(const ui::CommandResult& result) override { view_.report(result); }
 
     // Which ports a new song names that weren't found, once, to show after what opened it.
     std::string takeMissingPorts() { return std::exchange(missing_, {}); }
@@ -686,26 +676,21 @@ int main(int argc, char* argv[])
     view.setLineHandler(
         [&](const std::string& line)
         {
-            const auto result = commands.runLine(line);
+            auto result = commands.runLine(line);
             view.setKeymap(config.keymap);
             view.setScales(config.scales);
-            auto message = result.message;
-            bool warning = result.warning;
             if (auto error = apply(settings, window, view, document, playback); !error.empty())
             {
-                message = error;
-                warning = true;
+                result.message = error;
+                result.warning = true;
+                result.refused = true;
             }
             if (auto missing = files.takeMissingPorts(); !missing.empty())
             {
-                message = message.empty() ? missing : message + "; " + missing;
-                warning = true;
+                result.message = result.message.empty() ? missing : result.message + "; " + missing;
+                result.warning = true;
             }
-            if (!message.empty())
-            {
-                view.setMessage(message,
-                                warning ? ui::MessageKind::Warning : ui::MessageKind::Information);
-            }
+            view.report(result);
         });
 
     // Closing with unsaved changes asks first (decided in milestone 4). Saving goes through

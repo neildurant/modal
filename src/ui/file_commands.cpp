@@ -203,7 +203,7 @@ private:
         host_.songReplaced();
         if (!result.message.empty())
         {
-            return CommandResult::error(std::move(result.message)); // opened, with a warning
+            return {true, std::move(result.message), true}; // opened, with a warning
         }
         return {true, "Opened " + named(file), false};
     }

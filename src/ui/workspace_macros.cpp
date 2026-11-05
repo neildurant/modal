@@ -108,7 +108,7 @@ bool Workspace::endRecording()
 bool Workspace::playMacro(char32_t name, int count)
 {
     // Its keys again as typed, count times, as one undo step (decided October 2026, as Vim's
-    // @). A command failing in it, by a warning, a key that does nothing here or a motion that
+    // @). A command failing in it, by a refusal, a key that does nothing here or a motion that
     // can't move, stops it and any playing it, what was done staying, to undo or carry on
     // from; macros playing macros stop kMaxMacroDepth deep.
     const auto* keys = remembered_.macro(name);

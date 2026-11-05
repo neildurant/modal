@@ -1851,3 +1851,53 @@ TEST_CASE("A macro stops where a command is refused, whatever its message, and o
     CHECK(o.ws.arrangement().page().track() == 1);
     CHECK_FALSE(o.ws.refused());
 }
+
+TEST_CASE("A macro continues after a section split that warns about a short bar")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const bool colon = GENERATE(false, true);
+    Operating o{ppqn};
+    o.ws.setLineHandler([&](const std::string& line) { o.ws.report(o.registry.runLine(line)); });
+    const auto track = o.document.song().tracks()[0]->id();
+    o.document.edit("Track meter", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateMeter(track, [](core::MeterMap& meter)
+                                         { meter = core::MeterMap{meter.ppqn(), {3, 4}}; });
+                    });
+    o.ws.refresh();
+    o.type(U"gr");
+    o.ws.pianoRoll().setCursor({.track = track, .tick = 3 * o.q, .pitch = 60});
+    const auto before = o.document.song();
+    o.type(colon ? U"Qa:section-split Middle" : U"Qa,ss");
+    o.press(NamedKey::Enter);
+    REQUIRE(o.document.song().sections().size() == 2);
+    CHECK(o.ws.message().find("cuts a bar short") != std::string::npos);
+    CHECK(o.ws.messageKind() == MessageKind::Warning);
+    CHECK_FALSE(o.ws.refused());
+    o.type(U"4lQ");
+    o.type(U"u@a");
+    CHECK(o.document.song().sections().size() == 2);
+    CHECK(o.ws.pianoRoll().cursor().tick == 4 * o.q);
+    CHECK_FALSE(o.ws.refused());
+    o.type(U"u");
+    CHECK(o.document.song() == before);
+}
+
+TEST_CASE("A colon command's refusal stops a macro independently of message severity")
+{
+    const bool warning = GENERATE(false, true);
+    const bool refused = GENERATE(false, true);
+    Operating o;
+    o.registry.add({.name = "outcome", .description = "Report a command outcome"},
+                   [&](const CommandCall&)
+                   { return CommandResult{true, "Reported", warning, refused}; });
+    o.ws.setLineHandler([&](const std::string& line) { o.ws.report(o.registry.runLine(line)); });
+    o.type(U"Qa:outcome");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.refused() == refused);
+    CHECK(o.ws.messageKind() == (warning ? MessageKind::Warning : MessageKind::Information));
+    o.type(U"jQk@a");
+    CHECK(o.ws.arrangement().page().track() == (refused ? std::size_t{0} : std::size_t{1}));
+    CHECK(o.ws.refused() == refused);
+}

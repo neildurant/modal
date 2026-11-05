@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/smf_builder.hpp"
 #include "support/temp_directory.hpp"
 
 #include <modal/core/smf.hpp>
@@ -9,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -165,6 +167,33 @@ TEST_CASE(":e opens a song or imports a MIDI file, refusing to lose unsaved chan
     CHECK(missing.message.starts_with("Can't open "));
     CHECK(f.document.file() == f.directory / "song.modal");
     CHECK(f.host.replaced == 3);
+}
+
+TEST_CASE("Importing MIDI with a warning succeeds without refusing the command")
+{
+    Files f;
+    const auto file = f.directory / "warning.mid";
+    const core::Ppqn ppqn{96};
+    test::SmfTrack track;
+    track
+        .event(0, {0x80, 50, 0}) // an unmatched note-off is reported, but import succeeds
+        .event(0, {0x90, 60, 100})
+        .event(static_cast<std::uint32_t>(ppqn.quarter()), {0x80, 60, 0})
+        .end();
+    const auto bytes = test::makeSmf(0, static_cast<std::uint16_t>(ppqn.value), {track});
+    {
+        std::ofstream out{file, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        REQUIRE(out.good());
+    }
+    const auto result = f.run("e " + utf8Text(file));
+    CHECK(result.warning);
+    CHECK_FALSE(result.refused);
+    CHECK(result.message.find("without a note-on") != std::string::npos);
+    CHECK(f.host.replaced == 1);
+    CHECK(f.document.importedFrom() == file);
+    CHECK(f.run("e " + f.path("missing.mid")).refused);
 }
 
 TEST_CASE(":export writes a MIDI file, refusing to write over one unless given !")

@@ -1137,6 +1137,19 @@ bool Workspace::runAll(const std::vector<Action>& actions)
     return changed;
 }
 
+void Workspace::report(const CommandResult& result)
+{
+    const auto kind = result.warning ? MessageKind::Warning : MessageKind::Information;
+    if (result.refused)
+    {
+        refuse(result.message, kind);
+    }
+    else if (!result.message.empty())
+    {
+        setMessage(result.message, kind);
+    }
+}
+
 CommandResult Workspace::run(std::string_view command, int count)
 {
     if (command != "cut-at-edges" && !isOperator(command) && mode_ != Mode::OperatorPending)
@@ -1164,14 +1177,7 @@ CommandResult Workspace::run(std::string_view command, int count)
         unnamed = std::exchange(register_, from);
     }
     auto result = commands_.run(command, count, mode_);
-    if (result.warning)
-    {
-        refuse(result.message);
-    }
-    else if (!result.message.empty())
-    {
-        setMessage(result.message, MessageKind::Information);
-    }
+    report(result);
     if (named != 0 && put)
     {
         register_ = std::move(*unnamed);
@@ -2393,18 +2399,7 @@ CommandResult Workspace::section(std::string_view name)
     {
         // Asking its name first, with one to edit, so it's split and named as one step.
         askName("Start a section at " + at + ", named: ", song.newSectionName(),
-                [this](const std::string& given)
-                {
-                    const auto result = section(given);
-                    if (result.warning)
-                    {
-                        refuse(result.message);
-                    }
-                    else if (!result.message.empty())
-                    {
-                        setMessage(result.message, MessageKind::Information);
-                    }
-                });
+                [this](const std::string& given) { report(section(given)); });
         return {true};
     }
     const std::string wanted{name};
@@ -2767,18 +2762,7 @@ CommandResult Workspace::askBarInsert(int count)
     {
         askFor(
             before + ", " + bars + ", in the meter (" + here + "): ",
-            [this, bars](const std::string& given)
-            {
-                const auto result = barInsert(bars + " " + given);
-                if (result.warning)
-                {
-                    refuse(result.message);
-                }
-                else if (!result.message.empty())
-                {
-                    setMessage(result.message, MessageKind::Information);
-                }
-            },
+            [this, bars](const std::string& given) { report(barInsert(bars + " " + given)); },
             here);
     };
     if (count > 0)

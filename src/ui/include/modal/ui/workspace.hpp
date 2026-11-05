@@ -322,6 +322,8 @@ public:
         return jumpTime_ >= 0 ? std::optional{jumpTime_} : std::nullopt;
     }
 
+    // Report a registry command's outcome, independently of its message's severity.
+    void report(const CommandResult& result);
     void setMessage(std::string message, MessageKind kind) override
     {
         message_ = std::move(message);

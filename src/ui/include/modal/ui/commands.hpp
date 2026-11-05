@@ -121,14 +121,18 @@ struct CommandCall
 };
 
 // What running a command did: whether what's shown changed, and a message to show, perhaps
-// as a warning.
+// as a warning. Refusal is separate: a successful command may still have a warning.
 struct CommandResult
 {
     bool changed = false;
     std::string message = {};
     bool warning = false;
+    bool refused = false;
 
-    static CommandResult error(std::string message) { return {true, std::move(message), true}; }
+    static CommandResult error(std::string message)
+    {
+        return {true, std::move(message), true, true};
+    }
 
     friend bool operator==(const CommandResult&, const CommandResult&) = default;
 };
