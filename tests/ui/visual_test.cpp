@@ -1226,3 +1226,18 @@ TEST_CASE("Alt-p and Alt-P put at the cursor's pitch too, keeping the notes' int
     CHECK(s.ws.refused());
     CHECK(pitches(s.document, 0).size() == 8);
 }
+
+TEST_CASE("A selection's notes go to the cursor's pitch by the pitch it was started on")
+{
+    // Decided November 2026, after use: the start of a selection being the point chosen, not
+    // where the cursor stopped.
+    Selecting s;
+    const auto bass = s.document.song().tracks()[0]->id();
+    s.type(U"gr");
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 0, .pitch = 40}); // on E2
+    s.ws.handle(Key::typed(U'v', kCtrl), 0);
+    s.type(U"kkkkky"); // a box from E2 up to A2, the cursor at its top
+    s.ws.pianoRoll().setCursor({.track = bass, .tick = 4 * s.bar, .pitch = 50});
+    s.ws.handle(Key::typed(U'p', kAlt), 0);
+    CHECK(std::ranges::count(pitches(s.document, 0), 50) == 1); // E2 to D3, not A2's place
+}

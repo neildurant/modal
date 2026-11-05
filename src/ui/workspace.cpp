@@ -1896,6 +1896,14 @@ bool Workspace::operateOnSelection(std::string_view command, int count)
                     : command == "yank-this"  ? std::string_view{"operator-yank"}
                                               : command;
     const bool done = selection.cut ? cutThen(op, range, rangeCount, run) : run();
+    // What Alt-p puts at the cursor's pitch is placed by the selection's start, the pitch it
+    // was begun on, rather than wherever the cursor stopped (decided November 2026, after use);
+    // an object's, by the cursor where the object was chosen, as its operator's.
+    if (!byObject && selection.anchor.pitch && where() == Where::PianoRoll &&
+        (op == "operator-delete" || op == "operator-yank"))
+    {
+        register_.pitch = selection.anchor.pitch;
+    }
     // Ended once the view has taken it; while the operator asks something, at the prompt as ^
     // does or yes or no as q does about pedalling, it stays shown until the answer or Escape,
     // though what's changed is already taken (decided October 2026).
