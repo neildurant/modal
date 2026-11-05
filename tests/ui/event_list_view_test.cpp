@@ -786,7 +786,8 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
         // bars' and sections' commands what this song does: a one-bar song at its end, a
         // section starting there and no labels.
         const bool songs = command.name == "bar-delete" || command.name == "bar-insert" ||
-                           command.name == "section-split" || command.name == "label-to-section";
+                           command.name == "section-split" || command.name == "label-to-section" ||
+                           command.name == "section-join";
         CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
                !command.keys || songs));
     }
@@ -970,12 +971,16 @@ TEST_CASE(":section-split starts a new section at the bar line of the cursor's b
     // Without a name, Section and a number; one named again gets a number of its own.
     type(v.ws, U"u");
     CHECK(names() == std::vector<std::string>{"Section 1"});
-    CHECK(v.registry.runLine("section-split").message == "Section 2 starts at 3:1:000");
-    CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
-    // Then asking for a name, with that one to edit; Escape keeps it.
+    // Asking for its name first, with that one to edit (decided November 2026, after use):
+    // Escape starts none, Enter starts it named, as one step.
+    CHECK(v.registry.runLine("section-split").changed);
     REQUIRE(v.ws.mode() == Mode::CommandLine);
-    CHECK(v.ws.commandLine().text() == U"section-rename Section 2");
+    CHECK(v.ws.commandLine().text() == U"Section 2");
     v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(names() == std::vector<std::string>{"Section 1"});
+    v.registry.runLine("section-split");
+    v.ws.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(v.ws.message() == "Section 2 starts at 3:1:000");
     CHECK(names() == std::vector<std::string>{"Section 1", "Section 2"});
     // As renaming with no name asks, with the section's name to edit.
     CHECK(v.registry.runLine("section-rename").changed);

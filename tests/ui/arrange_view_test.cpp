@@ -578,15 +578,16 @@ TEST_CASE("Alt-h and Alt-l move a section, J joins, and + and - resize")
     CHECK(s.ws.message() == "A can't be shorter than a bar");
 }
 
-TEST_CASE("i and a insert a new section, which the prompt then names, as c renames one")
+TEST_CASE("i and a ask a new section's name and then insert it named, as c renames one")
 {
+    // Named first, so it goes in named as one step, and Escape inserts none (decided
+    // November 2026, after use).
     Strip s;
     s.type(U"gsl"); // B
     s.type(U"a");
-    CHECK(s.names() == std::vector<std::string>{"A", "B", "Section 1", "C"});
-    CHECK(s.document.song().sectionStart(3) == 9 * kBar); // four bars
     REQUIRE(s.ws.mode() == Mode::CommandLine);
-    CHECK(s.ws.commandLine().text() == U"section-rename Section 1");
+    CHECK(s.ws.commandLine().text() == U"Section 1");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
     for (int i = 0; i < 9; ++i) // over the name given
     {
         s.press(Key::of(NamedKey::Backspace));
@@ -594,12 +595,21 @@ TEST_CASE("i and a insert a new section, which the prompt then names, as c renam
     s.type(U"Bridge");
     s.press(Key::of(NamedKey::Enter));
     CHECK(s.names() == std::vector<std::string>{"A", "B", "Bridge", "C"});
-    CHECK(s.ws.message() == "Renamed Section 1 to Bridge");
+    CHECK(s.document.song().sectionStart(3) == 9 * kBar); // four bars
+    s.type(U"u");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"}); // one step
+    s.press(Key::typed(U'r', kCtrl));
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "Bridge", "C"});
+    s.type(U"hhhll"); // on Bridge
 
     s.type(U"2i"); // two bars, before it; the numbering starts again with no Section N left
+    CHECK(s.ws.commandLine().text() == U"Section 1");
+    s.press(Key::of(NamedKey::Enter));
     CHECK(s.names()[2] == "Section 1");
     CHECK(s.document.song().sectionStart(3) - s.document.song().sectionStart(2) == 2 * kBar);
-    s.press(Key::of(NamedKey::Escape)); // keeps the name
+    s.type(U"a");
+    s.press(Key::of(NamedKey::Escape)); // inserts none
+    CHECK(s.names().size() == 5);
 
     s.type(U"c");
     CHECK(s.ws.commandLine().text() == U"section-rename Section 1");

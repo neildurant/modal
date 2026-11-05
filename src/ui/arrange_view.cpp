@@ -1188,13 +1188,20 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     }
     if (command == "section-insert-before-strip" || command == "section-insert-after-strip")
     {
-        // A new section of 4 bars, or the count, named for now and then to be named.
-        const auto at = command == "section-insert-before-strip" ? section : section + 1;
-        const auto newName = song.newSectionName();
-        edit("Insert " + newName,
-             [&](core::Song& s) { s.insertEmptySection(at, newName, count > 0 ? count : 4); });
-        page_.setStripCursor(at);
-        host_.openPrompt("section-rename " + newName);
+        // A new section of 4 bars, or the count, asking its name first, with one to edit, so
+        // it goes in named, as one step (decided November 2026, after use); Escape puts none.
+        const bool before = command == "section-insert-before-strip";
+        const auto at = before ? section : section + 1;
+        const auto bars = count > 0 ? count : 4;
+        host_.askName("Insert a section " + std::string{before ? "before " : "after "} +
+                          name(section) + ", named: ",
+                      song.newSectionName(),
+                      [this, at, bars](const std::string& given)
+                      {
+                          edit("Insert " + given,
+                               [&](core::Song& s) { s.insertEmptySection(at, given, bars); });
+                          page_.setStripCursor(at);
+                      });
         return true;
     }
     if (command == "section-rename-strip")

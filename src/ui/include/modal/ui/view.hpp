@@ -200,8 +200,12 @@ public:
     virtual void show(ViewKind kind) = 0;
     virtual void open(ViewKind kind) = 0;
 
-    // Opens the : prompt with a line in it to edit, as naming a new section does.
+    // Opens the : prompt with a line in it to edit, as renaming a section does.
     virtual void openPrompt(std::string line) = 0;
+    // Asks for a name at the prompt, after a label, with one there to edit; answer runs with
+    // what's given (Enter), and Escape runs nothing.
+    virtual void askName(std::string label, std::string name,
+                         std::function<void(const std::string&)> answer) = 0;
 
     // Asks a question in the status line, running yes if the next key is y and no for any
     // other, or for Escape stop, if there's one, which stops a run of questions; with nothing

@@ -643,6 +643,13 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.answerSetting = 0;
 }
 
+void Workspace::askName(std::string label, std::string name,
+                        std::function<void(const std::string&)> answer)
+{
+    askFor(std::move(label), std::move(answer));
+    prompt_.line.open(decodeUtf8(name));
+}
+
 std::vector<PaletteItem> Workspace::paletteItems() const
 {
     // The commands that can be run from Normal mode, the palette apart, with their keys.

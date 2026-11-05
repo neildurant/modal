@@ -1276,18 +1276,36 @@ TEST_CASE("The leader's Sections group works on the cursor's section from any vi
     s.type(U",sj");
     CHECK(song.sections().size() == 2); // B and C, one
     s.type(U"u");
-    s.type(U"},ss"); // a new section at bar 4, asking for its name
-    REQUIRE(song.sections().size() == 4);
-    CHECK(s.ws.commandLine().text().starts_with(U"section-rename "));
+    // A new section at bar 4, its name asked first, so Enter starts it named, as one step.
+    s.type(U"},ss");
+    CHECK(s.ws.commandLine().text() == U"Section 1");
     s.press(NamedKey::Escape);
-    s.type(U"u,sr");
+    CHECK(song.sections().size() == 3);
+    s.type(U",ss");
+    s.ws.commandLine().text();
+    s.press(NamedKey::Enter);
+    REQUIRE(song.sections().size() == 4);
+    s.type(U"u");
+    CHECK(song.sections().size() == 3);
+    s.type(U",sr");
     CHECK(s.ws.commandLine().text() == U"section-rename B");
     s.press(NamedKey::Escape);
-    s.type(U",si");
-    CHECK(song.sections().size() == 4);
-    CHECK(song.sections()[1]->name() != "B"); // the new one, before B
-    s.press(NamedKey::Escape);
+    // Inserting names the new one, not this one (found after use), as one step, the cursor
+    // going to it.
+    s.type(U",sa");
+    for (int i = 0; i < 9; ++i)
+    {
+        s.ws.handle(Key::of(NamedKey::Backspace), 0);
+    }
+    s.type(U"Bridge");
+    s.press(NamedKey::Enter);
+    REQUIRE(song.sections().size() == 4);
+    CHECK(song.sections()[1]->name() == "B");
+    CHECK(song.sections()[2]->name() == "Bridge");
+    CHECK(song.sectionAt(s.ws.pianoRoll().cursor().tick) == 2);
     s.type(U"u");
+    CHECK(song.sections().size() == 3);
+    CHECK(song.sections()[1]->name() == "B");
     // And Select is on , S.
     s.type(U",Sb");
     CHECK(s.ws.mode() == Mode::Visual);

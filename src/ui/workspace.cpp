@@ -2327,12 +2327,23 @@ CommandResult Workspace::sectionHere(std::string_view command, int count)
         refresh();
         return {true};
     }
-    const auto at = command == "section-insert-before" ? section : section + 1;
-    const auto newName = song.newSectionName();
-    document_.edit("Insert " + newName, view().place(), [&](core::Song& s)
-                   { s.insertEmptySection(at, newName, count > 0 ? count : 4); });
-    refresh();
-    openPrompt("section-rename " + newName);
+    // Asking its name first, with one to edit, so it goes in named, as one step; the cursor
+    // then goes to it.
+    const bool before = command == "section-insert-before";
+    const auto at = before ? section : section + 1;
+    const auto bars = count > 0 ? count : 4;
+    askName("Insert a section " + std::string{before ? "before " : "after "} + name(section) +
+                ", named: ",
+            song.newSectionName(),
+            [this, at, bars](const std::string& given)
+            {
+                document_.edit("Insert " + given, view().place(),
+                               [&](core::Song& s) { s.insertEmptySection(at, given, bars); });
+                refresh();
+                auto cursor = view().cursor();
+                cursor.tick = document_.song().sectionStart(at);
+                view().setCursor(cursor);
+            });
     return {true};
 }
 
@@ -2356,7 +2367,25 @@ CommandResult Workspace::section(std::string_view name)
         return CommandResult::error(song.sections()[current]->name() + " starts at " + at +
                                     " already");
     }
-    const std::string wanted = name.empty() ? song.newSectionName() : std::string{name};
+    if (name.empty())
+    {
+        // Asking its name first, with one to edit, so it's split and named as one step.
+        askName("Start a section at " + at + ", named: ", song.newSectionName(),
+                [this](const std::string& given)
+                {
+                    const auto result = section(given);
+                    if (result.warning)
+                    {
+                        refuse(result.message);
+                    }
+                    else if (!result.message.empty())
+                    {
+                        setMessage(result.message, MessageKind::Information);
+                    }
+                });
+        return {true};
+    }
+    const std::string wanted{name};
     std::optional<core::Song::Split> split;
     document_.edit("Start section " + wanted + " at " + at, view().place(),
                    [&](core::Song& s) { split = s.splitSection(tick, wanted); });
@@ -2365,13 +2394,8 @@ CommandResult Workspace::section(std::string_view name)
     {
         return CommandResult::error("Can't start a section at " + at);
     }
-    // The name it got, numbered if another section had it; asking for one, with that to edit,
-    // if none was given (decided October 2026, splitting first as i on the strip does).
+    // The name it got, numbered if another section had it.
     const auto& named = document_.song().sections()[split->index]->name();
-    if (name.empty())
-    {
-        openPrompt("section-rename " + named);
-    }
     std::string cut;
     if (split->conductor)
     {
