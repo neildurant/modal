@@ -601,7 +601,7 @@ bool Workspace::setMark(char32_t character)
     // m Space is the play-from marker, which the keys bind apart, unless typed slowly.
     if (character == U' ')
     {
-        return run("marker-set", 0).changed;
+        return run("play-from-set", 0).changed;
     }
     if (character < U'a' || character > U'z')
     {
@@ -1413,7 +1413,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         return false;
     }
     if (command == "play-toggle" || command == "play-stop-back" || command == "play-cursor" ||
-        command == "marker-set" || command == "panic")
+        command == "play-from-set" || command == "panic")
     {
         return transport(command);
     }
@@ -2140,7 +2140,7 @@ bool Workspace::transport(std::string_view command)
         taken = player_->toggle();
         returning_ = taken ? was : returning_;
     }
-    else if (command == "play-cursor" || command == "marker-set")
+    else if (command == "play-cursor" || command == "play-from-set")
     {
         player_->setMarker(view().cursor().tick);
         if (command == "play-cursor")

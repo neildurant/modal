@@ -295,7 +295,7 @@ constexpr std::array kSharedCommands{
                                "started; or play, as Space does"},
     CommandInfo{.name = "play-cursor",
                 .description = "Put the play-from marker at the cursor, and play from there"},
-    CommandInfo{.name = "marker-set", .description = "Put the play-from marker at the cursor"},
+    CommandInfo{.name = "play-from-set", .description = "Put the play-from marker at the cursor"},
     CommandInfo{.name = "panic",
                 .description = "Stop, and send All Notes Off and Reset All Controllers"},
     CommandInfo{.name = "playhead-follow",
