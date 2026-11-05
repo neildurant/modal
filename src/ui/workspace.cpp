@@ -118,11 +118,13 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          }
                          if (name == "bar-insert")
                          {
-                             // From keys, a count says how many (3, b i).
-                             const auto counted = std::to_string(call.count);
-                             return barInsert(call.arguments.empty() && call.count > 0
-                                                  ? std::string_view{counted}
-                                                  : call.arguments);
+                             // From keys or the palette, asking how many and in what
+                             // meter (decided November 2026), a count answering the first.
+                             if (call.line.empty())
+                             {
+                                 return askBarInsert(call.count);
+                             }
+                             return barInsert(call.arguments);
                          }
                          if (name == "section-rename")
                          {
@@ -2699,6 +2701,47 @@ CommandResult Workspace::deleteBars(core::Tick from, core::Tick to)
             "Deleted " + bars +
                 " on every track; p on the section strip puts them back as a section",
             false};
+}
+
+CommandResult Workspace::askBarInsert(int count)
+{
+    // How many bars (1), then their meter (the one there), Enter taking each default.
+    const auto& song = document_.song();
+    const auto& meter = song.meter();
+    const auto bar = meter.toBarBeatTick(view().cursor().tick).bar;
+    if (meter.barStart(bar) >= song.end())
+    {
+        return CommandResult::error("Bars go in before a bar of the song");
+    }
+    const auto signature = meter.signatureAt(meter.barStart(bar));
+    const auto here =
+        std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
+    const auto before = "Insert bars before bar " + std::to_string(bar);
+    const auto askMeter = [this, before, here](const std::string& bars)
+    {
+        askFor(
+            before + ", " + bars + ", in the meter (" + here + "): ",
+            [this, bars](const std::string& given)
+            {
+                const auto result = barInsert(bars + " " + given);
+                if (result.warning)
+                {
+                    refuse(result.message);
+                }
+                else if (!result.message.empty())
+                {
+                    setMessage(result.message, MessageKind::Information);
+                }
+            },
+            here);
+    };
+    if (count > 0)
+    {
+        askMeter(std::to_string(count));
+        return {true};
+    }
+    askFor(before + ", how many (1): ", askMeter, "1");
+    return {true};
 }
 
 CommandResult Workspace::barInsert(std::string_view arguments)

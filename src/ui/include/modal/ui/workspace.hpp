@@ -439,6 +439,7 @@ private:
     // own bars; :section-rename NAME renames the section at the cursor.
     CommandResult section(std::string_view name);
     CommandResult sectionHere(std::string_view command, int count);
+    CommandResult askBarInsert(int count);
     // Bars on every track, at the cursor's bar in the conductor's bars.
     CommandResult barDelete(int count);
     // The conductor's bars from one bar line to another, on every track, closing up.

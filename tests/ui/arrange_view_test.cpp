@@ -1073,8 +1073,25 @@ TEST_CASE("The leader's Bars group deletes and inserts bars on every track, with
     CHECK(song.end() == end - kBar);
     a.type(U"u2,bd");
     CHECK(song.end() == end - 2 * kBar);
+    // , b i asks how many and in what meter, Enter taking one bar in the meter there; a
+    // count answers the first.
+    const auto enter = [&] { a.press(Key::of(NamedKey::Enter)); };
     a.type(U"u,bi");
+    CHECK(a.ws.mode() == Mode::CommandLine);
+    enter();
+    CHECK(a.ws.mode() == Mode::CommandLine); // the meter now
+    enter();
     CHECK(song.end() == end + kBar);
     a.type(U"u3,bi");
+    enter();
     CHECK(song.end() == end + 3 * kBar);
+    a.type(U"u,bi2");
+    enter();
+    a.type(U"3/4");
+    enter();
+    CHECK(song.end() == end + 2 * (kBar * 3 / 4));
+    a.type(U"u,bi");
+    a.press(Key::of(NamedKey::Escape));
+    CHECK(song.end() == end);
+    CHECK(a.ws.mode() == Mode::Normal);
 }

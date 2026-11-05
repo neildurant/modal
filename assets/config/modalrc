@@ -389,8 +389,9 @@ nmap <leader>sl label-to-section   "A section from the label"
 
 " Bars on every track, taking time out of the song or putting it in, the conductor's tempo and
 " meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping
-" them in the register as a section, and , b i inserts an empty bar before it, as :bar-delete
-" and :bar-insert do.
+" them in the register as a section, and , b i inserts empty bars before it, asking how many
+" and in what meter, Enter taking one bar in the meter there, as :bar-delete and :bar-insert
+" do.
 keysection "Bars"
 ngroup <leader>b "Bars"
 nmap <leader>bd bar-delete        "Delete bars on every track"
