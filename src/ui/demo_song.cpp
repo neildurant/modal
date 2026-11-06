@@ -3,6 +3,7 @@
 #include <modal/core/event.hpp>
 #include <modal/core/meter_map.hpp>
 #include <modal/core/note_fraction.hpp>
+#include <modal/core/tempo_map.hpp>
 #include <modal/ui/demo_song.hpp>
 
 #include <algorithm>
@@ -73,6 +74,74 @@ bool skipped(std::size_t track, std::int64_t bar)
     const auto hash =
         static_cast<std::uint64_t>(track) * 7919u + static_cast<std::uint64_t>(bar) * 104729u;
     return (hash >> 3) % 5 == 0;
+}
+
+// At least one of everything a song can hold besides notes, to try each feature on: in the track
+// that would have it, near the section it suits. The SysEx is under the ID for non-commercial
+// use, so no instrument acts on it, and nothing resets one.
+void addExamples(core::Song& song, const std::array<core::Tick, kSections + 1>& starts)
+{
+    const core::Tick q = song.ppqn().quarter();
+    const auto verse = starts[1];
+    const auto chorus = starts[2];
+    const auto bridge = starts[4];
+    const auto tracks = song.tracks();
+    const auto add = [&](std::size_t track, const std::vector<core::Event>& added)
+    {
+        song.updateEvents(tracks[track]->id(),
+                          [&](core::EventList& events)
+                          {
+                              for (const auto& event : added)
+                              {
+                                  events.insert(event);
+                              }
+                          });
+    };
+
+    // Sounds changing with the sections, with a bank select and without.
+    add(1, {{chorus, core::ProgramChange{34}}});
+    add(2, {{verse, core::ControlChange{0, 1}},
+            {verse, core::ControlChange{32, 2}},
+            {verse, core::ProgramChange{5}},
+            {chorus, core::ProgramChange{48}},
+            {bridge, core::ProgramChange{5}}});
+
+    // A sustain pedal, and a fade in on the volume controller.
+    add(2, {{0, core::ControlChange{64, 127}}, {4 * q - 1, core::ControlChange{64, 0}}});
+    std::vector<core::Event> fade;
+    for (int i = 0; i <= 8; ++i)
+    {
+        fade.push_back({i * q, core::ControlChange{7, static_cast<std::uint8_t>(40 + i * 10)}});
+    }
+    add(3, fade);
+
+    // A lead line's expression: modulation, a bend and back, and both kinds of pressure.
+    std::vector<core::Event> modulation;
+    for (int i = 0; i <= 8; ++i)
+    {
+        modulation.push_back(
+            {verse + i * q / 2, core::ControlChange{1, static_cast<std::uint8_t>(i * 12)}});
+    }
+    add(4, modulation);
+    add(4, {{chorus, core::PitchBend{core::PitchBend::kMax / 2}},
+            {chorus + q / 2, core::PitchBend{0}},
+            {chorus + q, core::ChannelPressure{70}},
+            {chorus + 2 * q, core::ChannelPressure{0}},
+            {chorus + 2 * q, core::PolyPressure{72, 60}}});
+
+    add(9, {{verse, core::makeSysEx({0xF0, 0x7D, 0x01, 0x02, 0x03, 0xF7})},
+            {verse, core::makeMetaText(core::MetaText::Kind::Text, "A text event")},
+            {verse, core::makeMetaText(core::MetaText::Kind::InstrumentName, "Effects unit")},
+            {chorus, core::makeMetaText(core::MetaText::Kind::Lyric, "la la la")},
+            {chorus, core::makeMetaText(core::MetaText::Kind::CuePoint, "Effects in")},
+            {0, core::makeMetaText(core::MetaText::Kind::Copyright, "Made up for testing")}});
+
+    // The conductor: a slower bridge, back up after it, with a bookmark and a mark to jump to.
+    song.updateTempo([&](core::TempoMap& tempo) { tempo.set(bridge, core::Tempo::fromBpm(96)); });
+    song.updateTempo([&](core::TempoMap& tempo)
+                     { tempo.set(starts[5], core::Tempo::fromBpm(120)); });
+    song.setLabel(chorus, "Sounds change here");
+    song.setMark({'a', bridge, std::nullopt, core::Mark::kNoPitch});
 }
 
 } // namespace
@@ -160,6 +229,7 @@ core::Song demoSong(core::Ppqn ppqn)
         song.addTrack();
     }
     song.fitToContent();
+    addExamples(song, starts);
     return song;
 }
 

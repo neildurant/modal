@@ -281,11 +281,14 @@ TEST_CASE("labels are named in the ruler, with faint lines through it and every 
     CHECK(lines == std::vector<int>{0, 160, 265, 515});
 
     // The sections are named on the strip, not in the ruler's top row, where only labels
-    // are.
+    // are: the demo song has the one.
     int names = 0;
     for (const auto& run : timeline.text)
     {
-        CHECK_FALSE((run.y == 0 && run.style.foreground == Role::Label));
+        if (run.y == 0 && run.style.foreground == Role::Label)
+        {
+            CHECK(run.text.starts_with(U"Sounds change"));
+        }
         names += run.y == ArrangePage::kStripRow * kCell.height ? 1 : 0;
     }
     CHECK(names == 4);

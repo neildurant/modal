@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <variant>
 
@@ -40,7 +41,6 @@ TEST_CASE("the demo song has sections in several meters, on most tracks")
     CHECK(song.sectionStart(1) == drums.barStart(9));
     CHECK(song.sectionStart(3) == drums.barStart(28));
     CHECK(song.sectionStart(5) == drums.barStart(48));
-    CHECK(song.labels().empty());
 
     // Two tracks have meters of their own, whose bars start again at each section.
     const auto& ostinato = song.meter(song.tracks()[6]->id());
@@ -60,8 +60,11 @@ TEST_CASE("the demo song has sections in several meters, on most tracks")
     {
         for (const auto& event : song.events(track->id()).all())
         {
-            REQUIRE(event.isNote());
-            CHECK(event.tick + std::get<core::Note>(event.data).duration <= end);
+            if (const auto* note = std::get_if<core::Note>(&event.data))
+            {
+                CHECK(event.tick + note->duration <= end);
+            }
+            CHECK(event.tick < end);
         }
     }
     CHECK(song.events(song.tracks()[0]->id()).all().back().tick >= drums.barStart(53));
@@ -86,4 +89,36 @@ TEST_CASE("some tracks of the demo song leave bars empty")
     }
     CHECK(empty > 0);
     CHECK(empty < 13);
+}
+
+TEST_CASE("the demo song has an example of every kind of event")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto song = demoSong(ppqn);
+
+    // One of each alternative an event's data can hold.
+    std::array<bool, std::variant_size_v<decltype(core::Event::data)>> found{};
+    std::set<core::MetaText::Kind> texts;
+    for (const auto& track : song.tracks())
+    {
+        for (const auto& event : song.events(track->id()).all())
+        {
+            found.at(event.data.index()) = true;
+            if (const auto* text = std::get_if<core::MetaText>(&event.data))
+            {
+                texts.insert(text->kind);
+            }
+        }
+    }
+    for (std::size_t i = 0; i < found.size(); ++i)
+    {
+        INFO("alternative " << i);
+        CHECK(found.at(i));
+    }
+    CHECK(texts.size() == 5);
+
+    // And of the conductor's.
+    CHECK(song.tempo().changes().size() > 1);
+    CHECK_FALSE(song.marks().empty());
+    CHECK_FALSE(song.labels().empty());
 }
