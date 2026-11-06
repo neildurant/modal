@@ -174,6 +174,11 @@ public:
 
     bool removeTrack(TrackId id);
 
+    // Moves some adjoining tracks, from first on, so the first of them is at the position `to`
+    // of the tracks as they'll be. A track's settings, events, meters and marks go with it, being
+    // held by its ID. Returns false if they don't all fit there, leaving the song as it was.
+    bool moveTracks(std::size_t first, std::size_t count, std::size_t to);
+
     std::optional<TrackCopy> copyTrack(TrackId id) const;
     bool canInsertTrack(const TrackCopy& copy) const;
     // New ID and a unique name; settings and each section's own/following meter survive.

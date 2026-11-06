@@ -446,3 +446,58 @@ TEST_CASE("a song made from its parts")
     copy.renameSection(1, "Chorus");
     CHECK(copy != song);
 }
+
+TEST_CASE("moving tracks keeps what's theirs, however they go")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song{ppqn};
+    const auto a = song.addTrack("A");
+    const auto b = song.addTrack("B");
+    const auto c = song.addTrack("C");
+    const auto d = song.addTrack("D");
+    song.updateEvents(b, [&](EventList& events) { events.insert({0, Note{60, 100, 1}}); });
+    song.updateMeter(c, [](MeterMap& meter) { meter = MeterMap{meter.ppqn(), {7, 8}}; });
+    song.setMark({'m', 0, b, 60});
+    const auto order = [&]
+    {
+        std::string names;
+        for (const auto& track : song.tracks())
+        {
+            names += track->name;
+        }
+        return names;
+    };
+
+    CHECK(song.moveTracks(1, 2, 2)); // down one
+    CHECK(order() == "ADBC");
+    CHECK(song.moveTracks(2, 2, 0)); // up to the top
+    CHECK(order() == "BCAD");
+    CHECK(song.moveTracks(0, 1, 3)); // one, to the end
+    CHECK(order() == "CADB");
+    CHECK(song.moveTracks(1, 1, 1)); // nowhere
+    CHECK(order() == "CADB");
+
+    CHECK_FALSE(song.moveTracks(0, 1, 4));
+    CHECK_FALSE(song.moveTracks(3, 2, 0));
+    CHECK_FALSE(song.moveTracks(0, 0, 1));
+    CHECK(order() == "CADB");
+
+    const auto keeps = [&](const Song& s)
+    {
+        CHECK(s.events(b).size() == 1);
+        CHECK(s.events(a).empty());
+        CHECK(s.meter(c).signatureAt(0) == TimeSignature{7, 8});
+        CHECK(s.meter(d).signatureAt(0) == s.meter().signatureAt(0));
+        REQUIRE(s.marks().size() == 1);
+        CHECK(s.marks().front().track == b);
+    };
+    keeps(song);
+
+    // And from its parts, as undo does; order counts as a difference.
+    const Song rebuilt{song.parts()};
+    keeps(rebuilt);
+    CHECK(rebuilt == song);
+    Song other = song;
+    other.moveTracks(0, 1, 1);
+    CHECK_FALSE(other == song);
+}

@@ -242,6 +242,32 @@ TrackId Song::addTrack(std::size_t position, std::string name)
     return id;
 }
 
+bool Song::moveTracks(std::size_t first, std::size_t count, std::size_t to)
+{
+    if (count == 0 || first + count > tracks_.size() || to + count > tracks_.size())
+    {
+        return false;
+    }
+    const auto move = [&](auto& items)
+    {
+        const auto begin = items.begin();
+        const auto from = static_cast<std::ptrdiff_t>(first);
+        const auto size = static_cast<std::ptrdiff_t>(count);
+        const auto at = static_cast<std::ptrdiff_t>(to);
+        if (to < first)
+        {
+            std::rotate(begin + at, begin + from, begin + from + size);
+        }
+        else
+        {
+            std::rotate(begin + from, begin + from + size, begin + at + size);
+        }
+    };
+    move(tracks_);
+    move(flattened_);
+    return true;
+}
+
 bool Song::updateTrack(TrackId id, const std::function<void(Track&)>& edit)
 {
     const auto index = indexOf(id);
