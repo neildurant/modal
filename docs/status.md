@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the first Tracks view step and revised note inspector are complete. The UI trial is confirmed, all six Linux configurations pass, and publication is approved.*
+*Last updated 6 November 2026: the first Tracks view step and revised note inspector are published. The UI trial is confirmed and all six Linux configurations pass. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -50,7 +50,7 @@ The UI trial below was confirmed on 5 November 2026, completing the check requir
 
 ## Tracks view: first implementation
 
-The first step of milestone 7 is complete: `40a8f84` adds the core support, `3030d68` the view, editing and timing inspector, and `cb85a4f` the revised layout and track controls. The revised UI trial was confirmed on 6 November 2026 and publication approved. The agreed design is in design.md and decisions.md; keys and editing are in grammar.md.
+The first step of milestone 7 is complete: `40a8f84` adds the core support, `3030d68` the view, editing and timing inspector, and `cb85a4f` the revised layout and track controls. The revised UI trial was confirmed on 6 November 2026 and the step published through `cc09eea`. The agreed design is in design.md and decisions.md; keys and editing are in grammar.md.
 
 - The table exposes number, name, mute, solo, chase, output port, channel, transpose, velocity offset and time offset. Mute/Solo/Chase show `-` or coloured `M`/`S`/`C` buttons; numeric values align on the right. Stable field identities, shared formatting/editing and one ordered column list keep later column visibility or reordering separate from track state.
 - `gt` and `, v t` open Tracks; `3gt` chooses track 3. Ctrl-PageDown / Ctrl-PageUp switch tracks. Musical position and pitch are retained when switching views.
@@ -66,7 +66,8 @@ The first step of milestone 7 is complete: `40a8f84` adds the core support, `303
 - Initial implementation: the full `tools/check-linux.sh` passed on the completed implementation: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each configuration registers 735 tests, with three platform/MIDI tests skipped and no failures. Whole-tree formatting and `git diff --check` also pass.
 - `build/linux-gcc/apps/Debug/modal` has been rebuilt after the implementation commits and checked to be newer than every application build input. The first UI trial produced the presentation feedback above; the revised layout was accepted on 6 November 2026.
 - Hidden offscreen sample renders pass for Tracks, the event list, arrangement and piano roll, including dark/light themes. The revised inspector and both table themes were inspected, including active M/S/C buttons and fraction-plus-fine offsets; this caught and fixed duplicated glyphs under the new buttons.
-- No desktop automation or MIDI hardware tests have been run. Local Windows builds are skipped under the agreed policy. CI must be checked after publication.
+- The [initial publication's CI](https://github.com/neildurant/modal/actions/runs/42157664843) passed formatting and every Linux job. MSVC rejected two test helpers' fallback returns after Catch2's unconditional `FAIL` as unreachable code (`C4702`). The helpers now use checked lookups; product behaviour is unchanged. After the correction, the full local Linux check passed again: all six configurations, 741 registered tests each, three skips and no failures. The follow-up push reruns the cross-platform matrix, including Windows Debug/Release; its result is available in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).
+- No desktop automation or MIDI hardware tests have been run. Local Windows builds are skipped under the agreed policy.
 
 ### Confirmed UI trial
 
