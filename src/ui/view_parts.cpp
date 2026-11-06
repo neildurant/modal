@@ -20,57 +20,6 @@ namespace
 
 constexpr Style kBarText{Role::BarText, Role::Bar, kPlain};
 
-// A fixed-width value box, shared by the compact note panel and the general inspector.
-void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
-                    int columns, CellSize cell, const InspectorEditor* editor,
-                    bool rightAligned = false)
-{
-    if (columns < 1)
-        return;
-    const bool edited = editor && editor->active() && editor->heading() == field.heading;
-    const auto box = static_cast<std::size_t>(columns);
-    if (edited)
-    {
-        text = editor->line().text();
-        const auto typed = editor->line().cursor();
-        const bool whole = editor->replacing() && !text.empty();
-        // A value keeps its place as editing starts: only a cursor past its end takes a cell,
-        // moving a right-aligned value along by one then.
-        const auto used = text.size() + (!whole && typed == text.size() ? 1 : 0);
-        const auto upTo = whole ? text.size() : typed + 1;
-        const std::size_t first = upTo > box ? upTo - box : 0;
-        const auto pad = rightAligned && first == 0 && used <= box ? box - used : 0;
-        auto visible = std::u32string(pad, U' ') + text.substr(first, box - pad);
-        visible.resize(box, U' ');
-        region.text.push_back({x, y, visible, {Role::Text, Role::Selection, kPlain}});
-        const Style cursor{Role::CursorText, Role::Cursor, kPlain};
-        if (whole)
-        {
-            // All of it highlighted: typing replaces it, until a key moves the cursor.
-            region.text.push_back({x + static_cast<int>(pad) * cell.width, y,
-                                   visible.substr(pad, std::min(text.size() - first, box - pad)),
-                                   cursor});
-        }
-        else
-        {
-            region.text.push_back({x + static_cast<int>(pad + typed - first) * cell.width, y,
-                                   std::u32string(1, typed < text.size() ? text[typed] : U' '),
-                                   cursor});
-        }
-    }
-    else
-    {
-        if (text.size() > box)
-            text = text.substr(0, box - 1) + U'…';
-        if (rightAligned)
-            x += static_cast<int>(box - text.size()) * cell.width;
-        region.text.push_back({x,
-                               y,
-                               std::move(text),
-                               {field.editable ? Role::Text : Role::Dim, Role::Panel, kPlain}});
-    }
-}
-
 Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                            int positionWidth, const InspectorEditor* editor)
 {
@@ -175,6 +124,58 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
 int inspectorHeight(CellSize cell)
 {
     return 2 * cell.height + (cell.height / 4) * 2;
+}
+
+void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
+                    int columns, CellSize cell, const InspectorEditor* editor, bool rightAligned)
+{
+    if (columns < 1)
+        return;
+    const bool edited = editor && editor->active() && editor->heading() == field.heading;
+    const auto box = static_cast<std::size_t>(columns);
+    if (edited)
+    {
+        text = editor->line().text();
+        const auto typed = editor->line().cursor();
+        const bool whole = editor->replacing() && !text.empty();
+        // A value keeps its place as editing starts: only a cursor past its end takes a cell,
+        // moving a right-aligned value along by one then.
+        const auto used = text.size() + (!whole && typed == text.size() ? 1 : 0);
+        const auto upTo = whole ? text.size() : typed + 1;
+        const std::size_t first = upTo > box ? upTo - box : 0;
+        const auto pad = rightAligned && first == 0 && used <= box ? box - used : 0;
+        auto visible = std::u32string(pad, U' ') + text.substr(first, box - pad);
+        visible.resize(box, U' ');
+        region.text.push_back({x, y, visible, {Role::Text, Role::Selection, kPlain}});
+        const Style cursor{Role::CursorText, Role::Cursor, kPlain};
+        if (whole)
+        {
+            // All of it highlighted: typing replaces it, until a key moves the cursor.
+            region.text.push_back({x + static_cast<int>(pad) * cell.width, y,
+                                   visible.substr(pad, std::min(text.size() - first, box - pad)),
+                                   cursor});
+        }
+        else
+        {
+            region.text.push_back({x + static_cast<int>(pad + typed - first) * cell.width, y,
+                                   std::u32string(1, typed < text.size() ? text[typed] : U' '),
+                                   cursor});
+        }
+    }
+    else
+    {
+        if (text.size() > box)
+            text = text.substr(0, box - 1) + U'…';
+        if (rightAligned)
+            x += static_cast<int>(box - text.size()) * cell.width;
+        region.text.push_back({x,
+                               y,
+                               std::move(text),
+                               {field.warning    ? Role::Warning
+                                : field.editable ? Role::Text
+                                                 : Role::Dim,
+                                Role::Panel, kPlain}});
+    }
 }
 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,

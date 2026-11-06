@@ -213,27 +213,22 @@ std::optional<std::string> TracksView::selectionStatus() const
 
 Inspection TracksView::inspection() const
 {
+    // What the table has no room for, the cursor's column's first; fields are edited in the table.
     Inspection result{"Track", {}};
     if (!cursor_.track)
     {
         return result;
     }
-    const auto& track = *document_.song().track(*cursor_.track);
-    const auto& column = trackColumns()[column_];
-    const auto full = trackFieldText(column.field, track, row());
-    if (column.field == TrackField::Program)
+    const auto& song = document_.song();
+    const auto& track = *song.track(*cursor_.track);
+    const auto field = trackColumns()[column_].field;
+    if (field == TrackField::ChaseNotes)
     {
-        // Unset is shown as - but edited as empty.
-        const auto setupField = [&](std::string heading, TrackField field)
-        {
-            auto text = trackFieldText(field, track, row());
-            result.fields.push_back(
-                {std::move(heading), text, true, text == "-" ? std::string{} : text});
-        };
-        setupField("Program", TrackField::Program);
-        setupField("Bank MSB", TrackField::BankMsb);
-        setupField("Bank LSB", TrackField::BankLsb);
-        const auto& song = document_.song();
+        result.fields.push_back({"When enabled", "Start notes already held"});
+    }
+    if (field == TrackField::Program || field == TrackField::BankMsb ||
+        field == TrackField::BankLsb)
+    {
         if (const auto own = programEvents(song, track.id()); own.count > 0)
         {
             result.fields.push_back({"Program events", std::to_string(own.count) + ", first at " +
@@ -246,34 +241,36 @@ Inspection TracksView::inspection() const
             {
                 names += (names.empty() ? "" : ", ") + std::to_string(index + 1);
             }
-            result.fields.push_back({"Differs from tracks on this channel", names});
+            InspectorField clash{"Differs from tracks on this channel", names};
+            clash.warning = true;
+            result.fields.push_back(std::move(clash));
         }
+    }
+    result.fields.push_back({"Name", track.name.empty() ? "-" : track.name});
+    return result;
+}
+
+Inspection TracksView::editableFields() const
+{
+    Inspection result{"Track", {}};
+    if (!cursor_.track)
+    {
         return result;
     }
-    result.fields.push_back({std::string{column.heading}, full,
-                             column.field != TrackField::Number && !isToggle(column.field), full});
-    if (column.field == TrackField::ChaseNotes)
-        result.fields.push_back({"When enabled", "Start notes already held"});
-    result.fields.push_back({"Grid", core::toString(track.grid)});
-    result.fields.push_back({"Default length", core::toString(track.defaultLength())});
-    result.fields.push_back({"Default velocity", std::to_string(track.noteVelocity)});
+    const auto& track = *document_.song().track(*cursor_.track);
+    for (const auto& column : trackColumns())
+    {
+        if (column.field != TrackField::Number && !isToggle(column.field))
+        {
+            const auto text = trackFieldText(column.field, track, row());
+            result.fields.push_back({std::string{column.heading}, text, true, text});
+        }
+    }
     return result;
 }
 
 TrackField TracksView::fieldFor(std::string_view heading) const
 {
-    if (heading == "Chase notes")
-    {
-        return TrackField::ChaseNotes;
-    }
-    if (heading == "Bank MSB")
-    {
-        return TrackField::BankMsb;
-    }
-    if (heading == "Bank LSB")
-    {
-        return TrackField::BankLsb;
-    }
     for (const auto& column : trackColumns())
     {
         if (column.heading == heading)
@@ -335,12 +332,10 @@ std::optional<std::string> TracksView::edit(TrackField field, std::string_view t
 std::optional<bool> TracksView::runTyping(std::string_view command)
 {
     const bool next = command == "command-line-next" || command == "command-line-previous";
-    const bool forwards = command == "command-line-next";
-    const std::string was = editor_.active() ? editor_.heading() : std::string{};
     const auto result =
         editor_.run(next ? "command-line-run" : command, host_,
                     {
-                        .inspection = [this] { return inspection(); },
+                        .inspection = [this] { return editableFields(); },
                         .set = [this](const std::string& heading, const std::string& text)
                         { return edit(fieldFor(heading), text); },
                         .step = [this](const std::string& heading, int steps)
@@ -348,29 +343,15 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
                     });
     if (next && !editor_.active())
     {
-        // The Program column's bank fields come between it and the next column.
-        const std::string_view within = forwards && was == "Program"     ? "Bank MSB"
-                                        : forwards && was == "Bank MSB"  ? "Bank LSB"
-                                        : !forwards && was == "Bank LSB" ? "Bank MSB"
-                                        : !forwards && was == "Bank MSB" ? "Program"
-                                                                         : "";
-        if (!within.empty())
-        {
-            if (editor_.open(inspection(), within))
-                host_.startTyping();
-            return result;
-        }
         const auto columns = trackColumns();
         do
         {
-            column_ = forwards ? (column_ + 1) % columns.size()
-                               : (column_ + columns.size() - 1) % columns.size();
+            column_ = command == "command-line-next"
+                          ? (column_ + 1) % columns.size()
+                          : (column_ + columns.size() - 1) % columns.size();
         } while (columns[column_].field == TrackField::Number || isToggle(columns[column_].field));
         ensureVisible();
-        const std::string_view heading = !forwards && columns[column_].field == TrackField::Program
-                                             ? "Bank LSB"
-                                             : columns[column_].heading;
-        if (editor_.open(inspection(), heading))
+        if (editor_.open(editableFields(), columns[column_].heading))
             host_.startTyping();
     }
     return result;
@@ -441,13 +422,11 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         {
             toggle(field);
         }
-        else if (command == "field-edit" && trackColumns()[column_].field == TrackField::Number)
+        else if (trackColumns()[column_].field == TrackField::Number)
         {
             host_.refuse("The track number follows its position");
         }
-        else if (editor_.open(inspection(), command == "field-edit"
-                                                ? trackColumns()[column_].heading
-                                                : std::string_view{}))
+        else if (editor_.open(editableFields(), trackColumns()[column_].heading))
         {
             host_.startTyping();
         }
@@ -672,7 +651,15 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style = {Role::CursorText, Role::Cursor, kPlain};
             }
-            table.text.push_back({x, y, std::move(text), style});
+            if (track && editor_.active() && index == row() && c == column_)
+            {
+                inspectorValue(table, {std::string{column.heading}, {}}, {}, x, y, wide - 1, cell_,
+                               &editor_, column.numeric);
+            }
+            else
+            {
+                table.text.push_back({x, y, std::move(text), style});
+            }
             if (toggle)
             {
                 const bool on = toggleState(column.field, *track);
@@ -718,6 +705,6 @@ void TracksView::addRegions(Frame& frame) const
     }
     frame.push_back(trackBarRegion(document_.song(), tracks.empty() ? 0 : row() + 1, cursor_.tick,
                                    cursorMeter(), layout_.top[0], width_, cell_));
-    frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9, &editor_));
+    frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9, nullptr));
 }
 } // namespace modal::ui

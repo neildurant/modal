@@ -334,7 +334,7 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
                         song.updateEvents(id, [&](core::EventList& events)
                                           { events.insert({q / 2, core::ProgramChange{3}}); });
                     });
-    p.type(U"gt6l");
+    p.type(U"gt8l");
     p.press(Key::typed(U' '));
     p.runFor(100ms);
 

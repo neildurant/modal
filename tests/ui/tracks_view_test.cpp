@@ -80,7 +80,7 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     t.type(U"l");
     t.enter(U"10");
     CHECK(t.track().channel == 10);
-    t.type(U"2l");
+    t.type(U"4l");
     t.enter(U"-12");
     CHECK(t.track().transpose == -12);
     t.type(U"l");
@@ -100,7 +100,7 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
 TEST_CASE("bulk track edits validate every row and undo together")
 {
     Tracking t;
-    t.type(U"7lVj"); // transpose, first two tracks
+    t.type(U"9lVj"); // transpose, first two tracks
     const auto first = t.track().transpose;
     const auto second = t.track(1).transpose;
     t.type(U"+");
@@ -116,7 +116,7 @@ TEST_CASE("bulk track edits validate every row and undo together")
     CHECK(t.track(2).transpose == 12);
     CHECK(t.ws.mode() == Mode::Visual);
     t.press(NamedKey::Escape);
-    t.type(U"2h");
+    t.type(U"4h");
     t.enter(U"16"); // channel
     t.type(U"Vk+");
     CHECK(t.track(2).channel == 16);
@@ -304,7 +304,7 @@ TEST_CASE("track columns start visible and keep the active field visible after r
     CHECK(frame.front().text.front().text.starts_with(U"No."));
     CHECK(frame.front().text.front().x >= 0);
     t.ws.resize(600, 300, {10, 20});
-    t.type(U"$");
+    t.type(U"$3h");
     frame = t.ws.frame();
     for (const auto& run : frame.front().text)
     {
@@ -379,7 +379,7 @@ TEST_CASE("track toggles are compact badges and numeric cells align on the right
 TEST_CASE("musical track offsets are shown as they were typed")
 {
     Tracking t;
-    t.type(U"$");
+    t.type(U"$3h");
     t.enter(U"+1/16-14t");
     const auto shown = [&]
     {
@@ -500,7 +500,7 @@ TEST_CASE("chasing toggles from the palette command for the current track and un
 TEST_CASE("stepping a musical offset keeps the parts it was typed in")
 {
     Tracking t;
-    t.type(U"$");
+    t.type(U"$3h");
     t.enter(U"+1/16-33t");
     const auto text = [&] { return core::offsetText(t.track().timeOffset); };
     t.type(U"_"); // a tick, in the fine part
@@ -530,7 +530,7 @@ TEST_CASE("stepping a musical offset keeps the parts it was typed in")
 TEST_CASE("a stepped musical offset stays within the limit")
 {
     Tracking t;
-    t.type(U"$");
+    t.type(U"$3h");
     t.enter(U"+64/1");
     t.type(U"=");
     CHECK(t.ws.message().find("limit") != std::string::npos);
@@ -664,7 +664,7 @@ TEST_CASE("the status line shows the cursor's time in every view, and the inspec
 TEST_CASE("numeric columns' headings are right-aligned over their values")
 {
     Tracking t;
-    t.type(U"$");
+    t.type(U"$3h");
     t.enter(U"-40ms");
     const auto frame = t.ws.frame();
     const auto& runs = frame.front().text;
@@ -674,8 +674,10 @@ TEST_CASE("numeric columns' headings are right-aligned over their values")
             runs,
             [&](const TextRun& run)
             {
-                return run.y == 0 &&
-                       run.text.find(decodeUtf8(column.heading)) != std::u32string::npos;
+                const auto start = run.text.find_first_not_of(U' ');
+                const auto end = run.text.find_last_not_of(U' ');
+                return run.y == 0 && start != std::u32string::npos &&
+                       run.text.substr(start, end - start + 1) == decodeUtf8(column.heading);
             });
         REQUIRE(heading != runs.end());
         if (column.numeric)
@@ -735,11 +737,11 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
     CHECK(shown(longer));
 
     // A wider window has room for more, without the table going past its edge.
-    t.ws.resize(1500, 600, {10, 20});
+    t.ws.resize(1800, 600, {10, 20});
     int others = 0;
     for (const auto& column : trackColumns())
         others += column.field == TrackField::Name ? 0 : column.width;
-    CHECK(headingX(U"Mute") - start == (150 - 2 - others) * 10);
+    CHECK(headingX(U"Mute") - start == (180 - 2 - others) * 10);
 
     t.type(U"uu");
     CHECK(headingX(U"Mute") - start == trackColumns()[1].width * 10);
@@ -752,10 +754,9 @@ TEST_CASE("a field that typing would replace is highlighted whole, until the cur
     {
         std::u32string text;
         for (const auto& region : t.ws.frame())
-            if (region.background == Role::Panel)
-                for (const auto& run : region.text)
-                    if (run.style.background == Role::Cursor)
-                        text += run.text;
+            for (const auto& run : region.text)
+                if (run.style.background == Role::Cursor)
+                    text += run.text;
         return text;
     };
     const auto name = decodeUtf8(t.track().name);
@@ -862,7 +863,7 @@ TEST_CASE("the conductor has no mute or solo to toggle")
 
 namespace
 {
-const std::u32string_view kToProgram = U"6l";
+const std::u32string_view kToProgram = U"8l";
 
 bool inspectorHas(const Frame& frame, std::u32string_view wanted)
 {
@@ -903,32 +904,85 @@ TEST_CASE("the Program column sets a track's setup, with empty leaving it unset"
     CHECK(t.track().programSetup.program == 0);
 }
 
-TEST_CASE("Tab goes from Program through its bank fields to the next column")
+TEST_CASE("Tab goes through the bank fields and Program, and on to the later columns")
 {
     Tracking t;
-    t.type(kToProgram);
+    t.type(U"6l"); // the bank's MSB
     t.press(NamedKey::Enter);
-    t.type(U"5");
-    t.press(NamedKey::Tab);
-    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Bank MSB");
     t.type(U"1");
     t.press(NamedKey::Tab);
-    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Bank LSB");
+    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "LSB");
     t.type(U"2");
+    t.press(NamedKey::Tab);
+    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Program");
+    t.type(U"5");
     t.press(NamedKey::Tab);
     CHECK(t.ws.tracks().inspectorEditor().heading() == "Transpose");
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
-
-    t.press(NamedKey::Tab, kShift);
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Bank LSB");
-    t.press(NamedKey::Tab, kShift);
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Bank MSB");
     t.press(NamedKey::Tab, kShift);
     CHECK(t.ws.tracks().inspectorEditor().heading() == "Program");
-    t.press(NamedKey::Tab, kShift);
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Channel");
     t.press(NamedKey::Escape);
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
+}
+
+TEST_CASE("a track field is edited in its cell, not the inspector")
+{
+    Tracking t;
+    t.type(U"5l"); // channel, numeric and so on the right of its column
+    const auto cellRun = [&](Role background)
+    {
+        const auto frame = t.ws.frame();
+        std::optional<TextRun> found;
+        for (const auto& run : frame.front().text)
+        {
+            if (run.style.background == background && run.y == 20)
+            {
+                found = run;
+            }
+        }
+        return found;
+    };
+    const auto before = cellRun(Role::Cursor);
+    REQUIRE(before);
+    const auto beforeEnd = before->x + static_cast<int>(before->text.size()) * 10;
+    t.press(NamedKey::Enter);
+    const auto editing = cellRun(Role::Cursor); // the value, highlighted whole
+    REQUIRE(editing);
+    CHECK(editing->x + static_cast<int>(editing->text.size()) * 10 == beforeEnd);
+    t.type(U"1");
+    REQUIRE(cellRun(Role::Selection));
+    CHECK(cellRun(Role::Selection)->text.find(U'1') != std::u32string::npos);
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Channel "));
+}
+
+TEST_CASE("a track's grid and default note are edited in the table")
+{
+    Tracking t;
+    t.type(U"$h"); // the default length, before the velocity at the end
+    CHECK_FALSE(t.track().noteLength);
+    t.enter(U"1/8t");
+    REQUIRE(t.track().noteLength);
+    CHECK(*t.track().noteLength == core::NoteFraction{1, 12});
+    t.enter(U"grid");
+    CHECK_FALSE(t.track().noteLength);
+    t.enter(U"nonsense");
+    CHECK(t.ws.tracks().typing());
+    t.press(NamedKey::Escape);
+
+    t.type(U"h");
+    t.enter(U"1/8.");
+    CHECK(t.track().grid == core::NoteFraction{3, 16});
+
+    t.type(U"$");
+    t.enter(U"64");
+    CHECK(t.track().noteVelocity == 64);
+    t.type(U"=");
+    CHECK(t.track().noteVelocity == 65);
+    t.enter(U"0");
+    CHECK(t.ws.message() == "The velocity must be 1 to 127");
+    t.press(NamedKey::Escape);
+    t.type(U"u");
+    CHECK(t.track().noteVelocity == 64);
 }
 
 TEST_CASE("stepping a setup starts from unset, and a selection is set together")
@@ -1034,10 +1088,8 @@ TEST_CASE("the bar shows a track's setup when it has one")
     t.enter(U"12");
     CHECK(inspectorHas(t.ws.frame(), U"Program:"));
     CHECK_FALSE(inspectorHas(t.ws.frame(), U"Bank:"));
-    t.press(NamedKey::Enter);
-    t.press(NamedKey::Tab);
-    t.type(U"3");
-    t.press(NamedKey::Enter);
+    t.type(U"2h");
+    t.enter(U"3");
     CHECK(inspectorHas(t.ws.frame(), U"Bank:"));
     CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
 

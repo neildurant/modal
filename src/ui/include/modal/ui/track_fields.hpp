@@ -26,9 +26,12 @@ enum class TrackField
     VelocityOffset,
     TimeOffset,
     ChaseNotes,
-    Program,
-    BankMsb, // these two are in the Program column's inspector, not columns of their own
+    BankMsb,
     BankLsb,
+    Program,
+    Grid,
+    DefaultLength,
+    DefaultVelocity,
 };
 
 struct TrackColumn

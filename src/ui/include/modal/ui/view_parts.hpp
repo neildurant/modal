@@ -78,6 +78,12 @@ int inspectorHeight(CellSize cell);
 // Notes have the kind above pitch and velocities on the left, and to the right a row each for
 // Start, Length and Ends, across their coarse, fine and exact values. With an editor, its field
 // is boxed.
+// A value in a box of some columns: what's being typed if the editor is on its field, with the
+// cursor, or else the value itself, cut short if need be.
+void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
+                    int columns, CellSize cell, const InspectorEditor* editor,
+                    bool rightAligned = false);
+
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor = nullptr);
 

@@ -22,10 +22,15 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::ChaseNotes, "Chase", 6},
     TrackColumn{TrackField::Port, "Output port", 16},
     TrackColumn{TrackField::Channel, "Channel", 8, true},
+    TrackColumn{TrackField::BankMsb, "MSB", 4, true},
+    TrackColumn{TrackField::BankLsb, "LSB", 4, true},
     TrackColumn{TrackField::Program, "Program", 8, true},
     TrackColumn{TrackField::Transpose, "Transpose", 10, true},
     TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13, true},
     TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
+    TrackColumn{TrackField::Grid, "Grid", 7},
+    TrackColumn{TrackField::DefaultLength, "Length", 8},
+    TrackColumn{TrackField::DefaultVelocity, "Vel", 4, true},
 };
 
 std::string signedText(int value)
@@ -83,6 +88,12 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return setupText(track.programSetup.bankMsb);
     case TrackField::BankLsb:
         return setupText(track.programSetup.bankLsb);
+    case TrackField::Grid:
+        return core::toString(track.grid);
+    case TrackField::DefaultLength: // following the grid until set
+        return track.noteLength ? core::toString(*track.noteLength) : "grid";
+    case TrackField::DefaultVelocity:
+        return std::to_string(track.noteVelocity);
     }
     return {};
 }
@@ -135,6 +146,30 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         }
         return {};
     }
+    if (field == TrackField::Grid || field == TrackField::DefaultLength)
+    {
+        if (field == TrackField::DefaultLength && (text.empty() || text == "grid"))
+        {
+            track.noteLength.reset();
+            return {};
+        }
+        const auto fraction = core::parseNoteFraction(text);
+        if (!fraction)
+        {
+            return field == TrackField::Grid ? "Use a note length, such as 1/16 or 1/8t"
+                                             : "Use a note length such as 1/16, or grid to follow "
+                                               "the grid";
+        }
+        if (field == TrackField::Grid)
+        {
+            track.grid = *fraction;
+        }
+        else
+        {
+            track.noteLength = *fraction;
+        }
+        return {};
+    }
     auto* const setup = setupPart(track, field);
     if (setup != nullptr && (text.empty() || text == "-"))
     {
@@ -166,6 +201,14 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
             return "Enter 0 to 127, or nothing to leave it unset";
         }
         *setup = static_cast<std::uint8_t>(value);
+    }
+    else if (field == TrackField::DefaultVelocity)
+    {
+        if (value < 1 || value > 127)
+        {
+            return "The velocity must be 1 to 127";
+        }
+        track.noteVelocity = static_cast<std::uint8_t>(value);
     }
     else if (field == TrackField::Channel)
     {
@@ -215,11 +258,12 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
         return {};
     }
     if (field == TrackField::Channel || field == TrackField::Transpose ||
-        field == TrackField::VelocityOffset)
+        field == TrackField::VelocityOffset || field == TrackField::DefaultVelocity)
     {
-        const auto value = field == TrackField::Channel     ? track.channel
-                           : field == TrackField::Transpose ? track.transpose
-                                                            : track.velocityOffset;
+        const int value = field == TrackField::Channel           ? track.channel
+                          : field == TrackField::Transpose       ? track.transpose
+                          : field == TrackField::DefaultVelocity ? int{track.noteVelocity}
+                                                                 : track.velocityOffset;
         return setTrackField(track, field, std::to_string(static_cast<std::int64_t>(value) + steps),
                              ppqn);
     }

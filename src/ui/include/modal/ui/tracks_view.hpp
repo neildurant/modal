@@ -46,6 +46,8 @@ private:
     int columnWidth(const TrackColumn& column) const;
     std::vector<core::TrackId> selected() const;
     Inspection inspection() const;
+    // The table's fields, as the editor works through them.
+    Inspection editableFields() const;
     TrackField fieldFor(std::string_view heading) const;
     std::optional<std::string> edit(TrackField field, std::string_view text, int steps = 0,
                                     bool fine = false);
