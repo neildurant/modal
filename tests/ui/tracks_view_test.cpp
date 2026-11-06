@@ -1253,3 +1253,164 @@ TEST_CASE("a port that isn't there stays until something else is chosen")
     t.press(NamedKey::Enter); // on it already
     CHECK(t.track().port == "Gone");
 }
+
+namespace
+{
+std::string order(const Tracking& t, std::size_t n = 5)
+{
+    std::string names;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        names += t.track(i).name.substr(0, 1);
+    }
+    return names;
+}
+constexpr const char* kStart = "DBPSL"; // Drums, Bass, Piano, Strings, Lead
+} // namespace
+
+TEST_CASE("reordering moves a track through the others until Enter or Escape")
+{
+    Tracking t;
+    CHECK(order(t) == kStart);
+    t.type(U",to");
+    t.type(U"jj");
+    CHECK(order(t) == "BPDSL");
+    CHECK(t.ws.tracks().cursor().track == t.track(2).id()); // the cursor stays on it
+
+    SECTION("Enter accepts it, as one undo step")
+    {
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Up);
+        t.press(NamedKey::Enter);
+        CHECK(order(t) == "BPDSL");
+        t.type(U"j"); // an ordinary key again
+        CHECK(t.ws.tracks().cursor().track == t.track(3).id());
+        t.type(U"u");
+        CHECK(order(t) == kStart);
+        t.press(NamedKey::Tab); // nothing, in Normal mode
+        CHECK_FALSE(t.document.canUndo());
+    }
+    SECTION("Escape puts it back, with no undo step")
+    {
+        t.press(NamedKey::Escape);
+        CHECK(order(t) == kStart);
+        CHECK_FALSE(t.document.canUndo());
+        CHECK_FALSE(t.document.modified());
+        CHECK(t.ws.tracks().cursor().track == t.track(0).id());
+    }
+    SECTION("each is its own step, however soon the next")
+    {
+        t.press(NamedKey::Enter);
+        t.type(U",to");
+        t.type(U"k");
+        t.press(NamedKey::Enter);
+        CHECK(order(t) == "BDPSL");
+        t.type(U"u");
+        CHECK(order(t) == "BPDSL");
+        t.type(U"u");
+        CHECK(order(t) == kStart);
+    }
+    SECTION("it stops at the ends, and counts and gg and G work")
+    {
+        t.type(U"kkkkkk");
+        CHECK(order(t) == kStart);
+        t.type(U"3j");
+        CHECK(order(t) == "BPSDL");
+        t.type(U"gg");
+        CHECK(order(t) == kStart);
+        t.type(U"G");
+        const auto last = t.document.song().tracks().size() - 1;
+        CHECK(t.track(last).name == "Drums");
+        t.type(U"99j");
+        CHECK(t.track(last).name == "Drums");
+        t.press(NamedKey::Escape);
+        CHECK(order(t) == kStart);
+    }
+    SECTION("every other key does nothing")
+    {
+        const auto before = t.document.song();
+        t.type(U"dupxM ");
+        t.press(NamedKey::Tab);
+        t.press(NamedKey::Backspace);
+        CHECK(t.document.song() == before);
+        t.type(U"j");
+        CHECK(order(t) == "BPSDL"); // still moving
+        t.press(NamedKey::Escape);
+    }
+}
+
+TEST_CASE("a V selection of tracks moves as a block, and accepting ends the selection")
+{
+    Tracking t;
+    t.type(U"Vj"); // Drums and Bass
+    t.type(U",to");
+    t.type(U"j");
+    CHECK(order(t) == "PDBSL");
+    SECTION("Enter")
+    {
+        t.press(NamedKey::Enter);
+        CHECK(t.ws.mode() == Mode::Normal);
+        t.type(U"u");
+        CHECK(order(t) == kStart);
+    }
+    SECTION("Escape leaves it selected")
+    {
+        t.press(NamedKey::Escape);
+        CHECK(order(t) == kStart);
+        CHECK(t.ws.mode() == Mode::Visual);
+        t.press(NamedKey::Escape);
+    }
+    SECTION("the whole block stops at the end")
+    {
+        t.type(U"G");
+        const auto last = t.document.song().tracks().size() - 1;
+        CHECK(t.track(last).name == "Bass");
+        CHECK(t.track(last - 1).name == "Drums");
+        t.press(NamedKey::Escape);
+        t.press(NamedKey::Escape);
+    }
+}
+
+TEST_CASE("Alt-Up and Alt-Down move a track at once, undoing together")
+{
+    Tracking t;
+    t.press(NamedKey::Down, kAlt);
+    CHECK(order(t) == "BDPSL");
+    CHECK(t.ws.tracks().cursor().track == t.track(1).id());
+    t.press(NamedKey::Down, kAlt);
+    CHECK(order(t) == "BPDSL");
+    t.type(U"j"); // a move of the cursor, and then the next track
+    t.press(NamedKey::Up, kAlt);
+    CHECK(order(t) == "BPSDL");
+    t.type(U"u");
+    CHECK(order(t) == kStart);
+
+    t.type(U"gg");
+    t.press(NamedKey::Up, kAlt);
+    CHECK(order(t) == kStart);
+    CHECK(t.ws.message() == "Already the first track");
+
+    // Visual: the block, staying selected.
+    t.type(U"Vj");
+    t.press(NamedKey::Down, kAlt);
+    CHECK(order(t) == "PDBSL");
+    CHECK(t.ws.mode() == Mode::Visual);
+    t.press(NamedKey::Escape);
+}
+
+TEST_CASE("the tracks being moved are shown, and the status line says what to do")
+{
+    Tracking t;
+    t.type(U",toj");
+    const auto frame = t.ws.frame();
+    bool band = false;
+    for (const auto& run : frame.front().text)
+    {
+        band = band || (run.y == 2 * 20 && run.style.background == Role::Selection);
+    }
+    CHECK(band);
+    CHECK(inspectorHas(frame, U" MOVE "));
+    CHECK(inspectorHas(frame, U"Enter accepts"));
+    t.press(NamedKey::Enter);
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U" MOVE "));
+}

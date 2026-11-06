@@ -328,7 +328,8 @@ void ArrangePage::follow()
 }
 
 void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
-                             std::optional<Selected> selected) const
+                             std::optional<Selected> selected,
+                             const std::vector<core::TrackId>& moving) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -357,13 +358,20 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         number.insert(0, 3 - std::min<std::size_t>(number.size(), 3), ' ');
         headers.write(0, row, number,
                       index == track_ ? Style{Role::CursorText, Role::Cursor, kBold} : Style{});
+        const bool isMoving = std::ranges::find(moving, track.id()) != moving.end();
+        const Style moved{Role::Text, Role::Selection, kPlain};
         if (track.name.empty())
         {
-            headers.write(4, row, std::string(kNameColumns, '-'), kDim);
+            headers.write(4, row, std::string(kNameColumns, '-'), isMoving ? moved : kDim);
         }
         else
         {
-            headers.write(4, row, track.name.substr(0, kNameColumns), {});
+            auto name = track.name.substr(0, kNameColumns);
+            if (isMoving) // the whole of its column, as a band
+            {
+                name.resize(kNameColumns, ' ');
+            }
+            headers.write(4, row, name, isMoving ? moved : Style{});
         }
     }
     frame.push_back(gridRegion(headers, main_, cell_, Role::Background));

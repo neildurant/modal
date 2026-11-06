@@ -198,6 +198,9 @@ public:
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;
 
+    // The tracks being moved through the others, to show them.
+    virtual std::vector<core::TrackId> movingTracks() const = 0;
+
     // The output ports there are now, to choose from.
     virtual std::vector<std::string> outputPorts() const = 0;
 

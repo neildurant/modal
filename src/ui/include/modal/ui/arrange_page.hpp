@@ -117,7 +117,8 @@ public:
         bool sections = false; // on the strip, sections, drawn there too
     };
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
-                    std::optional<Selected> selected = std::nullopt) const;
+                    std::optional<Selected> selected = std::nullopt,
+                    const std::vector<core::TrackId>& moving = {}) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

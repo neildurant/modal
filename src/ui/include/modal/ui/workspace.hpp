@@ -361,6 +361,7 @@ private:
     }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
+    std::vector<core::TrackId> movingTracks() const override;
     std::vector<std::string> outputPorts() const override
     {
         return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
@@ -450,6 +451,15 @@ private:
 
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
+    // The adjoining tracks a track command acts on, as first and count: the selected ones, or the
+    // cursor's. None on the conductor or the section strip.
+    std::optional<std::pair<std::size_t, std::size_t>> trackBlock() const;
+    // Moves them there, in a step with others of the same key, keeping the cursor on its track.
+    void moveTrackBlock(std::size_t first, std::size_t count, std::size_t to,
+                        const std::string& mergeKey);
+    // What a key does while moving tracks. Only the keys for that do anything.
+    bool trackMoveKey(const Key& key);
+
     // :event-insert puts an event of any kind but a note in the cursor's track at its time.
     CommandResult insertEvent(std::string_view text);
 
@@ -785,6 +795,19 @@ private:
     MessageKind messageKind_ = MessageKind::Information;
     LineHandler lineHandler_;
     PortFinder portFinder_;
+
+    // Moving tracks through the others, from , t o until Enter or Escape.
+    struct TrackMove
+    {
+        std::size_t first = 0; // where they are now
+        std::size_t count = 1;
+        std::size_t start = 0; // where they started, for Escape
+        std::string mergeKey;  // so that the moves are one undo step, and another's a new one
+        int number = 0;        // a count being typed
+        bool g = false;        // g typed, waiting for the other
+    };
+    std::optional<TrackMove> trackMove_;
+    std::uint64_t trackMoves_ = 0;
     Mode mode_ = Mode::Normal;
     int width_ = 0;
     int height_ = 0;

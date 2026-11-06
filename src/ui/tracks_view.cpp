@@ -848,7 +848,11 @@ void TracksView::addRegions(Frame& frame) const
                  .over = {}};
     const auto columns = trackColumns();
     const auto tracks = document_.song().tracks();
-    const auto chosen = host_.selection() ? selected() : std::vector<core::TrackId>{};
+    auto chosen = host_.movingTracks();
+    if (chosen.empty() && host_.selection())
+    {
+        chosen = selected();
+    }
     const auto draw = [&](std::size_t index, int y, const core::Track* track)
     {
         int x = (1 - left_) * cell_.width;

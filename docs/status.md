@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the Tracks table edited in place, a port list, tempo display and `:event-insert` are tried and published. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 6 November 2026: track reordering is committed locally for a UI trial, not yet pushed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -88,15 +88,18 @@ Tried in the real window and published: the Program column with its bank fields,
 
 ## The Tracks table edited in place
 
-Tried in the real window and published: the demo song with every kind of event, the event-sign colour, tempo in the status line and the arrangement's ruler, the Tracks table edited in its cells with bank, grid and note-default columns, the port list, and `:event-insert`. The reasons are in decisions.md, under The Tracks table edited in place.
+Tried in the real window and published: the demo song with every kind of event, the event-sign colour, tempo in the status line and the arrangement's ruler, the Tracks table edited in its cells with bank, grid and note-default columns, the port list, and `:event-insert` on `, e`, which also sets a tempo, as a stop-gap to refine later. The piano roll's ruler marks tempo changes as the arrangement's does. The reasons are in decisions.md, under The Tracks table edited in place.
+
+## Awaiting a UI trial
+
+Committed locally, to try before pushing: track reordering, with `, t o` and Alt-Up and Alt-Down, in the Tracks view and the arrangement. The reasons are in decisions.md, under Reordering tracks.
 
 ## Next
 
 The initial Tracks step and its UI feedback are complete. Settle the next step's open questions before implementation:
 
-1. Reordering tracks, requested November 2026, is to be scheduled: see To decide in design.md.
-2. Playback quantise: independent grid, note lengths, pedals, live changes, bypass and committing.
-3. Freeze is agreed in principle, with scope, out-of-range results, negative offsets, section boundaries and rounding still open. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
+1. Playback quantise: independent grid, note lengths, pedals, live changes, bypass and committing.
+2. Freeze is agreed in principle, with scope, out-of-range results, negative offsets, section boundaries and rounding still open. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
 
 The rest of milestone 7 remains the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Raise each feature's open questions before implementing the parts they affect.
 

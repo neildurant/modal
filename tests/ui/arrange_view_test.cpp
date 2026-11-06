@@ -1187,3 +1187,27 @@ TEST_CASE(
     const auto& region = frame[frame.size() - 2];
     CHECK(std::ranges::find(region.text, U"Section", &TextRun::text) == region.text.end());
 }
+
+TEST_CASE("tracks can be moved from the arrangement, but not the conductor or the strip")
+{
+    Arranging a;
+    const auto name = [&](std::size_t i) { return a.document.song().tracks()[i]->name; };
+    const auto first = name(0);
+    const auto second = name(1);
+
+    a.type(U",toj");
+    CHECK(name(1) == first);
+    CHECK(a.ws.arrangement().cursor().track == a.document.song().tracks()[1]->id());
+    a.press(Key::of(NamedKey::Enter));
+    CHECK(name(0) == second);
+
+    a.press(Key::of(NamedKey::Up, kAlt));
+    CHECK(name(0) == first);
+    CHECK(a.ws.arrangement().cursor().track == a.document.song().tracks()[0]->id());
+
+    // The strip has no track to move.
+    const auto before = a.document.song();
+    a.type(U"gs,to");
+    a.type(U"j");
+    CHECK(a.document.song() == before);
+}

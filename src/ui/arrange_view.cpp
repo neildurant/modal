@@ -1569,7 +1569,7 @@ void ArrangeView::addRegions(Frame& frame) const
                                          selectedSections().has_value()};
     }
     page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt,
-                     selected);
+                     selected, host_.movingTracks());
     const auto track = trackId() ? page_.track() + 1 : 0;
     frame.push_back(trackBarRegion(document_.song(), track, page_.time(), meter(), layout_.top[0],
                                    width_, cell_));

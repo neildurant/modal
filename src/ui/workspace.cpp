@@ -885,6 +885,10 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (trackMove_)
+    {
+        return trackMoveKey(key);
+    }
     widenSelection(); // a key run at a pause may have moved the cursor
     const bool changed = takeKey(key, now);
     widenSelection();
@@ -1523,6 +1527,41 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                        });
         setMessage(std::string{mute ? "Mute " : "Solo "} + (on ? "on: " : "off: ") + name,
                    MessageKind::Information);
+        return true;
+    }
+    if (command == "track-reorder")
+    {
+        const auto block = trackBlock();
+        if (!block)
+        {
+            refuse("Select a track to move");
+            return true;
+        }
+        trackMove_ = TrackMove{block->first, block->second, block->first,
+                               "track-reorder-" + std::to_string(++trackMoves_)};
+        return true;
+    }
+    if (command == "track-move-up" || command == "track-move-down")
+    {
+        const auto block = trackBlock();
+        if (!block)
+        {
+            refuse("Select a track to move");
+            return true;
+        }
+        const auto [first, tracks] = *block;
+        const auto last = document_.song().tracks().size() - tracks;
+        const auto by = static_cast<std::size_t>(std::max(count, 1));
+        const bool up = command == "track-move-up";
+        const auto to = up ? first - std::min(first, by) : std::min(first + by, last);
+        if (to == first)
+        {
+            refuse(up ? "Already the first track" : "Already the last track",
+                   MessageKind::Information);
+            return true;
+        }
+        // Moves one after another undo together, as with stepping a grid.
+        moveTrackBlock(first, tracks, to, "track-move");
         return true;
     }
     if (command == "track-chase-toggle")
@@ -2396,6 +2435,118 @@ void Workspace::showPlayhead()
         }
     }
     wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
+}
+
+std::optional<std::pair<std::size_t, std::size_t>> Workspace::trackBlock() const
+{
+    const auto here = where();
+    const auto cursor = view().cursor();
+    if (!cursor.track || (here != Where::Tracks && here != Where::TrackList))
+    {
+        return std::nullopt;
+    }
+    const auto tracks = document_.song().tracks();
+    const auto indexOf = [&](core::TrackId id)
+    {
+        return static_cast<std::size_t>(
+            std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == id; }) -
+            tracks.begin());
+    };
+    auto first = indexOf(*cursor.track);
+    auto last = first;
+    if (selection_ && selection_->anchor.track)
+    {
+        const auto anchor = indexOf(*selection_->anchor.track);
+        first = std::min(first, anchor);
+        last = std::max(last, anchor);
+    }
+    return std::pair{first, last - first + 1};
+}
+
+std::vector<core::TrackId> Workspace::movingTracks() const
+{
+    std::vector<core::TrackId> ids;
+    if (trackMove_)
+    {
+        const auto tracks = document_.song().tracks();
+        for (std::size_t i = 0; i < trackMove_->count; ++i)
+        {
+            ids.push_back(tracks[trackMove_->first + i]->id());
+        }
+    }
+    return ids;
+}
+
+void Workspace::moveTrackBlock(std::size_t first, std::size_t count, std::size_t to,
+                               const std::string& mergeKey)
+{
+    const auto cursor = view().cursor();
+    document_.edit(
+        count == 1 ? "Move a track" : "Move tracks", view().place(),
+        [&](core::Song& song) { song.moveTracks(first, count, to); }, mergeKey);
+    view().refresh();
+    view().setCursor(cursor);
+}
+
+bool Workspace::trackMoveKey(const Key& key)
+{
+    auto& move = *trackMove_;
+    const auto last = document_.song().tracks().size() - move.count;
+    const auto go = [&](std::size_t to)
+    {
+        if (to != move.first)
+        {
+            moveTrackBlock(move.first, move.count, to, move.mergeKey);
+            move.first = to;
+        }
+    };
+    const auto steps = [&] { return static_cast<std::size_t>(std::max(move.number, 1)); };
+    const bool plain = (key.modifiers & (kCtrl | kAlt)) == 0;
+    const bool g = std::exchange(move.g, false);
+    if (key.named == NamedKey::Enter)
+    {
+        trackMove_.reset();
+        endVisual();
+    }
+    else if (key.named == NamedKey::Escape)
+    {
+        go(move.start);
+        trackMove_.reset();
+    }
+    else if (key.named == NamedKey::Up || (plain && key.character == U'k'))
+    {
+        go(move.first - std::min(move.first, steps()));
+        move.number = 0;
+    }
+    else if (key.named == NamedKey::Down || (plain && key.character == U'j'))
+    {
+        go(std::min(move.first + steps(), last));
+        move.number = 0;
+    }
+    else if (plain && key.character == U'G')
+    {
+        go(last);
+        move.number = 0;
+    }
+    else if (plain && key.character == U'g')
+    {
+        if (g)
+        {
+            go(0);
+        }
+        move.g = !g;
+        move.number = 0;
+    }
+    else if (plain && key.character >= U'0' && key.character <= U'9' &&
+             (key.character != U'0' || move.number > 0))
+    {
+        move.number = std::min(move.number * 10 + static_cast<int>(key.character - U'0'), 9999);
+    }
+    else
+    {
+        move.number = 0;
+    }
+    return true;
 }
 
 CommandResult Workspace::insertEvent(std::string_view text)

@@ -248,7 +248,8 @@ Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
-    bottom.left = {{view().typing()         ? " EDIT "
+    bottom.left = {{trackMove_              ? " MOVE "
+                    : view().typing()       ? " EDIT "
                     : mode_ == Mode::Visual ? " VISUAL "
                                             : " NORMAL ",
                     {Role::ModeText, Role::Mode, kBold}}};
@@ -260,7 +261,11 @@ Bar Workspace::statusBar(bool withMessage) const
                                    " ends it",
                                {Role::Accent, Role::Bar, kBold}});
     }
-    if (withMessage && !message_.empty())
+    if (trackMove_)
+    {
+        bottom.left.push_back({"  j and k move, Enter accepts, Escape puts back", kBarText});
+    }
+    else if (withMessage && !message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
         bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});

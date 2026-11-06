@@ -48,6 +48,8 @@ Track numbers and numeric settings now align on the right. Musical offsets displ
 
 The tempo showed only in the event list, so the status line now gives it, and the arrangement's ruler marks where it changes; the song's first tempo isn't marked, as every song has one. The ruler's signs for program and tempo changes got a colour of their own, as the label colour was too close to the section names around them. `:event-insert` is a deliberate stop-gap: a way to insert any kind of event, in the song format's forms, until controller lanes and the like have proper ways of their own. The demo song has an example of every kind of event, with a test that keeps it so, because a feature without an example is hard to try.
 
+**Reordering tracks (November 2026).** Requested after use, as a command then the up and down keys until Enter or Escape. `, t o` gives it a place in the hint menu, and Alt-Up and Alt-Down give speed once it's known, moving at once rather than opening the mode. Transport could have stayed working during a move, to listen as tracks go, but keeping it simple and solid was preferred: the mode takes only its own keys.
+
 ## Editing grammar
 
 Editing follows Vim's model: `[count] operator [count] motion-or-object`, with `.` to repeat the last change. Key choices below are proposals; everything is rebindable in the keymap file.

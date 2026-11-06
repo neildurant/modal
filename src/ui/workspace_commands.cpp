@@ -410,6 +410,15 @@ constexpr std::array kSharedCommands{
                 .description = "Chase notes on the selected tracks or stop, as the cursor's "
                                "track doesn't",
                 .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "track-reorder",
+                .description = "Move this track or the selected tracks through the others: j and "
+                               "k move, Enter accepts, Escape puts them back"},
+    CommandInfo{.name = "track-move-up",
+                .description = "Move this track or the selected tracks up, {count} places",
+                .count = true},
+    CommandInfo{.name = "track-move-down",
+                .description = "Move this track or the selected tracks down, {count} places",
+                .count = true},
     CommandInfo{.name = "track-mute-toggle",
                 .description = "Mute or unmute this track",
                 .modes = modeBit(Mode::Normal)},
@@ -520,11 +529,14 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 121> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 124> where{{
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
             {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"track-reorder", onlyIn({Tracks, TrackList})},
+            {"track-move-up", onlyIn({Tracks, TrackList})},
+            {"track-move-down", onlyIn({Tracks, TrackList})},
             {"track-mute-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-solo-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-chase-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
