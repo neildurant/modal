@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -297,6 +298,21 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
                                signs[i].y,
                                std::u32string(1, signs[i].character),
                                {signs[i].role, Role::Background, kPlain}});
+    }
+}
+
+void addTempoSigns(std::vector<RowSign>& signs, const core::TempoMap& tempo, core::Tick from,
+                   core::Tick to, int y, const std::function<int(core::Tick)>& toX)
+{
+    std::optional<core::Tempo> last;
+    for (const auto& change : tempo.changes())
+    {
+        if (last && change.tempo != *last && change.tick >= from && change.tick < to)
+        {
+            signs.push_back({toX(change.tick), y, U'\u25B2', Role::EventSign,
+                             decodeUtf8(std::to_string(std::lround(change.tempo.bpm())))});
+        }
+        last = change.tempo;
     }
 }
 

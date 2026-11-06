@@ -2311,6 +2311,8 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
             }
         }
     }
+    addTempoSigns(signs, song.tempo(), p.start, p.end, h,
+                  [&](core::Tick tick) { return scale.toX(tick) + 2 * lineWidth; });
     addRowSigns(ruler, std::move(signs), cell_);
 
     // The third row: the bars, in the track's bars, numbered at their lines, every so many

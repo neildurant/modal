@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -1658,4 +1659,35 @@ TEST_CASE("the ruler marks a track's own program changes, and not its setup")
     CHECK(shown[0].y == kCell.height);
     CHECK(std::ranges::count(shown, U"34", &TextRun::text) == 1);
     CHECK(std::ranges::count(shown, U"12", &TextRun::text) == 0);
+}
+
+TEST_CASE("the ruler marks where the tempo changes, as the arrangement's does")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto signs = [&]
+    {
+        std::vector<std::u32string> found;
+        const auto frame = r.ws.frame();
+        for (const auto& region : frame)
+        {
+            for (const auto& run : region.text)
+            {
+                if (run.y == kCell.height && run.style.foreground == Role::EventSign)
+                {
+                    found.push_back(run.text);
+                }
+            }
+        }
+        std::ranges::sort(found, std::greater{});
+        return found;
+    };
+    CHECK(signs().empty()); // its starting tempo isn't a change
+    r.document.edit("Slow down", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTempo([&](core::TempoMap& tempo)
+                                         { tempo.set(r.t.quarters(2), core::Tempo::fromBpm(96)); });
+                    });
+    CHECK(signs() == std::vector<std::u32string>{U"\u25B2", U"96"});
 }

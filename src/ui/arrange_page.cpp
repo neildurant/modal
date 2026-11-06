@@ -9,7 +9,6 @@
 #include <modal/ui/view_parts.hpp>
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <iterator>
 #include <optional>
@@ -773,20 +772,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                        tracksTop + static_cast<int>(row - 1 - topTrack_) * cell_.height, cell_);
         }
     }
-    // The conductor's tempo where it changes, as whole BPM to keep it short; the exact value is
-    // in the status line and the event list. A section starting at the same tempo isn't a change,
-    // and neither is the song's first, which every song has.
-    std::optional<core::Tempo> tempo;
-    for (const auto& change : song_.tempo().changes())
-    {
-        if (tempo && change.tempo != *tempo && change.tick >= leftTick_ && change.tick < shownEnd)
-        {
-            signs.push_back({scale.toX(change.tick) + 2 * lineWidth, kSignRow * cell_.height, U'▲',
-                             Role::EventSign,
-                             decodeUtf8(std::to_string(std::lround(change.tempo.bpm())))});
-        }
-        tempo = change.tempo;
-    }
+    addTempoSigns(signs, song_.tempo(), leftTick_, shownEnd, kSignRow * cell_.height,
+                  [&](core::Tick tick) { return scale.toX(tick) + 2 * lineWidth; });
     addRowSigns(timeline, std::move(signs), cell_);
     // The playhead, a line through the ruler and the tracks.
     if (playhead_ && *playhead_ >= leftTick_ && *playhead_ < right)

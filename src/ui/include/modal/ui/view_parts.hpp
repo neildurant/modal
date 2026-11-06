@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -114,6 +115,12 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell);
 // over bars and notes of any shade (decided November 2026, after a letter boxed there blotted
 // out the bar under it). Its ring starts at x, so from where letters start, a pixel clear of
 // the line at the time.
+// Where the tempo changes in view, in a ruler's row of signs: a triangle and whole BPM, as the
+// exact value is in the status line and the event list. A section starting at the tempo already in
+// force isn't a change, and neither is the song's first, which every song has.
+void addTempoSigns(std::vector<RowSign>& signs, const core::TempoMap& tempo, core::Tick from,
+                   core::Tick to, int y, const std::function<int(core::Tick)>& toX);
+
 void addMarkDot(Region& region, int x, int y, CellSize cell);
 
 // Puts the register's events into the song at a time, its first track's onto a track (counting
