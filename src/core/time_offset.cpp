@@ -2,6 +2,7 @@
 
 #include <modal/core/time_offset.hpp>
 
+#include <algorithm>
 #include <charconv>
 
 namespace modal::core
@@ -37,6 +38,65 @@ TimeOffset TimeOffset::ticks(Tick value)
     TimeOffset result;
     result.value_ = value;
     return result;
+}
+
+TimeOffset TimeOffset::fraction(NoteFraction coarse, bool earlier, Tick fine, Ppqn ppqn)
+{
+    auto result = ticks((earlier ? -1 : 1) * coarse.toTicks(ppqn) + fine);
+    result.coarse_ = Coarse{coarse, earlier, fine};
+    return result;
+}
+
+TimeOffset TimeOffset::nudged(std::int64_t by) const
+{
+    auto result = *this;
+    if (!musical())
+    {
+        result.value_ = std::get<std::chrono::milliseconds>(value_) + std::chrono::milliseconds{by};
+        return result;
+    }
+    result.value_ = std::get<Tick>(value_) + by;
+    if (result.coarse_)
+    {
+        result.coarse_->fine += by;
+    }
+    return result;
+}
+
+TimeOffset TimeOffset::stepped(NoteFraction step, int steps, Ppqn ppqn) const
+{
+    if (!coarse_)
+    {
+        return musical() ? ticks(amount() + steps * std::max<Tick>(1, step.toTicks(ppqn))) : *this;
+    }
+    // The signed sum of two fractions, over a common denominator.
+    const auto denominator = coarse_->fraction.denominator() * step.denominator();
+    const auto sum =
+        (coarse_->earlier ? -1 : 1) * coarse_->fraction.numerator() * step.denominator() +
+        steps * step.numerator() * coarse_->fraction.denominator();
+    if (sum == 0)
+    {
+        return ticks(coarse_->fine);
+    }
+    return fraction({sum < 0 ? -sum : sum, denominator}, sum < 0, coarse_->fine, ppqn);
+}
+
+TimeOffset TimeOffset::rescaled(Ppqn from, Ppqn to) const
+{
+    if (!musical())
+    {
+        return *this;
+    }
+    const auto scale = [&](Tick value)
+    {
+        const auto magnitude = value < 0 ? -value : value;
+        const auto scaled =
+            magnitude / from.value * to.value +
+            (2 * (magnitude % from.value) * to.value + from.value) / (2 * from.value);
+        return value < 0 ? -scaled : scaled;
+    };
+    return coarse_ ? fraction(coarse_->fraction, coarse_->earlier, scale(coarse_->fine), to)
+                   : ticks(scale(amount()));
 }
 
 std::int64_t TimeOffset::amount() const
@@ -96,7 +156,7 @@ std::optional<TimeOffset> parseTimeOffset(std::string_view text, Ppqn ppqn)
         const auto result = TimeOffset::ticks(*value);
         return result.valid(ppqn) ? std::optional{result} : std::nullopt;
     }
-    const int sign = text.front() == '-' ? -1 : 1;
+    const bool earlier = text.front() == '-';
     if (text.front() == '-' || text.front() == '+')
     {
         text.remove_prefix(1);
@@ -107,7 +167,7 @@ std::optional<TimeOffset> parseTimeOffset(std::string_view text, Ppqn ppqn)
     {
         return std::nullopt;
     }
-    auto value = sign * fraction->toTicks(ppqn);
+    Tick fineTicks = 0;
     if (split != std::string_view::npos)
     {
         const auto fineText = text.substr(split);
@@ -121,14 +181,20 @@ std::optional<TimeOffset> parseTimeOffset(std::string_view text, Ppqn ppqn)
         {
             return std::nullopt;
         }
-        value += *fine;
+        fineTicks = *fine;
     }
-    const auto result = TimeOffset::ticks(value);
+    const auto result = TimeOffset::fraction(*fraction, earlier, fineTicks, ppqn);
     return result.valid(ppqn) ? std::optional{result} : std::nullopt;
 }
 
-std::string offsetText(TimeOffset offset)
+std::string offsetText(const TimeOffset& offset)
 {
+    if (offset.coarse_)
+    {
+        const auto fine = offset.coarse_->fine;
+        return (offset.coarse_->earlier ? "-" : "+") + toString(offset.coarse_->fraction) +
+               (fine == 0 ? "" : (fine > 0 ? "+" : "") + std::to_string(fine) + "t");
+    }
     return (offset.amount() > 0 ? "+" : "") + std::to_string(offset.amount()) +
            (offset.musical() ? "t" : "ms");
 }

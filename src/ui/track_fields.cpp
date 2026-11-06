@@ -36,43 +36,7 @@ std::span<const TrackColumn> trackColumns()
     return kColumns;
 }
 
-std::string musicalOffsetText(core::TimeOffset offset, core::Ppqn ppqn)
-{
-    if (!offset.musical() || offset.amount() == 0)
-        return core::offsetText(offset);
-    const auto amount = offset.amount();
-    const auto magnitude = std::abs(amount);
-    std::optional<core::NoteFraction> nearest;
-    auto distance = magnitude; // very small offsets stay in ticks
-    const auto consider = [&](core::NoteFraction value)
-    {
-        const auto away = std::abs(magnitude - value.toTicks(ppqn));
-        if (away < distance)
-        {
-            nearest = value;
-            distance = away;
-        }
-    };
-    // Prefer straight values on ties, then dotted and triplet values. Avoid arbitrary
-    // fractions: the fine ticks make the display exact without obscure note names.
-    for (std::int64_t d = 1; d <= 128; d *= 2)
-        consider({1, d});
-    for (std::int64_t n = 2; n <= core::TimeOffset::kMaxMusical.numerator(); ++n)
-        consider({n, 1});
-    for (std::int64_t d = 1; d <= 128; d *= 2)
-    {
-        consider(core::NoteFraction{1, d}.dotted());
-        consider(core::NoteFraction{1, d}.triplet());
-    }
-    if (!nearest)
-        return core::offsetText(offset);
-    const auto fine = amount - (amount < 0 ? -1 : 1) * nearest->toTicks(ppqn);
-    return (amount < 0 ? "-" : "+") + core::toString(*nearest) +
-           (fine == 0 ? "" : (fine > 0 ? "+" : "") + std::to_string(fine) + "t");
-}
-
-std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index,
-                           core::Ppqn ppqn)
+std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index)
 {
     switch (field)
     {
@@ -93,7 +57,7 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
     case TrackField::VelocityOffset:
         return signedText(track.velocityOffset);
     case TrackField::TimeOffset:
-        return musicalOffsetText(track.timeOffset, ppqn);
+        return core::offsetText(track.timeOffset);
     case TrackField::ChaseNotes:
         return track.chaseNotes ? "C" : "-";
     }
@@ -203,18 +167,15 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
     }
     if (field == TrackField::TimeOffset)
     {
-        const bool musical = track.timeOffset.musical();
-        const auto unit = musical && !fine ? std::max<core::Tick>(1, track.grid.toTicks(ppqn)) : 1;
-        const auto limit = musical ? core::TimeOffset::kMaxMusical.toTicks(ppqn)
-                                   : core::TimeOffset::kMaxMilliseconds.count();
-        const auto current = track.timeOffset.amount();
-        if ((steps > 0 && steps > (limit - current) / unit) ||
-            (steps < 0 && -static_cast<std::int64_t>(steps) > (limit + current) / unit))
+        const auto stepped = track.timeOffset.musical() && !fine
+                                 ? track.timeOffset.stepped(track.grid, steps, ppqn)
+                                 : track.timeOffset.nudged(steps);
+        if (!stepped.valid(ppqn))
         {
             return "That step exceeds the time offset limit";
         }
-        const auto amount = current + static_cast<std::int64_t>(steps) * unit;
-        return setTrackField(track, field, std::to_string(amount) + (musical ? "t" : "ms"), ppqn);
+        track.timeOffset = stepped;
+        return {};
     }
     if (field == TrackField::Channel || field == TrackField::Transpose ||
         field == TrackField::VelocityOffset)

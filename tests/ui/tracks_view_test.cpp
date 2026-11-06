@@ -88,9 +88,8 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     CHECK(t.track().velocityOffset == 15);
     t.type(U"l");
     t.enter(U"+1/16-22t");
-    CHECK(
-        t.track().timeOffset ==
-        core::TimeOffset::ticks(core::NoteFraction{1, 16}.toTicks(t.document.song().ppqn()) - 22));
+    CHECK(t.track().timeOffset.amount() ==
+          core::NoteFraction{1, 16}.toTicks(t.document.song().ppqn()) - 22);
     CHECK(t.document.song().events(t.track().id()) == events);
     t.enter(U"-40ms");
     CHECK(t.track().timeOffset == core::TimeOffset{std::chrono::milliseconds{-40}});
@@ -377,7 +376,7 @@ TEST_CASE("track toggles are compact badges and numeric cells align on the right
     CHECK(t.track().chaseNotes);
 }
 
-TEST_CASE("musical track offsets are shown as a fraction with signed fine ticks")
+TEST_CASE("musical track offsets are shown as they were typed")
 {
     Tracking t;
     t.type(U"$");
@@ -391,8 +390,12 @@ TEST_CASE("musical track offsets are shown as a fraction with signed fine ticks"
         return result;
     };
     CHECK(shown().find(U"+1/16-14t") != std::u32string::npos);
+    t.enter(U"+1/16-33t"); // nearer another fraction, whose name it doesn't take
+    CHECK(shown().find(U"+1/16-33t") != std::u32string::npos);
     t.enter(U"-1/16+14t");
     CHECK(shown().find(U"-1/16+14t") != std::u32string::npos);
+    t.enter(U"+200t");
+    CHECK(shown().find(U"+200t") != std::u32string::npos);
     t.enter(U"-40ms");
     CHECK(shown().find(U"-40ms") != std::u32string::npos);
 }
@@ -486,16 +489,44 @@ TEST_CASE("chasing toggles from the palette command for the current track and un
     CHECK(t.ws.message().find("Select a track") != std::string::npos);
 }
 
-TEST_CASE("musical offset display round trips at each PPQN")
+TEST_CASE("stepping a musical offset keeps the parts it was typed in")
 {
-    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
-    const auto limit = core::TimeOffset::kMaxMusical.toTicks(ppqn);
-    for (const auto ticks : {core::Tick{1}, core::Tick{-1}, core::Tick{0}, ppqn.quarter() / 3,
-                             ppqn.quarter() / 4 - 14, -ppqn.quarter() / 4 + 14, limit, -limit})
-    {
-        const auto offset = core::TimeOffset::ticks(ticks);
-        CHECK(core::parseTimeOffset(musicalOffsetText(offset, ppqn), ppqn) == offset);
-    }
+    Tracking t;
+    t.type(U"$");
+    t.enter(U"+1/16-33t");
+    const auto text = [&] { return core::offsetText(t.track().timeOffset); };
+    t.type(U"_"); // a tick, in the fine part
+    CHECK(text() == "+1/16-34t");
+    t.type(U"+");
+    CHECK(text() == "+1/16-33t");
+    REQUIRE(t.track().grid == core::NoteFraction{1, 16});
+    t.type(U"="); // a grid step, in the fraction
+    CHECK(text() == "+1/8-33t");
+    t.type(U"-");
+    CHECK(text() == "+1/16-33t");
+    t.type(U"-"); // down to nothing but the fine part
+    CHECK(text() == "-33t");
+    t.type(U"-"); // which is plain ticks from here on
+    CHECK(t.track().timeOffset.amount() ==
+          -33 - core::NoteFraction{1, 16}.toTicks(t.document.song().ppqn()));
+    t.enter(U"-1/16+22t");
+    t.type(U"-");
+    CHECK(text() == "-1/8+22t");
+    t.type(U"==");
+    CHECK(text() == "+22t");
+    t.enter(U"-40ms");
+    t.type(U"=");
+    CHECK(text() == "-39ms");
+}
+
+TEST_CASE("a stepped musical offset stays within the limit")
+{
+    Tracking t;
+    t.type(U"$");
+    t.enter(U"+64/1");
+    t.type(U"=");
+    CHECK(t.ws.message().find("limit") != std::string::npos);
+    CHECK(core::offsetText(t.track().timeOffset) == "+64/1");
 }
 
 TEST_CASE("Tab in track field editing commits and passes over the buttons")

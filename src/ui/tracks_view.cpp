@@ -198,7 +198,7 @@ Inspection TracksView::inspection() const
     }
     const auto& track = *document_.song().track(*cursor_.track);
     const auto& column = trackColumns()[column_];
-    const auto full = trackFieldText(column.field, track, row(), document_.song().ppqn());
+    const auto full = trackFieldText(column.field, track, row());
     auto shown = decodeUtf8(full);
     if (shown.size() > 28)
     {
@@ -531,9 +531,8 @@ void TracksView::addRegions(Frame& frame) const
         for (std::size_t c = 0; c < columns.size(); ++c)
         {
             const auto& column = columns[c];
-            auto text = decodeUtf8(
-                track ? trackFieldText(column.field, *track, index, document_.song().ppqn())
-                      : std::string{column.heading});
+            auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
+                                         : std::string{column.heading});
             if (text.size() >= static_cast<std::size_t>(column.width))
             {
                 text.resize(static_cast<std::size_t>(column.width - 2));
@@ -568,10 +567,8 @@ void TracksView::addRegions(Frame& frame) const
                 const auto colour = column.field == TrackField::Mute   ? Role::TrackMute
                                     : column.field == TrackField::Solo ? Role::TrackSolo
                                                                        : Role::TrackChase;
-                const auto badge = U" " +
-                                   decodeUtf8(trackFieldText(column.field, *track, index,
-                                                             document_.song().ppqn())) +
-                                   U" ";
+                const auto badge =
+                    U" " + decodeUtf8(trackFieldText(column.field, *track, index)) + U" ";
                 const auto edge = hairline(cell_);
                 const int w = 3 * cell_.width;
                 // Text backgrounds are painted before shapes; only the badge carries a glyph.

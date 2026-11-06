@@ -1399,15 +1399,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     for (const auto& track : song.tracks())
     {
         tracks.push_back(*track);
-        if (track->timeOffset.musical())
-        {
-            const auto ticks = track->timeOffset.amount();
-            const auto magnitude = ticks < 0 ? -ticks : ticks;
-            const auto scaled =
-                magnitude / from.value * to.value +
-                (2 * (magnitude % from.value) * to.value + from.value) / (2 * from.value);
-            tracks.back().timeOffset = TimeOffset::ticks(ticks < 0 ? -scaled : scaled);
-        }
+        tracks.back().timeOffset = track->timeOffset.rescaled(from, to);
     }
     std::vector<Section> sections;
     for (const auto& old : song.sections())

@@ -17,11 +17,17 @@ TEST_CASE("track offsets parse explicit units and signed coarse plus fine values
     const auto step = NoteFraction{1, 16}.toTicks(ppqn);
     CHECK(parseTimeOffset("-40ms", ppqn) == TimeOffset{-40ms});
     CHECK(parseTimeOffset("+120t", ppqn) == TimeOffset::ticks(120));
-    CHECK(parseTimeOffset("+1/16", ppqn) == TimeOffset::ticks(step));
-    CHECK(parseTimeOffset("+1/16-22t", ppqn) == TimeOffset::ticks(step - 22));
-    CHECK(parseTimeOffset("-1/16+22t", ppqn) == TimeOffset::ticks(-step + 22));
-    CHECK(parseTimeOffset("1/8t-1t", ppqn) ==
-          TimeOffset::ticks(NoteFraction{1, 8}.triplet().toTicks(ppqn) - 1));
+    CHECK(parseTimeOffset("+1/16", ppqn)->amount() == step);
+    CHECK(parseTimeOffset("+1/16-22t", ppqn)->amount() == step - 22);
+    CHECK(parseTimeOffset("-1/16+22t", ppqn)->amount() == -step + 22);
+    CHECK(parseTimeOffset("1/8t-1t", ppqn)->amount() ==
+          NoteFraction{1, 8}.triplet().toTicks(ppqn) - 1);
+    // The same ticks, given another way, are another offset, shown as given.
+    CHECK(parseTimeOffset("+1/16", ppqn) != TimeOffset::ticks(step));
+    for (const auto text : {"+1/16", "+1/16-33t", "-1/16+22t", "+1/32.+27t", "+1/8t-1t", "+120t"})
+    {
+        CHECK(offsetText(*parseTimeOffset(text, ppqn)) == text);
+    }
     for (const auto bad :
          {"", "1", "ms", "t", "+-1t", "--1/16", "1/0", "1/16+2ms", "1/16-2", "1/16+2t+3t", "1001ms",
           "-1001ms", "9223372036854775807t", "1/16+9223372036854775807t"})
@@ -88,6 +94,30 @@ TEST_CASE("song files preserve offset units and rescale musical offsets")
         CHECK(rescaled.song->tracks()[0]->timeOffset.amount() ==
               (offset.musical() ? offset.amount() * other.value / ppqn.value : offset.amount()));
     }
+}
+
+TEST_CASE("song files keep a musical offset as it was given")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song{ppqn};
+    const auto id = song.addTrack("Lead");
+    const auto offset = *parseTimeOffset("+1/16-3t", ppqn);
+    song.updateTrack(id, [&](Track& t) { t.timeOffset = offset; });
+    const auto text = writeSong(song);
+    CHECK(text.find("offset=+1/16-3t") != std::string::npos);
+    const auto loaded = readSong(text, ppqn);
+    REQUIRE(loaded.song);
+    CHECK(loaded.song->tracks()[0]->timeOffset == offset);
+}
+
+TEST_CASE("changing PPQN keeps an offset's fraction and scales its fine ticks")
+{
+    const auto offset = *parseTimeOffset("+1/16-48t", kPpqn);
+    const auto lower = offset.rescaled(kPpqn, Ppqn{96});
+    CHECK(offsetText(lower) == "+1/16-5t");
+    CHECK(lower.amount() == NoteFraction{1, 16}.toTicks(Ppqn{96}) - 5);
+    CHECK(offsetText(TimeOffset::ticks(480).rescaled(kPpqn, Ppqn{96})) == "+48t");
+    CHECK(offsetText(TimeOffset{-40ms}.rescaled(kPpqn, Ppqn{96})) == "-40ms");
 }
 
 TEST_CASE("whole tracks keep settings and per-section own or inherited meters")
