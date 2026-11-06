@@ -26,12 +26,13 @@ class ArrangePage
 {
 public:
     // The rows above the tracks: labels' names, the play-from marker and the conductor's marks,
-    // the conductor's meters, bar numbers, and the section strip.
+    // the conductor's meters, the section strip, and bar numbers, directly above the bars they
+    // number and beside the track column's heading.
     static constexpr int kRulerRows = 5;
     static constexpr int kSignRow = 1;
     static constexpr int kMeterRow = 2;
-    static constexpr int kNumberRow = 3;
-    static constexpr int kStripRow = 4;
+    static constexpr int kStripRow = 3;
+    static constexpr int kNumberRow = 4;
     static constexpr int kHeaderColumns = 20; // the track's number and name, and a line
     static constexpr int kNameColumns = 14;
 

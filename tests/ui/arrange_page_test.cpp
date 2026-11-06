@@ -636,3 +636,23 @@ TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
     CHECK(page.bar() == 69);
     CHECK(page.leftTick() == 86 * core::kPpqn.quarter());
 }
+
+TEST_CASE("the track column's heading sits directly above the names, the strip above the numbers")
+{
+    auto page = page80x22();
+    Frame frame;
+    page.addRegions(frame);
+    const auto rowOf = [&](std::u32string_view text)
+    {
+        const auto run =
+            std::ranges::find_if(frame[0].text, [&](const TextRun& candidate)
+                                 { return candidate.text.find(text) != candidate.text.npos; });
+        REQUIRE(run != frame[0].text.end());
+        return run->y / kCell.height;
+    };
+    CHECK(rowOf(U"Sections") == ArrangePage::kStripRow);
+    CHECK(rowOf(U"Trk Name") == ArrangePage::kNumberRow);
+    CHECK(rowOf(U"Trk Name") == rowOf(U"Sections") + 1);
+    CHECK(ArrangePage::kNumberRow + 1 == ArrangePage::kRulerRows);
+    CHECK(rowOf(decodeUtf8(demoSong().tracks()[0]->name)) == ArrangePage::kRulerRows);
+}

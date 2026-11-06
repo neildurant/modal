@@ -335,7 +335,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     // The track headers, in text cells.
     CellGrid headers{columns, rows};
     headers.write(1, 0, song_.title, {Role::Accent, Role::Background, kBold});
-    headers.write(0, kRulerRows - 2, "Trk Name", kDim);
+    headers.write(0, kNumberRow, "Trk Name", kDim);
     headers.write(0, kStripRow, "Sections",
                   stripCursor_ ? Style{Role::CursorText, Role::Cursor, kBold} : kDim);
     for (int row = 0; row < rows; ++row)
@@ -503,8 +503,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         }
     }
 
-    // The ruler: labels by name, the conductor's meters, and its bars, numbered where there's
-    // room for the numbers; then the section strip.
+    // The ruler: labels by name, the conductor's meters, the section strip, and its bars,
+    // numbered where there's room for the numbers.
     // Section starts and labels: faint lines under the text and bars, so as not to distract,
     // through the ruler and across the tracks. Labels are named up to the next line, cut
     // short with an ellipsis or left out if there's no room; sections are named on the strip.
@@ -705,7 +705,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     // through text.
     for (const int x : labelLines)
     {
-        for (int row = 0; row <= kStripRow; ++row)
+        for (int row = 0; row < kRulerRows; ++row)
         {
             const int y = row * cell_.height;
             const bool covered =
