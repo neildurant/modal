@@ -61,6 +61,20 @@ struct TrackId
     friend constexpr auto operator<=>(TrackId, TrackId) = default;
 };
 
+// The bank and program a track asks for when playback starts, before its own events. Each is
+// sent only if set: unset leaves the choice to the instrument or the track's events, and isn't
+// the same as zero.
+struct ProgramSetup
+{
+    std::optional<std::uint8_t> bankMsb; // 0-127, sent as controller 0
+    std::optional<std::uint8_t> bankLsb; // 0-127, sent as controller 32
+    std::optional<std::uint8_t> program; // 0-127
+
+    bool empty() const { return !bankMsb && !bankLsb && !program; }
+
+    friend bool operator==(const ProgramSetup&, const ProgramSetup&) = default;
+};
+
 // A track's settings. Its meter and events are held by the song's sections.
 class Track
 {
@@ -91,6 +105,7 @@ public:
     bool arm = false;
     bool thru = true;       // while armed, send MIDI input on to the track's port and channel
     bool chaseNotes = true; // off for drums and other sounds where a late attack sounds wrong
+    ProgramSetup programSetup;
 
     // Applied at playback only; the stored events never change.
     int transpose = 0;

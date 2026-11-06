@@ -725,6 +725,18 @@ bool Reader::readTrack(std::span<const Token> tokens)
             }
             (name == "thru" ? track.thru : track.chaseNotes) = *value == "on";
         }
+        else if (value && (name == "bankmsb" || name == "banklsb" || name == "program"))
+        {
+            const auto setting = parseInteger(*value, 0, 127);
+            if (!setting)
+            {
+                return fail(std::string{name} + " should be from 0 to 127");
+            }
+            auto& setup = track.programSetup;
+            (name == "bankmsb"   ? setup.bankMsb
+             : name == "banklsb" ? setup.bankLsb
+                                 : setup.program) = static_cast<std::uint8_t>(*setting);
+        }
         else if (value && (name == "transpose" || name == "velocity"))
         {
             const auto limit =
@@ -1523,6 +1535,16 @@ std::string writeSong(const Song& song)
         text += track->arm ? " arm" : "";
         text += track->thru ? "" : " thru=off";
         text += track->chaseNotes ? "" : " chase=off";
+        const auto setting = [&text](std::string_view name, std::optional<std::uint8_t> number)
+        {
+            if (number)
+            {
+                text += " " + std::string{name} + "=" + std::to_string(*number);
+            }
+        };
+        setting("bankmsb", track->programSetup.bankMsb);
+        setting("banklsb", track->programSetup.bankLsb);
+        setting("program", track->programSetup.program);
         if (track->transpose != 0)
         {
             text += " transpose=" + signedText(track->transpose);

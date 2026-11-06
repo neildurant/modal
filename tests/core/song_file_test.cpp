@@ -56,6 +56,7 @@ Song everything(Ppqn ppqn)
                          track.arm = true;
                          track.thru = false;
                          track.chaseNotes = false;
+                         track.programSetup = {1, 0, 127};
                          track.grid = NoteFraction{1, 8}.triplet();
                          track.noteLength = NoteFraction{437, 3840}; // not a common length
                          track.noteVelocity = 90;
@@ -279,6 +280,9 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + "track 2 \"T\" grid=1/0\n", "line 4", "grid should be a note length"},
         {header + "track 2 \"T\" len=long\n", "line 4", "len should be a note length"},
         {header + "track 2 \"T\" vel=0\n", "line 4", "vel should be a velocity"},
+        {header + "track 2 \"T\" program=128\n", "line 4", "program should be from 0 to 127"},
+        {header + "track 2 \"T\" bankmsb=-1\n", "line 4", "bankmsb should be from 0 to 127"},
+        {header + "track 2 \"T\" banklsb=x\n", "line 4", "banklsb should be from 0 to 127"},
         {header + "section \"A\"\n", "line 4", "bars=N"},
         {header + "section \"A\" bars=1\n  tempo 1:1:0 120\n", "line 5", "meter comes before"},
         {header + "section \"A\" bars=1\n  meter 1:1:0 4/4\n", "line 4", "no tempo"},
@@ -363,4 +367,26 @@ TEST_CASE("a song file is written whole, or not at all")
     }
     const auto bad = readSongFile(directory / "bad.modal");
     CHECK(bad.error.find("bad.modal, line 3: unknown line") != std::string::npos);
+}
+
+TEST_CASE("a program setup is saved only as far as it's set, with zero distinct from unset")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song{ppqn};
+    const auto unset = song.addTrack("Unset");
+    const auto bank = song.addTrack("Bank");
+    const auto zero = song.addTrack("Zero");
+    song.updateTrack(bank, [](Track& track) { track.programSetup.bankLsb = 3; });
+    song.updateTrack(zero, [](Track& track) { track.programSetup.program = 0; });
+
+    const auto text = writeSong(song);
+    CHECK(text.find("\"Unset\" ch=1\n") != std::string::npos);
+    CHECK(text.find("\"Bank\" ch=1 banklsb=3\n") != std::string::npos);
+    CHECK(text.find("\"Zero\" ch=1 program=0\n") != std::string::npos);
+
+    const auto read = readSong(text, ppqn);
+    REQUIRE(read.song);
+    CHECK(read.song->track(unset)->programSetup.empty());
+    CHECK(read.song->track(bank)->programSetup == ProgramSetup{std::nullopt, 3, std::nullopt});
+    CHECK(read.song->track(zero)->programSetup == ProgramSetup{std::nullopt, std::nullopt, 0});
 }
