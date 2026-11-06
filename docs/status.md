@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: track reordering is committed locally for a UI trial, not yet pushed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 6 November 2026: track reordering is tried and published, with nothing left unpushed. The next session may run on the Linux laptop rather than Windows, so a first build there is needed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -90,13 +90,13 @@ Tried in the real window and published: the Program column with its bank fields,
 
 Tried in the real window and published: the demo song with every kind of event, the event-sign colour, tempo in the status line and the arrangement's ruler, the Tracks table edited in its cells with bank, grid and note-default columns, the port list, and `:event-insert` on `, e`, which also sets a tempo, as a stop-gap to refine later. The piano roll's ruler marks tempo changes as the arrangement's does. The reasons are in decisions.md, under The Tracks table edited in place.
 
-## Awaiting a UI trial
+## Track reordering
 
-Committed locally, to try before pushing: track reordering, with `, t o` and Alt-Up and Alt-Down, in the Tracks view and the arrangement. The reasons are in decisions.md, under Reordering tracks.
+Tried in the real window and published: track reordering, with `, t o` and Alt-Up and Alt-Down, in the Tracks view and the arrangement. The reasons are in decisions.md, under Reordering tracks.
 
 ## Next
 
-The initial Tracks step and its UI feedback are complete. Settle the next step's open questions before implementation:
+The initial Tracks step and its UI feedback are complete. How `, e` asks for an event is a stop-gap, accepted as not very friendly for now, to refine later; the note on real MIDI hardware above still stands. Settle the next step's open questions before implementation:
 
 1. Playback quantise: independent grid, note lengths, pedals, live changes, bypass and committing.
 2. Freeze is agreed in principle, with scope, out-of-range results, negative offsets, section boundaries and rounding still open. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
