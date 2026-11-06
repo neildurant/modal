@@ -1369,15 +1369,16 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     result.fields.push_back({.heading = "Section",
                              .value = song.sections()[section]->name(),
                              .editable = true,
-                             .editText = song.sections()[section]->name()});
+                             .editText = song.sections()[section]->name(),
+                             .underKind = true});
     result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
+    result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     result.fields.push_back(
         {.heading = "Length",
          .value = std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") +
                   songTime(song.tempo().toTime(end) - song.tempo().toTime(start)),
          .editable = true,
          .editText = std::to_string(bars)});
-    result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     return result;
 }
 
@@ -1532,7 +1533,8 @@ Inspection ArrangeView::inspection() const
     {
         return sectionInspection(*section);
     }
-    // The cursor's bar: where it is, its meter, how many notes start in it, and its section.
+    // The cursor's bar: where it is, its meter, and how many notes and other events start in
+    // it, which together are what shade it.
     const auto& song = document_.song();
     const auto& m = meter();
     const auto bar = m.toBarBeatTick(page_.time()).bar;
@@ -1546,13 +1548,14 @@ Inspection ArrangeView::inspection() const
     if (const auto id = trackId())
     {
         std::size_t notes = 0;
+        std::size_t others = 0;
         for (const auto& event : song.events(*id).startingIn(start, end))
         {
-            notes += std::holds_alternative<core::Note>(event.data) ? 1 : 0;
+            ++(std::holds_alternative<core::Note>(event.data) ? notes : others);
         }
         result.fields.push_back({"Notes", std::to_string(notes)});
+        result.fields.push_back({"Other events", std::to_string(others)});
     }
-    result.fields.push_back({"Section", song.sections()[song.sectionAt(start)]->name()});
     return result;
 }
 

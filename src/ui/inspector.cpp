@@ -142,7 +142,8 @@ Inspection inspect(const EventList& list, std::size_t row)
         const auto last = meter.toBarBeatTick(song.sectionStart(r.index + 1) - 1).bar;
         const auto length = song.tempo().toTime(song.sectionStart(r.index + 1)) -
                             song.tempo().toTime(song.sectionStart(r.index));
-        add("Section", song.sections()[r.index]->name());
+        fields.push_back(
+            {.heading = "Section", .value = song.sections()[r.index]->name(), .underKind = true});
         add("Bars", std::to_string(first) + "–" + std::to_string(last));
         add("Length", barsText(last - first + 1) + ", " + songTime(length));
         return result;

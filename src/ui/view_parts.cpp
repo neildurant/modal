@@ -180,7 +180,8 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     const auto x = [&](int column) { return margin + column * cell.width; };
     const auto widthOf = [&](std::string_view name)
     {
-        constexpr std::array<std::pair<std::string_view, int>, 15> kWidths{{
+        constexpr std::array<std::pair<std::string_view, int>, 16> kWidths{{
+            {"Bar", 10},
             {"Pitch", 9},
             {"Velocity", 8},
             {"Length", 15},
@@ -194,7 +195,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
             {"Tempo", 12},
             {"Per quarter", 12},
             {"Meter", 6},
-            {"Bars", 9},
+            {"Bars", 10}, // as wide as Bar, so what comes after is in the same place
             {"Kind", 13},
         }};
         if (name == "Position" || name == "Ends")
@@ -211,6 +212,12 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
+        if (field.underKind)
+        {
+            inspectorValue(region, field, decodeUtf8(field.value), x(0), top + cell.height,
+                           widthOf("Kind"), cell, editor);
+            continue;
+        }
         auto title = decodeUtf8(field.heading);
         auto text = decodeUtf8(field.value);
         const bool edited =

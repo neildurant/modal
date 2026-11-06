@@ -6,6 +6,7 @@
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -1119,4 +1120,70 @@ TEST_CASE("The leader's Bars group deletes and inserts bars on every track, with
     a.press(Key::of(NamedKey::Escape));
     CHECK(song.end() == end);
     CHECK(a.ws.mode() == Mode::Normal);
+}
+
+namespace
+{
+// A run of the inspector's text, by what it says exactly.
+const TextRun& inspectorRun(const Frame& frame, std::u32string_view text)
+{
+    const auto& region = frame[frame.size() - 2];
+    const auto run = std::ranges::find(region.text, text, &TextRun::text);
+    REQUIRE(run != region.text.end());
+    return *run;
+}
+} // namespace
+
+TEST_CASE("a section's name goes under its heading, its Bars and Meter where a bar's are")
+{
+    Arranging a;
+    const auto onBar = a.ws.frame();
+    a.type(U"gs");
+    const auto onStrip = a.ws.frame();
+    const auto& kind = inspectorRun(onStrip, U"Section");
+    const auto& name = inspectorRun(onStrip, decodeUtf8(a.document.song().sections()[0]->name()));
+    CHECK(name.x == kind.x);
+    CHECK(name.y == kind.y + kCell.height);
+    // The bar's column, after its kind, which says the same.
+    const auto& barRuns = onBar[onBar.size() - 2].text;
+    const auto column = std::ranges::find_if(barRuns, [](const TextRun& run)
+                                             { return run.text == U"Bar" && run.x > 100; });
+    REQUIRE(column != barRuns.end());
+    CHECK(inspectorRun(onStrip, U"Bars").x == column->x);
+    CHECK(inspectorRun(onStrip, U"Meter").x == inspectorRun(onBar, U"Meter").x);
+    CHECK(inspectorRun(onStrip, U"Length").x == inspectorRun(onBar, U"Notes").x);
+    CHECK(inspectorRun(onStrip, U"Bars").x > name.x + 13 * kCell.width);
+}
+
+TEST_CASE(
+    "a bar's inspector counts its notes and other events, and leaves its section to the strip")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    core::Song song{ppqn};
+    const auto id = song.addTrack("Bass");
+    song.updateEvents(id,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{40, 90, ppqn.quarter()}});
+                          events.insert({0, core::ControlChange{1, 64}});
+                          events.insert({ppqn.quarter(), core::PitchBend{100}});
+                          events.insert({ppqn.quarter(), core::ProgramChange{5}});
+                      });
+    song.fitToContent();
+    Arranging a{std::move(song)};
+    const auto frame = a.ws.frame();
+    const auto valueUnder = [&](std::u32string_view heading)
+    {
+        const auto& title = inspectorRun(frame, heading);
+        const auto& region = frame[frame.size() - 2];
+        const auto run = std::ranges::find_if(
+            region.text, [&](const TextRun& candidate)
+            { return candidate.x == title.x && candidate.y == title.y + kCell.height; });
+        REQUIRE(run != region.text.end());
+        return run->text;
+    };
+    CHECK(valueUnder(U"Notes") == U"1");
+    CHECK(valueUnder(U"Other events") == U"3");
+    const auto& region = frame[frame.size() - 2];
+    CHECK(std::ranges::find(region.text, U"Section", &TextRun::text) == region.text.end());
 }

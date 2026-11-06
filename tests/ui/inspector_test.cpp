@@ -98,10 +98,11 @@ TEST_CASE("on a row that isn't an event, the inspector says what the row is")
 
     const auto section = of(list, RowKind::Section, 1);
     CHECK(section.kind == "Section");
-    CHECK(section.fields == std::vector<InspectorField>{{"Position", "2:1:000"},
-                                                        {"Section", "Verse"},
-                                                        {"Bars", "2–2"},
-                                                        {"Length", "1 bar, 0:02.000"}});
+    CHECK(section.fields ==
+          std::vector<InspectorField>{{"Position", "2:1:000"},
+                                      {.heading = "Section", .value = "Verse", .underKind = true},
+                                      {"Bars", "2–2"},
+                                      {"Length", "1 bar, 0:02.000"}});
     const auto tempo = of(list, RowKind::Tempo);
     CHECK(tempo.fields[1] == InspectorField{"Tempo", "120 BPM"});
     CHECK(tempo.fields[2] == InspectorField{"Per quarter", "500 ms"});

@@ -18,13 +18,15 @@ namespace modal::ui
 {
 
 // One of the inspector's fields: a heading, shown above its value; whether e can edit it, and
-// the text editing starts from if it isn't the value up to any " (" after it.
+// the text editing starts from if it isn't the value up to any " (" after it; and whether it
+// names the thing itself, shown under the kind with no heading of its own, as a section's name.
 struct InspectorField
 {
     std::string heading;
     std::string value;
     bool editable = false;
     std::string editText = {};
+    bool underKind = false;
 
     friend bool operator==(const InspectorField&, const InspectorField&) = default;
 };
