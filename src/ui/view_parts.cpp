@@ -33,13 +33,18 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
     {
         text = editor->line().text();
         const auto typed = editor->line().cursor();
-        const std::size_t first = typed + 1 > box ? typed + 1 - box : 0;
-        const auto pad = first == 0 && text.size() + 1 <= box ? box - text.size() - 1 : 0;
-        auto visible = std::u32string(pad, U' ') + text.substr(first, box);
+        const bool whole = editor->replacing() && !text.empty();
+        // A value keeps its place as editing starts: only a cursor past its end takes a cell,
+        // moving a right-aligned value along by one then.
+        const auto used = text.size() + (!whole && typed == text.size() ? 1 : 0);
+        const auto upTo = whole ? text.size() : typed + 1;
+        const std::size_t first = upTo > box ? upTo - box : 0;
+        const auto pad = rightAligned && first == 0 && used <= box ? box - used : 0;
+        auto visible = std::u32string(pad, U' ') + text.substr(first, box - pad);
         visible.resize(box, U' ');
         region.text.push_back({x, y, visible, {Role::Text, Role::Selection, kPlain}});
         const Style cursor{Role::CursorText, Role::Cursor, kPlain};
-        if (editor->replacing() && !text.empty())
+        if (whole)
         {
             // All of it highlighted: typing replaces it, until a key moves the cursor.
             region.text.push_back({x + static_cast<int>(pad) * cell.width, y,

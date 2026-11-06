@@ -62,7 +62,7 @@ private:
     std::optional<std::string> heading_;
     std::string last_; // the heading of the field it was last on
     CommandLine line_;
-    bool fresh_ = true; // typing replaces the value; keys that edit it keep it
+    bool fresh_ = true; // typing, Backspace and Delete replace the value; other keys keep it
 };
 
 } // namespace modal::ui

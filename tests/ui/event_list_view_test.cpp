@@ -550,6 +550,11 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     CHECK(styleAt(v.ws.frame()[0], column + 1, 5).background == Role::Cursor);
     v.ws.handle(Key::of(NamedKey::Escape), 0);
     enter(v.ws);
+    v.ws.handle(Key::of(NamedKey::Backspace), 0); // takes it all while it's highlighted
+    CHECK(v.view.fieldLine().text().empty());
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(bassNote(v, 1).velocity == 96);
+    enter(v.ws);
     type(v.ws, U"80");
     CHECK(v.view.fieldLine().text() == U"80");
     enter(v.ws);
@@ -576,6 +581,7 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     enter(v.ws);
     CHECK(bassNote(v, 1).velocity == 106);
     enter(v.ws);
+    v.ws.handle(Key::of(NamedKey::End), 0);
     v.ws.handle(Key::of(NamedKey::Backspace), 0);
     type(v.ws, U"0");
     CHECK(v.view.fieldLine().text() == U"100");

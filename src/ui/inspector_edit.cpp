@@ -146,8 +146,13 @@ std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& hos
         }
         return true;
     }
-    fresh_ = false; // keys that edit the value keep it
-    return editLine(line_, command);
+    if (std::exchange(fresh_, false) &&
+        (command == "command-line-backspace" || command == "command-line-delete"))
+    {
+        line_.clear(); // the value is highlighted whole, so these take it whole
+        return true;
+    }
+    return editLine(line_, command); // other keys that edit the value keep it
 }
 
 } // namespace modal::ui

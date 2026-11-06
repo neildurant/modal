@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/ui/demo_song.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -1557,6 +1558,58 @@ TEST_CASE("A value being edited in the inspector sits against the right of its b
             }
         }
     }
-    CHECK(box.ends_with(U"E1 ")); // the cursor's place after it
+    CHECK(box.ends_with(U"E1")); // where it was before editing
     CHECK(box.starts_with(U" "));
+}
+
+TEST_CASE("Starting to edit an inspector value leaves it where it is")
+{
+    Rolling r;
+    r.type(U"8j"); // the E1
+    const auto xOf = [&](std::u32string_view text)
+    {
+        for (const auto& region : r.ws.frame())
+            if (region.background == Role::Panel)
+                for (const auto& run : region.text)
+                    if (run.text == text)
+                        return run.x;
+        return -1;
+    };
+    const int before = xOf(U"E1 (28)");
+    REQUIRE(before >= 0);
+    r.type(U"e");
+    // The edit text is E1, on the right, as the value's end was.
+    const int edited = xOf(U"E1");
+    CHECK(edited == before + 5 * 10);
+    // A cursor moved within it needs no room; one past its end takes a cell, moving it along.
+    r.press(Key::of(NamedKey::Left));
+    CHECK(xOf(U"1") == edited + 10);
+    r.press(Key::of(NamedKey::Right));
+    CHECK(xOf(U" ") == edited + 10);
+}
+
+TEST_CASE("A value on the left of its inspector box stays there when edited")
+{
+    core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace ws{registry, document};
+    registry.add(windowCommands());
+    ws.resize(1200, 600, {10, 20});
+    ws.show(ViewKind::Arrangement);
+    for (const auto c : std::u32string_view{U"gs"})
+        ws.handle(Key::typed(c), 0);
+    const auto xOf = [&](std::u32string_view text)
+    {
+        for (const auto& region : ws.frame())
+            if (region.background == Role::Panel)
+                for (const auto& run : region.text)
+                    if (run.text == text)
+                        return run.x;
+        return -1;
+    };
+    const auto name = decodeUtf8(document.song().sections()[0]->name());
+    const int before = xOf(name);
+    REQUIRE(before >= 0);
+    ws.handle(Key::typed(U'e'), 0);
+    CHECK(xOf(name) == before);
 }

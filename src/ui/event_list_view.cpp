@@ -1673,8 +1673,13 @@ std::optional<bool> EventListView::runTyping(std::string_view command)
         host_.stopTyping();
         return true;
     }
-    field_->fresh = false; // keys that edit the value keep it
-    return editLine(fieldLine_, command);
+    if (std::exchange(field_->fresh, false) &&
+        (command == "command-line-backspace" || command == "command-line-delete"))
+    {
+        fieldLine_.clear(); // the value is highlighted whole, so these take it whole
+        return true;
+    }
+    return editLine(fieldLine_, command); // other keys that edit the value keep it
 }
 void EventListView::addRegions(Frame& frame) const
 {
