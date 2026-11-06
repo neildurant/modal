@@ -1493,6 +1493,23 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         showPlayhead();
         return true;
     }
+    if (command == "track-chase-toggle")
+    {
+        const auto id = view().cursor().track;
+        if (!id)
+        {
+            refuse("Select a track to change note chasing");
+            return true;
+        }
+        const bool on = !document_.song().track(*id)->chaseNotes;
+        document_.edit(
+            "Toggle note chasing", view().place(), [&](core::Song& song)
+            { song.updateTrack(*id, [&](core::Track& track) { track.chaseNotes = on; }); });
+        setMessage(on ? "Chase on: start notes already held at the playback position"
+                      : "Chase off: wait for subsequent notes",
+                   MessageKind::Information);
+        return true;
+    }
     if (command == "rewind-toggle")
     {
         // Through the setting, where there is one, so it stays set as other settings change.

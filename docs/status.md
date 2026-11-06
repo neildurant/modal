@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the first Tracks view implementation is built locally; all six Linux configurations pass and the UI trial is pending. Nothing from this step has been pushed.*
+*Last updated 6 November 2026: the first Tracks view implementation is built locally; the revised layout passes all six Linux configurations and awaits another UI trial. Nothing from this step has been pushed.*
 
 ## Milestones
 
@@ -20,7 +20,7 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ## Pending
 
-- **Tracks view UI trial:** the initial settings, whole-track clipboard and timing inspector below. Keep these changes local until tried, as AGENTS.md requires.
+- **Revised Tracks view UI trial:** the aligned note inspector, musical offset display, Mute/Solo/Chase buttons and numeric alignment below. Keep these changes local until tried, as AGENTS.md requires.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, and the views. Neil runs these.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
@@ -53,29 +53,30 @@ The UI trial below was confirmed on 5 November 2026, completing the check requir
 
 Built locally as the first step of milestone 7: `40a8f84` adds the core support and `3030d68` the view, editing and timing inspector. The agreed design is in design.md and decisions.md; keys and editing are in grammar.md. These commits have not been pushed.
 
-- The table exposes number, name, mute, solo, output port, channel, transpose, velocity offset and time offset; the inspector also edits note chasing. Stable field identities, shared formatting/editing and one ordered column list keep later column visibility or reordering separate from track state.
+- The table exposes number, name, mute, solo, chase, output port, channel, transpose, velocity offset and time offset. Mute/Solo/Chase show `-` or coloured `M`/`S`/`C` buttons; numeric values align on the right. Stable field identities, shared formatting/editing and one ordered column list keep later column visibility or reordering separate from track state.
 - `gt` and `, v t` open Tracks; `3gt` chooses track 3. Ctrl-PageDown / Ctrl-PageUp switch tracks. Musical position and pitch are retained when switching views.
 - `V` selects whole rows. Enter assigns a property across them, steps change each relative to its own value, and the batch validates and undoes together. Names are edited individually. `Vy` / `Vjy` copy whole tracks; Normal `p` / `P` insert copies after/before, Visual `p` / `P` replace selected rows, and `Vd` deletes explicitly selected tracks. Copying preserves settings, routing, mute/solo, editing defaults, section events and per-section meter ownership, with fresh IDs and unique names. Marks are not duplicated. Named registers also support whole tracks.
 - Offsets retain milliseconds or musical ticks through save/load and recording/playback. Inputs include `-40ms`, `+120t` and `+1/16-22t`; the agreed bounds are ±1000 ms or ±64 whole notes. Musical offsets rescale with PPQN and follow tempo changes at both note ends.
-- The piano-roll and event-list inspectors show coarse/fine timing below exact values. `timingunit=grid` is the agreed default; a fixed fraction also works without moving notes. `e` edits the inspector; event-list Enter retains cell editing, as does `e` on conductor rows.
+- The piano-roll and event-list inspectors group pitch/velocities on the left, aligned Start/Length coarse/fine pairs in the middle, and exact timing on the right. `timingunit=grid` is the agreed default; a fixed fraction also works without moving notes. `e` edits the inspector; event-list Enter retains cell editing, as does `e` on conductor rows.
 - The first whole-track clipboard requires matching PPQN and section names, order and lengths. Incompatible pastes are refused before changing the song. Wider mapping between songs remains future work.
 - Playback fixes found while exercising track settings: muting/rerouting the last track on a channel releases held pedals, and rerouting ends its old notes. A channel shared by another audible track keeps its pedal state. Detaching a stopping player also clears the view's playback state, avoiding a crash on a later view switch/wake.
 
 ### Validation
 
-- The full `tools/check-linux.sh` passed on the completed implementation: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each configuration registers 735 tests, with three platform/MIDI tests skipped and no failures. Whole-tree formatting and `git diff --check` also pass.
-- `build/linux-gcc/apps/Debug/modal` has been rebuilt after the implementation commits and checked to be newer than every application build input. The UI trial below remains pending; nothing from this step has been pushed.
-- Hidden offscreen sample renders pass for Tracks, the event list, arrangement and piano roll, including dark/light themes. Tracks and piano-roll images were inspected; this caught and fixed initial horizontal scrolling that hid the track-number column.
+- Follow-up presentation checks pass: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 741 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. New regressions cover aligned coarse/fine pairs, a visible editor at narrow widths, exact offset display at both PPQNs, toggle rendering, per-track Chase, and Tab through track columns.
+- Initial implementation: the full `tools/check-linux.sh` passed on the completed implementation: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each configuration registers 735 tests, with three platform/MIDI tests skipped and no failures. Whole-tree formatting and `git diff --check` also pass.
+- `build/linux-gcc/apps/Debug/modal` has been rebuilt after the implementation commits and checked to be newer than every application build input. The first UI trial produced the presentation feedback above; a trial of the revised layout remains pending. Nothing from this step has been pushed.
+- Hidden offscreen sample renders pass for Tracks, the event list, arrangement and piano roll, including dark/light themes. The revised inspector and both table themes were inspected, including active M/S/C buttons and fraction-plus-fine offsets; this caught and fixed duplicated glyphs under the new buttons.
 - No desktop automation or MIDI hardware tests have been run. Local Windows builds are skipped under the agreed policy; CI follows after the UI trial and push.
 
 ### What to try
 
 Run `build/linux-gcc/apps/Debug/modal --demo` (or open a song).
 
-1. `gt`, then `j/k` and `h/l`; Enter edits a field. Try mute/solo, channel, transpose and velocity offset. Space plays, `ga/ge/gr` switch views, Ctrl-PageDown / Ctrl-PageUp switch tracks, and Backspace returns. Resize the window with the time-offset column selected.
-2. On time offset (`$`), enter `+1/16-22t`, then `-40ms`; undo and redo, save and reopen. Confirm that stored note positions remain unchanged. Real MIDI output is useful for auditioning these settings, but has not been measured here.
+1. `gt`, then `j/k` and `h/l`; Enter edits a field. Try the Mute/Solo/Chase buttons, channel, transpose and velocity offset. Enter accepts `M`/`S`/`C`, `-`, or on/off; Tab commits and moves along columns. Space plays, `ga/ge/gr` switch views, Ctrl-PageDown / Ctrl-PageUp switch tracks, and Backspace returns. Resize the window with the time-offset column selected.
+2. On time offset (`$`), enter `+1/16-22t`, then `-40ms`; confirm the musical value displays as a fraction plus fine ticks, then undo and redo, save and reopen. Confirm that stored note positions remain unchanged. Real MIDI output is useful for auditioning these settings, but has not been measured here.
 3. `Vy`, then `p` or `P`, and undo. Try `Vjy` for two tracks and `Vp` for replacement. In a numeric column, `Vj` then Enter or `+` edits both selected tracks in one undo step. Copies preserve routing, mute and solo as agreed.
-4. In the piano roll or event list, `e` and Tab through to the Timing row. Edit Start step/fine and Length steps/fine; undo. Compare `:set timingunit=1/16` and `:set timingunit=grid`. Check the extra inspector row feels useful and leaves enough editing space.
+4. In the piano roll or event list, `e` and Tab through the pitch/velocity, coarse/fine and exact-timing groups. Edit Start step/fine and Length steps/fine; undo. Compare `:set timingunit=1/16` and `:set timingunit=grid`. Check the extra inspector row feels useful and leaves enough editing space.
 
 ## Next
 

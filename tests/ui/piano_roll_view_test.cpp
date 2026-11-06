@@ -537,7 +537,7 @@ TEST_CASE("the note under the piano roll's cursor is the current note, which the
               .events(r.document.song().tracks()[0]->id())[*r.view().currentNote()]
               .tick == 0);
     auto inspector = r.textOn(Role::Panel);
-    CHECK(contains(inspector, U"Note"));
+    CHECK(contains(inspector, U"Pitch:"));
     CHECK(contains(inspector, U"E1 (28)"));
     CHECK(contains(inspector, U"96"));
     r.type(U"l"); // off it in one step, to its end, rather than a grid step inside it
@@ -1220,14 +1220,25 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     CHECK(r.ws.message() == "No note here to edit");
     CHECK_FALSE(editor.active());
 
-    r.type(U"8je"); // the E1 at the start, on its position first
+    r.type(U"8je"); // the E1 at the start, on pitch first
     REQUIRE(editor.active());
+    CHECK(editor.heading() == "Pitch");
+    for (const auto heading : {"Velocity", "Release", "Start step", "Start fine", "Length steps",
+                               "Length fine", "Start bar", "Position", "Length", "Ends", "Pitch"})
+    {
+        tab();
+        CHECK(editor.heading() == heading);
+    }
+    for (int i = 0; i < 8; ++i)
+        tab();
     CHECK(editor.heading() == "Position");
     CHECK(editor.line().text().starts_with(U"1:1:0"));
     r.type(U"2:1");
     tab(); // moved to bar 2, the cursor with it
     CHECK(bassNote(r, 28)->first == t.bar(2));
     CHECK(r.view().time() == t.bar(2));
+    tab(); // Ends
+    tab(); // Pitch
     CHECK(editor.heading() == "Pitch");
     CHECK(editor.line().text() == U"E1");
     r.type(U"A2"); // onto the A2 there
@@ -1266,29 +1277,19 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     r.press(Key::of(NamedKey::Escape));
     CHECK(velocity() == 97);
 
-    // Its end, which sets its length; round from the first field to the last.
+    // End editing remains available in the exact-timing group, and Tab wraps to pitch.
     r.type(U"e");
-    tab();
-    tab();
+    for (int i = 0; i < 9; ++i)
+        tab();
     CHECK(editor.heading() == "Ends");
     r.type(U"2:2");
     tab();
     CHECK(bassNote(r, 29)->second == t.quarters(1));
-    CHECK(editor.heading() == "Release");
-    for (int i = 0; i < 5; ++i)
-        tab();
-    CHECK(editor.heading() == "Length fine");
-    tab();
-    CHECK(editor.heading() == "Position");
+    CHECK(editor.heading() == "Pitch");
     r.press(Key::of(NamedKey::Tab, kShift));
-    CHECK(editor.heading() == "Length fine");
-    for (int i = 0; i < 5; ++i)
-        r.press(Key::of(NamedKey::Tab, kShift));
-    CHECK(editor.heading() == "Release");
+    CHECK(editor.heading() == "Ends");
     r.press(Key::of(NamedKey::Escape));
-    r.type(U"e"); // where it was left, the release
-    CHECK(editor.heading() == "Release");
-    r.press(Key::of(NamedKey::Tab, kShift));
+    r.type(U"e");
     CHECK(editor.heading() == "Ends");
     r.type(U"1:4");
     tab();
@@ -1541,8 +1542,7 @@ TEST_CASE("A value being edited in the inspector sits against the right of its b
 {
     // As a spreadsheet's cell does (decided November 2026, after use), left again once set.
     Rolling r;
-    r.type(U"8je"); // the E1's position
-    r.press(Key::of(NamedKey::Tab));
+    r.type(U"8je"); // the E1's pitch
     REQUIRE(r.view().inspectorEditor().heading() == "Pitch");
     std::u32string box;
     for (const auto& region : r.ws.frame())

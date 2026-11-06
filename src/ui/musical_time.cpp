@@ -3,6 +3,7 @@
 #include <modal/ui/musical_time.hpp>
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <limits>
 
@@ -96,16 +97,21 @@ void addMusicalTiming(Inspection& inspection, const core::Event& event, const co
     const auto start = startParts(event.tick, meter, ticks);
     const auto length = lengthParts(note->duration, ticks);
     const auto add = [&](std::string heading, std::string value, bool editable = true)
-    {
-        inspection.fields.push_back(
-            {std::move(heading), std::move(value), editable, {}, false, true});
-    };
+    { inspection.fields.push_back({std::move(heading), std::move(value), editable}); };
     add("Units", core::toString(unit) + (unit.isExact(meter.ppqn()) ? "" : " (rounded)"), false);
     add("Start bar", std::to_string(start.bar));
     add("Start step", std::to_string(start.step));
     add("Start fine", fineText(start.fine));
     add("Length steps", std::to_string(length.step));
     add("Length fine", fineText(length.fine));
+
+    // Tab follows the visual groups: note properties, coarse/fine pairs, then exact timing.
+    constexpr std::array<std::string_view, 13> order{
+        "Pitch",      "Velocity",     "Release",     "Units",     "Start step",
+        "Start fine", "Length steps", "Length fine", "Start bar", "Position",
+        "Length",     "Ends",         "Time"};
+    std::ranges::stable_sort(inspection.fields, {}, [&](const InspectorField& field)
+                             { return std::ranges::find(order, field.heading) - order.begin(); });
 }
 
 EditResult setMusicalTiming(const core::Event& event, std::string_view heading,

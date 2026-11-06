@@ -291,10 +291,36 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marker.bmp"));
     view.run("view-tracks", 0);
+    const auto beforeTracks = document.song();
+    document.edit("Example track settings", {},
+                  [](modal::core::Song& song)
+                  {
+                      song.updateTrack(
+                          song.tracks()[0]->id(),
+                          [&](modal::core::Track& track)
+                          {
+                              track.mute = true;
+                              track.timeOffset = modal::core::TimeOffset::ticks(
+                                  modal::core::NoteFraction{1, 16}.toTicks(song.ppqn()) - 14);
+                          });
+                      song.updateTrack(song.tracks()[1]->id(),
+                                       [](modal::core::Track& track)
+                                       {
+                                           track.solo = true;
+                                           track.transpose = -12;
+                                       });
+                      song.updateTrack(song.tracks()[2]->id(),
+                                       [](modal::core::Track& track)
+                                       {
+                                           track.chaseNotes = false;
+                                           track.velocityOffset = 15;
+                                       });
+                  });
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-tracks.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-tracks-light.bmp"));
+    document.edit("Restore sample song", {}, [&](modal::core::Song& song) { song = beforeTracks; });
     view.run("view-arrangement", 0);
     for (const char32_t key : std::u32string_view{U"jj8l"})
     {

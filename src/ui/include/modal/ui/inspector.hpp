@@ -27,7 +27,6 @@ struct InspectorField
     bool editable = false;
     std::string editText = {};
     bool aside = false;
-    bool lower = false; // a second pair of lines, for coarse/fine timing
 
     friend bool operator==(const InspectorField&, const InspectorField&) = default;
 };

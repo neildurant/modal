@@ -20,6 +20,109 @@ namespace
 
 constexpr Style kBarText{Role::BarText, Role::Bar, kPlain};
 
+// A fixed-width value box, shared by the compact note panel and the general inspector.
+void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
+                    int columns, CellSize cell, const InspectorEditor* editor,
+                    bool rightAligned = false)
+{
+    if (columns < 1)
+        return;
+    const bool edited = editor && editor->active() && editor->heading() == field.heading;
+    const auto box = static_cast<std::size_t>(columns);
+    if (edited)
+    {
+        text = editor->line().text();
+        const auto typed = editor->line().cursor();
+        const std::size_t first = typed + 1 > box ? typed + 1 - box : 0;
+        const auto pad = first == 0 && text.size() + 1 <= box ? box - text.size() - 1 : 0;
+        auto visible = std::u32string(pad, U' ') + text.substr(first, box);
+        visible.resize(box, U' ');
+        region.text.push_back({x, y, visible, {Role::Text, Role::Selection, kPlain}});
+        region.text.push_back({x + static_cast<int>(pad + typed - first) * cell.width,
+                               y,
+                               std::u32string(1, typed < text.size() ? text[typed] : U' '),
+                               {Role::CursorText, Role::Cursor, kPlain}});
+    }
+    else
+    {
+        if (text.size() > box)
+            text = text.substr(0, box - 1) + U'…';
+        if (rightAligned)
+            x += static_cast<int>(box - text.size()) * cell.width;
+        region.text.push_back({x,
+                               y,
+                               std::move(text),
+                               {field.editable ? Role::Text : Role::Dim, Role::Panel, kPlain}});
+    }
+}
+
+Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
+                           int positionWidth, const InspectorEditor* editor)
+{
+    struct Slot
+    {
+        std::string_view field;
+        std::string_view label;
+        int row;
+        int labelColumn;
+        int valueColumn;
+        int width;
+        bool right = true;
+    };
+    const int exactWidth = std::max(positionWidth, 12);
+    const std::array slots{
+        Slot{"Pitch", "Pitch:", 0, 0, 10, 9},
+        Slot{"Velocity", "Velocity:", 1, 0, 10, 9},
+        Slot{"Release", "Off Vel:", 2, 0, 10, 9},
+        Slot{"Units", "Units:", 0, 22, 30, 6},
+        Slot{"Start step", "Start:", 1, 22, 30, 6},
+        Slot{"Start fine", "", 1, 38, 38, 8, false},
+        Slot{"Length steps", "Length:", 2, 22, 30, 6},
+        Slot{"Length fine", "", 2, 38, 38, 8, false},
+        Slot{"Start bar", "Bar:", 0, 48, 59, exactWidth},
+        Slot{"Position", "Position:", 1, 48, 59, exactWidth},
+        Slot{"Length", "Length:", 2, 48, 59, exactWidth},
+        Slot{"Ends", "Ends:", 3, 48, 59, exactWidth},
+        Slot{"Time", "Time:", 0, 62 + exactWidth, 68 + exactWidth, 12},
+    };
+    Region region{.bounds = bounds, .background = Role::Panel, .text = {}, .under = {}, .over = {}};
+    const int margin = BarSpacing::forCell(cell).margin;
+    const int columns = std::max(1, (width - 2 * margin) / cell.width);
+    int left = 0;
+    if (editor && editor->active())
+        for (const auto& slot : slots)
+            if (slot.field == editor->heading())
+                left = std::max(0, slot.valueColumn + slot.width - columns);
+    const auto x = [&](int col) { return margin + (col - left) * cell.width; };
+    const auto y = [&](int row) { return cell.height / 4 + row * cell.height; };
+    const Style label{Role::Dim, Role::Panel, kPlain};
+    region.text.push_back({x(38), y(0), U"Fine (t)", label});
+    for (const auto& slot : slots)
+    {
+        const auto it = std::ranges::find(inspection.fields, slot.field, &InspectorField::heading);
+        if (it == inspection.fields.end())
+            continue;
+        if (!slot.label.empty())
+            region.text.push_back(
+                {x(slot.labelColumn), y(slot.row), decodeUtf8(slot.label), label});
+        auto value = it->value;
+        if (slot.field == "Start fine" || slot.field == "Length fine")
+        {
+            if (value.ends_with('t'))
+                value.pop_back();
+        }
+        if (slot.field == "Length" || slot.field == "Units")
+        {
+            if (slot.field == "Units" && value.find("(rounded)") != std::string::npos)
+                region.text.push_back({x(22), y(3), U"Unit rounded to ticks", label});
+            value = value.substr(0, value.find(" ("));
+        }
+        inspectorValue(region, *it, decodeUtf8(value), x(slot.valueColumn), y(slot.row), slot.width,
+                       cell, editor, slot.right);
+    }
+    return region;
+}
+
 } // namespace
 
 int inspectorHeight(CellSize cell)
@@ -30,39 +133,10 @@ int inspectorHeight(CellSize cell)
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor)
 {
-    if (std::ranges::any_of(inspection.fields, &InspectorField::lower))
-    {
-        Inspection upper{inspection.kind, {}}, lower{"Timing", {}};
-        for (auto field : inspection.fields)
-        {
-            if (field.lower)
-            {
-                field.lower = false;
-                lower.fields.push_back(std::move(field));
-            }
-            else
-                upper.fields.push_back(std::move(field));
-        }
-        auto region = inspectorRegion(upper, bounds, width, cell, positionWidth, editor);
-        auto more = inspectorRegion(lower, bounds, width, cell, positionWidth, editor);
-        const int offset = 2 * cell.height;
-        for (auto& run : more.text)
-        {
-            run.y += offset;
-            region.text.push_back(std::move(run));
-        }
-        for (auto shape : more.under)
-        {
-            shape.rect.y += offset;
-            region.under.push_back(shape);
-        }
-        for (auto shape : more.over)
-        {
-            shape.rect.y += offset;
-            region.over.push_back(shape);
-        }
-        return region;
-    }
+    if (inspection.kind == "Note" &&
+        std::ranges::find(inspection.fields, "Units", &InspectorField::heading) !=
+            inspection.fields.end())
+        return noteInspectorRegion(inspection, bounds, width, cell, positionWidth, editor);
     // On a panel of its own: the kind of row, then headings above their values. Each column
     // is as wide as its longest value can be, so the columns stay put as the cursor moves;
     // a value that doesn't fit is cut short, and those after it left out.
@@ -71,7 +145,6 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     const int columns = std::max((width - 2 * margin) / cell.width, 0);
     const Style kind{Role::Accent, Role::Panel, kBold};
     const Style heading{Role::Dim, Role::Panel, kPlain};
-    const Style value{Role::Text, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell.width; };
     const auto widthOf = [&](std::string_view name)
     {
@@ -126,8 +199,6 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         right -= 3;
     }
 
-    const Style editing{Role::Text, Role::Selection, kPlain};
-    const Style cursor{Role::CursorText, Role::Cursor, kPlain};
     int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
@@ -161,31 +232,8 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         const int wide =
             std::max({static_cast<int>(title.size()),
                       static_cast<int>(text.size()) + (edited ? 1 : 0), widthOf(field.heading)});
-        if (edited)
-        {
-            // In a box as wide as the column, what's typed and its cursor, against its right
-            // edge as a spreadsheet's cell is (decided November 2026, after use); longer text
-            // scrolls to keep the cursor in it, as in the event list's cells.
-            const auto box = static_cast<std::size_t>(std::max(std::min(wide, room), 2));
-            const auto typed = editor->line().cursor();
-            const std::size_t first = typed + 1 > box ? typed + 1 - box : 0;
-            const auto shown = text.substr(first, box);
-            const auto pad = first == 0 && text.size() + 1 <= box ? box - text.size() - 1 : 0;
-            auto visible = std::u32string(pad, U' ') + shown;
-            visible.resize(box, U' ');
-            region.text.push_back({x(at), top + cell.height, visible, editing});
-            const auto c = static_cast<int>(pad + typed - first);
-            region.text.push_back({x(at + c), top + cell.height,
-                                   std::u32string(1, typed < text.size() ? text[typed] : U' '),
-                                   cursor});
-        }
-        else
-        {
-            cut(text);
-            // Bright where e can edit it, dim where it can't (decided October 2026).
-            region.text.push_back(
-                {x(at), top + cell.height, text, field.editable ? value : heading});
-        }
+        inspectorValue(region, field, std::move(text), x(at), top + cell.height,
+                       std::min(wide, room), cell, editor);
         at += wide + 3;
     }
     return region;

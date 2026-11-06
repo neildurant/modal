@@ -6,21 +6,23 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cstdlib>
 
 namespace modal::ui
 {
 namespace
 {
 constexpr std::array kColumns{
-    TrackColumn{TrackField::Number, "No.", 4},
-    TrackColumn{TrackField::Name, "Name", 18},
+    TrackColumn{TrackField::Number, "No.", 4, true},
+    TrackColumn{TrackField::Name, "Name", 16},
     TrackColumn{TrackField::Mute, "Mute", 5},
     TrackColumn{TrackField::Solo, "Solo", 5},
-    TrackColumn{TrackField::Port, "Output port", 20},
-    TrackColumn{TrackField::Channel, "Channel", 8},
-    TrackColumn{TrackField::Transpose, "Transpose", 10},
-    TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13},
-    TrackColumn{TrackField::TimeOffset, "Time offset", 14},
+    TrackColumn{TrackField::ChaseNotes, "Chase", 6},
+    TrackColumn{TrackField::Port, "Output port", 16},
+    TrackColumn{TrackField::Channel, "Channel", 8, true},
+    TrackColumn{TrackField::Transpose, "Transpose", 10, true},
+    TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13, true},
+    TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
 };
 
 std::string signedText(int value)
@@ -34,7 +36,43 @@ std::span<const TrackColumn> trackColumns()
     return kColumns;
 }
 
-std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index)
+std::string musicalOffsetText(core::TimeOffset offset, core::Ppqn ppqn)
+{
+    if (!offset.musical() || offset.amount() == 0)
+        return core::offsetText(offset);
+    const auto amount = offset.amount();
+    const auto magnitude = std::abs(amount);
+    std::optional<core::NoteFraction> nearest;
+    auto distance = magnitude; // very small offsets stay in ticks
+    const auto consider = [&](core::NoteFraction value)
+    {
+        const auto away = std::abs(magnitude - value.toTicks(ppqn));
+        if (away < distance)
+        {
+            nearest = value;
+            distance = away;
+        }
+    };
+    // Prefer straight values on ties, then dotted and triplet values. Avoid arbitrary
+    // fractions: the fine ticks make the display exact without obscure note names.
+    for (std::int64_t d = 1; d <= 128; d *= 2)
+        consider({1, d});
+    for (std::int64_t n = 2; n <= core::TimeOffset::kMaxMusical.numerator(); ++n)
+        consider({n, 1});
+    for (std::int64_t d = 1; d <= 128; d *= 2)
+    {
+        consider(core::NoteFraction{1, d}.dotted());
+        consider(core::NoteFraction{1, d}.triplet());
+    }
+    if (!nearest)
+        return core::offsetText(offset);
+    const auto fine = amount - (amount < 0 ? -1 : 1) * nearest->toTicks(ppqn);
+    return (amount < 0 ? "-" : "+") + core::toString(*nearest) +
+           (fine == 0 ? "" : (fine > 0 ? "+" : "") + std::to_string(fine) + "t");
+}
+
+std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index,
+                           core::Ppqn ppqn)
 {
     switch (field)
     {
@@ -43,9 +81,9 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
     case TrackField::Name:
         return track.name;
     case TrackField::Mute:
-        return track.mute ? "on" : "off";
+        return track.mute ? "M" : "-";
     case TrackField::Solo:
-        return track.solo ? "on" : "off";
+        return track.solo ? "S" : "-";
     case TrackField::Port:
         return track.port;
     case TrackField::Channel:
@@ -55,9 +93,9 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
     case TrackField::VelocityOffset:
         return signedText(track.velocityOffset);
     case TrackField::TimeOffset:
-        return core::offsetText(track.timeOffset);
+        return musicalOffsetText(track.timeOffset, ppqn);
     case TrackField::ChaseNotes:
-        return track.chaseNotes ? "on" : "off";
+        return track.chaseNotes ? "C" : "-";
     }
     return {};
 }
@@ -91,11 +129,13 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
     }
     if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes)
     {
-        if (text != "on" && text != "off" && text != "1" && text != "0")
+        const auto letter = field == TrackField::Mute ? "M" : field == TrackField::Solo ? "S" : "C";
+        if (text != "on" && text != "off" && text != "1" && text != "0" && text != "-" &&
+            text != letter)
         {
             return "Use on or off";
         }
-        const bool on = text == "on" || text == "1";
+        const bool on = text == "on" || text == "1" || text == letter;
         if (field == TrackField::Mute)
         {
             track.mute = on;

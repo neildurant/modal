@@ -29,3 +29,9 @@ highlight density-4    #587539
 highlight hint-key     #587539
 highlight hint-group   #9854f1
 highlight match        #007197
+
+" Active track toggles, with contrasting text.
+highlight track-mute #b5264c
+highlight track-solo #46652b
+highlight track-chase #245fb5
+highlight toggle-text #ffffff

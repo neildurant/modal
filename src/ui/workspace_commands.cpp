@@ -392,6 +392,11 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "keys-show",
                 .description = "Show the keys that do something here, in groups: q or Escape "
                                "closes it, j and k turn its pages"},
+    CommandInfo{
+        .name = "track-chase-toggle",
+        .description =
+            "Toggle note chasing on this track: start notes already held at the playback position",
+        .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},
@@ -491,7 +496,8 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 114> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 115> where{{
+            {"track-chase-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList, TrackList})},
@@ -639,7 +645,7 @@ std::span<const CommandInfo> Workspace::commands()
              "Insert whole tracks after this row; in Visual mode, replace the selected tracks"},
             {"put-before",
              "Insert whole tracks before this row; in Visual mode, replace the selected tracks"},
-            {"inspector-edit", "Edit this track's field or note chasing; Tab switches fields"},
+            {"inspector-edit", "Edit the selected track field"},
         }};
         for (auto& info : result)
         {
