@@ -2306,7 +2306,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
             if (const auto* program = std::get_if<core::ProgramChange>(&event.data);
                 program != nullptr && inView(event.tick))
             {
-                signs.push_back({scale.toX(event.tick) + 2 * lineWidth, h, U'◆', Role::Label,
+                signs.push_back({scale.toX(event.tick) + 2 * lineWidth, h, U'◆', Role::EventSign,
                                  decodeUtf8(std::to_string(program->program))});
             }
         }

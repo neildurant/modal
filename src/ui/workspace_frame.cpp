@@ -304,6 +304,13 @@ Bar Workspace::statusBar(bool withMessage) const
         bottom.right.push_back({"/" + searching_.text + " ", label});
         bottom.right.push_back({view().matchStatus(*searching_.query) + "   ", kBarText});
     }
+    // The tempo where the playhead is, or else the cursor, as nothing else shows it.
+    const auto playing = player_ != nullptr ? player_->position() : std::nullopt;
+    bottom.right.push_back({"Tempo ", label});
+    bottom.right.push_back(
+        {core::bpmText(document_.song().tempo().tempoAt(playing.value_or(view().cursor().tick))) +
+             "   ",
+         kBarText});
     if (player_ != nullptr)
     {
         bottom.right.push_back({"From ", label});

@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -658,4 +659,22 @@ TEST_CASE("the track column's heading sits directly above the names, the strip a
     CHECK(rowOf(U"Trk Name") == rowOf(U"Sections") + 1);
     CHECK(ArrangePage::kNumberRow + 1 == ArrangePage::kRulerRows);
     CHECK(rowOf(decodeUtf8(demoSong().tracks()[0]->name)) == ArrangePage::kRulerRows);
+}
+
+TEST_CASE("the ruler marks where the tempo changes, not where it starts or stays the same")
+{
+    auto page = page80x22(); // the demo song, to its slower bridge
+    Frame frame;
+    page.addRegions(frame);
+    std::vector<std::u32string> signs;
+    for (const auto& run : frame[1].text)
+    {
+        if (run.y == ArrangePage::kSignRow * kCell.height &&
+            run.style.foreground == Role::EventSign)
+        {
+            signs.push_back(run.text);
+        }
+    }
+    std::ranges::sort(signs, std::greater{}); // the sign and its number
+    CHECK(signs == std::vector<std::u32string>{U"▲", U"96"});
 }

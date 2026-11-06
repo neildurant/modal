@@ -132,6 +132,7 @@ The roles are:
 | `chrome` | the window around the view (the event list, piano roll or arrangement) and the gaps between bars; the view itself is on `background` |
 | `mode`, `mode-text` | the mode indicator, such as NORMAL |
 | `track-mute`, `track-solo`, `track-chase`, `toggle-text` | active Mute/Solo/Chase button backgrounds and their text |
+| `event-sign` | a sign in a ruler for a program or tempo change |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `label` | notes, and labels |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |

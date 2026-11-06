@@ -1654,8 +1654,7 @@ TEST_CASE("the ruler marks a track's own program changes, and not its setup")
     const auto shown = runs();
     REQUIRE(shown.size() == 3); // two signs, with room for only the later one's number
     CHECK(shown[0].text == U"\u25C6");
-    CHECK(shown[0].style.foreground == Role::Label);
-    CHECK(shown[0].style.foreground != Role::Accent); // the play-from marker's
+    CHECK(shown[0].style.foreground == Role::EventSign); // not the play-from marker's or a label's
     CHECK(shown[0].y == kCell.height);
     CHECK(std::ranges::count(shown, U"34", &TextRun::text) == 1);
     CHECK(std::ranges::count(shown, U"12", &TextRun::text) == 0);

@@ -352,3 +352,18 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
     CHECK(p.ws.message() == "Sent at the next play: the track's own program change is in force");
     CHECK(p.document.song().tracks()[0]->programSetup.program == 6);
 }
+
+TEST_CASE("the status line shows the tempo at the cursor, and at the playhead while playing")
+{
+    Playing p;
+    CHECK(p.status().find(U"Tempo 120") != std::u32string::npos);
+    p.type(U"'a"); // the demo song's mark, in its slower bridge
+    CHECK(p.status().find(U"Tempo 96") != std::u32string::npos);
+
+    p.type(U"gg");
+    CHECK(p.status().find(U"Tempo 120") != std::u32string::npos);
+    p.player.setMarker(p.document.song().marks().front().tick);
+    p.press(Key::typed(U' '));
+    p.runFor(100ms);
+    CHECK(p.status().find(U"Tempo 96") != std::u32string::npos);
+}

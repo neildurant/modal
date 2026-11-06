@@ -57,9 +57,10 @@ enum class Role : std::uint8_t
     TrackSolo,
     TrackChase,
     ToggleText,
+    EventSign, // a sign in a ruler for something in the song: a program or tempo change
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::ToggleText) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::EventSign) + 1;
 
 // A role's name, as themes and highlight write it: lower case with hyphens, such as
 // cursor-text or density-1; and the role of a name, if there is one.
