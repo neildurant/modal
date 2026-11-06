@@ -163,10 +163,11 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 
 In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$` go to the first/last column; `gg` / `G` go to the first/last track, or track N with a count. Page keys scroll through rows. Space keeps its transport meaning.
 
-- Enter edits the selected field; typing replaces the value. Enter commits, Escape leaves it, and Tab/Shift-Tab commit and move to the next/previous editable track column, wrapping at the ends. `e` edits the selected field in the inspector.
-- Mute, Solo and Chase are adjacent columns: `-` when disabled, coloured `M`, `S` and `C` when enabled. Enter accepts those letters or `-`, as well as `on`/`off` and `1`/`0`. Chase is per track: when enabled it starts notes already held at the playback position. `:track-chase-toggle`, also in the palette, toggles it for the current track; the conductor has no note chasing.
-- `=` / `-` and Ctrl-A / Ctrl-X step numeric fields. For musical offsets these step by the track's editing grid, while `+` / `_` step by one tick. Millisecond offsets step by 1 ms. In the Mute, Solo and Chase columns, an upward step sets on and a downward step sets off.
-- Time offsets accept `-40ms`, `+120t`, `+1/16` and composites such as `+1/16-22t`. These are absolute settings, including their sign; the last example is +218 ticks at 960 PPQN. Limits are ±1000 ms or ±64 whole notes. Musical and millisecond units retain their meaning through save/load. Musical values display as a nearby common note fraction and an exact signed tick remainder, such as `+1/16-14t`; very small values remain in ticks. This normalises the display without retaining the input spelling or changing the stored value.
+- Enter edits the selected field; typing replaces the value while it's highlighted whole, and a key that moves the cursor keeps it for editing. Enter commits, Escape leaves it, and Tab/Shift-Tab commit and move to the next/previous editable track column, wrapping at the ends. `e` edits the selected field in the inspector.
+- Mute, Solo and Chase are adjacent columns of buttons: `-` when disabled, coloured `M`, `S` and `C` when enabled. Enter or `e` toggles a button straight away, with no editor, and Tab passes over them. On a `V` selection, every selected row takes the opposite of the cursor's row. Chase is per track: when enabled it starts notes already held at the playback position.
+- `M` and `S` (or `, t m` and `, t s`) mute and solo the current track, and `, t c` toggles its chasing, from the Tracks view, the arrangement's tracks, the piano roll and the event list. Each is an undoable edit. The conductor has none of these, and the section strip has no current track.
+- `=` / `-` and Ctrl-A / Ctrl-X step numeric fields. For musical offsets these add the track's editing grid to the note fraction, keeping the fine ticks, while `+` / `_` step the fine ticks alone. An offset given in plain ticks stays in ticks. Millisecond offsets step by 1 ms. In the Mute, Solo and Chase columns, an upward step sets on and a downward step sets off.
+- Time offsets accept `-40ms`, `+120t`, `+1/16` and composites such as `+1/16-22t`. These are absolute settings, including their sign; the last example is +218 ticks at 960 PPQN. Limits are ±1000 ms or ±64 whole notes. Musical and millisecond units retain their meaning through save/load. A musical value stays as it was typed, on screen and in the song file: `+1/16-33t` is not rewritten around a nearer fraction. A change of PPQN keeps the fraction and scales the fine ticks.
 - `V` selects complete rows. Enter assigns the field to all selected tracks; steps change each track relative to its own value. The entire edit is refused if any row would be invalid. Each batch is one undo step; names are edited individually.
 - `Vy` copies one whole track, `Vjy` two; `yy` or `Y` also copies the current track. Settings, editing defaults, all section events and per-section meter ownership are included. `Vd` deletes explicitly selected tracks; `dd` and event-deletion keys do not delete whole tracks.
 - Normal `p` / `P` insert copies after/before the current row, with new IDs and unique numbered names. Visual `p` / `P` replace selected rows as one undo step. Routing and mute/solo are preserved. Named registers work (`V"ay`, `"ap`); appending adds rows. Event contents and sections remain separate payloads, and cannot be pasted as whole tracks.
@@ -174,9 +175,9 @@ In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$
 
 ## Coarse and fine note timing
 
-The note inspector in the piano roll and event list groups Pitch, Velocity and Off Vel vertically on the left. In the middle, Start and Length each have adjacent coarse and signed fine values aligned below Units and Fine (t). Bar, exact Position, Length and Ends sit to their right, with elapsed Time alongside. Units follow the track grid by default; `:set timingunit=1/16` fixes them, and `:set timingunit=grid` follows the grid again. Changing units never moves notes.
+The note inspector in the piano roll and event list has the Note heading above Pitch, Velocity and Off Vel on the left. To their right, Start, Length and Ends each have a row across a coarse value, a signed fine value and an exact value, under Units, Fine(t) and B:B:T, with the colons lined up. Elapsed time is in the status line, with the cursor's bars, beats and ticks, in every view. Units follow the track grid by default; `:set timingunit=1/16` fixes them, and `:set timingunit=grid` follows the grid again. Changing units never moves notes.
 
-`e` opens the inspector on Pitch at first, then remembers the last field. Tab/Shift-Tab move through pitch/velocities, the coarse/fine pairs, then exact timing, Up/Down step them, Enter commits and Escape leaves. Start bars and steps count from one; length steps count from zero. Fine is signed ticks from the nearest coarse step (ties use the earlier step). Coarse edits preserve that fine remainder. Fine entries such as `-22t` are absolute remainders. The exact Position and Length fields retain their existing input forms. In the event list, Enter still edits the current cell directly; `e` also keeps cell editing on conductor rows.
+`e` opens the inspector on Pitch at first, then remembers the last field. Tab/Shift-Tab move through pitch/velocities, then along the Start, Length and Ends rows, Up/Down step them, Enter commits and Escape leaves. Start and end steps count from one, within the bar the time falls in, and changing an end changes only the note's length; length steps count from zero. Fine is signed ticks from the nearest coarse step (ties use the earlier step). Coarse edits preserve that fine remainder. Fine entries such as `-22t` are absolute remainders. The exact Position and Length fields retain their existing input forms. In the event list, Enter still edits the current cell directly; `e` also keeps cell editing on conductor rows.
 
 ## Time and ripple
 
@@ -231,10 +232,10 @@ The leader is `,` (the `leader` setting). Its groups:
 | --- | --- |
 | `, b` | Bars on every track: `d` delete, `i` insert |
 | `, s` | Sections, on the cursor's section |
-| `, t` | Kept for tracks' commands, to come |
+| `, t` | Tracks: `m` mute, `s` solo, `c` chase |
 | `, S` | Select |
 | `, x` | Transforms |
-| `, v` | Views: `a` arrangement, `p` piano roll, `e` event list |
+| `, v` | Views: `t` Tracks, `a` arrangement, `p` piano roll, `e` event list |
 | `, T` | Toggles: `Space` rewind, `a` grid advance |
 | `, n` | Default note from this one |
 | `, :` | The command palette (also `Ctrl-p`) |

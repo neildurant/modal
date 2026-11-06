@@ -33,11 +33,10 @@ struct InspectorField
 
 // What the inspector shows for a row (decided in milestone 4): the kind of row, and every
 // property of what's there, including what the row can't show: a note's end, a controller's
-// name, and text and SysEx whole; the track and channel are in the view's bar, until a view
-// shows several tracks at once, and the time from the song's start in the status line. On a
-// row that isn't an
-// event, what the row is: a section's bars and length, a tempo, a meter,
-// a label, or at the end the song's length.
+// name, and text and SysEx whole. The track and channel are in the view's bar, until a view
+// shows several tracks at once, and the time from the song's start is in the status line. On a
+// row that isn't an event, what the row is: a section's bars and length, a tempo, a meter, a
+// label, or at the end the song's length.
 struct Inspection
 {
     std::string kind; // Note, CC, Section, End and so on

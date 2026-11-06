@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the first Tracks view step and revised note inspector are published. The UI trial is confirmed and all six Linux configurations pass. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 6 November 2026: refinements to the Tracks view, note inspector and arrangement are committed locally for a UI trial, not yet pushed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -78,9 +78,13 @@ The revised UI was accepted on 6 November 2026. These are the trial steps, retai
 3. `Vy`, then `p` or `P`, and undo. Try `Vjy` for two tracks and `Vp` for replacement. In a numeric column, `Vj` then Enter or `+` edits both selected tracks in one undo step. Copies preserve routing, mute and solo as agreed.
 4. In the piano roll or event list, `e` and Tab through the pitch/velocity, coarse/fine and exact-timing groups. Edit Start step/fine and Length steps/fine; undo. Compare `:set timingunit=1/16` and `:set timingunit=grid`. Check the grouped inspector is readable and leaves enough editing space.
 
+## Refinements awaiting a UI trial
+
+Committed locally on top of the published Tracks step, to try before pushing: Enter and `M`/`S` for the track buttons, time offsets kept as typed, the reworked note inspector with Time in the status line, the arrangement's inspector and section strip, a wider Name column, and a visible replace state. The decisions are in decisions.md, under Tracks, inspector and arrangement refined after use. `tests/support/no_crt_dialogs.cpp` also keeps MSVC's debug assertion dialogs out of test runs.
+
 ## Next
 
-The initial Tracks step and its UI feedback are complete. Settle the next step's open questions before implementation:
+Once those are tried and pushed, the initial Tracks step and its UI feedback are complete. Settle the next step's open questions before implementation, starting with bank/program setup:
 
 1. Numeric bank/program setup: display conventions, playback setup and event precedence, live changes and conflicts on shared channels. Instrument program tables with names are future work.
 2. Playback quantise: independent grid, note lengths, pedals, live changes, bypass and committing.
