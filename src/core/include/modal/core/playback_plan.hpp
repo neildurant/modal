@@ -93,7 +93,7 @@ struct PlannedTrack
     DestinationId destination;
     std::uint8_t channel; // 0-15
     bool chaseNotes;
-    std::chrono::nanoseconds timeOffset;
+    TimeOffset timeOffset;
 };
 
 // The metronome as the scheduler plays it: a click on each beat of the meter, from the

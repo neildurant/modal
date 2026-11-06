@@ -765,12 +765,12 @@ bool Reader::readTrack(std::span<const Token> tokens)
         }
         else if (value && name == "offset")
         {
-            const auto amount = signedValue(Track::kMaxTimeOffset.count(), "ms");
-            if (!amount || !value->ends_with("ms"))
+            const auto amount = parseTimeOffset(*value, ppqn_);
+            if (!amount)
             {
-                return fail("offset should be from -1000ms to +1000ms");
+                return fail("offset needs milliseconds, ticks or a note fraction with fine ticks");
             }
-            track.timeOffset = std::chrono::milliseconds{*amount};
+            track.timeOffset = *amount;
         }
         else
         {
@@ -1399,6 +1399,15 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     for (const auto& track : song.tracks())
     {
         tracks.push_back(*track);
+        if (track->timeOffset.musical())
+        {
+            const auto ticks = track->timeOffset.amount();
+            const auto magnitude = ticks < 0 ? -ticks : ticks;
+            const auto scaled =
+                magnitude / from.value * to.value +
+                (2 * (magnitude % from.value) * to.value + from.value) / (2 * from.value);
+            tracks.back().timeOffset = TimeOffset::ticks(ticks < 0 ? -scaled : scaled);
+        }
     }
     std::vector<Section> sections;
     for (const auto& old : song.sections())
@@ -1530,9 +1539,9 @@ std::string writeSong(const Song& song)
         {
             text += " velocity=" + signedText(track->velocityOffset);
         }
-        if (track->timeOffset.count() != 0)
+        if (track->timeOffset.amount() != 0 || track->timeOffset.musical())
         {
-            text += " offset=" + signedText(track->timeOffset.count()) + "ms";
+            text += " offset=" + offsetText(track->timeOffset);
         }
         if (track->grid != Track::kDefaultGrid)
         {

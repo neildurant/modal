@@ -164,7 +164,7 @@ TEST_CASE("how late the engine sends a steady stream", "[.timing]")
     for (const auto margin : {std::chrono::nanoseconds{0}, SystemClock::kDefaultSpinMargin})
     {
         PlaybackPlan plan{TempoMap{kPpqn}};
-        plan.tracks.push_back({TrackId{1}, DestinationId{0}, 0, false, 0ns});
+        plan.tracks.push_back({TrackId{1}, DestinationId{0}, 0, false, {}});
         for (int i = 0; i < 500; ++i)
         {
             PlannedEvent event{};

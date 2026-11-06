@@ -1,6 +1,7 @@
 add_library(modal_core STATIC
     engine.cpp
     files.cpp
+    time_offset.cpp
     timing_stats.cpp
     event.cpp
     event_query.cpp

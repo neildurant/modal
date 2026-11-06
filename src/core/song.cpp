@@ -248,6 +248,57 @@ bool Song::updateTrack(TrackId id, const std::function<void(Track&)>& edit)
     return true;
 }
 
+std::optional<TrackCopy> Song::copyTrack(TrackId id) const
+{
+    const auto* settings = track(id);
+    if (!settings)
+        return std::nullopt;
+    TrackCopy copy{*settings, ppqn(), {}};
+    for (const auto& section : sections_)
+    {
+        const auto* content = section->content(id);
+        copy.parts.push_back(
+            {section->name(), section->length(), content ? *content : TrackContent{}});
+    }
+    return copy;
+}
+
+bool Song::canInsertTrack(const TrackCopy& copy) const
+{
+    if (copy.ppqn != ppqn() || copy.parts.size() != sections_.size())
+        return false;
+    for (std::size_t i = 0; i < sections_.size(); ++i)
+    {
+        if (copy.parts[i].length != sections_[i]->length() ||
+            copy.parts[i].section != sections_[i]->name())
+            return false;
+    }
+    return true;
+}
+
+std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& copy)
+{
+    if (position > tracks_.size() || !canInsertTrack(copy))
+        return std::nullopt;
+    const std::string base = copy.settings.name.empty() ? "Track" : copy.settings.name;
+    std::string name = base;
+    for (int n = 2; std::ranges::any_of(tracks_, [&](const auto& t) { return t->name == name; });
+         ++n)
+        name = numbered(base, n);
+    const auto id = addTrack(position, name);
+    updateTrack(id,
+                [&](Track& track)
+                {
+                    track = copy.settings.withId(id);
+                    track.name = name;
+                });
+    for (std::size_t i = 0; i < sections_.size(); ++i)
+        updateContent(i, id, [&](TrackContent& content) { content = copy.parts[i].content; });
+    rebuildMeters();
+    rebuildEvents(position);
+    return id;
+}
+
 bool Song::removeTrack(TrackId id)
 {
     const auto index = indexOf(id);

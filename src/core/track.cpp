@@ -137,11 +137,11 @@ Track::Track(TrackId id)
 {
 }
 
-bool Track::hasValidSettings() const
+bool Track::hasValidSettings(Ppqn ppqn) const
 {
     return channel >= kMinChannel && channel <= kMaxChannel &&
            std::abs(transpose) <= kMaxTranspose && std::abs(velocityOffset) <= kMaxVelocityOffset &&
-           timeOffset >= -kMaxTimeOffset && timeOffset <= kMaxTimeOffset;
+           timeOffset.valid(ppqn);
 }
 
 } // namespace modal::core

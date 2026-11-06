@@ -76,6 +76,9 @@ public:
     std::chrono::nanoseconds toTime(Tick tick) const;
     Tick toTick(std::chrono::nanoseconds time) const;
 
+    // Extends the initial tempo backwards for anticipated notes before tick zero.
+    std::chrono::nanoseconds toTimeExtended(Tick tick) const;
+
     // As toTick(), but a time before 0 gives a tick before 0, at the tempo at tick 0, such as
     // for MIDI input during a count-in at the start of the song.
     Tick toTickExtended(std::chrono::nanoseconds time) const;

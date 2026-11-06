@@ -5,6 +5,7 @@
 #include <modal/core/event.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/tick.hpp>
+#include <modal/core/time_offset.hpp>
 
 #include <chrono>
 #include <compare>
@@ -68,13 +69,19 @@ public:
     static constexpr int kMaxChannel = 16;
     static constexpr int kMaxTranspose = 127; // semitones either way
     static constexpr int kMaxVelocityOffset = 127;
-    static constexpr std::chrono::milliseconds kMaxTimeOffset{1000};
+    static constexpr auto kMaxTimeOffset = TimeOffset::kMaxMilliseconds;
     static constexpr NoteFraction kDefaultGrid{1, 16};
     static constexpr std::uint8_t kDefaultVelocity = 100;
 
     explicit Track(TrackId id);
 
     TrackId id() const { return id_; }
+    Track withId(TrackId id) const
+    {
+        auto copy = *this;
+        copy.id_ = id;
+        return copy;
+    }
 
     std::string name;
     std::string port; // output port name, resolved through the machine's port aliases
@@ -88,7 +95,7 @@ public:
     // Applied at playback only; the stored events never change.
     int transpose = 0;
     int velocityOffset = 0;
-    std::chrono::milliseconds timeOffset{0}; // negative sends early
+    TimeOffset timeOffset{}; // negative sends early
 
     // For editing (decided for milestone 5): the piano roll's grid, and the default note new
     // notes take, after Sequencer Plus Gold. The default length follows the grid until set.
@@ -99,7 +106,7 @@ public:
     NoteFraction defaultLength() const { return noteLength.value_or(grid); }
 
     // Whether channel and the playback settings are in range.
-    bool hasValidSettings() const;
+    bool hasValidSettings(Ppqn ppqn = kPpqn) const;
 
     friend bool operator==(const Track&, const Track&) = default;
 

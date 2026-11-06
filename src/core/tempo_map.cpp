@@ -75,6 +75,16 @@ std::string bpmText(Tempo tempo)
     }
 }
 
+std::chrono::nanoseconds TempoMap::toTimeExtended(Tick tick) const
+{
+    if (tick >= 0)
+        return toTime(tick);
+    const auto nanosPerQuarter = changes_.front().tempo.microsPerQuarter * kNanosPerMicro;
+    // Round upwards on both sides of zero, so converting back gives the same tick.
+    return nanoseconds{(tick / ppqn_.value) * nanosPerQuarter +
+                       (tick % ppqn_.value) * nanosPerQuarter / ppqn_.value};
+}
+
 TempoMap::TempoMap(Ppqn ppqn, Tempo initial)
     : ppqn_(ppqn)
     , changes_{{0, initial}}

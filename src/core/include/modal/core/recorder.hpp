@@ -67,7 +67,7 @@ private:
     struct TrackTake
     {
         TrackId track;
-        std::chrono::nanoseconds timeOffset;
+        TimeOffset timeOffset;
         std::vector<TakeEvent> events;
         std::vector<HeldNote> held;
         std::array<std::optional<std::size_t>, 128> latestNote; // the last note on each pitch

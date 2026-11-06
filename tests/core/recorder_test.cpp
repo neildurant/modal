@@ -424,3 +424,17 @@ TEST_CASE("stopping at or before the record point leaves the song unchanged")
     recorder.receive(stamped(1500ms, {0x90, 60, 100}));
     CHECK(eventsOf(recorder.finish(4 * q), id) == std::vector<Event>{note(4 * q, 50, q)});
 }
+
+TEST_CASE("recording removes a musical offset across tempo changes")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = songAt(ppqn);
+    const auto id =
+        addTrack(song, 1, [&](EditTrack& track) { track.timeOffset = TimeOffset::ticks(q / 2); });
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(q, Tempo{1000000}); });
+    Recorder recorder{song, kPlay, 0};
+    recorder.receive(stamped(1000ms, {0x90, 60, 100}));
+    recorder.receive(stamped(1500ms, {0x80, 60, 64}));
+    CHECK(eventsOf(recorder.finish(4 * q), id) == std::vector<Event>{note(q, 60, q / 2)});
+}

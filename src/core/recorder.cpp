@@ -174,7 +174,7 @@ void Recorder::receiveMessage(InputId input, std::span<const std::uint8_t> messa
 
     for (auto& take : takes_)
     {
-        const Tick tick = song_.tempo().toTickExtended(songTime - take.timeOffset);
+        const Tick tick = take.timeOffset.undo(song_.tempo(), songTime);
         if (status == 0x90 && b > 0)
         {
             noteOn(take, input, inChannel, a, b, tick);

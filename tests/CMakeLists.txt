@@ -29,6 +29,7 @@ add_executable(modal_tests
     core/spsc_queue_test.cpp
     core/tempo_map_test.cpp
     core/thru_test.cpp
+    core/time_offset_test.cpp
     core/timing_stats_test.cpp
     core/track_test.cpp
     core/transforms_test.cpp

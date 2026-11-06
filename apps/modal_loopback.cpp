@@ -398,7 +398,7 @@ core::PlaybackPlan streamPlan(const Options& options, core::DestinationId destin
 {
     const auto interval = intervalOf(options);
     core::PlaybackPlan plan{core::TempoMap{core::kPpqn}};
-    plan.tracks.push_back({core::TrackId{1}, destination, 0, false, 0ns});
+    plan.tracks.push_back({core::TrackId{1}, destination, 0, false, {}});
     for (int i = 0; i < options.count; ++i)
     {
         for (int c = 0; c < options.chord; ++c)

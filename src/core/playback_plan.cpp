@@ -51,7 +51,7 @@ struct Planner
     const Track& track;
     const TempoMap& tempo;
     std::uint8_t channel;
-    nanoseconds offset;
+    TimeOffset offset;
     PlannedEvent& planned;
 
     bool operator()(const Note& note) const
@@ -65,7 +65,7 @@ struct Planner
             static_cast<std::uint8_t>(std::clamp(note.velocity + track.velocityOffset, 1, 127));
         planned.message = message(kNoteOn, channel, *pitch, velocity);
         planned.endTick = planned.tick + note.duration;
-        planned.noteOffTime = tempo.toTime(planned.endTick) + offset;
+        planned.noteOffTime = offset.at(tempo, planned.endTick);
         planned.releaseVelocity = note.releaseVelocity;
         return true;
     }
@@ -213,15 +213,26 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
         }
 
         const auto channel = static_cast<std::uint8_t>(track.channel - 1);
-        const nanoseconds offset = track.timeOffset;
+        const auto offset = track.timeOffset;
         plan.tracks.push_back({track.id(), *destination, channel, track.chaseNotes, offset});
-        plan.leadIn = std::max(plan.leadIn, -offset);
+        plan.leadIn = std::max(plan.leadIn, -offset.at(plan.tempo, 0));
+        if (offset.musical() && offset.amount() < 0)
+        {
+            // The delay across a fixed tick window can peak at either edge of a tempo
+            // segment, even on an empty armed track recording from later in the song.
+            for (const auto& change : plan.tempo.changes())
+            {
+                for (const auto tick : {change.tick, change.tick - offset.amount()})
+                    plan.leadIn = std::max(plan.leadIn,
+                                           plan.tempo.toTime(tick) - offset.at(plan.tempo, tick));
+            }
+        }
 
         std::size_t dropped = 0;
         for (const auto& event : song.events(track.id()).all())
         {
             PlannedEvent planned{};
-            planned.time = plan.tempo.toTime(event.tick) + offset;
+            planned.time = offset.at(plan.tempo, event.tick);
             planned.tick = event.tick;
             planned.track = track.id();
             planned.destination = *destination;

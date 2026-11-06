@@ -106,6 +106,24 @@ private:
     std::map<TrackId, std::shared_ptr<const TrackContent>> content_;
 };
 
+// A whole track in a register, independent of later edits to its source. Section lengths
+// let a paste reject a changed layout instead of silently moving or losing material.
+struct TrackCopy
+{
+    Track settings;
+    Ppqn ppqn;
+    struct Part
+    {
+        std::string section;
+        Tick length;
+        TrackContent content;
+        friend bool operator==(const Part&, const Part&) = default;
+    };
+    std::vector<Part> parts;
+
+    friend bool operator==(const TrackCopy&, const TrackCopy&) = default;
+};
+
 // A song: its tracks, and the sections that hold their content, in order, covering the song
 // from tick 0 with no gaps. A value that is cheap to copy, since copies share their tracks
 // and sections. Each edit changes a copy, and what it touches is copied on write, so the
@@ -151,6 +169,12 @@ public:
     bool updateTrack(TrackId id, const std::function<void(Track&)>& edit);
 
     bool removeTrack(TrackId id);
+
+    std::optional<TrackCopy> copyTrack(TrackId id) const;
+    bool canInsertTrack(const TrackCopy& copy) const;
+    // New ID and a unique name; settings and each section's own/following meter survive.
+    // Refuses a different PPQN or section layout, leaving the song unchanged.
+    std::optional<TrackId> insertTrack(std::size_t position, const TrackCopy& copy);
 
     // Sections in order.
     std::span<const std::shared_ptr<const Section>> sections() const { return sections_; }

@@ -65,13 +65,30 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
     {
         auto& note = sounding_[i];
         const auto* track = plan.track(note.track);
-        if (track == nullptr)
+        if (track == nullptr || track->destination != note.destination ||
+            track->channel != note.channel)
         {
             noteOff(i, now); // moves the last note into i
             continue;
         }
-        note.end = plan.tempo.toTime(note.endTick) + track->timeOffset;
+        note.end = track->timeOffset.at(plan.tempo, note.endTick);
         ++i;
+    }
+
+    // A muted or rerouted track must not leave its instrument sustained. A channel still
+    // used by another audible track keeps its pedal state, since MIDI shares it there.
+    for (auto it = pedals_.begin(); it != pedals_.end();)
+    {
+        const bool used = std::ranges::any_of(
+            plan.tracks, [&](const PlannedTrack& track)
+            { return track.destination == it->destination && track.channel == it->channel; });
+        if (used)
+            ++it;
+        else
+        {
+            sendControl(it->destination, it->channel, it->controller, 0, now);
+            it = pedals_.erase(it);
+        }
     }
 
     const auto& metronome = plan.metronome;

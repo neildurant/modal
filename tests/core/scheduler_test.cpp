@@ -996,3 +996,92 @@ TEST_CASE("stopping in a count-in ends it, and panic reaches its port")
     scheduler.panic(kNow + 20ms);
     CHECK(std::ranges::count(sink.sent, kClick, &Sent::destination) == 32);
 }
+
+TEST_CASE("muting the last track on a channel releases its held pedals")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.events.insert({0, ControlChange{64, 127}});
+                                 track.events.insert({0, Note{60, 100, ppqn.quarter() / 4}});
+                             });
+    const auto before = compilePlan(song, byPortName);
+    song.updateTrack(id, [](Track& track) { track.mute = true; });
+    const auto after = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(before, kNow);
+    scheduler.play(0, {}, kNow);
+    runUntil(scheduler, kNow + 200ms); // note-off sent, but sustain still holds the sound
+    sink.sent.clear();
+    scheduler.setPlan(after, kNow + 250ms);
+    CHECK(sink.sent == std::vector<Sent>{{{1}, {0xB0, 64, 0}, kNow + 250ms}});
+}
+
+TEST_CASE("changing a musical offset re-times a sounding note's end")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = songAt(ppqn);
+    const auto id = addTrack(song, 1, [&](EditTrack& track)
+                             { track.events.insert({0, Note{60, 100, 2 * q}}); });
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(q, Tempo{1000000}); });
+    const auto before = compilePlan(song, byPortName);
+    song.updateTrack(id, [&](Track& track) { track.timeOffset = TimeOffset::ticks(q / 2); });
+    const auto after = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(before, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow);
+    scheduler.setPlan(after, kNow + 300ms); // new attack time is already behind the playhead
+    runUntil(scheduler, kNow + 3s);
+    CHECK(sink.sent ==
+          std::vector<Sent>{{{1}, {0x90, 60, 100}, kNow}, {{1}, {0x80, 60, 64}, kNow + 2s}});
+}
+
+TEST_CASE("a shared channel keeps its pedal when one track is muted")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = songAt(ppqn);
+    const auto id = addTrack(song, 1, [](EditTrack& track)
+                             { track.events.insert({0, ControlChange{64, 127}}); });
+    addTrack(song, 1);
+    const auto before = compilePlan(song, byPortName);
+    song.updateTrack(id, [](Track& track) { track.mute = true; });
+    const auto after = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(before, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow);
+    sink.sent.clear();
+    scheduler.setPlan(after, kNow + 250ms);
+    CHECK(sink.sent.empty());
+}
+
+TEST_CASE("rerouting a track releases notes and pedals on its old channel")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.events.insert({0, ControlChange{64, 127}});
+                                 track.events.insert({0, Note{60, 100, ppqn.whole()}});
+                             });
+    const auto before = compilePlan(song, byPortName);
+    song.updateTrack(id, [](Track& track) { track.channel = 2; });
+    const auto after = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(before, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow);
+    sink.sent.clear();
+    scheduler.setPlan(after, kNow + 250ms);
+    CHECK(sink.sent == std::vector<Sent>{{{1}, {0x80, 60, 64}, kNow + 250ms},
+                                         {{1}, {0xB0, 64, 0}, kNow + 250ms}});
+}
