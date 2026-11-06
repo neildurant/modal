@@ -10,6 +10,22 @@
 namespace modal::ui
 {
 
+namespace
+{
+bool isToggle(TrackField field)
+{
+    return field == TrackField::Mute || field == TrackField::Solo ||
+           field == TrackField::ChaseNotes;
+}
+
+bool toggleState(TrackField field, const core::Track& track)
+{
+    return field == TrackField::Mute   ? track.mute
+           : field == TrackField::Solo ? track.solo
+                                       : track.chaseNotes;
+}
+} // namespace
+
 TracksView::TracksView(core::Document& document, ViewHost& host)
     : document_(document)
     , host_(host)
@@ -189,8 +205,8 @@ Inspection TracksView::inspection() const
         shown.resize(27);
         shown += U'…';
     }
-    result.fields.push_back(
-        {std::string{column.heading}, encodeUtf8(shown), column.field != TrackField::Number, full});
+    result.fields.push_back({std::string{column.heading}, encodeUtf8(shown),
+                             column.field != TrackField::Number && !isToggle(column.field), full});
     if (column.field == TrackField::ChaseNotes)
         result.fields.push_back({"When enabled", "Start notes already held"});
     result.fields.push_back({"Grid", core::toString(track.grid)});
@@ -270,7 +286,7 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
             column_ = command == "command-line-next"
                           ? (column_ + 1) % columns.size()
                           : (column_ + columns.size() - 1) % columns.size();
-        } while (columns[column_].field == TrackField::Number);
+        } while (columns[column_].field == TrackField::Number || isToggle(columns[column_].field));
         ensureVisible();
         if (editor_.open(inspection(), columns[column_].heading))
             host_.startTyping();
@@ -338,6 +354,15 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         if (!cursor_.track)
         {
             host_.refuse("No track to edit");
+        }
+        else if (const auto field = trackColumns()[column_].field; isToggle(field))
+        {
+            // A button: selected rows all follow the cursor's row, so they end up the same.
+            const bool on = !toggleState(field, *document_.song().track(*cursor_.track));
+            if (auto why = edit(field, on ? "on" : "off"))
+            {
+                host_.refuse(*why);
+            }
         }
         else if (command == "field-edit" && trackColumns()[column_].field == TrackField::Number)
         {
@@ -519,15 +544,18 @@ void TracksView::addRegions(Frame& frame) const
                 text.insert(0, padding, U' ');
             else
                 text.append(padding, U' ');
-            const bool toggle =
-                track && (column.field == TrackField::Mute || column.field == TrackField::Solo ||
-                          column.field == TrackField::ChaseNotes);
+            const bool toggle = track && isToggle(column.field);
             if (toggle)
                 text.assign(static_cast<std::size_t>(column.width - 1), U' ');
             Style style{track ? Role::Text : Role::Dim, Role::Background, kPlain};
             if (track && std::ranges::find(chosen, track->id()) != chosen.end())
             {
                 style.background = Role::Selection;
+                // Into the space after the column, so a selected row is one unbroken band.
+                table.text.push_back({x + (column.width - 1) * cell_.width,
+                                      y,
+                                      U" ",
+                                      {Role::Text, Role::Selection, kPlain}});
             }
             if (track && !toggle && index == row() && c == column_)
             {
@@ -536,9 +564,7 @@ void TracksView::addRegions(Frame& frame) const
             table.text.push_back({x, y, std::move(text), style});
             if (toggle)
             {
-                const bool on = column.field == TrackField::Mute   ? track->mute
-                                : column.field == TrackField::Solo ? track->solo
-                                                                   : track->chaseNotes;
+                const bool on = toggleState(column.field, *track);
                 const auto colour = column.field == TrackField::Mute   ? Role::TrackMute
                                     : column.field == TrackField::Solo ? Role::TrackSolo
                                                                        : Role::TrackChase;

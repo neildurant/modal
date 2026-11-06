@@ -1493,6 +1493,28 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         showPlayhead();
         return true;
     }
+    if (command == "track-mute-toggle" || command == "track-solo-toggle")
+    {
+        const bool mute = command == "track-mute-toggle";
+        const auto id = view().cursor().track;
+        if (!id)
+        {
+            refuse(mute ? "Select a track to mute" : "Select a track to solo");
+            return true;
+        }
+        const auto* track = document_.song().track(*id);
+        const bool on = !(mute ? track->mute : track->solo);
+        const auto name = track->name;
+        document_.edit(mute ? "Toggle mute" : "Toggle solo", view().place(),
+                       [&](core::Song& song)
+                       {
+                           song.updateTrack(*id, [&](core::Track& changed)
+                                            { (mute ? changed.mute : changed.solo) = on; });
+                       });
+        setMessage(std::string{mute ? "Mute " : "Solo "} + (on ? "on: " : "off: ") + name,
+                   MessageKind::Information);
+        return true;
+    }
     if (command == "track-chase-toggle")
     {
         const auto id = view().cursor().track;

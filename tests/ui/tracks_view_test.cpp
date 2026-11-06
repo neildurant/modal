@@ -96,10 +96,6 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     CHECK(t.track().timeOffset == core::TimeOffset{std::chrono::milliseconds{-40}});
     t.type(U"u");
     CHECK(t.track().timeOffset.musical());
-    t.type(U"04le");
-    t.type(U"off");
-    t.press(NamedKey::Enter);
-    CHECK_FALSE(t.track().chaseNotes);
 }
 
 TEST_CASE("bulk track edits validate every row and undo together")
@@ -502,20 +498,121 @@ TEST_CASE("musical offset display round trips at each PPQN")
     }
 }
 
-TEST_CASE("Tab in track field editing commits and moves through the columns")
+TEST_CASE("Tab in track field editing commits and passes over the buttons")
+{
+    Tracking t;
+    t.press(NamedKey::Enter); // the name
+    t.type(U"Renamed");
+    t.press(NamedKey::Tab);
+    CHECK(t.track().name == "Renamed");
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Output port");
+    t.press(NamedKey::Tab, kShift);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Name");
+}
+
+TEST_CASE("Enter toggles the track buttons without opening an editor")
 {
     Tracking t;
     t.type(U"l"); // mute
     t.press(NamedKey::Enter);
-    t.type(U"M");
-    t.press(NamedKey::Tab);
     CHECK(t.track().mute);
-    t.type(U"S");
-    t.press(NamedKey::Tab);
-    CHECK(t.track().solo);
-    t.type(U"-");
+    CHECK_FALSE(t.ws.tracks().inspectorEditor().active());
     t.press(NamedKey::Enter);
-    CHECK_FALSE(t.track().chaseNotes);
+    CHECK_FALSE(t.track().mute);
+    t.type(U"l"); // solo
+    t.press(NamedKey::Enter);
+    CHECK(t.track().solo);
     t.type(U"u");
-    CHECK(t.track().chaseNotes);
+    CHECK_FALSE(t.track().solo);
+    t.type(U"l"); // chase, which e toggles too, the inspector having no field for it
+    const bool chase = t.track().chaseNotes;
+    t.press(NamedKey::Enter);
+    CHECK(t.track().chaseNotes != chase);
+    t.type(U"e");
+    CHECK(t.track().chaseNotes == chase);
+    CHECK_FALSE(t.ws.tracks().inspectorEditor().active());
+}
+
+TEST_CASE("Enter on a button sets selected rows to the opposite of the cursor's row")
+{
+    Tracking t;
+    t.document.edit("Mute the first", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(song.tracks()[0]->id(),
+                                         [](core::Track& track) { track.mute = true; });
+                    });
+    const auto before = t.document.song();
+    t.type(U"lVj"); // the cursor on track 2, not muted; track 1 is
+    t.press(NamedKey::Enter);
+    CHECK(t.track(0).mute);
+    CHECK(t.track(1).mute);
+    t.press(NamedKey::Enter);
+    CHECK_FALSE(t.track(0).mute);
+    CHECK_FALSE(t.track(1).mute);
+    t.press(NamedKey::Escape);
+    t.type(U"uu");
+    CHECK(t.document.song() == before);
+}
+
+TEST_CASE("a selected track row is an unbroken band across the columns")
+{
+    Tracking t;
+    const auto bandEdges = [&]
+    {
+        // Where the row's text backgrounds cover, in cells from the first column.
+        const auto frame = t.ws.frame();
+        std::vector<bool> covered;
+        for (const auto& run : frame.front().text)
+        {
+            if (run.y != 20 || run.style.background == Role::Background)
+                continue;
+            const auto first = static_cast<std::size_t>(run.x / 10 - 1);
+            covered.resize(std::max(covered.size(), first + run.text.size()));
+            std::fill_n(covered.begin() + static_cast<std::ptrdiff_t>(first), run.text.size(),
+                        true);
+        }
+        return covered;
+    };
+    t.type(U"V");
+    const auto covered = bandEdges();
+    int width = 0;
+    for (const auto& column : trackColumns())
+        width += column.width;
+    CHECK(covered.size() == static_cast<std::size_t>(width));
+    CHECK(std::ranges::find(covered, false) == covered.end());
+}
+
+TEST_CASE("M, S and the track commands toggle the current track from every view")
+{
+    const auto view = GENERATE(as<std::u32string>{}, U"gt", U"ga", U"gr", U"ge");
+    Tracking t;
+    t.type(view);
+    t.type(U"M");
+    CHECK(t.track().mute);
+    CHECK(t.ws.message() == "Mute on: " + t.track().name);
+    t.type(U"S");
+    CHECK(t.track().solo);
+    CHECK(t.ws.message() == "Solo on: " + t.track().name);
+    t.type(U"uu");
+    CHECK_FALSE(t.track().mute);
+    CHECK_FALSE(t.track().solo);
+    t.type(U",tm");
+    CHECK(t.track().mute);
+    t.type(U",ts");
+    CHECK(t.track().solo);
+    const bool chase = t.track().chaseNotes;
+    t.type(U",tc");
+    CHECK(t.track().chaseNotes != chase);
+}
+
+TEST_CASE("the conductor has no mute or solo to toggle")
+{
+    Tracking t;
+    const auto before = t.document.song();
+    t.type(U"gcM");
+    CHECK(t.ws.message() == "Select a track to mute");
+    t.type(U"S");
+    CHECK(t.ws.message() == "Select a track to solo");
+    CHECK(t.document.song() == before);
 }

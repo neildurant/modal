@@ -129,13 +129,11 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
     }
     if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes)
     {
-        const auto letter = field == TrackField::Mute ? "M" : field == TrackField::Solo ? "S" : "C";
-        if (text != "on" && text != "off" && text != "1" && text != "0" && text != "-" &&
-            text != letter)
+        if (text != "on" && text != "off")
         {
             return "Use on or off";
         }
-        const bool on = text == "on" || text == "1" || text == letter;
+        const bool on = text == "on";
         if (field == TrackField::Mute)
         {
             track.mute = on;

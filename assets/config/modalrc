@@ -67,6 +67,12 @@ nmap <S-Tab>    cursor-note-previous      "Note before"
 keysection "Tracks"
 nmap <C-PageDown> track-next        "Next track"
 nmap <C-PageUp> track-previous    "Track before"
+nmap M          track-mute-toggle "Mute or unmute this track"
+nmap S          track-solo-toggle "Solo this track, or stop"
+ngroup <leader>t "Tracks"
+nmap <leader>tm track-mute-toggle "Mute or unmute this track"
+nmap <leader>ts track-solo-toggle "Solo this track, or stop"
+nmap <leader>tc track-chase-toggle "Chase notes on this track, or stop"
 
 " Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
 " there, and after an operator is the range to it (d'a); '' goes back to before the last jump.

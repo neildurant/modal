@@ -36,6 +36,7 @@ public:
     bool typing() const override { return editor_.active(); }
     void type(char32_t character) override { editor_.type(character); }
     std::optional<bool> runTyping(std::string_view command) override;
+    const InspectorEditor& inspectorEditor() const { return editor_; }
 
 private:
     std::size_t row() const;
