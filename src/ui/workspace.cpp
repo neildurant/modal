@@ -3,6 +3,7 @@
 #include "workspace_commands.hpp"
 
 #include <modal/core/pitch.hpp>
+#include <modal/core/song_file.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
@@ -92,6 +93,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "port")
                          {
                              return port(call.arguments);
+                         }
+                         if (name == "event-insert")
+                         {
+                             return insertEvent(call.arguments);
                          }
                          if (name == "section-insert-before" || name == "section-insert-after" ||
                              name == "section-join")
@@ -2391,6 +2396,29 @@ void Workspace::showPlayhead()
         }
     }
     wasPlaying_ = playing || (player_ != nullptr && player_->stopping());
+}
+
+CommandResult Workspace::insertEvent(std::string_view text)
+{
+    const auto cursor = view().cursor();
+    if (!cursor.track)
+    {
+        return CommandResult::error("The conductor holds only tempo and meter changes");
+    }
+    auto parsed = core::parseEvent(text);
+    if (!parsed.data)
+    {
+        return CommandResult::error(parsed.error);
+    }
+    const core::Event event{cursor.tick, std::move(*parsed.data)};
+    document_.edit("Insert an event", view().place(),
+                   [&](core::Song& song)
+                   {
+                       song.updateEvents(*cursor.track,
+                                         [&](core::EventList& events) { events.insert(event); });
+                   });
+    view().refresh();
+    return {true, "Inserted at " + view().position(cursor.tick), false};
 }
 
 CommandResult Workspace::port(std::string_view name)

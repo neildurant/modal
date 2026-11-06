@@ -328,6 +328,7 @@ class Reader
 {
 public:
     SongReadResult read(std::string_view text);
+    EventParseResult event(std::string_view text);
 
 private:
     bool fail(const std::string& message) { return failAt(line_, message); }
@@ -1058,6 +1059,34 @@ bool Reader::readEvent(std::span<const Token> tokens)
     return true;
 }
 
+EventParseResult Reader::event(std::string_view text)
+{
+    std::vector<Token> tokens;
+    if (auto broken = tokenize(text, tokens); !broken.empty())
+    {
+        return {std::nullopt, std::move(broken)};
+    }
+    if (tokens.empty())
+    {
+        return {std::nullopt, "Give the event, such as program 5 or cc 7 100"};
+    }
+    if (tokens[0].text == "note")
+    {
+        return {std::nullopt, "Notes are added with o, or by recording"};
+    }
+    auto data = eventData(tokens);
+    // Without the line it would name in a file.
+    if (const auto colon = error_.find(": "); colon != std::string::npos)
+    {
+        error_.erase(0, colon + 2);
+    }
+    if (data && !isValid(Event{0, *data}))
+    {
+        return {std::nullopt, "A value is out of range"};
+    }
+    return {std::move(data), error_};
+}
+
 std::optional<EventData> Reader::eventData(std::span<const Token> tokens)
 {
     const auto& type = tokens[0].text;
@@ -1637,6 +1666,11 @@ std::string writeSong(const Song& song)
         }
     }
     return out;
+}
+
+EventParseResult parseEvent(std::string_view text)
+{
+    return Reader{}.event(text);
 }
 
 SongReadResult readSong(std::string_view text, Ppqn ppqn)

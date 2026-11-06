@@ -1303,3 +1303,54 @@ TEST_CASE("the meters offered: built in, the song's own and those typed, in orde
     REQUIRE(v.registry.runLine("bar-insert 7/8").message.empty());
     CHECK(v.ws.remembered().meters().size() == 1);
 }
+
+TEST_CASE("any kind of event but a note can be inserted at the cursor, as one undo step")
+{
+    Viewing v;
+    const auto id = v.document.song().tracks()[0]->id();
+    const auto count = [&] { return v.document.song().events(id).size(); };
+    const auto before = count();
+
+    struct Inserted
+    {
+        std::string_view line;
+        core::EventData data;
+    };
+    const std::vector<Inserted> cases{
+        {"event-insert program 5", core::ProgramChange{5}},
+        {"event-insert cc 7 100", core::ControlChange{7, 100}},
+        {"event-insert bend -200", core::PitchBend{-200}},
+        {"event-insert pressure 60", core::ChannelPressure{60}},
+        {"event-insert polypressure C4 60", core::PolyPressure{60, 60}},
+        {"event-insert sysex F0 7D 01 F7", core::makeSysEx({0xF0, 0x7D, 0x01, 0xF7})},
+        {"event-insert lyric \"la\"", core::makeMetaText(core::MetaText::Kind::Lyric, "la")},
+    };
+    for (const auto& inserted : cases)
+    {
+        CAPTURE(inserted.line);
+        const auto result = v.registry.runLine(inserted.line);
+        CHECK_FALSE(result.warning);
+        const auto all = v.document.song().events(id).all();
+        CHECK(std::ranges::any_of(all, [&](const core::Event& event)
+                                  { return event.data == inserted.data; }));
+    }
+    CHECK(count() == before + cases.size());
+    type(v.ws, U"u");
+    CHECK(count() == before + cases.size() - 1);
+
+    for (const auto* bad :
+         {"event-insert", "event-insert program 128", "event-insert cc 7",
+          "event-insert nonsense 1", "event-insert note C4", "event-insert sysex 7D 01"})
+    {
+        CAPTURE(bad);
+        const auto result = v.registry.runLine(bad);
+        CHECK(result.warning);
+        CHECK_FALSE(result.message.empty());
+        CHECK(result.message.find("line ") == std::string::npos);
+        CHECK(count() == before + cases.size() - 1);
+    }
+
+    // The conductor has no such events.
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
+    CHECK(v.registry.runLine("event-insert program 5").warning);
+}

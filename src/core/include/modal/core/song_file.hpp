@@ -41,6 +41,16 @@ std::string writeSong(const Song& song);
 // file stops it being read, with the line given, so nothing is lost without a word.
 SongReadResult readSong(std::string_view text, Ppqn ppqn = kPpqn);
 
+// An event but for its time, as the format writes it: cc 7 100, program 5, bend -200, pressure 60,
+// polypressure C4 60, sysex F0 7D 01 F7, or text, copyright, instrument, lyric or cue with its
+// words in quotes. Notes aren't read here, needing a time and resolution. Says why if it can't.
+struct EventParseResult
+{
+    std::optional<EventData> data;
+    std::string error;
+};
+EventParseResult parseEvent(std::string_view text);
+
 // Writes a song to a file, writing a temporary file beside it first and then renaming it, so
 // a failed save never leaves half a file. Returns an error message, or an empty string.
 std::string writeSongFile(const Song& song, const std::filesystem::path& path);

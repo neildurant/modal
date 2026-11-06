@@ -335,6 +335,12 @@ constexpr std::array kSharedCommands{
                 .usage = "[NAME]",
                 .keys = false,
                 .choices = {Choices::Port}},
+    CommandInfo{.name = "event-insert",
+                .description = "Insert an event at the cursor: cc 7 100, program 5, bend -200, "
+                               "pressure 60, polypressure C4 60, sysex F0 7D 01 F7, or text, "
+                               "lyric, cue, copyright or instrument with words in quotes",
+                .usage = "EVENT",
+                .keys = false},
     CommandInfo{.name = "section-insert-before",
                 .description = "Insert a new section before the cursor's, of {count} bars (4), "
                                "asking for its name",
@@ -512,10 +518,11 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 120> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 121> where{{
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
+            {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-mute-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-solo-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-chase-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
