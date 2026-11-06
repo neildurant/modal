@@ -885,7 +885,7 @@ std::optional<std::string> PianoRollView::setNote(const std::string& heading,
     {
         return why;
     }
-    auto field = heading == "Ends" ? std::string{"end"} : heading;
+    auto field = heading.starts_with("Ends") ? "end" + heading.substr(4) : heading;
     field[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(field[0])));
     editEvents("Set " + field + " of " + core::pitchName(std::get<core::Note>(old.data).pitch) +
                    " in " + trackName(),
@@ -2161,8 +2161,6 @@ Inspection PianoRollView::inspection() const
     {
         const auto& event = song.events(*trackId())[*index];
         result.fields.push_back({"Position", positionText(m, event.tick)});
-        result.fields.push_back(
-            {.heading = "Time", .value = songTime(song.tempo().toTime(event.tick)), .aside = true});
         addNoteFields(result, song, m, event.tick, std::get<core::Note>(event.data));
         markEditable(result);
         addMusicalTiming(result, event, m, host_.timingUnit(grid()));
@@ -2170,8 +2168,6 @@ Inspection PianoRollView::inspection() const
     }
     result.kind = "No note";
     result.fields.push_back({"Position", positionText(m, time_)});
-    result.fields.push_back(
-        {.heading = "Time", .value = songTime(song.tempo().toTime(time_)), .aside = true});
     result.fields.push_back({"Pitch", pitchText(pitch_)});
     return result;
 }
@@ -2682,14 +2678,14 @@ std::string PianoRollView::position(core::Tick tick) const
 std::string PianoRollView::timeStatus(core::Tick tick) const
 {
     const auto& song = document_.song();
-    return positionText(meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
+    return placeText(song, meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
            song.sections()[song.sectionAt(tick)]->name();
 }
 
 std::string PianoRollView::cursorStatus() const
 {
     const auto& song = document_.song();
-    return positionText(meter(), time_) + "  " + core::pitchName(pitch_) + "  " +
+    return placeText(song, meter(), time_) + "  " + core::pitchName(pitch_) + "  " +
            signatureText(meter().signatureAt(time_)) + "  " +
            song.sections()[song.sectionAt(time_)]->name();
 }

@@ -88,6 +88,11 @@ std::string songTime(std::chrono::nanoseconds time)
                      : std::to_string(minutes) + ":" + rest;
 }
 
+std::string placeText(const core::Song& song, const core::MeterMap& meter, core::Tick tick)
+{
+    return positionText(meter, tick) + "  " + songTime(song.tempo().toTime(tick));
+}
+
 std::string pitchText(std::uint8_t pitch)
 {
     return core::pitchName(pitch) + " (" + std::to_string(pitch) + ")";
@@ -127,8 +132,6 @@ Inspection inspect(const EventList& list, std::size_t row)
     { fields.push_back({std::move(heading), std::move(value)}); };
 
     add("Position", positionText(meter, r.tick));
-    fields.push_back(
-        {.heading = "Time", .value = songTime(song.tempo().toTime(r.tick)), .aside = true});
 
     switch (r.kind)
     {

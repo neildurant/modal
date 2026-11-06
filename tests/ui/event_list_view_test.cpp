@@ -154,15 +154,12 @@ TEST_CASE("the event list opens on track 1, at its first row")
         const auto it = std::ranges::find(region.text, text, &TextRun::text);
         return it == region.text.end() ? -1 : it->x;
     };
-    const int time = xOf(frame[2], U"Time");
-    CHECK(time > 0);
-    type(v.ws, U"5j"); // a note
+    CHECK(xOf(frame[2], U"Time") == -1); // which is in the status line
+    const int position = xOf(frame[2], U"Position");
+    CHECK(position >= 0);
+    type(v.ws, U"5j"); // an event
     REQUIRE(v.view.list().rows()[v.view.row()].kind == RowKind::Event);
-    const auto note = v.ws.frame()[2];
-    CHECK(xOf(note, U"Time") == time);
-    const int ends = xOf(note, U"Ends");
-    type(v.ws, U"j");
-    CHECK(xOf(v.ws.frame()[2], U"Ends") == ends);
+    CHECK(xOf(v.ws.frame()[2], U"Position") == position);
     type(v.ws, U"gg");
 
     // The status line names the song's file, with [+] once it has changes not saved.
@@ -178,7 +175,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(contains(rowText(list, 5), U"E1 (28)"));
     CHECK(contains(rowText(list, 5), U"1/8"));
     CHECK(contains(rowText(frame[3], 0), U"NORMAL"));
-    CHECK(contains(rowText(frame[3], 0), U"1:1:000  4/4  Section 1"));
+    CHECK(contains(rowText(frame[3], 0), U"1:1:000  0:00.000  4/4  Section 1"));
 
     // The conductor's rows are dimmed; the cursor's field is in the cursor's colours.
     CHECK(styleAt(list, 2, 1).background == Role::Cursor);

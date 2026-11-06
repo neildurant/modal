@@ -140,7 +140,7 @@ TEST_CASE("the piano roll opens on the track at the cursor, centred on its notes
               .firstBar = 1, .lastBar = 4, .start = 0, .end = r.t.bar(5), .section = 0});
     CHECK(contains(r.textOn(Role::Bar), U"Bass"));
     CHECK(contains(r.textOn(Role::Bar), U"1–4"));
-    CHECK(contains(r.status(), U"1:1:000  C2"));
+    CHECK(contains(r.status(), U"1:1:000  0:00.000  C2"));
 }
 
 TEST_CASE("Enter on a bar in the arrangement opens it in the piano roll, at its start")
@@ -1223,13 +1223,14 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     r.type(U"8je"); // the E1 at the start, on pitch first
     REQUIRE(editor.active());
     CHECK(editor.heading() == "Pitch");
-    for (const auto heading : {"Velocity", "Release", "Start step", "Start fine", "Length steps",
-                               "Length fine", "Start bar", "Position", "Length", "Ends", "Pitch"})
+    for (const auto heading :
+         {"Velocity", "Release", "Start step", "Start fine", "Position", "Length steps",
+          "Length fine", "Length", "Ends step", "Ends fine", "Ends", "Pitch"})
     {
         tab();
         CHECK(editor.heading() == heading);
     }
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 5; ++i)
         tab();
     CHECK(editor.heading() == "Position");
     CHECK(editor.line().text().starts_with(U"1:1:0"));
@@ -1237,8 +1238,8 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     tab(); // moved to bar 2, the cursor with it
     CHECK(bassNote(r, 28)->first == t.bar(2));
     CHECK(r.view().time() == t.bar(2));
-    tab(); // Ends
-    tab(); // Pitch
+    for (int i = 0; i < 6; ++i)
+        tab(); // round the times to Pitch
     CHECK(editor.heading() == "Pitch");
     CHECK(editor.line().text() == U"E1");
     r.type(U"A2"); // onto the A2 there
@@ -1279,7 +1280,7 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
 
     // End editing remains available in the exact-timing group, and Tab wraps to pitch.
     r.type(U"e");
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < 10; ++i)
         tab();
     CHECK(editor.heading() == "Ends");
     r.type(U"2:2");

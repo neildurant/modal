@@ -74,10 +74,10 @@ int inspectorHeight(CellSize cell);
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.
 // Each column is as wide as its longest value can be, so the columns stay put as the cursor
 // moves, a position or end as wide as positionWidth; a value that doesn't fit is cut short,
-// and those after it left out. Values e can edit are bright, the others dim; fields set aside
-// (the time) go at the right.
-// Notes group pitch/velocities on the left, aligned coarse/fine Start and Length pairs
-// in the middle, and exact timing on the right. With an editor, its field is boxed.
+// and those after it left out. Values e can edit are bright, the others dim.
+// Notes have the kind above pitch and velocities on the left, and to the right a row each for
+// Start, Length and Ends, across their coarse, fine and exact values. With an editor, its field
+// is boxed.
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor = nullptr);
 

@@ -6,6 +6,7 @@
 #include <array>
 #include <charconv>
 #include <limits>
+#include <variant>
 
 namespace modal::ui
 {
@@ -77,12 +78,34 @@ core::Tick ticksIn(core::NoteFraction unit, core::Ppqn ppqn)
 {
     return std::max<core::Tick>(1, unit.toTicks(ppqn));
 }
+
+// The tick a place in a bar stands for, or why there's no such place.
+std::variant<core::Tick, std::string> placed(const Parts& parts, const core::MeterMap& meter,
+                                             core::Tick unit)
+{
+    if (parts.step < 1)
+    {
+        return std::string{"Steps count from 1"};
+    }
+    const auto start = meter.barStart(parts.bar);
+    const auto end = meter.barStart(parts.bar + 1);
+    if (parts.step - 1 > (end - start - 1) / unit)
+    {
+        return std::string{"That step is outside the bar"};
+    }
+    const auto coarse = start + (parts.step - 1) * unit;
+    if (parts.fine < -coarse)
+    {
+        return std::string{"A note cannot start before the song"};
+    }
+    return coarse + parts.fine;
+}
 } // namespace
 
 bool isMusicalTimingField(std::string_view heading)
 {
-    return heading == "Start bar" || heading == "Start step" || heading == "Start fine" ||
-           heading == "Length steps" || heading == "Length fine";
+    return heading == "Start step" || heading == "Start fine" || heading == "Length steps" ||
+           heading == "Length fine" || heading == "Ends step" || heading == "Ends fine";
 }
 
 void addMusicalTiming(Inspection& inspection, const core::Event& event, const core::MeterMap& meter,
@@ -96,20 +119,30 @@ void addMusicalTiming(Inspection& inspection, const core::Event& event, const co
     const auto ticks = ticksIn(unit, meter.ppqn());
     const auto start = startParts(event.tick, meter, ticks);
     const auto length = lengthParts(note->duration, ticks);
+    const auto end = startParts(event.tick + note->duration, meter, ticks);
     const auto add = [&](std::string heading, std::string value, bool editable = true)
     { inspection.fields.push_back({std::move(heading), std::move(value), editable}); };
     add("Units", core::toString(unit) + (unit.isExact(meter.ppqn()) ? "" : " (rounded)"), false);
-    add("Start bar", std::to_string(start.bar));
     add("Start step", std::to_string(start.step));
     add("Start fine", fineText(start.fine));
     add("Length steps", std::to_string(length.step));
     add("Length fine", fineText(length.fine));
+    add("Ends step", std::to_string(end.step));
+    add("Ends fine", fineText(end.fine));
+    for (const auto& change : meter.changes())
+    {
+        if (change.signature.numerator > 9)
+        {
+            inspection.beatDigits = 2;
+        }
+    }
 
-    // Tab follows the visual groups: note properties, coarse/fine pairs, then exact timing.
+    // Tab follows the rows as drawn: note properties, then each time across its coarse, fine
+    // and exact values.
     constexpr std::array<std::string_view, 13> order{
-        "Pitch",      "Velocity",     "Release",     "Units",     "Start step",
-        "Start fine", "Length steps", "Length fine", "Start bar", "Position",
-        "Length",     "Ends",         "Time"};
+        "Pitch",      "Velocity",  "Release",      "Units",       "Start step",
+        "Start fine", "Position",  "Length steps", "Length fine", "Length",
+        "Ends step",  "Ends fine", "Ends"};
     std::ranges::stable_sort(inspection.fields, {}, [&](const InspectorField& field)
                              { return std::ranges::find(order, field.heading) - order.begin(); });
 }
@@ -131,14 +164,12 @@ EditResult setMusicalTiming(const core::Event& event, std::string_view heading,
     }
     const auto ticks = ticksIn(unit, meter.ppqn());
     auto result = event;
-    if (heading.starts_with("Start"))
+    if (!heading.starts_with("Length"))
     {
-        auto parts = startParts(event.tick, meter, ticks);
-        if (heading == "Start bar")
-        {
-            parts.bar = *number;
-        }
-        else if (heading == "Start step")
+        const bool starting = heading.starts_with("Start");
+        const auto end = event.tick + note->duration;
+        auto parts = startParts(starting ? event.tick : end, meter, ticks);
+        if (heading.ends_with("step"))
         {
             parts.step = *number;
         }
@@ -146,22 +177,23 @@ EditResult setMusicalTiming(const core::Event& event, std::string_view heading,
         {
             parts.fine = *number;
         }
-        if (parts.bar < 1 || parts.step < 1)
+        const auto tick = placed(parts, meter, ticks);
+        if (const auto* why = std::get_if<std::string>(&tick))
         {
-            return std::string{"Bars and start steps count from 1"};
+            return *why;
         }
-        const auto start = meter.barStart(parts.bar);
-        const auto end = meter.barStart(parts.bar + 1);
-        if (parts.step - 1 > (end - start - 1) / ticks)
+        if (starting)
         {
-            return std::string{"That step is outside the bar"};
+            result.tick = std::get<core::Tick>(tick);
         }
-        const auto coarse = start + (parts.step - 1) * ticks;
-        if (parts.fine < -coarse)
+        else if (std::get<core::Tick>(tick) <= event.tick)
         {
-            return std::string{"A note cannot start before the song"};
+            return std::string{"A note has to end after it starts"};
         }
-        result.tick = coarse + parts.fine;
+        else
+        {
+            std::get<core::Note>(result.data).duration = std::get<core::Tick>(tick) - event.tick;
+        }
     }
     else
     {
@@ -199,11 +231,13 @@ EditResult stepMusicalTiming(const core::Event& event, std::string_view heading,
     const auto ticks = ticksIn(unit, meter.ppqn());
     const auto start = startParts(event.tick, meter, ticks);
     const auto length = lengthParts(note->duration, ticks);
-    const auto value = heading == "Start bar"      ? start.bar
-                       : heading == "Start step"   ? start.step
+    const auto end = startParts(event.tick + note->duration, meter, ticks);
+    const auto value = heading == "Start step"     ? start.step
                        : heading == "Start fine"   ? start.fine
                        : heading == "Length steps" ? length.step
-                                                   : length.fine;
+                       : heading == "Length fine"  ? length.fine
+                       : heading == "Ends step"    ? end.step
+                                                   : end.fine;
     return setMusicalTiming(event, heading, std::to_string(value + by), meter, unit);
 }
 } // namespace modal::ui

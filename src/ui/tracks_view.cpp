@@ -123,13 +123,13 @@ std::string TracksView::position(core::Tick tick) const
 }
 std::string TracksView::timeStatus(core::Tick tick) const
 {
-    return position(tick);
+    return placeText(document_.song(), cursorMeter(), tick);
 }
 std::string TracksView::cursorStatus() const
 {
     return document_.song().tracks().empty()
                ? "No tracks"
-               : "Track " + std::to_string(row() + 1) + "  " + position(cursor_.tick);
+               : "Track " + std::to_string(row() + 1) + "  " + timeStatus(cursor_.tick);
 }
 
 core::EditPlace TracksView::place() const

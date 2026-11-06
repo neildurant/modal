@@ -1366,8 +1366,6 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     const auto bars = last - first + 1;
     Inspection result{.kind = "Section", .fields = {}};
     result.fields.push_back({"Position", positionText(m, start)});
-    result.fields.push_back(
-        {.heading = "Time", .value = songTime(song.tempo().toTime(start)), .aside = true});
     result.fields.push_back({.heading = "Section",
                              .value = song.sections()[section]->name(),
                              .editable = true,
@@ -1543,8 +1541,6 @@ Inspection ArrangeView::inspection() const
     const auto last = m.toBarBeatTick(std::max<core::Tick>(song.end() - 1, 0)).bar;
     Inspection result{.kind = "Bar", .fields = {}};
     result.fields.push_back({"Position", positionText(m, start)});
-    result.fields.push_back(
-        {.heading = "Time", .value = songTime(song.tempo().toTime(start)), .aside = true});
     result.fields.push_back({"Bar", std::to_string(bar) + " of " + std::to_string(last)});
     result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     if (const auto id = trackId())
@@ -1588,7 +1584,7 @@ std::string ArrangeView::position(core::Tick tick) const
 std::string ArrangeView::timeStatus(core::Tick tick) const
 {
     const auto& song = document_.song();
-    return positionText(meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
+    return placeText(song, meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
            song.sections()[song.sectionAt(tick)]->name();
 }
 

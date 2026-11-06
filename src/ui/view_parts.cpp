@@ -67,23 +67,23 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
         int labelColumn;
         int valueColumn;
         int width;
-        bool right = true;
     };
-    const int exactWidth = std::max(positionWidth, 12);
+    const int exactWidth = std::max(positionWidth, 9) + inspection.beatDigits - 1;
+    constexpr int kExactColumn = 48;
     const std::array slots{
-        Slot{"Pitch", "Pitch:", 0, 0, 10, 9},
-        Slot{"Velocity", "Velocity:", 1, 0, 10, 9},
-        Slot{"Release", "Off Vel:", 2, 0, 10, 9},
+        Slot{"Pitch", "Pitch:", 1, 0, 10, 9},
+        Slot{"Velocity", "Velocity:", 2, 0, 10, 9},
+        Slot{"Release", "Off Vel:", 3, 0, 10, 9},
         Slot{"Units", "Units:", 0, 22, 30, 6},
         Slot{"Start step", "Start:", 1, 22, 30, 6},
-        Slot{"Start fine", "", 1, 38, 38, 8, false},
+        Slot{"Start fine", "", 1, 38, 38, 8},
+        Slot{"Position", "", 1, kExactColumn, kExactColumn, exactWidth},
         Slot{"Length steps", "Length:", 2, 22, 30, 6},
-        Slot{"Length fine", "", 2, 38, 38, 8, false},
-        Slot{"Start bar", "Bar:", 0, 48, 59, exactWidth},
-        Slot{"Position", "Position:", 1, 48, 59, exactWidth},
-        Slot{"Length", "Length:", 2, 48, 59, exactWidth},
-        Slot{"Ends", "Ends:", 3, 48, 59, exactWidth},
-        Slot{"Time", "Time:", 0, 62 + exactWidth, 68 + exactWidth, 12},
+        Slot{"Length fine", "", 2, 38, 38, 8},
+        Slot{"Length", "", 2, kExactColumn, kExactColumn, exactWidth},
+        Slot{"Ends step", "Ends:", 3, 22, 30, 6},
+        Slot{"Ends fine", "", 3, 38, 38, 8},
+        Slot{"Ends", "", 3, kExactColumn, kExactColumn, exactWidth},
     };
     Region region{.bounds = bounds, .background = Role::Panel, .text = {}, .under = {}, .over = {}};
     const int margin = BarSpacing::forCell(cell).margin;
@@ -96,7 +96,36 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
     const auto x = [&](int col) { return margin + (col - left) * cell.width; };
     const auto y = [&](int row) { return cell.height / 4 + row * cell.height; };
     const Style label{Role::Dim, Role::Panel, kPlain};
-    region.text.push_back({x(38), y(0), U"Fine (t)", label});
+    // A bar, beat and tick, with room for the widest beat, so the colons line up whatever's
+    // in them; the bars and ticks line up by being on the right.
+    const auto aligned = [&](std::string text)
+    {
+        const auto first = text.find(':');
+        const auto second = text.find(':', first + 1);
+        if (second != std::string::npos)
+        {
+            const auto digits = static_cast<std::size_t>(inspection.beatDigits);
+            const auto beat = second - first - 1;
+            text.insert(first + 1, digits > beat ? digits - beat : 0, ' ');
+        }
+        return text;
+    };
+
+    region.text.push_back(
+        {x(0), y(0), decodeUtf8(inspection.kind), {Role::Accent, Role::Panel, kBold}});
+    const std::u32string fine = U"Fine(t)";
+    region.text.push_back({x(38 + 8 - static_cast<int>(fine.size())), y(0), fine, label});
+    // Over the exact values, each letter above its part: the T above the ticks' first digit.
+    const auto position =
+        std::ranges::find(inspection.fields, "Position", &InspectorField::heading);
+    if (position != inspection.fields.end())
+    {
+        const auto digits = position->value.size() - position->value.rfind(':') - 1;
+        const auto heading =
+            decodeUtf8(aligned("B:B:T")) + std::u32string(digits > 0 ? digits - 1 : 0, U' ');
+        region.text.push_back({x(kExactColumn + exactWidth - static_cast<int>(heading.size())),
+                               y(0), heading, label});
+    }
     for (const auto& slot : slots)
     {
         const auto it = std::ranges::find(inspection.fields, slot.field, &InspectorField::heading);
@@ -106,7 +135,7 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
             region.text.push_back(
                 {x(slot.labelColumn), y(slot.row), decodeUtf8(slot.label), label});
         auto value = it->value;
-        if (slot.field == "Start fine" || slot.field == "Length fine")
+        if (slot.field.ends_with(" fine"))
         {
             if (value.ends_with('t'))
                 value.pop_back();
@@ -114,11 +143,14 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
         if (slot.field == "Length" || slot.field == "Units")
         {
             if (slot.field == "Units" && value.find("(rounded)") != std::string::npos)
-                region.text.push_back({x(22), y(3), U"Unit rounded to ticks", label});
+                region.text.push_back(
+                    {x(kExactColumn + exactWidth + 2), y(0), U"Unit rounded to ticks", label});
             value = value.substr(0, value.find(" ("));
         }
+        if (slot.field == "Position" || slot.field == "Length" || slot.field == "Ends")
+            value = aligned(std::move(value));
         inspectorValue(region, *it, decodeUtf8(value), x(slot.valueColumn), y(slot.row), slot.width,
-                       cell, editor, slot.right);
+                       cell, editor, true);
     }
     return region;
 }
@@ -148,8 +180,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     const auto x = [&](int column) { return margin + column * cell.width; };
     const auto widthOf = [&](std::string_view name)
     {
-        constexpr std::array<std::pair<std::string_view, int>, 16> kWidths{{
-            {"Time", 9},
+        constexpr std::array<std::pair<std::string_view, int>, 15> kWidths{{
             {"Pitch", 9},
             {"Velocity", 8},
             {"Length", 15},
@@ -177,35 +208,9 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     const int top = cell.height / 4;
     region.text.push_back({x(0), top, decodeUtf8(inspection.kind), kind});
 
-    // The fields set aside, from the right edge in.
-    int right = columns;
-    for (auto it = inspection.fields.rbegin(); it != inspection.fields.rend(); ++it)
-    {
-        if (!it->aside)
-        {
-            continue;
-        }
-        const auto title = decodeUtf8(it->heading);
-        const auto text = decodeUtf8(it->value);
-        const int wide = std::max(
-            {static_cast<int>(title.size()), static_cast<int>(text.size()), widthOf(it->heading)});
-        if (right - wide < widthOf("Kind") + 3)
-        {
-            break;
-        }
-        right -= wide;
-        region.text.push_back({x(right), top, title, heading});
-        region.text.push_back({x(right), top + cell.height, text, heading});
-        right -= 3;
-    }
-
     int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
-        if (field.aside)
-        {
-            continue;
-        }
         auto title = decodeUtf8(field.heading);
         auto text = decodeUtf8(field.value);
         const bool edited =
@@ -214,7 +219,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         {
             text = editor->line().text();
         }
-        const int room = std::min(columns, right) - at;
+        const int room = columns - at;
         if (room < kMinSegmentCharacters + 1)
         {
             break;

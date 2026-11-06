@@ -1691,7 +1691,7 @@ std::string EventListView::position(core::Tick tick) const
 std::string EventListView::timeStatus(core::Tick tick) const
 {
     const auto& song = document_.song();
-    return positionText(list_.meter(), tick) + "  " +
+    return placeText(song, list_.meter(), tick) + "  " +
            signatureText(list_.meter().signatureAt(tick)) + "  " +
            song.sections()[song.sectionAt(tick)]->name();
 }
@@ -1700,7 +1700,7 @@ std::string EventListView::cursorStatus() const
 {
     const auto& song = document_.song();
     const auto tick = list_.rows()[row_].tick;
-    return list_.text(row_)[Column::Position] + "  " +
+    return list_.text(row_)[Column::Position] + "  " + songTime(song.tempo().toTime(tick)) + "  " +
            signatureText(list_.meter().signatureAt(tick)) + "  " +
            song.sections()[song.sectionAt(tick)]->name();
 }
@@ -1943,7 +1943,7 @@ std::optional<bool> EventListView::runInspector(std::string_view command)
         if (const auto* why = std::get_if<std::string>(&result))
             return *why;
         const auto column = heading.starts_with("Start") ? Column::Position
-                            : heading.starts_with("Length") || heading == "Ends"
+                            : heading.starts_with("Length") || heading.starts_with("Ends")
                                 ? Column::Length
                                 : inspectorColumn(heading).value_or(Column::Data);
         return replaceEvent(row_, std::get<core::Event>(result), column);

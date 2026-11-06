@@ -237,7 +237,7 @@ TEST_CASE("note timing display follows the grid or a fixed setting without editi
         }
         return all;
     };
-    CHECK(text().find(U"Fine (t)") != std::u32string::npos);
+    CHECK(text().find(U"Fine(t)") != std::u32string::npos);
     CHECK(text().find(U"+10") != std::u32string::npos);
     CHECK(text().find(U"+40") != std::u32string::npos);
     REQUIRE(settings.set("timingunit", "1/8").empty());
@@ -448,19 +448,27 @@ TEST_CASE("the note inspector aligns start and length coarse-fine pairs")
     const auto length = find(U"Length:");
     CHECK(start.x == length.x);
     CHECK(length.y == start.y + 20);
-    CHECK(find(U"Fine (t)").x > start.x);
+    CHECK(find(U"Fine(t)").x > start.x);
     const auto startCoarse = find(U"2");
     const auto startFine = find(U"+2");
     const auto lengthCoarse = find(U"3");
     const auto lengthFine = find(U"+1");
     CHECK(startFine.x == lengthFine.x);
     CHECK(startCoarse.x == lengthCoarse.x);
-    CHECK(startFine.x - (startCoarse.x + 10) == 20); // two cells separate the pair
+    // On the right of its column, as the values to its left are, under its heading.
+    CHECK(startFine.x + 2 * 10 == find(U"Fine(t)").x + 7 * 10);
+    CHECK(find(U"Note").y < pitch.y);
+    CHECK(find(U"Note").style.foreground == Role::Accent);
+    CHECK(find(U"Note").style.attributes == kBold);
+    CHECK(find(U"Ends:").x == start.x);
+    CHECK(find(U"Ends:").y == length.y + 20);
+    CHECK(find(U"Units:").y == find(U"Note").y);
+    CHECK(pitch.y == start.y);
     CHECK(startFine.y == startCoarse.y);
     CHECK(lengthFine.y == lengthCoarse.y);
     t.ws.resize(600, 400, {10, 20});
     t.type(U"e");
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 5; ++i)
         t.press(NamedKey::Tab);
     REQUIRE(t.ws.pianoRoll().inspectorEditor().heading() == "Position");
     for (const auto& region : t.ws.frame())
@@ -635,6 +643,22 @@ TEST_CASE("M, S and the track commands toggle the current track from every view"
     const bool chase = t.track().chaseNotes;
     t.type(U",tc");
     CHECK(t.track().chaseNotes != chase);
+}
+
+TEST_CASE("the status line shows the cursor's time in every view, and the inspector doesn't")
+{
+    const auto view = GENERATE(as<std::u32string>{}, U"gt", U"ga", U"gr", U"ge");
+    Tracking t;
+    t.type(view);
+    const auto frame = t.ws.frame();
+    std::u32string status;
+    for (const auto& run : frame.back().text)
+        status += run.text;
+    CHECK(status.find(U"1:1:000  0:00.000") != std::u32string::npos);
+    for (const auto& region : frame)
+        if (region.background == Role::Panel)
+            for (const auto& run : region.text)
+                CHECK(run.text != U"Time");
 }
 
 TEST_CASE("the conductor has no mute or solo to toggle")
