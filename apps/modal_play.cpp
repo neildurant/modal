@@ -264,7 +264,7 @@ int panic(platform::MidiOutputs& outputs, core::DestinationId destination)
 {
     // The scheduler's panic reaches the destinations its plans have used.
     core::PlaybackPlan plan{core::TempoMap{core::kPpqn}};
-    plan.tracks.push_back({core::TrackId{1}, destination, 0, false, {}});
+    plan.tracks.push_back({core::TrackId{1}, destination, 0, false, {}, {}, {}});
     core::Scheduler scheduler{outputs};
     scheduler.setPlan(plan, platform::now());
     scheduler.panic(platform::now());
