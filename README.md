@@ -15,7 +15,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 
 ![The event list, playing](docs/screenshot.png)
 
-After milestone 6 come more for the views (the outline, ghost notes, controller lanes, drum maps and several songs at once), then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
+Milestone 7 has begun with the Tracks view, whole-track copying and musical timing controls. Numeric bank/program setup and playback quantise come next, followed by the outline, ghost notes, controller lanes, drum maps and several songs at once, then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
@@ -82,7 +82,17 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `Alt-H` `Alt-L`, `=` `-`, `+` `_` | Nudge it by 5 ms (`set nudge`); lengthen or shorten it to the grid, or by a nudge |
 | `Ctrl-A` `Ctrl-X` | Step its velocity, with counts |
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go between them, Up and Down step one, Enter sets it and Escape leaves it |
-| `gt` `gT` | The next or previous track |
+| Ctrl-PageDown / Ctrl-PageUp | The next or previous track |
+
+### The Tracks view
+
+`gt` or `, v t` opens the track-settings table; `3gt` chooses track 3. Columns are number, name, mute, solo, output port, channel, transpose, velocity offset and time offset. Use `j/k` for rows, `h/l` for columns and Enter to edit. The inspector also offers note chasing.
+
+`Vy` copies a complete track with its settings and section content; `Vjy` copies two. Normal `p/P` insert new tracks after/before, and Visual `p/P` replace selected rows. Copies retain their routing and mute/solo settings. Enter and numeric steps also edit selected rows together, as one undo step. Whole-track deletion requires `Vd`.
+
+Offsets accept milliseconds (`-40ms`), ticks (`+120t`) and musical composites (`+1/16-22t`). The note inspector in the piano roll and event list also shows coarse units plus signed fine ticks, alongside exact timing. `e` edits those fields; `:set timingunit=grid` follows the editing grid, or a fraction such as `1/16` fixes the display unit.
+
+Whole-track paste initially requires the same PPQN and section names/order/lengths. Numeric bank/program setup, playback quantise and Freeze are later steps. See [the grammar](docs/grammar.md) for the detailed keys and limits.
 
 ### The event list
 
@@ -107,7 +117,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `>` `<`, `t` `T`, `q`, `^`, `~` | Transpose, move by the grid step, quantise, change velocity and humanise the events a motion takes, as in the piano roll (`>j` this event and the next) |
 | `x` `Y`, `p` | Delete or yank this event; put what was yanked or deleted at the cursor's time, or bars at the start of the cursor's bar |
 | Enter | Edit the field under the cursor: type a value, or a change such as `+10` or `+1/16` |
-| `e`, Tab Shift-Tab, Up Down | `e` edits the field as Enter does; while editing, Tab and Shift-Tab set it and go along the row, and Up and Down step it |
+| `e`, Tab Shift-Tab, Up Down | `e` edits the inspector, including coarse/fine note timing; Enter edits the current cell. In either editor, Tab and Shift-Tab set the field and go on, and Up and Down step it |
 | `+` `-`, `Ctrl-A` `Ctrl-X` | Step the field up or down, with counts |
 | `o` | Add a note at the cursor's time, typing its pitch |
 | `u` `Ctrl-R` | Undo and redo, going back to where the change was made |
@@ -119,7 +129,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 | `V`, `Ctrl-v`, `ie`, `:` | Select whole rows: tracks in the arrangement, pitch rows across the whole track in the piano roll (the status line says so), an object setting the time (`Vjis`); or a box, tracks by bars or pitches by grid steps; on the section strip, `ie` is the whole song (`vie`, `die`); `:` on a selection runs a command over it (`gsvie:label-to-section`) |
 | Enter on a selection | In the arrangement, open its bars in the piano roll as the page, turning on by as many |
 | `\|` | Cut the notes crossing the edges, so operators take only the parts inside: on a selection, or before an operator for it alone (`\|d]b`) |
-| `gt` `gT`, `gc` | Next and previous track, the conductor as track 0; `3gt` goes to track 3; `gc` shows the conductor's list from any view |
+| Ctrl-PageDown / Ctrl-PageUp, `gc` | Next and previous track, the conductor as track 0; `gc` shows the conductor's list from any view |
 | Ctrl with `j` `k` or the arrows | Move, scrolling so the cursor stays in place on screen |
 | `Ctrl-D` `Ctrl-U`, `Ctrl-F` `Ctrl-B` | Scroll half a page, or a page |
 | `Ctrl-Shift-h` `Ctrl-Shift-l` (or the arrows) | In the arrangement and the piano roll, a page earlier or later, the cursor staying in place on screen |

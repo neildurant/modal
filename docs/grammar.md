@@ -14,8 +14,9 @@ The cursor is one place in the song, a track, a time and in the piano roll a pit
 - **The section strip,** above the arrangement's tracks: the song's sections. `gs` goes to it (or `k` from the first track), `j` back.
 - **The piano roll:** one track's notes, by time and pitch. `gr`, or Enter on a bar in the arrangement.
 - **The event list:** one track's events as rows. `ge`; `gc` shows the conductor's list (tempo and meter changes), as track 0.
+- **The Tracks view:** track settings in columns. `gt` or `, v t` opens it; `3gt` chooses track 3.
 
-`Backspace` goes back to the view before. `gt` and `gT` go to the next track and the one before (`3gt` to track 3).
+`Backspace` goes back to the view before. Ctrl-PageDown and Ctrl-PageUp go to the next and previous track, with counts moving that many tracks. The event list includes the conductor as track 0; the piano roll wraps among note tracks; the Tracks table stops at its first/last row.
 
 Some keys mean different commands in different places: `J` joins sections on the strip and goes down an octave in the piano roll. A key that does nothing where the cursor is says where it does something.
 
@@ -52,6 +53,7 @@ The ends that `0` and `$` go to depend on the view:
 | Section strip | The first section | The last section |
 | Piano roll | The current bar's start | The current bar's last grid step |
 | Event list | The first field in the row | The last field in the row |
+| Tracks view | The first track column | The last track column |
 
 On an arrangement track, `d$` takes the events from the cursor's bar through the song's last bar on that track. `dib` takes just the current bar's contents. In the event list, `0` and `$` move between fields and aren't ranges after an operator.
 
@@ -131,12 +133,12 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 | Key | Selects |
 | --- | --- |
 | `v` | From here as the cursor moves: bars on every track (arrangement), grid steps at every pitch (piano roll), events (event list), sections (strip) |
-| `V` | Whole rows: tracks at every time (arrangement), pitch rows across the whole track (piano roll); in the event list and on the strip, as `v` |
+| `V` | Whole rows: complete tracks with settings (Tracks view), track contents at every time (arrangement), pitch rows across the whole track (piano roll); in the event list and on the strip, as `v` |
 | `Ctrl-v` | A box: tracks by bars (arrangement), pitches by grid steps (piano roll) |
 
 - Its own key again, or Escape, ends it; another of them changes to it. `o` goes to the other end; `gv` selects the last selection again.
 - **An object selects exactly what an operator would take with it,** so `v` then an object then an operator does what the operator does with the object: `visd` is `dis`, `v2itd` is `d2it`. Moving the cursor, or `V`, `v` or `Ctrl-v`, lets go of the object; another object replaces it. After `V` or `Ctrl-v`, which chose the rows, an object sets only their time (`Vjis`).
-- **Operators act at once** on the selection: `d` and `x` delete what's selected, `y` and `Y` yank it, the others change it, a count before them saying how far.
+- **Operators act at once** on the selection: `d` and `x` delete what's selected (`d` alone for complete tracks in the Tracks view), `y` and `Y` yank it, the others change it, a count before them saying how far.
 - **`D` takes the selection's time out,** closing up within each section. The event list refuses it, as does a piano-roll selection restricted to some pitches; use `v` in the piano roll to select time at every pitch.
 - **`p` and `P` put** the register in place of the selection, as one change.
 - **`|` cuts notes crossing the edges** for the selection, so operators take only the parts inside; before an operator in Normal mode, for that one (`|d]b`).
@@ -145,7 +147,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 
 ## Putting and registers
 
-| Key | On tracks and in the piano roll | On the strip | In Visual mode |
+| Key | On arrangement tracks and in the piano roll | On the strip | In Visual mode |
 | --- | --- | --- | --- |
 | `p` | Over what's there (`put-merge`) | Sections after this one | In place of the selection |
 | `P` | In, moving the rest of the section later (`put-insert`), asking to lengthen it if it must | Sections before this one | In place of the selection |
@@ -156,6 +158,24 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 - **`:put-ending`** (no key) puts the register over what's there so it ends at the cursor, or at its bar line for bars: a sweep ending on a downbeat.
 - After a put the status line says what, how and where ("Put 4 events in Bass at bar 3, over what's there").
 - **Registers:** `"a` before a yank, delete or put uses register a; `"A` adds to it. `:registers` lists them.
+
+## Whole tracks and their settings
+
+In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$` go to the first/last column; `gg` / `G` go to the first/last track, or track N with a count. Page keys scroll through rows. Space keeps its transport meaning.
+
+- Enter edits the selected field; typing replaces the value. Enter commits, Escape leaves it, and Tab moves between that field and note chasing in the inspector. `e` opens the inspector at its last field.
+- `=` / `-` and Ctrl-A / Ctrl-X step numeric fields. For musical offsets these step by the track's editing grid, while `+` / `_` step by one tick. Millisecond offsets step by 1 ms. On Mute, Solo and Chase notes, an upward step sets on and a downward step sets off.
+- Time offsets accept `-40ms`, `+120t`, `+1/16` and composites such as `+1/16-22t`. These are absolute settings, including their sign; the last example is +218 ticks at 960 PPQN. Limits are ±1000 ms or ±64 whole notes. Musical and millisecond units retain their meaning through save/load.
+- `V` selects complete rows. Enter assigns the field to all selected tracks; steps change each track relative to its own value. The entire edit is refused if any row would be invalid. Each batch is one undo step; names are edited individually.
+- `Vy` copies one whole track, `Vjy` two; `yy` or `Y` also copies the current track. Settings, editing defaults, all section events and per-section meter ownership are included. `Vd` deletes explicitly selected tracks; `dd` and event-deletion keys do not delete whole tracks.
+- Normal `p` / `P` insert copies after/before the current row, with new IDs and unique numbered names. Visual `p` / `P` replace selected rows as one undo step. Routing and mute/solo are preserved. Named registers work (`V"ay`, `"ap`); appending adds rows. Event contents and sections remain separate payloads, and cannot be pasted as whole tracks.
+- The first implementation requires matching PPQN, section names, order and lengths when pasting. An incompatible paste leaves the song and register unchanged. `yit` in the editing views still takes only event contents.
+
+## Coarse and fine note timing
+
+The note inspector in the piano roll and event list keeps exact positions and lengths, and adds a Timing row: Units, Start bar, Start step, Start fine, Length steps and Length fine. Units follow the track grid by default; `:set timingunit=1/16` fixes them, and `:set timingunit=grid` follows the grid again. Changing units never moves notes.
+
+`e` opens the inspector. Tab/Shift-Tab move between editable fields, Up/Down step them, Enter commits and Escape leaves. Start bars and steps count from one; length steps count from zero. Fine is signed ticks from the nearest coarse step (ties use the earlier step). Coarse edits preserve that fine remainder. Fine entries such as `-22t` are absolute remainders. The exact Position and Length fields retain their existing input forms. In the event list, Enter still edits the current cell directly; `e` also keeps cell editing on conductor rows.
 
 ## Time and ripple
 

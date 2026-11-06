@@ -97,6 +97,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `leader` | `,` | The leader key, which `<leader>` stands for in key bindings: one key, such as `,` or `<Space>` |
 | `hints` | `on` | Whether the hint menu shows, after a pause, the keys that can follow those typed |
 | `hintdelay` | `400` | How long to wait, in milliseconds, before the hint menu shows (0 to 10000; 0 shows it at once) |
+| `timingunit` | `grid` | Note-inspector coarse timing units: follow each track’s grid, or a fixed fraction such as `1/16` (1/128 to 8/1); display only |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
 | `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, T a` turns it on and off |
 | `nudge` | `5` | How far, in milliseconds, `Alt-H` / `Alt-L` nudge a note in the piano roll and `+` / `_` lengthen or shorten it (1 to 1000) |
