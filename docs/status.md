@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the Tracks table edited in place, a port list, tempo display and `:event-insert` are committed locally for a UI trial, not yet pushed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 6 November 2026: the Tracks table edited in place, a port list, tempo display and `:event-insert` are tried and published. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -86,9 +86,9 @@ Tried in the real window and published: Enter and `M`/`S` for the track buttons,
 
 Tried in the real window and published: the Program column with its bank fields, a setup sent at each playback start and on an edit, tracks catching up when they become audible during playback, the setup in MIDI export, and program changes marked in the piano roll's ruler. The reasons are in decisions.md, under Numeric bank and program setup. The tests check the messages sent; how instruments respond on real MIDI hardware hasn't been recorded here.
 
-## Awaiting a UI trial
+## The Tracks table edited in place
 
-Committed locally, to try before pushing: the demo song with every kind of event, the event-sign colour, tempo in the status line and the arrangement's ruler, the Tracks table edited in its cells with bank, grid and note-default columns, the port list, and `:event-insert`. The reasons are in decisions.md, under The Tracks table edited in place.
+Tried in the real window and published: the demo song with every kind of event, the event-sign colour, tempo in the status line and the arrangement's ruler, the Tracks table edited in its cells with bank, grid and note-default columns, the port list, and `:event-insert`. The reasons are in decisions.md, under The Tracks table edited in place.
 
 ## Next
 
