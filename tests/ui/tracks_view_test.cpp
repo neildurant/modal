@@ -661,6 +661,42 @@ TEST_CASE("the status line shows the cursor's time in every view, and the inspec
                 CHECK(run.text != U"Time");
 }
 
+TEST_CASE("numeric columns' headings are right-aligned over their values")
+{
+    Tracking t;
+    t.type(U"$");
+    t.enter(U"-40ms");
+    const auto frame = t.ws.frame();
+    const auto& runs = frame.front().text;
+    for (const auto& column : trackColumns())
+    {
+        const auto heading = std::ranges::find_if(
+            runs,
+            [&](const TextRun& run)
+            {
+                return run.y == 0 &&
+                       run.text.find(decodeUtf8(column.heading)) != std::u32string::npos;
+            });
+        REQUIRE(heading != runs.end());
+        if (column.numeric)
+        {
+            CHECK(heading->text.ends_with(decodeUtf8(column.heading)));
+        }
+        else
+        {
+            CHECK(heading->text.starts_with(decodeUtf8(column.heading)));
+        }
+    }
+    const auto value =
+        std::ranges::find_if(runs, [](const TextRun& run) { return run.text.ends_with(U"-40ms"); });
+    const auto last = std::ranges::find_if(runs, [](const TextRun& run)
+                                           { return run.text.ends_with(U"Time offset"); });
+    REQUIRE(value != runs.end());
+    REQUIRE(last != runs.end());
+    CHECK(value->x + static_cast<int>(value->text.size()) * 10 ==
+          last->x + static_cast<int>(last->text.size()) * 10);
+}
+
 TEST_CASE("the name column grows with the longest name, up to a limit")
 {
     Tracking t;
@@ -685,15 +721,28 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
 
     const std::u32string thirty = U"A name of thirty characters ok";
     REQUIRE(thirty.size() == 30);
+    t.ws.resize(1000, 600, {10, 20}); // too narrow for the whole table
     t.enter(thirty);
     CHECK(shown(thirty));
     CHECK(headingX(U"Mute") - start == 31 * 10);
 
-    t.enter(thirty + U" and a good deal more");
-    CHECK(shown(thirty + U" …"));
+    // Cut short at 32 characters, the whole name being in the bar above and the inspector.
+    const auto longer = thirty + U" and a good deal more than that, and then some";
+    t.enter(longer);
     CHECK(headingX(U"Mute") - start == 33 * 10);
+    CHECK(shown(thirty + U" …"));
+    t.ws.resize(2000, 600, {10, 20});
+    CHECK(shown(longer));
+
+    // A wider window has room for more, without the table going past its edge.
+    t.ws.resize(1200, 600, {10, 20});
+    int others = 0;
+    for (const auto& column : trackColumns())
+        others += column.field == TrackField::Name ? 0 : column.width;
+    CHECK(headingX(U"Mute") - start == (120 - 2 - others) * 10);
+
     t.type(U"uu");
-    CHECK(headingX(U"Mute") == usual);
+    CHECK(headingX(U"Mute") - start == trackColumns()[1].width * 10);
 }
 
 TEST_CASE("a field that typing would replace is highlighted whole, until the cursor moves")
@@ -724,6 +773,80 @@ TEST_CASE("a field that typing would replace is highlighted whole, until the cur
     CHECK(highlighted() == U" ");
     t.press(NamedKey::Enter);
     CHECK(t.track().name == "N");
+}
+
+TEST_CASE("Backspace and Delete clear a value highlighted whole, and only then")
+{
+    const auto key = GENERATE(NamedKey::Backspace, NamedKey::Delete);
+    Tracking t;
+    t.enter(U"Bassline");
+    t.press(NamedKey::Enter);
+    t.press(key);
+    CHECK(t.ws.tracks().inspectorEditor().line().text().empty());
+    t.type(U"Keys");
+    t.press(NamedKey::Enter);
+    CHECK(t.track().name == "Keys");
+
+    // With the cursor moved, they take a character.
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Left);
+    t.press(key);
+    CHECK(t.ws.tracks().inspectorEditor().line().text().size() == 3);
+    t.press(NamedKey::Escape);
+    CHECK(t.track().name == "Keys");
+
+    // Left empty, Enter sets it, or says why it can't be.
+    t.press(NamedKey::Enter);
+    t.press(key);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().name.empty());
+    t.type(U"6l"); // channel
+    REQUIRE(t.track().channel > 0);
+    const auto channel = t.track().channel;
+    t.press(NamedKey::Enter);
+    t.press(key);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().channel == channel);
+    CHECK(t.ws.message() == "Enter a whole number");
+}
+
+TEST_CASE("M, S and , t c toggle selected rows in the tracks view, as one undo step")
+{
+    Tracking t;
+    const auto before = t.document.song();
+    t.type(U"Vj"); // the cursor on track 2
+    t.type(U"M");
+    CHECK(t.track(0).mute);
+    CHECK(t.track(1).mute);
+    CHECK_FALSE(t.track(2).mute);
+    CHECK(t.ws.mode() == Mode::Visual);
+    t.type(U"S");
+    CHECK(t.track(0).solo);
+    CHECK(t.track(1).solo);
+    const auto chase = t.track(1).chaseNotes;
+    t.type(U",tc");
+    CHECK(t.track(0).chaseNotes != chase);
+    CHECK(t.track(1).chaseNotes != chase);
+    t.type(U"M");
+    CHECK_FALSE(t.track(0).mute);
+    CHECK_FALSE(t.track(1).mute);
+    t.press(NamedKey::Escape);
+    t.type(U"uuuu");
+    CHECK(t.document.song() == before);
+}
+
+TEST_CASE("M and S on a selection are for the tracks view")
+{
+    const auto view = GENERATE(as<std::u32string>{}, U"ga", U"gr", U"ge");
+    Tracking t;
+    t.type(view);
+    t.type(U"V");
+    REQUIRE(t.ws.mode() == Mode::Visual);
+    const auto before = t.document.song();
+    t.type(U"M");
+    t.type(U"S");
+    CHECK(t.document.song() == before);
+    CHECK(t.ws.mode() == Mode::Visual);
 }
 
 TEST_CASE("the conductor has no mute or solo to toggle")

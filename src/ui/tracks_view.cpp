@@ -69,14 +69,20 @@ int TracksView::columnWidth(const TrackColumn& column) const
     {
         return column.width;
     }
-    constexpr std::size_t kLongestShown = 32;
     std::size_t longest = 0;
     for (const auto& track : document_.song().tracks())
     {
         longest = std::max(longest, decodeUtf8(track->name).size());
     }
-    // A character more for the space after it, the width being what the column takes up.
-    return std::max(column.width, static_cast<int>(std::min(longest, kLongestShown)) + 1);
+    // Up to 32 characters, scrolling the table sideways if it must, or further if that leaves
+    // the table within the window. A character more for the space after it.
+    int others = 0;
+    for (const auto& other : trackColumns())
+    {
+        others += other.field == TrackField::Name ? 0 : other.width;
+    }
+    const int widest = std::max(32 + 1, layout_.fullColumns - 2 - others);
+    return std::max(column.width, std::min(static_cast<int>(longest) + 1, widest));
 }
 
 void TracksView::ensureVisible()
@@ -215,13 +221,7 @@ Inspection TracksView::inspection() const
     const auto& track = *document_.song().track(*cursor_.track);
     const auto& column = trackColumns()[column_];
     const auto full = trackFieldText(column.field, track, row());
-    auto shown = decodeUtf8(full);
-    if (shown.size() > 32) // as long as the table shows
-    {
-        shown.resize(31);
-        shown += U'…';
-    }
-    result.fields.push_back({std::string{column.heading}, encodeUtf8(shown),
+    result.fields.push_back({std::string{column.heading}, full,
                              column.field != TrackField::Number && !isToggle(column.field), full});
     if (column.field == TrackField::ChaseNotes)
         result.fields.push_back({"When enabled", "Start notes already held"});
@@ -373,12 +373,7 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         }
         else if (const auto field = trackColumns()[column_].field; isToggle(field))
         {
-            // A button: selected rows all follow the cursor's row, so they end up the same.
-            const bool on = !toggleState(field, *document_.song().track(*cursor_.track));
-            if (auto why = edit(field, on ? "on" : "off"))
-            {
-                host_.refuse(*why);
-            }
+            toggle(field);
         }
         else if (command == "field-edit" && trackColumns()[column_].field == TrackField::Number)
         {
@@ -390,6 +385,18 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         {
             host_.startTyping();
         }
+    }
+    else if (command == "tracks-mute-toggle")
+    {
+        toggle(TrackField::Mute);
+    }
+    else if (command == "tracks-solo-toggle")
+    {
+        toggle(TrackField::Solo);
+    }
+    else if (command == "tracks-chase-toggle")
+    {
+        toggle(TrackField::ChaseNotes);
     }
     else if (command == "field-increase" || command == "field-decrease" ||
              command == "field-increase-fine" || command == "field-decrease-fine" ||
@@ -416,6 +423,21 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         return std::nullopt;
     }
     return true;
+}
+
+void TracksView::toggle(TrackField field)
+{
+    if (!cursor_.track)
+    {
+        host_.refuse("No track to change");
+        return;
+    }
+    // Selected rows all follow the cursor's row, so they end up the same.
+    const bool on = !toggleState(field, *document_.song().track(*cursor_.track));
+    if (auto why = edit(field, on ? "on" : "off"))
+    {
+        host_.refuse(*why);
+    }
 }
 
 bool TracksView::operate(std::string_view op, std::string_view motion, int count)
@@ -556,7 +578,7 @@ void TracksView::addRegions(Frame& frame) const
                 text += U'…';
             }
             const auto padding = static_cast<std::size_t>(wide - 1) - text.size();
-            if (track && column.numeric)
+            if (column.numeric) // the heading too, over its values
                 text.insert(0, padding, U' ');
             else
                 text.append(padding, U' ');

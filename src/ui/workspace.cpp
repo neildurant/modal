@@ -1493,6 +1493,11 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         showPlayhead();
         return true;
     }
+    if (command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
+        command == "tracks-chase-toggle")
+    {
+        return view().run(command, count).value_or(false);
+    }
     if (command == "track-mute-toggle" || command == "track-solo-toggle")
     {
         const bool mute = command == "track-mute-toggle";

@@ -50,6 +50,8 @@ private:
     std::optional<std::string> edit(TrackField field, std::string_view text, int steps = 0,
                                     bool fine = false);
     bool put(bool before, bool replace, int count);
+    // Flips a button on the cursor's row, and any selected rows to match it.
+    void toggle(TrackField field);
 
     core::Document& document_;
     ViewHost& host_;
