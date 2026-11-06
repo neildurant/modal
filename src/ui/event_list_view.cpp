@@ -1821,8 +1821,16 @@ Region EventListView::listRegion() const
                 const int from = fits ? textX(x[c], width[c], kColumns[c].right, visible) : x[c];
                 grid.fill(x[c] - 1, line, static_cast<int>(box) + 1, 1, {U' ', editing});
                 grid.write(from, line, visible, editing);
-                grid.set(from + static_cast<int>(cursor - first), line,
-                         {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
+                if (field_->fresh && !typed.empty())
+                {
+                    // All of it highlighted: typing replaces it, until a key moves the cursor.
+                    grid.write(from, line, visible, kCursor);
+                }
+                else
+                {
+                    grid.set(from + static_cast<int>(cursor - first), line,
+                             {cursor < typed.size() ? typed[cursor] : U' ', kCursor});
+                }
             }
             else if (!adding && row == row_ && column == cursorField)
             {

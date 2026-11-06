@@ -540,6 +540,16 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     CHECK(v.ws.mode() == Mode::CommandLine);
     CHECK(v.view.fieldLine().text() == U"96");
     CHECK(contains(rowText(v.ws.frame()[3], 0), U"EDIT"));
+    // Highlighted whole while typing would replace it, then with a cursor once it's moved.
+    const auto column = static_cast<int>(before);
+    CHECK(styleAt(v.ws.frame()[0], column, 5).background == Role::Cursor);
+    CHECK(styleAt(v.ws.frame()[0], column + 1, 5).background == Role::Cursor);
+    v.ws.handle(Key::of(NamedKey::Left), 0);
+    CHECK(v.view.fieldLine().text() == U"96");
+    CHECK(styleAt(v.ws.frame()[0], column, 5).background == Role::Selection);
+    CHECK(styleAt(v.ws.frame()[0], column + 1, 5).background == Role::Cursor);
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    enter(v.ws);
     type(v.ws, U"80");
     CHECK(v.view.fieldLine().text() == U"80");
     enter(v.ws);

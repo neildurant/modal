@@ -46,6 +46,8 @@ public:
     // The field being edited, by its heading, and what's typed in it.
     const std::string& heading() const { return *heading_; }
     const CommandLine& line() const { return line_; }
+    // Whether the next character typed replaces the value, shown by highlighting all of it.
+    bool replacing() const { return fresh_; }
 
     void type(char32_t character);
 

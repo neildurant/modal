@@ -696,6 +696,36 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
     CHECK(headingX(U"Mute") == usual);
 }
 
+TEST_CASE("a field that typing would replace is highlighted whole, until the cursor moves")
+{
+    Tracking t;
+    const auto highlighted = [&]
+    {
+        std::u32string text;
+        for (const auto& region : t.ws.frame())
+            if (region.background == Role::Panel)
+                for (const auto& run : region.text)
+                    if (run.style.background == Role::Cursor)
+                        text += run.text;
+        return text;
+    };
+    const auto name = decodeUtf8(t.track().name);
+    REQUIRE(name.size() > 1);
+    t.press(NamedKey::Enter);
+    CHECK(highlighted() == name);
+    t.press(NamedKey::Left); // keeps the value, with a cursor in it
+    CHECK(highlighted() == name.substr(name.size() - 1));
+    t.type(U"x");
+    CHECK(highlighted().size() == 1);
+    t.press(NamedKey::Escape);
+    t.press(NamedKey::Enter);
+    CHECK(highlighted() == name);
+    t.type(U"N"); // replaces it, and the cursor follows
+    CHECK(highlighted() == U" ");
+    t.press(NamedKey::Enter);
+    CHECK(t.track().name == "N");
+}
+
 TEST_CASE("the conductor has no mute or solo to toggle")
 {
     Tracking t;

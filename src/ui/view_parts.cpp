@@ -38,10 +38,20 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
         auto visible = std::u32string(pad, U' ') + text.substr(first, box);
         visible.resize(box, U' ');
         region.text.push_back({x, y, visible, {Role::Text, Role::Selection, kPlain}});
-        region.text.push_back({x + static_cast<int>(pad + typed - first) * cell.width,
-                               y,
-                               std::u32string(1, typed < text.size() ? text[typed] : U' '),
-                               {Role::CursorText, Role::Cursor, kPlain}});
+        const Style cursor{Role::CursorText, Role::Cursor, kPlain};
+        if (editor->replacing() && !text.empty())
+        {
+            // All of it highlighted: typing replaces it, until a key moves the cursor.
+            region.text.push_back({x + static_cast<int>(pad) * cell.width, y,
+                                   visible.substr(pad, std::min(text.size() - first, box - pad)),
+                                   cursor});
+        }
+        else
+        {
+            region.text.push_back({x + static_cast<int>(pad + typed - first) * cell.width, y,
+                                   std::u32string(1, typed < text.size() ? text[typed] : U' '),
+                                   cursor});
+        }
     }
     else
     {
