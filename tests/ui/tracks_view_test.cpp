@@ -80,7 +80,7 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     t.type(U"l");
     t.enter(U"10");
     CHECK(t.track().channel == 10);
-    t.type(U"l");
+    t.type(U"2l");
     t.enter(U"-12");
     CHECK(t.track().transpose == -12);
     t.type(U"l");
@@ -100,7 +100,7 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
 TEST_CASE("bulk track edits validate every row and undo together")
 {
     Tracking t;
-    t.type(U"6lVj"); // transpose, first two tracks
+    t.type(U"7lVj"); // transpose, first two tracks
     const auto first = t.track().transpose;
     const auto second = t.track(1).transpose;
     t.type(U"+");
@@ -116,7 +116,7 @@ TEST_CASE("bulk track edits validate every row and undo together")
     CHECK(t.track(2).transpose == 12);
     CHECK(t.ws.mode() == Mode::Visual);
     t.press(NamedKey::Escape);
-    t.type(U"h");
+    t.type(U"2h");
     t.enter(U"16"); // channel
     t.type(U"Vk+");
     CHECK(t.track(2).channel == 16);
@@ -735,11 +735,11 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
     CHECK(shown(longer));
 
     // A wider window has room for more, without the table going past its edge.
-    t.ws.resize(1200, 600, {10, 20});
+    t.ws.resize(1500, 600, {10, 20});
     int others = 0;
     for (const auto& column : trackColumns())
         others += column.field == TrackField::Name ? 0 : column.width;
-    CHECK(headingX(U"Mute") - start == (120 - 2 - others) * 10);
+    CHECK(headingX(U"Mute") - start == (150 - 2 - others) * 10);
 
     t.type(U"uu");
     CHECK(headingX(U"Mute") - start == trackColumns()[1].width * 10);
@@ -800,7 +800,7 @@ TEST_CASE("Backspace and Delete clear a value highlighted whole, and only then")
     t.press(key);
     t.press(NamedKey::Enter);
     CHECK(t.track().name.empty());
-    t.type(U"6l"); // channel
+    t.type(U"5l"); // channel
     REQUIRE(t.track().channel > 0);
     const auto channel = t.track().channel;
     t.press(NamedKey::Enter);
@@ -858,4 +858,190 @@ TEST_CASE("the conductor has no mute or solo to toggle")
     t.type(U"S");
     CHECK(t.ws.message() == "Select a track to solo");
     CHECK(t.document.song() == before);
+}
+
+namespace
+{
+const std::u32string_view kToProgram = U"6l";
+
+bool inspectorHas(const Frame& frame, std::u32string_view wanted)
+{
+    for (const auto& region : frame)
+    {
+        for (const auto& run : region.text)
+        {
+            if (run.text.find(wanted) != std::u32string::npos)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+} // namespace
+
+TEST_CASE("the Program column sets a track's setup, with empty leaving it unset")
+{
+    Tracking t;
+    t.type(kToProgram);
+    CHECK(t.track().programSetup.empty());
+    t.enter(U"12");
+    CHECK(t.track().programSetup.program == 12);
+    t.enter(U"0");
+    CHECK(t.track().programSetup.program == 0); // not the same as unset
+
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Backspace);
+    t.press(NamedKey::Enter);
+    CHECK_FALSE(t.track().programSetup.program);
+    t.type(U"u");
+    CHECK(t.track().programSetup.program == 0);
+
+    t.enter(U"128");
+    CHECK(t.ws.tracks().typing());
+    t.press(NamedKey::Escape);
+    CHECK(t.track().programSetup.program == 0);
+}
+
+TEST_CASE("Tab goes from Program through its bank fields to the next column")
+{
+    Tracking t;
+    t.type(kToProgram);
+    t.press(NamedKey::Enter);
+    t.type(U"5");
+    t.press(NamedKey::Tab);
+    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Bank MSB");
+    t.type(U"1");
+    t.press(NamedKey::Tab);
+    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Bank LSB");
+    t.type(U"2");
+    t.press(NamedKey::Tab);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Transpose");
+    CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
+
+    t.press(NamedKey::Tab, kShift);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Bank LSB");
+    t.press(NamedKey::Tab, kShift);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Bank MSB");
+    t.press(NamedKey::Tab, kShift);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Program");
+    t.press(NamedKey::Tab, kShift);
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Channel");
+    t.press(NamedKey::Escape);
+    CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
+}
+
+TEST_CASE("stepping a setup starts from unset, and a selection is set together")
+{
+    Tracking t;
+    t.type(kToProgram);
+    t.type(U"=");
+    CHECK(t.track().programSetup.program == 0);
+    t.type(U"=");
+    CHECK(t.track().programSetup.program == 1);
+    t.type(U"Vj");
+    t.enter(U"40");
+    CHECK(t.track(0).programSetup.program == 40);
+    CHECK(t.track(1).programSetup.program == 40);
+    t.press(NamedKey::Escape);
+    t.type(U"u");
+    CHECK(t.track(0).programSetup.program == 1);
+    CHECK_FALSE(t.track(1).programSetup.program);
+}
+
+TEST_CASE("a track with its own program changes is marked, and says where they are")
+{
+    Tracking t;
+    const auto id = t.track().id();
+    t.document.edit("Add programs", {},
+                    [&](core::Song& song)
+                    {
+                        const auto q = song.ppqn().quarter();
+                        song.updateEvents(id,
+                                          [&](core::EventList& events)
+                                          {
+                                              events.insert({4 * q, core::ProgramChange{3}});
+                                              events.insert({8 * q, core::ProgramChange{4}});
+                                          });
+                    });
+    t.type(kToProgram);
+    const auto frame = t.ws.frame();
+    CHECK(inspectorHas(frame, U"Program events"));
+    CHECK(inspectorHas(frame, U"2, first at"));
+    bool marked = false;
+    for (const auto& region : frame)
+    {
+        for (const auto& run : region.text)
+        {
+            marked = marked || run.text.ends_with(U"-•");
+        }
+    }
+    CHECK(marked);
+}
+
+TEST_CASE("tracks on one channel with different setups are warned about, but allowed")
+{
+    Tracking t;
+    t.document.edit("Share a channel", {},
+                    [&](core::Song& song)
+                    {
+                        const auto tracks = song.tracks();
+                        song.updateTrack(tracks[1]->id(), [&](core::Track& track)
+                                         { track.channel = tracks[0]->channel; });
+                        song.updateTrack(tracks[1]->id(),
+                                         [&](core::Track& track) { track.port = tracks[0]->port; });
+                        song.updateTrack(tracks[1]->id(), [](core::Track& track)
+                                         { track.programSetup.program = 2; });
+                    });
+    const auto warned = [&]
+    {
+        const auto frame = t.ws.frame();
+        for (const auto& region : frame)
+        {
+            for (const auto& run : region.text)
+            {
+                if (run.style.foreground == Role::Warning &&
+                    run.text.find(U'2') != std::u32string::npos)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    t.type(kToProgram);
+    t.type(U"j");
+    t.type(U"k");
+    CHECK_FALSE(warned());
+
+    t.enter(U"1");
+    CHECK(t.track(0).programSetup.program == 1);
+    t.type(U"l");
+    CHECK(warned());
+    t.type(U"h");
+    CHECK(inspectorHas(t.ws.frame(), U"Differs from tracks on this channel"));
+
+    t.enter(U"2");
+    CHECK_FALSE(warned());
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Differs from tracks on this channel"));
+}
+
+TEST_CASE("the bar shows a track's setup when it has one")
+{
+    Tracking t;
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Program:"));
+    t.type(kToProgram);
+    t.enter(U"12");
+    CHECK(inspectorHas(t.ws.frame(), U"Program:"));
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Bank:"));
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Tab);
+    t.type(U"3");
+    t.press(NamedKey::Enter);
+    CHECK(inspectorHas(t.ws.frame(), U"Bank:"));
+    CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
+
+    t.type(U"ge");
+    CHECK(inspectorHas(t.ws.frame(), U"Program:"));
+    CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
 }

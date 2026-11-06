@@ -221,6 +221,35 @@ Inspection TracksView::inspection() const
     const auto& track = *document_.song().track(*cursor_.track);
     const auto& column = trackColumns()[column_];
     const auto full = trackFieldText(column.field, track, row());
+    if (column.field == TrackField::Program)
+    {
+        // Unset is shown as - but edited as empty.
+        const auto setupField = [&](std::string heading, TrackField field)
+        {
+            auto text = trackFieldText(field, track, row());
+            result.fields.push_back(
+                {std::move(heading), text, true, text == "-" ? std::string{} : text});
+        };
+        setupField("Program", TrackField::Program);
+        setupField("Bank MSB", TrackField::BankMsb);
+        setupField("Bank LSB", TrackField::BankLsb);
+        const auto& song = document_.song();
+        if (const auto own = programEvents(song, track.id()); own.count > 0)
+        {
+            result.fields.push_back({"Program events", std::to_string(own.count) + ", first at " +
+                                                           position(own.first)});
+        }
+        if (const auto clashes = programClashes(song, track); !clashes.empty())
+        {
+            std::string names;
+            for (const auto index : clashes)
+            {
+                names += (names.empty() ? "" : ", ") + std::to_string(index + 1);
+            }
+            result.fields.push_back({"Differs from tracks on this channel", names});
+        }
+        return result;
+    }
     result.fields.push_back({std::string{column.heading}, full,
                              column.field != TrackField::Number && !isToggle(column.field), full});
     if (column.field == TrackField::ChaseNotes)
@@ -236,6 +265,14 @@ TrackField TracksView::fieldFor(std::string_view heading) const
     if (heading == "Chase notes")
     {
         return TrackField::ChaseNotes;
+    }
+    if (heading == "Bank MSB")
+    {
+        return TrackField::BankMsb;
+    }
+    if (heading == "Bank LSB")
+    {
+        return TrackField::BankLsb;
     }
     for (const auto& column : trackColumns())
     {
@@ -279,12 +316,27 @@ std::optional<std::string> TracksView::edit(TrackField field, std::string_view t
                            song.updateTrack(track.id(), [&](core::Track& into) { into = track; });
                        }
                    });
+    if (const auto* player = host_.player();
+        player != nullptr && player->playing() &&
+        (field == TrackField::Program || field == TrackField::BankMsb ||
+         field == TrackField::BankLsb))
+    {
+        const auto at = player->position().value_or(player->marker());
+        if (std::ranges::any_of(ids, [&](core::TrackId id)
+                                { return programBefore(document_.song(), id, at); }))
+        {
+            host_.setMessage("Sent at the next play: the track's own program change is in force",
+                             MessageKind::Information);
+        }
+    }
     return {};
 }
 
 std::optional<bool> TracksView::runTyping(std::string_view command)
 {
     const bool next = command == "command-line-next" || command == "command-line-previous";
+    const bool forwards = command == "command-line-next";
+    const std::string was = editor_.active() ? editor_.heading() : std::string{};
     const auto result =
         editor_.run(next ? "command-line-run" : command, host_,
                     {
@@ -296,15 +348,29 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
                     });
     if (next && !editor_.active())
     {
+        // The Program column's bank fields come between it and the next column.
+        const std::string_view within = forwards && was == "Program"     ? "Bank MSB"
+                                        : forwards && was == "Bank MSB"  ? "Bank LSB"
+                                        : !forwards && was == "Bank LSB" ? "Bank MSB"
+                                        : !forwards && was == "Bank MSB" ? "Program"
+                                                                         : "";
+        if (!within.empty())
+        {
+            if (editor_.open(inspection(), within))
+                host_.startTyping();
+            return result;
+        }
         const auto columns = trackColumns();
         do
         {
-            column_ = command == "command-line-next"
-                          ? (column_ + 1) % columns.size()
-                          : (column_ + columns.size() - 1) % columns.size();
+            column_ = forwards ? (column_ + 1) % columns.size()
+                               : (column_ + columns.size() - 1) % columns.size();
         } while (columns[column_].field == TrackField::Number || isToggle(columns[column_].field));
         ensureVisible();
-        if (editor_.open(inspection(), columns[column_].heading))
+        const std::string_view heading = !forwards && columns[column_].field == TrackField::Program
+                                             ? "Bank LSB"
+                                             : columns[column_].heading;
+        if (editor_.open(inspection(), heading))
             host_.startTyping();
     }
     return result;
@@ -572,6 +638,11 @@ void TracksView::addRegions(Frame& frame) const
             const int wide = columnWidth(column);
             auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
                                          : std::string{column.heading});
+            const bool program = track && column.field == TrackField::Program;
+            if (program) // a mark for the track's own program changes, keeping the digits in line
+            {
+                text += programEvents(document_.song(), track->id()).count > 0 ? U'•' : U' ';
+            }
             if (text.size() >= static_cast<std::size_t>(wide))
             {
                 text.resize(static_cast<std::size_t>(wide - 2));
@@ -586,6 +657,10 @@ void TracksView::addRegions(Frame& frame) const
             if (toggle)
                 text.assign(static_cast<std::size_t>(wide - 1), U' ');
             Style style{track ? Role::Text : Role::Dim, Role::Background, kPlain};
+            if (program && !programClashes(document_.song(), *track).empty())
+            {
+                style.foreground = Role::Warning;
+            }
             if (track && std::ranges::find(chosen, track->id()) != chosen.end())
             {
                 style.background = Role::Selection;

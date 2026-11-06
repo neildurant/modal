@@ -6,7 +6,9 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
+#include <variant>
 
 namespace modal::ui
 {
@@ -20,6 +22,7 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::ChaseNotes, "Chase", 6},
     TrackColumn{TrackField::Port, "Output port", 16},
     TrackColumn{TrackField::Channel, "Channel", 8, true},
+    TrackColumn{TrackField::Program, "Program", 8, true},
     TrackColumn{TrackField::Transpose, "Transpose", 10, true},
     TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13, true},
     TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
@@ -28,6 +31,20 @@ constexpr std::array kColumns{
 std::string signedText(int value)
 {
     return (value > 0 ? "+" : "") + std::to_string(value);
+}
+
+std::optional<std::uint8_t>* setupPart(core::Track& track, TrackField field)
+{
+    auto& setup = track.programSetup;
+    return field == TrackField::Program   ? &setup.program
+           : field == TrackField::BankMsb ? &setup.bankMsb
+           : field == TrackField::BankLsb ? &setup.bankLsb
+                                          : nullptr;
+}
+
+std::string setupText(std::optional<std::uint8_t> value)
+{
+    return value ? std::to_string(*value) : "-";
 }
 } // namespace
 
@@ -60,6 +77,12 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return core::offsetText(track.timeOffset);
     case TrackField::ChaseNotes:
         return track.chaseNotes ? "C" : "-";
+    case TrackField::Program:
+        return setupText(track.programSetup.program);
+    case TrackField::BankMsb:
+        return setupText(track.programSetup.bankMsb);
+    case TrackField::BankLsb:
+        return setupText(track.programSetup.bankLsb);
     }
     return {};
 }
@@ -112,6 +135,12 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         }
         return {};
     }
+    auto* const setup = setupPart(track, field);
+    if (setup != nullptr && (text.empty() || text == "-"))
+    {
+        setup->reset();
+        return {};
+    }
     if (text.starts_with('+'))
     {
         text.remove_prefix(1);
@@ -130,7 +159,15 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
     {
         return "Enter a whole number";
     }
-    if (field == TrackField::Channel)
+    if (setup != nullptr)
+    {
+        if (value < 0 || value > 127)
+        {
+            return "Enter 0 to 127, or nothing to leave it unset";
+        }
+        *setup = static_cast<std::uint8_t>(value);
+    }
+    else if (field == TrackField::Channel)
     {
         if (value < core::Track::kMinChannel || value > core::Track::kMaxChannel)
         {
@@ -186,6 +223,53 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
         return setTrackField(track, field, std::to_string(static_cast<std::int64_t>(value) + steps),
                              ppqn);
     }
+    if (auto* const setup = setupPart(track, field))
+    {
+        // From unset, up to the first number.
+        const auto value = setup->has_value() ? static_cast<std::int64_t>(**setup) : -1;
+        return setTrackField(track, field, std::to_string(value + steps), ppqn);
+    }
     return "Enter edits this field";
+}
+
+ProgramEvents programEvents(const core::Song& song, core::TrackId track)
+{
+    ProgramEvents result;
+    for (const auto& event : song.events(track).all())
+    {
+        if (std::holds_alternative<core::ProgramChange>(event.data))
+        {
+            result.first = result.count == 0 ? event.tick : result.first;
+            ++result.count;
+        }
+    }
+    return result;
+}
+
+bool programBefore(const core::Song& song, core::TrackId track, core::Tick tick)
+{
+    const auto found = programEvents(song, track);
+    return found.count > 0 && found.first < tick;
+}
+
+std::vector<std::size_t> programClashes(const core::Song& song, const core::Track& track)
+{
+    std::vector<std::size_t> result;
+    if (track.programSetup.empty())
+    {
+        return result;
+    }
+    const auto tracks = song.tracks();
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        const auto& other = *tracks[i];
+        if (other.id() != track.id() && other.port == track.port &&
+            other.channel == track.channel && !other.programSetup.empty() &&
+            other.programSetup != track.programSetup)
+        {
+            result.push_back(i);
+        }
+    }
+    return result;
 }
 } // namespace modal::ui

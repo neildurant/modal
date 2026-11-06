@@ -2,12 +2,14 @@
 
 #pragma once
 
+#include <modal/core/song.hpp>
 #include <modal/core/track.hpp>
 
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace modal::ui
 {
@@ -24,6 +26,9 @@ enum class TrackField
     VelocityOffset,
     TimeOffset,
     ChaseNotes,
+    Program,
+    BankMsb, // these two are in the Program column's inspector, not columns of their own
+    BankLsb,
 };
 
 struct TrackColumn
@@ -41,5 +46,20 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
                                          std::string_view text, core::Ppqn ppqn);
 std::optional<std::string> stepTrackField(core::Track& track, TrackField field, int steps,
                                           bool fine, core::Ppqn ppqn);
+
+// The program changes among a track's own events: how many, and when the first is.
+struct ProgramEvents
+{
+    std::size_t count = 0;
+    core::Tick first = 0;
+};
+ProgramEvents programEvents(const core::Song& song, core::TrackId track);
+
+// Whether a track has one of its own program changes before a tick.
+bool programBefore(const core::Song& song, core::TrackId track, core::Tick tick);
+
+// The tracks, from the first as 0, sharing a track's port and channel with a different setup, so
+// that whichever is sent last wins. A track with no setup asks for nothing, so clashes with none.
+std::vector<std::size_t> programClashes(const core::Song& song, const core::Track& track);
 
 } // namespace modal::ui

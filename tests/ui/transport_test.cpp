@@ -322,3 +322,33 @@ TEST_CASE("detaching a stopping player leaves views safe to switch and wake")
     CHECK(p.ws.shown() == ViewKind::Arrangement);
     CHECK_FALSE(p.ws.frame().empty());
 }
+
+TEST_CASE("a setup edited in playback says when a track's own program change holds it back")
+{
+    Playing p;
+    const auto id = p.document.song().tracks()[0]->id();
+    const auto q = p.document.song().ppqn().quarter();
+    p.document.edit("Add a program", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(id, [&](core::EventList& events)
+                                          { events.insert({q / 2, core::ProgramChange{3}}); });
+                    });
+    p.type(U"gt6l");
+    p.press(Key::typed(U' '));
+    p.runFor(100ms);
+
+    const auto set = [&](std::u32string_view value)
+    {
+        p.press(Key::of(NamedKey::Enter));
+        p.type(value);
+        p.press(Key::of(NamedKey::Enter));
+    };
+    set(U"5"); // before the track's program change
+    CHECK(p.ws.message().empty());
+
+    p.runFor(1s);
+    set(U"6");
+    CHECK(p.ws.message() == "Sent at the next play: the track's own program change is in force");
+    CHECK(p.document.song().tracks()[0]->programSetup.program == 6);
+}

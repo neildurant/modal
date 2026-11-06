@@ -320,6 +320,17 @@ Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick
         pair(top.left, "Track " + std::to_string(track) + ":", shown.name);
         pair(top.left, "Channel:", std::to_string(shown.channel));
         pair(top.left, "Port:", shown.port.empty() ? "default" : shown.port);
+        const auto& setup = shown.programSetup;
+        if (setup.program)
+        {
+            pair(top.left, "Program:", std::to_string(*setup.program));
+        }
+        if (setup.bankMsb || setup.bankLsb)
+        {
+            const auto part = [](std::optional<std::uint8_t> value)
+            { return value ? std::to_string(*value) : std::string{"-"}; };
+            pair(top.left, "Bank:", part(setup.bankMsb) + "/" + part(setup.bankLsb));
+        }
     }
     const auto first = meter.toBarBeatTick(song.sectionStart(section)).bar;
     const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
