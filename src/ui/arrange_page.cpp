@@ -737,7 +737,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     std::vector<RowSign> signs;
     if (playFrom && *playFrom >= leftTick_ && *playFrom < right)
     {
-        signs.push_back({scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent, false});
+        signs.push_back(
+            {scale.toX(*playFrom), kSignRow * cell_.height, U'▶', Role::Accent, {}, false});
     }
     std::vector<std::pair<std::size_t, const core::Mark*>> marks; // with its row, the conductor 0
     for (const auto& mark : song_.marks())

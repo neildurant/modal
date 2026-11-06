@@ -2278,7 +2278,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     std::vector<RowSign> signs;
     if (const auto* player = host_.player(); player != nullptr && inView(player->marker()))
     {
-        signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent, false});
+        signs.push_back({scale.toX(player->marker()), h, U'\u25B6', Role::Accent, {}, false});
     }
     std::vector<const core::Mark*> marks;
     for (const auto& mark : song.marks())
@@ -2296,6 +2296,20 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     {
         signs.push_back(
             {scale.toX(mark->tick) + 2 * lineWidth, h, static_cast<char32_t>(mark->letter)});
+    }
+    // The track's own program changes, each with its number, since they explain why a passage
+    // sounds different. Its setup isn't an event in the song, so has no place here.
+    if (const auto track = trackId())
+    {
+        for (const auto& event : song.events(*track).all())
+        {
+            if (const auto* program = std::get_if<core::ProgramChange>(&event.data);
+                program != nullptr && inView(event.tick))
+            {
+                signs.push_back({scale.toX(event.tick) + 2 * lineWidth, h, U'◆', Role::Label,
+                                 decodeUtf8(std::to_string(program->program))});
+            }
+        }
     }
     addRowSigns(ruler, std::move(signs), cell_);
 

@@ -279,6 +279,18 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
             x = std::max(x, right);
         }
         right = x + cell.width;
+        if (const auto& label = signs[i].label; !label.empty())
+        {
+            const int end = right + static_cast<int>(label.size()) * cell.width;
+            const bool room =
+                i + 1 == signs.size() || signs[i + 1].y != signs[i].y || signs[i + 1].x >= end;
+            if (room)
+            {
+                region.text.push_back(
+                    {right, signs[i].y, label, {signs[i].role, Role::Background, kPlain}});
+                right = end;
+            }
+        }
         region.under.push_back({{x, signs[i].y, cell.width, cell.height}, Role::Background, 255});
         region.text.push_back({x,
                                signs[i].y,

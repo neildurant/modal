@@ -93,7 +93,8 @@ struct RowSign
     int y = 0;
     char32_t character = 0;
     Role role = Role::Text;
-    bool moves = true; // false for the play-from marker, whose place matters
+    std::u32string label = {}; // after it, if there's room before the next sign
+    bool moves = true;         // false for the play-from marker, whose place matters
 };
 
 // Signs, each in a box of the background, so a line through the row doesn't run through it.

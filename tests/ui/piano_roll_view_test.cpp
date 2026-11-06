@@ -1613,3 +1613,50 @@ TEST_CASE("A value on the left of its inspector box stays there when edited")
     ws.handle(Key::typed(U'e'), 0);
     CHECK(xOf(name) == before);
 }
+
+TEST_CASE("the ruler marks a track's own program changes, and not its setup")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto runs = [&]
+    {
+        std::vector<TextRun> found;
+        const auto frame = r.ws.frame();
+        for (const auto& region : frame)
+        {
+            for (const auto& run : region.text)
+            {
+                if (run.text == U"\u25C6" || run.text == U"12" || run.text == U"34")
+                {
+                    found.push_back(run);
+                }
+            }
+        }
+        return found;
+    };
+    r.document.edit(
+        "Set up", {}, [&](core::Song& song)
+        { song.updateTrack(id, [](core::Track& track) { track.programSetup.program = 99; }); });
+    CHECK(runs().empty());
+
+    r.document.edit("Add programs", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            id,
+                            [&](core::EventList& events)
+                            {
+                                events.insert({r.t.quarters(1), core::ProgramChange{12}});
+                                events.insert({r.t.quarters(1) + 1, core::ProgramChange{34}});
+                            });
+                    });
+    const auto shown = runs();
+    REQUIRE(shown.size() == 3); // two signs, with room for only the later one's number
+    CHECK(shown[0].text == U"\u25C6");
+    CHECK(shown[0].style.foreground == Role::Label);
+    CHECK(shown[0].style.foreground != Role::Accent); // the play-from marker's
+    CHECK(shown[0].y == kCell.height);
+    CHECK(std::ranges::count(shown, U"34", &TextRun::text) == 1);
+    CHECK(std::ranges::count(shown, U"12", &TextRun::text) == 0);
+}
