@@ -17,6 +17,7 @@
 #include <modal/ui/palette.hpp>
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/remembered.hpp>
+#include <modal/ui/tracks_view.hpp>
 #include <modal/ui/view.hpp>
 
 #include <chrono>
@@ -131,6 +132,9 @@ public:
     PianoRollView& pianoRoll() { return *pianoRoll_; }
     const PianoRollView& pianoRoll() const { return *pianoRoll_; }
 
+    TracksView& tracks() { return *tracks_; }
+    const TracksView& tracks() const { return *tracks_; }
+
     // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
     // goes back to (decided for milestone 5).
     void show(ViewKind kind) override;
@@ -238,6 +242,7 @@ public:
     void setKeymap(Keymap keymap);
 
     // The settings, for the palette's ? to list with their values.
+    core::NoteFraction timingUnit(core::NoteFraction grid) const override;
     void setSettings(const Settings* settings) { settings_ = settings; }
 
     // What's remembered between sessions, as read from the state directory, and what to call
@@ -350,7 +355,10 @@ private:
     void playFrom(core::Tick tick) override;
     std::optional<Selection> selection() const override { return selection_; }
     void chosenMeter(core::TimeSignature meter) override;
-    void stopTyping() override { mode_ = Mode::Normal; }
+    void stopTyping() override
+    {
+        mode_ = selection_ && where() == Where::TrackList ? Mode::Visual : Mode::Normal;
+    }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
 
@@ -470,6 +478,7 @@ private:
     std::unique_ptr<EventListView> eventList_;
     std::unique_ptr<ArrangeView> arrange_;
     std::unique_ptr<PianoRollView> pianoRoll_;
+    std::unique_ptr<TracksView> tracks_;
     View* current_ = nullptr;
     std::vector<View*> history_; // the views shown before, for Backspace
     Keymap keymap_;

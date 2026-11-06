@@ -18,6 +18,7 @@ add_library(modal_ui STATIC
     file_commands.cpp
     inspector.cpp
     inspector_edit.cpp
+    musical_time.cpp
     frame.cpp
     key_notation.cpp
     keymap.cpp
@@ -33,6 +34,8 @@ add_library(modal_ui STATIC
     piano_roll_view.cpp
     themes.cpp
     time_motions.cpp
+    track_fields.cpp
+    tracks_view.cpp
     view_parts.cpp
     view_state.cpp
     window_commands.cpp

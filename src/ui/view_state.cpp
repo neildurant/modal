@@ -14,6 +14,7 @@ namespace
 constexpr std::uint8_t kArrange = 1;
 constexpr std::uint8_t kPianoRoll = 2;
 constexpr std::uint8_t kEventList = 3;
+constexpr std::uint8_t kTracks = 4;
 
 std::int64_t number(std::size_t value)
 {
@@ -51,6 +52,25 @@ core::EditPlace placeWith(std::optional<core::TrackId> track, core::Tick tick,
                           const EventListState& state)
 {
     return {track, tick, {number(state.top), number(state.down)}, kEventList};
+}
+
+core::EditPlace placeWith(std::optional<core::TrackId> track, core::Tick tick,
+                          const TracksState& state)
+{
+    return {track,
+            tick,
+            {number(state.top), number(state.column), state.left, state.pitch ? *state.pitch : -1},
+            kTracks};
+}
+
+std::optional<TracksState> tracksStateOf(const core::EditPlace& place)
+{
+    if (place.viewKind != kTracks || place.view.size() != 4)
+        return std::nullopt;
+    const auto& v = place.view;
+    return TracksState{
+        count(v[0]), count(v[1]), static_cast<int>(std::clamp<std::int64_t>(v[2], 0, 1000000)),
+        v[3] >= 0 && v[3] <= 127 ? std::optional{static_cast<std::uint8_t>(v[3])} : std::nullopt};
 }
 
 std::optional<ArrangeState> arrangeStateOf(const core::EditPlace& place)

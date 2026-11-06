@@ -440,7 +440,7 @@ std::optional<std::string> overlap(const core::EventList& events, std::optional<
 
 std::optional<Column> inspectorColumn(std::string_view heading)
 {
-    constexpr std::array<std::pair<std::string_view, Column>, 10> kColumns{{
+    constexpr std::array<std::pair<std::string_view, Column>, 12> kColumns{{
         {"Position", Column::Position},
         {"Pitch", Column::Data},
         {"Controller", Column::Data},
@@ -451,6 +451,8 @@ std::optional<Column> inspectorColumn(std::string_view heading)
         {"Pressure", Column::Value},
         {"Length", Column::Length},
         {"Release", Column::Release},
+        {"Text", Column::Data},
+        {"SysEx", Column::Data},
     }};
     const auto it =
         std::ranges::find(kColumns, heading, &std::pair<std::string_view, Column>::first);

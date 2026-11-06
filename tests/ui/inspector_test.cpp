@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/musical_time.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <string>
 #include <vector>
@@ -115,4 +117,48 @@ TEST_CASE("on a row that isn't an event, the inspector says what the row is")
     CHECK(of(list, RowKind::Meter).fields[2] == InspectorField{"Meter", "4/4"});
     CHECK(of(list, RowKind::Label).fields[2] == InspectorField{"Label", "fill"});
     CHECK(of(list, RowKind::End).fields[2] == InspectorField{"Song", "2 bars, 0:04.000"});
+}
+
+TEST_CASE("coarse and fine timing preserves exact starts and lengths")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const core::MeterMap meter{ppqn};
+    const core::NoteFraction unit{1, 16};
+    const auto step = unit.toTicks(ppqn);
+    const auto tick = meter.barStart(7) + 2 * step + 1;
+    const core::Event event{tick, core::Note{60, 90, 2 * step + 2}};
+    Inspection inspection;
+    addMusicalTiming(inspection, event, meter, unit);
+    const auto value = [&](std::string_view heading) -> std::string
+    {
+        for (const auto& field : inspection.fields)
+            if (field.heading == heading)
+                return field.value;
+        return {};
+    };
+    CHECK(value("Start bar") == "7");
+    CHECK(value("Start step") == "3");
+    CHECK(value("Start fine") == "+1t");
+    CHECK(value("Length steps") == "2");
+    CHECK(value("Length fine") == "+2t");
+    const auto changed = setMusicalTiming(event, "Start step", "4", meter, unit);
+    REQUIRE(std::holds_alternative<core::Event>(changed));
+    CHECK(std::get<core::Event>(changed).tick == tick + step);
+    const auto length = setMusicalTiming(event, "Length steps", "3", meter, unit);
+    REQUIRE(std::holds_alternative<core::Event>(length));
+    CHECK(std::get<core::Note>(std::get<core::Event>(length).data).duration == 3 * step + 2);
+    const auto early = setMusicalTiming(event, "Start fine", "-1t", meter, unit);
+    REQUIRE(std::holds_alternative<core::Event>(early));
+    CHECK(std::get<core::Event>(early).tick == tick - 2);
+    CHECK(std::holds_alternative<std::string>(
+        setMusicalTiming(event, "Start step", "0", meter, unit)));
+    CHECK(std::holds_alternative<std::string>(
+        setMusicalTiming(event, "Start step", "10000000000000000", meter, unit)));
+    const auto boundary = core::Event{meter.barStart(2) - 1, core::Note{60, 90, step - 1}};
+    inspection = {};
+    addMusicalTiming(inspection, boundary, meter, unit);
+    CHECK(value("Start bar") == "2");
+    CHECK(value("Start step") == "1");
+    CHECK(value("Start fine") == "-1t");
+    CHECK(value("Length fine") == "-1t");
 }

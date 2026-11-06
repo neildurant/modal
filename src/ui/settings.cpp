@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/core/note_fraction.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
 
@@ -96,6 +97,9 @@ Settings::Settings()
                   "How long to wait, in milliseconds, after keys that start longer bindings, "
                   "before the hint menu shows what can follow",
                   std::int64_t{400}, 0, 10000),
+          setting("timingunit",
+                  "The note inspector's coarse timing unit: grid, or a note fraction such as 1/16",
+                  std::string{"grid"}),
           setting("chordwindow",
                   "How far apart, in milliseconds, events can start and still be one chord, "
                   "as a chord's notes played a little apart are",
@@ -168,6 +172,13 @@ std::string Settings::set(std::string_view name, std::string_view text)
     if (setting == nullptr)
     {
         return "unknown setting \"" + std::string{name} + "\"";
+    }
+    if (name == "timingunit" && text != "grid")
+    {
+        const auto fraction = core::parseNoteFraction(text);
+        if (!fraction || *fraction < core::NoteFraction{1, 128} ||
+            *fraction > core::NoteFraction{8, 1})
+            return "timingunit must be grid or a note fraction from 1/128 to 8/1";
     }
     const std::string range = numberText(setting->minimum) + " to " + numberText(setting->maximum);
     const auto inRange = [&](double value)

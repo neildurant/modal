@@ -30,6 +30,39 @@ int inspectorHeight(CellSize cell)
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor)
 {
+    if (std::ranges::any_of(inspection.fields, &InspectorField::lower))
+    {
+        Inspection upper{inspection.kind, {}}, lower{"Timing", {}};
+        for (auto field : inspection.fields)
+        {
+            if (field.lower)
+            {
+                field.lower = false;
+                lower.fields.push_back(std::move(field));
+            }
+            else
+                upper.fields.push_back(std::move(field));
+        }
+        auto region = inspectorRegion(upper, bounds, width, cell, positionWidth, editor);
+        auto more = inspectorRegion(lower, bounds, width, cell, positionWidth, editor);
+        const int offset = 2 * cell.height;
+        for (auto& run : more.text)
+        {
+            run.y += offset;
+            region.text.push_back(std::move(run));
+        }
+        for (auto shape : more.under)
+        {
+            shape.rect.y += offset;
+            region.under.push_back(shape);
+        }
+        for (auto shape : more.over)
+        {
+            shape.rect.y += offset;
+            region.over.push_back(shape);
+        }
+        return region;
+    }
     // On a panel of its own: the kind of row, then headings above their values. Each column
     // is as wide as its longest value can be, so the columns stay put as the cursor moves;
     // a value that doesn't fit is cut short, and those after it left out.

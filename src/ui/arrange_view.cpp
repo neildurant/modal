@@ -910,6 +910,11 @@ bool ArrangeView::put(bool insert, bool ending)
         host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
+    if (!reg.wholeTracks.empty())
+    {
+        host_.refuse("Put whole tracks in the tracks view");
+        return true;
+    }
     if (!reg.sections.empty())
     {
         host_.refuse("The register holds sections: put them on the section strip",

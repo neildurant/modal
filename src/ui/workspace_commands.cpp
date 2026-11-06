@@ -399,6 +399,9 @@ constexpr std::array kSharedCommands{
                 .description = "Turn gridadvance on or off: whether O moves on by the grid step "
                                "or the note's length"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
+    CommandInfo{.name = "view-tracks",
+                .description = "Show track settings, at track {count} if given",
+                .count = true},
     CommandInfo{.name = "view-arrangement", .description = "Show the arrangement"},
     CommandInfo{.name = "view-piano-roll", .description = "Show the piano roll"},
     CommandInfo{.name = "view-events", .description = "Show the event list"},
@@ -491,10 +494,10 @@ std::span<const CommandInfo> Workspace::commands()
         const std::array<std::pair<std::string_view, std::uint8_t>, 114> where{{
             {"scroll-page-left", onlyIn({Tracks, PianoRoll})},
             {"visual", onlyIn({Tracks, Strip, PianoRoll, EventList})},
-            {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"visual-rows", onlyIn({Tracks, Strip, PianoRoll, EventList, TrackList})},
             {"visual-box", onlyIn({Tracks, Strip, PianoRoll})},
             {"cut-at-edges", onlyIn({Tracks, PianoRoll})},
-            {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList})},
+            {"visual-again", onlyIn({Tracks, Strip, PianoRoll, EventList, TrackList})},
             {"scroll-page-right", onlyIn({Tracks, PianoRoll})},
             {"operator-humanize", onlyIn({Tracks, Strip, PianoRoll, EventList})},
             {"operator-velocity", onlyIn({Tracks, Strip, PianoRoll, EventList})},
@@ -529,20 +532,20 @@ std::span<const CommandInfo> Workspace::commands()
             {"put-ending", onlyIn({Tracks, PianoRoll, EventList})},
             {"put-merge-at-pitch", onlyIn({PianoRoll})},
             {"put-insert-at-pitch", onlyIn({PianoRoll})},
-            {"put-after", onlyIn({Strip})},
-            {"put-before", onlyIn({Strip})},
+            {"put-after", onlyIn({Strip, TrackList})},
+            {"put-before", onlyIn({Strip, TrackList})},
             {"zoom-in", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},
-            {"field-edit", onlyIn({EventList})},
+            {"field-edit", onlyIn({EventList, TrackList})},
             {"bar-open", onlyIn({Tracks})},
             {"section-play", onlyIn({Strip})},
-            {"field-increase", onlyIn({EventList})},
-            {"field-decrease", onlyIn({EventList})},
-            {"field-increase-fine", onlyIn({EventList})},
-            {"field-decrease-fine", onlyIn({EventList})},
-            {"number-increase", onlyIn({EventList})},
-            {"number-decrease", onlyIn({EventList})},
+            {"field-increase", onlyIn({EventList, TrackList})},
+            {"field-decrease", onlyIn({EventList, TrackList})},
+            {"field-increase-fine", onlyIn({EventList, TrackList})},
+            {"field-decrease-fine", onlyIn({EventList, TrackList})},
+            {"number-increase", onlyIn({EventList, TrackList})},
+            {"number-decrease", onlyIn({EventList, TrackList})},
             {"note-add", onlyIn({PianoRoll, EventList})},
             {"cursor-chord-next", onlyIn({PianoRoll, EventList})},
             {"cursor-chord-previous", onlyIn({PianoRoll, EventList})},
@@ -590,11 +593,11 @@ std::span<const CommandInfo> Workspace::commands()
             {"cursor-right-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-up-scroll", onlyIn({Tracks, PianoRoll, EventList})},
             {"cursor-down-scroll", onlyIn({Tracks, PianoRoll, EventList})},
-            {"scroll-centre", onlyIn({Tracks, PianoRoll, EventList})},
-            {"scroll-half-down", onlyIn({Tracks, PianoRoll, EventList})},
-            {"scroll-half-up", onlyIn({Tracks, PianoRoll, EventList})},
-            {"scroll-page-down", onlyIn({Tracks, PianoRoll, EventList})},
-            {"scroll-page-up", onlyIn({Tracks, PianoRoll, EventList})},
+            {"scroll-centre", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"scroll-half-down", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"scroll-half-up", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"scroll-page-down", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"scroll-page-up", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"cursor-note-next", onlyIn({PianoRoll})},
             {"cursor-note-previous", onlyIn({PianoRoll})},
             {"octave-up", onlyIn({PianoRoll})},
@@ -618,6 +621,37 @@ std::span<const CommandInfo> Workspace::commands()
             {
                 info.where = onlyIn({PianoRoll}); // the Alt keys move notes
             }
+        }
+        const std::array<std::pair<std::string_view, std::string_view>, 15> trackDescriptions{{
+            {"cursor-left", "Move to the previous track field"},
+            {"cursor-right", "Move to the next track field"},
+            {"cursor-down", "Move down a track"},
+            {"cursor-up", "Move up a track"},
+            {"cursor-first", "Move to the first track field"},
+            {"cursor-last", "Move to the last track field"},
+            {"go-first", "Go to the first track, or track {count}"},
+            {"go-last", "Go to the last track, or track {count}"},
+            {"visual-rows", "Select whole tracks, including settings and all section content"},
+            {"operator-yank", "Yank selected whole tracks, or yy this track"},
+            {"operator-delete", "Delete explicitly selected whole tracks; use V first"},
+            {"event-yank", "Yank this whole track, including its settings"},
+            {"put-after",
+             "Insert whole tracks after this row; in Visual mode, replace the selected tracks"},
+            {"put-before",
+             "Insert whole tracks before this row; in Visual mode, replace the selected tracks"},
+            {"inspector-edit", "Edit this track's field or note chasing; Tab switches fields"},
+        }};
+        for (auto& info : result)
+        {
+            for (const auto& [name, description] : trackDescriptions)
+                if (info.name == name)
+                    info.here[static_cast<std::size_t>(TrackList)] = description;
+            if (info.where == 0 &&
+                (info.object || info.name == "event-delete" || info.name == "event-delete-line" ||
+                 info.name == "visual-delete-time" || info.name == "bar-delete" ||
+                 info.name == "bar-insert" || info.name.starts_with("section-") ||
+                 info.name == "label-to-section"))
+                info.where = onlyIn({Tracks, Strip, PianoRoll, EventList});
         }
         return result;
     }();

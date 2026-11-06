@@ -290,6 +290,11 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     }
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-marker.bmp"));
+    view.run("view-tracks", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-tracks.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-tracks-light.bmp"));
     view.run("view-arrangement", 0);
     for (const char32_t key : std::u32string_view{U"jj8l"})
     {

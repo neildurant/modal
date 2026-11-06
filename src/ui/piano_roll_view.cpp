@@ -6,6 +6,7 @@
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/musical_time.hpp>
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/view_parts.hpp>
@@ -190,7 +191,7 @@ PianoRollView::PianoRollView(core::Document& document, ViewHost& host)
 
 std::vector<int> PianoRollView::topHeights(CellSize cell) const
 {
-    return {cell.height, inspectorHeight(cell)};
+    return {cell.height, inspectorHeight(cell) + 2 * cell.height};
 }
 
 void PianoRollView::resize(const WindowLayout& layout, int width, CellSize cell)
@@ -725,6 +726,11 @@ bool PianoRollView::put(bool insert, bool ending, bool atPitch)
         host_.refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
+    if (!reg.wholeTracks.empty())
+    {
+        host_.refuse("Put whole tracks in the tracks view");
+        return true;
+    }
     if (!reg.sections.empty())
     {
         host_.refuse("The register holds sections: put them on the section strip",
@@ -836,7 +842,10 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
             {
                 return "No note here to edit";
             }
-            return set(heading, setInspectorField(*note, heading, text, m));
+            return set(heading,
+                       isMusicalTimingField(heading)
+                           ? setMusicalTiming(*note, heading, text, m, host_.timingUnit(grid()))
+                           : setInspectorField(*note, heading, text, m));
         },
         .step = [&](const std::string& heading, int steps) -> std::optional<std::string>
         {
@@ -845,7 +854,10 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
             {
                 return std::nullopt;
             }
-            const auto result = stepInspectorField(*note, heading, steps, m);
+            const auto result =
+                isMusicalTimingField(heading)
+                    ? stepMusicalTiming(*note, heading, steps, m, host_.timingUnit(grid()))
+                    : stepInspectorField(*note, heading, steps, m);
             return std::holds_alternative<std::string>(result) ? std::nullopt
                                                                : set(heading, result);
         }};
@@ -1477,17 +1489,15 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     else if (command == "track-next" || command == "track-previous")
     {
-        // The tracks in turn, with no conductor's here; with a count, gt goes to that track.
+        // The tracks in turn, with no conductor's here.
         const auto tracks = song.tracks().size();
         if (tracks == 0)
         {
             return false;
         }
         const auto steps = static_cast<std::size_t>(n) % tracks;
-        const auto to = count > 0 && command == "track-next"
-                            ? std::min(static_cast<std::size_t>(count), tracks) - 1
-                        : command == "track-next" ? (track_ + steps) % tracks
-                                                  : (track_ + tracks - steps) % tracks;
+        const auto to = command == "track-next" ? (track_ + steps) % tracks
+                                                : (track_ + tracks - steps) % tracks;
         showTrack(to, std::nullopt);
         align();
     }
@@ -2155,6 +2165,7 @@ Inspection PianoRollView::inspection() const
             {.heading = "Time", .value = songTime(song.tempo().toTime(event.tick)), .aside = true});
         addNoteFields(result, song, m, event.tick, std::get<core::Note>(event.data));
         markEditable(result);
+        addMusicalTiming(result, event, m, host_.timingUnit(grid()));
         return result;
     }
     result.kind = "No note";

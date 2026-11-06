@@ -447,7 +447,7 @@ TEST_CASE("the conductor's list edits its names, tempos and meters, and deletes 
     // Verse at 2:1:000, and 5 the end.
     Viewing v;
     const auto& song = [&]() -> const core::Song& { return v.document.song(); };
-    type(v.ws, U"gT");
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     REQUIRE(v.view.track() == 0);
 
     type(v.ws, U"3jl"); // the label's name
@@ -682,7 +682,7 @@ TEST_CASE("only the track's own events are edited in its list")
     Viewing v;
     enter(v.ws); // the section row
     CHECK_FALSE(v.view.editingField());
-    CHECK(v.ws.message() == "That's the conductor's: edit it in its list (gT)");
+    CHECK(v.ws.message() == "That's the conductor's: edit it in its list (gc)");
     type(v.ws, U"G");
     enter(v.ws);
     CHECK(v.ws.message() == "Nothing to edit here");
@@ -690,48 +690,51 @@ TEST_CASE("only the track's own events are edited in its list")
     CHECK(v.ws.message() == "Nothing to change here");
 }
 
-TEST_CASE("gt and gT go through the tracks, the conductor as track 0, keeping the time")
+TEST_CASE("Ctrl-PageDown and Ctrl-PageUp go through the tracks, the conductor as track 0, keeping "
+          "the time")
 {
     Viewing v;
     type(v.ws, U"7j"); // the verse's section row, at 2:1:000
     REQUIRE(v.view.list().rows()[v.view.row()].tick == 4 * q);
-    type(v.ws, U"gt");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
     CHECK(v.view.track() == 2);
     CHECK(v.view.list().rows()[v.view.row()].tick == 4 * q);
     CHECK(contains(rowText(v.ws.frame()[1], 0), U"Track 2: Lead"));
-    type(v.ws, U"gt");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
     CHECK(v.view.track() == 0); // round to the conductor
     CHECK(contains(rowText(v.ws.frame()[1], 0), U"Track 0: Conductor"));
-    type(v.ws, U"gt");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
     CHECK(v.view.track() == 1);
-    type(v.ws, U"gT");
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     CHECK(v.view.track() == 0);
-    type(v.ws, U"gT");
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     CHECK(v.view.track() == 2);
-    type(v.ws, U"1gt"); // a count goes to that track
-    CHECK(v.view.track() == 1);
-    type(v.ws, U"0gt");
-    CHECK(v.view.track() == 2); // 0 is a motion, then gt
+    type(v.ws, U"1");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0); // one track on, wrapping to the conductor
+    CHECK(v.view.track() == 0);
+    type(v.ws, U"0");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    CHECK(v.view.track() == 1); // 0 is a field motion, then the next track
 }
 
 TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k keep place")
 {
     Viewing v{demoSong()};
-    REQUIRE(v.view.viewRows() == 17); // below the inspector, the track's bar and the headings
+    REQUIRE(v.view.viewRows() == 15); // below the inspector, the track's bar and the headings
     v.ws.handle(Key::typed(U'd', kCtrl), 0);
-    CHECK(v.view.row() == 8);
-    CHECK(v.view.top() == 8);
+    CHECK(v.view.row() == 7);
+    CHECK(v.view.top() == 7);
     v.ws.handle(Key::typed(U'f', kCtrl), 0);
-    CHECK(v.view.row() == 23); // a page less two rows, as in Vim
-    CHECK(v.view.top() == 23);
+    CHECK(v.view.row() == 20); // a page less two rows, as in Vim
+    CHECK(v.view.top() == 20);
     v.ws.handle(Key::typed(U'u', kCtrl), 0);
-    CHECK(v.view.top() == 15);
+    CHECK(v.view.top() == 13);
 
     v.ws.handle(Key::typed(U'j', kCtrl), 0);
-    CHECK(v.view.row() == 16);
-    CHECK(v.view.top() == 16);
+    CHECK(v.view.row() == 14);
+    CHECK(v.view.top() == 14);
     type(v.ws, U"zz");
-    CHECK(v.view.top() == 8); // row 16 in the middle of 17
+    CHECK(v.view.top() == 7); // row 14 in the middle of 15
     type(v.ws, U"gg");
     v.ws.handle(Key::typed(U'k', kCtrl), 0); // the view stops at the top
     CHECK(v.view.top() == 0);
@@ -739,7 +742,7 @@ TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k
 
     // The cursor stays in view as it moves.
     type(v.ws, U"30j");
-    CHECK(v.view.top() == 14);
+    CHECK(v.view.top() == 16);
 }
 
 TEST_CASE("a note's length shows as bars, beats and ticks, with the value it's close to")
@@ -914,7 +917,7 @@ TEST_CASE(":port sets the track's output port by its name or part of it")
     CHECK(port() == "Pro-800");
 
     // The conductor sends nothing, so has no port.
-    type(v.ws, U"gT");
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     result = v.registry.runLine("port GS");
     CHECK(result.warning);
     CHECK(result.message == "The conductor has no port; its tempo and meter aren't sent");
@@ -990,7 +993,7 @@ TEST_CASE(":section-split starts a new section at the bar line of the cursor's b
 
     // From the lead, in 2/4, its second bar starts in the middle of the conductor's first,
     // which ends short.
-    type(v.ws, U"gt");
+    v.ws.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
     REQUIRE(v.view.track() == 2);
     type(v.ws, U"gg");
     while (v.view.list().rows()[v.view.row()].kind != RowKind::Event)
@@ -1005,7 +1008,7 @@ TEST_CASE(":section-split starts a new section at the bar line of the cursor's b
     CHECK(v.document.song().sectionStart(1) == 2 * q);
 }
 
-TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on along the row")
+TEST_CASE("Enter edits the cell under the cursor, and Tab goes on along the row")
 {
     // The bass's rows: 0 section, 1 meter, 2 tempo, 3 program and 4 note at 1:1:000, 5 cc at
     // 1:2:240, 6 label at 1:3:000, 7 section and 8 note at 2:1:000, and 9 the end.
@@ -1013,7 +1016,8 @@ TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on alo
     const auto events = [&]
     { return v.document.song().events(v.document.song().tracks()[0]->id()); };
     const auto note = [&] { return std::get<core::Note>(events()[1].data); };
-    type(v.ws, U"4je"); // the note's position
+    type(v.ws, U"4j");
+    v.ws.handle(Key::of(NamedKey::Enter), 0); // the note's position
     REQUIRE(v.view.editingField());
     CHECK(v.view.field() == Column::Position);
     v.ws.handle(Key::of(NamedKey::Tab), 0); // past its type, to its pitch
@@ -1030,7 +1034,8 @@ TEST_CASE("e edits the cell under the cursor, as Enter does, and Tab goes on alo
     CHECK_FALSE(v.view.editingField());
 
     // Round from the first field to the last.
-    type(v.ws, U"0e");
+    type(v.ws, U"0");
+    v.ws.handle(Key::of(NamedKey::Enter), 0);
     v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
     CHECK(v.view.field() == Column::Release);
     v.ws.handle(Key::of(NamedKey::Tab), 0);

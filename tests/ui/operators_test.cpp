@@ -243,7 +243,8 @@ TEST_CASE("q quantises notes' starts to the grid, and the event list and arrange
 
     // Not on the conductor's list, nor on the section strip, nor over a single note in the
     // arrangement.
-    o.type(U"gT>>");
+    o.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
+    o.type(U">>");
     CHECK(o.ws.message() == "The conductor's tempo and meter changes aren't changed this way");
     o.type(U"gags>>");
     CHECK(o.ws.message() ==

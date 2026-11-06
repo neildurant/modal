@@ -39,8 +39,10 @@ std::optional<std::size_t> indexOf(const Inspection& inspection, std::string_vie
 
 } // namespace
 
-bool InspectorEditor::open(const Inspection& inspection)
+bool InspectorEditor::open(const Inspection& inspection, std::string_view heading)
 {
+    if (!heading.empty())
+        last_ = heading;
     if (const auto last = indexOf(inspection, last_))
     {
         show(inspection, *last);

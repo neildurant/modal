@@ -54,6 +54,11 @@ SelectionKind selectionKind(std::string_view command)
 
 } // namespace
 
+core::NoteFraction Workspace::timingUnit(core::NoteFraction grid) const
+{
+    return settings_ ? core::parseNoteFraction(settings_->text("timingunit")).value_or(grid) : grid;
+}
+
 Keymap Workspace::defaultKeymap()
 {
     Config config;
@@ -73,6 +78,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , eventList_(std::make_unique<EventListView>(document, static_cast<ViewHost&>(*this)))
     , arrange_(std::make_unique<ArrangeView>(document, static_cast<ViewHost&>(*this)))
     , pianoRoll_(std::make_unique<PianoRollView>(document, static_cast<ViewHost&>(*this)))
+    , tracks_(std::make_unique<TracksView>(document, static_cast<ViewHost&>(*this)))
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
@@ -338,6 +344,7 @@ void Workspace::refresh()
     eventList_->refresh();
     arrange_->refresh();
     pianoRoll_->refresh();
+    tracks_->refresh();
 }
 
 void Workspace::showSong()
@@ -345,6 +352,7 @@ void Workspace::showSong()
     eventList_->showSong();
     arrange_->showSong();
     pianoRoll_->showSong();
+    tracks_->showSong();
     history_.clear();
     layOut();
 }
@@ -352,6 +360,7 @@ void Workspace::showSong()
 ViewKind Workspace::shown() const
 {
     return current_ == arrange_.get()     ? ViewKind::Arrangement
+           : current_ == tracks_.get()    ? ViewKind::Tracks
            : current_ == pianoRoll_.get() ? ViewKind::PianoRoll
                                           : ViewKind::EventList;
 }
@@ -360,6 +369,9 @@ void Workspace::show(ViewKind kind)
 {
     switch (kind)
     {
+    case ViewKind::Tracks:
+        switchTo(*tracks_, true);
+        break;
     case ViewKind::Arrangement:
         switchTo(*arrange_, true);
         break;
@@ -374,9 +386,10 @@ void Workspace::show(ViewKind kind)
 
 void Workspace::open(ViewKind kind)
 {
-    switchTo(kind == ViewKind::Arrangement ? static_cast<View&>(*arrange_)
-             : kind == ViewKind::PianoRoll ? static_cast<View&>(*pianoRoll_)
-                                           : static_cast<View&>(*eventList_),
+    switchTo(kind == ViewKind::Tracks        ? static_cast<View&>(*tracks_)
+             : kind == ViewKind::Arrangement ? static_cast<View&>(*arrange_)
+             : kind == ViewKind::PianoRoll   ? static_cast<View&>(*pianoRoll_)
+                                             : static_cast<View&>(*eventList_),
              true, true);
 }
 
@@ -391,6 +404,8 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
         return;
     }
     const auto cursor = current_->cursor();
+    if (selection_)
+        endVisual();
     current_->stopPlayhead(std::nullopt);
     if (remember)
     {
@@ -533,6 +548,12 @@ EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
     {
         return more;
     }
+    if (!more.wholeTracks.empty() && !to.wholeTracks.empty())
+    {
+        to.wholeTracks.insert(to.wholeTracks.end(), more.wholeTracks.begin(),
+                              more.wholeTracks.end());
+        return to;
+    }
     if (!more.sections.empty() || !to.sections.empty())
     {
         to.sections.insert(to.sections.end(), more.sections.begin(), more.sections.end());
@@ -565,6 +586,8 @@ EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
 
 std::string Workspace::registerAbout(const EventRegister& reg)
 {
+    if (!reg.wholeTracks.empty())
+        return std::to_string(reg.wholeTracks.size()) + " whole tracks";
     // What a register holds: "12 events on 2 tracks", "2 sections, Verse, Chorus".
     if (!reg.sections.empty())
     {
@@ -1039,6 +1062,8 @@ Where Workspace::where() const
         return arrange_->onStrip() ? Where::Strip : Where::Tracks;
     case ViewKind::PianoRoll:
         return Where::PianoRoll;
+    case ViewKind::Tracks:
+        return Where::TrackList;
     case ViewKind::EventList:
         break;
     }
@@ -1176,6 +1201,22 @@ CommandResult Workspace::run(std::string_view command, int count)
         }
         unnamed = std::exchange(register_, from);
     }
+    const bool taking =
+        command == "event-yank" || command == "event-delete" || command == "operator-yank" ||
+        command == "operator-delete" || command == "visual-delete-time" ||
+        command == "bar-delete" ||
+        (operator_ && (operator_->name == "operator-yank" || operator_->name == "operator-delete"));
+    if (taking && named != 0 && named != letter)
+    {
+        const auto& into = registers_[letter];
+        if (!into.empty() && (where() == Where::TrackList) != !into.wholeTracks.empty())
+        {
+            // Refuse before a delete changes the song, or a yank changes either register.
+            refuse("Cannot append whole tracks and other material to the same register");
+            registerName_.reset();
+            return {true};
+        }
+    }
     auto result = commands_.run(command, count, mode_);
     report(result);
     if (named != 0 && put)
@@ -1185,7 +1226,7 @@ CommandResult Workspace::run(std::string_view command, int count)
     }
     else if (named != 0 && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
     {
-        if (!(register_ == registerBefore_))
+        if (!(register_ == registerBefore_) || (taking && !refused_))
         {
             // Saying which register, and adding, what it now holds.
             auto& into = registers_[letter];
@@ -1282,11 +1323,12 @@ bool Workspace::sayWhereFor(std::string_view command)
         }
     }
     std::vector<std::string> places;
-    constexpr std::array<std::pair<Where, std::string_view>, 4> kPlaces{{
+    constexpr std::array<std::pair<Where, std::string_view>, 5> kPlaces{{
         {Where::Tracks, "the arrangement's tracks"},
         {Where::Strip, "the section strip"},
         {Where::PianoRoll, "the piano roll"},
         {Where::EventList, "the event list"},
+        {Where::TrackList, "the tracks view"},
     }};
     for (const auto& [place, name] : kPlaces)
     {
@@ -1379,9 +1421,15 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             refuse("No selection yet to select again", MessageKind::Information);
             return true;
         }
-        selection_ = lastSelection_->selection;
-        beforeObject_ = lastSelection_->beforeObject;
-        view().setCursor(lastSelection_->cursor);
+        const auto saved = *lastSelection_;
+        const auto here = saved.selection.where;
+        show(here == Where::TrackList   ? ViewKind::Tracks
+             : here == Where::EventList ? ViewKind::EventList
+             : here == Where::PianoRoll ? ViewKind::PianoRoll
+                                        : ViewKind::Arrangement);
+        selection_ = saved.selection;
+        beforeObject_ = saved.beforeObject;
+        view().setCursor(saved.cursor);
         mode_ = Mode::Visual;
         return true;
     }
@@ -1523,6 +1571,20 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             return *done;
         }
         return view().operate("operator-yank", "object-note", count);
+    }
+    if (command == "view-tracks")
+    {
+        show(ViewKind::Tracks);
+        if (count > 0)
+        {
+            auto cursor = view().cursor();
+            const auto tracks = document_.song().tracks();
+            if (!tracks.empty())
+                cursor.track =
+                    tracks[std::min(static_cast<std::size_t>(count - 1), tracks.size() - 1)]->id();
+            view().setCursor(cursor);
+        }
+        return true;
     }
     if (command == "view-arrangement" || command == "view-events" || command == "view-piano-roll")
     {
@@ -1946,6 +2008,17 @@ bool Workspace::putOverSelection()
 {
     // p and P: what's in it goes, and the register goes in its place, as one undo step; the
     // register keeps what it had.
+    if (where() == Where::TrackList)
+    {
+        const auto done = tracks_->run("put-replace", 1).value_or(false);
+        endVisual();
+        return done;
+    }
+    if (!register_.wholeTracks.empty())
+    {
+        refuse("Put whole tracks in the tracks view");
+        return true;
+    }
     const auto what = view().selectionStatus().value_or("the selection");
     const auto span = view().selectionSpan();
     if (selection_->filter)
@@ -2206,6 +2279,13 @@ bool Workspace::transport(std::string_view command)
 
 void Workspace::setPlayer(core::Player* player)
 {
+    if (player_ != player)
+    {
+        view().stopPlayhead(std::nullopt);
+        wasPlaying_ = false;
+        returning_ = false;
+        playedFrom_.reset();
+    }
     player_ = player;
     if (player_ != nullptr)
     {

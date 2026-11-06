@@ -576,20 +576,22 @@ TEST_CASE("the piano roll shares the cursor with the other views")
     CHECK(r.view().pitch() == 45);
 }
 
-TEST_CASE("gt and gT go between the tracks in the piano roll, each keeping its pitch")
+TEST_CASE(
+    "Ctrl-PageDown and Ctrl-PageUp go between the tracks in the piano roll, each keeping its pitch")
 {
     Rolling r;
     r.type(U"K");
-    r.type(U"gt");
+    r.press(Key::of(NamedKey::PageDown, kCtrl));
     CHECK(r.view().track() == 1);
     CHECK(r.view().pitch() == 60); // no notes: middle C
     CHECK(contains(r.textOn(Role::Bar), U"Lead"));
-    r.type(U"gt"); // round to the first
+    r.press(Key::of(NamedKey::PageDown, kCtrl)); // round to the first
     CHECK(r.view().track() == 0);
     CHECK(r.view().pitch() == 48);
-    r.type(U"2gt");
+    r.type(U"3");
+    r.press(Key::of(NamedKey::PageDown, kCtrl));
     CHECK(r.view().track() == 1);
-    r.type(U"gT");
+    r.press(Key::of(NamedKey::PageUp, kCtrl));
     CHECK(r.view().track() == 0);
 }
 
@@ -663,9 +665,9 @@ TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
 
     // Each track has its own.
     r.type(U"zl");
-    r.type(U"gt");
+    r.press(Key::of(NamedKey::PageDown, kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 16});
-    r.type(U"gT");
+    r.press(Key::of(NamedKey::PageUp, kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
 }
 
@@ -1273,9 +1275,15 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     tab();
     CHECK(bassNote(r, 29)->second == t.quarters(1));
     CHECK(editor.heading() == "Release");
+    for (int i = 0; i < 5; ++i)
+        tab();
+    CHECK(editor.heading() == "Length fine");
     tab();
     CHECK(editor.heading() == "Position");
     r.press(Key::of(NamedKey::Tab, kShift));
+    CHECK(editor.heading() == "Length fine");
+    for (int i = 0; i < 5; ++i)
+        r.press(Key::of(NamedKey::Tab, kShift));
     CHECK(editor.heading() == "Release");
     r.press(Key::of(NamedKey::Escape));
     r.type(U"e"); // where it was left, the release
@@ -1340,11 +1348,12 @@ TEST_CASE("the hint menu offers only the commands that do something where the cu
 {
     // Every binding offered in each place, run there afresh, does something there rather than
     // saying it's for somewhere else; and gs, say, isn't offered in the piano roll.
-    const std::array<std::pair<std::u32string_view, Where>, 4> places{{
+    const std::array<std::pair<std::u32string_view, Where>, 5> places{{
         {U"", Where::PianoRoll},
         {U"ga", Where::Tracks},
         {U"gags", Where::Strip},
         {U"ge", Where::EventList},
+        {U"gt", Where::TrackList},
     }};
     const auto keymap = Workspace::defaultKeymap();
     for (const auto& [to, where] : places)
@@ -1396,7 +1405,7 @@ TEST_CASE("the hint menu shows after an operator once it has waited, its keys ig
     {
         keys.push_back(hint.keys);
     }
-    CHECK(keys == std::vector<std::string>{"a", "c", "e", "g", "n", "r", "t", "T", "v"});
+    CHECK(keys == std::vector<std::string>{"a", "c", "e", "g", "n", "r", "t", "v"});
 }
 
 TEST_CASE("keys bound to one command show together in the hint menu, arrows as arrows")
@@ -1481,7 +1490,7 @@ TEST_CASE("the list of keys keeps each group whole in one column")
         }
         return hints;
     };
-    r.ws.resize(120 * kCell.width, 14 * kCell.height, kCell);
+    r.ws.resize(120 * kCell.width, 16 * kCell.height, kCell);
     const std::vector<Workspace::KeyGroup> groups{
         {"First", keys(3)}, {"Second", keys(4)}, {"Long", keys(30)}, {"Last", keys(2)}};
     const auto pages = r.ws.keyPages(groups);

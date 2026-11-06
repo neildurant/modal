@@ -336,7 +336,7 @@ TEST_CASE("it takes the track's events, keeping the track, and in the arrangemen
     CHECK(o.pitches(0) == bass);
 
     // Not on the conductor's list, nor on the section strip.
-    o.type(U"gT");
+    o.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     o.type(U"dit");
     CHECK(o.ws.message() ==
           "it isn't on the conductor's list, whose tempo and meter changes the song needs");

@@ -39,7 +39,7 @@ public:
 
     // Starts editing, on the field it was last on if there is one, or else the first that can be;
     // false if none can.
-    bool open(const Inspection& inspection);
+    bool open(const Inspection& inspection, std::string_view heading = {});
     void close() { heading_.reset(); }
     bool active() const { return heading_.has_value(); }
 

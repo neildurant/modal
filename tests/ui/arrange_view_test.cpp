@@ -233,7 +233,8 @@ TEST_CASE("a command a view doesn't have says so")
 {
     Arranging a;
     a.type(U"=");
-    CHECK(a.ws.message() == "= is for the section strip, the piano roll and the event list");
+    CHECK(a.ws.message() ==
+          "= is for the section strip, the piano roll, the event list and the tracks view");
     a.registry.runLine("note-lengthen"); // by name, not keys
     CHECK(a.ws.message() == "Note lengthen is for the piano roll");
     a.type(U"ge");
@@ -913,7 +914,7 @@ TEST_CASE("gc shows the conductor's list in the event list, at the cursor's time
     REQUIRE(a.ws.shown() == ViewKind::EventList);
     CHECK(a.ws.eventList().track() == 0);
     CHECK(a.ws.eventList().cursor().tick == 2 * kBar);
-    a.type(U"gt"); // and on to the first track
+    a.press(Key::of(NamedKey::PageDown, kCtrl)); // and on to the first track
     CHECK(a.ws.eventList().track() == 1);
 }
 

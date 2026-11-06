@@ -111,6 +111,8 @@ void markEditable(Inspection& inspection)
     for (auto& field : inspection.fields)
     {
         field.editable = field.heading == "Ends" || inspectorColumn(field.heading).has_value();
+        if (field.heading == "Controller")
+            field.editText = field.value.substr(0, field.value.find(' '));
     }
 }
 

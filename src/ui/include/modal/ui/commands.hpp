@@ -72,7 +72,7 @@ struct CommandInfo
     // What it does in each place, by Where, where that reads differently from description
     // (decided October 2026, built November 2026): the palette says what it does where the
     // cursor is, rather than one sentence covering every view.
-    std::array<std::string_view, 4> here = {};
+    std::array<std::string_view, 5> here = {};
 };
 
 // Where a command does something, for the hint menu and the palette to offer only what works
@@ -83,6 +83,7 @@ enum class Where : std::uint8_t
     Strip,  // its section strip
     PianoRoll,
     EventList,
+    TrackList, // the settings table
 };
 
 // What a command does in a place: its description there, or its description.

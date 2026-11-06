@@ -7,6 +7,7 @@
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/musical_time.hpp>
 #include <modal/ui/time_motions.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/view_state.hpp>
@@ -116,8 +117,8 @@ constexpr std::array kCommands{
     counted("scroll-page-down", "Scroll down a page"),
     counted("scroll-page-up", "Scroll up a page"),
     CommandInfo{.name = "scroll-centre", .description = "Scroll the cursor to the middle"},
-    counted("track-next", "Show the next track's list, or track {count}'s"),
-    counted("track-previous", "Show the track's list before, {count} tracks back"),
+    counted("track-next", "Go to the next track, {count} tracks ahead"),
+    counted("track-previous", "Go to the previous track, {count} tracks back"),
     CommandInfo{.name = "field-edit",
                 .description = "Edit the field under the cursor, typing a value or a change"},
     CommandInfo{.name = "note-add", .description = "Add a note at the cursor"},
@@ -175,10 +176,9 @@ EventListView::EventListView(core::Document& document, ViewHost& host)
 
 std::vector<int> EventListView::topHeights(CellSize cell) const
 {
-    // The view's own bar, a title for it, then the inspector, two lines with a quarter of a
-    // line's padding above and below (decided in milestone 4: every view has its bar first,
-    // then the inspector, then the view).
-    return {cell.height, inspectorHeight(cell)};
+    // Keep room for exact event fields and coarse/fine note timing without moving the
+    // list when the cursor crosses a conductor or non-note row.
+    return {cell.height, inspectorHeight(cell) + 2 * cell.height};
 }
 
 void EventListView::resize(const WindowLayout& layout, int width, CellSize cell)
@@ -660,7 +660,7 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
         std::int64_t to = static_cast<std::int64_t>(track_);
         if (command == "track-next")
         {
-            to = count > 0 ? std::min<std::int64_t>(count, tracks - 1) : (to + 1) % tracks;
+            to = (to + n) % tracks;
         }
         else
         {
@@ -677,10 +677,16 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     {
         return put(command == "put-ending");
     }
+    else if (command == "inspector-edit" && list_.rows()[row_].kind == RowKind::Event &&
+             list_.track())
+    {
+        if (editor_.open(inspection()))
+            host_.startTyping();
+        return true;
+    }
     else if (command == "field-edit" || command == "inspector-edit")
     {
-        // e too: the event list's fields are edited in their cells, as in a spreadsheet,
-        // rather than in the inspector (decided October 2026, after use).
+        // On conductor rows e keeps cell editing, as Enter does everywhere.
         return openField();
     }
     else if (command == "note-add")
@@ -1076,6 +1082,11 @@ bool EventListView::put(bool ending)
         refuse("Nothing yanked or deleted to put", MessageKind::Warning);
         return true;
     }
+    if (!host_.eventRegister().wholeTracks.empty())
+    {
+        host_.refuse("Put whole tracks in the tracks view");
+        return true;
+    }
     if (!host_.eventRegister().sections.empty())
     {
         refuse("The register holds sections: put them on the section strip", MessageKind::Warning);
@@ -1160,7 +1171,7 @@ bool EventListView::openField()
     }
     if (row.dim)
     {
-        refuse("That's the conductor's: edit it in its list (gT)", MessageKind::Warning);
+        refuse("That's the conductor's: edit it in its list (gc)", MessageKind::Warning);
         return true;
     }
     if (track_ == 0 && field() != Column::Data)
@@ -1303,7 +1314,7 @@ bool EventListView::stepFieldBy(int steps)
     }
     if (row.kind != RowKind::Event)
     {
-        refuse(row.dim ? "That's the conductor's: edit it in its list (gT)"
+        refuse(row.dim ? "That's the conductor's: edit it in its list (gc)"
                        : "Nothing to change here",
                MessageKind::Warning);
         return true;
@@ -1593,6 +1604,11 @@ std::string EventListView::trackName() const
 
 void EventListView::type(char32_t character)
 {
+    if (editor_.active())
+    {
+        editor_.type(character);
+        return;
+    }
     if (std::exchange(field_->fresh, false))
     {
         fieldLine_.clear(); // typing replaces the value, as in a spreadsheet
@@ -1602,6 +1618,8 @@ void EventListView::type(char32_t character)
 
 std::optional<bool> EventListView::runTyping(std::string_view command)
 {
+    if (editor_.active())
+        return runInspector(command);
     if (command == "command-line-run" ||
         (field_->adding && (command == "command-line-next" || command == "command-line-previous")))
     {
@@ -1893,11 +1911,58 @@ std::optional<std::string> EventListView::describeRange(std::string_view op,
     return describeTimeRange(motion);
 }
 
+Inspection EventListView::inspection() const
+{
+    auto result = inspect(list_, row_);
+    if (list_.track() && list_.rows()[row_].kind == RowKind::Event)
+    {
+        const auto id = *list_.track();
+        markEditable(result);
+        addMusicalTiming(result, document_.song().events(id)[list_.rows()[row_].index],
+                         list_.meter(), host_.timingUnit(document_.song().track(id)->grid));
+    }
+    return result;
+}
+
+std::optional<bool> EventListView::runInspector(std::string_view command)
+{
+    const auto change = [&](const std::string& heading, const std::string& text,
+                            int steps) -> std::optional<std::string>
+    {
+        if (!list_.track() || list_.rows()[row_].kind != RowKind::Event)
+            return "No event to edit";
+        const auto id = *list_.track();
+        const auto event = document_.song().events(id)[list_.rows()[row_].index];
+        const auto unit = host_.timingUnit(document_.song().track(id)->grid);
+        const auto& meter = list_.meter();
+        const auto result = isMusicalTimingField(heading)
+                                ? (steps ? stepMusicalTiming(event, heading, steps, meter, unit)
+                                         : setMusicalTiming(event, heading, text, meter, unit))
+                                : (steps ? stepInspectorField(event, heading, steps, meter)
+                                         : setInspectorField(event, heading, text, meter));
+        if (const auto* why = std::get_if<std::string>(&result))
+            return *why;
+        const auto column = heading.starts_with("Start") ? Column::Position
+                            : heading.starts_with("Length") || heading == "Ends"
+                                ? Column::Length
+                                : inspectorColumn(heading).value_or(Column::Data);
+        return replaceEvent(row_, std::get<core::Event>(result), column);
+    };
+    return editor_.run(command, host_,
+                       {
+                           .inspection = [this] { return inspection(); },
+                           .set = [&](const std::string& heading, const std::string& text)
+                           { return change(heading, text, 0); },
+                           .step = [&](const std::string& heading, int steps)
+                           { return change(heading, {}, steps); },
+                       });
+}
+
 Region EventListView::inspectorRegion() const
 {
     const int position =
         static_cast<int>(list_.text(list_.rows().size() - 1)[Column::Position].size());
-    return ui::inspectorRegion(inspect(list_, row_), layout_.top[1], width_, cell_, position);
+    return ui::inspectorRegion(inspection(), layout_.top[1], width_, cell_, position, &editor_);
 }
 
 Region EventListView::barRegion() const

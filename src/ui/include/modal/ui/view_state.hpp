@@ -51,6 +51,18 @@ struct EventListState
     friend bool operator==(const EventListState&, const EventListState&) = default;
 };
 
+struct TracksState
+{
+    std::size_t top = 0;
+    std::size_t column = 1;
+    int left = 0;
+    std::optional<std::uint8_t> pitch;
+};
+
+core::EditPlace placeWith(std::optional<core::TrackId> track, core::Tick tick,
+                          const TracksState& state);
+std::optional<TracksState> tracksStateOf(const core::EditPlace& place);
+
 core::EditPlace placeWith(std::optional<core::TrackId> track, core::Tick tick,
                           const ArrangeState& state);
 core::EditPlace placeWith(std::optional<core::TrackId> track, core::Tick tick,

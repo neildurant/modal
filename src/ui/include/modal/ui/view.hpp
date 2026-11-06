@@ -64,6 +64,7 @@ enum class ViewKind : std::uint8_t
     Arrangement,
     PianoRoll,
     EventList,
+    Tracks,
 };
 
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
@@ -83,9 +84,11 @@ struct EventRegister
     // elsewhere, the lowest note is.
     std::optional<std::uint8_t> pitch = std::nullopt;
 
+    std::vector<core::TrackCopy> wholeTracks = {};
+
     bool empty() const
     {
-        return sections.empty() &&
+        return wholeTracks.empty() && sections.empty() &&
                std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
     }
 
@@ -215,6 +218,9 @@ public:
 
     // Puts the play-from marker at a time and plays from there, as Enter on a section does.
     virtual void playFrom(core::Tick tick) = 0;
+
+    // The unit used to display coarse/fine note timing; by default the track's editing grid.
+    virtual core::NoteFraction timingUnit(core::NoteFraction grid) const { return grid; }
 
     // The Visual selection, if there is one; operators take it as the motion "visual".
     virtual std::optional<Selection> selection() const = 0;

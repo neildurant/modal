@@ -309,3 +309,16 @@ TEST_CASE("Shift-Space stops and goes back to where the cursor was when playback
     p.press(Key::typed(U' ', kShift));
     CHECK(p.player.playing());
 }
+
+TEST_CASE("detaching a stopping player leaves views safe to switch and wake")
+{
+    Playing p;
+    p.type(U" ");
+    p.runFor(1s);
+    REQUIRE(p.player.stop());
+    p.ws.setPlayer(nullptr);
+    p.type(U"gtgrgega");
+    p.ws.wake(p.now + 20);
+    CHECK(p.ws.shown() == ViewKind::Arrangement);
+    CHECK_FALSE(p.ws.frame().empty());
+}
