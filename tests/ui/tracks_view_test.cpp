@@ -8,6 +8,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <algorithm>
+#include <optional>
+
 using namespace modal;
 using namespace modal::ui;
 
@@ -344,11 +347,11 @@ TEST_CASE("track toggles are compact badges and numeric cells align on the right
     Tracking t;
     const auto find = [&](const Frame& frame, std::u32string_view text) -> const TextRun&
     {
-        for (const auto& run : frame.front().text)
-            if (run.text.find(text) != std::u32string::npos)
-                return run;
-        FAIL("Missing table text");
-        return frame.front().text.front();
+        const auto run =
+            std::ranges::find_if(frame.front().text, [&](const TextRun& candidate)
+                                 { return candidate.text.find(text) != std::u32string::npos; });
+        REQUIRE(run != frame.front().text.end());
+        return *run;
     };
     t.type(U"l+"); // mute
     t.type(U"l+"); // solo
@@ -419,13 +422,21 @@ TEST_CASE("the note inspector aligns start and length coarse-fine pairs")
     const auto frame = t.ws.frame();
     const auto find = [&](std::u32string_view text) -> TextRun
     {
+        std::optional<TextRun> found;
         for (const auto& region : frame)
+        {
             if (region.background == Role::Panel)
-                for (const auto& run : region.text)
-                    if (run.text == text)
-                        return run;
-        FAIL("Missing inspector text");
-        return {};
+            {
+                const auto run = std::ranges::find(region.text, text, &TextRun::text);
+                if (run != region.text.end())
+                {
+                    found = *run;
+                    break;
+                }
+            }
+        }
+        REQUIRE(found.has_value());
+        return *found;
     };
     const auto pitch = find(U"Pitch:");
     const auto velocity = find(U"Velocity:");
