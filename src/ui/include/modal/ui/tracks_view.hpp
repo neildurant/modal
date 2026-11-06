@@ -33,10 +33,11 @@ public:
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::size_t> selectionIndex() const override { return row(); }
-    bool typing() const override { return editor_.active(); }
-    void type(char32_t character) override { editor_.type(character); }
+    bool typing() const override { return editor_.active() || portChoice_.has_value(); }
+    void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
     const InspectorEditor& inspectorEditor() const { return editor_; }
+    bool choosingPort() const { return portChoice_.has_value(); }
 
 private:
     std::size_t row() const;
@@ -52,6 +53,18 @@ private:
     std::optional<std::string> edit(TrackField field, std::string_view text, int steps = 0,
                                     bool fine = false);
     bool put(bool before, bool replace, int count);
+    // Opens the cursor's column for editing, as a list of ports or in its cell; false if it can't.
+    bool openField();
+    // Goes on to the next or previous column that can be edited, and opens it.
+    void nextField(bool forwards);
+
+    // The ports to choose from, narrowed by what's typed: indexes into the choice's list.
+    std::vector<std::size_t> portMatches() const;
+    std::optional<bool> runPortChoice(std::string_view command);
+    // Whether a track names a port that wasn't found, as a song from elsewhere may.
+    bool portMissing(const core::Track& track) const;
+    void addPortChoice(Frame& frame) const;
+
     // Flips a button on the cursor's row, and any selected rows to match it.
     void toggle(TrackField field);
 
@@ -65,6 +78,19 @@ private:
     CellSize cell_{1, 1};
     int width_ = 0;
     InspectorEditor editor_;
+
+    // Choosing a track's port from a list at its cell: "" is the default port, and a port the
+    // track names that wasn't found stays on the list until something else is chosen.
+    struct PortChoice
+    {
+        std::vector<std::string> ports;
+        std::string current;
+        std::u32string typed;
+        std::size_t chosen = 0;          // among the matches
+        std::size_t top = 0;             // the first match shown
+        std::optional<std::size_t> gone; // the port on the list that wasn't found
+    };
+    std::optional<PortChoice> portChoice_;
 };
 
 } // namespace modal::ui

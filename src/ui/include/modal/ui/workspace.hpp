@@ -361,6 +361,10 @@ private:
     }
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
+    std::vector<std::string> outputPorts() const override
+    {
+        return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
+    }
 
     View& view() const { return *current_; }
 

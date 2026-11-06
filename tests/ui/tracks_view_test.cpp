@@ -74,10 +74,7 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     CHECK(t.track().mute);
     t.type(U"l+");
     CHECK(t.track().solo);
-    t.type(U"2l");
-    t.enter(U"My MIDI output");
-    CHECK(t.track().port == "My MIDI output");
-    t.type(U"l");
+    t.type(U"3l");
     t.enter(U"10");
     CHECK(t.track().channel == 10);
     t.type(U"4l");
@@ -544,8 +541,9 @@ TEST_CASE("Tab in track field editing commits and passes over the buttons")
     t.type(U"Renamed");
     t.press(NamedKey::Tab);
     CHECK(t.track().name == "Renamed");
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Output port");
+    CHECK(t.ws.tracks().choosingPort());
     t.press(NamedKey::Tab, kShift);
+    CHECK_FALSE(t.ws.tracks().choosingPort());
     CHECK(t.ws.tracks().inspectorEditor().heading() == "Name");
 }
 
@@ -1096,4 +1094,162 @@ TEST_CASE("the bar shows a track's setup when it has one")
     t.type(U"ge");
     CHECK(inspectorHas(t.ws.frame(), U"Program:"));
     CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
+}
+
+namespace
+{
+// A workspace with some output ports, on the Output port column.
+struct ChoosingPorts : Tracking
+{
+    ChoosingPorts()
+    {
+        ws.setPortFinder(
+            [this](std::string_view)
+            {
+                Workspace::PortLookup lookup;
+                lookup.ports = ports;
+                return lookup;
+            });
+        type(U"4l");
+    }
+    std::vector<std::string> ports{"Pro-800", "loopMIDI Port 1", "loopMIDI Port 2"};
+
+    std::vector<std::u32string> listed()
+    {
+        std::vector<std::u32string> rows;
+        const auto frame = ws.frame();
+        for (const auto& run : frame[1].text)
+        {
+            auto text = run.text;
+            text.erase(text.find_last_not_of(U' ') + 1);
+            rows.push_back(text.substr(text.find_first_not_of(U' ')));
+        }
+        return rows;
+    }
+};
+} // namespace
+
+TEST_CASE("a track's port is chosen from a list of the ports there are")
+{
+    ChoosingPorts t;
+    t.press(NamedKey::Enter);
+    REQUIRE(t.ws.tracks().choosingPort());
+    CHECK(t.listed() == std::vector<std::u32string>{U"default", U"Pro-800", U"loopMIDI Port 1",
+                                                    U"loopMIDI Port 2"});
+
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Enter);
+    CHECK_FALSE(t.ws.tracks().choosingPort());
+    CHECK(t.track().port == "Pro-800");
+
+    SECTION("it opens on the current port, and Escape leaves it")
+    {
+        t.press(NamedKey::Enter);
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Escape);
+        CHECK_FALSE(t.ws.tracks().choosingPort());
+        CHECK(t.track().port == "Pro-800");
+        t.press(NamedKey::Enter);
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Enter);
+        CHECK(t.track().port == "loopMIDI Port 1");
+    }
+    SECTION("typing narrows the list, in any case, and Backspace widens it")
+    {
+        t.press(NamedKey::Enter);
+        t.type(U"PORT 2");
+        CHECK(t.listed() == std::vector<std::u32string>{U"loopMIDI Port 2"});
+        t.press(NamedKey::Backspace);
+        CHECK(t.listed() == std::vector<std::u32string>{U"loopMIDI Port 1", U"loopMIDI Port 2"});
+        t.type(U"2");
+        t.press(NamedKey::Enter);
+        CHECK(t.track().port == "loopMIDI Port 2");
+    }
+    SECTION("nothing can be chosen that isn't there")
+    {
+        t.press(NamedKey::Enter);
+        t.type(U"nothing like it");
+        CHECK(t.listed() == std::vector<std::u32string>{U"No port matches"});
+        t.press(NamedKey::Enter);
+        CHECK(t.ws.tracks().choosingPort());
+        CHECK(t.track().port == "Pro-800");
+        CHECK(t.ws.message() == "No port matches that");
+        t.press(NamedKey::Escape);
+    }
+    SECTION("default goes back to the default port, and undo restores the last")
+    {
+        t.press(NamedKey::Enter);
+        t.type(U"default");
+        t.press(NamedKey::Enter);
+        CHECK(t.track().port.empty());
+        t.type(U"u");
+        CHECK(t.track().port == "Pro-800");
+    }
+    SECTION("a selection all takes the port, in one undo step")
+    {
+        t.type(U"Vj"); // the cursor on the second, on the default port
+        t.press(NamedKey::Enter);
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Enter);
+        CHECK(t.track(0).port == "loopMIDI Port 1");
+        CHECK(t.track(1).port == "loopMIDI Port 1");
+        t.press(NamedKey::Escape);
+        t.type(U"u");
+        CHECK(t.track(0).port == "Pro-800");
+        CHECK(t.track(1).port.empty());
+    }
+    SECTION("a selection takes the port the cursor's track already has")
+    {
+        t.type(U"Vj");
+        t.type(U"o"); // the cursor back on the first, on Pro-800
+        t.press(NamedKey::Enter);
+        t.press(NamedKey::Enter);
+        CHECK(t.track(0).port == "Pro-800");
+        CHECK(t.track(1).port == "Pro-800");
+    }
+    SECTION("Tab takes the one chosen, and goes on")
+    {
+        t.press(NamedKey::Enter);
+        t.press(NamedKey::Down);
+        t.press(NamedKey::Tab);
+        CHECK(t.track().port == "loopMIDI Port 1");
+        CHECK(t.ws.tracks().inspectorEditor().heading() == "Channel");
+        t.press(NamedKey::Escape);
+    }
+}
+
+TEST_CASE("a long list of ports shows a few at a time, following the choice")
+{
+    ChoosingPorts t;
+    t.ports.clear();
+    for (int i = 0; i < 300; ++i)
+    {
+        t.ports.push_back("Port " + std::to_string(1000 + i));
+    }
+    t.press(NamedKey::Enter);
+    CHECK(t.listed().size() == 8);
+    for (int i = 0; i < 20; ++i)
+    {
+        t.press(NamedKey::Down);
+    }
+    CHECK(t.listed().size() == 8);
+    CHECK(t.listed().back() == U"Port 1019");
+    t.press(NamedKey::Enter);
+    CHECK(t.track().port == "Port 1019");
+}
+
+TEST_CASE("a port that isn't there stays until something else is chosen")
+{
+    ChoosingPorts t;
+    t.document.edit("Set a port", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(song.tracks()[0]->id(),
+                                         [](core::Track& track) { track.port = "Gone"; });
+                    });
+    t.press(NamedKey::Enter);
+    CHECK(t.listed().back() == U"Gone (not found)");
+    t.press(NamedKey::Enter); // on it already
+    CHECK(t.track().port == "Gone");
 }

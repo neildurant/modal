@@ -198,6 +198,9 @@ public:
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;
 
+    // The output ports there are now, to choose from.
+    virtual std::vector<std::string> outputPorts() const = 0;
+
     // Shows another view at the cursor; or opens it afresh there, as Enter on a bar in the
     // arrangement does (see View::open).
     virtual void show(ViewKind kind) = 0;

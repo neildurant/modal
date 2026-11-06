@@ -367,3 +367,67 @@ TEST_CASE("the status line shows the tempo at the cursor, and at the playhead wh
     p.runFor(100ms);
     CHECK(p.status().find(U"Tempo 96") != std::u32string::npos);
 }
+
+TEST_CASE("a track's port that wasn't found is dim in the table, and explained in the inspector")
+{
+    test::RecordingSink sink;
+    test::FakeClock clock;
+    core::Engine engine{sink, clock};
+    core::Player player{engine, [](std::string_view name) -> std::optional<core::DestinationId>
+                        {
+                            if (name == "Gone")
+                            {
+                                return std::nullopt;
+                            }
+                            return core::DestinationId{1};
+                        }};
+    core::Document document{demoSong()};
+    document.edit("Set a port", {},
+                  [&](core::Song& song)
+                  {
+                      song.updateTrack(song.tracks()[0]->id(),
+                                       [](core::Track& track) { track.port = "Gone"; });
+                  });
+    player.update(document.song());
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace ws{registry, document};
+    ws.resize(120 * kCell.width, 24 * kCell.height, kCell);
+    ws.setPlayer(&player);
+    for (const char32_t key : std::u32string_view{U"gtj"})
+    {
+        ws.handle(Key::typed(key), 0);
+    }
+    const auto find = [&](std::u32string_view wanted) -> std::optional<TextRun>
+    {
+        for (const auto& region : ws.frame())
+        {
+            for (const auto& run : region.text)
+            {
+                if (run.text.find(wanted) != std::u32string::npos)
+                {
+                    return run;
+                }
+            }
+        }
+        return std::nullopt;
+    };
+    REQUIRE(find(U"Gone"));
+    CHECK(find(U"Gone")->style.foreground == Role::Dim);
+    CHECK_FALSE(find(U"Port not found"));
+
+    for (const char32_t key : std::u32string_view{U"k4l"})
+    {
+        ws.handle(Key::typed(key), 0);
+    }
+    REQUIRE(find(U"Port not found"));
+    bool warned = false;
+    for (const auto& region : ws.frame())
+    {
+        for (const auto& run : region.text)
+        {
+            warned = warned || (run.text == U"Gone" && run.style.foreground == Role::Warning);
+        }
+    }
+    CHECK(warned);
+}
