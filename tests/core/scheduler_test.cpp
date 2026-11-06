@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <string>
@@ -1062,7 +1063,7 @@ TEST_CASE("a shared channel keeps its pedal when one track is muted")
     CHECK(sink.sent.empty());
 }
 
-TEST_CASE("rerouting a track releases notes and pedals on its old channel")
+TEST_CASE("rerouting a track moves its notes and pedals to its new channel")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = songAt(ppqn);
@@ -1083,5 +1084,250 @@ TEST_CASE("rerouting a track releases notes and pedals on its old channel")
     sink.sent.clear();
     scheduler.setPlan(after, kNow + 250ms);
     CHECK(sink.sent == std::vector<Sent>{{{1}, {0x80, 60, 64}, kNow + 250ms},
-                                         {{1}, {0xB0, 64, 0}, kNow + 250ms}});
+                                         {{1}, {0xB0, 64, 0}, kNow + 250ms},
+                                         {{1}, {0xB1, 64, 127}, kNow + 250ms},
+                                         {{1}, {0x91, 60, 100}, kNow + 250ms}});
+}
+
+namespace
+{
+
+// A track with a setup, a program, a controller and a long note from the start, then a short note
+// at the third beat, in a song that starts playing and reaches its second beat.
+struct CatchingUp
+{
+    Ppqn ppqn = MODAL_ANY_PPQN();
+    Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    TrackId other = addTrack(song, 2);
+    TrackId track = addTrack(song, 1,
+                             [&](EditTrack& edit)
+                             {
+                                 edit.programSetup = {1, 2, 3};
+                                 edit.events.insert({0, ProgramChange{5}});
+                                 edit.events.insert({0, ControlChange{7, 90}});
+                                 edit.events.insert({0, ControlChange{7, 80}});
+                                 edit.events.insert({0, Note{48, 100, 2 * q}});
+                                 edit.events.insert({2 * q, Note{50, 100, q}});
+                             });
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+
+    void set(const std::function<void(Track&)>& edit) { song.updateTrack(track, edit); }
+};
+
+using Messages = std::vector<Bytes>;
+
+} // namespace
+
+TEST_CASE("a track unmuted during playback catches up, as if starting there")
+{
+    CatchingUp t;
+    t.set([](Track& track) { track.mute = true; });
+    const auto muted = compilePlan(t.song, byPortName);
+    t.scheduler.setPlan(muted, kNow);
+    t.scheduler.play(0, {}, kNow);
+    t.scheduler.sendDue(kNow + 250ms);
+    CHECK(t.sink.sent.empty());
+
+    const Messages setupAndValues{{0xB0, 0, 1}, {0xB0, 32, 2}, {0xC0, 3}, {0xC0, 5}, {0xB0, 7, 80}};
+    SECTION("with its note still sounding, if it chases notes")
+    {
+        t.set([](Track& track) { track.mute = false; });
+        const auto unmuted = compilePlan(t.song, byPortName);
+        t.scheduler.setPlan(unmuted, kNow + 750ms);
+        auto expected = setupAndValues;
+        expected.push_back({0x90, 48, 100});
+        CHECK(t.sink.messages() == expected);
+        for (const auto& sent : t.sink.sent)
+        {
+            CHECK(sent.due == kNow + 750ms);
+        }
+        CHECK(t.scheduler.soundingNotes() == 1);
+
+        // The note ends where it would have, and playback carries on.
+        t.sink.sent.clear();
+        runUntil(t.scheduler, kNow + 10s);
+        CHECK(t.sink.sent == std::vector<Sent>{{{1}, {0x80, 48, 64}, kNow + 1s},
+                                               {{1}, {0x90, 50, 100}, kNow + 1s},
+                                               {{1}, {0x80, 50, 64}, kNow + 1500ms}});
+    }
+    SECTION("with chasing off, its values are still sent, but not its note")
+    {
+        t.set(
+            [](Track& track)
+            {
+                track.mute = false;
+                track.chaseNotes = false;
+            });
+        const auto unmuted = compilePlan(t.song, byPortName);
+        t.scheduler.setPlan(unmuted, kNow + 750ms);
+        CHECK(t.sink.messages() == setupAndValues);
+        CHECK(t.scheduler.soundingNotes() == 0);
+    }
+    SECTION("a note that has ended isn't sent again")
+    {
+        t.set([](Track& track) { track.mute = false; });
+        const auto unmuted = compilePlan(t.song, byPortName);
+        t.scheduler.setPlan(unmuted, kNow + 1250ms);
+        auto expected = setupAndValues;
+        expected.push_back({0x90, 50, 100}); // the later note, which is sounding at this point
+        CHECK(t.sink.messages() == expected);
+    }
+}
+
+TEST_CASE("releasing a solo catches up the tracks that become audible")
+{
+    CatchingUp t;
+    editTrack(t.song, t.other, [](EditTrack& track) { track.solo = true; });
+    const auto soloed = compilePlan(t.song, byPortName);
+    t.scheduler.setPlan(soloed, kNow);
+    t.scheduler.play(0, {}, kNow);
+    t.scheduler.sendDue(kNow + 750ms);
+    CHECK(t.sink.sent.empty());
+
+    editTrack(t.song, t.other, [](EditTrack& track) { track.solo = false; });
+    const auto released = compilePlan(t.song, byPortName);
+    t.scheduler.setPlan(released, kNow + 750ms);
+    CHECK(t.sink.messages() ==
+          Messages{
+              {0xB0, 0, 1}, {0xB0, 32, 2}, {0xC0, 3}, {0xC0, 5}, {0xB0, 7, 80}, {0x90, 48, 100}});
+}
+
+TEST_CASE("a rerouted track catches up on its new channel, and others are left alone")
+{
+    CatchingUp t;
+    const auto before = compilePlan(t.song, byPortName);
+    t.scheduler.setPlan(before, kNow);
+    t.scheduler.play(0, {}, kNow);
+    t.scheduler.sendDue(kNow + 750ms);
+    t.sink.sent.clear();
+
+    SECTION("a change of channel")
+    {
+        t.set([](Track& track) { track.channel = 3; });
+        const auto after = compilePlan(t.song, byPortName);
+        t.scheduler.setPlan(after, kNow + 750ms);
+        CHECK(t.sink.messages() == Messages{{0x80, 48, 64},
+                                            {0xB2, 0, 1},
+                                            {0xB2, 32, 2},
+                                            {0xC2, 3},
+                                            {0xC2, 5},
+                                            {0xB2, 7, 80},
+                                            {0x92, 48, 100}});
+    }
+    SECTION("a change that doesn't affect it sends nothing")
+    {
+        t.set([](Track& track) { track.name = "Renamed"; });
+        const auto after = compilePlan(t.song, byPortName);
+        t.scheduler.setPlan(after, kNow + 750ms);
+        CHECK(t.sink.sent.empty());
+    }
+}
+
+TEST_CASE("a setup changed during playback is sent at once, unless a program is in force")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.events.insert({0, ControlChange{7, 90}});
+                                 track.events.insert({2 * q, ProgramChange{5}});
+                                 track.events.insert({10 * q, Note{60, 100, q}});
+                             });
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    const auto first = compilePlan(song, byPortName);
+    scheduler.setPlan(first, kNow);
+    scheduler.play(0, {}, kNow);
+    scheduler.sendDue(kNow + 250ms);
+    sink.sent.clear();
+
+    song.updateTrack(id, [](Track& track) { track.programSetup = {std::nullopt, 2, 7}; });
+    const auto changed = compilePlan(song, byPortName);
+    scheduler.setPlan(changed, kNow + 250ms);
+    CHECK(sink.sent ==
+          std::vector<Sent>{{{1}, {0xB0, 32, 2}, kNow + 250ms}, {{1}, {0xC0, 7}, kNow + 250ms}});
+
+    // Past the track's own program change, which stands until the next play.
+    scheduler.sendDue(kNow + 1250ms);
+    sink.sent.clear();
+    song.updateTrack(id, [](Track& track) { track.programSetup.program = 8; });
+    const auto held = compilePlan(song, byPortName);
+    scheduler.setPlan(held, kNow + 1250ms);
+    CHECK(sink.sent.empty());
+}
+
+TEST_CASE("a setup changed while stopped is sent at once")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1, [](EditTrack& track) { track.programSetup.program = 1; });
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+
+    // The first plan isn't a change: opening a song sends nothing.
+    const auto first = compilePlan(song, byPortName);
+    scheduler.setPlan(first, kNow);
+    CHECK(sink.sent.empty());
+
+    song.updateTrack(id, [](Track& track) { track.programSetup.program = 2; });
+    const auto changed = compilePlan(song, byPortName);
+    scheduler.setPlan(changed, kNow + 1s);
+    CHECK(sink.sent == std::vector<Sent>{{{1}, {0xC0, 2}, kNow + 1s}});
+
+    sink.sent.clear();
+    SECTION("clearing a setup sends nothing")
+    {
+        song.updateTrack(id, [](Track& track) { track.programSetup = {}; });
+        const auto cleared = compilePlan(song, byPortName);
+        scheduler.setPlan(cleared, kNow + 2s);
+        CHECK(sink.sent.empty());
+    }
+    SECTION("nor does another change to the track")
+    {
+        song.updateTrack(id, [](Track& track) { track.transpose = 2; });
+        const auto other = compilePlan(song, byPortName);
+        scheduler.setPlan(other, kNow + 2s);
+        CHECK(sink.sent.empty());
+    }
+    SECTION("nor does a muted track")
+    {
+        song.updateTrack(id,
+                         [](Track& track)
+                         {
+                             track.mute = true;
+                             track.programSetup.program = 3;
+                         });
+        const auto muted = compilePlan(song, byPortName);
+        scheduler.setPlan(muted, kNow + 2s);
+        CHECK(sink.sent.empty());
+    }
+}
+
+TEST_CASE("another song's plan sends nothing of its setups, even with the same track ids")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto songWith = [&](std::uint8_t program)
+    {
+        Song song = songAt(ppqn);
+        addTrack(song, 1, [&](EditTrack& track) { track.programSetup.program = program; });
+        return song;
+    };
+    const Song one = songWith(1);
+    const Song two = songWith(2);
+    CHECK(one.identity() != two.identity());
+    Song copy = one;
+    CHECK(copy.identity() == one.identity());
+    CHECK(Song{one.parts()}.identity() == one.identity());
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    const auto first = compilePlan(one, byPortName);
+    const auto second = compilePlan(two, byPortName);
+    scheduler.setPlan(first, kNow);
+    scheduler.setPlan(second, kNow + 1s);
+    CHECK(sink.sent.empty());
 }

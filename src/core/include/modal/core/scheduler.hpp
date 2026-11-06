@@ -58,7 +58,12 @@ public:
     // Replaces the plan. While playing, first sends what is due by now from the old plan, then
     // carries on from the same tick in the new one: events not yet sent come from the new plan,
     // and sounding notes end at their original tick, at the new tempo and time offset. Notes
-    // on tracks no longer in the plan (muted, removed or unrouted) end now.
+    // on tracks no longer in the plan (muted, removed or unrouted) end now. A track that joins
+    // the plan, or whose port or channel changes, catches up as if starting there: its setup,
+    // the values it has passed and, if it chases notes, those still sounding. A track whose
+    // setup changes sends the new one, unless one of its own program changes is already in
+    // force, when the next play sends it. Stopped, a changed setup is sent at once. None of
+    // this applies when the plan is of a different song.
     void setPlan(const PlaybackPlan& plan, std::chrono::nanoseconds now) noexcept;
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
@@ -148,6 +153,10 @@ private:
     std::optional<std::chrono::nanoseconds> countInDue() const noexcept;
 
     void send(const PlannedEvent& event) noexcept;
+    bool passed(const PlannedEvent& event, std::chrono::nanoseconds position) const noexcept;
+    void sendSetup(const PlannedTrack& track, std::chrono::nanoseconds now) noexcept;
+    void catchUp(const PlannedTrack& track, std::chrono::nanoseconds position,
+                 std::chrono::nanoseconds now) noexcept;
     void sendClick(Tick tick) noexcept;
     void sendCountInClick() noexcept;
     void endClick(std::chrono::nanoseconds due) noexcept;

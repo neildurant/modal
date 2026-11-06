@@ -3,6 +3,9 @@
 #include <modal/core/scheduler.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <optional>
 
 namespace modal::core
 {
@@ -15,6 +18,7 @@ using std::chrono::nanoseconds;
 constexpr std::uint8_t kNoteOff = 0x80;
 constexpr std::uint8_t kNoteOn = 0x90;
 constexpr std::uint8_t kControlChange = 0xB0;
+constexpr std::uint8_t kProgramChange = 0xC0;
 
 constexpr std::uint8_t kSustain = 64;
 constexpr std::uint8_t kSostenuto = 66;
@@ -50,9 +54,22 @@ Scheduler::Scheduler(MessageSink& sink, StopOptions options)
 void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
 {
     rememberDestinations(plan);
+    const PlaybackPlan* const old = plan_ != nullptr && plan_->song == plan.song ? plan_ : nullptr;
     if (!playing_)
     {
         plan_ = &plan;
+        if (old != nullptr)
+        {
+            for (const auto& track : plan.tracks)
+            {
+                const auto* before = old->track(track.id);
+                if (before != nullptr && before->destination == track.destination &&
+                    before->channel == track.channel && before->setup != track.setup)
+                {
+                    sendSetup(track, now);
+                }
+            }
+        }
         return;
     }
 
@@ -115,6 +132,97 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
     // Everything at or before the position has been sent, from one plan or the other.
     const auto it = std::ranges::upper_bound(plan.events, position, {}, &PlannedEvent::time);
     next_ = static_cast<std::size_t>(it - plan.events.begin());
+
+    if (old == nullptr)
+    {
+        return;
+    }
+    for (const auto& track : plan.tracks)
+    {
+        const auto* before = old->track(track.id);
+        if (before == nullptr || before->destination != track.destination ||
+            before->channel != track.channel)
+        {
+            catchUp(track, position, now);
+        }
+        else if (before->setup != track.setup)
+        {
+            const bool programInForce =
+                std::ranges::any_of(track.events,
+                                    [&](std::size_t index)
+                                    {
+                                        const auto& event = plan.events[index];
+                                        return passed(event, position) && !event.sysex &&
+                                               (event.message.bytes[0] & 0xF0) == kProgramChange;
+                                    });
+            if (!programInForce)
+            {
+                sendSetup(track, now);
+            }
+        }
+    }
+}
+
+bool Scheduler::passed(const PlannedEvent& event, nanoseconds position) const noexcept
+{
+    // Those before where playback started were chased, even if a lead-in hasn't reached them.
+    return event.time <= position || event.tick < startTick_;
+}
+
+void Scheduler::sendSetup(const PlannedTrack& track, nanoseconds now) noexcept
+{
+    for (const auto& message : track.setup)
+    {
+        sink_.send(track.destination, message.view(), now);
+    }
+}
+
+void Scheduler::catchUp(const PlannedTrack& track, nanoseconds position, nanoseconds now) noexcept
+{
+    sendSetup(track, now);
+
+    const auto& events = plan_->events;
+    std::array<std::optional<std::size_t>, kChaseSlots> last{};
+    for (const auto index : track.events)
+    {
+        if (passed(events[index], position))
+        {
+            if (const auto slot = chaseSlot(events[index]))
+            {
+                last[*slot] = index;
+            }
+        }
+    }
+    std::array<std::size_t, kChaseSlots> values{};
+    std::size_t count = 0;
+    for (const auto& index : last)
+    {
+        if (index)
+        {
+            values[count++] = *index;
+        }
+    }
+    std::sort(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(count));
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const auto& event = events[values[i]];
+        notePedal(event);
+        sink_.send(event.destination, event.message.view(), now);
+    }
+
+    if (!track.chaseNotes)
+    {
+        return;
+    }
+    const nanoseconds from = std::max(position, plan_->tempo.toTime(startTick_));
+    for (const auto index : track.events)
+    {
+        const auto& event = events[index];
+        if (event.isNoteOn() && passed(event, position) && event.noteOffTime > from)
+        {
+            noteOn(event, now);
+        }
+    }
 }
 
 void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanoseconds now,
