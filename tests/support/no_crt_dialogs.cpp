@@ -16,11 +16,13 @@ namespace
 {
 [[maybe_unused]] const bool kNoDialogs = []
 {
+#ifdef _DEBUG // these do nothing in a release build
     for (const int kind : {_CRT_WARN, _CRT_ERROR, _CRT_ASSERT})
     {
         _CrtSetReportMode(kind, _CRTDBG_MODE_FILE);
         _CrtSetReportFile(kind, _CRTDBG_FILE_STDERR);
     }
+#endif
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
     return true;
 }();
