@@ -8,6 +8,7 @@
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <string>
@@ -1365,7 +1366,8 @@ TEST_CASE("the key for inserting an event asks which, completing the kind")
     CHECK(v.ws.mode() == Mode::CommandLine);
     CHECK(v.ws.choices(Choices::EventKind, "") ==
           std::vector<std::string>{"bend", "cc", "copyright", "cue", "instrument", "lyric",
-                                   "polypressure", "pressure", "program", "sysex", "text"});
+                                   "polypressure", "pressure", "program", "sysex", "tempo",
+                                   "text"});
     type(v.ws, U"program 7");
     v.ws.handle(Key::of(NamedKey::Enter), 0);
     CHECK(v.ws.mode() == Mode::Normal);
@@ -1376,4 +1378,58 @@ TEST_CASE("the key for inserting an event asks which, completing the kind")
     v.ws.handle(Key::of(NamedKey::Escape), 0);
     CHECK(v.ws.mode() == Mode::Normal);
     CHECK(v.document.song().events(id).size() == before + 1);
+}
+
+TEST_CASE("a tempo change can be inserted at the cursor, from any track or the conductor")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Viewing v{[&]
+              {
+                  core::Song song{ppqn};
+                  const auto id = song.addTrack("Bass");
+                  song.updateEvents(
+                      id,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{40, 100, ppqn.quarter()}});
+                          events.insert({4 * ppqn.quarter(), core::Note{42, 100, ppqn.quarter()}});
+                      });
+                  return song;
+              }()};
+    const auto tempoAt = [&](core::Tick tick) { return v.document.song().tempo().tempoAt(tick); };
+    const auto before = tempoAt(0);
+
+    for (int i = 0; i < 8 && v.view.cursor().tick == 0; ++i)
+    {
+        type(v.ws, U"j"); // to the second note
+    }
+    const auto tick = v.view.cursor().tick;
+    REQUIRE(tick == 4 * ppqn.quarter());
+    const auto result = v.registry.runLine("event-insert tempo 96.5");
+    CHECK_FALSE(result.warning);
+    CHECK(tempoAt(tick) == core::Tempo::fromBpm(96.5));
+    CHECK(tempoAt(tick - 1) == before);
+
+    // Another at the same time replaces it, each an undo step.
+    CHECK_FALSE(v.registry.runLine("event-insert tempo 100").warning);
+    CHECK(tempoAt(tick) == core::Tempo::fromBpm(100));
+    type(v.ws, U"u");
+    CHECK(tempoAt(tick) == core::Tempo::fromBpm(96.5));
+    type(v.ws, U"u");
+    CHECK(tempoAt(tick) == before);
+
+    for (const auto* bad : {"event-insert tempo", "event-insert tempo 0", "event-insert tempo 1001",
+                            "event-insert tempo fast", "event-insert tempo 96 bpm"})
+    {
+        CAPTURE(bad);
+        CHECK(v.registry.runLine(bad).message == "A tempo must be from 1 to 1000 BPM");
+        CHECK(tempoAt(tick) == before);
+    }
+
+    // The conductor takes it, though nothing else.
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
+    REQUIRE_FALSE(v.view.cursor().track);
+    CHECK_FALSE(v.registry.runLine("event-insert tempo 80").warning);
+    CHECK(tempoAt(v.view.cursor().tick) == core::Tempo::fromBpm(80));
+    CHECK(v.registry.runLine("event-insert program 5").warning);
 }

@@ -336,9 +336,11 @@ constexpr std::array kSharedCommands{
                 .keys = false,
                 .choices = {Choices::Port}},
     CommandInfo{.name = "event-insert",
-                .description = "Insert an event at the cursor: cc 7 100, program 5, bend -200, "
-                               "pressure 60, polypressure C4 60, sysex F0 7D 01 F7, or text, "
-                               "lyric, cue, copyright or instrument with words in quotes",
+                .description =
+                    "Insert an event at the cursor: cc 7 100, program 5, bend -200, "
+                    "pressure 60, polypressure C4 60, sysex F0 7D 01 F7, or text, "
+                    "lyric, cue, copyright or instrument with words in quotes; or tempo 96, "
+                    "the conductor's",
                 .usage = "EVENT",
                 .choices = {Choices::EventKind}},
     CommandInfo{.name = "section-insert-before",

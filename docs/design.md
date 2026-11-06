@@ -797,7 +797,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 - [ ] Whether users may configure column order, in addition to the future per-view visibility settings.
 - [ ] A song-tempo control or fallback: relationship to the conductor and explicit starting tempo in each section.
 - [x] Bank/program numbers, initial setup, precedence over events, live changes and shared channels: see Bank and program setup above.
-- [x] `, e` for `:event-insert`, a stop-gap for inserting any event but a note until the controller lanes and so on have ways of their own: one key that asks, with the kinds completed, as a key per kind would run out of letters among program, pressure and polypressure (November 2026).
+- [x] `, e` for `:event-insert`, a stop-gap for inserting any event but a note, and tempo changes, until the controller lanes and so on have ways of their own: one key that asks, with the kinds completed, as a key per kind would run out of letters among program, pressure and polypressure (November 2026).
 - [ ] Reordering tracks (requested November 2026, to schedule): from the Tracks view or the arrangement, a command on a track or a `V` selection, after which the up and down keys move it or them through the other tracks, until Enter accepts or Escape cancels. The command's key is to choose.
 - [ ] Playback quantise: note lengths, pedal alignment, live changes, bypass and committing to stored notes; additional parameters beyond the grid.
 - [ ] Whether ghost notes are coloured by their track or all dimmed alike.

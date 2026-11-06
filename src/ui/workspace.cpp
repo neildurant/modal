@@ -2401,15 +2401,38 @@ void Workspace::showPlayhead()
 CommandResult Workspace::insertEvent(std::string_view text)
 {
     const auto cursor = view().cursor();
-    if (!cursor.track)
-    {
-        return CommandResult::error("The conductor holds only tempo and meter changes");
-    }
-    if (text.find_first_not_of(" \t") == std::string_view::npos)
+    const auto first = text.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
     {
         // From its key: asks which, with the kinds to complete from.
         openPrompt("event-insert ");
         return {true, {}, false};
+    }
+    text = text.substr(first, text.find_last_not_of(" \t") - first + 1);
+    if (text == "tempo" || text.starts_with("tempo "))
+    {
+        // The conductor's, whichever track the cursor is on.
+        auto number = text.substr(std::min(text.size(), std::string_view{"tempo"}.size()));
+        number.remove_prefix(std::min(number.find_first_not_of(' '), number.size()));
+        double bpm = 0;
+        const auto [end, error] =
+            std::from_chars(number.data(), number.data() + number.size(), bpm);
+        if (error != std::errc{} || end != number.data() + number.size() || !(bpm >= 1) ||
+            bpm > 1000)
+        {
+            return CommandResult::error("A tempo must be from 1 to 1000 BPM");
+        }
+        const auto tempo = core::Tempo::fromBpm(bpm);
+        document_.edit(
+            "Set tempo to " + core::bpmText(tempo), view().place(), [&](core::Song& song)
+            { song.updateTempo([&](core::TempoMap& map) { map.set(cursor.tick, tempo); }); });
+        view().refresh();
+        return {true, "Tempo " + core::bpmText(tempo) + " from " + view().position(cursor.tick),
+                false};
+    }
+    if (!cursor.track)
+    {
+        return CommandResult::error("The conductor holds only tempo and meter changes");
     }
     auto parsed = core::parseEvent(text);
     if (!parsed.data)
