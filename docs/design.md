@@ -781,7 +781,7 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestone 7: more for the views**
 
-- [x] A dedicated Tracks view first: existing settings, then numeric bank/program setup, then playback quantise. Mute/solo beside the name; shared column definitions leave room for later per-view visibility in `modalrc` and reusable instrument program tables (decided November 2026; see Views). The first settings/copying step is built locally for UI trial.
+- [x] A dedicated Tracks view first: existing settings, then numeric bank/program setup, then playback quantise. Mute/solo beside the name; shared column definitions leave room for later per-view visibility in `modalrc` and reusable instrument program tables (decided November 2026; see Views). The first settings/copying step is complete, with its revised UI trial confirmed on 6 November 2026.
 - [x] Tracks view on `, v t`; note chasing moved from the inspector into its own column after Solo after the first UI trial (November 2026). Arm/Thru remain deferred to GUI recording and MIDI input.
 - [x] Column order is easy to change in code: one ordered list, with stable column identities and drawing/navigation following that list (decided November 2026).
 - [x] `gt` and `, v t` open Tracks; `3gt` selects track 3 there. Ctrl-PageDown / Ctrl-PageUp switch to next/previous track, leaving `]t` / `[t` for takes (decided November 2026).

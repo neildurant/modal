@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: the first Tracks view implementation is built locally; the revised layout passes all six Linux configurations and awaits another UI trial. Nothing from this step has been pushed.*
+*Last updated 6 November 2026: the first Tracks view step and revised note inspector are complete. The UI trial is confirmed, all six Linux configurations pass, and publication is approved.*
 
 ## Milestones
 
@@ -14,13 +14,12 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 | 4. Event list and core grammar | Done, except the Linux checks |
 | 5. Piano roll and arrangement | Done, except the Linux checks |
 | 6. Full grammar | Done (November 2026), except the Linux checks |
-| 7. More for the views, and several songs | First Tracks view step built locally; UI trial pending |
+| 7. More for the views, and several songs | First Tracks view step complete; UI trial confirmed |
 
 What each milestone holds is in [design.md](design.md), under Milestones.
 
 ## Pending
 
-- **Revised Tracks view UI trial:** the aligned note inspector, musical offset display, Mute/Solo/Chase buttons and numeric alignment below. Keep these changes local until tried, as AGENTS.md requires.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, and the views. Neil runs these.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
@@ -51,7 +50,7 @@ The UI trial below was confirmed on 5 November 2026, completing the check requir
 
 ## Tracks view: first implementation
 
-Built locally as the first step of milestone 7: `40a8f84` adds the core support and `3030d68` the view, editing and timing inspector. The agreed design is in design.md and decisions.md; keys and editing are in grammar.md. These commits have not been pushed.
+The first step of milestone 7 is complete: `40a8f84` adds the core support, `3030d68` the view, editing and timing inspector, and `cb85a4f` the revised layout and track controls. The revised UI trial was confirmed on 6 November 2026 and publication approved. The agreed design is in design.md and decisions.md; keys and editing are in grammar.md.
 
 - The table exposes number, name, mute, solo, chase, output port, channel, transpose, velocity offset and time offset. Mute/Solo/Chase show `-` or coloured `M`/`S`/`C` buttons; numeric values align on the right. Stable field identities, shared formatting/editing and one ordered column list keep later column visibility or reordering separate from track state.
 - `gt` and `, v t` open Tracks; `3gt` chooses track 3. Ctrl-PageDown / Ctrl-PageUp switch tracks. Musical position and pitch are retained when switching views.
@@ -65,22 +64,22 @@ Built locally as the first step of milestone 7: `40a8f84` adds the core support 
 
 - Follow-up presentation checks pass: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 741 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. New regressions cover aligned coarse/fine pairs, a visible editor at narrow widths, exact offset display at both PPQNs, toggle rendering, per-track Chase, and Tab through track columns.
 - Initial implementation: the full `tools/check-linux.sh` passed on the completed implementation: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each configuration registers 735 tests, with three platform/MIDI tests skipped and no failures. Whole-tree formatting and `git diff --check` also pass.
-- `build/linux-gcc/apps/Debug/modal` has been rebuilt after the implementation commits and checked to be newer than every application build input. The first UI trial produced the presentation feedback above; a trial of the revised layout remains pending. Nothing from this step has been pushed.
+- `build/linux-gcc/apps/Debug/modal` has been rebuilt after the implementation commits and checked to be newer than every application build input. The first UI trial produced the presentation feedback above; the revised layout was accepted on 6 November 2026.
 - Hidden offscreen sample renders pass for Tracks, the event list, arrangement and piano roll, including dark/light themes. The revised inspector and both table themes were inspected, including active M/S/C buttons and fraction-plus-fine offsets; this caught and fixed duplicated glyphs under the new buttons.
-- No desktop automation or MIDI hardware tests have been run. Local Windows builds are skipped under the agreed policy; CI follows after the UI trial and push.
+- No desktop automation or MIDI hardware tests have been run. Local Windows builds are skipped under the agreed policy. CI must be checked after publication.
 
-### What to try
+### Confirmed UI trial
 
-Run `build/linux-gcc/apps/Debug/modal --demo` (or open a song).
+The revised UI was accepted on 6 November 2026. These are the trial steps, retained for reference; the acceptance does not establish MIDI hardware timing results. Run `build/linux-gcc/apps/Debug/modal --demo` (or open a song).
 
 1. `gt`, then `j/k` and `h/l`; Enter edits a field. Try the Mute/Solo/Chase buttons, channel, transpose and velocity offset. Enter accepts `M`/`S`/`C`, `-`, or on/off; Tab commits and moves along columns. Space plays, `ga/ge/gr` switch views, Ctrl-PageDown / Ctrl-PageUp switch tracks, and Backspace returns. Resize the window with the time-offset column selected.
 2. On time offset (`$`), enter `+1/16-22t`, then `-40ms`; confirm the musical value displays as a fraction plus fine ticks, then undo and redo, save and reopen. Confirm that stored note positions remain unchanged. Real MIDI output is useful for auditioning these settings, but has not been measured here.
 3. `Vy`, then `p` or `P`, and undo. Try `Vjy` for two tracks and `Vp` for replacement. In a numeric column, `Vj` then Enter or `+` edits both selected tracks in one undo step. Copies preserve routing, mute and solo as agreed.
-4. In the piano roll or event list, `e` and Tab through the pitch/velocity, coarse/fine and exact-timing groups. Edit Start step/fine and Length steps/fine; undo. Compare `:set timingunit=1/16` and `:set timingunit=grid`. Check the extra inspector row feels useful and leaves enough editing space.
+4. In the piano roll or event list, `e` and Tab through the pitch/velocity, coarse/fine and exact-timing groups. Edit Start step/fine and Length steps/fine; undo. Compare `:set timingunit=1/16` and `:set timingunit=grid`. Check the grouped inspector is readable and leaves enough editing space.
 
 ## Next
 
-After the Tracks UI trial, address feedback, push the passing local step and watch CI. Then settle the next step's open questions before implementation:
+The initial Tracks step and its UI feedback are complete. Settle the next step's open questions before implementation:
 
 1. Numeric bank/program setup: display conventions, playback setup and event precedence, live changes and conflicts on shared channels. Instrument program tables with names are future work.
 2. Playback quantise: independent grid, note lengths, pedals, live changes, bypass and committing.
