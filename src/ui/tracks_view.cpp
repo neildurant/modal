@@ -63,6 +63,22 @@ void TracksView::go(std::size_t index)
     ensureVisible();
 }
 
+int TracksView::columnWidth(const TrackColumn& column) const
+{
+    if (column.field != TrackField::Name)
+    {
+        return column.width;
+    }
+    constexpr std::size_t kLongestShown = 32;
+    std::size_t longest = 0;
+    for (const auto& track : document_.song().tracks())
+    {
+        longest = std::max(longest, decodeUtf8(track->name).size());
+    }
+    // A character more for the space after it, the width being what the column takes up.
+    return std::max(column.width, static_cast<int>(std::min(longest, kLongestShown)) + 1);
+}
+
 void TracksView::ensureVisible()
 {
     const auto rows = static_cast<std::size_t>(std::max(layout_.fullRows - 1, 1));
@@ -79,16 +95,16 @@ void TracksView::ensureVisible()
     column_ = std::min(column_, columns.size() - 1);
     for (std::size_t i = 0; i < column_; ++i)
     {
-        x += columns[i].width;
+        x += columnWidth(columns[i]);
     }
     const int room = std::max(layout_.fullColumns - 2, 1);
     if (x < left_)
     {
         left_ = x;
     }
-    if (x + columns[column_].width > left_ + room)
+    if (x + columnWidth(columns[column_]) > left_ + room)
     {
-        left_ = std::max(0, x + columns[column_].width - room);
+        left_ = std::max(0, x + columnWidth(columns[column_]) - room);
     }
 }
 
@@ -200,9 +216,9 @@ Inspection TracksView::inspection() const
     const auto& column = trackColumns()[column_];
     const auto full = trackFieldText(column.field, track, row());
     auto shown = decodeUtf8(full);
-    if (shown.size() > 28)
+    if (shown.size() > 32) // as long as the table shows
     {
-        shown.resize(27);
+        shown.resize(31);
         shown += U'…';
     }
     result.fields.push_back({std::string{column.heading}, encodeUtf8(shown),
@@ -531,30 +547,29 @@ void TracksView::addRegions(Frame& frame) const
         for (std::size_t c = 0; c < columns.size(); ++c)
         {
             const auto& column = columns[c];
+            const int wide = columnWidth(column);
             auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
                                          : std::string{column.heading});
-            if (text.size() >= static_cast<std::size_t>(column.width))
+            if (text.size() >= static_cast<std::size_t>(wide))
             {
-                text.resize(static_cast<std::size_t>(column.width - 2));
+                text.resize(static_cast<std::size_t>(wide - 2));
                 text += U'…';
             }
-            const auto padding = static_cast<std::size_t>(column.width - 1) - text.size();
+            const auto padding = static_cast<std::size_t>(wide - 1) - text.size();
             if (track && column.numeric)
                 text.insert(0, padding, U' ');
             else
                 text.append(padding, U' ');
             const bool toggle = track && isToggle(column.field);
             if (toggle)
-                text.assign(static_cast<std::size_t>(column.width - 1), U' ');
+                text.assign(static_cast<std::size_t>(wide - 1), U' ');
             Style style{track ? Role::Text : Role::Dim, Role::Background, kPlain};
             if (track && std::ranges::find(chosen, track->id()) != chosen.end())
             {
                 style.background = Role::Selection;
                 // Into the space after the column, so a selected row is one unbroken band.
-                table.text.push_back({x + (column.width - 1) * cell_.width,
-                                      y,
-                                      U" ",
-                                      {Role::Text, Role::Selection, kPlain}});
+                table.text.push_back(
+                    {x + (wide - 1) * cell_.width, y, U" ", {Role::Text, Role::Selection, kPlain}});
             }
             if (track && !toggle && index == row() && c == column_)
             {
@@ -584,7 +599,7 @@ void TracksView::addRegions(Frame& frame) const
                     table.over.push_back({{x + w - edge, y, edge, cell_.height}, Role::Cursor});
                 }
             }
-            x += column.width * cell_.width;
+            x += wide * cell_.width;
         }
     };
     draw(0, 0, nullptr);

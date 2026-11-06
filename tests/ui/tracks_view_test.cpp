@@ -661,6 +661,41 @@ TEST_CASE("the status line shows the cursor's time in every view, and the inspec
                 CHECK(run.text != U"Time");
 }
 
+TEST_CASE("the name column grows with the longest name, up to a limit")
+{
+    Tracking t;
+    const auto headingX = [&](std::u32string_view heading)
+    {
+        const auto frame = t.ws.frame();
+        const auto run = std::ranges::find_if(
+            frame.front().text, [&](const TextRun& candidate)
+            { return candidate.y == 0 && candidate.text.starts_with(heading); });
+        REQUIRE(run != frame.front().text.end());
+        return run->x;
+    };
+    const auto shown = [&](std::u32string_view text)
+    {
+        const auto frame = t.ws.frame();
+        return std::ranges::any_of(frame.front().text, [&](const TextRun& run)
+                                   { return run.text.find(text) != run.text.npos; });
+    };
+    const int start = headingX(U"Name");
+    const int usual = headingX(U"Mute");
+    CHECK(usual - start == trackColumns()[1].width * 10);
+
+    const std::u32string thirty = U"A name of thirty characters ok";
+    REQUIRE(thirty.size() == 30);
+    t.enter(thirty);
+    CHECK(shown(thirty));
+    CHECK(headingX(U"Mute") - start == 31 * 10);
+
+    t.enter(thirty + U" and a good deal more");
+    CHECK(shown(thirty + U" …"));
+    CHECK(headingX(U"Mute") - start == 33 * 10);
+    t.type(U"uu");
+    CHECK(headingX(U"Mute") == usual);
+}
+
 TEST_CASE("the conductor has no mute or solo to toggle")
 {
     Tracking t;

@@ -42,6 +42,8 @@ private:
     std::size_t row() const;
     void go(std::size_t row);
     void ensureVisible();
+    // A column's width in cells: Name grows with the longest name, up to a limit.
+    int columnWidth(const TrackColumn& column) const;
     std::vector<core::TrackId> selected() const;
     Inspection inspection() const;
     TrackField fieldFor(std::string_view heading) const;
