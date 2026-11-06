@@ -1339,8 +1339,8 @@ TEST_CASE("any kind of event but a note can be inserted at the cursor, as one un
     CHECK(count() == before + cases.size() - 1);
 
     for (const auto* bad :
-         {"event-insert", "event-insert program 128", "event-insert cc 7",
-          "event-insert nonsense 1", "event-insert note C4", "event-insert sysex 7D 01"})
+         {"event-insert program 128", "event-insert cc 7", "event-insert nonsense 1",
+          "event-insert note C4", "event-insert sysex 7D 01"})
     {
         CAPTURE(bad);
         const auto result = v.registry.runLine(bad);
@@ -1353,4 +1353,27 @@ TEST_CASE("any kind of event but a note can be inserted at the cursor, as one un
     // The conductor has no such events.
     v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
     CHECK(v.registry.runLine("event-insert program 5").warning);
+}
+
+TEST_CASE("the key for inserting an event asks which, completing the kind")
+{
+    Viewing v;
+    const auto id = v.document.song().tracks()[0]->id();
+    const auto before = v.document.song().events(id).size();
+    v.ws.setLineHandler([&](const std::string& line) { v.registry.runLine(line); });
+    type(v.ws, U",e");
+    CHECK(v.ws.mode() == Mode::CommandLine);
+    CHECK(v.ws.choices(Choices::EventKind, "") ==
+          std::vector<std::string>{"bend", "cc", "copyright", "cue", "instrument", "lyric",
+                                   "polypressure", "pressure", "program", "sysex", "text"});
+    type(v.ws, U"program 7");
+    v.ws.handle(Key::of(NamedKey::Enter), 0);
+    CHECK(v.ws.mode() == Mode::Normal);
+    REQUIRE(v.document.song().events(id).size() == before + 1);
+
+    // Asked and left without an answer, nothing changes.
+    type(v.ws, U",e");
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    CHECK(v.ws.mode() == Mode::Normal);
+    CHECK(v.document.song().events(id).size() == before + 1);
 }

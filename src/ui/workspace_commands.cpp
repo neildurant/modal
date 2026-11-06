@@ -340,7 +340,7 @@ constexpr std::array kSharedCommands{
                                "pressure 60, polypressure C4 60, sysex F0 7D 01 F7, or text, "
                                "lyric, cue, copyright or instrument with words in quotes",
                 .usage = "EVENT",
-                .keys = false},
+                .choices = {Choices::EventKind}},
     CommandInfo{.name = "section-insert-before",
                 .description = "Insert a new section before the cursor's, of {count} bars (4), "
                                "asking for its name",

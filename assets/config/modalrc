@@ -392,6 +392,10 @@ cmap <C-.>      panic             "Panic"
 " asking with its name to edit; , s i and , s a insert a new one before or after it; , s j
 " joins it with the next; , s s starts a new section at the cursor's bar line; and , s l
 " starts one at the label at or before the cursor. The strip's own keys do the same there.
+" , e asks for an event to insert at the cursor, of any kind but a note, as :event-insert does;
+" Tab completes the kind, and what it should be followed by is explained if it's wrong.
+nmap <leader>e  event-insert      "Insert an event"
+
 keysection "Sections"
 ngroup <leader>s "Sections"
 nmap <leader>sr section-rename     "Rename this section"

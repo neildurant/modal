@@ -2405,6 +2405,12 @@ CommandResult Workspace::insertEvent(std::string_view text)
     {
         return CommandResult::error("The conductor holds only tempo and meter changes");
     }
+    if (text.find_first_not_of(" \t") == std::string_view::npos)
+    {
+        // From its key: asks which, with the kinds to complete from.
+        openPrompt("event-insert ");
+        return {true, {}, false};
+    }
     auto parsed = core::parseEvent(text);
     if (!parsed.data)
     {

@@ -421,6 +421,9 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         }
         return found;
     }
+    case Choices::EventKind:
+        return {"bend",         "cc",       "copyright", "cue",   "instrument", "lyric",
+                "polypressure", "pressure", "program",   "sysex", "text"};
     case Choices::Port:
         if (portFinder_)
         {
