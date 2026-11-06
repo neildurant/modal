@@ -22,6 +22,8 @@ constexpr std::uint8_t kProgramChange = 0xC0;
 constexpr std::uint8_t kChannelPressure = 0xD0;
 constexpr std::uint8_t kPitchBend = 0xE0;
 
+constexpr std::uint8_t kBankSelectMsb = 0;
+constexpr std::uint8_t kBankSelectLsb = 32;
 constexpr std::uint8_t kFirstChannelModeController = 120;
 
 ShortMessage message(std::uint8_t status, std::uint8_t channel, std::uint8_t data1)
@@ -116,9 +118,30 @@ struct Planner
     bool operator()(const MetaText&) const { return false; }
 };
 
-// Which chased value an event sets, so later ones replace earlier ones: one slot per
-// controller below the channel mode messages, then program, pitch bend and pressure.
-std::optional<std::size_t> chaseSlot(const PlannedEvent& event)
+static_assert(kChaseSlots == kFirstChannelModeController + 3);
+
+// The messages for a track's setup: bank before program, as instruments expect.
+std::vector<ShortMessage> setupMessages(const ProgramSetup& setup, std::uint8_t channel)
+{
+    std::vector<ShortMessage> messages;
+    if (setup.bankMsb)
+    {
+        messages.push_back(message(kControlChange, channel, kBankSelectMsb, *setup.bankMsb));
+    }
+    if (setup.bankLsb)
+    {
+        messages.push_back(message(kControlChange, channel, kBankSelectLsb, *setup.bankLsb));
+    }
+    if (setup.program)
+    {
+        messages.push_back(message(kProgramChange, channel, *setup.program));
+    }
+    return messages;
+}
+
+} // namespace
+
+std::optional<std::size_t> chaseSlot(const PlannedEvent& event) noexcept
 {
     if (event.sysex || event.message.size == 0)
     {
@@ -144,10 +167,6 @@ std::optional<std::size_t> chaseSlot(const PlannedEvent& event)
     }
 }
 
-constexpr std::size_t kChaseSlots = kFirstChannelModeController + 3;
-
-} // namespace
-
 std::size_t PlaybackPlan::firstAtOrAfter(nanoseconds time) const
 {
     const auto it = std::ranges::lower_bound(events, time, {}, &PlannedEvent::time);
@@ -164,6 +183,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
                          const PlanOptions& options)
 {
     PlaybackPlan plan{song.tempo()};
+    plan.song = song.identity();
 
     const auto& metronome = song.metronome;
     using When = MetronomeSettings::When;
@@ -214,7 +234,13 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
 
         const auto channel = static_cast<std::uint8_t>(track.channel - 1);
         const auto offset = track.timeOffset;
-        plan.tracks.push_back({track.id(), *destination, channel, track.chaseNotes, offset});
+        plan.tracks.push_back({track.id(),
+                               *destination,
+                               channel,
+                               track.chaseNotes,
+                               offset,
+                               setupMessages(track.programSetup, channel),
+                               {}});
         plan.leadIn = std::max(plan.leadIn, -offset.at(plan.tempo, 0));
         if (offset.musical() && offset.amount() < 0)
         {
@@ -253,6 +279,15 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     }
 
     std::ranges::stable_sort(plan.events, {}, &PlannedEvent::time);
+    std::map<TrackId, std::size_t> trackIndex;
+    for (std::size_t i = 0; i < plan.tracks.size(); ++i)
+    {
+        trackIndex.emplace(plan.tracks[i].id, i);
+    }
+    for (std::size_t i = 0; i < plan.events.size(); ++i)
+    {
+        plan.tracks[trackIndex.at(plan.events[i].track)].events.push_back(i);
+    }
     return plan;
 }
 
@@ -264,38 +299,47 @@ std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start)
         std::vector<std::size_t> sounding;
     };
 
-    std::map<TrackId, std::size_t> trackIndex;
-    for (std::size_t i = 0; i < plan.tracks.size(); ++i)
-    {
-        trackIndex.emplace(plan.tracks[i].id, i);
-    }
     std::vector<TrackChase> chases(plan.tracks.size());
 
-    for (std::size_t i = 0; i < plan.events.size(); ++i)
+    for (std::size_t t = 0; t < plan.tracks.size(); ++t)
     {
-        const auto& event = plan.events[i];
-        if (event.tick >= start)
+        for (const auto i : plan.tracks[t].events)
         {
-            continue; // played normally; a later event may still be before the start
-        }
-        const auto t = trackIndex.at(event.track);
-        if (event.isNoteOn())
-        {
-            if (plan.tracks[t].chaseNotes && event.endTick > start)
+            const auto& event = plan.events[i];
+            if (event.tick >= start)
             {
-                chases[t].sounding.push_back(i);
+                continue; // played normally; a later event may still be before the start
             }
-        }
-        else if (const auto slot = chaseSlot(event))
-        {
-            chases[t].last[*slot] = i;
+            if (event.isNoteOn())
+            {
+                if (plan.tracks[t].chaseNotes && event.endTick > start)
+                {
+                    chases[t].sounding.push_back(i);
+                }
+            }
+            else if (const auto slot = chaseSlot(event))
+            {
+                chases[t].last[*slot] = i;
+            }
         }
     }
 
     const nanoseconds startTime = plan.tempo.toTime(start) - plan.leadIn;
     std::vector<PlannedEvent> result;
-    for (const auto& trackChase : chases)
+    for (std::size_t t = 0; t < plan.tracks.size(); ++t)
     {
+        const auto& track = plan.tracks[t];
+        const auto& trackChase = chases[t];
+        for (const auto& setup : track.setup)
+        {
+            PlannedEvent event{};
+            event.time = startTime;
+            event.tick = start;
+            event.track = track.id;
+            event.destination = track.destination;
+            event.message = setup;
+            result.push_back(std::move(event));
+        }
         std::vector<std::size_t> values;
         for (const auto& index : trackChase.last)
         {

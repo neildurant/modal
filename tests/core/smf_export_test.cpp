@@ -367,3 +367,50 @@ TEST_CASE("exporting to a file replaces it whole")
     CHECK(failed.bytes.empty());
     CHECK_FALSE(std::filesystem::exists(nowhere));
 }
+
+TEST_CASE("a track's program setup is exported ahead of its events, and imports as events")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn};
+    addTrack(song, "T", 3,
+             [&](EditTrack& track)
+             {
+                 track.programSetup = {1, 2, 3};
+                 track.events.insert({0, ProgramChange{9}});
+                 track.events.insert({0, Note{60, 100, q}});
+             });
+
+    const auto result = exportSmf(song);
+    REQUIRE(result.error.empty());
+    const auto conductor = chunk("MTrk", concat({
+                                             {0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20},
+                                             {0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 24, 8},
+                                             vlq(q),
+                                             {0xFF, 0x2F, 0x00},
+                                         }));
+    const auto track = chunk("MTrk", concat({
+                                         {0x00, 0xFF, 0x03, 0x01, 'T'},
+                                         {0x00, 0xFF, 0x20, 0x01, 0x02},
+                                         {0x00, 0xB2, 0, 1},
+                                         {0x00, 32, 2},
+                                         {0x00, 0xC2, 3},
+                                         {0x00, 9},
+                                         {0x00, 0x92, 60, 100},
+                                         vlq(q),
+                                         {0x82, 60, 64},
+                                         {0x00, 0xFF, 0x2F, 0x00},
+                                     }));
+    CHECK(tracksOf(result.bytes) == concat({conductor, track}));
+}
+
+TEST_CASE("a song without a program setup exports nothing extra for it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song{ppqn};
+    addTrack(song, "T", 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, 1}}); });
+    const auto before = exportSmf(song);
+    addTrack(song, "U", 1, [&](EditTrack& track) { track.programSetup.program = 0; });
+    const auto after = exportSmf(song);
+    CHECK(after.bytes.size() > before.bytes.size());
+}

@@ -149,6 +149,10 @@ public:
 
     Ppqn ppqn() const { return tempo_.ppqn(); }
 
+    // Which song this is: new for each song made or read, and kept through copies, edits and
+    // undo, so that playback can tell an edited song from a different one.
+    std::uint64_t identity() const { return identity_; }
+
     std::string title;
     MetronomeSettings metronome;
     CountInSettings countIn;
@@ -324,6 +328,7 @@ public:
         std::vector<std::shared_ptr<const Track>> tracks;
         std::vector<std::shared_ptr<const Section>> sections;
         std::uint64_t nextTrackId;
+        std::uint64_t identity;
     };
 
     Parts parts() const;
@@ -332,6 +337,8 @@ public:
     explicit Song(Parts parts);
 
 private:
+    static std::uint64_t newIdentity();
+
     struct Flattened
     {
         MeterMap meter;
@@ -365,6 +372,7 @@ private:
     std::vector<std::shared_ptr<const Track>> tracks_;
     std::vector<std::shared_ptr<const Section>> sections_;
     std::uint64_t nextTrackId_ = 1;
+    std::uint64_t identity_ = newIdentity();
 
     // Flattened.
     TempoMap tempo_;

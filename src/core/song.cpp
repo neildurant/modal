@@ -3,6 +3,7 @@
 #include <modal/core/song.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <charconv>
 #include <iterator>
@@ -155,6 +156,12 @@ bool operator==(const Section& a, const Section& b)
            a.marks_ == b.marks_ && std::ranges::equal(a.content_, b.content_, sameContent);
 }
 
+std::uint64_t Song::newIdentity()
+{
+    static std::atomic<std::uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
 Song::Song(Ppqn ppqn)
     : tempo_(ppqn)
     , meter_(ppqn)
@@ -190,6 +197,7 @@ Song::Song(Parts parts)
     , tracks_(std::move(parts.tracks))
     , sections_(std::move(parts.sections))
     , nextTrackId_(parts.nextTrackId)
+    , identity_(parts.identity)
     , tempo_(parts.ppqn)
     , meter_(parts.ppqn)
 {
@@ -199,7 +207,7 @@ Song::Song(Parts parts)
 
 Song::Parts Song::parts() const
 {
-    return {ppqn(), title, metronome, countIn, tracks_, sections_, nextTrackId_};
+    return {ppqn(), title, metronome, countIn, tracks_, sections_, nextTrackId_, identity_};
 }
 
 bool operator==(const Song& a, const Song& b)

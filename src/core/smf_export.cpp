@@ -34,6 +34,7 @@ enum class Slot : std::uint8_t
 {
     Header,    // track name and channel prefix
     Conductor, // tempo, meter and markers
+    Setup,     // the track's bank and program setup, before anything of its own
     NoteOff,
     Other,
     NoteOn,
@@ -108,6 +109,20 @@ void addTrackEvents(const Track& track, const EventList& events, std::vector<Out
     const auto channel = static_cast<std::uint8_t>(track.channel - 1);
     const auto status = [channel](std::uint8_t type)
     { return static_cast<std::uint8_t>(type | channel); };
+
+    const auto& setup = track.programSetup;
+    if (setup.bankMsb)
+    {
+        out.push_back({0, Slot::Setup, {status(0xB0), 0, *setup.bankMsb}});
+    }
+    if (setup.bankLsb)
+    {
+        out.push_back({0, Slot::Setup, {status(0xB0), 32, *setup.bankLsb}});
+    }
+    if (setup.program)
+    {
+        out.push_back({0, Slot::Setup, {status(0xC0), *setup.program}});
+    }
 
     for (const auto& event : events.all())
     {

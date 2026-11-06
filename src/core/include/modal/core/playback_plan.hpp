@@ -94,6 +94,8 @@ struct PlannedTrack
     std::uint8_t channel; // 0-15
     bool chaseNotes;
     TimeOffset timeOffset;
+    std::vector<ShortMessage> setup; // its bank and program setup, in the order to send them
+    std::vector<std::size_t> events; // its events in the plan's list, in order
 };
 
 // The metronome as the scheduler plays it: a click on each beat of the meter, from the
@@ -121,6 +123,7 @@ struct PlaybackPlan
     }
 
     TempoMap tempo;
+    std::uint64_t song = 0;           // which song this came from (see Song::identity)
     std::vector<PlannedEvent> events; // by time; at equal times, in track and stored order
     std::vector<PlannedTrack> tracks; // the tracks in the plan, in song order
     std::vector<TrackId> unrouted;    // audible tracks left out for want of a destination
@@ -160,11 +163,18 @@ struct PlanOptions
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
                          const PlanOptions& options = {});
 
+// Which chased value an event sets, so later ones replace earlier ones, or none if it isn't
+// chased: one slot per controller below the channel mode messages (CC 120-127), then program,
+// pitch bend and pressure.
+std::optional<std::size_t> chaseSlot(const PlannedEvent& event) noexcept;
+inline constexpr std::size_t kChaseSlots = 123;
+
 // What to send when playback starts at a tick, before the events from that tick on: for each
-// track, the last program change, controller values, pitch bend and channel pressure before
-// the start, in the order they were sent, and then (for tracks with note chasing on) the
-// notes still sounding, which end at their usual time. Channel mode messages (CC 120-127)
-// aren't chased. Every event is timed to send at the start of playback.
+// track, its bank and program setup, so that its own events can override it and a later program
+// change finds the bank it asked for; then the last program change, controller values, pitch
+// bend and channel pressure before the start, in the order they were sent; and then (for tracks
+// with note chasing on) the notes still sounding, which end at their usual time. Every event is
+// timed to send at the start of playback.
 std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start);
 
 } // namespace modal::core

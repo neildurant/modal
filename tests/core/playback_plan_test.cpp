@@ -498,3 +498,64 @@ TEST_CASE("the metronome is planned when its settings say it plays, and it has a
     song.metronome.when = When::Off;
     CHECK_FALSE(compilePlan(song, everythingToPort, recording).metronome);
 }
+
+TEST_CASE("a track's setup is chased first, so later events can override it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 2,
+             [&](EditTrack& track)
+             {
+                 track.programSetup = {1, 2, 3};
+                 track.events.insert({0, ProgramChange{10}});
+                 track.events.insert({3 * q, ProgramChange{11}});
+             });
+    const auto plan = compilePlan(song, everythingToPort);
+
+    SECTION("from the song's start, only the setup goes ahead of the events")
+    {
+        const auto chased = chase(plan, 0);
+        CHECK(messagesOf(chased) ==
+              std::vector<ShortMessage>{bytes(0xB1, 0, 1), bytes(0xB1, 32, 2), bytes(0xC1, 3)});
+        for (const auto& event : chased)
+        {
+            CHECK(event.time == 0s);
+        }
+    }
+    SECTION("from mid-song, the track's own program comes after it")
+    {
+        CHECK(messagesOf(chase(plan, 2 * q)) ==
+              std::vector<ShortMessage>{bytes(0xB1, 0, 1), bytes(0xB1, 32, 2), bytes(0xC1, 3),
+                                        bytes(0xC1, 10)});
+    }
+}
+
+TEST_CASE("only the parts of a setup that are set are sent")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+
+    song.updateTrack(id, [](Track& track) { track.programSetup.bankMsb = 0; });
+    CHECK(messagesOf(chase(compilePlan(song, everythingToPort), 0)) ==
+          std::vector<ShortMessage>{bytes(0xB0, 0, 0)});
+
+    song.updateTrack(id,
+                     [](Track& track) { track.programSetup = {std::nullopt, std::nullopt, 0}; });
+    CHECK(messagesOf(chase(compilePlan(song, everythingToPort), 0)) ==
+          std::vector<ShortMessage>{bytes(0xC0, 0)});
+}
+
+TEST_CASE("a muted track's setup isn't sent")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.mute = true;
+                 track.programSetup.program = 5;
+             });
+    CHECK(chase(compilePlan(song, everythingToPort), 0).empty());
+}
