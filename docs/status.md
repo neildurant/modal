@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 6 November 2026: numeric bank/program setup is committed locally for a UI trial, not yet pushed; `main` is green on all six CI configurations. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 6 November 2026: numeric bank/program setup is tried and published. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -82,9 +82,9 @@ The revised UI was accepted on 6 November 2026. These are the trial steps, retai
 
 Tried in the real window and published: Enter and `M`/`S` for the track buttons, including on a `V` selection, time offsets kept as typed, the reworked note inspector with Time in the status line, the arrangement's inspector and section strip, a Name column that grows with long names, a visible replace state, Backspace clearing a highlighted value, and values that stay in place when a field opens. The decisions are in decisions.md, under Tracks, inspector and arrangement refined after use. `tests/support/no_crt_dialogs.cpp` also keeps MSVC's debug assertion dialogs out of test runs.
 
-## Bank and program setup awaiting a UI trial
+## Bank and program setup
 
-Committed locally, to try before pushing: the Program column with its bank fields, a setup sent at each playback start and on an edit, tracks catching up when they become audible during playback, the setup in MIDI export, and program changes marked in the piano roll's ruler. The reasons are in decisions.md, under Numeric bank and program setup. Only the messages sent are tested; how instruments respond needs real MIDI hardware.
+Tried in the real window and published: the Program column with its bank fields, a setup sent at each playback start and on an edit, tracks catching up when they become audible during playback, the setup in MIDI export, and program changes marked in the piano roll's ruler. The reasons are in decisions.md, under Numeric bank and program setup. The tests check the messages sent; how instruments respond on real MIDI hardware hasn't been recorded here.
 
 ## Next
 
