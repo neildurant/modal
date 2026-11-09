@@ -625,7 +625,8 @@ TEST_CASE("a quantised track plays its notes on the grid, stored where they were
     {
         const auto stored =
             std::vector<std::pair<Tick, Tick>>{{s - 5, s - 5}, {2 * s + 3, 2 * s + 3}};
-        CHECK(noteTicks(compilePlan(song, everythingToPort, {.bypassQuantize = true})) == stored);
+        CHECK(noteTicks(compilePlan(song, everythingToPort,
+                                    PlanOptions{false, std::nullopt, true})) == stored);
         song.updateTrack(id, [](Track& track) { track.quantize.on = false; });
         CHECK(noteTicks(compilePlan(song, everythingToPort)) == stored);
     }

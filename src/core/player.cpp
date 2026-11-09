@@ -32,9 +32,10 @@ std::optional<DestinationId> Player::destination(const std::string& port)
 void Player::update(const Song& song)
 {
     missingPorts_.clear();
+    PlanOptions options;
+    options.bypassQuantize = bypassQuantize_;
     auto plan = std::make_shared<const PlaybackPlan>(
-        compilePlan(song, [&](const Track& track) { return destination(track.port); },
-                    {.bypassQuantize = bypassQuantize_}));
+        compilePlan(song, [&](const Track& track) { return destination(track.port); }, options));
     quantizeWarnings_ = plan->quantizeWarnings;
     waiting_ = engine_.setPlan(plan) ? nullptr : std::move(plan);
 }
