@@ -27,12 +27,12 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ### Review of changes from 4 November to `cd49989`
 
-Reviewed on 9 November 2026, including 4 November. Fixes are in progress:
+Reviewed on 9 November 2026, including 4 November. All four fixes are implemented locally; full Linux validation and a UI trial are pending:
 
 1. **Fixed: operators and replacement objects follow a moved selection.** The remembered origin and the selection before its object move with it; operators take the moved selection rather than resolving the old object again. GCC Debug regressions first reproduced the failure, then passed at both PPQNs for deletion, yanking, `gv`, colon transforms, replacement objects and a moved bar's time, with undo checked.
 2. **Fixed: changing the editing grid does not repeat an already-sent quantised note.** Playback plans record the effective quantise grid, so the scheduler recognises changes when quantise follows the editing grid. A GCC Debug regression first reproduced the duplicate, then passed at all three core-test PPQNs, checking the note-ons and releases, an unsent note's new time, and an independent fixed quantise grid.
 3. **Fixed: pedalling stays with a note left unquantised after a clash.** Pinned notes contribute a zero movement to the quantiser's movement table. A GCC Debug regression first reproduced the incorrect pedal times, then passed at all three core-test PPQNs for sustain, sostenuto and soft pedal, including a later pedal that should follow a moved note.
-4. **Nudging a selection earlier at the song's start changes it in part.** A selection with notes at zero and one quarter note, nudged earlier, leaves the first at zero and moves the second. The callback clamps each start before the batch validates it, so the batch succeeds and changes the spacing instead of refusing the whole move.
+4. **Fixed: a selected nudge before the song is refused whole.** Batch validation sees the unclamped starts, so one note reaching before zero leaves the song, cursor, selection and undo history unchanged and reports the refusal. A GCC Debug regression first reproduced the partial move, then passed at both PPQNs and checked that the selection can still move in the other direction and undo. Single-note nudges retain their existing clamp at zero.
 
 All four were reproduced with a standalone C++ review harness against the current libraries at both 960 and 96 PPQN. The harness is in `/tmp/modal_review.cpp` for this session; permanent regressions still need adding with the fixes. Native GCC Debug and Clang Debug builds and their suites passed: 817 registered tests each, three platform/MIDI skips, no failures. Whole-tree formatting and `git diff --check` passed. Sanitizers, real desktop checks and MIDI hardware checks were not run for this review.
 

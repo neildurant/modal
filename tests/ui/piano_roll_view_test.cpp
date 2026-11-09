@@ -1872,3 +1872,29 @@ TEST_CASE("deleting a moved bar selection takes its new time")
     CHECK(r.document.song().events(id).size() == 2);
     CHECK(r.document.song().events(id)[0].tick == r.t.bar(5) + 7);
 }
+
+TEST_CASE("a selected nudge before the song is refused without moving any notes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    r.type(U"v]b]b");
+    const auto before = r.document.song();
+    const auto cursor = r.view().cursor();
+    const auto selected = r.view().selectionStatus();
+    const auto version = r.document.version();
+    r.press(Key::of(NamedKey::Left, kAlt | kShift));
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    CHECK_FALSE(r.document.canUndo());
+    CHECK(r.view().cursor() == cursor);
+    CHECK(r.view().selectionStatus() == selected);
+    CHECK(r.ws.mode() == Mode::Visual);
+    CHECK(r.ws.message() == "Not all the selected notes can go there");
+
+    // A refusal keeps the selection available for a move that can be made.
+    r.press(Key::of(NamedKey::Right, kAlt | kShift));
+    CHECK(r.document.song() != before);
+    r.press(Key::of(NamedKey::Escape));
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}

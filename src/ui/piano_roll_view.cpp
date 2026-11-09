@@ -1668,8 +1668,11 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         return changeNote("Nudge",
                           [&](core::Event& event)
                           {
-                              event.tick = std::max<core::Tick>(
-                                  nudged(event.tick, command == "move-left-fine" ? -n : n), 0);
+                              const auto to =
+                                  nudged(event.tick, command == "move-left-fine" ? -n : n);
+                              // A batch must refuse a start before zero, rather than change
+                              // its spacing by stopping only some notes there.
+                              event.tick = selecting() ? to : std::max<core::Tick>(to, 0);
                               return true;
                           });
     }
