@@ -140,9 +140,9 @@ std::variant<FrozenTrack, FreezeRefusal> freezeTrack(const Song& song, TrackId i
         auto event = original;
         const auto start = shifted(event.tick);
         if (!start)
-            return refuse(
-                original.tick,
-                "Time offset would move an event before the song or outside the tick range");
+            return refuse(original.tick, offset.amount() < 0
+                                             ? "An event would start before zero"
+                                             : "Time offset exceeds the tick range");
         event.tick = *start;
         if (auto* note = std::get_if<Note>(&event.data))
         {

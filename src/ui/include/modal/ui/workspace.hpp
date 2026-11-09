@@ -21,6 +21,7 @@
 #include <modal/ui/tracks_view.hpp>
 #include <modal/ui/view.hpp>
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -32,6 +33,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace modal::ui
@@ -353,14 +355,22 @@ public:
 private:
     CommandResult trackFreeze(std::string_view arguments);
     CommandResult applyFreeze(std::span<const core::TrackId> tracks, core::FreezePart part);
-    std::optional<std::string> freezeReason(std::span<const core::TrackId> tracks,
-                                            core::FreezePart part) const;
+    using FreezePreparation = std::variant<std::vector<core::FrozenTrack>, std::string>;
+    FreezePreparation prepareFreeze(std::span<const core::TrackId> tracks,
+                                    core::FreezePart part) const;
+    const std::array<std::optional<std::string>, 5>& freezeReasons() const;
     bool freezeChoiceKey(const Key& key);
     Region freezeChoiceRegion() const;
     struct FreezeChoice
     {
         std::vector<core::TrackId> tracks;
         std::size_t chosen = 0;
+        // Preview invalidates with the song or transport, rather than transforming every
+        // track again on each frame. Enter prepares the chosen operation afresh.
+        mutable std::optional<std::uint64_t> version = std::nullopt;
+        mutable bool bypass = false;
+        mutable bool busy = false;
+        mutable std::array<std::optional<std::string>, 5> reasons{};
     };
     std::optional<FreezeChoice> freezeChoice_;
     void startTyping() override { mode_ = Mode::CommandLine; }

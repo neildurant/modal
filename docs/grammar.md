@@ -187,6 +187,8 @@ In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$
 
 Freeze takes the whole current track, or selected whole rows in Tracks; leave other Visual selections first. Playback must be stopped. All selected tracks validate and change together, as one undo step restoring both events and settings.
 
+The list checks the result of each choice, dimming invalid results with their reason, such as an event starting before zero. It also dims a choice with "Nothing to freeze" when no selected track has that transform active; All is dimmed when none has any active transform. A zero offset is inactive in any unit, and retained quantise parameters are inactive while Q is off. A choice stays available when one selected track has work and another has none, provided every row can accept it. Enter and direct commands check the same rules again before editing.
+
 Only the chosen transform is applied and reset. All applies quantise before time offset. Quantise turns off but keeps its parameters; other playback settings, bank/program setup and routing stay as they are. Time offset alone requires quantise off: freeze quantise first, or choose All. Quantise and All require bypass off where a chosen track has quantise enabled.
 
 A pitch outside MIDI range or an event before the song refuses the whole edit. Events can cross sections, keeping notes whole and growing the last section when needed. Millisecond offsets capture the current tempo map, rounding each end to the nearest tick, ties earlier; a new collision or a positive note collapsing to zero length refuses the edit. Quantise's notes left in place and pedal-order fallback are reported, as in playback.

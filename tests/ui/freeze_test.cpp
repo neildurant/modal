@@ -183,6 +183,12 @@ TEST_CASE("Freeze validates selected rows together and leaves a refused batch un
         const auto version = f.document.version();
         f.type(U"Vj,tf");
         const auto cursor = f.ws.tracks().cursor();
+        const auto rows = f.menu();
+        REQUIRE(rows.size() == 6);
+        CHECK(rows[1].style.foreground == Role::Dim);
+        CHECK(rows[2].style.foreground == Role::Dim);
+        CHECK(rows[1].text.find(U"Bass") != std::u32string::npos);
+        CHECK(rows[3].style.foreground != Role::Dim); // Velocity is independent of pitch
         f.press(NamedKey::Enter);
         CHECK(f.document.song() == original);
         CHECK(f.document.version() == version);
@@ -325,4 +331,172 @@ TEST_CASE("Freeze reports quantise warnings as a completed change")
     CHECK(f.ws.messageKind() == MessageKind::Warning);
     CHECK_FALSE(f.ws.refused());
     CHECK(f.ws.message().find("notes left where stored") != std::string::npos);
+}
+
+TEST_CASE("Freeze dims choices whose results would start before zero")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const bool musical = GENERATE(false, true);
+    Freezing f{ppqn};
+    const auto id = f.track().id();
+    f.document.edit(
+        "Earlier than zero", {},
+        [&](core::Song& song)
+        {
+            song.updateTrack(id,
+                             [&](core::Track& track)
+                             {
+                                 track.quantize.on = false;
+                                 track.timeOffset =
+                                     musical ? core::TimeOffset::ticks(-ppqn.quarter() / 4)
+                                             : core::TimeOffset{std::chrono::milliseconds{-40}};
+                             });
+            song.updateEvents(id,
+                              [&](core::EventList& events)
+                              {
+                                  events = {};
+                                  events.insert({0, core::Note{60, 80, ppqn.quarter()}});
+                              });
+        });
+    const auto original = f.document.song();
+    const auto version = f.document.version();
+    f.type(U",tf");
+    const auto rows = f.menu();
+    REQUIRE(rows.size() == 6);
+    CHECK(rows[1].style.foreground == Role::Dim);
+    CHECK(rows[5].style.foreground == Role::Dim);
+    CHECK(rows[1].text.find(U"before zero") != std::u32string::npos);
+    CHECK(rows[5].text.find(U"before zero") != std::u32string::npos);
+    CHECK(rows[2].style.foreground != Role::Dim);
+    CHECK(rows[3].style.foreground != Role::Dim);
+    f.press(NamedKey::Enter);
+    CHECK(f.document.song() == original);
+    CHECK(f.document.version() == version);
+    CHECK(f.ws.message().find("before zero") != std::string::npos);
+    f.press(NamedKey::Down);
+    CHECK(f.menu()[2].style.background == Role::Cursor);
+    f.press(NamedKey::Up); // All is unavailable, so stay on Transpose
+    CHECK(f.menu()[2].style.background == Role::Cursor);
+    f.press(NamedKey::Escape);
+    f.type(U":track-freeze all");
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message().find("before zero") != std::string::npos);
+    CHECK(f.document.song() == original);
+    CHECK(f.document.version() == version);
+}
+
+TEST_CASE("Freeze dims transforms with no active playback setting")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Freezing f{ppqn};
+    const auto id = f.track().id();
+    f.document.edit("No transforms", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(id,
+                                         [](core::Track& track)
+                                         {
+                                             track.transpose = 0;
+                                             track.velocityOffset = 0;
+                                             track.quantize.on = false;
+                                             track.timeOffset = core::TimeOffset::ticks(0);
+                                         });
+                    });
+    const auto original = f.document.song();
+    const auto version = f.document.version();
+    const auto cursor = f.ws.tracks().cursor();
+    f.type(U",tf");
+    const auto rows = f.menu();
+    REQUIRE(rows.size() == 6);
+    for (std::size_t i = 1; i < rows.size(); ++i)
+    {
+        CHECK(rows[i].style.foreground == Role::Dim);
+        CHECK(rows[i].text.find(U"Nothing to freeze") != std::u32string::npos);
+    }
+    f.press(NamedKey::Down);
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message() == "Nothing to freeze");
+    CHECK(f.document.song() == original);
+    CHECK(f.document.version() == version);
+    CHECK(f.ws.tracks().cursor() == cursor);
+    f.press(NamedKey::Escape);
+    f.type(U":track-freeze time");
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message() == "Nothing to freeze");
+    CHECK(f.document.song() == original);
+}
+
+TEST_CASE("Freeze leaves a choice available if any selected row has work")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Freezing f{ppqn};
+    const auto first = f.track().id();
+    f.document.edit(
+        "One velocity offset", {}, [&](core::Song& song)
+        { song.updateTrack(first, [](core::Track& track) { track.velocityOffset = 0; }); });
+    const auto original = f.document.song();
+    f.type(U"Vj,tf");
+    REQUIRE(f.menu().size() == 6);
+    CHECK(f.menu()[3].style.foreground != Role::Dim);
+    f.press(NamedKey::Down);
+    f.press(NamedKey::Down);
+    f.press(NamedKey::Enter);
+    CHECK(f.track().velocityOffset == 0);
+    CHECK(f.track(1).velocityOffset == 0);
+    CHECK(std::get<core::Note>(f.document.song().events(first)[0].data).velocity == 80);
+    const auto second = f.track(1).id();
+    CHECK(std::get<core::Note>(f.document.song().events(second)[0].data).velocity == 90);
+    CHECK(f.ws.message() == "Freeze Velocity on 2 tracks");
+    f.type(U"u");
+    CHECK(f.document.song() == original);
+}
+
+TEST_CASE("Freeze availability stays current and confirmation rechecks the operation")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Freezing f{ppqn};
+    test::RecordingSink sink;
+    test::FakeClock clock;
+    core::Engine engine{sink, clock};
+    core::Player player{engine, [](std::string_view) { return core::DestinationId{1}; }};
+    player.update(f.document.song());
+    f.ws.setPlayer(&player);
+    f.type(U",tf");
+    REQUIRE(f.menu().size() == 6);
+    REQUIRE(f.menu()[1].style.foreground != Role::Dim);
+    SECTION("the song changes after the list was drawn")
+    {
+        const auto id = f.track().id();
+        f.document.edit(
+            "Out of range", {}, [&](core::Song& song)
+            { song.updateTrack(id, [](core::Track& track) { track.transpose = 100; }); });
+        const auto original = f.document.song();
+        const auto version = f.document.version();
+        f.press(NamedKey::Enter); // no redraw between the edit and confirmation
+        CHECK(f.document.song() == original);
+        CHECK(f.document.version() == version);
+        CHECK(f.ws.message().find("outside MIDI") != std::string::npos);
+        CHECK(f.menu()[1].style.foreground == Role::Dim);
+        REQUIRE(f.document.undo());
+        CHECK(f.menu()[1].style.foreground != Role::Dim);
+    }
+    SECTION("bypass changes after the list was drawn")
+    {
+        player.setBypassQuantize(true);
+        CHECK(f.menu()[1].style.foreground == Role::Dim);
+        CHECK(f.menu()[4].style.foreground == Role::Dim);
+        player.setBypassQuantize(false);
+        CHECK(f.menu()[1].style.foreground != Role::Dim);
+    }
+    SECTION("playback starts after the list was drawn")
+    {
+        const auto original = f.document.song();
+        REQUIRE(player.play());
+        CHECK(f.menu()[1].style.foreground == Role::Dim);
+        f.press(NamedKey::Enter);
+        CHECK(f.document.song() == original);
+        CHECK(f.ws.message().find("Stop playback") != std::string::npos);
+    }
+    f.press(NamedKey::Escape);
+    f.ws.setPlayer(nullptr);
 }

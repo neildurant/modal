@@ -122,14 +122,23 @@ Tried in the real window and published: the `Q` button and Quantise column with 
 
 ## Freeze
 
-Implemented and committed locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. Design: `4e1515a`; core operation and shared playback rules: `87bcb0b`; chooser and batch command: `8e000f7`. This step has not been published; the UI trial below is outstanding.
+Implemented and committed locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. Design: `4e1515a`; core operation and shared playback rules: `87bcb0b`; chooser and batch command: `8e000f7`. The first UI trial accepted the behaviour and requested the availability refinements below. This step has not been published.
 
-- The 19 focused GCC Debug tests pass, with 551 assertions. Core timing tests run at 960, 6720 and 96 PPQN; Workspace tests run at 960 and 96. They cover matching playback messages and times, independent transform choices, retaining settings, pitch and start refusals, millisecond rounding and collisions, section ownership and song growth, quantise fallback, the list and disabled choices, atomic batches, undo/redo, cancellation, bypass, transport restrictions and dot repeat.
-- The final `tools/check-linux.sh` passes: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 841 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. No local Windows build is required; CI will check Windows after publication.
-- The chooser was rendered and inspected through SDL's offscreen driver at widths of 1200 and 640 pixels in both dark and light themes. The selected item and the dimmed Time offset reason are readable. No real desktop was driven, and MIDI hardware timing has not been tested.
+After the first trial, the chooser now previews the full batch for each choice, dimming invalid results (including starts before zero) with their reason, and inactive choices with "Nothing to freeze". A zero offset is inactive in either unit. One unchanged selected row does not disable a choice with work on another row. Cached reasons update with the song, bypass and transport, and confirmation and direct commands prepare again before editing. The new regressions reproduced the missing dimming before the fix, and the complete focused suite and Linux matrix pass. A brief follow-up UI trial is pending.
+
+- The 23 focused GCC Debug tests pass, with 709 assertions. Core timing tests run at 960, 6720 and 96 PPQN; Workspace tests run at 960 and 96. They cover matching playback messages and times, independent transform choices, retaining settings, pitch and start refusals, millisecond rounding and collisions, section ownership and song growth, quantise fallback, the list and disabled choices, atomic batches, undo/redo, cancellation, bypass, transport restrictions and dot repeat. The availability regressions cover negative musical and millisecond offsets, inactive choices including musical zero, mixed active/inactive rows, and revalidation after the song, bypass or transport changes.
+- The final `tools/check-linux.sh` passes: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 845 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. No local Windows build is required; CI will check Windows after publication.
+- The chooser was rendered and inspected through SDL's offscreen driver at widths of 1200 and 640 pixels in both dark and light themes, including the negative-offset and no-active-transform cases after the refinement. The before-zero reason and "Nothing to freeze" labels are readable. No real desktop was driven, and MIDI hardware timing has not been tested.
 - `build/linux-gcc/apps/Debug/modal` has been rebuilt and checked to be newer than every tracked application build input.
 
-### Pending Freeze UI trial
+### Pending availability UI trial
+
+The initial Freeze trial was accepted. Only these refinements need another look before publication:
+
+1. On a track with notes at tick zero, set a negative time offset and open `, t f`. All should be dim with "An event would start before zero", naming the track and position; navigation should skip it, and pressing Enter while it is selected should explain the refusal without changing anything. With Q off, Time offset should show the same refusal.
+2. Set transpose, velocity and time offsets to zero and Q off. All five choices should be dim with "Nothing to freeze". Setting just a velocity offset should make All and Velocity available; selecting rows where only one has an offset should still allow Velocity, changing that row and leaving the others alone in one undo step.
+
+### Initial Freeze trial steps, retained for reference
 
 Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song, with playback stopped:
 
