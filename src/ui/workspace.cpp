@@ -1599,6 +1599,36 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                    MessageKind::Information);
         return true;
     }
+    if (command == "quantize-bypass-toggle")
+    {
+        if (player_ == nullptr)
+        {
+            refuse("Nothing plays here");
+            return true;
+        }
+        player_->setBypassQuantize(!player_->bypassQuantize());
+        player_->update(document_.song());
+        setMessage(player_->bypassQuantize() ? "Quantise bypassed: every track plays as stored"
+                                             : "Quantise back on, for the tracks that have it",
+                   MessageKind::Information);
+        return true;
+    }
+    if (command == "quantize-marks-toggle")
+    {
+        // Through the setting, as rewind's is.
+        if (lineHandler_)
+        {
+            lineHandler_("set quantizemarks!");
+        }
+        else
+        {
+            quantizeMarks_ = !quantizeMarks_;
+        }
+        setMessage(quantizeMarks_ ? "Marks show where quantised notes will be heard"
+                                  : "Marks of quantised notes hidden",
+                   MessageKind::Information);
+        return true;
+    }
     if (command == "rewind-toggle")
     {
         // Through the setting, where there is one, so it stays set as other settings change.

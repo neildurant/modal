@@ -1691,3 +1691,46 @@ TEST_CASE("the ruler marks where the tempo changes, as the arrangement's does")
                     });
     CHECK(signs() == std::vector<std::u32string>{U"\u25B2", U"96"});
 }
+
+TEST_CASE("a quantised track's notes are marked where they'll be heard, unless far too close")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto marks = [&]
+    {
+        std::size_t count = 0;
+        const auto frame = r.ws.frame();
+        for (const auto& region : frame)
+        {
+            for (const auto& shape : region.over)
+            {
+                count += shape.role == Role::Note && shape.alpha < 255 ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    CHECK(marks() == 0);
+    // The C2 just after bar 5's start is 7 ticks late: too close to mark at 960, not at 96.
+    r.document.edit("Quantise", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(id, [](core::Track& track) { track.quantize.on = true; });
+                        song.updateEvents(id,
+                                          [&](core::EventList& events)
+                                          {
+                                              events.insert({r.t.bar(1) + r.t.sixteenth() / 2 + 1,
+                                                             core::Note{33, 100, 10}});
+                                          });
+                    });
+    const auto shown = marks();
+    CHECK(shown >= 1);
+    r.type(U",Tm");
+    CHECK(marks() == 0);
+    r.type(U",Tm");
+    CHECK(marks() == shown);
+    r.document.edit(
+        "Off", {}, [&](core::Song& song)
+        { song.updateTrack(id, [](core::Track& track) { track.quantize.on = false; }); });
+    CHECK(marks() == 0);
+}

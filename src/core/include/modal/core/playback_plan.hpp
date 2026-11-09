@@ -173,6 +173,11 @@ struct PlanOptions
     bool bypassQuantize = false;                       // play every track as stored, to compare
 };
 
+// A track's events as its playback quantise plays them, by the quantise transform's rules with its
+// pedalling following its notes; or why it can't be. For the plan, and for the views to show it.
+std::variant<std::vector<QuantizedEvent>, Refusal> playbackQuantized(const Song& song,
+                                                                     const Track& track);
+
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside
 // 0-127 are left out and reported in transposeWarnings; velocities are clamped to 1-127

@@ -179,6 +179,27 @@ const PlannedTrack* PlaybackPlan::track(TrackId id) const
     return it == tracks.end() ? nullptr : &*it;
 }
 
+std::variant<std::vector<QuantizedEvent>, Refusal> playbackQuantized(const Song& song,
+                                                                     const Track& track)
+{
+    const auto& quantize = track.quantize;
+    const auto& meter = song.meter(track.id());
+    const auto step = std::max<Tick>(quantize.grid.value_or(track.grid).toTicks(song.ppqn()), 1);
+    const auto end = song.end();
+    const auto nearest = [&](Tick tick)
+    {
+        // Not onto the song's end, where nothing can start, as the transform has it.
+        const auto to = nearestGridLine(meter, tick, step, quantize.swing);
+        return to < end ? to : tick;
+    };
+    return quantizeAll(song.events(track.id()), nearest, true,
+                       {.strength = quantize.strength,
+                        .move = quantize.move,
+                        .step = [step](Tick) { return step; },
+                        .nearestEnd = [&](Tick tick)
+                        { return nearestGridLine(meter, tick, step, quantize.swing); }});
+}
+
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
                          const PlanOptions& options)
 {
@@ -263,22 +284,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
         const auto& quantize = track.quantize;
         if (quantize.on && !options.bypassQuantize)
         {
-            const auto& meter = song.meter(track.id());
-            const auto step =
-                std::max<Tick>(quantize.grid.value_or(track.grid).toTicks(song.ppqn()), 1);
-            const auto end = song.end();
-            const auto nearest = [&](Tick tick)
-            {
-                const auto to = nearestGridLine(meter, tick, step, quantize.swing);
-                return to < end ? to : tick;
-            };
-            auto result =
-                quantizeAll(stored, nearest, true,
-                            {.strength = quantize.strength,
-                             .move = quantize.move,
-                             .step = [step](Tick) { return step; },
-                             .nearestEnd = [&](Tick tick)
-                             { return nearestGridLine(meter, tick, step, quantize.swing); }});
+            auto result = playbackQuantized(song, track);
             if (auto* quantized = std::get_if<std::vector<QuantizedEvent>>(&result))
             {
                 played = std::move(*quantized);

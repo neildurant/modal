@@ -437,6 +437,12 @@ constexpr std::array kSharedCommands{
         .description =
             "Toggle note chasing on this track: start notes already held at the playback position",
         .modes = modeBit(Mode::Normal)},
+    CommandInfo{.name = "quantize-bypass-toggle",
+                .description = "Play every track as stored, to compare with its playback "
+                               "quantise, or stop"},
+    CommandInfo{.name = "quantize-marks-toggle",
+                .description = "Mark in the piano roll where a quantised track's notes will be "
+                               "heard, or stop"},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "
                                "when playback stops, or moves to where it stopped"},

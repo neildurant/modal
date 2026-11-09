@@ -174,6 +174,8 @@ nmap z<Right>   grid-coarser              "Coarser grid"
 nmap <C-t>      grid-triplets             "Triplets on or off"
 nmap <leader>n  default-note-set          "Default note from this one"
 ngroup <leader>T "Toggles"
+nmap <leader>Tq quantize-bypass-toggle "Bypass playback quantise, to compare"
+nmap <leader>Tm quantize-marks-toggle "Marks of where quantised notes play"
 nmap <leader>Ta grid-advance-toggle "O by grid step or note length"
 
 " Adding notes in the piano roll: o adds the track's default note at the cursor, and O adds

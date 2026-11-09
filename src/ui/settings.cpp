@@ -146,6 +146,10 @@ Settings::Settings()
                   "The output port for tracks without one: its name, or part of it, or empty "
                   "for the first port found",
                   std::string{}),
+          setting("quantizemarks",
+                  "Whether the piano roll marks where a note of a track quantised as it plays "
+                  "will be heard, when that's far from where it's stored",
+                  true),
           setting("rewind",
                   "Whether the play-from marker, which Space plays from, stays put when "
                   "playback stops (on), or moves to where it stopped (off)",

@@ -431,3 +431,16 @@ TEST_CASE("a track's port that wasn't found is dim in the table, and explained i
     }
     CHECK(warned);
 }
+
+TEST_CASE("bypassing playback quantise plays every track as stored, and says so")
+{
+    Playing p;
+    CHECK(p.status().find(U"Quantise bypassed") == std::u32string::npos);
+    p.type(U",Tq");
+    CHECK(p.player.bypassQuantize());
+    CHECK(p.status().find(U"Quantise bypassed") != std::u32string::npos);
+    p.press(Key::typed(U'j'));
+    p.type(U",Tq");
+    CHECK_FALSE(p.player.bypassQuantize());
+    CHECK(p.status().find(U"Quantise bypassed") == std::u32string::npos);
+}

@@ -176,6 +176,7 @@ public:
     // cursor stays where it was; otherwise the play-from marker moves to where playback stops, and
     // the cursor follows the playhead there.
     void setRewind(bool rewind);
+    void setQuantizeMarks(bool marks) { quantizeMarks_ = marks; }
 
     // How far ~ moves notes at most, either way: in time (humanizetime) and in velocity
     // (humanizevel).
@@ -362,6 +363,7 @@ private:
     EventRegister& eventRegister() override { return register_; }
     const core::Player* player() const override { return player_; }
     std::vector<core::TrackId> movingTracks() const override;
+    bool quantizeMarks() const override { return quantizeMarks_; }
     std::vector<std::string> outputPorts() const override
     {
         return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
@@ -770,6 +772,7 @@ private:
     std::string firstPitch(const OperatorTarget& target) const;
     core::VelocityLimits velocityLimits_;
     QuantizePedal quantizePedal_ = QuantizePedal::Follow;
+    bool quantizeMarks_ = true;
     bool refused_ = false; // the last key's command, refused or given up
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;

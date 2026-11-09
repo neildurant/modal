@@ -321,6 +321,10 @@ Bar Workspace::statusBar(bool withMessage) const
         bottom.right.push_back({"From ", label});
         bottom.right.push_back({view().position(player_->marker()) + "   ", kBarText});
     }
+    if (player_ != nullptr && player_->bypassQuantize())
+    {
+        bottom.right.push_back({"Quantise bypassed   ", {Role::Warning, Role::Bar, kPlain}});
+    }
     bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();

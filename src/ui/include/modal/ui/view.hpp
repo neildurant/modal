@@ -198,6 +198,9 @@ public:
     // The player, for the play-from marker, if there is one.
     virtual const core::Player* player() const = 0;
 
+    // Whether to mark where a quantised track's notes will be heard (quantizemarks).
+    virtual bool quantizeMarks() const = 0;
+
     // The tracks being moved through the others, to show them.
     virtual std::vector<core::TrackId> movingTracks() const = 0;
 

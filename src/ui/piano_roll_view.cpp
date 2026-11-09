@@ -126,6 +126,7 @@ constexpr std::array kCommands{
 
 // The grid's limits, without triplets: from a 1/64 note to a whole note.
 constexpr core::NoteFraction kFinestGrid{1, 64};
+constexpr std::uint8_t kQuantizeMark = 140; // how strongly a quantised note's mark shows
 constexpr core::NoteFraction kCoarsestGrid{1, 1};
 
 bool isTriplet(core::NoteFraction grid)
@@ -2598,6 +2599,34 @@ void PianoRollView::addRegions(Frame& frame) const
                 lane.under.push_back({{x0, laneHeight - high, std::max(2 * lineWidth, 2), high},
                                       matched && !picked ? Role::Match : role,
                                       255});
+            }
+        }
+    }
+
+    // Where a quantised track's notes will be heard, faintly, for those far enough from where
+    // they're stored to see: a few ticks, as a played part's notes all are slightly off.
+    if (const auto id = trackId(); id && host_.quantizeMarks())
+    {
+        const auto* player = host_.player();
+        const auto& track = *song.track(*id);
+        if (track.quantize.on && (player == nullptr || !player->bypassQuantize()))
+        {
+            const auto result = core::playbackQuantized(song, track);
+            if (const auto* played = std::get_if<std::vector<core::QuantizedEvent>>(&result))
+            {
+                const auto near = std::max<core::Tick>(song.ppqn().quarter() / 48, 2);
+                for (const auto& [event, stored] : *played)
+                {
+                    const auto* note = std::get_if<core::Note>(&event.data);
+                    if (note != nullptr && std::abs(event.tick - stored) > near &&
+                        event.tick >= p.start && event.tick < p.end && shown(note->pitch))
+                    {
+                        notes.over.push_back({{scale.toX(event.tick), rowOf(note->pitch) * h,
+                                               std::max(2 * lineWidth, 2), h},
+                                              Role::Note,
+                                              kQuantizeMark});
+                    }
+                }
             }
         }
     }
