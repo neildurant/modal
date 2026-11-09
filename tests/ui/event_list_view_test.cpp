@@ -1090,7 +1090,7 @@ TEST_CASE("the hint menu shows what can follow keys that start longer bindings, 
     CHECK(find("v") == Workspace::Hint{"v", "Views", true});
     CHECK_FALSE(find("n")); // the default note is the piano roll's
     v.ws.handle(Key::typed(U'T'), 2500);
-    CHECK(find("<Space>") == Workspace::Hint{"<Space>", "Rewind on or off", false});
+    CHECK(find("<Space>") == Workspace::Hint{"<Space>", "Rewind: on", false});
     v.ws.handle(Key::of(NamedKey::Escape), 2600);
     CHECK_FALSE(v.ws.hints());
 
@@ -1432,4 +1432,40 @@ TEST_CASE("a tempo change can be inserted at the cursor, from any track or the c
     CHECK_FALSE(v.registry.runLine("event-insert tempo 80").warning);
     CHECK(tempoAt(v.view.cursor().tick) == core::Tempo::fromBpm(80));
     CHECK(v.registry.runLine("event-insert program 5").warning);
+}
+
+TEST_CASE("the hint menu says what each toggle is set to now")
+{
+    Viewing v;
+    v.ws.setHints(true, 0);
+    const auto titles = [&]
+    {
+        std::vector<std::string> found;
+        for (const auto& hint : v.ws.hints().value_or(std::vector<Workspace::Hint>{}))
+        {
+            found.push_back(hint.title);
+        }
+        return found;
+    };
+    const auto has = [&](std::string_view title)
+    {
+        const auto all = titles();
+        return std::ranges::find(all, title) != all.end();
+    };
+    type(v.ws, U",T");
+    CHECK(has("Rewind: on"));
+    CHECK(has("Quantise marks: shown"));
+    CHECK(has("O moves on by: note length"));
+    type(v.ws, U" ");
+    type(v.ws, U",T");
+    CHECK(has("Rewind: off"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+
+    type(v.ws, U",t");
+    CHECK(has("Mute this track: off"));
+    CHECK(has("Quantise this track: off"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U",tm,t");
+    CHECK(has("Mute this track: on"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
 }

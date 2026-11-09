@@ -168,6 +168,51 @@ bool Workspace::findWaiting() const
     return awaiting_ || (finding_.naming && finding_.naming->redo);
 }
 
+std::optional<std::string> Workspace::toggleTitle(std::string_view command) const
+{
+    const auto onOff = [](bool on) { return std::string{on ? "on" : "off"}; };
+    if (command == "quantize-bypass-toggle")
+    {
+        return "Quantise bypass: " + onOff(player_ != nullptr && player_->bypassQuantize());
+    }
+    if (command == "quantize-marks-toggle")
+    {
+        return std::string{"Quantise marks: "} + (quantizeMarks_ ? "shown" : "hidden");
+    }
+    if (command == "grid-advance-toggle")
+    {
+        return std::string{"O moves on by: "} +
+               (pianoRoll().gridAdvance() ? "grid step" : "note length");
+    }
+    if (command == "rewind-toggle")
+    {
+        return "Rewind: " + onOff(rewind_);
+    }
+    const auto id = view().cursor().track;
+    const auto* track = id ? document_.song().track(*id) : nullptr;
+    if (track == nullptr)
+    {
+        return std::nullopt;
+    }
+    if (command == "track-mute-toggle")
+    {
+        return "Mute this track: " + onOff(track->mute);
+    }
+    if (command == "track-solo-toggle")
+    {
+        return "Solo this track: " + onOff(track->solo);
+    }
+    if (command == "track-chase-toggle")
+    {
+        return "Chase notes on this track: " + onOff(track->chaseNotes);
+    }
+    if (command == "track-quantize-toggle")
+    {
+        return "Quantise this track: " + onOff(track->quantize.on);
+    }
+    return std::nullopt;
+}
+
 std::optional<std::vector<Workspace::Hint>> Workspace::hints() const
 {
     if (!hintsOn_ || !hintsShown_ || (keys_.keys().empty() && !operator_ && !findWaiting()))
@@ -248,6 +293,10 @@ std::vector<Workspace::Hint> Workspace::hintsAfter(const Keymap& keymap, Mode mo
             hint.title = !binding.hint.empty() ? binding.hint
                          : info != nullptr     ? titleOf(*info)
                                                : binding.command;
+            if (auto state = toggleTitle(binding.command))
+            {
+                hint.title = std::move(*state); // what it's set to now, as it changes
+            }
             // A count, which the menu can't take, as N: "bar N".
             if (const auto at = hint.title.find("{count}"); at != std::string::npos)
             {

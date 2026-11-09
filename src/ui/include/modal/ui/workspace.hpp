@@ -271,6 +271,9 @@ public:
     };
     // What the hint menu shows now, if it's showing.
     std::optional<std::vector<Hint>> hints() const;
+    // A toggle's name and what it's set to now, for the hint menu, such as "Rewind: on"; none
+    // for a command that isn't one, or a track's with no track to say of.
+    std::optional<std::string> toggleTitle(std::string_view command) const;
 
     // The list of keys (, ?, decided October 2026): every binding that does something where the
     // cursor is, under the built-in modalrc's sections, over the view; its pages, if it needs
