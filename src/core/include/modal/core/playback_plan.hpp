@@ -7,6 +7,7 @@
 #include <modal/core/tempo_map.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
+#include <modal/core/transforms.hpp>
 
 #include <array>
 #include <chrono>
@@ -47,7 +48,8 @@ struct ShortMessage
 struct PlannedEvent
 {
     std::chrono::nanoseconds time; // when to send, from the song's start; can be negative
-    Tick tick;                     // the stored position, before any time offset
+    Tick tick;   // where it plays, before any time offset: where it's stored, or quantised
+    Tick stored; // where it's stored
     TrackId track;
     DestinationId destination;
 
@@ -96,6 +98,20 @@ struct PlannedTrack
     TimeOffset timeOffset;
     std::vector<ShortMessage> setup; // its bank and program setup, in the order to send them
     std::vector<std::size_t> events; // its events in the plan's list, in order
+    // How it's quantised as it plays, if it is, and its events by where they're stored, then
+    // the order they're sent in, to find the same event in another plan.
+    std::optional<PlaybackQuantize> quantize;
+    std::vector<std::size_t> byStored;
+};
+
+// A track whose playback quantise can't be applied as set, so plays as stored: two notes of a
+// pitch would start together, or a pedal pass the next of its pedal.
+struct QuantizeWarning
+{
+    TrackId track;
+    Tick at; // where, as it would be
+
+    friend bool operator==(const QuantizeWarning&, const QuantizeWarning&) = default;
 };
 
 // The metronome as the scheduler plays it: a click on each beat of the meter, from the
@@ -128,6 +144,7 @@ struct PlaybackPlan
     std::vector<PlannedTrack> tracks; // the tracks in the plan, in song order
     std::vector<TrackId> unrouted;    // audible tracks left out for want of a destination
     std::vector<TransposeWarning> transposeWarnings;
+    std::vector<QuantizeWarning> quantizeWarnings;
 
     // The armed tracks with thru on and a destination, in song order. Muted and un-soloed
     // tracks are included, since thru is how a track being recorded is heard.
@@ -153,6 +170,7 @@ struct PlanOptions
 {
     bool recording = false; // whether this playback records, for the metronome's When
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
+    bool bypassQuantize = false;                       // play every track as stored, to compare
 };
 
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise

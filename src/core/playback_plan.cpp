@@ -240,6 +240,8 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
                                track.chaseNotes,
                                offset,
                                setupMessages(track.programSetup, channel),
+                               {},
+                               std::nullopt,
                                {}});
         plan.leadIn = std::max(plan.leadIn, -offset.at(plan.tempo, 0));
         if (offset.musical() && offset.amount() < 0)
@@ -254,12 +256,55 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
             }
         }
 
+        // Where each event plays: quantised if the track is, as the quantise transform would
+        // leave it; or else as stored, as it is if it can't be, which is reported.
+        const auto& stored = song.events(track.id());
+        std::vector<QuantizedEvent> played;
+        const auto& quantize = track.quantize;
+        if (quantize.on && !options.bypassQuantize)
+        {
+            const auto& meter = song.meter(track.id());
+            const auto step =
+                std::max<Tick>(quantize.grid.value_or(track.grid).toTicks(song.ppqn()), 1);
+            const auto end = song.end();
+            const auto nearest = [&](Tick tick)
+            {
+                const auto to = nearestGridLine(meter, tick, step, quantize.swing);
+                return to < end ? to : tick;
+            };
+            auto result =
+                quantizeAll(stored, nearest, true,
+                            {.strength = quantize.strength,
+                             .move = quantize.move,
+                             .step = [step](Tick) { return step; },
+                             .nearestEnd = [&](Tick tick)
+                             { return nearestGridLine(meter, tick, step, quantize.swing); }});
+            if (auto* quantized = std::get_if<std::vector<QuantizedEvent>>(&result))
+            {
+                played = std::move(*quantized);
+                plan.tracks.back().quantize = quantize;
+            }
+            else
+            {
+                plan.quantizeWarnings.push_back({track.id(), std::get<Refusal>(result).event.tick});
+            }
+        }
+        if (!plan.tracks.back().quantize)
+        {
+            played.reserve(stored.size());
+            for (const auto& event : stored.all())
+            {
+                played.push_back({event, event.tick});
+            }
+        }
+
         std::size_t dropped = 0;
-        for (const auto& event : song.events(track.id()).all())
+        for (const auto& [event, at] : played)
         {
             PlannedEvent planned{};
             planned.time = offset.at(plan.tempo, event.tick);
             planned.tick = event.tick;
+            planned.stored = at;
             planned.track = track.id();
             planned.destination = *destination;
             if (std::visit(Planner{track, plan.tempo, channel, offset, planned}, event.data))
@@ -287,6 +332,12 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     for (std::size_t i = 0; i < plan.events.size(); ++i)
     {
         plan.tracks[trackIndex.at(plan.events[i].track)].events.push_back(i);
+    }
+    for (auto& track : plan.tracks)
+    {
+        track.byStored = track.events;
+        std::ranges::stable_sort(track.byStored, {},
+                                 [&](std::size_t i) { return plan.events[i].stored; });
     }
     return plan;
 }

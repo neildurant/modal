@@ -162,13 +162,7 @@ bool hasPedals(const EventList& events, std::span<const std::size_t> which);
 // it's left as it was.
 struct QuantizeHow
 {
-    enum class Move : std::uint8_t
-    {
-        Starts,
-        Ends,
-        Both,
-        Lengths,
-    };
+    using Move = QuantizeMove;
 
     int strength = 100;
     Move move = Move::Starts;
@@ -179,6 +173,17 @@ struct QuantizeHow
 Transformed quantize(const EventList& events, std::span<const std::size_t> which,
                      const std::function<Tick(Tick)>& nearest, bool pedals,
                      const QuantizeHow& how = {});
+
+// Every event of a track as quantize() would leave them, to play: each with the tick it's stored
+// at, in tick order, notes after other events at a tick. Or why the track can't be.
+struct QuantizedEvent
+{
+    Event event;
+    Tick stored;
+};
+std::variant<std::vector<QuantizedEvent>, Refusal>
+quantizeAll(const EventList& events, const std::function<Tick(Tick)>& nearest, bool pedals,
+            const QuantizeHow& how);
 
 // The grid line nearest a tick, the lines a step apart from each bar line, which is one too.
 // Halfway between two, the later. With swing, the line between each pair of steps from the

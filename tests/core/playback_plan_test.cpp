@@ -559,3 +559,116 @@ TEST_CASE("a muted track's setup isn't sent")
              });
     CHECK(chase(compilePlan(song, everythingToPort), 0).empty());
 }
+
+namespace
+{
+// The notes' ticks as they play, and as they're stored, on the plan's first track.
+std::vector<std::pair<Tick, Tick>> noteTicks(const PlaybackPlan& plan)
+{
+    std::vector<std::pair<Tick, Tick>> ticks;
+    for (const auto& event : plan.events)
+    {
+        if (event.isNoteOn())
+        {
+            ticks.emplace_back(event.tick, event.stored);
+        }
+    }
+    return ticks;
+}
+} // namespace
+
+TEST_CASE("a quantised track plays its notes on the grid, stored where they were")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick s = ppqn.quarter() / 4; // a sixteenth
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.events.insert({s - 5, Note{60, 100, s}});
+                                 track.events.insert({2 * s + 3, Note{62, 100, s}});
+                                 track.events.insert({2 * s + 4, ControlChange{7, 90}});
+                             });
+    CHECK(noteTicks(compilePlan(song, everythingToPort)) ==
+          std::vector<std::pair<Tick, Tick>>{{s - 5, s - 5}, {2 * s + 3, 2 * s + 3}});
+
+    song.updateTrack(id,
+                     [](Track& track)
+                     {
+                         track.quantize.on = true; // to its editing grid, 1/16
+                     });
+    const auto plan = compilePlan(song, everythingToPort);
+    CHECK(noteTicks(plan) == std::vector<std::pair<Tick, Tick>>{{s, s - 5}, {2 * s, 2 * s + 3}});
+    CHECK(plan.quantizeWarnings.empty());
+    CHECK(song.events(id).all()[0].tick == s - 5); // the song unchanged
+    // A controller stays where it is.
+    const auto cc = std::ranges::find_if(plan.events, [](const PlannedEvent& e)
+                                         { return (e.message.bytes[0] & 0xF0) == 0xB0; });
+    REQUIRE(cc != plan.events.end());
+    CHECK(cc->tick == 2 * s + 4);
+
+    SECTION("its own grid and strength")
+    {
+        song.updateTrack(id,
+                         [](Track& track)
+                         {
+                             track.quantize.grid = NoteFraction{1, 8};
+                             track.quantize.strength = 50;
+                         });
+        // Halfway to the eighth lines, 0 and 2s, as quantize() works it out.
+        const auto halfway = [](Tick from, Tick to) { return from + (to - from) * 50 / 100; };
+        CHECK(noteTicks(compilePlan(song, everythingToPort)) ==
+              std::vector<std::pair<Tick, Tick>>{{halfway(s - 5, 0), s - 5},
+                                                 {halfway(2 * s + 3, 2 * s), 2 * s + 3}});
+    }
+    SECTION("bypassed, or off with its settings kept, as stored")
+    {
+        const auto stored =
+            std::vector<std::pair<Tick, Tick>>{{s - 5, s - 5}, {2 * s + 3, 2 * s + 3}};
+        CHECK(noteTicks(compilePlan(song, everythingToPort, {.bypassQuantize = true})) == stored);
+        song.updateTrack(id, [](Track& track) { track.quantize.on = false; });
+        CHECK(noteTicks(compilePlan(song, everythingToPort)) == stored);
+    }
+}
+
+TEST_CASE("a quantised track's pedalling goes with its notes, and its events keep their order")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick s = ppqn.quarter() / 4;
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.quantize.on = true;
+                 track.events.insert({s + 4, Note{60, 100, s}});
+                 track.events.insert({s + 6, ControlChange{64, 127}});
+                 track.events.insert({4 * s, ProgramChange{3}});
+                 track.events.insert({4 * s - 2, Note{64, 100, s}});
+             });
+    const auto plan = compilePlan(song, everythingToPort);
+    std::vector<std::pair<Tick, std::uint8_t>> sent;
+    for (const auto& event : plan.events)
+    {
+        sent.emplace_back(event.tick, event.message.bytes[0]);
+    }
+    CHECK(sent == std::vector<std::pair<Tick, std::uint8_t>>{
+                      {s, 0x90}, {s + 2, 0xB0}, {4 * s, 0xC0}, {4 * s, 0x90}});
+}
+
+TEST_CASE("a track that can't be quantised as set plays as stored, and says where")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick s = ppqn.quarter() / 4;
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.quantize.on = true;
+                                 track.events.insert({s - 2, Note{60, 100, 1}});
+                                 track.events.insert({s + 2, Note{60, 100, 1}});
+                             });
+    const auto plan = compilePlan(song, everythingToPort);
+    CHECK(noteTicks(plan) == std::vector<std::pair<Tick, Tick>>{{s - 2, s - 2}, {s + 2, s + 2}});
+    CHECK(plan.quantizeWarnings == std::vector<QuantizeWarning>{{id, s}});
+    CHECK_FALSE(plan.tracks.front().quantize);
+}

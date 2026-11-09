@@ -10,6 +10,7 @@
 #include <iterator>
 #include <numeric>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,7 @@ struct Entry
 {
     Event event;
     bool changed = false;
+    std::size_t from = 0; // its index in the events
 };
 
 Tick endOf(const Event& event)
@@ -33,8 +35,9 @@ Tick endOf(const Event& event)
 // The events with those taken replaced by their changed selves, in the same order; refused
 // where notes of a pitch would overlap and one of them was changed. With trim, a note run into
 // the next of its pitch ends where that starts.
-Transformed finish(const EventList& events, std::span<const std::size_t> which,
-                   std::span<const Event> changed, bool trim)
+std::variant<std::vector<Entry>, Refusal> finishEntries(const EventList& events,
+                                                        std::span<const std::size_t> which,
+                                                        std::span<const Event> changed, bool trim)
 {
     std::vector<Entry> all;
     all.reserve(events.size());
@@ -43,12 +46,12 @@ Transformed finish(const EventList& events, std::span<const std::size_t> which,
     {
         if (taken < which.size() && which[taken] == i)
         {
-            all.push_back({changed[taken], changed[taken] != events[i]});
+            all.push_back({changed[taken], changed[taken] != events[i], i});
             ++taken;
         }
         else
         {
-            all.push_back({events[i], false});
+            all.push_back({events[i], false, i});
         }
     }
 
@@ -87,8 +90,19 @@ Transformed finish(const EventList& events, std::span<const std::size_t> which,
     }
 
     std::ranges::stable_sort(all, {}, [](const Entry& e) { return e.event.tick; });
+    return all;
+}
+
+Transformed finish(const EventList& events, std::span<const std::size_t> which,
+                   std::span<const Event> changed, bool trim)
+{
+    auto entries = finishEntries(events, which, changed, trim);
+    if (const auto* refusal = std::get_if<Refusal>(&entries))
+    {
+        return *refusal;
+    }
     EventList result;
-    for (auto& entry : all)
+    for (auto& entry : std::get<std::vector<Entry>>(entries))
     {
         result.insert(std::move(entry.event));
     }
@@ -534,8 +548,14 @@ bool hasPedals(const EventList& events, std::span<const std::size_t> which)
     return std::ranges::any_of(which, [&](std::size_t i) { return isPedal(events[i]); });
 }
 
-Transformed quantize(const EventList& events, std::span<const std::size_t> which,
-                     const std::function<Tick(Tick)>& nearest, bool pedals, const QuantizeHow& how)
+namespace
+{
+
+// The events taken as quantize() changes them, in the same order, before they're put back.
+std::variant<std::vector<Event>, Refusal> quantizeTaken(const EventList& events,
+                                                        std::span<const std::size_t> which,
+                                                        const std::function<Tick(Tick)>& nearest,
+                                                        bool pedals, const QuantizeHow& how)
 {
     using Move = QuantizeHow::Move;
     const auto towards = [&](Tick from, Tick to)
@@ -625,7 +645,56 @@ Transformed quantize(const EventList& events, std::span<const std::size_t> which
             before = event;
         }
     }
-    return finish(events, which, changed, true);
+    return changed;
+}
+
+} // namespace
+
+Transformed quantize(const EventList& events, std::span<const std::size_t> which,
+                     const std::function<Tick(Tick)>& nearest, bool pedals, const QuantizeHow& how)
+{
+    auto changed = quantizeTaken(events, which, nearest, pedals, how);
+    if (const auto* refusal = std::get_if<Refusal>(&changed))
+    {
+        return *refusal;
+    }
+    return finish(events, which, std::get<std::vector<Event>>(changed), true);
+}
+
+std::variant<std::vector<QuantizedEvent>, Refusal>
+quantizeAll(const EventList& events, const std::function<Tick(Tick)>& nearest, bool pedals,
+            const QuantizeHow& how)
+{
+    std::vector<std::size_t> which(events.size());
+    for (std::size_t i = 0; i < which.size(); ++i)
+    {
+        which[i] = i;
+    }
+    auto changed = quantizeTaken(events, which, nearest, pedals, how);
+    if (const auto* refusal = std::get_if<Refusal>(&changed))
+    {
+        return *refusal;
+    }
+    auto entries = finishEntries(events, which, std::get<std::vector<Event>>(changed), true);
+    if (const auto* refusal = std::get_if<Refusal>(&entries))
+    {
+        return *refusal;
+    }
+    auto& all = std::get<std::vector<Entry>>(entries);
+    // As an event list keeps them: by tick, then other events before notes, then as stored.
+    std::ranges::stable_sort(all,
+                             [](const Entry& a, const Entry& b)
+                             {
+                                 return std::tuple{a.event.tick, a.event.isNote(), a.from} <
+                                        std::tuple{b.event.tick, b.event.isNote(), b.from};
+                             });
+    std::vector<QuantizedEvent> result;
+    result.reserve(all.size());
+    for (auto& entry : all)
+    {
+        result.push_back({std::move(entry.event), events[entry.from].tick});
+    }
+    return result;
 }
 
 Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step, int swing)
