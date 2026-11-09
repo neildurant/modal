@@ -1331,3 +1331,83 @@ TEST_CASE("another song's plan sends nothing of its setups, even with the same t
     scheduler.setPlan(second, kNow + 1s);
     CHECK(sink.sent.empty());
 }
+
+TEST_CASE("changing a track's quantise as it plays sends nothing twice, and leaves nothing out")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const Tick s = q / 4; // a sixteenth, 125 ms
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.events.insert({s - s / 8, Note{60, 100, 1}});     // early
+                                 track.events.insert({3 * s + s / 8, Note{62, 100, 1}}); // late
+                                 track.events.insert({8 * s, Note{64, 100, 1}});
+                             });
+    const auto notesSent = [](const RecordingSink& sink)
+    {
+        std::vector<std::uint8_t> pitches;
+        for (const auto& sent : sink.sent)
+        {
+            if ((sent.bytes[0] & 0xF0) == 0x90)
+            {
+                pitches.push_back(sent.bytes[1]);
+            }
+        }
+        return pitches;
+    };
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    const auto toTime = [&](Tick tick) { return song.tempo().toTime(tick); };
+
+    SECTION("turned on just after an early note was sent, which quantise would put later")
+    {
+        const auto stored = compilePlan(song, byPortName);
+        scheduler.setPlan(stored, kNow);
+        scheduler.play(0, {}, kNow);
+        const auto at = kNow + toTime(s - s / 16);
+        scheduler.sendDue(at);
+        REQUIRE(notesSent(sink) == std::vector<std::uint8_t>{60});
+        song.updateTrack(id, [](Track& track) { track.quantize.on = true; });
+        const auto quantised = compilePlan(song, byPortName);
+        scheduler.setPlan(quantised, at);
+        runUntil(scheduler, kNow + 10s);
+        CHECK(notesSent(sink) == std::vector<std::uint8_t>{60, 62, 64});
+    }
+    SECTION("stepped again and again, still once each")
+    {
+        song.updateTrack(id, [](Track& track) { track.quantize.on = true; });
+        std::vector<PlaybackPlan> plans;
+        plans.reserve(8);
+        plans.push_back(compilePlan(song, byPortName));
+        scheduler.setPlan(plans.back(), kNow);
+        scheduler.play(0, {}, kNow);
+        const auto at = kNow + toTime(3 * s + s / 16); // past the late note's line, before it
+        scheduler.sendDue(at);
+        REQUIRE(notesSent(sink) == std::vector<std::uint8_t>{60, 62});
+        for (const int strength : {80, 60, 40, 20, 0})
+        {
+            song.updateTrack(id, [&](Track& track) { track.quantize.strength = strength; });
+            plans.push_back(compilePlan(song, byPortName));
+            scheduler.setPlan(plans.back(), at);
+            scheduler.sendDue(at);
+        }
+        runUntil(scheduler, kNow + 10s);
+        CHECK(notesSent(sink) == std::vector<std::uint8_t>{60, 62, 64});
+    }
+    SECTION("an edit to another track leaves this one's timing alone")
+    {
+        song.updateTrack(id, [](Track& track) { track.quantize.on = true; });
+        const auto first = compilePlan(song, byPortName);
+        scheduler.setPlan(first, kNow);
+        scheduler.play(0, {}, kNow);
+        scheduler.sendDue(kNow + toTime(2 * s));
+        const auto other = addTrack(song, 2);
+        song.updateTrack(other, [](Track& track) { track.transpose = 1; });
+        const auto second = compilePlan(song, byPortName);
+        scheduler.setPlan(second, kNow + toTime(2 * s));
+        runUntil(scheduler, kNow + 10s);
+        CHECK(notesSent(sink) == std::vector<std::uint8_t>{60, 62, 64});
+    }
+}

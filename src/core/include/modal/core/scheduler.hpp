@@ -63,7 +63,8 @@ public:
     // the values it has passed and, if it chases notes, those still sounding. A track whose
     // setup changes sends the new one, unless one of its own program changes is already in
     // force, when the next play sends it. Stopped, a changed setup is sent at once. None of
-    // this applies when the plan is of a different song.
+    // this applies when the plan is of a different song. A track whose quantise changes doesn't
+    // send again what it has sent, though the new timing puts it ahead of the playhead.
     void setPlan(const PlaybackPlan& plan, std::chrono::nanoseconds now) noexcept;
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
@@ -153,6 +154,10 @@ private:
     std::optional<std::chrono::nanoseconds> countInDue() const noexcept;
 
     void send(const PlannedEvent& event) noexcept;
+    // Remembers which events of the tracks whose quantise changed have been sent already, by
+    // the old plan's timing, though the new one has them still to come.
+    void noteAlreadySent(const PlaybackPlan& old, std::chrono::nanoseconds position) noexcept;
+    bool takeAlreadySent(const PlannedEvent& event) noexcept;
     bool passed(const PlannedEvent& event, std::chrono::nanoseconds position) const noexcept;
     void sendSetup(const PlannedTrack& track, std::chrono::nanoseconds now) noexcept;
     void catchUp(const PlannedTrack& track, std::chrono::nanoseconds position,
@@ -194,6 +199,19 @@ private:
 
     std::array<DestinationId, kMaxDestinations> destinations_{};
     std::size_t destinationCount_ = 0;
+
+    // An event already sent that a changed plan has still to come; beyond so many, the rest
+    // may be sent again.
+    struct Sent
+    {
+        TrackId track;
+        Tick stored;
+        ShortMessage message;
+    };
+    static constexpr std::size_t kMaxAlreadySent = 512;
+    std::array<Sent, kMaxAlreadySent> alreadySent_{};
+    std::size_t alreadySentCount_ = 0;
+    std::array<Sent, kMaxAlreadySent> stillSent_{}; // the next list, as it's made
 };
 
 } // namespace modal::core

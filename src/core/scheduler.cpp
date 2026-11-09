@@ -135,8 +135,10 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
 
     if (old == nullptr)
     {
+        alreadySentCount_ = 0;
         return;
     }
+    noteAlreadySent(*old, position);
     for (const auto& track : plan.tracks)
     {
         const auto* before = old->track(track.id);
@@ -161,6 +163,87 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
             }
         }
     }
+}
+
+void Scheduler::noteAlreadySent(const PlaybackPlan& old, nanoseconds position) noexcept
+{
+    const auto& plan = *plan_;
+    const auto same = [](const Sent& sent, const PlannedEvent& event)
+    {
+        return sent.track == event.track && sent.stored == event.stored &&
+               sent.message == event.message;
+    };
+    const auto changed = [&](TrackId id)
+    {
+        const auto* before = old.track(id);
+        const auto* now = plan.track(id);
+        return before != nullptr && now != nullptr && before->quantize != now->quantize;
+    };
+    // What was noted of the tracks that haven't changed still stands.
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < alreadySentCount_; ++i)
+    {
+        if (plan.track(alreadySent_[i].track) != nullptr && !changed(alreadySent_[i].track))
+        {
+            stillSent_[count++] = alreadySent_[i];
+        }
+    }
+    for (const auto& track : plan.tracks)
+    {
+        if (!changed(track.id))
+        {
+            continue;
+        }
+        const auto& before = *old.track(track.id);
+        for (const auto index : track.events)
+        {
+            const auto& event = plan.events[index];
+            if (event.time <= position || event.sysex || count == kMaxAlreadySent)
+            {
+                continue;
+            }
+            // The same event in the old plan, sent if its time there has passed, or noted.
+            const auto from =
+                std::ranges::lower_bound(before.byStored, event.stored, {},
+                                         [&](std::size_t i) { return old.events[i].stored; });
+            for (auto i = from; i != before.byStored.end() && old.events[*i].stored == event.stored;
+                 ++i)
+            {
+                const auto& was = old.events[*i];
+                if (was.message != event.message || was.sysex)
+                {
+                    continue;
+                }
+                const bool noted = std::any_of(alreadySent_.begin(),
+                                               alreadySent_.begin() +
+                                                   static_cast<std::ptrdiff_t>(alreadySentCount_),
+                                               [&](const Sent& sent) { return same(sent, was); });
+                if (was.time <= position || was.tick < startTick_ || noted)
+                {
+                    stillSent_[count++] = {event.track, event.stored, event.message};
+                }
+                break;
+            }
+        }
+    }
+    std::copy(stillSent_.begin(), stillSent_.begin() + static_cast<std::ptrdiff_t>(count),
+              alreadySent_.begin());
+    alreadySentCount_ = count;
+}
+
+bool Scheduler::takeAlreadySent(const PlannedEvent& event) noexcept
+{
+    for (std::size_t i = 0; i < alreadySentCount_; ++i)
+    {
+        const auto& sent = alreadySent_[i];
+        if (sent.track == event.track && sent.stored == event.stored &&
+            sent.message == event.message)
+        {
+            alreadySent_[i] = alreadySent_[--alreadySentCount_];
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Scheduler::passed(const PlannedEvent& event, nanoseconds position) const noexcept
@@ -252,6 +335,7 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     recordPoint_ = origin_ + plan_->tempo.toTime(start);
     next_ = plan_->firstAtOrAfter(startTime);
     chased_ = chased;
+    alreadySentCount_ = 0;
     nextClick_.reset();
     if (plan_->metronome)
     {
@@ -265,6 +349,7 @@ void Scheduler::stop(nanoseconds now) noexcept
     {
         return;
     }
+    alreadySentCount_ = 0;
     endAllNotes(now);
     releasePedals(now);
     playing_ = false;
@@ -393,7 +478,7 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         case Due::Event:
         {
             const auto& event = events[next_++];
-            if (event.tick >= startTick_)
+            if (event.tick >= startTick_ && (alreadySentCount_ == 0 || !takeAlreadySent(event)))
             {
                 send(event);
             }
