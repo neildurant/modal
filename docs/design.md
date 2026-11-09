@@ -117,6 +117,7 @@ Editing follows Vim's model: `[count] operator [count] range-or-object`, with `.
 - **Contents or time.** `i` objects and `d` leave silence; `ab`, `D` and `P` take time out or put it in, rippling only within the section, so the rest of the song stays aligned. Changing the song's length is explicit (`, b d`, `, b i`, the strip).
 - **One command per meaning.** A command does one thing, named for it; keys are bound to several commands, each doing something in places of its own, and mean the one that does something where the cursor is. The palette and the keys list name each as itself, and say what it does in the view the cursor is in.
 - **The key decides, not the history.** What `p` does is decided by the key and where the cursor is, never by how the register was filled; what a macro does when a command fails is decided by the command's outcome, never by its message.
+- **Toggles say their state (decided November 2026, after use).** In the hint menu a toggle shows its name and what it's set to now, `Quantise marks: shown`, rather than what it does, as its state was otherwise only seen by trying it.
 - **Taught as it's used.** The hint menu after any key that starts longer ones, and after an operator (objects and motions apart, each with what it would take here); `, ?` for every key here; keys waiting for a letter saying what they want; the status line saying what an operator will do and what was done.
 - **Lines typed into are safe:** Escape gives one up; Backspace on an empty line does nothing; a question takes only its own answers.
 

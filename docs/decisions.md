@@ -54,6 +54,8 @@ The tempo showed only in the event list, so the status line now gives it, and th
 
 **Playback quantise after use (November 2026).** On a 1/4 grid most of the demo's tracks played unquantised, since two notes of a pitch quantised onto one line refused the whole track, as `q` refuses. Playback can't usefully refuse, so the note that would move further stays where it's stored instead, which on a busy part keeps the note played on the beat on it, rather than the one after it pulling over. The Tracks table's layout was tightened at the same time: short headings, evenly spaced buttons, a port column sized to its names, and quantise last. The grid and note defaults left it, as they only matter in the piano roll. Up and Down stepping a field wasn't discoverable, so the status line says what a field takes and that they step it while it's edited; the quantise grid steps through triplets as well, as they're common grids to quantise to.
 
+**Selections and the piano roll's moving keys (November 2026, after use).** Nudging a selection moved only the note under the cursor, or nothing, since the moving keys only knew of one note; `t` and `T` shift a selection by grid steps, but nothing moved one in milliseconds. The moving and length keys now take every note a selection takes, refused as a whole as the shift operator is, and the selection goes with them, so nudging and listening can go on; a run of nudges undoes together. A time selection still takes whatever is in it, so moved onto other notes it takes them too.
+
 ## Editing grammar
 
 Editing follows Vim's model: `[count] operator [count] motion-or-object`, with `.` to repeat the last change. Key choices below are proposals; everything is rebindable in the keymap file.

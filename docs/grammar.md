@@ -163,6 +163,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 
 In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$` go to the first/last column; `gg` / `G` go to the first/last track, or track N with a count. Page keys scroll through rows. Space keeps its transport meaning.
 
+- The hint menu gives a toggle's name and what it's set to now, such as `Rewind: on` or `Mute this track: off`.
 - While a field is edited, here and in every view, the status line says what it takes and what the keys do; Up and Down step a value that can be stepped.
 - Enter or `e` edits the selected field in its cell; while it's highlighted whole, typing replaces the value and Backspace or Delete clears it, and a key that moves the cursor keeps it for editing. Enter commits, Escape leaves it, and Tab/Shift-Tab commit and move to the next/previous editable track column, wrapping at the ends.
 - Output port is chosen from a list at the cell, with the default port first: typing narrows it, whatever the case, Up and Down move through it, and Enter or Tab takes the one chosen, or Escape leaves it. Only what's listed can be chosen, `:port NAME` still taking a name. A port that wasn't found is dim in the table and named in the warning colour in the inspector, and stays until something else is chosen.
@@ -204,6 +205,8 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 | `=` `-` | Move its end to the grid step after, before |
 | `+` `_` | Lengthen, shorten it by a nudge |
 | `Ctrl-a` `Ctrl-x` | Velocity up, down |
+
+On a Visual selection, the moving and length keys act on every note it takes, refused as a whole if a note would overlap another of its pitch, and the selection moves with them; moves one after another undo together.
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |
 
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
