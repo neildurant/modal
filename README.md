@@ -92,7 +92,7 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 
 Offsets accept milliseconds (`-40ms`), ticks (`+120t`) and musical composites (`+1/16-22t`). Musical offsets stay as typed. The note inspector groups pitch and velocities on the left, and has a row each for Start, Length and Ends across their coarse, fine and exact values. `e` edits those fields; `:set timingunit=grid` follows the editing grid, or a fraction such as `1/16` fixes the display unit.
 
-Whole-track paste initially requires the same PPQN and section names/order/lengths. Freeze, committing playback quantise and the other playback settings to the notes, is a later step. See [the grammar](docs/grammar.md) for the detailed keys and limits.
+Whole-track paste initially requires the same PPQN and section names/order/lengths. Freeze (`, t f`) commits all or one playback transform to the track's events, resets the chosen settings and undoes as one edit. Its list offers All, Transpose, Velocity, Quantise and Time offset; playback must be stopped. Time offset alone requires quantise off, so freeze quantise first or choose All. See [the grammar](docs/grammar.md) for the detailed keys and limits.
 
 ### The event list
 

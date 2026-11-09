@@ -14,7 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 | 4. Event list and core grammar | Done, except the Linux checks |
 | 5. Piano roll and arrangement | Done, except the Linux checks |
 | 6. Full grammar | Done (November 2026), except the Linux checks |
-| 7. More for the views, and several songs | First Tracks view step complete; UI trial confirmed |
+| 7. More for the views, and several songs | Tracks steps complete; Freeze implemented, UI trial pending |
 
 What each milestone holds is in [design.md](design.md), under Milestones.
 
@@ -120,11 +120,15 @@ Tried in the real window and published: track reordering, with `, t o` and Alt-U
 
 Tried in the real window and published: the `Q` button and Quantise column with its settings in the inspector, notes that clash left where they are rather than the whole track, the tightened table layout and the editing hints in the status line, toggles giving their state in the hint menu, the piano roll's moving keys acting on a selection, `, t q`, `, T q` to bypass and `, T m` for the piano roll's marks, and changes while playing that neither repeat nor drop notes. The reasons are in decisions.md, under Playback quantise. As with the bank and program setup, the tests check the messages sent and their times; hearing it on real MIDI hardware is still to do.
 
+## Freeze
+
+Implemented locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. The 19 focused GCC Debug tests pass, with 551 assertions, at multiple PPQNs. Full Linux validation is in progress and the UI trial is outstanding; this step has not been published.
+
 ## Next
 
 The three Tracks steps are built. How `, e` asks for an event is a stop-gap, accepted as not very friendly for now, to refine later; the note on real MIDI hardware above still stands. Settle the next step's open questions before implementation:
 
-1. Freeze is agreed in principle, with scope, out-of-range results, negative offsets, section boundaries and rounding still open. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
+1. Complete Freeze's implementation, validation and UI trial under the agreed rules above. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
 
 The rest of milestone 7 remains the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Raise each feature's open questions before implementing the parts they affect.
 

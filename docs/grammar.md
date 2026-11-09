@@ -181,6 +181,16 @@ In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$
 - Normal `p` / `P` insert copies after/before the current row, with new IDs and unique numbered names. Visual `p` / `P` replace selected rows as one undo step. Routing and mute/solo are preserved. Named registers work (`V"ay`, `"ap`); appending adds rows. Event contents and sections remain separate payloads, and cannot be pasted as whole tracks.
 - The first implementation requires matching PPQN, section names, order and lengths when pasting. An incompatible paste leaves the song and register unchanged. `yit` in the editing views still takes only event contents.
 
+## Freezing playback transforms
+
+`, t f` or `:track-freeze` opens a list: **All**, Transpose, Velocity, Quantise and Time offset. Up/Down choose, Enter freezes and Escape cancels. All is selected initially. Unavailable choices are dimmed with their reason, and navigation skips them. `:track-freeze all`, `transpose`, `velocity`, `quantise` or `time` makes the choice directly (`quantize` and `offset` are aliases).
+
+Freeze takes the whole current track, or selected whole rows in Tracks; leave other Visual selections first. Playback must be stopped. All selected tracks validate and change together, as one undo step restoring both events and settings.
+
+Only the chosen transform is applied and reset. All applies quantise before time offset. Quantise turns off but keeps its parameters; other playback settings, bank/program setup and routing stay as they are. Time offset alone requires quantise off: freeze quantise first, or choose All. Quantise and All require bypass off where a chosen track has quantise enabled.
+
+A pitch outside MIDI range or an event before the song refuses the whole edit. Events can cross sections, keeping notes whole and growing the last section when needed. Millisecond offsets capture the current tempo map, rounding each end to the nearest tick, ties earlier; a new collision or a positive note collapsing to zero length refuses the edit. Quantise's notes left in place and pedal-order fallback are reported, as in playback.
+
 ## Coarse and fine note timing
 
 The note inspector in the piano roll and event list has the Note heading above Pitch, Velocity and Off Vel on the left. To their right, Start, Length and Ends each have a row across a coarse value, a signed fine value and an exact value, under Units, Fine(t) and B:B:T, with the colons lined up. Elapsed time is in the status line, with the cursor's bars, beats and ticks, in every view. Units follow the track grid by default; `:set timingunit=1/16` fixes them, and `:set timingunit=grid` follows the grid again. Changing units never moves notes.
@@ -243,7 +253,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, b` | Bars on every track: `d` delete, `i` insert |
 | `, e` | Insert an event at the cursor, asking which |
 | `, s` | Sections, on the cursor's section |
-| `, t` | Tracks: `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder |
+| `, t` | Tracks: `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
 | `, S` | Select |
 | `, x` | Transforms |
 | `, v` | Views: `t` Tracks, `a` arrangement, `p` piano roll, `e` event list |
