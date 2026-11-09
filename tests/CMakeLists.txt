@@ -11,6 +11,7 @@ add_executable(modal_tests
     core/engine_test.cpp
     core/event_query_test.cpp
     core/event_test.cpp
+    core/freeze_test.cpp
     core/input_queue_test.cpp
     core/meter_map_test.cpp
     core/note_fraction_test.cpp

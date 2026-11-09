@@ -1,6 +1,7 @@
 add_library(modal_core STATIC
     engine.cpp
     files.cpp
+    freeze.cpp
     time_offset.cpp
     timing_stats.cpp
     event.cpp
@@ -14,6 +15,7 @@ add_library(modal_core STATIC
     document.cpp
     pitch.cpp
     playback_plan.cpp
+    playback_transform.cpp
     player.cpp
     recorder.cpp
     scale.cpp

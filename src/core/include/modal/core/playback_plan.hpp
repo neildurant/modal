@@ -3,6 +3,7 @@
 #pragma once
 
 #include <modal/core/meter_map.hpp>
+#include <modal/core/playback_transform.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tempo_map.hpp>
 #include <modal/core/tick.hpp>
@@ -174,10 +175,6 @@ struct PlanOptions
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
     bool bypassQuantize = false;                       // play every track as stored, to compare
 };
-
-// A track's events as its playback quantise plays them, by the quantise transform's rules with its
-// pedalling following its notes; or why it can't be. For the plan, and for the views to show it.
-std::variant<QuantizedTrack, Refusal> playbackQuantized(const Song& song, const Track& track);
 
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside

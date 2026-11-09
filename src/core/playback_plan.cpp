@@ -37,16 +37,6 @@ ShortMessage message(std::uint8_t status, std::uint8_t channel, std::uint8_t dat
     return {{static_cast<std::uint8_t>(status | channel), data1, data2}, 3};
 }
 
-std::optional<std::uint8_t> transposed(std::uint8_t pitch, int transpose)
-{
-    const int result = pitch + transpose;
-    if (result < 0 || result > 127)
-    {
-        return std::nullopt;
-    }
-    return static_cast<std::uint8_t>(result);
-}
-
 // Fills in the message for one stored event, or returns false to leave it out.
 struct Planner
 {
@@ -58,13 +48,12 @@ struct Planner
 
     bool operator()(const Note& note) const
     {
-        const auto pitch = transposed(note.pitch, track.transpose);
+        const auto pitch = playbackPitch(note.pitch, track.transpose);
         if (!pitch)
         {
             return false;
         }
-        const auto velocity =
-            static_cast<std::uint8_t>(std::clamp(note.velocity + track.velocityOffset, 1, 127));
+        const auto velocity = playbackVelocity(note.velocity, track.velocityOffset);
         planned.message = message(kNoteOn, channel, *pitch, velocity);
         planned.endTick = planned.tick + note.duration;
         planned.noteOffTime = offset.at(tempo, planned.endTick);
@@ -100,7 +89,7 @@ struct Planner
 
     bool operator()(const PolyPressure& pressure) const
     {
-        const auto pitch = transposed(pressure.pitch, track.transpose);
+        const auto pitch = playbackPitch(pressure.pitch, track.transpose);
         if (!pitch)
         {
             return false;
@@ -177,26 +166,6 @@ const PlannedTrack* PlaybackPlan::track(TrackId id) const
 {
     const auto it = std::ranges::find(tracks, id, &PlannedTrack::id);
     return it == tracks.end() ? nullptr : &*it;
-}
-
-std::variant<QuantizedTrack, Refusal> playbackQuantized(const Song& song, const Track& track)
-{
-    const auto& quantize = track.quantize;
-    const auto& meter = song.meter(track.id());
-    const auto step = std::max<Tick>(quantize.grid.value_or(track.grid).toTicks(song.ppqn()), 1);
-    const auto end = song.end();
-    const auto nearest = [&](Tick tick)
-    {
-        // Not onto the song's end, where nothing can start, as the transform has it.
-        const auto to = nearestGridLine(meter, tick, step, quantize.swing);
-        return to < end ? to : tick;
-    };
-    return quantizeAll(song.events(track.id()), nearest, true,
-                       {.strength = quantize.strength,
-                        .move = quantize.move,
-                        .step = [step](Tick) { return step; },
-                        .nearestEnd = [&](Tick tick)
-                        { return nearestGridLine(meter, tick, step, quantize.swing); }});
 }
 
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
