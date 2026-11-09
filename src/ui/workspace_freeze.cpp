@@ -159,10 +159,10 @@ bool Workspace::freezeChoiceKey(const Key& key)
     }
     else if (key.named == NamedKey::Enter)
     {
+        if (freezeReasons()[freezeChoice_->chosen])
+            return true; // the dimmed entry already explains why it cannot be applied
         const auto choice = *freezeChoice_;
         auto result = applyFreeze(choice.tracks, kFreezeParts[choice.chosen]);
-        if (result.refused)
-            result.message = "Nothing done: " + result.message;
         report(result);
         if (!result.refused)
             freezeChoice_.reset();

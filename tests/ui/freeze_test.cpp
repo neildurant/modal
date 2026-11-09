@@ -194,8 +194,8 @@ TEST_CASE("Freeze validates selected rows together and leaves a refused batch un
         CHECK(f.document.version() == version);
         CHECK(f.ws.tracks().cursor() == cursor);
         CHECK(f.ws.mode() == Mode::Visual);
-        CHECK(f.ws.message().find("Bass") != std::string::npos);
-        CHECK(f.ws.message().find("outside MIDI") != std::string::npos);
+        CHECK(f.ws.message().empty());
+        CHECK(f.menu()[1].text.find(U"outside MIDI") != std::u32string::npos);
         CHECK_FALSE(f.menu().empty());
         f.press(NamedKey::Escape);
         CHECK(f.ws.mode() == Mode::Visual);
@@ -372,11 +372,18 @@ TEST_CASE("Freeze dims choices whose results would start before zero")
     f.press(NamedKey::Enter);
     CHECK(f.document.song() == original);
     CHECK(f.document.version() == version);
-    CHECK(f.ws.message().find("before zero") != std::string::npos);
+    CHECK(f.ws.message().empty());
     f.press(NamedKey::Down);
     CHECK(f.menu()[2].style.background == Role::Cursor);
     f.press(NamedKey::Up); // All remains selectable even though it is unavailable
     CHECK(f.menu()[1].style.background == Role::Cursor);
+    for (int i = 0; i < 4; ++i)
+        f.press(NamedKey::Down);
+    REQUIRE(f.menu()[5].style.background == Role::Cursor);
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message().empty());
+    CHECK(f.document.song() == original);
+    CHECK(f.document.version() == version);
     f.press(NamedKey::Escape);
     f.type(U":track-freeze all");
     f.press(NamedKey::Enter);
@@ -417,6 +424,10 @@ TEST_CASE("Freeze dims transforms with no active playback setting")
     {
         f.press(NamedKey::Down);
         CHECK(f.menu()[i].style.background == Role::Cursor);
+        f.press(NamedKey::Enter);
+        CHECK(f.ws.message().empty());
+        CHECK(f.document.version() == version);
+        REQUIRE_FALSE(f.menu().empty());
     }
     f.press(NamedKey::Down); // stop at the last entry
     CHECK(f.menu()[5].style.background == Role::Cursor);
@@ -426,7 +437,7 @@ TEST_CASE("Freeze dims transforms with no active playback setting")
         CHECK(f.menu()[i].style.background == Role::Cursor);
     }
     f.press(NamedKey::Enter);
-    CHECK(f.ws.message() == "Nothing done: Nothing to freeze");
+    CHECK(f.ws.message().empty());
     CHECK(f.document.song() == original);
     CHECK(f.document.version() == version);
     CHECK(f.ws.tracks().cursor() == cursor);
@@ -486,7 +497,8 @@ TEST_CASE("Freeze availability stays current and confirmation rechecks the opera
         f.press(NamedKey::Enter); // no redraw between the edit and confirmation
         CHECK(f.document.song() == original);
         CHECK(f.document.version() == version);
-        CHECK(f.ws.message().find("outside MIDI") != std::string::npos);
+        CHECK(f.ws.message().empty());
+        CHECK(f.menu()[1].text.find(U"outside MIDI") != std::u32string::npos);
         CHECK(f.menu()[1].style.foreground == Role::Dim);
         REQUIRE(f.document.undo());
         CHECK(f.menu()[1].style.foreground != Role::Dim);
@@ -506,13 +518,14 @@ TEST_CASE("Freeze availability stays current and confirmation rechecks the opera
         CHECK(f.menu()[1].style.foreground == Role::Dim);
         f.press(NamedKey::Enter);
         CHECK(f.document.song() == original);
-        CHECK(f.ws.message().find("Stop playback") != std::string::npos);
+        CHECK(f.ws.message().empty());
+        CHECK(f.menu()[1].text.find(U"Stop playback") != std::u32string::npos);
     }
     f.press(NamedKey::Escape);
     f.ws.setPlayer(nullptr);
 }
 
-TEST_CASE("Freeze can select a dimmed choice and explain it without changing anything")
+TEST_CASE("Freeze ignores Enter on a dimmed choice without a message or change")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Freezing f{ppqn};
@@ -527,7 +540,13 @@ TEST_CASE("Freeze can select a dimmed choice and explain it without changing any
     CHECK(rows[5].style.background == Role::Cursor);
     CHECK(rows[5].style.foreground == Role::Dim);
     f.press(NamedKey::Enter);
-    CHECK(f.ws.message() == "Nothing done: Freeze quantise first, or choose All");
+    CHECK(f.ws.message().empty());
+    CHECK_FALSE(f.ws.refused());
+    const auto status = f.ws.frame().back();
+    CHECK(std::ranges::none_of(status.text, [](const TextRun& run)
+                               { return run.style.foreground == Role::Warning; }));
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message().empty());
     CHECK(f.document.song() == original);
     CHECK(f.document.version() == version);
     CHECK(f.ws.tracks().cursor() == cursor);

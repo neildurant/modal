@@ -183,7 +183,7 @@ In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$
 
 ## Freezing playback transforms
 
-`, t f` or `:track-freeze` opens a list: **All**, Transpose, Velocity, Quantise and Time offset. Up/Down choose any entry, including dimmed ones, stopping at the first and last entries. Enter freezes an available choice; on an unavailable choice it says "Nothing done" with the reason, changes nothing and keeps the list open. Escape cancels. All is selected initially. Unavailable choices stay dimmed with their reason. `:track-freeze all`, `transpose`, `velocity`, `quantise` or `time` makes the choice directly (`quantize` and `offset` are aliases).
+`, t f` or `:track-freeze` opens a list: **All**, Transpose, Velocity, Quantise and Time offset. Up/Down choose any entry, including dimmed ones, stopping at the first and last entries. Enter freezes an available choice; on a dimmed choice it does nothing, shows no status message and keeps the list open. Escape cancels. All is selected initially. Unavailable choices stay dimmed with their reason. `:track-freeze all`, `transpose`, `velocity`, `quantise` or `time` makes the choice directly (`quantize` and `offset` are aliases); a refused direct command still reports why.
 
 Freeze takes the whole current track, or selected whole rows in Tracks; leave other Visual selections first. Playback must be stopped. All selected tracks validate and change together, as one undo step restoring both events and settings.
 
