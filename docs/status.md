@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: the four findings from the latest review are fixed locally and pass the full Linux checks; a UI trial is pending before publication. Current published cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: the four findings from the latest review are fixed and pass the full Linux checks; the moved-note deletion and refused-nudge UI trials are confirmed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -27,7 +27,7 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ### Review of changes from 4 November to `cd49989`
 
-Reviewed on 9 November 2026, including 4 November. All four fixes are implemented and committed locally; full Linux validation passes, with a UI trial pending before publication:
+Reviewed on 9 November 2026, including 4 November. All four fixes pass full Linux validation. The requested UI trials for moved-note deletion and refusing a selected nudge before zero were confirmed in the real window on 9 November 2026:
 
 1. **Fixed: operators and replacement objects follow a moved selection.** The remembered origin and the selection before its object move with it; operators take the moved selection rather than resolving the old object again. GCC Debug regressions first reproduced the failure, then passed at both PPQNs for deletion, yanking, `gv`, colon transforms, replacement objects and a moved bar's time, with undo checked.
 2. **Fixed: changing the editing grid does not repeat an already-sent quantised note.** Playback plans record the effective quantise grid, so the scheduler recognises changes when quantise follows the editing grid. A GCC Debug regression first reproduced the duplicate, then passed at all three core-test PPQNs, checking the note-ons and releases, an unsent note's new time, and an independent fixed quantise grid.
@@ -36,9 +36,9 @@ Reviewed on 9 November 2026, including 4 November. All four fixes are implemente
 
 The initial review reproduced all four with a standalone C++ harness at both 960 and 96 PPQN. Permanent regressions now cover them in `piano_roll_view_test.cpp`, `scheduler_test.cpp` and `playback_plan_test.cpp`. The fix commits are `fecc99d` (moved selections), `91416c5` (effective quantise grid), `6803fcc` (pedal following) and `25d0c91` (batch nudges).
 
-`tools/check-linux.sh` passes on the final implementation and regression tests: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, with 822 registered tests per configuration, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop or MIDI hardware checks have been run, and nothing from this fix step has been pushed.
+`tools/check-linux.sh` passes on the final implementation and regression tests: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, with 822 registered tests per configuration, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No desktop automation was used. The confirmed UI trials do not establish MIDI hardware timing results.
 
-For the pending UI trial, run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song:
+Trial steps retained for reference, including additional cases covered by the automated tests. Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song:
 
 - In the piano roll, on a note, try `vin`, Alt-Up, then `d`. It should delete the moved note. Undo restores it at its moved pitch, and another undo restores its original pitch. Repeat with Escape and `gv` before deleting, and with `ic` after moving to replace the selection with its chord.
 - On a sparse bar, try `vib`, Alt-}, then `d`. Deletion should act at the moved selection's time. Undo the deletion and move afterwards.
