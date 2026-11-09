@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: playback quantise is committed locally for a UI trial, not yet pushed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: playback quantise is tried and published. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -94,9 +94,9 @@ Tried in the real window and published: the demo song with every kind of event, 
 
 Tried in the real window and published: track reordering, with `, t o` and Alt-Up and Alt-Down, in the Tracks view and the arrangement. The reasons are in decisions.md, under Reordering tracks.
 
-## Playback quantise awaiting a UI trial
+## Playback quantise
 
-Committed locally, to try before pushing: the `Q` button and Quantise column with its settings in the inspector, notes that clash left where they are rather than the whole track, the tightened table layout and the editing hints in the status line, toggles giving their state in the hint menu, the piano roll's moving keys acting on a selection, `, t q`, `, T q` to bypass and `, T m` for the piano roll's marks, and changes while playing that neither repeat nor drop notes. The reasons are in decisions.md, under Playback quantise. As with the bank and program setup, the tests check the messages sent and their times; hearing it on real MIDI hardware is still to do.
+Tried in the real window and published: the `Q` button and Quantise column with its settings in the inspector, notes that clash left where they are rather than the whole track, the tightened table layout and the editing hints in the status line, toggles giving their state in the hint menu, the piano roll's moving keys acting on a selection, `, t q`, `, T q` to bypass and `, T m` for the piano roll's marks, and changes while playing that neither repeat nor drop notes. The reasons are in decisions.md, under Playback quantise. As with the bank and program setup, the tests check the messages sent and their times; hearing it on real MIDI hardware is still to do.
 
 ## Next
 
