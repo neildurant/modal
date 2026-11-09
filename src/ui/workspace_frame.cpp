@@ -106,6 +106,10 @@ Frame Workspace::frame() const
     {
         frame.push_back(listingRegion());
     }
+    if (freezeChoice_)
+    {
+        frame.push_back(freezeChoiceRegion());
+    }
     frame.push_back(mode_ == Mode::CommandLine && !view().typing() ? promptRegion()
                                                                    : statusRegion());
     return frame;
@@ -248,7 +252,8 @@ Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
-    bottom.left = {{trackMove_              ? " MOVE "
+    bottom.left = {{freezeChoice_           ? " FREEZE "
+                    : trackMove_            ? " MOVE "
                     : view().typing()       ? " EDIT "
                     : mode_ == Mode::Visual ? " VISUAL "
                                             : " NORMAL ",
@@ -261,7 +266,11 @@ Bar Workspace::statusBar(bool withMessage) const
                                    " ends it",
                                {Role::Accent, Role::Bar, kBold}});
     }
-    if (trackMove_)
+    if (freezeChoice_ && (!withMessage || message_.empty()))
+    {
+        bottom.left.push_back({"  Up and Down choose, Enter freezes, Escape cancels", kBarText});
+    }
+    else if (trackMove_)
     {
         bottom.left.push_back({"  j and k move, Enter accepts, Escape puts back", kBarText});
     }

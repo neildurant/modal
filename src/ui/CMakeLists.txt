@@ -42,6 +42,7 @@ add_library(modal_ui STATIC
     workspace.cpp
     workspace_commands.cpp
     workspace_frame.cpp
+    workspace_freeze.cpp
     workspace_hints.cpp
     workspace_macros.cpp
     workspace_prompt.cpp

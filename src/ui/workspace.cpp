@@ -100,6 +100,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          {
                              return insertEvent(call.arguments);
                          }
+                         if (name == "track-freeze")
+                         {
+                             return trackFreeze(call.arguments);
+                         }
                          if (name == "section-insert-before" || name == "section-insert-after" ||
                              name == "section-join")
                          {
@@ -887,6 +891,10 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (freezeChoice_)
+    {
+        return freezeChoiceKey(key);
+    }
     if (trackMove_)
     {
         return trackMoveKey(key);

@@ -40,6 +40,8 @@ public:
     const InspectorEditor& inspectorEditor() const { return editor_; }
     bool choosingPort() const { return portChoice_.has_value(); }
     bool editingQuantize() const { return quantizeEditing_; }
+    // Whole rows for shared batch operations, or the current track without a selection.
+    std::vector<core::TrackId> selected() const;
 
 private:
     std::size_t row() const;
@@ -47,7 +49,6 @@ private:
     void ensureVisible();
     // A column's width in cells: Name grows with the longest name, up to a limit.
     int columnWidth(const TrackColumn& column) const;
-    std::vector<core::TrackId> selected() const;
     Inspection inspection() const;
     // The table's fields, as the editor works through them.
     Inspection editableFields() const;

@@ -73,7 +73,8 @@ void Workspace::endChange()
 {
     // A command waiting for its letter (@a, "ap) isn't idle yet, so . repeats the whole of it.
     const bool idle = mode_ == Mode::Normal && keys_.pending().empty() && !operator_ &&
-                      !question_ && !cutNext_ && !awaiting_ && !registerName_ && !finding_.naming;
+                      !question_ && !cutNext_ && !awaiting_ && !registerName_ && !finding_.naming &&
+                      !freezeChoice_;
     if (idle && !repeat_.changeKeys.empty())
     {
         if (document_.version() != repeat_.versionBefore && !repeat_.notAChange)

@@ -75,6 +75,7 @@ nmap <leader>ts track-solo-toggle "Solo this track, or stop"
 nmap <leader>tc track-chase-toggle "Chase notes on this track, or stop"
 nmap <leader>tq track-quantize-toggle "Quantise this track as it plays, or stop"
 nmap <leader>to track-reorder     "Move through the other tracks"
+nmap <leader>tf track-freeze      "Freeze playback transforms into events"
 nmap <A-Up>     track-move-up     "Move the track up"
 nmap <A-Down>   track-move-down   "Move the track down"
 nmap <A-k>      track-move-up     "Move the track up"
@@ -86,6 +87,7 @@ vmap <leader>tm tracks-mute-toggle "Mute the selected tracks, or unmute"
 vmap <leader>ts tracks-solo-toggle "Solo the selected tracks, or stop"
 vmap <leader>tc tracks-chase-toggle "Chase notes on the selected tracks, or stop"
 vmap <leader>tq tracks-quantize-toggle "Quantise the selected tracks, or stop"
+vmap <leader>tf track-freeze      "Freeze the selected whole tracks"
 
 " Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
 " there, and after an operator is the range to it (d'a); '' goes back to before the last jump.

@@ -420,6 +420,12 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "track-reorder",
                 .description = "Move this track or the selected tracks through the others: j and "
                                "k move, Enter accepts, Escape puts them back"},
+    CommandInfo{.name = "track-freeze",
+                .description = "Freeze all or one playback transform into this track's events, "
+                               "or the selected rows, as one undo step; while stopped",
+                .usage = "[all|transpose|velocity|quantise|time]",
+                .range = true,
+                .choices = {Choices::FreezePart}},
     CommandInfo{.name = "track-move-up",
                 .description = "Move this track or the selected tracks up, {count} places",
                 .count = true},
@@ -542,7 +548,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 126> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 127> where{{
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
@@ -550,6 +556,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"track-quantize-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-reorder", onlyIn({Tracks, TrackList})},
+            {"track-freeze", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-move-up", onlyIn({Tracks, TrackList})},
             {"track-move-down", onlyIn({Tracks, TrackList})},
             {"track-mute-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},

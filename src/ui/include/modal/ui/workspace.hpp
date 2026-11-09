@@ -3,6 +3,7 @@
 #pragma once
 
 #include <modal/core/document.hpp>
+#include <modal/core/freeze.hpp>
 #include <modal/core/player.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/arrange_view.hpp>
@@ -350,6 +351,18 @@ public:
     MessageKind messageKind() const { return messageKind_; }
 
 private:
+    CommandResult trackFreeze(std::string_view arguments);
+    CommandResult applyFreeze(std::span<const core::TrackId> tracks, core::FreezePart part);
+    std::optional<std::string> freezeReason(std::span<const core::TrackId> tracks,
+                                            core::FreezePart part) const;
+    bool freezeChoiceKey(const Key& key);
+    Region freezeChoiceRegion() const;
+    struct FreezeChoice
+    {
+        std::vector<core::TrackId> tracks;
+        std::size_t chosen = 0;
+    };
+    std::optional<FreezeChoice> freezeChoice_;
     void startTyping() override { mode_ = Mode::CommandLine; }
     void openPrompt(std::string line) override;
     void askName(std::string label, std::string name,

@@ -45,6 +45,7 @@ enum class Choices : std::uint8_t
     Option,     // a transform's option, NAME=VALUE, with its values
     Key,        // a key: a tonic, then a scale
     EventKind,  // a kind of event to insert
+    FreezePart, // all, or one playback transform to commit to events
     Query,      // a search's terms: keywords, and keys after inside and outside
 };
 inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Query) + 1;
