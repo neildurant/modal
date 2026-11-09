@@ -93,6 +93,12 @@ public:
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
     // Editing the inspector's fields, with e.
     bool typing() const override { return editor_.active(); }
+    std::optional<std::string> typingHint() const override
+    {
+        if (!typing())
+            return std::nullopt;
+        return "Enter sets it, Tab goes on, Escape leaves it; Up and Down step it";
+    }
     const InspectorEditor& inspectorEditor() const { return editor_; }
     void type(char32_t character) override { editor_.type(character); }
     std::optional<bool> runTyping(std::string_view command) override;

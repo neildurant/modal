@@ -71,6 +71,12 @@ public:
     void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
     bool typing() const override { return field_.has_value() || editor_.active(); }
+    std::optional<std::string> typingHint() const override
+    {
+        if (!typing())
+            return std::nullopt;
+        return "Enter sets it, Tab goes on, Escape leaves it; Up and Down step it";
+    }
     void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
 

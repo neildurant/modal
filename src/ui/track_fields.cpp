@@ -17,22 +17,21 @@ namespace
 constexpr std::array kColumns{
     TrackColumn{TrackField::Number, "No.", 4, true},
     TrackColumn{TrackField::Name, "Name", 16},
-    TrackColumn{TrackField::Mute, "Mute", 5},
-    TrackColumn{TrackField::Solo, "Solo", 5},
+    // The buttons as wide as each other, so they're evenly spaced.
+    TrackColumn{TrackField::Mute, "Mute", 6},
+    TrackColumn{TrackField::Solo, "Solo", 6},
     TrackColumn{TrackField::ChaseNotes, "Chase", 6},
     TrackColumn{TrackField::Quantize, "Quant", 6},
-    TrackColumn{TrackField::Port, "Output port", 16},
-    TrackColumn{TrackField::Channel, "Channel", 8, true},
+    TrackColumn{TrackField::Port, "Output port", 12},
+    TrackColumn{TrackField::Channel, "Ch", 4, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
     TrackColumn{TrackField::BankLsb, "LSB", 4, true},
-    TrackColumn{TrackField::Program, "Program", 8, true},
-    TrackColumn{TrackField::Transpose, "Transpose", 10, true},
-    TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13, true},
+    TrackColumn{TrackField::Program, "Prog", 6, true},
+    TrackColumn{TrackField::Transpose, "Trans", 6, true},
+    TrackColumn{TrackField::VelocityOffset, "Vel +/-", 8, true},
     TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
+    // Last, as its settings can run long.
     TrackColumn{TrackField::QuantizeSummary, "Quantise", 25},
-    TrackColumn{TrackField::Grid, "Grid", 7},
-    TrackColumn{TrackField::DefaultLength, "Length", 8},
-    TrackColumn{TrackField::DefaultVelocity, "Vel", 4, true},
 };
 
 std::string signedText(int value)
@@ -90,12 +89,6 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return setupText(track.programSetup.bankMsb);
     case TrackField::BankLsb:
         return setupText(track.programSetup.bankLsb);
-    case TrackField::Grid:
-        return core::toString(track.grid);
-    case TrackField::DefaultLength: // following the grid until set
-        return track.noteLength ? core::toString(*track.noteLength) : "grid";
-    case TrackField::DefaultVelocity:
-        return std::to_string(track.noteVelocity);
     case TrackField::Quantize:
         return track.quantize.on ? "Q" : "-";
     case TrackField::QuantizeSummary:
@@ -218,30 +211,6 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         (strength ? quantize.strength : quantize.swing) = value;
         return {};
     }
-    if (field == TrackField::Grid || field == TrackField::DefaultLength)
-    {
-        if (field == TrackField::DefaultLength && (text.empty() || text == "grid"))
-        {
-            track.noteLength.reset();
-            return {};
-        }
-        const auto fraction = core::parseNoteFraction(text);
-        if (!fraction)
-        {
-            return field == TrackField::Grid ? "Use a note length, such as 1/16 or 1/8t"
-                                             : "Use a note length such as 1/16, or grid to follow "
-                                               "the grid";
-        }
-        if (field == TrackField::Grid)
-        {
-            track.grid = *fraction;
-        }
-        else
-        {
-            track.noteLength = *fraction;
-        }
-        return {};
-    }
     auto* const setup = setupPart(track, field);
     if (setup != nullptr && (text.empty() || text == "-"))
     {
@@ -273,14 +242,6 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
             return "Enter 0 to 127, or nothing to leave it unset";
         }
         *setup = static_cast<std::uint8_t>(value);
-    }
-    else if (field == TrackField::DefaultVelocity)
-    {
-        if (value < 1 || value > 127)
-        {
-            return "The velocity must be 1 to 127";
-        }
-        track.noteVelocity = static_cast<std::uint8_t>(value);
     }
     else if (field == TrackField::Channel)
     {
@@ -316,26 +277,32 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
     auto& quantize = track.quantize;
     if (field == TrackField::QuantizeGrid)
     {
-        // Doubling or halving, keeping triplets, from 1/1 to 1/64, as the piano roll's does.
-        auto to = quantize.grid.value_or(track.grid);
-        const auto straight = [](core::NoteFraction f)
+        // Coarser or finer through the straight and triplet lengths, from wherever it is.
+        constexpr std::array<core::NoteFraction, 12> kSteps{{{1, 1},
+                                                             {1, 2},
+                                                             {1, 3},
+                                                             {1, 4},
+                                                             {1, 6},
+                                                             {1, 8},
+                                                             {1, 12},
+                                                             {1, 16},
+                                                             {1, 24},
+                                                             {1, 32},
+                                                             {1, 48},
+                                                             {1, 64}}};
+        const auto now = quantize.grid.value_or(track.grid);
+        // The first at or shorter than it, or with steps up the one longer just before it.
+        const auto shorter =
+            std::ranges::find_if(kSteps, [&](core::NoteFraction f) { return !(now < f); });
+        auto at = shorter - kSteps.begin();
+        if (steps > 0 && (shorter == kSteps.end() || *shorter != now))
         {
-            return f.denominator() % 3 == 0
-                       ? core::NoteFraction{f.numerator() * 3, f.denominator() * 2}
-                       : f;
-        };
-        for (int i = 0; i < std::abs(steps); ++i)
-        {
-            const auto next = steps > 0 ? core::NoteFraction{to.numerator() * 2, to.denominator()}
-                                        : core::NoteFraction{to.numerator(), to.denominator() * 2};
-            if (straight(next) > core::NoteFraction{1, 1} ||
-                straight(next) < core::NoteFraction{1, 64})
-            {
-                break;
-            }
-            to = next;
+            --at; // to the next longer is already a step
+            --steps;
         }
-        quantize.grid = to;
+        at = std::clamp<std::ptrdiff_t>(at - steps, 0,
+                                        static_cast<std::ptrdiff_t>(kSteps.size()) - 1);
+        quantize.grid = kSteps[static_cast<std::size_t>(at)];
         return {};
     }
     if (field == TrackField::QuantizeStrength)
@@ -373,12 +340,11 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
         return {};
     }
     if (field == TrackField::Channel || field == TrackField::Transpose ||
-        field == TrackField::VelocityOffset || field == TrackField::DefaultVelocity)
+        field == TrackField::VelocityOffset)
     {
-        const int value = field == TrackField::Channel           ? track.channel
-                          : field == TrackField::Transpose       ? track.transpose
-                          : field == TrackField::DefaultVelocity ? int{track.noteVelocity}
-                                                                 : track.velocityOffset;
+        const int value = field == TrackField::Channel     ? track.channel
+                          : field == TrackField::Transpose ? track.transpose
+                                                           : track.velocityOffset;
         return setTrackField(track, field, std::to_string(static_cast<std::int64_t>(value) + steps),
                              ppqn);
     }

@@ -29,9 +29,6 @@ enum class TrackField
     BankMsb,
     BankLsb,
     Program,
-    Grid,
-    DefaultLength,
-    DefaultVelocity,
     Quantize,        // the Q button
     QuantizeSummary, // the Quantise column, its settings edited in the inspector
     QuantizeGrid,

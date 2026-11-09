@@ -80,6 +80,17 @@ void TracksView::go(std::size_t index)
 
 int TracksView::columnWidth(const TrackColumn& column) const
 {
+    if (column.field == TrackField::Port)
+    {
+        // As wide as the longest port a track names, up to 24 characters, the whole name in
+        // the bar above and the inspector.
+        std::size_t longest = 0;
+        for (const auto& track : document_.song().tracks())
+        {
+            longest = std::max(longest, decodeUtf8(track->port).size());
+        }
+        return std::clamp(static_cast<int>(longest) + 1, column.width, 24 + 1);
+    }
     if (column.field != TrackField::Name)
     {
         return column.width;
@@ -94,7 +105,7 @@ int TracksView::columnWidth(const TrackColumn& column) const
     int others = 0;
     for (const auto& other : trackColumns())
     {
-        others += other.field == TrackField::Name ? 0 : other.width;
+        others += other.field == TrackField::Name ? 0 : columnWidth(other);
     }
     const int widest = std::max(32 + 1, layout_.fullColumns - 2 - others);
     return std::max(column.width, std::min(static_cast<int>(longest) + 1, widest));
@@ -449,6 +460,52 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
         nextField(command == "command-line-next");
     }
     return result;
+}
+
+std::optional<std::string> TracksView::typingHint() const
+{
+    if (portChoice_)
+    {
+        return "Type to narrow the list; Up and Down choose, Enter or Tab takes it, Escape "
+               "leaves it";
+    }
+    if (!editor_.active())
+    {
+        return std::nullopt;
+    }
+    if (quantizeEditing_)
+    {
+        const auto& heading = editor_.heading();
+        if (heading == "Grid")
+            return "A note length, such as 1/4, 1/8, 1/16 or 1/8t for a triplet, or grid for the "
+                   "track's own; Up and Down go coarser and finer, through triplets too";
+        if (heading == "Strength")
+            return "How far towards the line, 0% to 100%; Up and Down step 5%";
+        if (heading == "Swing")
+            return "25% to 75%: 50% straight, 66% a triplet feel, under 50% pushed; Up and Down "
+                   "step 1%";
+        return "starts, ends, both or lengths; Up and Down go through them";
+    }
+    switch (fieldFor(editor_.heading()))
+    {
+    case TrackField::Name:
+        return "Any name; Enter sets it, Tab goes on, Escape leaves it";
+    case TrackField::Channel:
+        return "1 to 16; Up and Down step it";
+    case TrackField::BankMsb:
+    case TrackField::BankLsb:
+    case TrackField::Program:
+        return "0 to 127, or nothing to leave it unset; Up and Down step it";
+    case TrackField::Transpose:
+        return "Semitones, -127 to +127; Up and Down step it";
+    case TrackField::VelocityOffset:
+        return "Added to every velocity, -127 to +127; Up and Down step it";
+    case TrackField::TimeOffset:
+        return "Such as -40ms, +120t or +1/16-22t; Up and Down step it, by the track's grid if "
+               "it's musical";
+    default:
+        return std::nullopt;
+    }
 }
 
 bool TracksView::openField()

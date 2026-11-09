@@ -301,7 +301,7 @@ TEST_CASE("track columns start visible and keep the active field visible after r
     CHECK(frame.front().text.front().text.starts_with(U"No."));
     CHECK(frame.front().text.front().x >= 0);
     t.ws.resize(600, 300, {10, 20});
-    t.type(U"$4h");
+    t.type(U"$h");
     frame = t.ws.frame();
     for (const auto& run : frame.front().text)
     {
@@ -376,7 +376,7 @@ TEST_CASE("track toggles are compact badges and numeric cells align on the right
 TEST_CASE("musical track offsets are shown as they were typed")
 {
     Tracking t;
-    t.type(U"$4h");
+    t.type(U"$h");
     t.enter(U"+1/16-14t");
     const auto shown = [&]
     {
@@ -497,7 +497,7 @@ TEST_CASE("chasing toggles from the palette command for the current track and un
 TEST_CASE("stepping a musical offset keeps the parts it was typed in")
 {
     Tracking t;
-    t.type(U"$4h");
+    t.type(U"$h");
     t.enter(U"+1/16-33t");
     const auto text = [&] { return core::offsetText(t.track().timeOffset); };
     t.type(U"_"); // a tick, in the fine part
@@ -527,7 +527,7 @@ TEST_CASE("stepping a musical offset keeps the parts it was typed in")
 TEST_CASE("a stepped musical offset stays within the limit")
 {
     Tracking t;
-    t.type(U"$4h");
+    t.type(U"$h");
     t.enter(U"+64/1");
     t.type(U"=");
     CHECK(t.ws.message().find("limit") != std::string::npos);
@@ -662,7 +662,7 @@ TEST_CASE("the status line shows the cursor's time in every view, and the inspec
 TEST_CASE("numeric columns' headings are right-aligned over their values")
 {
     Tracking t;
-    t.type(U"$4h");
+    t.type(U"$h");
     t.enter(U"-40ms");
     const auto frame = t.ws.frame();
     const auto& runs = frame.front().text;
@@ -913,13 +913,13 @@ TEST_CASE("Tab goes through the bank fields and Program, and on to the later col
     REQUIRE(t.ws.tracks().inspectorEditor().heading() == "LSB");
     t.type(U"2");
     t.press(NamedKey::Tab);
-    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Program");
+    REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Prog");
     t.type(U"5");
     t.press(NamedKey::Tab);
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Transpose");
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Trans");
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
     t.press(NamedKey::Tab, kShift);
-    CHECK(t.ws.tracks().inspectorEditor().heading() == "Program");
+    CHECK(t.ws.tracks().inspectorEditor().heading() == "Prog");
     t.press(NamedKey::Escape);
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
 }
@@ -952,36 +952,6 @@ TEST_CASE("a track field is edited in its cell, not the inspector")
     REQUIRE(cellRun(Role::Selection));
     CHECK(cellRun(Role::Selection)->text.find(U'1') != std::u32string::npos);
     CHECK_FALSE(inspectorHas(t.ws.frame(), U"Channel "));
-}
-
-TEST_CASE("a track's grid and default note are edited in the table")
-{
-    Tracking t;
-    t.type(U"$h"); // the default length, before the velocity at the end
-    CHECK_FALSE(t.track().noteLength);
-    t.enter(U"1/8t");
-    REQUIRE(t.track().noteLength);
-    CHECK(*t.track().noteLength == core::NoteFraction{1, 12});
-    t.enter(U"grid");
-    CHECK_FALSE(t.track().noteLength);
-    t.enter(U"nonsense");
-    CHECK(t.ws.tracks().typing());
-    t.press(NamedKey::Escape);
-
-    t.type(U"h");
-    t.enter(U"1/8.");
-    CHECK(t.track().grid == core::NoteFraction{3, 16});
-
-    t.type(U"$");
-    t.enter(U"64");
-    CHECK(t.track().noteVelocity == 64);
-    t.type(U"=");
-    CHECK(t.track().noteVelocity == 65);
-    t.enter(U"0");
-    CHECK(t.ws.message() == "The velocity must be 1 to 127");
-    t.press(NamedKey::Escape);
-    t.type(U"u");
-    CHECK(t.track().noteVelocity == 64);
 }
 
 TEST_CASE("stepping a setup starts from unset, and a selection is set together")
@@ -1215,7 +1185,7 @@ TEST_CASE("a track's port is chosen from a list of the ports there are")
         t.press(NamedKey::Down);
         t.press(NamedKey::Tab);
         CHECK(t.track().port == "loopMIDI Port 1");
-        CHECK(t.ws.tracks().inspectorEditor().heading() == "Channel");
+        CHECK(t.ws.tracks().inspectorEditor().heading() == "Ch");
         t.press(NamedKey::Escape);
     }
 }
@@ -1419,7 +1389,7 @@ TEST_CASE("the tracks being moved are shown, and the status line says what to do
 namespace
 {
 const std::u32string_view kToQuantizeButton = U"4l";
-const std::u32string_view kToQuantizeColumn = U"$3h"; // before Grid, Length and Vel
+const std::u32string_view kToQuantizeColumn = U"$"; // the last
 } // namespace
 
 TEST_CASE("the Q button quantises a track as it plays, keeping its settings when off")
@@ -1479,8 +1449,10 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
     CHECK(t.track().quantize.strength == 75);
     t.press(NamedKey::Tab, kShift);
     CHECK(editor.heading() == "Grid");
-    t.press(NamedKey::Up); // coarser, from the track's own grid
+    t.press(NamedKey::Up); // coarser, from the track's own grid, through the triplets
     REQUIRE(t.track().quantize.grid);
+    CHECK(*t.track().quantize.grid == core::NoteFraction{1, 12});
+    t.press(NamedKey::Up);
     CHECK(*t.track().quantize.grid == core::NoteFraction{1, 8});
     t.type(U"1/16t");
     t.press(NamedKey::Enter);
@@ -1504,6 +1476,8 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
     REQUIRE(summary());
     t.type(U"u");
     CHECK(t.track().quantize.grid == core::NoteFraction{1, 8});
+    t.type(U"uu");
+    CHECK_FALSE(t.track().quantize.grid);
 
     SECTION("a value out of range keeps the field open, saying why")
     {
@@ -1527,4 +1501,85 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
         CHECK(t.track(1).quantize.grid == core::NoteFraction{1, 4});
         t.press(NamedKey::Escape);
     }
+}
+
+TEST_CASE("the status line says what a field takes while it's edited")
+{
+    Tracking t;
+    const auto status = [&] { return inspectorHas(t.ws.frame(), U"1 to 16; Up and Down step it"); };
+    CHECK_FALSE(status());
+    t.type(U"6l"); // channel
+    t.press(NamedKey::Enter);
+    CHECK(status());
+    t.press(NamedKey::Escape);
+    CHECK_FALSE(status());
+
+    t.type(U"$");
+    t.press(NamedKey::Enter);
+    CHECK(inspectorHas(t.ws.frame(), U"or 1/8t for a triplet"));
+    t.press(NamedKey::Tab, kShift); // round to Moves
+    CHECK(
+        inspectorHas(t.ws.frame(), U"starts, ends, both or lengths; Up and Down go through them"));
+    t.press(NamedKey::Escape);
+}
+
+TEST_CASE("the quantise grid steps through the triplets, from anywhere")
+{
+    Tracking t;
+    t.type(U"$");
+    t.press(NamedKey::Enter);
+    const auto grid = [&] { return *t.track().quantize.grid; };
+    t.type(U"1/8.");
+    t.press(NamedKey::Enter); // a dotted eighth, between 1/4t and 1/8
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Down);
+    CHECK(grid() == core::NoteFraction{1, 8});
+    t.press(NamedKey::Down);
+    CHECK(grid() == core::NoteFraction{1, 12});
+    for (int i = 0; i < 20; ++i)
+        t.press(NamedKey::Down);
+    CHECK(grid() == core::NoteFraction{1, 64});
+    for (int i = 0; i < 20; ++i)
+        t.press(NamedKey::Up);
+    CHECK(grid() == core::NoteFraction{1, 1});
+    t.press(NamedKey::Escape);
+}
+
+TEST_CASE("the button columns are evenly spaced, and Output port fits its names")
+{
+    Tracking t;
+    const auto headingX = [&](std::u32string_view heading)
+    {
+        const auto frame = t.ws.frame();
+        for (const auto& run : frame.front().text)
+        {
+            const auto first = run.text.find_first_not_of(U' ');
+            const auto last = run.text.find_last_not_of(U' ');
+            if (run.y == 0 && first != std::u32string::npos &&
+                run.text.substr(first, last - first + 1) == heading)
+            {
+                return run.x;
+            }
+        }
+        return -1;
+    };
+    const auto mute = headingX(U"Mute");
+    const auto solo = headingX(U"Solo");
+    const auto chase = headingX(U"Chase");
+    const auto quant = headingX(U"Quant");
+    CHECK(solo - mute == chase - solo);
+    CHECK(quant - chase == chase - solo);
+
+    const auto port = headingX(U"Output port");
+    const auto channel = [&] { return headingX(U"Ch"); };
+    const auto narrow = channel() - port;
+    t.document.edit("A long port", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(
+                            song.tracks()[0]->id(), [](core::Track& track)
+                            { track.port = "A port with quite a long name, longer than room"; });
+                    });
+    CHECK(channel() - port == 25 * 10);
+    CHECK(narrow == trackColumns()[6].width * 10);
 }

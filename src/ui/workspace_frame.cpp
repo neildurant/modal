@@ -270,6 +270,10 @@ Bar Workspace::statusBar(bool withMessage) const
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
         bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
     }
+    else if (const auto hint = view().typingHint())
+    {
+        bottom.left.push_back({"  " + *hint, kBarText});
+    }
     else if (const auto at = player_ != nullptr ? player_->position() : std::nullopt)
     {
         // While playing, where the playhead is.

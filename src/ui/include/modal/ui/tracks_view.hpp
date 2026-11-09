@@ -34,6 +34,7 @@ public:
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::size_t> selectionIndex() const override { return row(); }
     bool typing() const override { return editor_.active() || portChoice_.has_value(); }
+    std::optional<std::string> typingHint() const override;
     void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
     const InspectorEditor& inspectorEditor() const { return editor_; }
