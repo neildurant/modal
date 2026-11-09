@@ -233,6 +233,9 @@ private:
     // start or past its last tick, or run into another note of its pitch. The change says
     // whether it can be made, giving its own message if not.
     bool changeNote(std::string_view verb, const std::function<bool(core::Event&)>& change);
+    // The same change to every note a selection takes, refused whole if it can't be made to
+    // one, the selection going with them; moves one after another undo together.
+    bool changeSelected(std::string_view verb, const std::function<bool(core::Event&)>& change);
     // A time a number of nudges on, or back if negative: at least a tick each way, however
     // short the nudge is at the tempo there.
     core::Tick nudged(core::Tick tick, int nudges) const;

@@ -900,9 +900,90 @@ std::optional<std::string> PianoRollView::setNote(const std::string& heading,
     return std::nullopt;
 }
 
+bool PianoRollView::changeSelected(std::string_view verb,
+                                   const std::function<bool(core::Event&)>& change)
+{
+    const auto id = *trackId();
+    const auto& song = document_.song();
+    const auto& events = song.events(id);
+    const auto selection = host_.selection();
+    std::vector<std::size_t> which;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto* note = std::get_if<core::Note>(&events[i].data);
+        if (note != nullptr && takes(events[i].tick, note->pitch) &&
+            (!selection || !selection->filter ||
+             core::matches(*selection->filter, events[i].data, song.ppqn())))
+        {
+            which.push_back(i);
+        }
+    }
+    if (which.empty())
+    {
+        host_.refuse("No notes in the selection", MessageKind::Warning);
+        return true;
+    }
+    std::vector<std::pair<core::Event, core::Event>> moves; // each as it was and would be
+    for (const auto i : which)
+    {
+        auto changed = events[i];
+        if (!change(changed) || changed.tick < 0 || changed.tick > lastTick())
+        {
+            host_.refuse("Not all the selected notes can go there", MessageKind::Warning);
+            return true;
+        }
+        moves.emplace_back(events[i], changed);
+    }
+    const auto pitchOf = [](const core::Event& e) { return std::get<core::Note>(e.data).pitch; };
+    const auto& [first, firstTo] = moves.front();
+    const auto by = firstTo.tick - first.tick;
+    const auto up = int{pitchOf(firstTo)} - int{pitchOf(first)};
+    if (std::ranges::all_of(moves, [](const auto& m) { return m.first == m.second; }))
+    {
+        return true;
+    }
+    // Each in turn, those ahead first, so none runs into one still to move out of its way.
+    std::ranges::sort(moves,
+                      [&](const auto& a, const auto& b)
+                      {
+                          if (by != 0 && a.first.tick != b.first.tick)
+                          {
+                              return by > 0 ? a.first.tick > b.first.tick
+                                            : a.first.tick < b.first.tick;
+                          }
+                          return up > 0 ? pitchOf(a.first) > pitchOf(b.first)
+                                        : pitchOf(a.first) < pitchOf(b.first);
+                      });
+    auto working = events;
+    for (const auto& [was, to] : moves)
+    {
+        const auto at = std::ranges::find(working.all(), was) - working.all().begin();
+        working.erase(static_cast<std::size_t>(at));
+        if (auto why = overlap(working, std::nullopt, to, meter()))
+        {
+            host_.refuse(std::move(*why), MessageKind::Warning);
+            return true;
+        }
+        working.insert(to);
+    }
+    const auto count = moves.size();
+    editEvents(
+        std::string{verb} + " " + std::to_string(count) + (count == 1 ? " note" : " notes") +
+            " in " + trackName(),
+        [&](core::EventList& list) { list = working; }, "selected-" + std::string{verb});
+    moveTo(time_ + by);
+    moveToPitch(std::clamp(int{pitch_} + up, 0, 127));
+    host_.moveSelection(by, up);
+    return true;
+}
+
 bool PianoRollView::changeNote(std::string_view verb,
                                const std::function<bool(core::Event&)>& change)
 {
+    if (selecting())
+    {
+        return changeSelected(verb, change);
+    }
     const auto index = noteHere(verb == "Move" || verb == "Nudge" ? "move" : "change");
     if (!index)
     {

@@ -358,6 +358,7 @@ private:
              std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;
     std::optional<Selection> selection() const override { return selection_; }
+    void moveSelection(core::Tick by, int pitches) override;
     void chosenMeter(core::TimeSignature meter) override;
     void stopTyping() override
     {

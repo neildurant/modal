@@ -2052,6 +2052,31 @@ void Workspace::selectObject(std::string_view command, int count)
     }
 }
 
+void Workspace::moveSelection(core::Tick by, int pitches)
+{
+    if (!selection_)
+    {
+        return;
+    }
+    selection_->anchor.tick += by;
+    if (auto& pitch = selection_->anchor.pitch)
+    {
+        *pitch = static_cast<std::uint8_t>(std::clamp(*pitch + pitches, 0, 127));
+    }
+    for (auto* range : {&selection_->span, &selection_->starts})
+    {
+        if (*range)
+        {
+            (*range)->first += by;
+            (*range)->second += by;
+        }
+    }
+    if (selection_->object)
+    {
+        selection_->object->after = view().place(); // still what the object took
+    }
+}
+
 void Workspace::widenSelection()
 {
     // Once the cursor moves, the selection is from its anchor to the cursor again, as v's, the

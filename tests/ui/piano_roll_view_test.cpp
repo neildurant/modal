@@ -1734,3 +1734,74 @@ TEST_CASE("a quantised track's notes are marked where they'll be heard, unless f
         { song.updateTrack(id, [](core::Track& track) { track.quantize.on = false; }); });
     CHECK(marks() == 0);
 }
+
+TEST_CASE("the moving keys move every note a selection takes, and the selection with them")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto ticks = [&]
+    {
+        std::vector<core::Tick> found;
+        for (const auto& event : r.document.song().events(id).all())
+        {
+            found.push_back(event.tick);
+        }
+        return found;
+    };
+    const auto before = ticks(); // the chord at the start, an A2 in bar 2, ...
+    // Bars 1 and 2 at every pitch, by time, the cursor on no note.
+    r.type(U"v");
+    r.type(U"]b]b");
+    REQUIRE(r.ws.mode() == Mode::Visual);
+
+    r.press(Key::of(NamedKey::Right, kAlt | kShift)); // a nudge later
+    const auto nudged = ticks();
+    REQUIRE(nudged.size() == before.size());
+    CHECK(nudged[0] > before[0]);
+    CHECK(nudged[1] > before[1]);
+    CHECK(nudged[2] > before[2]);  // bar 2's A2 too
+    CHECK(nudged[3] == before[3]); // after the selection
+    r.press(Key::of(NamedKey::Right, kAlt | kShift));
+    CHECK(ticks()[2] > nudged[2]);
+    CHECK(r.ws.mode() == Mode::Visual); // still selected, to go on
+
+    // The two nudges undo together.
+    r.press(Key::of(NamedKey::Escape));
+    r.type(U"u");
+    CHECK(ticks() == before);
+
+    SECTION("a semitone up, the selection too")
+    {
+        r.type(U"ggv]b]b");
+        r.press(Key::of(NamedKey::Up, kAlt));
+        r.press(Key::of(NamedKey::Up, kAlt));
+        std::vector<int> pitches;
+        for (const auto& event : r.document.song().events(id).all())
+        {
+            pitches.push_back(std::get<core::Note>(event.data).pitch);
+        }
+        CHECK(pitches[0] == 33); // G1 and E1, then A2, two semitones up
+        CHECK(pitches[1] == 30);
+        CHECK(pitches[2] == 47);
+        CHECK(pitches[3] == 36); // the C2 after it, as it was
+    }
+    SECTION("a move that would run notes of a pitch together is refused whole")
+    {
+        r.document.edit(
+            "Another", {},
+            [&](core::Song& song)
+            {
+                song.updateEvents(
+                    id, [&](core::EventList& events)
+                    { events.insert({r.t.bar(4) + r.t.sixteenth(), core::Note{45, 90, 1}}); });
+            });
+        r.type(U"ggv]b]b");
+        r.press(Key::typed(U'}', kAlt)); // a bar later, the selection too
+        const auto moved = ticks();
+        REQUIRE(moved != before);
+        r.press(Key::typed(U'}', kAlt)); // bar 2's A2, now in bar 3, into bar 4's
+        CHECK(ticks() == moved);
+        CHECK(r.ws.message().find("Would") != std::string::npos);
+    }
+}

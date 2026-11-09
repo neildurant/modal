@@ -233,6 +233,9 @@ public:
 
     // The Visual selection, if there is one; operators take it as the motion "visual".
     virtual std::optional<Selection> selection() const = 0;
+    // Moves it with what it took, as its notes moved: its start and pitch, the cursor being
+    // moved by the view itself.
+    virtual void moveSelection(core::Tick by, int pitches) = 0;
 
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.
