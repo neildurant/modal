@@ -3,10 +3,13 @@
 #include <modal/core/track.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstdlib>
 #include <iterator>
 #include <map>
+#include <optional>
+#include <string_view>
 #include <utility>
 
 namespace modal::core
@@ -137,11 +140,34 @@ Track::Track(TrackId id)
 {
 }
 
+namespace
+{
+constexpr std::array<std::pair<std::string_view, QuantizeMove>, 4> kMoves{{
+    {"starts", QuantizeMove::Starts},
+    {"ends", QuantizeMove::Ends},
+    {"both", QuantizeMove::Both},
+    {"lengths", QuantizeMove::Lengths},
+}};
+} // namespace
+
+std::optional<QuantizeMove> quantizeMove(std::string_view name)
+{
+    const auto found =
+        std::ranges::find(kMoves, name, &std::pair<std::string_view, QuantizeMove>::first);
+    return found == kMoves.end() ? std::nullopt : std::optional{found->second};
+}
+
+std::string_view quantizeMoveName(QuantizeMove move)
+{
+    return std::ranges::find(kMoves, move, &std::pair<std::string_view, QuantizeMove>::second)
+        ->first;
+}
+
 bool Track::hasValidSettings(Ppqn ppqn) const
 {
     return channel >= kMinChannel && channel <= kMaxChannel &&
            std::abs(transpose) <= kMaxTranspose && std::abs(velocityOffset) <= kMaxVelocityOffset &&
-           timeOffset.valid(ppqn);
+           timeOffset.valid(ppqn) && quantize.valid();
 }
 
 } // namespace modal::core

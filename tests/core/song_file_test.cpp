@@ -57,6 +57,8 @@ Song everything(Ppqn ppqn)
                          track.thru = false;
                          track.chaseNotes = false;
                          track.programSetup = {1, 0, 127};
+                         track.quantize = {true, NoteFraction{1, 8}.triplet(), 80, 60,
+                                           QuantizeMove::Both};
                          track.grid = NoteFraction{1, 8}.triplet();
                          track.noteLength = NoteFraction{437, 3840}; // not a common length
                          track.noteVelocity = 90;
@@ -281,6 +283,11 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + "track 2 \"T\" len=long\n", "line 4", "len should be a note length"},
         {header + "track 2 \"T\" vel=0\n", "line 4", "vel should be a velocity"},
         {header + "track 2 \"T\" program=128\n", "line 4", "program should be from 0 to 127"},
+        {header + "track 2 \"T\" quantize=yes\n", "line 4", "quantize should be on or off"},
+        {header + "track 2 \"T\" qgrid=1/0\n", "line 4", "qgrid should be a note length"},
+        {header + "track 2 \"T\" qstrength=101\n", "line 4", "qstrength should be from 0"},
+        {header + "track 2 \"T\" qswing=80\n", "line 4", "qswing should be from 25"},
+        {header + "track 2 \"T\" qmove=all\n", "line 4", "qmove should be starts"},
         {header + "track 2 \"T\" bankmsb=-1\n", "line 4", "bankmsb should be from 0 to 127"},
         {header + "track 2 \"T\" banklsb=x\n", "line 4", "banklsb should be from 0 to 127"},
         {header + "section \"A\"\n", "line 4", "bars=N"},
@@ -389,4 +396,26 @@ TEST_CASE("a program setup is saved only as far as it's set, with zero distinct 
     CHECK(read.song->track(unset)->programSetup.empty());
     CHECK(read.song->track(bank)->programSetup == ProgramSetup{std::nullopt, 3, std::nullopt});
     CHECK(read.song->track(zero)->programSetup == ProgramSetup{std::nullopt, std::nullopt, 0});
+}
+
+TEST_CASE("playback quantise keeps its settings while off, saved only where they differ")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Song song{ppqn};
+    const auto plain = song.addTrack("Plain");
+    const auto off = song.addTrack("Off");
+    song.updateTrack(off,
+                     [](Track& track)
+                     {
+                         track.quantize.strength = 70;
+                         track.quantize.grid = NoteFraction{1, 8};
+                     });
+    const auto text = writeSong(song);
+    CHECK(text.find("\"Plain\" ch=1\n") != std::string::npos);
+    CHECK(text.find("\"Off\" ch=1 qgrid=1/8 qstrength=70\n") != std::string::npos);
+    const auto read = readSong(text, ppqn);
+    REQUIRE(read.song);
+    CHECK(read.song->track(plain)->quantize == PlaybackQuantize{});
+    CHECK_FALSE(read.song->track(off)->quantize.on);
+    CHECK(read.song->track(off)->quantize.strength == 70);
 }

@@ -776,6 +776,45 @@ bool Reader::readTrack(std::span<const Token> tokens)
             }
             track.noteVelocity = static_cast<std::uint8_t>(*velocity);
         }
+        else if (value && name == "quantize")
+        {
+            if (*value != "on" && *value != "off")
+            {
+                return fail("quantize should be on or off");
+            }
+            track.quantize.on = *value == "on";
+        }
+        else if (value && name == "qgrid")
+        {
+            const auto fraction = parseNoteFraction(*value);
+            if (!fraction)
+            {
+                return fail("qgrid should be a note length, such as 1/16");
+            }
+            track.quantize.grid = *fraction;
+        }
+        else if (value && (name == "qstrength" || name == "qswing"))
+        {
+            const bool strength = name == "qstrength";
+            const auto percent = parseInteger(*value, strength ? 0 : PlaybackQuantize::kMinSwing,
+                                              strength ? 100 : PlaybackQuantize::kMaxSwing);
+            if (!percent)
+            {
+                return fail(strength ? "qstrength should be from 0 to 100"
+                                     : "qswing should be from 25 to 75");
+            }
+            (strength ? track.quantize.strength : track.quantize.swing) =
+                static_cast<int>(*percent);
+        }
+        else if (value && name == "qmove")
+        {
+            const auto move = quantizeMove(*value);
+            if (!move)
+            {
+                return fail("qmove should be starts, ends, both or lengths");
+            }
+            track.quantize.move = *move;
+        }
         else if (value && name == "offset")
         {
             const auto amount = parseTimeOffset(*value, ppqn_);
@@ -1585,6 +1624,24 @@ std::string writeSong(const Song& song)
         if (track->timeOffset.amount() != 0 || track->timeOffset.musical())
         {
             text += " offset=" + offsetText(track->timeOffset);
+        }
+        const auto& quantize = track->quantize;
+        text += quantize.on ? " quantize=on" : "";
+        if (quantize.grid)
+        {
+            text += " qgrid=" + toString(*quantize.grid);
+        }
+        if (quantize.strength != 100)
+        {
+            text += " qstrength=" + std::to_string(quantize.strength);
+        }
+        if (quantize.swing != 50)
+        {
+            text += " qswing=" + std::to_string(quantize.swing);
+        }
+        if (quantize.move != QuantizeMove::Starts)
+        {
+            text += " qmove=" + std::string{quantizeMoveName(quantize.move)};
         }
         if (track->grid != Track::kDefaultGrid)
         {

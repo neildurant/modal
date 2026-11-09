@@ -14,6 +14,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace modal::core
@@ -75,6 +76,42 @@ struct ProgramSetup
     friend bool operator==(const ProgramSetup&, const ProgramSetup&) = default;
 };
 
+// What quantising moves: starts, as q does; ends, keeping starts; both; or lengths, rounded to
+// whole grid steps, keeping starts.
+enum class QuantizeMove : std::uint8_t
+{
+    Starts,
+    Ends,
+    Both,
+    Lengths,
+};
+
+// Quantising a track's notes as it plays, leaving them stored where they are (decided November
+// 2026), by the quantise transform's rules, so that committing it gives what was heard. Its
+// settings are kept while it's off, to compare the two.
+struct PlaybackQuantize
+{
+    static constexpr int kMinSwing = 25;
+    static constexpr int kMaxSwing = 75;
+
+    bool on = false;
+    std::optional<NoteFraction> grid; // none for the track's editing grid
+    int strength = 100;               // how far towards the line, 0% to 100%
+    int swing = 50;                   // 50% straight, 25% to 75%
+    QuantizeMove move = QuantizeMove::Starts;
+
+    bool valid() const
+    {
+        return strength >= 0 && strength <= 100 && swing >= kMinSwing && swing <= kMaxSwing;
+    }
+
+    friend bool operator==(const PlaybackQuantize&, const PlaybackQuantize&) = default;
+};
+
+// What to move by name, as typed and saved, and the name of each.
+std::optional<QuantizeMove> quantizeMove(std::string_view name);
+std::string_view quantizeMoveName(QuantizeMove move);
+
 // A track's settings. Its meter and events are held by the song's sections.
 class Track
 {
@@ -111,6 +148,7 @@ public:
     int transpose = 0;
     int velocityOffset = 0;
     TimeOffset timeOffset{}; // negative sends early
+    PlaybackQuantize quantize;
 
     // For editing (decided for milestone 5): the piano roll's grid, and the default note new
     // notes take, after Sequencer Plus Gold. The default length follows the grid until set.
