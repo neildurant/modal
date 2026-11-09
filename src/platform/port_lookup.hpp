@@ -59,6 +59,9 @@ FoundPort<Port> findPort(const std::vector<Port>& ports, std::string_view name,
 
 std::string errorText(const stdx::error& error);
 
+// The name of Modal's ALSA sequencer clients.
+inline constexpr std::string_view kClientName = "Modal";
+
 // Names Modal's ALSA sequencer client, where the API has one.
 template <class Configuration>
 void nameClient(Configuration& configuration)
@@ -68,10 +71,20 @@ void nameClient(Configuration& configuration)
         {
             if constexpr (requires { api.client_name; })
             {
-                api.client_name = "Modal";
+                api.client_name = kClientName;
             }
         },
         configuration);
+}
+
+// The ports of other programs and devices, leaving out Modal's own: the ports it makes for
+// others to play from, and those its inputs and outputs connect through. Listening to its own
+// ports would send MIDI thru round in a loop. Only the ALSA sequencer names a port's client.
+template <class Port>
+std::vector<Port> othersPorts(std::vector<Port> ports)
+{
+    std::erase_if(ports, [](const Port& port) { return port.device_name == kClientName; });
+    return ports;
 }
 
 } // namespace modal::platform::detail

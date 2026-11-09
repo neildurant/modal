@@ -34,7 +34,7 @@ PortOpenResult MidiInput::open(std::string_view name)
         return {{}, "MIDI isn't available on this system"};
     }
     const auto observer = detail::makeObserver(*api);
-    auto found = detail::findPort(observer.get_input_ports(), name, "input");
+    auto found = detail::findPort(detail::othersPorts(observer.get_input_ports()), name, "input");
     if (!found.port)
     {
         return found.result;

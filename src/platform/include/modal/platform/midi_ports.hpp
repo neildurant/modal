@@ -28,7 +28,7 @@ struct MidiPortList
 };
 
 // Lists the MIDI ports visible through the platform's default MIDI 1.0 API,
-// including virtual ports created by other applications.
+// including virtual ports created by other applications, but not Modal's own.
 MidiPortList listMidiPorts();
 
 // Whether the MIDI API in use lets Modal create ports of its own (see MidiOutputs::openOwn):

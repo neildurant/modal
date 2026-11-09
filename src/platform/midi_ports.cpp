@@ -111,11 +111,11 @@ MidiPortList listMidiPorts()
     const auto observer = detail::makeObserver(*api);
 
     list.api = std::string{libremidi::get_api_display_name(*api)};
-    for (const auto& port : observer.get_input_ports())
+    for (const auto& port : detail::othersPorts(observer.get_input_ports()))
     {
         list.inputs.push_back({detail::portName(port)});
     }
-    for (const auto& port : observer.get_output_ports())
+    for (const auto& port : detail::othersPorts(observer.get_output_ports()))
     {
         list.outputs.push_back({detail::portName(port)});
     }

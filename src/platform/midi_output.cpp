@@ -31,7 +31,7 @@ OutputOpenResult MidiOutputs::open(std::string_view name)
         return result;
     }
     const auto observer = detail::makeObserver(*api);
-    auto found = detail::findPort(observer.get_output_ports(), name, "output");
+    auto found = detail::findPort(detail::othersPorts(observer.get_output_ports()), name, "output");
     static_cast<PortOpenResult&>(result) = found.result;
     if (!found.port)
     {
