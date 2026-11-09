@@ -8,6 +8,7 @@
 #include <charconv>
 #include <cmath>
 #include <iterator>
+#include <map>
 #include <numeric>
 #include <string>
 #include <tuple>
@@ -555,7 +556,8 @@ namespace
 std::variant<std::vector<Event>, Refusal> quantizeTaken(const EventList& events,
                                                         std::span<const std::size_t> which,
                                                         const std::function<Tick(Tick)>& nearest,
-                                                        bool pedals, const QuantizeHow& how)
+                                                        bool pedals, const QuantizeHow& how,
+                                                        const std::vector<bool>& pinned = {})
 {
     using Move = QuantizeHow::Move;
     const auto towards = [&](Tick from, Tick to)
@@ -563,9 +565,10 @@ std::variant<std::vector<Event>, Refusal> quantizeTaken(const EventList& events,
     auto changed = takenEvents(events, which);
     // Each note's start, and how far it moved, in tick order.
     std::vector<std::pair<Tick, Tick>> moves;
-    for (auto& event : changed)
+    for (std::size_t k = 0; k < changed.size(); ++k)
     {
-        if (!event.isNote())
+        auto& event = changed[k];
+        if (!event.isNote() || (!pinned.empty() && pinned[k]))
         {
             continue;
         }
@@ -661,21 +664,68 @@ Transformed quantize(const EventList& events, std::span<const std::size_t> which
     return finish(events, which, std::get<std::vector<Event>>(changed), true);
 }
 
-std::variant<std::vector<QuantizedEvent>, Refusal>
-quantizeAll(const EventList& events, const std::function<Tick(Tick)>& nearest, bool pedals,
-            const QuantizeHow& how)
+std::variant<QuantizedTrack, Refusal> quantizeAll(const EventList& events,
+                                                  const std::function<Tick(Tick)>& nearest,
+                                                  bool pedals, const QuantizeHow& how)
 {
     std::vector<std::size_t> which(events.size());
     for (std::size_t i = 0; i < which.size(); ++i)
     {
         which[i] = i;
     }
-    auto changed = quantizeTaken(events, which, nearest, pedals, how);
-    if (const auto* refusal = std::get_if<Refusal>(&changed))
+    // Of two notes of a pitch that would start on one line, the one that would move further
+    // stays where it is, the later if they'd move as far, until none would; leaving one where
+    // it is may put it where another has moved, so again.
+    std::vector<bool> pinned(events.size(), false);
+    std::vector<Event> changed;
+    for (;;)
     {
-        return *refusal;
+        auto result = quantizeTaken(events, which, nearest, pedals, how, pinned);
+        if (const auto* refusal = std::get_if<Refusal>(&result))
+        {
+            return *refusal;
+        }
+        changed = std::move(std::get<std::vector<Event>>(result));
+        std::map<std::pair<std::uint8_t, Tick>, std::size_t> first;
+        bool more = false;
+        for (std::size_t k = 0; k < changed.size(); ++k)
+        {
+            if (!changed[k].isNote())
+            {
+                continue;
+            }
+            const auto key = std::pair{std::get<Note>(changed[k].data).pitch, changed[k].tick};
+            const auto [at, added] = first.emplace(key, k);
+            if (added)
+            {
+                continue;
+            }
+            const auto earlier = at->second;
+            const auto moved = [&](std::size_t i)
+            { return std::abs(changed[i].tick - events[i].tick); };
+            const auto pin = moved(k) >= moved(earlier) ? k : earlier;
+            at->second = pin == k ? earlier : k; // the one that keeps the line
+            if (!pinned[pin])
+            {
+                pinned[pin] = true;
+                more = true;
+            }
+        }
+        if (!more)
+        {
+            break;
+        }
     }
-    auto entries = finishEntries(events, which, std::get<std::vector<Event>>(changed), true);
+    QuantizedTrack quantized;
+    for (std::size_t k = 0; k < pinned.size(); ++k)
+    {
+        if (pinned[k])
+        {
+            quantized.firstLeft = quantized.leftInPlace == 0 ? events[k].tick : quantized.firstLeft;
+            ++quantized.leftInPlace;
+        }
+    }
+    auto entries = finishEntries(events, which, changed, true);
     if (const auto* refusal = std::get_if<Refusal>(&entries))
     {
         return *refusal;
@@ -688,13 +738,12 @@ quantizeAll(const EventList& events, const std::function<Tick(Tick)>& nearest, b
                                  return std::tuple{a.event.tick, a.event.isNote(), a.from} <
                                         std::tuple{b.event.tick, b.event.isNote(), b.from};
                              });
-    std::vector<QuantizedEvent> result;
-    result.reserve(all.size());
+    quantized.events.reserve(all.size());
     for (auto& entry : all)
     {
-        result.push_back({std::move(entry.event), events[entry.from].tick});
+        quantized.events.push_back({std::move(entry.event), events[entry.from].tick});
     }
-    return result;
+    return quantized;
 }
 
 Tick nearestGridLine(const MeterMap& meter, Tick tick, Tick step, int swing)

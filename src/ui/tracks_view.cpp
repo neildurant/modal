@@ -256,12 +256,18 @@ Inspection TracksView::inspection() const
             {
                 if (warning.track == track.id())
                 {
-                    InspectorField refused{"Plays as stored",
-                                           "two notes would start together, or a pedal pass "
-                                           "the next, at " +
-                                               position(warning.at)};
-                    refused.warning = true;
-                    result.fields.push_back(std::move(refused));
+                    InspectorField left{
+                        warning.leftInPlace > 0 ? "Left where stored" : "Plays as stored",
+                        warning.leftInPlace > 0
+                            ? std::to_string(warning.leftInPlace) +
+                                  (warning.leftInPlace == 1 ? " note, at "
+                                                            : " notes, the first at ") +
+                                  position(warning.at) +
+                                  ", as another of its pitch starts on that line"
+                            : "a pedal would pass the next of its pedal at " +
+                                  position(warning.at)};
+                    left.warning = warning.leftInPlace == 0;
+                    result.fields.push_back(std::move(left));
                 }
             }
         }

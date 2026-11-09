@@ -104,12 +104,14 @@ struct PlannedTrack
     std::vector<std::size_t> byStored;
 };
 
-// A track whose playback quantise can't be applied as set, so plays as stored: two notes of a
-// pitch would start together, or a pedal pass the next of its pedal.
+// A track whose playback quantise left some notes where they're stored, as each would start
+// where another of its pitch does; or, with none left so, that can't be applied at all, and so
+// plays as stored, as a pedal would pass the next of its pedal.
 struct QuantizeWarning
 {
     TrackId track;
-    Tick at; // where, as it would be
+    Tick at;                     // the first note left in place, or where the pedal would go
+    std::size_t leftInPlace = 0; // none: the whole track plays as stored
 
     friend bool operator==(const QuantizeWarning&, const QuantizeWarning&) = default;
 };
@@ -175,8 +177,7 @@ struct PlanOptions
 
 // A track's events as its playback quantise plays them, by the quantise transform's rules with its
 // pedalling following its notes; or why it can't be. For the plan, and for the views to show it.
-std::variant<std::vector<QuantizedEvent>, Refusal> playbackQuantized(const Song& song,
-                                                                     const Track& track);
+std::variant<QuantizedTrack, Refusal> playbackQuantized(const Song& song, const Track& track);
 
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise
 // the unmuted ones. Text events aren't sent and are left out. Notes transposed outside

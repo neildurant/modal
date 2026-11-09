@@ -2612,8 +2612,9 @@ void PianoRollView::addRegions(Frame& frame) const
         if (track.quantize.on && (player == nullptr || !player->bypassQuantize()))
         {
             const auto result = core::playbackQuantized(song, track);
-            if (const auto* played = std::get_if<std::vector<core::QuantizedEvent>>(&result))
+            if (const auto* quantized = std::get_if<core::QuantizedTrack>(&result))
             {
+                const auto* played = &quantized->events;
                 const auto near = std::max<core::Tick>(song.ppqn().quarter() / 48, 2);
                 for (const auto& [event, stored] : *played)
                 {

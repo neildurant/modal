@@ -656,7 +656,7 @@ TEST_CASE("a quantised track's pedalling goes with its notes, and its events kee
                       {s, 0x90}, {s + 2, 0xB0}, {4 * s, 0xC0}, {4 * s, 0x90}});
 }
 
-TEST_CASE("a track that can't be quantised as set plays as stored, and says where")
+TEST_CASE("of two notes of a pitch that would start together, the further stays where it is")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick s = ppqn.quarter() / 4;
@@ -667,9 +667,49 @@ TEST_CASE("a track that can't be quantised as set plays as stored, and says wher
                                  track.quantize.on = true;
                                  track.events.insert({s - 2, Note{60, 100, 1}});
                                  track.events.insert({s + 2, Note{60, 100, 1}});
+                                 track.events.insert({s + 3, Note{62, 100, 1}}); // another pitch
+                                 track.events.insert({3 * s, Note{60, 100, 1}}); // on its line
+                                 track.events.insert({3 * s + 1, Note{60, 100, 1}});
                              });
     const auto plan = compilePlan(song, everythingToPort);
-    CHECK(noteTicks(plan) == std::vector<std::pair<Tick, Tick>>{{s - 2, s - 2}, {s + 2, s + 2}});
-    CHECK(plan.quantizeWarnings == std::vector<QuantizeWarning>{{id, s}});
-    CHECK_FALSE(plan.tracks.front().quantize);
+    // As far from the line, the later is left; the one already on its line keeps it, and the next,
+    // which would have joined it, is left.
+    CHECK(noteTicks(plan) ==
+          std::vector<std::pair<Tick, Tick>>{
+              {s, s - 2}, {s, s + 3}, {s + 2, s + 2}, {3 * s, 3 * s}, {3 * s + 1, 3 * s + 1}});
+    CHECK(plan.quantizeWarnings == std::vector<QuantizeWarning>{{id, s + 2, 2}});
+    REQUIRE(plan.tracks.front().quantize);
+}
+
+TEST_CASE("on a coarse grid, a busy track is still quantised, but for its clashes")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick e = ppqn.quarter() / 2;
+    Song song = songAt(ppqn);
+    addTrack(song, 10,
+             [&](EditTrack& track)
+             {
+                 track.quantize = {true, NoteFraction{1, 4}, 100, 50, QuantizeMove::Starts};
+                 for (int i = 0; i < 8; ++i)
+                 {
+                     track.events.insert({i * e + 5, Note{36, 100, 1}}); // eighths, a little late
+                 }
+             });
+    const auto plan = compilePlan(song, everythingToPort);
+    // The notes played just after a beat take it; those just after the off-beats between, which
+    // would move further to it, stay late, but for the last, with no beat to share.
+    std::vector<Tick> left;
+    std::size_t onLines = 0;
+    for (const auto& [tick, stored] : noteTicks(plan))
+    {
+        onLines += tick % (2 * e) == 0 ? 1 : 0;
+        if (tick == stored)
+        {
+            left.push_back(tick);
+        }
+    }
+    CHECK(onLines == 5);
+    CHECK(left == std::vector<Tick>{e + 5, 3 * e + 5, 5 * e + 5});
+    REQUIRE(plan.quantizeWarnings.size() == 1);
+    CHECK(plan.quantizeWarnings.front().leftInPlace == 3);
 }

@@ -179,8 +179,7 @@ const PlannedTrack* PlaybackPlan::track(TrackId id) const
     return it == tracks.end() ? nullptr : &*it;
 }
 
-std::variant<std::vector<QuantizedEvent>, Refusal> playbackQuantized(const Song& song,
-                                                                     const Track& track)
+std::variant<QuantizedTrack, Refusal> playbackQuantized(const Song& song, const Track& track)
 {
     const auto& quantize = track.quantize;
     const auto& meter = song.meter(track.id());
@@ -285,14 +284,20 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
         if (quantize.on && !options.bypassQuantize)
         {
             auto result = playbackQuantized(song, track);
-            if (auto* quantized = std::get_if<std::vector<QuantizedEvent>>(&result))
+            if (auto* quantized = std::get_if<QuantizedTrack>(&result))
             {
-                played = std::move(*quantized);
+                if (quantized->leftInPlace > 0)
+                {
+                    plan.quantizeWarnings.push_back(
+                        {track.id(), quantized->firstLeft, quantized->leftInPlace});
+                }
+                played = std::move(quantized->events);
                 plan.tracks.back().quantize = quantize;
             }
             else
             {
-                plan.quantizeWarnings.push_back({track.id(), std::get<Refusal>(result).event.tick});
+                plan.quantizeWarnings.push_back(
+                    {track.id(), std::get<Refusal>(result).event.tick, 0});
             }
         }
         if (!plan.tracks.back().quantize)
