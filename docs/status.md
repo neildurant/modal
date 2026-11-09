@@ -25,6 +25,19 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ## Review findings
 
+### Review of changes from 4 November to `cd49989`
+
+Reviewed on 9 November 2026, including 4 November. Four findings remain to address; no product code was changed:
+
+1. **Moving an object selection keeps its original operator origin.** `vin`, Alt-Up, then `d` leaves the transposed note and reports no note to delete. `moveSelection()` moves the visible selection but only updates the object's `after`; `selectionRange()` restores its old `at`. Operators and replacement objects need to follow the moved selection.
+2. **Changing the editing grid can repeat an already-sent quantised note.** With playback quantise following the editing grid, changing from 1/16 to 1/4 after a note at three quarters of a beat has played schedules it again at the next beat. The scheduler compares the stored quantise settings, which still contain an unset grid, rather than the effective grid.
+3. **Pedalling after a note left unquantised can follow an earlier note instead.** Pinned notes are omitted from the quantiser's note-movement table rather than contributing a zero movement. At 960 PPQN, notes at ticks 0 (C4), 120 (D4) and 240 (C4), with a 1/4 quantise grid, leave the second C4 at 240 but move its following sustain at 300 to 180. The pedal should stay with the unmoved note.
+4. **Nudging a selection earlier at the song's start changes it in part.** A selection with notes at zero and one quarter note, nudged earlier, leaves the first at zero and moves the second. The callback clamps each start before the batch validates it, so the batch succeeds and changes the spacing instead of refusing the whole move.
+
+All four were reproduced with a standalone C++ review harness against the current libraries at both 960 and 96 PPQN. The harness is in `/tmp/modal_review.cpp` for this session; permanent regressions still need adding with the fixes. Native GCC Debug and Clang Debug builds and their suites passed: 817 registered tests each, three platform/MIDI skips, no failures. Whole-tree formatting and `git diff --check` passed. Sanitizers, real desktop checks and MIDI hardware checks were not run for this review.
+
+### Earlier review fixes
+
 All five findings from the review of `30f6301..64c0fce` are addressed. The six findings from the preceding review were already fixed.
 
 1. **Fixed: `gv` restores the state needed to replace an object.** It now remembers the selection before its object as well as the selection and cursor. A regression test first reproduced whole-track deletion with `vit<Esc>gvibd` and `v2it<Esc>gvibd`, and after yanking instead of Escape; all now delete only the first bar's contents on the original track. The focused GCC Debug test passes at both PPQNs and checks undo.
