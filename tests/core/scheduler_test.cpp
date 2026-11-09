@@ -1411,3 +1411,44 @@ TEST_CASE("changing a track's quantise as it plays sends nothing twice, and leav
         CHECK(notesSent(sink) == std::vector<std::uint8_t>{60, 62, 64});
     }
 }
+
+TEST_CASE("changing the editing grid during playback does not repeat a quantised note")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1,
+                             [&](EditTrack& track)
+                             {
+                                 track.quantize.on = true;
+                                 track.grid = {1, 16};
+                                 track.events.insert({3 * q / 4, Note{60, 100, 1}});
+                                 track.events.insert({5 * q / 4, Note{62, 100, 1}});
+                             });
+    bool follows = true;
+    SECTION("quantise follows the editing grid") {}
+    SECTION("quantise has its own fixed grid")
+    {
+        follows = false;
+        song.updateTrack(id, [](Track& track) { track.quantize.grid = NoteFraction{1, 16}; });
+    }
+    const auto first = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(first, kNow);
+    scheduler.play(0, {}, kNow);
+    const auto at = kNow + song.tempo().toTime(7 * q / 8);
+    scheduler.sendDue(at);
+    REQUIRE(sink.sent.size() == 2); // the first note, including its release
+    song.updateTrack(id, [](Track& track) { track.grid = {1, 4}; });
+    const auto second = compilePlan(song, byPortName);
+    scheduler.setPlan(second, at);
+    runUntil(scheduler, kNow + 10s);
+    CHECK(sink.sent ==
+          std::vector<Sent>{
+              {{1}, {0x90, 60, 100}, kNow + song.tempo().toTime(3 * q / 4)},
+              {{1}, {0x80, 60, 64}, kNow + song.tempo().toTime(3 * q / 4 + 1)},
+              {{1}, {0x90, 62, 100}, kNow + song.tempo().toTime(follows ? q : 5 * q / 4)},
+              {{1}, {0x80, 62, 64}, kNow + song.tempo().toTime((follows ? q : 5 * q / 4) + 1)},
+          });
+}

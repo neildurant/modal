@@ -293,6 +293,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
                 }
                 played = std::move(quantized->events);
                 plan.tracks.back().quantize = quantize;
+                plan.tracks.back().quantize->grid = quantize.grid.value_or(track.grid);
             }
             else
             {

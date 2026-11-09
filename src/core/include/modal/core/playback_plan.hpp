@@ -98,8 +98,8 @@ struct PlannedTrack
     TimeOffset timeOffset;
     std::vector<ShortMessage> setup; // its bank and program setup, in the order to send them
     std::vector<std::size_t> events; // its events in the plan's list, in order
-    // How it's quantised as it plays, if it is, and its events by where they're stored, then
-    // the order they're sent in, to find the same event in another plan.
+    // How it's quantised as it plays, with its effective grid, if it is, and its events by where
+    // they're stored, then the order they're sent in, to find the same event in another plan.
     std::optional<PlaybackQuantize> quantize;
     std::vector<std::size_t> byStored;
 };
