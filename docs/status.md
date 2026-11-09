@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: Freeze and its chooser refinements are tried and accepted. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: Freeze and its chooser refinements are tried and accepted. The revised ongoing plan is in [schedule.md](schedule.md); basic GUI recording is next. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -14,9 +14,10 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 | 4. Event list and core grammar | Done, except the Linux checks |
 | 5. Piano roll and arrangement | Done, except the Linux checks |
 | 6. Full grammar | Done (November 2026), except the Linux checks |
-| 7. More for the views, and several songs | Tracks steps and Freeze complete; UI trials confirmed |
+| 7. Tracks and playback transforms | Done; Tracks steps and Freeze complete, UI trials confirmed |
+| 8. Basic GUI recording | To do; next milestone, implementation questions not yet settled |
 
-What each milestone holds is in [design.md](design.md), under Milestones.
+Milestone order and To do/Doing/Done item states are maintained in [schedule.md](schedule.md). Behaviour and open design questions remain in [design.md](design.md).
 
 ## Pending
 
@@ -150,11 +151,13 @@ Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song, with pl
 
 ## Next
 
-The three Tracks steps are built. How `, e` asks for an event is a stop-gap, accepted as not very friendly for now, to refine later; the note on real MIDI hardware above still stands. Settle the next step's open questions before implementation:
+The revised schedule was agreed on 9 November 2026 and is maintained in [schedule.md](schedule.md), including completed work and the explicit someday maybe list. No implementation item is Doing yet.
 
-1. Freeze is complete and tried. Column configuration and song-tempo fallback remain separate open questions. No whole-track Loop column is planned.
+Next is milestone 8, basic GUI recording: MIDI input, arming, input selection, Thru and activity controls, then linear replace/overdub recording, metronome, count-in and pre-roll, with each pass and any song extension one undo step. Propose the first implementation step and settle record controls, replace indication, input/Thru ownership and saved settings before coding. Step entry and loops remain later milestones.
 
-The rest of milestone 7 remains the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Raise each feature's open questions before implementing the parts they affect.
+Controller lanes, drum maps and folding follow in milestone 9, including folding to named drum-map rows even without events. Multiple songs, backups, jump history and paste history follow in milestone 10. Outline and other additional views move later. MIDI clock output and transport/sync are now explicitly unscheduled, alongside the other someday maybe items. Column configuration and song-tempo fallback wait for polish. No whole-track Loop column is planned. The recent playback features still need the real MIDI trials noted above.
+
+Schedule documentation checks: local Markdown links, the milestone sequence, checkbox states, whole-tree formatting and `git diff --check` pass. This change only updates documentation; no application builds or tests were rerun.
 
 ## Contribution environment checked on 5 November 2026
 

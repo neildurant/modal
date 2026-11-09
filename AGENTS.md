@@ -7,13 +7,13 @@ These are the instructions for any AI coding agent working on Modal (Claude Code
 ## Starting a session
 
 1. Pull: another agent may have pushed since. `git log` from where you last were says what changed. Check the handoff for any build or test checks still outstanding (see Before pushing).
-2. Read `docs/status.md`: where things stand, what's pending and what's next.
+2. Read `docs/status.md` for the handoff and `docs/schedule.md` for the ongoing plan, current milestone and item states.
 3. The full design is in `docs/design.md`, how each part of it was decided in `docs/decisions.md`, and the editing grammar as it is in `docs/grammar.md`. Read the parts the task touches before starting it, and follow them. If a task seems to require departing from the design, stop and ask rather than deciding alone.
-4. Keep `docs/status.md` up to date as work lands, so the next session, or the next agent, starts from it.
+4. Keep `docs/status.md` and `docs/schedule.md` up to date as work lands, so the next session, or the next agent, starts from them. Mark schedule items Doing when work starts and Done after validation and any required UI trial; keep pending checks explicit.
 
 ## How we work
 
-- Work one milestone at a time, in the order given in `docs/design.md`. Don't build ahead into later milestones.
+- Work one milestone at a time, in the order given in `docs/schedule.md`. Don't build ahead into later milestones.
 - Before writing code for a milestone or any substantial change, propose a short plan and wait for approval.
 - Check the design's "To decide" section for the current milestone. Raise any open items before implementing the parts they affect.
 - Keep changes small and reviewable. One logical change per commit, with a clear message.
@@ -68,7 +68,8 @@ CMakeLists.txt
 CMakePresets.json
 README.md
 AGENTS.md       these instructions (CLAUDE.md imports them)
-docs/           status.md (where things stand), design.md (the design as it is),
+docs/           status.md (the handoff), schedule.md (the ongoing milestone plan),
+                design.md (the design as it is),
                 decisions.md (how it was decided, dated), grammar.md, configuration.md
                 and tools.md (for users)
 assets/         fonts, the built-in modalrc and themes, built into the program

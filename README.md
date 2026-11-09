@@ -15,7 +15,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 
 ![The event list, playing](docs/screenshot.png)
 
-Milestone 7 has begun with the Tracks view, whole-track copying and musical timing controls. Numeric bank/program setup and playback quantise are in; next come the outline, ghost notes, controller lanes, drum maps and several songs at once, then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
+Milestone 7 is complete: Tracks, whole-track copying, musical timing controls, bank/program setup, playback quantise and Freeze. Next is basic GUI recording, followed by controller lanes, drum maps and folding, then multiple songs and editing histories. The ongoing plan and item states, including unscheduled ideas, are in [docs/schedule.md](docs/schedule.md); behaviour is specified in [docs/design.md](docs/design.md).
 
 ## Building
 
