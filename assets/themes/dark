@@ -36,5 +36,6 @@ highlight match        #7dcfff
 highlight track-mute #f7768e
 highlight track-solo #9ece6a
 highlight track-chase #7aa2f7
+highlight track-quantize #73daca
 highlight toggle-text #1a1b26
 highlight event-sign #bb9af7

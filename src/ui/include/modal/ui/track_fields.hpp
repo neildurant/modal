@@ -32,6 +32,12 @@ enum class TrackField
     Grid,
     DefaultLength,
     DefaultVelocity,
+    Quantize,        // the Q button
+    QuantizeSummary, // the Quantise column, its settings edited in the inspector
+    QuantizeGrid,
+    QuantizeStrength,
+    QuantizeSwing,
+    QuantizeMove,
 };
 
 struct TrackColumn
@@ -49,6 +55,9 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
                                          std::string_view text, core::Ppqn ppqn);
 std::optional<std::string> stepTrackField(core::Track& track, TrackField field, int steps,
                                           bool fine, core::Ppqn ppqn);
+
+// A track's playback quantise in a few words: its grid, then anything not as a new track's.
+std::string quantizeSummary(const core::Track& track);
 
 // The program changes among a track's own events: how many, and when the first is.
 struct ProgramEvents

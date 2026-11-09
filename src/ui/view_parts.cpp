@@ -2,6 +2,7 @@
 
 #include <modal/ui/bar.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/track_fields.hpp>
 #include <modal/ui/view_parts.hpp>
 
 #include <algorithm>
@@ -349,6 +350,10 @@ Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick
         pair(top.left, "Track " + std::to_string(track) + ":", shown.name);
         pair(top.left, "Channel:", std::to_string(shown.channel));
         pair(top.left, "Port:", shown.port.empty() ? "default" : shown.port);
+        if (shown.quantize.on)
+        {
+            pair(top.left, "Quantise:", quantizeSummary(shown));
+        }
         const auto& setup = shown.programSetup;
         if (setup.program)
         {

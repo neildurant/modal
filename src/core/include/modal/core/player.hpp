@@ -41,6 +41,13 @@ public:
     // Whether a plan is waiting for the engine to take it, so poll() should be called.
     bool planWaiting() const { return waiting_ != nullptr; }
 
+    // Plays every track as stored, to compare with its playback quantise, from the next update.
+    void setBypassQuantize(bool bypass) { bypassQuantize_ = bypass; }
+    bool bypassQuantize() const { return bypassQuantize_; }
+
+    // The tracks whose playback quantise couldn't be applied at the last update, and where.
+    const std::vector<QuantizeWarning>& quantizeWarnings() const { return quantizeWarnings_; }
+
     // Looks every port up again at the next update, as when ports have come or gone.
     void forgetPorts() { ports_.clear(); }
 
@@ -91,6 +98,8 @@ private:
     PortResolver resolvePort_;
     std::map<std::string, std::optional<DestinationId>, std::less<>> ports_;
     std::vector<std::string> missingPorts_;
+    std::vector<QuantizeWarning> quantizeWarnings_;
+    bool bypassQuantize_ = false;
     std::shared_ptr<const PlaybackPlan> waiting_; // a plan the engine hasn't taken yet
     Tick marker_ = 0;
     bool rewind_ = true;

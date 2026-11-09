@@ -6,9 +6,11 @@
 #include <modal/ui/view_state.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace modal::ui
@@ -19,15 +21,24 @@ namespace
 bool isToggle(TrackField field)
 {
     return field == TrackField::Mute || field == TrackField::Solo ||
-           field == TrackField::ChaseNotes;
+           field == TrackField::ChaseNotes || field == TrackField::Quantize;
 }
 
 bool toggleState(TrackField field, const core::Track& track)
 {
-    return field == TrackField::Mute   ? track.mute
-           : field == TrackField::Solo ? track.solo
-                                       : track.chaseNotes;
+    return field == TrackField::Mute         ? track.mute
+           : field == TrackField::Solo       ? track.solo
+           : field == TrackField::ChaseNotes ? track.chaseNotes
+                                             : track.quantize.on;
 }
+
+// The inspector's fields for playback quantise, and what each sets.
+constexpr std::array<std::pair<std::string_view, TrackField>, 4> kQuantizeFields{{
+    {"Grid", TrackField::QuantizeGrid},
+    {"Strength", TrackField::QuantizeStrength},
+    {"Swing", TrackField::QuantizeSwing},
+    {"Moves", TrackField::QuantizeMove},
+}};
 } // namespace
 
 TracksView::TracksView(core::Document& document, ViewHost& host)
@@ -134,6 +145,7 @@ void TracksView::showSong()
     left_ = 0;
     column_ = 1;
     editor_.close();
+    quantizeEditing_ = false;
     portChoice_.reset();
     go(0);
 }
@@ -227,6 +239,34 @@ Inspection TracksView::inspection() const
     const auto& song = document_.song();
     const auto& track = *song.track(*cursor_.track);
     const auto field = trackColumns()[column_].field;
+    if (field == TrackField::Quantize || field == TrackField::QuantizeSummary)
+    {
+        auto fields = quantizeFields();
+        if (!quantizeEditing_)
+        {
+            for (auto& shown : fields.fields)
+            {
+                shown.editable = track.quantize.on; // dim while it's off
+            }
+        }
+        result = std::move(fields);
+        if (const auto* player = host_.player())
+        {
+            for (const auto& warning : player->quantizeWarnings())
+            {
+                if (warning.track == track.id())
+                {
+                    InspectorField refused{"Plays as stored",
+                                           "two notes would start together, or a pedal pass "
+                                           "the next, at " +
+                                               position(warning.at)};
+                    refused.warning = true;
+                    result.fields.push_back(std::move(refused));
+                }
+            }
+        }
+        return result;
+    }
     if (field == TrackField::ChaseNotes)
     {
         result.fields.push_back({"When enabled", "Start notes already held"});
@@ -272,7 +312,7 @@ Inspection TracksView::editableFields() const
     for (const auto& column : trackColumns())
     {
         if (column.field != TrackField::Number && column.field != TrackField::Port &&
-            !isToggle(column.field))
+            column.field != TrackField::QuantizeSummary && !isToggle(column.field))
         {
             const auto text = trackFieldText(column.field, track, row());
             result.fields.push_back({std::string{column.heading}, text, true, text});
@@ -281,8 +321,34 @@ Inspection TracksView::editableFields() const
     return result;
 }
 
+Inspection TracksView::quantizeFields() const
+{
+    Inspection result{"Quantise", {}};
+    if (!cursor_.track)
+    {
+        return result;
+    }
+    const auto& track = *document_.song().track(*cursor_.track);
+    for (const auto& [heading, field] : kQuantizeFields)
+    {
+        auto text = trackFieldText(field, track, row());
+        auto edit = text.ends_with('%') ? text.substr(0, text.size() - 1) : text;
+        result.fields.push_back({std::string{heading}, std::move(text), true, std::move(edit)});
+    }
+    return result;
+}
+
 TrackField TracksView::fieldFor(std::string_view heading) const
 {
+    if (quantizeEditing_)
+    {
+        const auto it = std::ranges::find(kQuantizeFields, heading,
+                                          &std::pair<std::string_view, TrackField>::first);
+        if (it != kQuantizeFields.end())
+        {
+            return it->second;
+        }
+    }
     for (const auto& column : trackColumns())
     {
         if (column.heading == heading)
@@ -347,6 +413,21 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
     {
         return runPortChoice(command);
     }
+    if (quantizeEditing_)
+    {
+        // The inspector's own fields: Tab goes between them, as in the note inspector.
+        const auto result =
+            editor_.run(command, host_,
+                        {
+                            .inspection = [this] { return quantizeFields(); },
+                            .set = [this](const std::string& heading, const std::string& text)
+                            { return edit(fieldFor(heading), text); },
+                            .step = [this](const std::string& heading, int steps)
+                            { return edit(fieldFor(heading), {}, steps); },
+                        });
+        quantizeEditing_ = editor_.active();
+        return result;
+    }
     const bool next = command == "command-line-next" || command == "command-line-previous";
     const auto result =
         editor_.run(next ? "command-line-run" : command, host_,
@@ -366,6 +447,11 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
 
 bool TracksView::openField()
 {
+    if (trackColumns()[column_].field == TrackField::QuantizeSummary)
+    {
+        quantizeEditing_ = editor_.open(quantizeFields());
+        return quantizeEditing_;
+    }
     if (trackColumns()[column_].field != TrackField::Port)
     {
         return editor_.open(editableFields(), trackColumns()[column_].heading);
@@ -680,6 +766,10 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
     {
         toggle(TrackField::Solo);
     }
+    else if (command == "tracks-quantize-toggle")
+    {
+        toggle(TrackField::Quantize);
+    }
     else if (command == "tracks-chase-toggle")
     {
         toggle(TrackField::ChaseNotes);
@@ -896,7 +986,8 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style = {Role::CursorText, Role::Cursor, kPlain};
             }
-            if (track && column.field == TrackField::Port && portMissing(*track))
+            if (track && ((column.field == TrackField::Port && portMissing(*track)) ||
+                          (column.field == TrackField::QuantizeSummary && !track->quantize.on)))
             {
                 style.foreground = Role::Dim;
             }
@@ -920,7 +1011,8 @@ void TracksView::addRegions(Frame& frame) const
                                       std::u32string(1, at < shown.size() ? shown[at] : U' '),
                                       {Role::CursorText, Role::Cursor, kPlain}});
             }
-            else if (track && editor_.active() && index == row() && c == column_)
+            else if (track && editor_.active() && !quantizeEditing_ && index == row() &&
+                     c == column_)
             {
                 inspectorValue(table, {std::string{column.heading}, {}}, {}, x, y, wide - 1, cell_,
                                &editor_, column.numeric);
@@ -932,9 +1024,10 @@ void TracksView::addRegions(Frame& frame) const
             if (toggle)
             {
                 const bool on = toggleState(column.field, *track);
-                const auto colour = column.field == TrackField::Mute   ? Role::TrackMute
-                                    : column.field == TrackField::Solo ? Role::TrackSolo
-                                                                       : Role::TrackChase;
+                const auto colour = column.field == TrackField::Mute         ? Role::TrackMute
+                                    : column.field == TrackField::Solo       ? Role::TrackSolo
+                                    : column.field == TrackField::ChaseNotes ? Role::TrackChase
+                                                                             : Role::TrackQuantize;
                 const auto badge =
                     U" " + decodeUtf8(trackFieldText(column.field, *track, index)) + U" ";
                 const auto edge = hairline(cell_);
@@ -978,6 +1071,7 @@ void TracksView::addRegions(Frame& frame) const
     }
     frame.push_back(trackBarRegion(document_.song(), tracks.empty() ? 0 : row() + 1, cursor_.tick,
                                    cursorMeter(), layout_.top[0], width_, cell_));
-    frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9, nullptr));
+    frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9,
+                                    quantizeEditing_ ? &editor_ : nullptr));
 }
 } // namespace modal::ui

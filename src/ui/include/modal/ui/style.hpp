@@ -56,6 +56,7 @@ enum class Role : std::uint8_t
     TrackMute,    // active track toggle backgrounds
     TrackSolo,
     TrackChase,
+    TrackQuantize,
     ToggleText,
     EventSign, // a sign in a ruler for something in the song: a program or tempo change
 };

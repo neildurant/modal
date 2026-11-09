@@ -33,7 +33,9 @@ void Player::update(const Song& song)
 {
     missingPorts_.clear();
     auto plan = std::make_shared<const PlaybackPlan>(
-        compilePlan(song, [&](const Track& track) { return destination(track.port); }));
+        compilePlan(song, [&](const Track& track) { return destination(track.port); },
+                    {.bypassQuantize = bypassQuantize_}));
+    quantizeWarnings_ = plan->quantizeWarnings;
     waiting_ = engine_.setPlan(plan) ? nullptr : std::move(plan);
 }
 

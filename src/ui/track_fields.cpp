@@ -20,6 +20,7 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::Mute, "Mute", 5},
     TrackColumn{TrackField::Solo, "Solo", 5},
     TrackColumn{TrackField::ChaseNotes, "Chase", 6},
+    TrackColumn{TrackField::Quantize, "Quant", 6},
     TrackColumn{TrackField::Port, "Output port", 16},
     TrackColumn{TrackField::Channel, "Channel", 8, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
@@ -28,6 +29,7 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::Transpose, "Transpose", 10, true},
     TrackColumn{TrackField::VelocityOffset, "Velocity +/-", 13, true},
     TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
+    TrackColumn{TrackField::QuantizeSummary, "Quantise", 25},
     TrackColumn{TrackField::Grid, "Grid", 7},
     TrackColumn{TrackField::DefaultLength, "Length", 8},
     TrackColumn{TrackField::DefaultVelocity, "Vel", 4, true},
@@ -94,6 +96,18 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return track.noteLength ? core::toString(*track.noteLength) : "grid";
     case TrackField::DefaultVelocity:
         return std::to_string(track.noteVelocity);
+    case TrackField::Quantize:
+        return track.quantize.on ? "Q" : "-";
+    case TrackField::QuantizeSummary:
+        return quantizeSummary(track);
+    case TrackField::QuantizeGrid:
+        return track.quantize.grid ? core::toString(*track.quantize.grid) : "grid";
+    case TrackField::QuantizeStrength:
+        return std::to_string(track.quantize.strength) + "%";
+    case TrackField::QuantizeSwing:
+        return std::to_string(track.quantize.swing) + "%";
+    case TrackField::QuantizeMove:
+        return std::string{core::quantizeMoveName(track.quantize.move)};
     }
     return {};
 }
@@ -125,6 +139,15 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         track.timeOffset = *offset;
         return {};
     }
+    if (field == TrackField::Quantize)
+    {
+        if (text != "on" && text != "off")
+        {
+            return "Use on or off";
+        }
+        track.quantize.on = text == "on";
+        return {};
+    }
     if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes)
     {
         if (text != "on" && text != "off")
@@ -144,6 +167,55 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         {
             track.chaseNotes = on;
         }
+        return {};
+    }
+    auto& quantize = track.quantize;
+    if (field == TrackField::QuantizeSummary)
+    {
+        return "Enter edits the settings in the inspector";
+    }
+    if (field == TrackField::QuantizeGrid)
+    {
+        if (text.empty() || text == "grid")
+        {
+            quantize.grid.reset();
+            return {};
+        }
+        const auto fraction = core::parseNoteFraction(text);
+        if (!fraction)
+        {
+            return "Use a note length, such as 1/16 or 1/8t, or grid for the track's grid";
+        }
+        quantize.grid = *fraction;
+        return {};
+    }
+    if (field == TrackField::QuantizeMove)
+    {
+        const auto move = core::quantizeMove(text);
+        if (!move)
+        {
+            return "Use starts, ends, both or lengths";
+        }
+        quantize.move = *move;
+        return {};
+    }
+    if (field == TrackField::QuantizeStrength || field == TrackField::QuantizeSwing)
+    {
+        if (text.ends_with('%'))
+        {
+            text.remove_suffix(1);
+        }
+        int value = 0;
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+        const bool strength = field == TrackField::QuantizeStrength;
+        const int low = strength ? 0 : core::PlaybackQuantize::kMinSwing;
+        const int high = strength ? 100 : core::PlaybackQuantize::kMaxSwing;
+        if (text.empty() || error != std::errc{} || end != text.data() + text.size() ||
+            value < low || value > high)
+        {
+            return strength ? "Strength is 0% to 100%" : "Swing is 25% to 75%, 50% straight";
+        }
+        (strength ? quantize.strength : quantize.swing) = value;
         return {};
     }
     if (field == TrackField::Grid || field == TrackField::DefaultLength)
@@ -241,7 +313,50 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
 std::optional<std::string> stepTrackField(core::Track& track, TrackField field, int steps,
                                           bool fine, core::Ppqn ppqn)
 {
-    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes)
+    auto& quantize = track.quantize;
+    if (field == TrackField::QuantizeGrid)
+    {
+        // Doubling or halving, keeping triplets, from 1/1 to 1/64, as the piano roll's does.
+        auto to = quantize.grid.value_or(track.grid);
+        const auto straight = [](core::NoteFraction f)
+        {
+            return f.denominator() % 3 == 0
+                       ? core::NoteFraction{f.numerator() * 3, f.denominator() * 2}
+                       : f;
+        };
+        for (int i = 0; i < std::abs(steps); ++i)
+        {
+            const auto next = steps > 0 ? core::NoteFraction{to.numerator() * 2, to.denominator()}
+                                        : core::NoteFraction{to.numerator(), to.denominator() * 2};
+            if (straight(next) > core::NoteFraction{1, 1} ||
+                straight(next) < core::NoteFraction{1, 64})
+            {
+                break;
+            }
+            to = next;
+        }
+        quantize.grid = to;
+        return {};
+    }
+    if (field == TrackField::QuantizeStrength)
+    {
+        quantize.strength = std::clamp(quantize.strength + 5 * steps, 0, 100);
+        return {};
+    }
+    if (field == TrackField::QuantizeSwing)
+    {
+        quantize.swing = std::clamp(quantize.swing + steps, core::PlaybackQuantize::kMinSwing,
+                                    core::PlaybackQuantize::kMaxSwing);
+        return {};
+    }
+    if (field == TrackField::QuantizeMove)
+    {
+        const int at = (static_cast<int>(quantize.move) + steps % 4 + 4) % 4;
+        quantize.move = static_cast<core::QuantizeMove>(at);
+        return {};
+    }
+    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes ||
+        field == TrackField::Quantize)
     {
         return setTrackField(track, field, steps > 0 ? "on" : "off", ppqn);
     }
@@ -274,6 +389,25 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
         return setTrackField(track, field, std::to_string(value + steps), ppqn);
     }
     return "Enter edits this field";
+}
+
+std::string quantizeSummary(const core::Track& track)
+{
+    const auto& quantize = track.quantize;
+    auto text = quantize.grid ? core::toString(*quantize.grid) : core::toString(track.grid);
+    if (quantize.strength != 100)
+    {
+        text += " " + std::to_string(quantize.strength) + "%";
+    }
+    if (quantize.swing != 50)
+    {
+        text += " swing " + std::to_string(quantize.swing);
+    }
+    if (quantize.move != core::QuantizeMove::Starts)
+    {
+        text += " " + std::string{core::quantizeMoveName(quantize.move)};
+    }
+    return text;
 }
 
 ProgramEvents programEvents(const core::Song& song, core::TrackId track)

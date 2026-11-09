@@ -410,6 +410,13 @@ constexpr std::array kSharedCommands{
                 .description = "Chase notes on the selected tracks or stop, as the cursor's "
                                "track doesn't",
                 .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "tracks-quantize-toggle",
+                .description = "Quantise the selected tracks as they play, or stop, as the "
+                               "cursor's track doesn't",
+                .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "track-quantize-toggle",
+                .description = "Quantise this track as it plays, or stop, keeping its settings",
+                .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "track-reorder",
                 .description = "Move this track or the selected tracks through the others: j and "
                                "k move, Enter accepts, Escape puts them back"},
@@ -529,10 +536,12 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 124> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 126> where{{
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
+            {"tracks-quantize-toggle", onlyIn({TrackList})},
+            {"track-quantize-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-reorder", onlyIn({Tracks, TrackList})},
             {"track-move-up", onlyIn({Tracks, TrackList})},

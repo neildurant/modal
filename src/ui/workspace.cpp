@@ -12,6 +12,7 @@
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/settings.hpp>
+#include <modal/ui/track_fields.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -1503,7 +1504,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         return true;
     }
     if (command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
-        command == "tracks-chase-toggle")
+        command == "tracks-chase-toggle" || command == "tracks-quantize-toggle")
     {
         return view().run(command, count).value_or(false);
     }
@@ -1562,6 +1563,23 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         }
         // Moves one after another undo together, as with stepping a grid.
         moveTrackBlock(first, tracks, to, "track-move");
+        return true;
+    }
+    if (command == "track-quantize-toggle")
+    {
+        const auto id = view().cursor().track;
+        if (!id)
+        {
+            refuse("Select a track to quantise as it plays");
+            return true;
+        }
+        const bool on = !document_.song().track(*id)->quantize.on;
+        document_.edit(
+            on ? "Quantise as it plays" : "Play as stored", view().place(), [&](core::Song& song)
+            { song.updateTrack(*id, [&](core::Track& track) { track.quantize.on = on; }); });
+        setMessage(on ? "Quantise on: " + quantizeSummary(*document_.song().track(*id))
+                      : "Quantise off: playing as stored, its settings kept",
+                   MessageKind::Information);
         return true;
     }
     if (command == "track-chase-toggle")

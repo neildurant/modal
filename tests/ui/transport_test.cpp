@@ -334,7 +334,7 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
                         song.updateEvents(id, [&](core::EventList& events)
                                           { events.insert({q / 2, core::ProgramChange{3}}); });
                     });
-    p.type(U"gt8l");
+    p.type(U"gt9l");
     p.press(Key::typed(U' '));
     p.runFor(100ms);
 
@@ -416,7 +416,7 @@ TEST_CASE("a track's port that wasn't found is dim in the table, and explained i
     CHECK(find(U"Gone")->style.foreground == Role::Dim);
     CHECK_FALSE(find(U"Port not found"));
 
-    for (const char32_t key : std::u32string_view{U"k4l"})
+    for (const char32_t key : std::u32string_view{U"k5l"})
     {
         ws.handle(Key::typed(key), 0);
     }

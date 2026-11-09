@@ -38,6 +38,7 @@ public:
     std::optional<bool> runTyping(std::string_view command) override;
     const InspectorEditor& inspectorEditor() const { return editor_; }
     bool choosingPort() const { return portChoice_.has_value(); }
+    bool editingQuantize() const { return quantizeEditing_; }
 
 private:
     std::size_t row() const;
@@ -49,6 +50,8 @@ private:
     Inspection inspection() const;
     // The table's fields, as the editor works through them.
     Inspection editableFields() const;
+    // Playback quantise's settings, edited in the inspector rather than the table.
+    Inspection quantizeFields() const;
     TrackField fieldFor(std::string_view heading) const;
     std::optional<std::string> edit(TrackField field, std::string_view text, int steps = 0,
                                     bool fine = false);
@@ -78,6 +81,7 @@ private:
     CellSize cell_{1, 1};
     int width_ = 0;
     InspectorEditor editor_;
+    bool quantizeEditing_ = false; // the editor on the inspector's quantise fields
 
     // Choosing a track's port from a list at its cell: "" is the default port, and a port the
     // track names that wasn't found stays on the list until something else is chosen.
