@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: Freeze and its chooser refinements are committed locally; the latest dimmed-entry behaviour passes GCC/Clang Debug and awaits a UI trial before publication. Current published cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: Freeze and its chooser refinements are tried and accepted. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -14,7 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 | 4. Event list and core grammar | Done, except the Linux checks |
 | 5. Piano roll and arrangement | Done, except the Linux checks |
 | 6. Full grammar | Done (November 2026), except the Linux checks |
-| 7. More for the views, and several songs | Tracks steps complete; Freeze implemented, UI trial pending |
+| 7. More for the views, and several songs | Tracks steps and Freeze complete; UI trials confirmed |
 
 What each milestone holds is in [design.md](design.md), under Milestones.
 
@@ -122,18 +122,18 @@ Tried in the real window and published: the `Q` button and Quantise column with 
 
 ## Freeze
 
-Implemented and committed locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. Design: `4e1515a`; core operation and shared playback rules: `87bcb0b`; chooser and batch command: `8e000f7`. The first UI trial accepted the behaviour and requested the availability refinements below. This step has not been published.
+Implemented and tried, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. Design: `4e1515a`; core operation and shared playback rules: `87bcb0b`; chooser and batch command: `8e000f7`. The initial behaviour and the availability, navigation and confirmation refinements were accepted in the real window on 9 November 2026.
 
-After the first trial, the chooser now previews the full batch for each choice, dimming invalid results (including starts before zero) with their reason, and inactive choices with "Nothing to freeze". A zero offset is inactive in either unit. One unchanged selected row does not disable a choice with work on another row. Cached reasons update with the song, bypass and transport, and confirmation and direct commands prepare again before editing. The availability refinement (`73e7e0f`) was accepted in the real window, then `1e5f659` allowed Up/Down to visit every entry, including dimmed ones. Further feedback settled Enter on dimmed entries: it now does nothing and keeps the list open without a status message; the dimmed entry already gives the reason. Direct colon commands still report refusals. A brief UI trial of this final confirmation adjustment is pending.
+After the first trial, the chooser now previews the full batch for each choice, dimming invalid results (including starts before zero) with their reason, and inactive choices with "Nothing to freeze". A zero offset is inactive in either unit. One unchanged selected row does not disable a choice with work on another row. Cached reasons update with the song, bypass and transport, and confirmation and direct commands prepare again before editing. The availability refinement (`73e7e0f`) was accepted in the real window, then `1e5f659` allowed Up/Down to visit every entry, including dimmed ones. Further feedback settled Enter on dimmed entries: `e0b342b` makes it do nothing and keep the list open without a status message; the dimmed entry already gives the reason. Direct colon commands still report refusals. This final confirmation adjustment was tried and accepted.
 
 - The 24 focused GCC Debug tests pass, with 803 assertions. Core timing tests run at 960, 6720 and 96 PPQN; Workspace tests run at 960 and 96. They cover matching playback messages and times, independent transform choices, retaining settings, pitch and start refusals, millisecond rounding and collisions, section ownership and song growth, quantise fallback, the list and disabled choices, atomic batches, undo/redo, cancellation, bypass, transport restrictions and dot repeat. The availability regressions cover negative musical and millisecond offsets, inactive choices including musical zero, mixed active/inactive rows, and revalidation after the song, bypass or transport changes. Navigation regressions reproduce the earlier skipping and unwanted refusal message, visit every entry when all are dimmed, check movement back to disabled All and verify that Enter on every dimmed choice preserves the song, cursor and undo history, leaves the list open and produces no status message or warning styling. Direct-command refusal messages are also checked.
 - Full `tools/check-linux.sh` passed at `73e7e0f`: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 845 registered tests, three platform/MIDI skips and no failures. For the subsequent menu-only refinements, `tools/check-linux.sh linux-gcc-debug linux-clang-debug` passes, each with 846 registered tests and the same three skips. Whole-tree formatting and `git diff --check` pass. Release and sanitizer checks were last run at `73e7e0f`. No local Windows build is required; CI will check Windows after publication.
 - The chooser was rendered and inspected through SDL's offscreen driver at widths of 1200 and 640 pixels in both dark and light themes, including the negative-offset and no-active-transform cases after the refinement. The before-zero reason and "Nothing to freeze" labels are readable. No real desktop was driven, and MIDI hardware timing has not been tested.
 - `build/linux-gcc/apps/Debug/modal` has been rebuilt and checked to be newer than every tracked application build input.
 
-### Pending dimmed-entry UI trial
+### Confirmed dimmed-entry UI trial
 
-The Freeze behaviour, availability and navigation have been tried. Only the silent Enter behaviour on dimmed entries needs another look before publication:
+The final silent Enter behaviour was accepted on 9 November 2026. These trial steps are retained for reference; the acceptance does not establish MIDI hardware timing results:
 
 1. With a negative offset and notes at tick zero, open `, t f`. All should be dim with its before-zero reason. Enter on it should do nothing, show no status message and leave the list open. With Q off, check Time offset too. Up/Down should still visit every entry.
 2. With transpose, velocity and time offsets zero and Q off, all five choices should be dim with "Nothing to freeze". Up/Down should still move through every entry, stopping at the ends. Enter on each should be equally inert, with no status message, change or undo step; Escape should close the list.
@@ -152,7 +152,7 @@ Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song, with pl
 
 The three Tracks steps are built. How `, e` asks for an event is a stop-gap, accepted as not very friendly for now, to refine later; the note on real MIDI hardware above still stands. Settle the next step's open questions before implementation:
 
-1. Complete Freeze's UI trial before publication. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
+1. Freeze is complete and tried. Column configuration and song-tempo fallback remain separate open questions. No whole-track Loop column is planned.
 
 The rest of milestone 7 remains the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Raise each feature's open questions before implementing the parts they affect.
 
