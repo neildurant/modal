@@ -14,6 +14,7 @@
 #include <modal/ui/settings.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/view_parts.hpp>
+#include <modal/ui/view_state.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -2058,22 +2059,40 @@ void Workspace::moveSelection(core::Tick by, int pitches)
     {
         return;
     }
-    selection_->anchor.tick += by;
-    if (auto& pitch = selection_->anchor.pitch)
+    const auto shiftPitch = [&](std::uint8_t pitch)
+    { return static_cast<std::uint8_t>(std::clamp(pitch + pitches, 0, 127)); };
+    const auto shift = [&](Selection& selection)
     {
-        *pitch = static_cast<std::uint8_t>(std::clamp(*pitch + pitches, 0, 127));
-    }
-    for (auto* range : {&selection_->span, &selection_->starts})
-    {
-        if (*range)
+        selection.anchor.tick = std::max<core::Tick>(0, selection.anchor.tick + by);
+        if (auto& pitch = selection.anchor.pitch)
         {
-            (*range)->first += by;
-            (*range)->second += by;
+            *pitch = shiftPitch(*pitch);
         }
-    }
+        for (auto* range : {&selection.span, &selection.starts})
+        {
+            if (*range)
+            {
+                (*range)->first = std::max<core::Tick>(0, (*range)->first + by);
+                (*range)->second += by;
+            }
+        }
+    };
+    shift(*selection_);
     if (selection_->object)
     {
-        selection_->object->after = view().place(); // still what the object took
+        auto& object = *selection_->object;
+        if (auto state = pianoRollStateOf(object.at))
+        {
+            state->pitch = shiftPitch(state->pitch);
+            object.at =
+                placeWith(object.at.track, std::max<core::Tick>(0, object.at.tick + by), *state);
+        }
+        object.after = view().place();
+        object.moved = true;
+        if (beforeObject_)
+        {
+            shift(*beforeObject_);
+        }
     }
 }
 
@@ -2094,7 +2113,8 @@ void Workspace::widenSelection()
 
 std::pair<std::string, int> Workspace::selectionRange(std::string_view command)
 {
-    if (selection_->object && !selection_->filter && command != "visual-delete-time")
+    if (selection_->object && !selection_->object->moved && !selection_->filter &&
+        command != "visual-delete-time")
     {
         const auto& object = *selection_->object;
         view().restore(object.at);

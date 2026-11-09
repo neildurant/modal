@@ -1805,3 +1805,70 @@ TEST_CASE("the moving keys move every note a selection takes, and the selection 
         CHECK(r.ws.message().find("Would") != std::string::npos);
     }
 }
+
+TEST_CASE("operators and replacement objects follow a moved note selection")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto original = r.document.song();
+    r.ws.pianoRoll().setCursor({id, 0, 31});
+    r.type(U"vin");
+    r.press(Key::of(NamedKey::Up, kAlt));
+    REQUIRE(r.view().pitch() == 32);
+    REQUIRE(r.ws.mode() == Mode::Visual);
+    const auto moved = r.document.song();
+
+    SECTION("delete the moved note")
+    {
+        r.type(U"d");
+        CHECK(r.document.song().events(id).size() == 4);
+        CHECK(r.ws.message().find("No note") == std::string::npos);
+        r.type(U"u");
+        CHECK(r.document.song() == moved);
+        r.type(U"u");
+        CHECK(r.document.song() == original);
+    }
+    SECTION("recall and delete the moved selection")
+    {
+        r.press(Key::of(NamedKey::Escape));
+        r.type(U"gvd");
+        CHECK(r.document.song().events(id).size() == 4);
+    }
+    SECTION("yank the moved note")
+    {
+        r.type(U"y");
+        CHECK(r.document.song() == moved);
+        r.ws.pianoRoll().setCursor({id, r.t.bar(3), 32});
+        r.type(U"p");
+        const auto pasted = r.document.song().events(id).startingIn(r.t.bar(3), r.t.bar(4));
+        REQUIRE(pasted.size() == 1);
+        CHECK(std::get<core::Note>(pasted.front().data).pitch == 32);
+    }
+    SECTION("a colon transform takes the moved note")
+    {
+        r.type(U":transpose +1");
+        r.press(Key::of(NamedKey::Enter));
+        const auto& events = r.document.song().events(id);
+        CHECK(std::ranges::any_of(events.all(), [](const core::Event& event)
+                                  { return std::get<core::Note>(event.data).pitch == 33; }));
+    }
+    SECTION("another object replaces it from its moved origin")
+    {
+        r.type(U"icd");
+        CHECK(r.document.song().events(id).size() == 3);
+    }
+}
+
+TEST_CASE("deleting a moved bar selection takes its new time")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    r.type(U"vib");
+    r.press(Key::typed(U'}', kAlt));
+    REQUIRE(r.document.song().events(id)[0].tick == r.t.bar(2));
+    r.type(U"d");
+    CHECK(r.document.song().events(id).size() == 2);
+    CHECK(r.document.song().events(id)[0].tick == r.t.bar(5) + 7);
+}

@@ -131,6 +131,7 @@ struct Selection
         int count = 0;
         core::EditPlace at;
         core::EditPlace after;
+        bool moved = false; // operators take the moved selection rather than resolving it again
     };
     std::optional<Object> object = std::nullopt;
 };
