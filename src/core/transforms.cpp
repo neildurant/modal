@@ -568,8 +568,13 @@ std::variant<std::vector<Event>, Refusal> quantizeTaken(const EventList& events,
     for (std::size_t k = 0; k < changed.size(); ++k)
     {
         auto& event = changed[k];
-        if (!event.isNote() || (!pinned.empty() && pinned[k]))
+        if (!event.isNote())
         {
+            continue;
+        }
+        if (!pinned.empty() && pinned[k])
+        {
+            moves.emplace_back(event.tick, 0); // its pedalling stays with the unmoved note
             continue;
         }
         auto& note = std::get<Note>(event.data);

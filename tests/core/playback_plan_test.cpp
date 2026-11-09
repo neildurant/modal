@@ -713,3 +713,39 @@ TEST_CASE("on a coarse grid, a busy track is still quantised, but for its clashe
     REQUIRE(plan.quantizeWarnings.size() == 1);
     CHECK(plan.quantizeWarnings.front().leftInPlace == 3);
 }
+
+TEST_CASE("pedalling follows a note left in place by a playback quantise clash")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto controller = static_cast<std::uint8_t>(GENERATE(64, 66, 67));
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id =
+        addTrack(song, 1,
+                 [&](EditTrack& track)
+                 {
+                     track.quantize = {true, NoteFraction{1, 4}, 100, 50, QuantizeMove::Starts};
+                     track.events.insert({0, Note{60, 100, 1}});
+                     track.events.insert({q / 8, Note{62, 100, 1}});
+                     track.events.insert({q / 4, Note{60, 100, q / 2}});
+                     track.events.insert({5 * q / 16, ControlChange{controller, 127}});
+                     track.events.insert({7 * q / 16, ControlChange{controller, 0}});
+                     track.events.insert({2 * q + q / 8, Note{64, 100, 1}});
+                     track.events.insert({2 * q + q / 4, ControlChange{controller, 127}});
+                 });
+    const auto plan = compilePlan(song, everythingToPort);
+    CHECK(plan.quantizeWarnings == std::vector<QuantizeWarning>{{id, q / 4, 1}});
+    std::vector<std::pair<Tick, Tick>> pedals;
+    for (const auto& event : plan.events)
+    {
+        if (event.message.bytes[0] == 0xB0 && event.message.bytes[1] == controller)
+        {
+            pedals.emplace_back(event.tick, event.stored);
+        }
+    }
+    CHECK(pedals == std::vector<std::pair<Tick, Tick>>{
+                        {5 * q / 16, 5 * q / 16},
+                        {7 * q / 16, 7 * q / 16},
+                        {2 * q + q / 8, 2 * q + q / 4},
+                    });
+}
