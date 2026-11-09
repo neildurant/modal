@@ -736,6 +736,11 @@ TEST_CASE("numeric columns' headings are right-aligned over their values")
     REQUIRE(last != runs.end());
     CHECK(value->x + static_cast<int>(value->text.size()) * 10 ==
           last->x + static_cast<int>(last->text.size()) * 10);
+    // Two cells between Time offset's values, on the right, and Quantise's, on the left.
+    const auto quantise = std::ranges::find_if(
+        runs, [](const TextRun& run) { return run.y == 0 && run.text.starts_with(U"Quantise"); });
+    REQUIRE(quantise != runs.end());
+    CHECK(quantise->x - (last->x + static_cast<int>(last->text.size()) * 10) == 2 * 10);
 }
 
 TEST_CASE("the name column grows with the longest name, up to a limit")
@@ -779,7 +784,7 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
     CHECK(shown(thirty));
     CHECK(nameEnd() - start == 31 * 10);
 
-    // Cut short at 32 characters, the whole name being in the bar above and the inspector.
+    // Cut short at 32 characters, the whole name being in the bar above.
     const auto longer = thirty + U" and a good deal more than that, and then some";
     t.enter(longer);
     CHECK(nameEnd() - start == 33 * 10);
@@ -1730,5 +1735,12 @@ TEST_CASE("the inspector says what the column under the cursor is")
         t.column(column.field);
         INFO(column.heading);
         CHECK(inspectorHas(t.ws.frame(), decodeUtf8(trackFieldDescription(column.field))));
+        // Only what's under the cursor: the bar above names the track.
+        // The table's heading is padded to its column; an inspector heading isn't.
+        for (const auto& region : t.ws.frame())
+        {
+            CHECK(std::ranges::none_of(region.text,
+                                       [](const TextRun& run) { return run.text == U"Name"; }));
+        }
     }
 }

@@ -33,11 +33,11 @@ highlight hint-group   #bb9af7
 highlight match        #7dcfff
 
 " Active track toggles, with contrasting text.
-highlight track-mute #f7768e
+highlight track-mute #f7a1b4
 highlight track-solo #9ece6a
 highlight track-chase #7aa2f7
 highlight track-quantize #73daca
-highlight track-arm #ff9e64
+highlight track-arm #ff2a2a
 highlight track-thru #e0af68
 highlight toggle-text #1a1b26
 highlight event-sign #bb9af7

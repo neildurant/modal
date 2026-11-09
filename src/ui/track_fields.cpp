@@ -32,7 +32,8 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::Program, "Prog", 6, true},
     TrackColumn{TrackField::Transpose, "Trans", 6, true},
     TrackColumn{TrackField::VelocityOffset, "Vel +/-", 8, true},
-    TrackColumn{TrackField::TimeOffset, "Time offset", 15, true},
+    // A wider gap after it, as its values align on the right and Quantise's on the left.
+    TrackColumn{TrackField::TimeOffset, "Time offset", 16, true, 2},
     // Last, as its settings can run long.
     TrackColumn{TrackField::QuantizeSummary, "Quantise", 25},
 };
@@ -152,7 +153,7 @@ std::string_view trackFieldDescription(TrackField field)
     case TrackField::ChaseNotes:
         return "Chase: start notes already held where playback starts";
     case TrackField::Quantize:
-        return "Quantise as it plays, leaving the notes where they're stored";
+        return "Quantise notes live during playback";
     case TrackField::Port:
         return "Output port";
     case TrackField::Channel:

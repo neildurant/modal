@@ -254,7 +254,8 @@ std::optional<std::string> TracksView::selectionStatus() const
 
 Inspection TracksView::inspection() const
 {
-    // What the table has no room for, the cursor's column's first; fields are edited in the table.
+    // Only about the column under the cursor, the bar above naming the track (decided November
+    // 2026, after use); fields are edited in the table.
     Inspection result{"Track", {}};
     if (!cursor_.track)
     {
@@ -332,7 +333,6 @@ Inspection TracksView::inspection() const
             result.fields.push_back(std::move(clash));
         }
     }
-    result.fields.push_back({"Name", track.name.empty() ? "-" : track.name});
     return result;
 }
 
@@ -1046,6 +1046,7 @@ void TracksView::addRegions(Frame& frame) const
         {
             const auto& column = columns[c];
             const int wide = columnWidth(column);
+            const int room = wide - column.gap; // for its text
             // Buttons have no heading: their letters say what they are.
             auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
                                    : isToggle(column.field) ? std::string{}
@@ -1055,19 +1056,19 @@ void TracksView::addRegions(Frame& frame) const
             {
                 text += programEvents(document_.song(), track->id()).count > 0 ? U'•' : U' ';
             }
-            if (text.size() >= static_cast<std::size_t>(wide))
+            if (text.size() > static_cast<std::size_t>(room))
             {
-                text.resize(static_cast<std::size_t>(wide - 2));
+                text.resize(static_cast<std::size_t>(room - 1));
                 text += U'…';
             }
-            const auto padding = static_cast<std::size_t>(wide - 1) - text.size();
+            const auto padding = static_cast<std::size_t>(room) - text.size();
             if (column.numeric) // the heading too, over its values
                 text.insert(0, padding, U' ');
             else
                 text.append(padding, U' ');
             const bool toggle = track && isToggle(column.field);
             if (toggle)
-                text.assign(static_cast<std::size_t>(wide - 1), U' ');
+                text.assign(static_cast<std::size_t>(room), U' ');
             Style style{track ? Role::Text : Role::Dim, Role::Background, kPlain};
             if (program && !programClashes(document_.song(), *track).empty())
             {
@@ -1077,8 +1078,10 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style.background = Role::Selection;
                 // Into the space after the column, so a selected row is one unbroken band.
-                table.text.push_back(
-                    {x + (wide - 1) * cell_.width, y, U" ", {Role::Text, Role::Selection, kPlain}});
+                table.text.push_back({x + room * cell_.width,
+                                      y,
+                                      std::u32string(static_cast<std::size_t>(column.gap), U' '),
+                                      {Role::Text, Role::Selection, kPlain}});
             }
             if (track && !toggle && index == row() && c == column_)
             {
@@ -1094,7 +1097,7 @@ void TracksView::addRegions(Frame& frame) const
                 // What's typed to narrow the list, or else the port it's on now, with a cursor.
                 auto shown = portChoice_->typed.empty() ? decodeUtf8(portChoice_->current)
                                                         : portChoice_->typed;
-                const auto box = static_cast<std::size_t>(wide - 1);
+                const auto box = static_cast<std::size_t>(room);
                 if (shown.size() >= box)
                 {
                     shown = shown.substr(shown.size() - box + 1);
@@ -1112,7 +1115,7 @@ void TracksView::addRegions(Frame& frame) const
             else if (track && editor_.active() && !quantizeEditing_ && index == row() &&
                      c == column_)
             {
-                inspectorValue(table, {std::string{column.heading}, {}}, {}, x, y, wide - 1, cell_,
+                inspectorValue(table, {std::string{column.heading}, {}}, {}, x, y, room, cell_,
                                &editor_, column.numeric);
             }
             else

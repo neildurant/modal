@@ -43,8 +43,9 @@ struct TrackColumn
 {
     TrackField field;
     std::string_view heading;
-    int width;
+    int width; // including the blank cells after it
     bool numeric = false;
+    int gap = 1; // blank cells after it, within its width
 };
 
 // This order drives both drawing and navigation; field identities do not depend on it.
