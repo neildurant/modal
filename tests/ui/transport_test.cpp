@@ -7,11 +7,14 @@
 #include <modal/core/player.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/track_fields.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -26,6 +29,20 @@ namespace
 {
 
 constexpr CellSize kCell{10, 20};
+
+// The keys from the Tracks view's Name column, where it opens, to a field's column.
+std::u32string toColumn(TrackField field)
+{
+    const auto columns = trackColumns();
+    const auto name = std::ranges::find(columns, TrackField::Name, &TrackColumn::field);
+    const auto to = std::ranges::find(columns, field, &TrackColumn::field);
+    std::u32string keys;
+    for (const char c : std::to_string(to - name))
+    {
+        keys += static_cast<char32_t>(c);
+    }
+    return keys + U'l';
+}
 
 // The demo song's event list, playing through an engine on a clock that stands still until
 // moved, every port going to one destination.
@@ -334,7 +351,7 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
                         song.updateEvents(id, [&](core::EventList& events)
                                           { events.insert({q / 2, core::ProgramChange{3}}); });
                     });
-    p.type(U"gt9l");
+    p.type(U"gt" + toColumn(TrackField::Program));
     p.press(Key::typed(U' '));
     p.runFor(100ms);
 
@@ -416,7 +433,7 @@ TEST_CASE("a track's port that wasn't found is dim in the table, and explained i
     CHECK(find(U"Gone")->style.foreground == Role::Dim);
     CHECK_FALSE(find(U"Port not found"));
 
-    for (const char32_t key : std::u32string_view{U"k5l"})
+    for (const char32_t key : U"k" + toColumn(TrackField::Port))
     {
         ws.handle(Key::typed(key), 0);
     }
@@ -443,4 +460,48 @@ TEST_CASE("bypassing playback quantise plays every track as stored, and says so"
     p.type(U",Tq");
     CHECK_FALSE(p.player.bypassQuantize());
     CHECK(p.status().find(U"Quantise bypassed") == std::u32string::npos);
+}
+
+TEST_CASE("MIDI input is taken from the engine when it arrives, and again shortly after")
+{
+    Playing p;
+    CHECK_FALSE(p.ws.deadline());
+    const std::array<std::uint8_t, 3> on{0x90, 60, 100};
+    const std::array<std::uint8_t, 3> off{0x80, 60, 0};
+    REQUIRE(p.engine.receive(core::InputId{0}, on, p.clock.time));
+    test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+    p.ws.inputWoken(p.now);
+    CHECK_FALSE(p.engine.nextReceived()); // taken
+    CHECK(p.ws.deadline() == p.now + Workspace::kInputSettle);
+
+    // What the engine passes back after the wake-up is taken at that deadline, which then goes.
+    REQUIRE(p.engine.receive(core::InputId{0}, off, p.clock.time));
+    test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+    p.now += Workspace::kInputSettle;
+    p.ws.wake(p.now);
+    CHECK_FALSE(p.engine.nextReceived());
+    CHECK_FALSE(p.ws.deadline());
+    CHECK(p.ws.message().empty());
+}
+
+TEST_CASE("MIDI input lost for want of taking it is reported once")
+{
+    Playing p;
+    const std::array<std::uint8_t, 3> cc{0xB0, 1, 64};
+    const auto sent = core::Engine::kMaxStamped + 100;
+    for (std::size_t i = 0; i < sent; ++i)
+    {
+        REQUIRE(p.engine.receive(core::InputId{0}, cc, p.clock.time));
+        if (i % 500 == 499) // within the input's own queue
+        {
+            test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+        }
+    }
+    test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+    REQUIRE(p.player.inputLost() > 0);
+    CHECK(p.ws.inputWoken(p.now));
+    CHECK(p.ws.message() == "MIDI input lost: " + std::to_string(p.player.inputLost()) +
+                                " messages, arriving faster than it was taken");
+    CHECK(p.ws.messageKind() == MessageKind::Warning);
+    CHECK_FALSE(p.ws.inputWoken(p.now)); // nothing more lost
 }

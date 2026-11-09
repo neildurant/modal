@@ -23,7 +23,7 @@ Change an item's state when work starts or finishes, and update status.md in the
 
 First make it possible to record new material in Modal for daily use. Reuse the measured engine and recorder; step entry, loops and take management follow later.
 
-- [ ] **To do** — GUI MIDI input, input-port selection and track arming.
+- [ ] **Doing** — GUI MIDI input, input-port selection and track arming. Step 8.1: the `inputs` setting, input collected in the GUI, Arm and Thru buttons in Tracks and `, r a` / `, r t`; decisions settled 9 November 2026.
 - [ ] **To do** — Per-track Thru and monitoring while stopped or playing; input activity and controls for trying an instrument before recording.
 - [ ] **To do** — Arm and Thru columns in Tracks, input selection, and clear armed/recording state in the transport and status line.
 - [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end.
@@ -33,7 +33,7 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 - [ ] **To do** — Save the relevant track and song recording settings.
 - [ ] **To do** — Automated coverage and real MIDI recording trials; record measured results in status.md.
 
-Before implementation: settle record-start controls, replace-mode indication, input/Thru ownership and the scope of saved settings. Review bounded, fair processing of heavy input here. Resolve blocking Windows SysEx delivery if needed for this work.
+Settled 9 November 2026 (see design.md, Recording in the GUI): `R` records from the play-from marker, the `, r` group, replace/overdub a song setting shown in the status line, the `inputs` setting and independent arming with a note naming other armed tracks. Still to settle: each track's own input and the remaining saved settings. Review bounded, fair processing of heavy input here. Resolve blocking Windows SysEx delivery if needed for this work.
 
 ## 9. Controllers, drums and folding
 

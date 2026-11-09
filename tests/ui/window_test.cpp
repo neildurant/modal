@@ -307,8 +307,11 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
                                        [](modal::core::Track& track)
                                        {
                                            track.solo = true;
+                                           track.arm = true;
                                            track.transpose = -12;
                                        });
+                      song.updateTrack(song.tracks()[3]->id(),
+                                       [](modal::core::Track& track) { track.thru = false; });
                       song.updateTrack(song.tracks()[2]->id(),
                                        [](modal::core::Track& track)
                                        {

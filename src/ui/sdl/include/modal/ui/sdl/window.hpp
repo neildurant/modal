@@ -79,6 +79,10 @@ struct WindowHandlers
     // Asked when the window's close button, or the system, asks it to close, returning
     // whether it should; without it, it closes.
     std::function<bool()> closing = {};
+
+    // Called when another thread has woken the window (see Window::waker), returning whether
+    // it changed what's shown.
+    std::function<bool(std::int64_t)> woken = {};
 };
 
 // A window with a renderer and a monospace font, which draws frames of regions. SDL's video
@@ -117,6 +121,11 @@ public:
 
     // Ends run once the events it's handling are done, as for a quit command.
     void close();
+
+    // Something any thread can call to have run's thread call the woken handler soon, as when
+    // MIDI input arrives. Calls before the handler runs are taken together. It must not be
+    // called once the window has gone.
+    std::function<void()> waker();
 
     // Shows the system's dialog for a file to open, or to save to (which asks about writing
     // over a file itself), offering the filters' kinds of file and starting from a suggested

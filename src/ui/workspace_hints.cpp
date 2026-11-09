@@ -210,6 +210,14 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
     {
         return "Quantise this track: " + onOff(track->quantize.on);
     }
+    if (command == "track-arm-toggle")
+    {
+        return std::string{"Arm this track: "} + (track->arm ? "armed" : "off");
+    }
+    if (command == "track-thru-toggle")
+    {
+        return "Thru to this track: " + onOff(track->thru);
+    }
     return std::nullopt;
 }
 

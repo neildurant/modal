@@ -471,6 +471,14 @@ Recorded events are timestamped by the engine at arrival, never by the UI, so re
 - **Pedals (decided in milestone 2).** Sustain (CC 64), sostenuto (CC 66) and soft (CC 67) are stored as ordinary CC events, never folded into note lengths. So that a take never leaves a pedal down: a pedal still down when recording stops gets a pedal-up at the stop point, as held notes end there. When replace cuts through older pedal data, the old material is patched at both edges: a pedal-up at the record point if the old track had the pedal down there, and a pedal-down at the stop point if the old track had it down there, so what follows sounds as before.
 - **Takes (decided in milestone 2).** A take is collected while recording and applied to the song when recording stops, as one edit, so a recording pass can later be one undo step. Every armed track gets the whole take (until tracks can be set to one input), on its own channel. The recorded range runs from the record point up to, not including, the stop point. A note played on a pitch already sounding in the take, from any input or channel, ends the earlier note where the new one starts, and at the same tick replaces it; overdubbing applies the same rule between the take and the old notes (whichever starts first ends where the other starts, and at the same tick the take's note wins), so recording never creates overlapping notes of one pitch. A note whose note-on and note-off arrive on the same tick lasts one tick. Overdubbing doesn't patch pedals at the record point, but if the take lets a pedal up at the stop point where the old track had it down, the old pedal goes down again there.
 
+**Recording in the GUI (decided November 2026, for milestone 8)**
+
+- **Which inputs.** An `inputs` setting in `modalrc` names the input ports to listen to, matched as `:port` matches output ports, separated by commas; empty, the default, listens to every input port found. Ports differ between machines, so the choice is the machine's, like the `port` setting, rather than the song's. Modal's own ports are never listened to, so Thru can't feed back into itself. At most 16 are opened, the engine's limit; a name that isn't found is reported in the status line, as missing output ports are. Each track's own input, saved with the song, comes later in milestone 8.
+- **Arming.** Each track is armed on its own, like mute and solo, so several can be armed and each records the whole take on its own channel. As arming a track while another is still armed is often a mistake, arming one while others are armed says which others are, gently, in the status line, and starting to record onto more than one names them all.
+- **Arm and Thru in the Tracks view.** Buttons after Mute and Solo: Arm `R`, Thru `T`. Like the other buttons they have no headings, and show their letter grey when off and filled with their colour when on; Thru on a track not armed shows its letter in its colour, unfilled, since Thru only reaches armed tracks. The inspector says first what the column under the cursor is, much as a tooltip would. `, r a` arms or disarms the current track and `, r t` switches its Thru, from any view with a track, and on a Visual selection of Tracks rows every row takes the opposite of the cursor's. Both are undoable edits, saved with the song (`arm`, `thru=off`), and take effect at once, playing or not.
+- **Starting to record.** `R` records from the play-from marker, as Space plays from it, with the song's count-in or pre-roll before it; Space stops. The `, r` leader group holds the recording commands and settings.
+- **Replace or overdub** is a song setting, saved with the song, switched under `, r`. The status line shows `REC` or `ODUB` while recording, and the mode beside the armed tracks while stopped.
+
 **Sections: looping, takes and count-in (decided October 2026)**
 
 - **Looping:** `, L` loops the section the cursor is in; a run of sections selected on the strip loops as a range.
@@ -815,8 +823,9 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 **Milestone 8: basic GUI recording**
 
-- [ ] Recording keys, record point and replace/overdub indication.
-- [ ] Input selection, arming and Thru ownership, monitoring controls and saved recording settings.
+- [x] Recording keys, record point and replace/overdub indication: `R` from the play-from marker, the `, r` group, replace or overdub a song setting shown in the status line (decided November 2026; see Recording in the GUI).
+- [x] Input selection and arming: the `inputs` setting in `modalrc`, every input by default; independent arming, with a gentle note when others are armed (decided November 2026).
+- [ ] Each track's own input, input activity and monitoring controls, and the rest of the saved recording settings (milestone 8's second step).
 - [ ] Song growth, undo and unavailable-input/overflow behaviour in the GUI, preserving the engine's recording rules.
 
 **Milestone 9: controllers, drums and folding**

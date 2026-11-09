@@ -107,6 +107,22 @@ void Player::stoppedAt(Tick tick)
     }
 }
 
+std::size_t Player::takeInput()
+{
+    std::size_t messages = 0;
+    while (const auto stamped = engine_.nextReceived())
+    {
+        messages += stamped->first ? 1 : 0;
+    }
+    return messages;
+}
+
+std::size_t Player::inputLost() const
+{
+    const auto status = engine_.status();
+    return status.inputDropped + status.inputUnreported;
+}
+
 bool Player::poll()
 {
     if (waiting_ && engine_.setPlan(waiting_))

@@ -1132,7 +1132,38 @@ std::optional<std::int64_t> Workspace::deadline() const
         const auto frame = lastTime_ + kFrameInterval;
         deadline = deadline ? std::min(*deadline, frame) : frame;
     }
+    if (inputDue_)
+    {
+        deadline = deadline ? std::min(*deadline, *inputDue_) : *inputDue_;
+    }
     return deadline;
+}
+
+bool Workspace::inputWoken(std::int64_t now)
+{
+    inputDue_ = now + kInputSettle;
+    return takeInput();
+}
+
+bool Workspace::takeInput()
+{
+    if (player_ == nullptr)
+    {
+        return false;
+    }
+    player_->takeInput();
+    // Said once for each loss, rather than at every message, as a flood keeps losing more.
+    const auto lost = player_->inputLost();
+    if (lost == inputLost_)
+    {
+        return false;
+    }
+    const auto more = lost - inputLost_;
+    inputLost_ = lost;
+    setMessage("MIDI input lost: " + std::to_string(more) + (more == 1 ? " message" : " messages") +
+                   ", arriving faster than it was taken",
+               MessageKind::Warning);
+    return true;
 }
 
 bool Workspace::wake(std::int64_t now)
@@ -1163,6 +1194,15 @@ bool Workspace::wake(std::int64_t now)
     else if (player_ != nullptr && player_->planWaiting())
     {
         player_->poll(); // handing the engine the plan it couldn't take
+    }
+    if (inputDue_ && now >= *inputDue_)
+    {
+        inputDue_.reset();
+        changed = takeInput() || changed;
+    }
+    else if (wasPlaying_)
+    {
+        changed = takeInput() || changed; // each frame, as recording will
     }
     return changed || keys_.pending() != before;
 }
@@ -1513,9 +1553,43 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         return true;
     }
     if (command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
-        command == "tracks-chase-toggle" || command == "tracks-quantize-toggle")
+        command == "tracks-chase-toggle" || command == "tracks-quantize-toggle" ||
+        command == "tracks-arm-toggle" || command == "tracks-thru-toggle")
     {
         return view().run(command, count).value_or(false);
+    }
+    if (command == "track-arm-toggle" || command == "track-thru-toggle")
+    {
+        const bool arm = command == "track-arm-toggle";
+        const auto id = view().cursor().track;
+        if (!id)
+        {
+            refuse(arm ? "Select a track to arm" : "Select a track to change its thru");
+            return true;
+        }
+        const auto* track = document_.song().track(*id);
+        const bool on = !(arm ? track->arm : track->thru);
+        document_.edit(arm ? (on ? "Arm" : "Disarm") : "Toggle thru", view().place(),
+                       [&](core::Song& song)
+                       {
+                           song.updateTrack(*id, [&](core::Track& changed)
+                                            { (arm ? changed.arm : changed.thru) = on; });
+                       });
+        if (arm)
+        {
+            const std::array ids{*id};
+            const auto said = armedMessage(document_.song(), ids, on);
+            setMessage(said.text, said.warning ? MessageKind::Warning : MessageKind::Information);
+        }
+        else
+        {
+            const auto* changed = document_.song().track(*id);
+            setMessage(!on            ? "Thru off: MIDI input isn't sent to this track"
+                       : changed->arm ? "Thru on: MIDI input is sent to this track"
+                                      : "Thru on: MIDI input is sent to this track once it's armed",
+                       MessageKind::Information);
+        }
+        return true;
     }
     if (command == "track-mute-toggle" || command == "track-solo-toggle")
     {

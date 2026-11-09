@@ -414,6 +414,20 @@ constexpr std::array kSharedCommands{
                 .description = "Quantise the selected tracks as they play, or stop, as the "
                                "cursor's track doesn't",
                 .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "tracks-arm-toggle",
+                .description = "Arm the selected tracks to record, or disarm them, as the cursor's "
+                               "track isn't",
+                .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "tracks-thru-toggle",
+                .description = "Send MIDI input on to the selected tracks while armed, or stop, "
+                               "as the cursor's track doesn't",
+                .modes = modeBit(Mode::Visual)},
+    CommandInfo{.name = "track-arm-toggle",
+                .description = "Arm this track to record, or disarm it",
+                .modes = modeBit(Mode::Normal)},
+    CommandInfo{.name = "track-thru-toggle",
+                .description = "Send MIDI input on to this track while it's armed, or stop",
+                .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "track-quantize-toggle",
                 .description = "Quantise this track as it plays, or stop, keeping its settings",
                 .modes = modeBit(Mode::Normal)},
@@ -548,11 +562,15 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 127> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 131> where{{
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
             {"tracks-quantize-toggle", onlyIn({TrackList})},
+            {"tracks-arm-toggle", onlyIn({TrackList})},
+            {"tracks-thru-toggle", onlyIn({TrackList})},
+            {"track-arm-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"track-thru-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-quantize-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-reorder", onlyIn({Tracks, TrackList})},

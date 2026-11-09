@@ -20,6 +20,8 @@ enum class TrackField
     Name,
     Mute,
     Solo,
+    Arm,  // armed to record
+    Thru, // MIDI input sent through to it while armed
     Port,
     Channel,
     Transpose,
@@ -48,6 +50,12 @@ struct TrackColumn
 // This order drives both drawing and navigation; field identities do not depend on it.
 std::span<const TrackColumn> trackColumns();
 std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index);
+
+// A button's letter, shown whether it's on or off, as the buttons have no headings.
+std::string_view toggleLetter(TrackField field);
+
+// What a field is, in a few words, for the inspector to say about the column under the cursor.
+std::string_view trackFieldDescription(TrackField field);
 std::optional<std::string> setTrackField(core::Track& track, TrackField field,
                                          std::string_view text, core::Ppqn ppqn);
 std::optional<std::string> stepTrackField(core::Track& track, TrackField field, int steps,
@@ -55,6 +63,16 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
 
 // A track's playback quantise in a few words: its grid, then anything not as a new track's.
 std::string quantizeSummary(const core::Track& track);
+
+// What to say on arming or disarming tracks: which, and on arming, any others still armed, as
+// a warning, since a track left armed by mistake records the take too.
+struct ArmedMessage
+{
+    std::string text;
+    bool warning = false;
+};
+ArmedMessage armedMessage(const core::Song& song, std::span<const core::TrackId> changed,
+                          bool armed);
 
 // The program changes among a track's own events: how many, and when the first is.
 struct ProgramEvents

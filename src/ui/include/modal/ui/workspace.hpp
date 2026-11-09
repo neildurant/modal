@@ -156,6 +156,14 @@ public:
     std::optional<std::int64_t> deadline() const;
     bool wake(std::int64_t now);
 
+    // MIDI input has arrived, as another thread says: takes what the engine has passed back,
+    // and again shortly after, for what it hadn't yet. Returns whether what's shown changed.
+    bool inputWoken(std::int64_t now);
+
+    // How long after input arrives to take it again, by when the engine will have passed back
+    // anything it hadn't yet.
+    static constexpr std::int64_t kInputSettle = 10; // milliseconds
+
     // How often to draw a frame while playing, in milliseconds; the display's refresh rate
     // may hold it back further.
     static constexpr std::int64_t kFrameInterval = 8;
@@ -404,6 +412,9 @@ private:
     void layOut();
 
     bool runAll(const std::vector<Action>& actions);
+
+    // Takes the MIDI input waiting, reporting any lost; returns whether what's shown changed.
+    bool takeInput();
 
     // Runs a command the workspace has itself, returning whether what's shown changed, or
     // nothing if it isn't one; or a view's command, through the view shown.
@@ -851,6 +862,8 @@ private:
     std::optional<SongCursor> playedFrom_; // the cursor when playback started
     bool returning_ = false;               // stopping with play-stop-back, back to it
     std::int64_t lastTime_ = 0;            // of the last key or wake-up
+    std::optional<std::int64_t> inputDue_; // when to take MIDI input again, after some arrived
+    std::size_t inputLost_ = 0;            // input messages lost, as last reported
     bool hintsOn_ = true;
     std::int64_t hintDelay_ = 400;
     std::optional<std::int64_t> waitingSince_; // when keys started longer bindings

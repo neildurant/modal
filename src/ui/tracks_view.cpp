@@ -20,16 +20,29 @@ namespace
 {
 bool isToggle(TrackField field)
 {
-    return field == TrackField::Mute || field == TrackField::Solo ||
-           field == TrackField::ChaseNotes || field == TrackField::Quantize;
+    return field == TrackField::Mute || field == TrackField::Solo || field == TrackField::Arm ||
+           field == TrackField::Thru || field == TrackField::ChaseNotes ||
+           field == TrackField::Quantize;
 }
 
 bool toggleState(TrackField field, const core::Track& track)
 {
     return field == TrackField::Mute         ? track.mute
            : field == TrackField::Solo       ? track.solo
+           : field == TrackField::Arm        ? track.arm
+           : field == TrackField::Thru       ? track.thru
            : field == TrackField::ChaseNotes ? track.chaseNotes
                                              : track.quantize.on;
+}
+
+Role toggleColour(TrackField field)
+{
+    return field == TrackField::Mute         ? Role::TrackMute
+           : field == TrackField::Solo       ? Role::TrackSolo
+           : field == TrackField::Arm        ? Role::TrackArm
+           : field == TrackField::Thru       ? Role::TrackThru
+           : field == TrackField::ChaseNotes ? Role::TrackChase
+                                             : Role::TrackQuantize;
 }
 
 // The inspector's fields for playback quantise, and what each sets.
@@ -250,9 +263,13 @@ Inspection TracksView::inspection() const
     const auto& song = document_.song();
     const auto& track = *song.track(*cursor_.track);
     const auto field = trackColumns()[column_].field;
+    // What the column under the cursor is, first, much as a tooltip would say (decided November
+    // 2026, as the buttons have no headings).
+    const InspectorField about{"About", std::string{trackFieldDescription(field)}};
     if (field == TrackField::Quantize || field == TrackField::QuantizeSummary)
     {
         auto fields = quantizeFields();
+        fields.fields.insert(fields.fields.begin(), about);
         if (!quantizeEditing_)
         {
             for (auto& shown : fields.fields)
@@ -284,9 +301,10 @@ Inspection TracksView::inspection() const
         }
         return result;
     }
-    if (field == TrackField::ChaseNotes)
+    result.fields.push_back(about);
+    if (field == TrackField::Thru && track.thru && !track.arm)
     {
-        result.fields.push_back({"When enabled", "Start notes already held"});
+        result.fields.push_back({"Not armed", "Thru reaches it once it's armed"});
     }
     if (field == TrackField::Port && portMissing(track))
     {
@@ -837,6 +855,14 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
     {
         toggle(TrackField::ChaseNotes);
     }
+    else if (command == "tracks-arm-toggle")
+    {
+        toggle(TrackField::Arm);
+    }
+    else if (command == "tracks-thru-toggle")
+    {
+        toggle(TrackField::Thru);
+    }
     else if (command == "field-increase" || command == "field-decrease" ||
              command == "field-increase-fine" || command == "field-decrease-fine" ||
              command == "number-increase" || command == "number-decrease")
@@ -873,9 +899,16 @@ void TracksView::toggle(TrackField field)
     }
     // Selected rows all follow the cursor's row, so they end up the same.
     const bool on = !toggleState(field, *document_.song().track(*cursor_.track));
+    const auto ids = selected();
     if (auto why = edit(field, on ? "on" : "off"))
     {
         host_.refuse(*why);
+        return;
+    }
+    if (field == TrackField::Arm)
+    {
+        const auto said = armedMessage(document_.song(), ids, on);
+        host_.setMessage(said.text, said.warning ? MessageKind::Warning : MessageKind::Information);
     }
 }
 
@@ -1013,8 +1046,10 @@ void TracksView::addRegions(Frame& frame) const
         {
             const auto& column = columns[c];
             const int wide = columnWidth(column);
+            // Buttons have no heading: their letters say what they are.
             auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
-                                         : std::string{column.heading});
+                                   : isToggle(column.field) ? std::string{}
+                                                            : std::string{column.heading});
             const bool program = track && column.field == TrackField::Program;
             if (program) // a mark for the track's own program changes, keeping the digits in line
             {
@@ -1086,20 +1121,24 @@ void TracksView::addRegions(Frame& frame) const
             }
             if (toggle)
             {
+                // Filled in its colour when on, its letter grey when off. Thru on a track not
+                // armed is its letter in its colour, unfilled, as it does nothing until armed.
                 const bool on = toggleState(column.field, *track);
-                const auto colour = column.field == TrackField::Mute         ? Role::TrackMute
-                                    : column.field == TrackField::Solo       ? Role::TrackSolo
-                                    : column.field == TrackField::ChaseNotes ? Role::TrackChase
-                                                                             : Role::TrackQuantize;
-                const auto badge =
-                    U" " + decodeUtf8(trackFieldText(column.field, *track, index)) + U" ";
+                const bool filled = on && (column.field != TrackField::Thru || track->arm);
+                const auto colour = toggleColour(column.field);
+                const auto badge = U" " + decodeUtf8(toggleLetter(column.field)) + U" ";
                 const auto edge = hairline(cell_);
                 const int w = 3 * cell_.width;
                 // Text backgrounds are painted before shapes; only the badge carries a glyph.
                 table.under.push_back({{x, y + edge, w, std::max(1, cell_.height - 2 * edge)},
-                                       on ? colour : Role::Panel});
-                table.text.push_back(
-                    {x, y, badge, {on ? Role::ToggleText : Role::Dim, style.background, kBold}});
+                                       filled ? colour : Role::Panel});
+                table.text.push_back({x,
+                                      y,
+                                      badge,
+                                      {filled ? Role::ToggleText
+                                       : on   ? colour
+                                              : Role::Dim,
+                                       style.background, kBold}});
                 if (index == row() && c == column_)
                 {
                     table.over.push_back({{x, y, w, edge}, Role::Cursor});

@@ -80,6 +80,14 @@ public:
 
     bool playing() const { return playing_; }
 
+    // Takes the MIDI input the engine has passed back since last asked, so its queue never
+    // fills, and returns how many messages there were. Recording keeps them, in a later step.
+    std::size_t takeInput();
+
+    // How many input messages have been lost so far: dropped because the engine didn't keep up,
+    // or not passed back because takeInput() didn't.
+    std::size_t inputLost() const;
+
     // Whether playback has stopped but the engine hasn't yet said where, after which the
     // marker may move there (without rewind); poll() until it has.
     bool stopping() const { return !playing_ && !stopExact_; }

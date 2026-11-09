@@ -89,6 +89,15 @@ vmap <leader>tc tracks-chase-toggle "Chase notes on the selected tracks, or stop
 vmap <leader>tq tracks-quantize-toggle "Quantise the selected tracks, or stop"
 vmap <leader>tf track-freeze      "Freeze the selected whole tracks"
 
+" Recording: arming tracks and sending MIDI input through to them
+keysection "Recording"
+ngroup <leader>r "Recording"
+nmap <leader>ra track-arm-toggle  "Arm this track, or disarm it"
+nmap <leader>rt track-thru-toggle "Thru to this track, or stop"
+vgroup <leader>r "Recording"
+vmap <leader>ra tracks-arm-toggle "Arm the selected tracks, or disarm them"
+vmap <leader>rt tracks-thru-toggle "Thru to the selected tracks, or stop"
+
 " Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
 " there, and after an operator is the range to it (d'a); '' goes back to before the last jump.
 keysection "Marks"

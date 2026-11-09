@@ -57,6 +57,8 @@ enum class Role : std::uint8_t
     TrackSolo,
     TrackChase,
     TrackQuantize,
+    TrackArm,
+    TrackThru,
     ToggleText,
     EventSign, // a sign in a ruler for something in the song: a program or tempo change
 };

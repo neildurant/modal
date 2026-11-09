@@ -35,5 +35,7 @@ highlight track-mute #b5264c
 highlight track-solo #46652b
 highlight track-chase #245fb5
 highlight track-quantize #387068
+highlight track-arm #c45000
+highlight track-thru #7a6a00
 highlight toggle-text #ffffff
 highlight event-sign #9854f1

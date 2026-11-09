@@ -112,6 +112,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `ownports`   | `1`     | How many MIDI output ports of its own Modal makes, for other programs such as a plugin host to connect to (0 to 16; Linux only, since Windows can't) |
 | `ownportname` | `Modal` | The name of Modal's own ports: one is `Modal`, several are `Modal 1`, `Modal 2` and so on |
 | `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
+| `inputs`     | (empty) | The MIDI input ports to listen to, for recording and thru: names, or parts of names that match only one port, separated by commas, or empty for every input port found (up to 16). Modal's own ports are never listened to |
 | `quantizemarks` | `on` | Whether the piano roll marks where a note of a track quantised as it plays will be heard, when that's far from where it's stored; `, T m` turns it on or off |
 | `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |
 
@@ -132,7 +133,7 @@ The roles are:
 | `panel` | the background of the inspector |
 | `chrome` | the window around the view (the event list, piano roll or arrangement) and the gaps between bars; the view itself is on `background` |
 | `mode`, `mode-text` | the mode indicator, such as NORMAL |
-| `track-mute`, `track-solo`, `track-chase`, `track-quantize`, `toggle-text` | active Mute/Solo/Chase button backgrounds and their text |
+| `track-mute`, `track-solo`, `track-chase`, `track-quantize`, `track-arm`, `track-thru`, `toggle-text` | active Mute/Solo/Chase/Quant/Arm/Thru button backgrounds and their text |
 | `event-sign` | a sign in a ruler for a program or tempo change |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `label` | notes, and labels |

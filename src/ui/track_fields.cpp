@@ -17,11 +17,14 @@ namespace
 constexpr std::array kColumns{
     TrackColumn{TrackField::Number, "No.", 4, true},
     TrackColumn{TrackField::Name, "Name", 16},
-    // The buttons as wide as each other, so they're evenly spaced.
-    TrackColumn{TrackField::Mute, "Mute", 6},
-    TrackColumn{TrackField::Solo, "Solo", 6},
-    TrackColumn{TrackField::ChaseNotes, "Chase", 6},
-    TrackColumn{TrackField::Quantize, "Quant", 6},
+    // The buttons as wide as each other, so they're evenly spaced, and close together, with no
+    // headings over them (decided November 2026): their letters say what they are.
+    TrackColumn{TrackField::Mute, "Mute", 4},
+    TrackColumn{TrackField::Solo, "Solo", 4},
+    TrackColumn{TrackField::Arm, "Arm", 4},
+    TrackColumn{TrackField::Thru, "Thru", 4},
+    TrackColumn{TrackField::ChaseNotes, "Chase", 4},
+    TrackColumn{TrackField::Quantize, "Quant", 4},
     TrackColumn{TrackField::Port, "Output port", 12},
     TrackColumn{TrackField::Channel, "Ch", 4, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
@@ -71,6 +74,10 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return track.mute ? "M" : "-";
     case TrackField::Solo:
         return track.solo ? "S" : "-";
+    case TrackField::Arm:
+        return track.arm ? "R" : "-";
+    case TrackField::Thru:
+        return track.thru ? "T" : "-";
     case TrackField::Port:
         return track.port;
     case TrackField::Channel:
@@ -101,6 +108,74 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return std::to_string(track.quantize.swing) + "%";
     case TrackField::QuantizeMove:
         return std::string{core::quantizeMoveName(track.quantize.move)};
+    }
+    return {};
+}
+
+std::string_view toggleLetter(TrackField field)
+{
+    switch (field)
+    {
+    case TrackField::Mute:
+        return "M";
+    case TrackField::Solo:
+        return "S";
+    case TrackField::Arm:
+        return "R";
+    case TrackField::Thru:
+        return "T";
+    case TrackField::ChaseNotes:
+        return "C";
+    case TrackField::Quantize:
+        return "Q";
+    default:
+        return {};
+    }
+}
+
+std::string_view trackFieldDescription(TrackField field)
+{
+    switch (field)
+    {
+    case TrackField::Number:
+        return "Track number: its place among the tracks";
+    case TrackField::Name:
+        return "Track name";
+    case TrackField::Mute:
+        return "Mute: silence this track in playback";
+    case TrackField::Solo:
+        return "Solo: play only the soloed tracks";
+    case TrackField::Arm:
+        return "Arm: record onto this track";
+    case TrackField::Thru:
+        return "Thru: send MIDI input on to this track while it's armed";
+    case TrackField::ChaseNotes:
+        return "Chase: start notes already held where playback starts";
+    case TrackField::Quantize:
+        return "Quantise as it plays, leaving the notes where they're stored";
+    case TrackField::Port:
+        return "Output port";
+    case TrackField::Channel:
+        return "MIDI channel";
+    case TrackField::BankMsb:
+        return "Bank select MSB, sent before the program";
+    case TrackField::BankLsb:
+        return "Bank select LSB, sent before the program";
+    case TrackField::Program:
+        return "Program, sent when playback starts";
+    case TrackField::Transpose:
+        return "Transpose in semitones, as it plays";
+    case TrackField::VelocityOffset:
+        return "Velocity offset, added as it plays";
+    case TrackField::TimeOffset:
+        return "Time offset, as it plays: negative sends early";
+    case TrackField::QuantizeSummary:
+        return "Playback quantise settings";
+    case TrackField::QuantizeGrid:
+    case TrackField::QuantizeStrength:
+    case TrackField::QuantizeSwing:
+    case TrackField::QuantizeMove:
+        return "Playback quantise";
     }
     return {};
 }
@@ -141,25 +216,19 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         track.quantize.on = text == "on";
         return {};
     }
-    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes)
+    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::Arm ||
+        field == TrackField::Thru || field == TrackField::ChaseNotes)
     {
         if (text != "on" && text != "off")
         {
             return "Use on or off";
         }
         const bool on = text == "on";
-        if (field == TrackField::Mute)
-        {
-            track.mute = on;
-        }
-        else if (field == TrackField::Solo)
-        {
-            track.solo = on;
-        }
-        else
-        {
-            track.chaseNotes = on;
-        }
+        (field == TrackField::Mute   ? track.mute
+         : field == TrackField::Solo ? track.solo
+         : field == TrackField::Arm  ? track.arm
+         : field == TrackField::Thru ? track.thru
+                                     : track.chaseNotes) = on;
         return {};
     }
     auto& quantize = track.quantize;
@@ -322,7 +391,8 @@ std::optional<std::string> stepTrackField(core::Track& track, TrackField field, 
         quantize.move = static_cast<core::QuantizeMove>(at);
         return {};
     }
-    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::ChaseNotes ||
+    if (field == TrackField::Mute || field == TrackField::Solo || field == TrackField::Arm ||
+        field == TrackField::Thru || field == TrackField::ChaseNotes ||
         field == TrackField::Quantize)
     {
         return setTrackField(track, field, steps > 0 ? "on" : "off", ppqn);
@@ -374,6 +444,42 @@ std::string quantizeSummary(const core::Track& track)
         text += " " + std::string{core::quantizeMoveName(quantize.move)};
     }
     return text;
+}
+
+ArmedMessage armedMessage(const core::Song& song, std::span<const core::TrackId> changed,
+                          bool armed)
+{
+    const auto tracks = song.tracks();
+    const auto names = [&](auto&& wanted)
+    {
+        std::string text;
+        for (std::size_t i = 0; i < tracks.size(); ++i)
+        {
+            const auto& track = *tracks[i];
+            if (wanted(track))
+            {
+                text += (text.empty() ? "" : ", ") +
+                        (track.name.empty() ? "track " + std::to_string(i + 1) : track.name);
+            }
+        }
+        return text;
+    };
+    const auto isChanged = [&](const core::Track& track)
+    { return std::ranges::find(changed, track.id()) != changed.end(); };
+    ArmedMessage result{(armed ? "Armed: " : "Disarmed: ") + names(isChanged), false};
+    if (!armed)
+    {
+        return result;
+    }
+    // A track left armed is easy to miss, and records the take too.
+    const auto others =
+        names([&](const core::Track& track) { return track.arm && !isChanged(track); });
+    if (!others.empty())
+    {
+        result.text += "; also armed: " + others;
+        result.warning = true;
+    }
+    return result;
 }
 
 ProgramEvents programEvents(const core::Song& song, core::TrackId track)

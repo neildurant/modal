@@ -9,6 +9,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -31,6 +32,9 @@ struct Window::Impl
     int minimumRows = 0;
     bool closing = false;   // asked to close, so run returns
     Uint32 dialogEvent = 0; // a file dialog's answer, back on run's thread
+    Uint32 wakeEvent = 0;   // another thread waking run's (see waker)
+    // Whether a wake event is on its way, so a stream of wakes sends one at a time.
+    std::shared_ptr<std::atomic<bool>> wakePending = std::make_shared<std::atomic<bool>>(false);
 
     ~Impl()
     {
@@ -553,6 +557,12 @@ void Window::run(const WindowHandlers& handlers)
                     needsFrame = true;
                     break;
                 }
+                if (event.type == impl_->wakeEvent && impl_->wakeEvent != 0)
+                {
+                    impl_->wakePending->store(false); // before handling, so no wake is missed
+                    needsFrame = (handlers.woken && handlers.woken(now())) || needsFrame;
+                    break;
+                }
                 needsFrame = keys.read(event) || needsFrame;
                 break;
             }
@@ -567,6 +577,27 @@ void Window::run(const WindowHandlers& handlers)
 void Window::close()
 {
     impl_->closing = true;
+}
+
+std::function<void()> Window::waker()
+{
+    if (impl_->wakeEvent == 0)
+    {
+        impl_->wakeEvent = SDL_RegisterEvents(1);
+    }
+    return [type = impl_->wakeEvent, pending = impl_->wakePending]
+    {
+        if (type == 0 || pending->exchange(true))
+        {
+            return; // no event to send, or one already on its way
+        }
+        SDL_Event event{};
+        event.type = type;
+        if (!SDL_PushEvent(&event))
+        {
+            pending->store(false);
+        }
+    };
 }
 
 namespace

@@ -57,11 +57,37 @@ struct Tracking
         type(value);
         press(NamedKey::Enter);
     }
+    // Goes to a field's column, wherever it is in the table.
+    void column(TrackField field)
+    {
+        type(U"0");
+        const auto columns = trackColumns();
+        const auto at = std::ranges::find(columns, field, &TrackColumn::field);
+        REQUIRE(at != columns.end());
+        for (auto i = columns.begin(); i != at; ++i)
+        {
+            type(U"l");
+        }
+    }
     const core::Track& track(std::size_t i = 0) const { return *document.song().tracks()[i]; }
     core::Document document{demoSong()};
     CommandRegistry registry;
     Workspace ws{registry, document};
 };
+
+// How many columns lie between two fields' columns, for typing a count before l or h.
+std::u32string columnsBetween(TrackField from, TrackField to, char32_t key)
+{
+    const auto columns = trackColumns();
+    const auto a = std::ranges::find(columns, from, &TrackColumn::field) - columns.begin();
+    const auto b = std::ranges::find(columns, to, &TrackColumn::field) - columns.begin();
+    std::u32string keys;
+    for (const char c : std::to_string(b > a ? b - a : a - b))
+    {
+        keys += static_cast<char32_t>(c);
+    }
+    return keys + key;
+}
 } // namespace
 
 TEST_CASE("track fields edit settings and musical offsets without moving events")
@@ -74,10 +100,10 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
     CHECK(t.track().mute);
     t.type(U"l+");
     CHECK(t.track().solo);
-    t.type(U"4l");
+    t.type(columnsBetween(TrackField::Solo, TrackField::Channel, U'l'));
     t.enter(U"10");
     CHECK(t.track().channel == 10);
-    t.type(U"4l");
+    t.type(columnsBetween(TrackField::Channel, TrackField::Transpose, U'l'));
     t.enter(U"-12");
     CHECK(t.track().transpose == -12);
     t.type(U"l");
@@ -97,7 +123,8 @@ TEST_CASE("track fields edit settings and musical offsets without moving events"
 TEST_CASE("bulk track edits validate every row and undo together")
 {
     Tracking t;
-    t.type(U"10lVj"); // transpose, first two tracks
+    t.column(TrackField::Transpose);
+    t.type(U"Vj"); // first two tracks
     const auto first = t.track().transpose;
     const auto second = t.track(1).transpose;
     t.type(U"+");
@@ -113,7 +140,7 @@ TEST_CASE("bulk track edits validate every row and undo together")
     CHECK(t.track(2).transpose == 12);
     CHECK(t.ws.mode() == Mode::Visual);
     t.press(NamedKey::Escape);
-    t.type(U"4h");
+    t.type(columnsBetween(TrackField::Transpose, TrackField::Channel, U'h'));
     t.enter(U"16"); // channel
     t.type(U"Vk+");
     CHECK(t.track(2).channel == 16);
@@ -366,7 +393,8 @@ TEST_CASE("track toggles are compact badges and numeric cells align on the right
     }
     const auto& first = frame.front().text[trackColumns().size()];
     CHECK(first.text == U"  1");
-    t.type(U"l-"); // chase, on the same track only
+    t.column(TrackField::ChaseNotes);
+    t.type(U"-"); // on the same track only
     CHECK_FALSE(t.track().chaseNotes);
     CHECK(t.track(1).chaseNotes);
     t.type(U"u");
@@ -561,7 +589,16 @@ TEST_CASE("Enter toggles the track buttons without opening an editor")
     CHECK(t.track().solo);
     t.type(U"u");
     CHECK_FALSE(t.track().solo);
-    t.type(U"l"); // chase, which e toggles too, the inspector having no field for it
+    t.column(TrackField::Arm);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().arm);
+    t.type(U"l"); // thru
+    t.press(NamedKey::Enter);
+    CHECK_FALSE(t.track().thru);
+    t.type(U"uu");
+    CHECK_FALSE(t.track().arm);
+    CHECK(t.track().thru);
+    t.column(TrackField::ChaseNotes); // which e toggles too, the inspector having no field for it
     const bool chase = t.track().chaseNotes;
     t.press(NamedKey::Enter);
     CHECK(t.track().chaseNotes != chase);
@@ -668,6 +705,10 @@ TEST_CASE("numeric columns' headings are right-aligned over their values")
     const auto& runs = frame.front().text;
     for (const auto& column : trackColumns())
     {
+        if (!toggleLetter(column.field).empty())
+        {
+            continue; // the buttons have no headings
+        }
         const auto heading = std::ranges::find_if(
             runs,
             [&](const TextRun& run)
@@ -715,8 +756,20 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
         return std::ranges::any_of(frame.front().text, [&](const TextRun& run)
                                    { return run.text.find(text) != run.text.npos; });
     };
+    // The buttons after Name have no headings, so measure to Output port, past them.
+    int buttons = 0;
+    bool afterName = false;
+    for (const auto& column : trackColumns())
+    {
+        if (column.field == TrackField::Port)
+            break;
+        if (afterName)
+            buttons += column.width * 10;
+        afterName = afterName || column.field == TrackField::Name;
+    }
+    const auto nameEnd = [&] { return headingX(U"Output port") - buttons; };
     const int start = headingX(U"Name");
-    const int usual = headingX(U"Mute");
+    const int usual = nameEnd();
     CHECK(usual - start == trackColumns()[1].width * 10);
 
     const std::u32string thirty = U"A name of thirty characters ok";
@@ -724,12 +777,12 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
     t.ws.resize(1000, 600, {10, 20}); // too narrow for the whole table
     t.enter(thirty);
     CHECK(shown(thirty));
-    CHECK(headingX(U"Mute") - start == 31 * 10);
+    CHECK(nameEnd() - start == 31 * 10);
 
     // Cut short at 32 characters, the whole name being in the bar above and the inspector.
     const auto longer = thirty + U" and a good deal more than that, and then some";
     t.enter(longer);
-    CHECK(headingX(U"Mute") - start == 33 * 10);
+    CHECK(nameEnd() - start == 33 * 10);
     CHECK(shown(thirty + U" …"));
     int others = 0;
     for (const auto& column : trackColumns())
@@ -740,10 +793,10 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
 
     // A wider window has room for more, without the table going past its edge.
     t.ws.resize(wide(40), 600, {10, 20});
-    CHECK(headingX(U"Mute") - start == 40 * 10);
+    CHECK(nameEnd() - start == 40 * 10);
 
     t.type(U"uu");
-    CHECK(headingX(U"Mute") - start == trackColumns()[1].width * 10);
+    CHECK(nameEnd() - start == trackColumns()[1].width * 10);
 }
 
 TEST_CASE("a field that typing would replace is highlighted whole, until the cursor moves")
@@ -800,7 +853,7 @@ TEST_CASE("Backspace and Delete clear a value highlighted whole, and only then")
     t.press(key);
     t.press(NamedKey::Enter);
     CHECK(t.track().name.empty());
-    t.type(U"6l"); // channel
+    t.column(TrackField::Channel);
     REQUIRE(t.track().channel > 0);
     const auto channel = t.track().channel;
     t.press(NamedKey::Enter);
@@ -862,7 +915,8 @@ TEST_CASE("the conductor has no mute or solo to toggle")
 
 namespace
 {
-const std::u32string_view kToProgram = U"9l";
+// From the Name column, where the view opens, to Program.
+const std::u32string kToProgram = columnsBetween(TrackField::Name, TrackField::Program, U'l');
 
 bool inspectorHas(const Frame& frame, std::u32string_view wanted)
 {
@@ -906,7 +960,7 @@ TEST_CASE("the Program column sets a track's setup, with empty leaving it unset"
 TEST_CASE("Tab goes through the bank fields and Program, and on to the later columns")
 {
     Tracking t;
-    t.type(U"7l"); // the bank's MSB
+    t.column(TrackField::BankMsb);
     t.press(NamedKey::Enter);
     t.type(U"1");
     t.press(NamedKey::Tab);
@@ -927,7 +981,7 @@ TEST_CASE("Tab goes through the bank fields and Program, and on to the later col
 TEST_CASE("a track field is edited in its cell, not the inspector")
 {
     Tracking t;
-    t.type(U"6l"); // channel, numeric and so on the right of its column
+    t.column(TrackField::Channel); // numeric and so on the right of its column
     const auto cellRun = [&](Role background)
     {
         const auto frame = t.ws.frame();
@@ -1081,7 +1135,7 @@ struct ChoosingPorts : Tracking
                 lookup.ports = ports;
                 return lookup;
             });
-        type(U"5l");
+        type(columnsBetween(TrackField::Name, TrackField::Port, U'l'));
     }
     std::vector<std::string> ports{"Pro-800", "loopMIDI Port 1", "loopMIDI Port 2"};
 
@@ -1388,7 +1442,8 @@ TEST_CASE("the tracks being moved are shown, and the status line says what to do
 
 namespace
 {
-const std::u32string_view kToQuantizeButton = U"4l";
+const std::u32string kToQuantizeButton =
+    columnsBetween(TrackField::Name, TrackField::Quantize, U'l');
 const std::u32string_view kToQuantizeColumn = U"$"; // the last
 } // namespace
 
@@ -1508,7 +1563,7 @@ TEST_CASE("the status line says what a field takes while it's edited")
     Tracking t;
     const auto status = [&] { return inspectorHas(t.ws.frame(), U"1 to 16; Up and Down step it"); };
     CHECK_FALSE(status());
-    t.type(U"6l"); // channel
+    t.column(TrackField::Channel);
     t.press(NamedKey::Enter);
     CHECK(status());
     t.press(NamedKey::Escape);
@@ -1563,12 +1618,25 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
         }
         return -1;
     };
-    const auto mute = headingX(U"Mute");
-    const auto solo = headingX(U"Solo");
-    const auto chase = headingX(U"Chase");
-    const auto quant = headingX(U"Quant");
-    CHECK(solo - mute == chase - solo);
-    CHECK(quant - chase == chase - solo);
+    // The buttons have no headings, their letters showing whether on or off, a cell apart.
+    for (const auto heading : {U"Mute", U"Solo", U"Arm", U"Thru", U"Chase", U"Quant"})
+    {
+        CHECK(headingX(heading) == -1);
+    }
+    std::vector<int> badges;
+    for (const auto letter : {U" M ", U" S ", U" R ", U" T ", U" C ", U" Q "})
+    {
+        const auto frame = t.ws.frame();
+        const auto run =
+            std::ranges::find_if(frame.front().text, [&](const TextRun& candidate)
+                                 { return candidate.y == 20 && candidate.text == letter; });
+        REQUIRE(run != frame.front().text.end());
+        badges.push_back(run->x);
+    }
+    for (std::size_t i = 1; i < badges.size(); ++i)
+    {
+        CHECK(badges[i] - badges[i - 1] == 4 * 10);
+    }
 
     const auto port = headingX(U"Output port");
     const auto channel = [&] { return headingX(U"Ch"); };
@@ -1581,5 +1649,86 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
                             { track.port = "A port with quite a long name, longer than room"; });
                     });
     CHECK(channel() - port == 25 * 10);
-    CHECK(narrow == trackColumns()[6].width * 10);
+    CHECK(narrow ==
+          std::ranges::find(trackColumns(), TrackField::Port, &TrackColumn::field)->width * 10);
+}
+
+TEST_CASE("arming a track says so, and names any others still armed")
+{
+    Tracking t;
+    const auto first = t.track(0).name;
+    const auto second = t.track(1).name;
+    t.type(U",ra");
+    CHECK(t.track().arm);
+    CHECK(t.ws.message() == "Armed: " + first);
+    CHECK(t.ws.messageKind() == MessageKind::Information);
+
+    // Another armed while the first still is: allowed, but said gently, as it may be a mistake.
+    t.type(U"j,ra");
+    CHECK(t.track(1).arm);
+    CHECK(t.ws.message() == "Armed: " + second + "; also armed: " + first);
+    CHECK(t.ws.messageKind() == MessageKind::Warning);
+
+    t.type(U",ra");
+    CHECK_FALSE(t.track(1).arm);
+    CHECK(t.ws.message() == "Disarmed: " + second);
+    t.type(U"uuu"); // each one undo step
+    CHECK_FALSE(t.track(0).arm);
+    CHECK_FALSE(t.track(1).arm);
+}
+
+TEST_CASE("arm and thru toggle on a selection of whole rows, as one undo step")
+{
+    Tracking t;
+    const auto before = t.document.song();
+    t.type(U"Vj,ra");
+    CHECK(t.track(0).arm);
+    CHECK(t.track(1).arm);
+    CHECK_FALSE(t.track(2).arm);
+    t.type(U",rt");
+    CHECK_FALSE(t.track(0).thru);
+    CHECK_FALSE(t.track(1).thru);
+    t.press(NamedKey::Escape);
+    t.type(U"uu");
+    CHECK(t.document.song() == before);
+}
+
+TEST_CASE("thru says whether input reaches the track, and shows unfilled until it's armed")
+{
+    Tracking t;
+    REQUIRE(t.track().thru);
+    t.column(TrackField::Thru);
+    const auto badge = [&]
+    {
+        const auto frame = t.ws.frame();
+        const auto run =
+            std::ranges::find_if(frame.front().text, [](const TextRun& candidate)
+                                 { return candidate.y == 20 && candidate.text == U" T "; });
+        REQUIRE(run != frame.front().text.end());
+        const bool filled = std::ranges::any_of(
+            frame.front().under, [&](const Shape& shape)
+            { return shape.rect.x == run->x && shape.role == Role::TrackThru; });
+        return std::pair{run->style.foreground, filled};
+    };
+    CHECK(badge() == std::pair{Role::TrackThru, false});
+    CHECK(inspectorHas(t.ws.frame(), U"Thru reaches it once it's armed"));
+    t.type(U",ra");
+    CHECK(badge() == std::pair{Role::ToggleText, true});
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Thru reaches it once it's armed"));
+    t.type(U",rt");
+    CHECK(t.ws.message() == "Thru off: MIDI input isn't sent to this track");
+    CHECK(badge() == std::pair{Role::Dim, false});
+    t.type(U",ra,rt"); // disarmed, then thru on again
+    CHECK(t.ws.message() == "Thru on: MIDI input is sent to this track once it's armed");
+}
+
+TEST_CASE("the inspector says what the column under the cursor is")
+{
+    Tracking t;
+    for (const auto& column : trackColumns())
+    {
+        t.column(column.field);
+        INFO(column.heading);
+        CHECK(inspectorHas(t.ws.frame(), decodeUtf8(trackFieldDescription(column.field))));
+    }
 }
