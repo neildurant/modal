@@ -1847,11 +1847,14 @@ TEST_CASE("operators and replacement objects follow a moved note selection")
     }
     SECTION("a colon transform takes the moved note")
     {
+        r.ws.setLineHandler([&](const std::string& line)
+                            { r.ws.report(r.registry.runLine(line)); });
         r.type(U":transpose +1");
         r.press(Key::of(NamedKey::Enter));
         const auto& events = r.document.song().events(id);
-        CHECK(std::ranges::any_of(events.all(), [](const core::Event& event)
-                                  { return std::get<core::Note>(event.data).pitch == 33; }));
+        CHECK(std::ranges::any_of(
+            events.all(), [](const core::Event& event)
+            { return event.tick == 0 && std::get<core::Note>(event.data).pitch == 33; }));
     }
     SECTION("another object replaces it from its moved origin")
     {

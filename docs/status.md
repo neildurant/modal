@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: playback quantise is tried and published. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: the four findings from the latest review are fixed locally and pass the full Linux checks; a UI trial is pending before publication. Current published cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -27,14 +27,23 @@ What each milestone holds is in [design.md](design.md), under Milestones.
 
 ### Review of changes from 4 November to `cd49989`
 
-Reviewed on 9 November 2026, including 4 November. All four fixes are implemented locally; full Linux validation and a UI trial are pending:
+Reviewed on 9 November 2026, including 4 November. All four fixes are implemented and committed locally; full Linux validation passes, with a UI trial pending before publication:
 
 1. **Fixed: operators and replacement objects follow a moved selection.** The remembered origin and the selection before its object move with it; operators take the moved selection rather than resolving the old object again. GCC Debug regressions first reproduced the failure, then passed at both PPQNs for deletion, yanking, `gv`, colon transforms, replacement objects and a moved bar's time, with undo checked.
 2. **Fixed: changing the editing grid does not repeat an already-sent quantised note.** Playback plans record the effective quantise grid, so the scheduler recognises changes when quantise follows the editing grid. A GCC Debug regression first reproduced the duplicate, then passed at all three core-test PPQNs, checking the note-ons and releases, an unsent note's new time, and an independent fixed quantise grid.
 3. **Fixed: pedalling stays with a note left unquantised after a clash.** Pinned notes contribute a zero movement to the quantiser's movement table. A GCC Debug regression first reproduced the incorrect pedal times, then passed at all three core-test PPQNs for sustain, sostenuto and soft pedal, including a later pedal that should follow a moved note.
 4. **Fixed: a selected nudge before the song is refused whole.** Batch validation sees the unclamped starts, so one note reaching before zero leaves the song, cursor, selection and undo history unchanged and reports the refusal. A GCC Debug regression first reproduced the partial move, then passed at both PPQNs and checked that the selection can still move in the other direction and undo. Single-note nudges retain their existing clamp at zero.
 
-All four were reproduced with a standalone C++ review harness against the current libraries at both 960 and 96 PPQN. The harness is in `/tmp/modal_review.cpp` for this session; permanent regressions still need adding with the fixes. Native GCC Debug and Clang Debug builds and their suites passed: 817 registered tests each, three platform/MIDI skips, no failures. Whole-tree formatting and `git diff --check` passed. Sanitizers, real desktop checks and MIDI hardware checks were not run for this review.
+The initial review reproduced all four with a standalone C++ harness at both 960 and 96 PPQN. Permanent regressions now cover them in `piano_roll_view_test.cpp`, `scheduler_test.cpp` and `playback_plan_test.cpp`. The fix commits are `fecc99d` (moved selections), `91416c5` (effective quantise grid), `6803fcc` (pedal following) and `25d0c91` (batch nudges).
+
+`tools/check-linux.sh` passes on the final implementation and regression tests: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, with 822 registered tests per configuration, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop or MIDI hardware checks have been run, and nothing from this fix step has been pushed.
+
+For the pending UI trial, run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song:
+
+- In the piano roll, on a note, try `vin`, Alt-Up, then `d`. It should delete the moved note. Undo restores it at its moved pitch, and another undo restores its original pitch. Repeat with Escape and `gv` before deleting, and with `ic` after moving to replace the selection with its chord.
+- On a sparse bar, try `vib`, Alt-}, then `d`. Deletion should act at the moved selection's time. Undo the deletion and move afterwards.
+- With notes at tick zero and later, try `ggv]b]b`, then Alt-Shift-Left. The whole nudge should be refused with every note, the cursor and the selection unchanged. Alt-Shift-Right should still move the selection; Escape and undo should restore it.
+- If listening through MIDI, enable playback quantise with its grid following the editing grid, then change `:grid 1/16` to `:grid 1/4` during playback. Already-played notes should not repeat. The message tests also cover pedalling after a note left in place by a clash; hearing these cases on real hardware remains unmeasured.
 
 ### Earlier review fixes
 
