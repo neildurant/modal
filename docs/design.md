@@ -131,7 +131,9 @@ Editing follows Vim's model: `[count] operator [count] range-or-object`, with `.
 - **Tracks' commands** under `, t`: add, delete, rename, mute, solo and reorder (`o`, for order, leaving `r` for renaming).
 - **Search:** across tracks in the arrangement, drum-map names (`/kick`), matching controllers highlighted in the lane, interval and rhythm patterns.
 - **Ripple to the end of a track** (`:ripple track`), for rare cases.
-- **Undo:** an undo tree; a jump list (`Ctrl-o` / `Ctrl-i`); Vim's other registers (`"0`, `"_`, `"+`).
+- **Undo:** an undo tree; Vim's other registers (`"0`, `"_`, `"+`).
+- **A jump list (requested November 2026):** `Ctrl-o` and `Ctrl-i` go back and forward through the places jumped from and to, as in Vim, across views: jump to the bridge to check something, and `Ctrl-o` goes straight back to where editing was. Which moves count as jumps (marks, `gg`/`G`, sections, search, opening another view) is to decide, as is how it sits with `` ` `` / `'`, which already go back to before the last jump.
+- **Paste history (requested November 2026):** as Emacs's kill ring and yank-pop: straight after a put, one key replaces what was put with the copy before, and again with the one before that, so a phrase copied a few moves ago isn't lost. Vim's numbered registers (`"1` to `"9`) are the same history by name; the key, how far back it goes, and whether deletes go into it as well as yanks are to decide.
 - **Visual mode:** `:select pitch C1 in section` and drum-map names; hand-picked notes and pitch rows apart, with folding.
 
 ## MIDI transforms
@@ -685,6 +687,12 @@ Distinctive features to consider after version 1. Not committed to any milestone
 - **Musical search and replace:** `/` searches by interval pattern or rhythm, in any key; `n` jumps between matches; `:s` substitutes across the song.
 - **Linked variations:** copies that stay linked to the original, optionally with a transform (inverted, transposed, half speed); editing the original updates every variation.
 - **Retrospective capture:** MIDI input is always buffered; one key turns the last few minutes of playing into a take.
+- **A notebook (requested November 2026):** a store of musical fragments kept across songs and sessions, outside any song.
+  - **Context:** each fragment remembers where and when it came from (the date, the song and section, its key, tempo and meter), and can have a name and tags ("fill", "chorus idea", "7/8 riff").
+  - **In:** yank any selection into it; record straight into it; and retrospective capture can send the last few minutes of playing there, so stray noodling ends up somewhere safe and searchable.
+  - **Out:** a palette prefix searches fragments by name, tag or source song, and auditions them before putting one in; putting can optionally transpose into the current song's key and fit its tempo.
+  - **Snippets are the same feature:** a strum pattern or voicing used often is a fragment used often; fields such as key or length make one a template rather than a fixed phrase.
+  - **To decide:** where it's stored (in the configuration directory, as a file of its own in the song format, perhaps), how it fits with registers and the paste history, and what fitting a tempo means for a fragment's timing.
 
 **Recording**
 - **Half-speed recording:** record at half the tempo (or another fraction) and play back at full speed, for passages too fast to play in; similar uses to step entry.
