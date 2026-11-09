@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: the four findings from the latest review are fixed and pass the full Linux checks; the moved-note deletion and refused-nudge UI trials are confirmed. Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: Freeze is implemented and committed locally, with full Linux checks passing; its UI trial is pending before publication. Current published cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -122,13 +122,28 @@ Tried in the real window and published: the `Q` button and Quantise column with 
 
 ## Freeze
 
-Implemented locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. The 19 focused GCC Debug tests pass, with 551 assertions, at multiple PPQNs. Full Linux validation is in progress and the UI trial is outstanding; this step has not been published.
+Implemented and committed locally, following the rules agreed on 9 November 2026. Freeze applies all or one playback transform to the whole current track, or selected Tracks rows, through a list opened with `, t f` or `:track-freeze`. The timing-order restriction, batch validation, invalid-result refusals, section ownership and rounding rules are recorded in design.md, decisions.md and grammar.md. Design: `4e1515a`; core operation and shared playback rules: `87bcb0b`; chooser and batch command: `8e000f7`. This step has not been published; the UI trial below is outstanding.
+
+- The 19 focused GCC Debug tests pass, with 551 assertions. Core timing tests run at 960, 6720 and 96 PPQN; Workspace tests run at 960 and 96. They cover matching playback messages and times, independent transform choices, retaining settings, pitch and start refusals, millisecond rounding and collisions, section ownership and song growth, quantise fallback, the list and disabled choices, atomic batches, undo/redo, cancellation, bypass, transport restrictions and dot repeat.
+- The final `tools/check-linux.sh` passes: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 841 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. No local Windows build is required; CI will check Windows after publication.
+- The chooser was rendered and inspected through SDL's offscreen driver at widths of 1200 and 640 pixels in both dark and light themes. The selected item and the dimmed Time offset reason are readable. No real desktop was driven, and MIDI hardware timing has not been tested.
+- `build/linux-gcc/apps/Debug/modal` has been rebuilt and checked to be newer than every tracked application build input.
+
+### Pending Freeze UI trial
+
+Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song, with playback stopped:
+
+1. In Tracks (`gt`), give a track Transpose `+12`, Velocity offset `+10` and Time offset `+1/16`, and turn playback quantise on (`, t q`). Open `, t f`: All should be selected, Up/Down should choose, and Time offset should be dim with "Freeze quantise first". Escape should change nothing. Try resizing and both themes.
+2. Choose Quantise alone. Q should turn off while transpose, velocity and time offset stay set. The notes should take the quantised timing. Reopen the list: Time offset should now be available. Undo should restore the notes and Q together. Direct commands such as `:track-freeze quantise` should give the same result.
+3. Choose All. The notes should take the transposed pitches, adjusted velocities and offset timing; the chosen playback transforms should reset, with quantise parameters retained. Undo and redo should restore events and settings together. Bank/program setup and routing should stay set.
+4. Give two tracks different playback settings, select their whole rows with `Vj`, then `, t f`. Freeze should act on both as one undo step. A refused batch, such as a transpose outside MIDI range or a negative offset moving an event before zero, should change neither track and explain why.
+5. Space should keep its transport meaning outside the chooser. Freeze while playing or awaiting a stop should be refused. With quantise bypass on and Q enabled on a chosen track, All and Quantise should be dimmed; Transpose and Velocity should remain available. Playback comparisons through real MIDI are useful, but remain unmeasured here.
 
 ## Next
 
 The three Tracks steps are built. How `, e` asks for an event is a stop-gap, accepted as not very friendly for now, to refine later; the note on real MIDI hardware above still stands. Settle the next step's open questions before implementation:
 
-1. Complete Freeze's implementation, validation and UI trial under the agreed rules above. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
+1. Complete Freeze's UI trial before publication. Column configuration and song-tempo fallback are separate open questions. No whole-track Loop column is planned.
 
 The rest of milestone 7 remains the outline view, ghost notes, split view, controller lanes beyond velocity, drum maps and folding, and several songs open at once. Raise each feature's open questions before implementing the parts they affect.
 
