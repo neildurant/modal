@@ -15,7 +15,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 
 ![The event list, playing](docs/screenshot.png)
 
-Milestone 7 has begun with the Tracks view, whole-track copying and musical timing controls. Numeric bank/program setup is in; playback quantise comes next, followed by the outline, ghost notes, controller lanes, drum maps and several songs at once, then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
+Milestone 7 has begun with the Tracks view, whole-track copying and musical timing controls. Numeric bank/program setup and playback quantise are in; next come the outline, ghost notes, controller lanes, drum maps and several songs at once, then step entry and loop recording. The plan for the rest is in [docs/design.md](docs/design.md).
 
 ## Building
 
@@ -86,13 +86,13 @@ Above the tracks is the section strip: `gs` (or `k` from the first track) goes t
 
 ### The Tracks view
 
-`gt` or `, v t` opens the track-settings table; `3gt` chooses track 3. Columns are number, name, mute, solo, chase, output port, channel, bank MSB and LSB, program, transpose, velocity offset, time offset, grid, and a new note's length and velocity. Numeric values align on the right. A track can ask for a bank and program when playback starts. Use `j/k` for rows, `h/l` for columns and Enter to edit in the cell; the output port is chosen from a list of the ports there are. `, t o` or Alt-Up and Alt-Down reorder tracks, here or in the arrangement. Mute, Solo and Chase show `-` when off and coloured `M`, `S` or `C` buttons when on, and Enter toggles them; `M` and `S` mute and solo the current track from any view. Chase starts notes already held when playback begins partway through them; it belongs to each track.
+`gt` or `, v t` opens the track-settings table; `3gt` chooses track 3. Columns are number, name, mute, solo, chase, output port, channel, bank MSB and LSB, program, transpose, velocity offset, time offset, grid, and a new note's length and velocity. Numeric values align on the right. A track can ask for a bank and program when playback starts. Use `j/k` for rows, `h/l` for columns and Enter to edit in the cell; the output port is chosen from a list of the ports there are. `, t o` or Alt-Up and Alt-Down reorder tracks, here or in the arrangement. The `Q` button, or `, t q`, quantises a track as it plays, with its settings in the inspector, and `, T q` bypasses it to compare. Mute, Solo and Chase show `-` when off and coloured `M`, `S` or `C` buttons when on, and Enter toggles them; `M` and `S` mute and solo the current track from any view. Chase starts notes already held when playback begins partway through them; it belongs to each track.
 
 `Vy` copies a complete track with its settings and section content; `Vjy` copies two. Normal `p/P` insert new tracks after/before, and Visual `p/P` replace selected rows. Copies retain their routing and mute/solo settings. Enter and numeric steps also edit selected rows together, as one undo step. Whole-track deletion requires `Vd`.
 
 Offsets accept milliseconds (`-40ms`), ticks (`+120t`) and musical composites (`+1/16-22t`). Musical offsets stay as typed. The note inspector groups pitch and velocities on the left, and has a row each for Start, Length and Ends across their coarse, fine and exact values. `e` edits those fields; `:set timingunit=grid` follows the editing grid, or a fraction such as `1/16` fixes the display unit.
 
-Whole-track paste initially requires the same PPQN and section names/order/lengths. Playback quantise and Freeze are later steps. See [the grammar](docs/grammar.md) for the detailed keys and limits.
+Whole-track paste initially requires the same PPQN and section names/order/lengths. Freeze, committing playback quantise and the other playback settings to the notes, is a later step. See [the grammar](docs/grammar.md) for the detailed keys and limits.
 
 ### The event list
 
