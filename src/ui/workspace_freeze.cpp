@@ -151,24 +151,18 @@ bool Workspace::freezeChoiceKey(const Key& key)
     }
     if (key.named == NamedKey::Up || key.named == NamedKey::Down)
     {
-        const auto& reasons = freezeReasons();
         const bool down = key.named == NamedKey::Down;
         auto& choice = *freezeChoice_;
-        auto next = choice.chosen;
-        while (down ? next + 1 < kFreezeParts.size() : next > 0)
-        {
-            next = down ? next + 1 : next - 1;
-            if (!reasons[next])
-            {
-                choice.chosen = next;
-                break;
-            }
-        }
+        choice.chosen = down                ? std::min(choice.chosen + 1, kFreezeParts.size() - 1)
+                        : choice.chosen > 0 ? choice.chosen - 1
+                                            : 0;
     }
     else if (key.named == NamedKey::Enter)
     {
         const auto choice = *freezeChoice_;
         auto result = applyFreeze(choice.tracks, kFreezeParts[choice.chosen]);
+        if (result.refused)
+            result.message = "Nothing done: " + result.message;
         report(result);
         if (!result.refused)
             freezeChoice_.reset();

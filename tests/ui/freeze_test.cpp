@@ -138,9 +138,9 @@ TEST_CASE("Freeze can commit quantise alone and time afterwards from the list")
     const auto id = f.track().id();
     const auto settings = f.track();
     f.type(U",tf");
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 3; ++i)
         f.press(NamedKey::Down);
-    REQUIRE(f.menu()[4].style.background == Role::Cursor); // Time is skipped
+    REQUIRE(f.menu()[4].style.background == Role::Cursor);
     f.press(NamedKey::Enter);
     CHECK_FALSE(f.track().quantize.on);
     CHECK(f.track().transpose == settings.transpose);
@@ -375,8 +375,8 @@ TEST_CASE("Freeze dims choices whose results would start before zero")
     CHECK(f.ws.message().find("before zero") != std::string::npos);
     f.press(NamedKey::Down);
     CHECK(f.menu()[2].style.background == Role::Cursor);
-    f.press(NamedKey::Up); // All is unavailable, so stay on Transpose
-    CHECK(f.menu()[2].style.background == Role::Cursor);
+    f.press(NamedKey::Up); // All remains selectable even though it is unavailable
+    CHECK(f.menu()[1].style.background == Role::Cursor);
     f.press(NamedKey::Escape);
     f.type(U":track-freeze all");
     f.press(NamedKey::Enter);
@@ -413,9 +413,20 @@ TEST_CASE("Freeze dims transforms with no active playback setting")
         CHECK(rows[i].style.foreground == Role::Dim);
         CHECK(rows[i].text.find(U"Nothing to freeze") != std::u32string::npos);
     }
-    f.press(NamedKey::Down);
+    for (std::size_t i = 2; i < rows.size(); ++i)
+    {
+        f.press(NamedKey::Down);
+        CHECK(f.menu()[i].style.background == Role::Cursor);
+    }
+    f.press(NamedKey::Down); // stop at the last entry
+    CHECK(f.menu()[5].style.background == Role::Cursor);
+    for (std::size_t i = 4; i > 0; --i)
+    {
+        f.press(NamedKey::Up);
+        CHECK(f.menu()[i].style.background == Role::Cursor);
+    }
     f.press(NamedKey::Enter);
-    CHECK(f.ws.message() == "Nothing to freeze");
+    CHECK(f.ws.message() == "Nothing done: Nothing to freeze");
     CHECK(f.document.song() == original);
     CHECK(f.document.version() == version);
     CHECK(f.ws.tracks().cursor() == cursor);
@@ -499,4 +510,33 @@ TEST_CASE("Freeze availability stays current and confirmation rechecks the opera
     }
     f.press(NamedKey::Escape);
     f.ws.setPlayer(nullptr);
+}
+
+TEST_CASE("Freeze can select a dimmed choice and explain it without changing anything")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Freezing f{ppqn};
+    const auto original = f.document.song();
+    const auto version = f.document.version();
+    const auto cursor = f.ws.tracks().cursor();
+    f.type(U",tf");
+    for (int i = 0; i < 4; ++i)
+        f.press(NamedKey::Down);
+    const auto rows = f.menu();
+    REQUIRE(rows.size() == 6);
+    CHECK(rows[5].style.background == Role::Cursor);
+    CHECK(rows[5].style.foreground == Role::Dim);
+    f.press(NamedKey::Enter);
+    CHECK(f.ws.message() == "Nothing done: Freeze quantise first, or choose All");
+    CHECK(f.document.song() == original);
+    CHECK(f.document.version() == version);
+    CHECK(f.ws.tracks().cursor() == cursor);
+    CHECK_FALSE(f.document.canUndo());
+    REQUIRE_FALSE(f.menu().empty());
+    CHECK(f.menu()[5].style.background == Role::Cursor);
+    f.press(NamedKey::Up);
+    CHECK(f.menu()[4].style.background == Role::Cursor);
+    f.press(NamedKey::Escape);
+    CHECK(f.menu().empty());
+    CHECK(f.document.song() == original);
 }
