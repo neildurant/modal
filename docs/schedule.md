@@ -33,7 +33,7 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 - [ ] **To do** — Save the relevant track and song recording settings.
 - [ ] **To do** — Automated coverage and real MIDI recording trials; record measured results in status.md.
 
-Settled 9 November 2026 (see design.md, Recording in the GUI): `R` records from the play-from marker, the `, r` group, replace/overdub a song setting shown in the status line, the `inputs` setting and independent arming with a note naming other armed tracks. Still to settle: each track's own input and the remaining saved settings. Review bounded, fair processing of heavy input here. Resolve blocking Windows SysEx delivery if needed for this work.
+Settled 9 November 2026 (see design.md, Recording in the GUI): `R` records from the play-from marker, the `, r` group, replace/overdub a song setting shown in the status line, the `inputs` setting and independent arming with a note naming other armed tracks. Settled 10 November 2026 for step 8.2: each track's input in an Input column after Output port, input activity as an `In` light with the last note on the status line, and a `thru` setting with `, T t` (see design.md). Still to settle: the remaining saved settings. Review bounded, fair processing of heavy input here. Resolve blocking Windows SysEx delivery if needed for this work.
 
 ## 9. Controllers, drums and folding
 

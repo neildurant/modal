@@ -426,6 +426,8 @@ Three ways to reach any action: keys, for speed and muscle memory; the hint menu
 
 ## Input and recording
 
+**Step 8.2's choices (decided 10 November 2026).** Each track's Input column goes after Output port, so the two ports read together. Input activity shows on the status line, a light and the last note, so it's seen in every view, rather than only on the armed tracks' buttons in Tracks. Switching Thru everywhere is the machine's, a `thru` setting with `, T t`, since it's for the keyboard in use (local control) rather than the song.
+
 **Recording in the GUI (decided November 2026, for milestone 8).** Settled before the milestone's first step, as the schedule asks:
 
 - **Inputs are a `modalrc` setting,** `inputs`, every input port found by default, since ports differ between machines and a song's list would break when it moves to another until port aliases exist. Each track's own input, saved with the song, follows later in the milestone, as the design has always allowed. Modal's own ports are left out of the inputs, as listening to them would send Thru round in a loop.

@@ -168,7 +168,7 @@ Milestone 8's decisions were settled on 9 November 2026 (design.md, Recording in
 
 ## Next
 
-Next is step 8.2: each track's own input, input activity and controls for trying an instrument. Linear recording with `R`, the metronome, count-in and pre-roll follow. Step entry and loops remain later milestones.
+Next is step 8.2, its choices settled 10 November 2026 but nothing built yet: each track's own input (an Input column after Output port, saved with the song, thru and recording filtered by it in the core), an `In` light with the last note on the status line, and a `thru` setting with `, T t`; see design.md's milestone 8 To-decide list. CI for `8da3d60` was still running at the end of the session; check it first. Linear recording with `R`, the metronome, count-in and pre-roll follow. Step entry and loops remain later milestones.
 
 Controller lanes, drum maps and folding follow in milestone 9, including folding to named drum-map rows even without events. Multiple songs, backups, jump history and paste history follow in milestone 10. Outline and other additional views move later. MIDI clock output and transport/sync are now explicitly unscheduled, alongside the other someday maybe items. Column configuration and song-tempo fallback wait for polish. No whole-track Loop column is planned. The recent playback features still need the real MIDI trials noted above.
 

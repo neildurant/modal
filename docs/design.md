@@ -826,7 +826,8 @@ Settled one milestone at a time, at the start of that milestone's work. Add to t
 
 - [x] Recording keys, record point and replace/overdub indication: `R` from the play-from marker, the `, r` group, replace or overdub a song setting shown in the status line (decided November 2026; see Recording in the GUI).
 - [x] Input selection and arming: the `inputs` setting in `modalrc`, every input by default; independent arming, with a gentle note when others are armed (decided November 2026).
-- [ ] Each track's own input, input activity and monitoring controls, and the rest of the saved recording settings (milestone 8's second step).
+- [x] Each track's own input, input activity and switching Thru everywhere (decided 10 November 2026, for step 8.2): a track's `input` names an input port, as `port` names an output, or is empty for every input listened to; saved with the song (`input="…"`), resolved when the plan is built as output ports are, so thru and recording take a track's input only from its port; a track naming an input not found is left out of thru and the input reported missing. An Input column after Output port in Tracks, with the same chooser, listing the input ports; dim with a warning in the inspector when not found. Input activity: `In` on the status line's right, lit for a moment as input arrives, with the last note played (`In C4 96`), in every view. A `thru` setting in `modalrc`, on by default, the machine's (as for a keyboard with local control on), with `, T t` to switch it; the status line says when it's off.
+- [ ] The rest of the saved recording settings.
 - [ ] Song growth, undo and unavailable-input/overflow behaviour in the GUI, preserving the engine's recording rules.
 
 **Milestone 9: controllers, drums and folding**
