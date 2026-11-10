@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 10 November 2026: the hardening before step 8.2 passes the full Linux matrix; the moved-selection and undo-boundary trials are accepted. Publication is authorised; CI validation of the pushed commits remains to be checked. See [schedule.md](schedule.md) for work order and item states. The earlier published MIDI input reset fix passed [CI](https://github.com/neildurant/modal/actions/runs/42800733689).*
+*Last updated 10 November 2026: the hardening before step 8.2 passes the full Linux matrix; the moved-selection and undo-boundary trials are accepted. Published through `7a77fb6`; [CI passed on Linux and Windows](https://github.com/neildurant/modal/actions/runs/42849396506). See [schedule.md](schedule.md) for work order and item states. The earlier published MIDI input reset fix passed [CI](https://github.com/neildurant/modal/actions/runs/42800733689).*
 
 ## Current handoff
 
@@ -191,7 +191,7 @@ The approved sequence is complete: moved-selection membership, a testable input 
 
 ## Next
 
-Step 8.2 is next in [schedule.md](schedule.md#8-basic-gui-recording), after publication and CI validation of the completed hardening. Its input/monitoring behaviour remains agreed in [design.md](design.md#per-track-input-and-monitoring). Broader editor refactoring is separate from the approved hardening sequence.
+Step 8.2 is next in [schedule.md](schedule.md#8-basic-gui-recording). The completed hardening is published through `7a77fb6` and passed [CI on Linux and Windows](https://github.com/neildurant/modal/actions/runs/42849396506). Its input/monitoring behaviour remains agreed in [design.md](design.md#per-track-input-and-monitoring). Broader editor refactoring is separate from the approved hardening sequence.
 
 The documentation ownership cleanup on 10 November 2026 removed parallel milestone/progress lists from design.md and this handoff. Historical decisions were preserved in decisions.md; unresolved design choices remain in design.md. The schedule separates delivered input/Arm/Thru work from step 8.2 and records the already-delivered program markers and ratio/percentage stretch transform. This changes no agreed feature order. All 80 settled checklist entries were preserved; document links/anchors, numbering, the unscheduled list, formatting and diff checks were verified.
 
