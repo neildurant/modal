@@ -210,3 +210,7 @@ Schedule documentation checks: local Markdown links, the milestone sequence, che
 - **Visual selections made by an object** remember it (`Selection::object`), and operators on them run as that operator with that object; a table-driven test in `tests/ui/visual_test.cpp` checks `v{count}{object}d` against `d{count}{object}` everywhere.
 - **Strip-only commands** carry a `-strip` suffix (`section-join-strip`), so the generic ones (`section-join`, under `, s`) can work from any view.
 - **Building on Windows:** Neil's machine has the WSL distro `Ubuntu-24.04` for the Linux builds (`/opt/vcpkg` there). See AGENTS.md for the checks before pushing.
+
+## CI follow-up for input replacement (10 November 2026)
+
+[CI for `76d8ba0`](https://github.com/neildurant/modal/actions/runs/42798631597) passed every Linux job, but MSVC rejected an implicit conversion from the pedal test's integer initializer list to `uint8_t` (C4244, warnings treated as errors). The regression now uses an explicitly typed `std::array<std::uint8_t, 3>`; no product behaviour changed. Native GCC Debug and Clang Debug both pass all 861 registered tests after this correction, with the same expected platform/MIDI skips; whole-tree formatting and `git diff --check` pass. The correction is isolated from the local documentation-ownership cleanup; the new CI run will check Windows again.

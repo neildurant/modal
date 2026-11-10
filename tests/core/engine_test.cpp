@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -595,7 +596,7 @@ TEST_CASE("resetting inputs releases notes and pedals before input IDs can be re
     engine.step();
     REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, clock.time));
     REQUIRE(engine.receive(InputId{1}, std::vector<std::uint8_t>{0x90, 64, 100}, clock.time));
-    for (const std::uint8_t pedal : {64, 66, 67})
+    for (const auto pedal : std::array<std::uint8_t, 3>{64, 66, 67})
     {
         REQUIRE(
             engine.receive(InputId{0}, std::vector<std::uint8_t>{0xB0, pedal, 100}, clock.time));
