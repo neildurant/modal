@@ -93,14 +93,16 @@ void TracksView::go(std::size_t index)
 
 int TracksView::columnWidth(const TrackColumn& column) const
 {
-    if (column.field == TrackField::Port)
+    if (column.field == TrackField::Port || column.field == TrackField::Input)
     {
         // As wide as the longest port a track names, up to 24 characters, the whole name in
         // the bar above and the inspector.
         std::size_t longest = 0;
         for (const auto& track : document_.song().tracks())
         {
-            longest = std::max(longest, decodeUtf8(track->port).size());
+            longest = std::max(
+                longest,
+                decodeUtf8(column.field == TrackField::Input ? track->input : track->port).size());
         }
         return std::clamp(static_cast<int>(longest) + 1, column.width, 24 + 1);
     }
@@ -296,9 +298,11 @@ Inspection TracksView::inspection() const
     {
         result.fields.push_back({"Not armed", "Thru reaches it once it's armed"});
     }
-    if (field == TrackField::Port && portMissing(track))
+    if ((field == TrackField::Port || field == TrackField::Input) &&
+        portMissing(track, field == TrackField::Input))
     {
-        InspectorField missing{"Port not found", track.port};
+        InspectorField missing{field == TrackField::Input ? "Input not found" : "Port not found",
+                               field == TrackField::Input ? track.input : track.port};
         missing.warning = true;
         result.fields.push_back(std::move(missing));
     }
@@ -336,7 +340,8 @@ Inspection TracksView::editableFields() const
     for (const auto& column : trackColumns())
     {
         if (column.field != TrackField::Number && column.field != TrackField::Port &&
-            column.field != TrackField::QuantizeSummary && !isToggle(column.field))
+            column.field != TrackField::Input && column.field != TrackField::QuantizeSummary &&
+            !isToggle(column.field))
         {
             const auto text = trackFieldText(column.field, track, row());
             result.fields.push_back({std::string{column.heading}, text, true, text});
@@ -522,24 +527,27 @@ bool TracksView::openField()
         quantizeEditing_ = editor_.open(quantizeFields());
         return quantizeEditing_;
     }
-    if (trackColumns()[column_].field != TrackField::Port)
+    if (trackColumns()[column_].field != TrackField::Port &&
+        trackColumns()[column_].field != TrackField::Input)
     {
         return editor_.open(editableFields(), trackColumns()[column_].heading);
     }
     const auto& track = *document_.song().track(*cursor_.track);
     PortChoice choice;
-    choice.current = track.port;
+    choice.input = trackColumns()[column_].field == TrackField::Input;
+    choice.current = choice.input ? track.input : track.port;
     choice.ports.emplace_back();
-    for (auto& port : host_.outputPorts())
+    for (auto& port : choice.input ? host_.inputPorts() : host_.outputPorts())
     {
         choice.ports.push_back(std::move(port));
     }
-    const auto at = std::ranges::find(choice.ports, track.port);
+    const auto at = std::ranges::find(choice.ports, choice.current);
     if (at == choice.ports.end())
     {
-        choice.ports.push_back(track.port);
+        choice.ports.push_back(choice.current);
         choice.chosen = choice.ports.size() - 1;
-        choice.gone = choice.chosen;
+        if (!choice.input || host_.player() == nullptr || portMissing(track, true))
+            choice.gone = choice.chosen;
     }
     else
     {
@@ -595,8 +603,9 @@ std::vector<std::size_t> TracksView::portMatches() const
     for (std::size_t i = 0; i < portChoice_->ports.size(); ++i)
     {
         const auto& port = portChoice_->ports[i];
-        if (folded(decodeUtf8(port.empty() ? "default" : port)).find(wanted) !=
-            std::u32string::npos)
+        if (folded(
+                decodeUtf8(port.empty() ? (portChoice_->input ? "All inputs" : "default") : port))
+                .find(wanted) != std::u32string::npos)
         {
             result.push_back(i);
         }
@@ -664,13 +673,14 @@ std::optional<bool> TracksView::runPortChoice(std::string_view command)
             return true;
         }
         const auto port = choice.ports[matches[choice.chosen]];
+        const auto field = choice.input ? TrackField::Input : TrackField::Port;
         // On a selection, the others may not have it yet even if the cursor's track does.
         const bool changed = port != choice.current || selected().size() > 1;
         portChoice_.reset();
         host_.stopTyping();
         if (changed)
         {
-            if (auto why = edit(TrackField::Port, port))
+            if (auto why = edit(field, port))
             {
                 host_.refuse(std::move(*why));
                 return true;
@@ -684,11 +694,14 @@ std::optional<bool> TracksView::runPortChoice(std::string_view command)
     return true;
 }
 
-bool TracksView::portMissing(const core::Track& track) const
+bool TracksView::portMissing(const core::Track& track, bool input) const
 {
     const auto* player = host_.player();
-    return player != nullptr && !track.port.empty() &&
-           std::ranges::find(player->missingPorts(), track.port) != player->missingPorts().end();
+    if (!player)
+        return false;
+    const auto& name = input ? track.input : track.port;
+    const auto& missing = input ? player->missingInputs() : player->missingPorts();
+    return !name.empty() && std::ranges::find(missing, name) != missing.end();
 }
 
 void TracksView::addPortChoice(Frame& frame) const
@@ -699,7 +712,7 @@ void TracksView::addPortChoice(Frame& frame) const
     const auto label = [&](std::size_t match)
     {
         const auto& port = portChoice_->ports[matches[match]];
-        return decodeUtf8(port.empty()                          ? std::string{"default"}
+        return decodeUtf8(port.empty() ? std::string{portChoice_->input ? "All inputs" : "default"}
                           : matches[match] == portChoice_->gone ? port + " (not found)"
                                                                 : port);
     };
@@ -1076,8 +1089,10 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style = {Role::CursorText, Role::Cursor, kPlain};
             }
-            if (track && ((column.field == TrackField::Port && portMissing(*track)) ||
-                          (column.field == TrackField::QuantizeSummary && !track->quantize.on)))
+            if (track &&
+                (((column.field == TrackField::Port || column.field == TrackField::Input) &&
+                  portMissing(*track, column.field == TrackField::Input)) ||
+                 (column.field == TrackField::QuantizeSummary && !track->quantize.on)))
             {
                 style.foreground = Role::Dim;
             }

@@ -113,6 +113,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `ownports`   | `1`     | How many MIDI output ports of its own Modal makes, for other programs such as a plugin host to connect to (0 to 16; Linux only, since Windows can't) |
 | `ownportname` | `Modal` | The name of Modal's own ports: one is `Modal`, several are `Modal 1`, `Modal 2` and so on |
 | `port`       | (empty) | The output port for tracks without one: its name, or any part of it that matches only one port, or empty for the first port found |
+| `thru`       | `on` | Send MIDI input through to armed tracks whose own Thru is on; `, T t` switches it. Held notes and pedals still finish when switched off. This is a machine setting, independent of the song |
 | `inputs`     | (empty) | The MIDI input ports to listen to, for recording and thru: names, or parts of names that match only one port, separated by commas, or empty for every input port found (up to 16). Modal's own ports are never listened to |
 | `quantizemarks` | `on` | Whether the piano roll marks where a note of a track quantised as it plays will be heard, when that's far from where it's stored; `, T m` turns it on or off |
 | `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |

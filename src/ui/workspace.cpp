@@ -1132,6 +1132,10 @@ std::optional<std::int64_t> Workspace::deadline() const
         const auto frame = lastTime_ + kFrameInterval;
         deadline = deadline ? std::min(*deadline, frame) : frame;
     }
+    if (inputLitUntil_)
+    {
+        deadline = deadline ? std::min(*deadline, *inputLitUntil_) : *inputLitUntil_;
+    }
     if (inputDue_)
     {
         deadline = deadline ? std::min(*deadline, *inputDue_) : *inputDue_;
@@ -1141,6 +1145,7 @@ std::optional<std::int64_t> Workspace::deadline() const
 
 bool Workspace::inputWoken(std::int64_t now)
 {
+    lastTime_ = now;
     inputDue_ = now + kInputSettle;
     return takeInput();
 }
@@ -1151,12 +1156,14 @@ bool Workspace::takeInput()
     {
         return false;
     }
-    player_->takeInput();
+    const bool activity = player_->takeInput() > 0;
+    if (activity)
+        inputLitUntil_ = lastTime_ + kInputLightTime;
     // Said once for each loss, rather than at every message, as a flood keeps losing more.
     const auto lost = player_->inputLost();
     if (lost == inputLost_)
     {
-        return false;
+        return activity;
     }
     const auto more = lost - inputLost_;
     inputLost_ = lost;
@@ -1207,6 +1214,11 @@ bool Workspace::wake(std::int64_t now)
     else if (wasPlaying_)
     {
         changed = takeInput() || changed; // each frame, as recording will
+    }
+    if (inputLitUntil_ && now >= *inputLitUntil_)
+    {
+        inputLitUntil_.reset();
+        changed = true;
     }
     return changed || keys_.pending() != before;
 }
@@ -1716,6 +1728,15 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         setMessage(quantizeMarks_ ? "Marks show where quantised notes will be heard"
                                   : "Marks of quantised notes hidden",
                    MessageKind::Information);
+        return true;
+    }
+    if (command == "thru-toggle")
+    {
+        if (lineHandler_)
+            lineHandler_("set thru!");
+        else
+            setThru(!thru_);
+        setMessage(thru_ ? "Thru on" : "Thru off", MessageKind::Information);
         return true;
     }
     if (command == "rewind-toggle")
@@ -2527,7 +2548,15 @@ void Workspace::setPlayer(core::Player* player)
     if (player_ != nullptr)
     {
         player_->setRewind(rewind_);
+        player_->setThru(thru_);
     }
+}
+
+void Workspace::setThru(bool on)
+{
+    thru_ = on;
+    if (player_)
+        player_->setThru(on);
 }
 
 void Workspace::setRewind(bool rewind)

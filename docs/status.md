@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 10 November 2026: the hardening before step 8.2 passes the full Linux matrix; the moved-selection and undo-boundary trials are accepted. Published through `7a77fb6`; [CI passed on Linux and Windows](https://github.com/neildurant/modal/actions/runs/42849396506). See [schedule.md](schedule.md) for work order and item states. The earlier published MIDI input reset fix passed [CI](https://github.com/neildurant/modal/actions/runs/42800733689).*
+*Last updated 10 November 2026: step 8.2 is implemented locally and passes all six Linux configurations; the UI/MIDI trial is pending. See [schedule.md](schedule.md) for work order. The preceding hardening is published and passed Linux/Windows CI.*
 
 ## Current handoff
 
@@ -175,7 +175,7 @@ Trial accepted on 10 November 2026. Steps retained for reference, using `build/l
 
 ## Hardening before step 8.2 (10 November 2026)
 
-The approved sequence is complete: moved-selection membership, a testable input session, then bounded/fair input service. The selection and undo-boundary trials were accepted on 10 November 2026, with publication authorised. Step 8.2 has not started. The schedule owns the item states.
+The approved sequence is complete: moved-selection membership, a testable input session, then bounded/fair input service. The selection and undo-boundary trials were accepted on 10 November 2026, with publication authorised. Step 8.2 is now in progress, as recorded below. The schedule owns the item states.
 
 **Moved selections.** `6cdac30` retains the original notes after movement instead of collecting neighbours newly inside the rectangle. Escape/gv, deletion, yanking, colon transforms, pitch boxes, whole pitch rows, either active end, explicit selection extension, atomic collision refusal and undo are covered at 960 and 96 PPQN. The initial permanent regression failed in 16 checks before the fix. A follow-up off-grid case first failed in eight checks: snapping changes the spacing of retained notes, so an edit could miss the last one. The selection span now covers every retained start without selecting unrelated notes inside the larger bounds. One older moved-bar deletion test was corrected because it expected the same accidental deletion of a neighbour.
 
@@ -189,9 +189,21 @@ The approved sequence is complete: moved-selection membership, a testable input 
 
 **Accepted selection trial / hardware checks for reference:** run the rebuilt `build/linux-gcc/apps/Debug/modal --demo`, or a disposable song. Move a Visual selection through neighbouring notes and back using Alt-arrows; neighbours must stay put and unselected. Try v, Ctrl-v and V, then delete/yank, Escape/gv and undo. Include off-grid notes, where snapping can spread them apart. Confirm that deliberately extending/replacing a selection still selects the new area. With MIDI hardware, check Thru and changing `inputs` while holding a note/pedal, stopped and during playback; held old input should release and playback continue. Trial acceptance will not establish measured latency or jitter.
 
+## Step 8.2: per-track input and monitoring (10 November 2026)
+
+The approved plan is implemented locally, including the confirmed initial **All inputs** choice (no separate default port). Each track saves an optional `input` name. Playback plans and the recorder resolve named inputs against the actual open-port mapping; an unavailable named input receives nothing and its recording track is left untouched, including replace mode. The GUI refreshes routing after asynchronous input replacement completes. The command-line recorder supplies the same resolver.
+
+Tracks has an Input column after Output port, using the existing chooser with active input ports and All inputs. Missing saved names remain selectable and dimmed, with an inspector warning; resolved partial names are not marked missing. A Visual track selection applies one input choice as one undo step. Tab now proceeds from Output port to Input, then Channel.
+
+Every view's status line shows `In` and the last positive-velocity note-on's pitch and velocity. Any input message lights the indicator for 150 ms, with a deadline to redraw it dimmed when idle; note-offs and controllers preserve the last note. Machine-wide `thru`, on by default, is a modalrc setting switched with `, T t`, with `Thru off` shown while disabled. It changes no song or undo state, and held notes/pedals still release to their original destinations while new sends are blocked.
+
+**Validation.** `tools/check-linux.sh` passes GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer: 891 registered tests per configuration, three expected platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass, and 34 local document links resolve. The hidden offscreen sample passes (19 assertions); Tracks renders were inspected in dark and light themes. The GCC Debug executable is newer than all tracked application build inputs. The changes are committed locally for trial and are not pushed; Windows CI will run after acceptance and publication. New tests cover per-input channel-message routing and retained releases, global Thru off/on, input resolution/missing/restored IDs without silencing stored playback, per-track recording, quoted-name song round-tripping, chooser filtering/cancel/All inputs/undo, Visual track application, missing-input styling and valid aliases, and status activity in every view with idle expiry. The old Output-port Tab and width tests now account for Input; the tempo-status test uses the default minimum window width to accommodate the additional status display. No real desktop or MIDI hardware has been driven.
+
+**Trial pending:** run `build/linux-gcc/apps/Debug/modal --demo` or a disposable song. In Tracks, choose All inputs or a specific device under Input, including on a Visual track selection; check Escape, Tab, undo/redo and save/reopen. Play notes and controllers and check the `In` light/last note in each view. Arm tracks with Thru on; if two devices are available, verify each named input reaches only its chosen track and All inputs hears both. With a note and pedal held, toggle `, T t` off and release them: releases should still arrive, new notes should not sound, and the input monitor should remain active. Toggle back on. Change `inputs` and check named routing resumes correctly when replacement completes; an unavailable saved input should be dimmed with a warning and never fall back to All inputs. Hardware latency and jitter have not been measured.
+
 ## Next
 
-Step 8.2 is next in [schedule.md](schedule.md#8-basic-gui-recording). The completed hardening is published through `7a77fb6` and passed [CI on Linux and Windows](https://github.com/neildurant/modal/actions/runs/42849396506). Its input/monitoring behaviour remains agreed in [design.md](design.md#per-track-input-and-monitoring). Broader editor refactoring is separate from the approved hardening sequence.
+Finish step 8.2 validation and its trial in [schedule.md](schedule.md#8-basic-gui-recording). The completed hardening is published through `7a77fb6` and passed [CI on Linux and Windows](https://github.com/neildurant/modal/actions/runs/42849396506). Its input/monitoring behaviour remains agreed in [design.md](design.md#per-track-input-and-monitoring). Broader editor refactoring is separate from the approved hardening sequence.
 
 The documentation ownership cleanup on 10 November 2026 removed parallel milestone/progress lists from design.md and this handoff. Historical decisions were preserved in decisions.md; unresolved design choices remain in design.md. The schedule separates delivered input/Arm/Thru work from step 8.2 and records the already-delivered program markers and ratio/percentage stretch transform. This changes no agreed feature order. All 80 settled checklist entries were preserved; document links/anchors, numbering, the unscheduled list, formatting and diff checks were verified.
 

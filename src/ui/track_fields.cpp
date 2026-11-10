@@ -26,6 +26,7 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::ChaseNotes, "Chase", 4},
     TrackColumn{TrackField::Quantize, "Quant", 4},
     TrackColumn{TrackField::Port, "Output port", 12},
+    TrackColumn{TrackField::Input, "Input", 12},
     TrackColumn{TrackField::Channel, "Ch", 4, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
     TrackColumn{TrackField::BankLsb, "LSB", 4, true},
@@ -81,6 +82,8 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return track.thru ? "T" : "-";
     case TrackField::Port:
         return track.port;
+    case TrackField::Input:
+        return track.input.empty() ? "All inputs" : track.input;
     case TrackField::Channel:
         return std::to_string(track.channel);
     case TrackField::Transpose:
@@ -156,6 +159,8 @@ std::string_view trackFieldDescription(TrackField field)
         return "Quantise notes live during playback";
     case TrackField::Port:
         return "Output port";
+    case TrackField::Input:
+        return "Input port: All inputs or one named port";
     case TrackField::Channel:
         return "MIDI channel";
     case TrackField::BankMsb:
@@ -193,9 +198,9 @@ std::optional<std::string> setTrackField(core::Track& track, TrackField field,
         track.name = text;
         return {};
     }
-    if (field == TrackField::Port)
+    if (field == TrackField::Port || field == TrackField::Input)
     {
-        track.port = text;
+        (field == TrackField::Input ? track.input : track.port) = text;
         return {};
     }
     if (field == TrackField::TimeOffset)

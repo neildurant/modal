@@ -1271,6 +1271,8 @@ TEST_CASE("a track's port is chosen from a list of the ports there are")
         t.press(NamedKey::Down);
         t.press(NamedKey::Tab);
         CHECK(t.track().port == "loopMIDI Port 1");
+        CHECK(t.ws.tracks().choosingPort()); // Input follows Output port
+        t.press(NamedKey::Tab);
         CHECK(t.ws.tracks().inspectorEditor().heading() == "Ch");
         t.press(NamedKey::Escape);
     }
@@ -1671,8 +1673,8 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
     }
 
     const auto port = headingX(U"Output port");
-    const auto channel = [&] { return headingX(U"Ch"); };
-    const auto narrow = channel() - port;
+    const auto input = [&] { return headingX(U"Input"); };
+    const auto narrow = input() - port;
     t.document.edit("A long port", {},
                     [&](core::Song& song)
                     {
@@ -1680,7 +1682,7 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
                             song.tracks()[0]->id(), [](core::Track& track)
                             { track.port = "A port with quite a long name, longer than room"; });
                     });
-    CHECK(channel() - port == 25 * 10);
+    CHECK(input() - port == 25 * 10);
     CHECK(narrow ==
           std::ranges::find(trackColumns(), TrackField::Port, &TrackColumn::field)->width * 10);
 }
@@ -1770,4 +1772,62 @@ TEST_CASE("the inspector says what the column under the cursor is")
                                        [](const TextRun& run) { return run.text == U"Name"; }));
         }
     }
+}
+
+TEST_CASE("the Input column chooses all or one active input and changes are undoable")
+{
+    ChoosingPorts t;
+    t.ws.setInputPorts([] { return std::vector<std::string>{"Keyboard A", "Keyboard B"}; });
+    t.column(TrackField::Input);
+    CHECK(t.track().input.empty());
+    t.press(NamedKey::Enter);
+    CHECK(t.listed() == std::vector<std::u32string>{U"All inputs", U"Keyboard A", U"Keyboard B"});
+    t.type(U"Keyboard B");
+    t.press(NamedKey::Enter);
+    CHECK(t.track().input == "Keyboard B");
+    CHECK(t.track().port.empty());
+    t.type(U"u");
+    CHECK(t.track().input.empty());
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Escape);
+    CHECK(t.track().input.empty());
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().input == "Keyboard A");
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Up);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().input.empty());
+}
+
+TEST_CASE("input choices retain a missing saved name without substituting all inputs")
+{
+    ChoosingPorts t;
+    const auto id = t.track().id();
+    t.document.edit(
+        "Input", {}, [&](core::Song& song)
+        { song.updateTrack(id, [](core::Track& track) { track.input = "Absent keys"; }); });
+    t.column(TrackField::Input);
+    t.press(NamedKey::Enter);
+    CHECK(t.listed() == std::vector<std::u32string>{U"All inputs", U"Absent keys (not found)"});
+    t.press(NamedKey::Enter);
+    CHECK(t.track().input == "Absent keys");
+}
+
+TEST_CASE("a Visual track selection takes one chosen input with one undo step")
+{
+    ChoosingPorts t;
+    t.ws.setInputPorts([] { return std::vector<std::string>{"Keys"}; });
+    t.column(TrackField::Input);
+    t.type(U"Vj");
+    const auto before = t.document.song();
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Enter);
+    CHECK(t.track(0).input == "Keys");
+    CHECK(t.track(1).input == "Keys");
+    t.type(U"u");
+    CHECK(t.document.song() == before);
 }

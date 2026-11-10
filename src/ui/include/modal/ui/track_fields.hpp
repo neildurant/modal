@@ -23,6 +23,7 @@ enum class TrackField
     Arm,  // armed to record
     Thru, // MIDI input sent through to it while armed
     Port,
+    Input,
     Channel,
     Transpose,
     VelocityOffset,

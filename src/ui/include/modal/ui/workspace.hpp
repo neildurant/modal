@@ -187,6 +187,7 @@ public:
     // cursor stays where it was; otherwise the play-from marker moves to where playback stops, and
     // the cursor follows the playhead there.
     void setRewind(bool rewind);
+    void setThru(bool on);
     void setQuantizeMarks(bool marks) { quantizeMarks_ = marks; }
 
     // How far ~ moves notes at most, either way: in time (humanizetime) and in velocity
@@ -231,6 +232,10 @@ public:
     };
     using PortFinder = std::function<PortLookup(std::string_view name)>;
     void setPortFinder(PortFinder finder) { portFinder_ = std::move(finder); }
+    void setInputPorts(std::function<std::vector<std::string>()> ports)
+    {
+        inputPorts_ = std::move(ports);
+    }
 
     // Where completion at the : prompt finds the choices of a kind of argument, from the word
     // typed so far (the workspace has those of commands, sections, roles, meters, lengths and
@@ -403,6 +408,11 @@ private:
     std::vector<std::string> outputPorts() const override
     {
         return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
+    }
+
+    std::vector<std::string> inputPorts() const override
+    {
+        return inputPorts_ ? inputPorts_() : std::vector<std::string>{};
     }
 
     View& view() const { return *current_; }
@@ -843,6 +853,7 @@ private:
     MessageKind messageKind_ = MessageKind::Information;
     LineHandler lineHandler_;
     PortFinder portFinder_;
+    std::function<std::vector<std::string>()> inputPorts_;
 
     // Moving tracks through the others, from , t o until Enter or Escape.
     struct TrackMove
@@ -863,6 +874,9 @@ private:
     WindowLayout layout_;
     core::Player* player_ = nullptr;
     bool rewind_ = true;
+    bool thru_ = true;
+    std::optional<std::int64_t> inputLitUntil_;
+    static constexpr std::int64_t kInputLightTime = 150;
     bool wasPlaying_ = false;     // or stopping, until the player knows where it stopped
     bool following_ = true;       // the views following the playhead, until moved away from it
     core::Tick lastPlayhead_ = 0; // where the playhead was last shown

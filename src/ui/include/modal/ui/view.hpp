@@ -224,6 +224,7 @@ public:
 
     // The output ports there are now, to choose from.
     virtual std::vector<std::string> outputPorts() const = 0;
+    virtual std::vector<std::string> inputPorts() const { return {}; }
 
     // Shows another view at the cursor; or opens it afresh there, as Enter on a bar in the
     // arrangement does (see View::open).

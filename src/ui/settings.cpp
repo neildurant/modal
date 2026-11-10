@@ -149,6 +149,7 @@ Settings::Settings()
                   "The output port for tracks without one: its name, or part of it, or empty "
                   "for the first port found",
                   std::string{}),
+          setting("thru", "Send MIDI input through to armed tracks with Thru enabled", true),
           setting("inputs",
                   "The MIDI input ports to listen to, for recording and thru: their names, or "
                   "parts of them, separated by commas, or empty for every input port found",

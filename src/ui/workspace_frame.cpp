@@ -347,6 +347,18 @@ Bar Workspace::statusBar(bool withMessage) const
         bottom.right.push_back({"Grid ", label});
         bottom.right.push_back({padText(*grid, 5, false) + "   ", kBarText});
     }
+    if (!thru_)
+        bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
+    bottom.right.push_back({"In", {inputLitUntil_ ? Role::Accent : Role::Dim, Role::Bar, kPlain}});
+    if (player_ && player_->lastInputNote())
+    {
+        const auto note = *player_->lastInputNote();
+        bottom.right.push_back(
+            {" " + core::pitchName(note.pitch) + " " + std::to_string(note.velocity) + "   ",
+             kBarText});
+    }
+    else
+        bottom.right.push_back({"          ", kBarText});
     bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();

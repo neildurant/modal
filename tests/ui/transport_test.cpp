@@ -374,6 +374,7 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
 TEST_CASE("the transport shows the tempo at the marker, and at the playhead while playing")
 {
     Playing p;
+    p.ws.resize(120 * kCell.width, 30 * kCell.height, kCell); // the default minimum window
     CHECK(contains(p.status(), U"120 BPM"));
     p.type(U"'a"); // the demo song's mark, in its slower bridge: the cursor isn't the transport's
     CHECK(contains(p.status(), U"120 BPM"));
@@ -543,6 +544,8 @@ TEST_CASE("MIDI input is taken from the engine when it arrives, and again shortl
     p.now += Workspace::kInputSettle;
     p.ws.wake(p.now);
     CHECK_FALSE(p.engine.nextReceived());
+    REQUIRE(p.ws.deadline()); // input light still needs to expire
+    p.ws.wake(*p.ws.deadline());
     CHECK_FALSE(p.ws.deadline());
     CHECK(p.ws.message().empty());
 }
@@ -592,6 +595,116 @@ TEST_CASE("an idle workspace collects every bounded input batch before stopping 
     p.now += Workspace::kInputSettle;
     p.ws.wake(p.now);
     CHECK_FALSE(p.engine.nextReceived()); // final batch was collected too
-    CHECK_FALSE(p.ws.deadline());         // back to an idle window
+    REQUIRE(p.ws.deadline());             // the light expires after the final batch
+    p.ws.wake(*p.ws.deadline());
+    CHECK_FALSE(p.ws.deadline()); // back to an idle window
     CHECK(p.ws.message().empty());
+}
+
+TEST_CASE("input activity and the last note are visible in every view and the light expires")
+{
+    Playing p;
+    const std::array<std::uint8_t, 3> on{0x90, 60, 96};
+    REQUIRE(p.engine.receive(core::InputId{0}, on, p.clock.time));
+    p.engine.step();
+    CHECK(p.ws.inputWoken(p.now));
+    CHECK(contains(p.status(), U"In C4 96"));
+    const auto light = [&]
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            if (run.text == U"In")
+                return run.style.foreground;
+        return Role::Warning;
+    };
+    CHECK(light() == Role::Accent);
+    p.ws.show(ViewKind::Tracks);
+    CHECK(contains(p.status(), U"In C4 96"));
+    p.ws.show(ViewKind::PianoRoll);
+    CHECK(contains(p.status(), U"In C4 96"));
+    p.ws.show(ViewKind::Arrangement);
+    CHECK(contains(p.status(), U"In C4 96"));
+    // The short collection deadline precedes the light's deadline.
+    REQUIRE(p.ws.deadline());
+    p.ws.wake(*p.ws.deadline());
+    REQUIRE(p.ws.deadline());
+    p.ws.wake(*p.ws.deadline());
+    CHECK(light() == Role::Dim);
+    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK_FALSE(p.ws.deadline());
+}
+
+TEST_CASE("global Thru is a machine control and held notes can end while it is off")
+{
+    Playing p;
+    const auto id = p.document.song().tracks()[0]->id();
+    p.document.edit("Arm", {}, [&](core::Song& song)
+                    { song.updateTrack(id, [](core::Track& track) { track.arm = true; }); });
+    p.player.update(p.document.song());
+    const auto before = p.document.song();
+    p.engine.step();
+    p.sink.sent.clear();
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 60, 96},
+                             p.clock.time));
+    p.engine.step();
+    REQUIRE(p.sink.sent.size() == 1);
+    p.type(U",Tt");
+    CHECK(p.document.song() == before);
+    CHECK(contains(p.status(), U"Thru off"));
+    p.sink.sent.clear();
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 62, 96},
+                             p.clock.time));
+    REQUIRE(
+        p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x80, 60, 0}, p.clock.time));
+    p.engine.step();
+    REQUIRE(p.sink.sent.size() == 1);
+    CHECK((p.sink.sent[0].bytes[0] & 0xF0) == 0x80);
+    p.type(U",Tt");
+    CHECK(p.ws.message() == "Thru on");
+    CHECK_FALSE(contains(p.status(), U"Thru off"));
+}
+
+TEST_CASE("an unavailable input is dimmed with an inspector warning and a resolved alias is not")
+{
+    Playing p;
+    const auto id = p.document.song().tracks()[0]->id();
+    p.document.edit("Input", {}, [&](core::Song& song)
+                    { song.updateTrack(id, [](core::Track& track) { track.input = "Keys"; }); });
+    bool available = false;
+    core::Player routed{p.engine, [](std::string_view) { return core::DestinationId{1}; },
+                        [&](std::string_view) -> std::optional<core::InputId>
+                        { return available ? std::optional{core::InputId{0}} : std::nullopt; }};
+    routed.update(p.document.song());
+    p.ws.setPlayer(&routed);
+    p.ws.setInputPorts([] { return std::vector<std::string>{"My Keys"}; });
+    p.type(U"gt");
+    p.type(toColumn(TrackField::Input));
+    const auto dimmed = [&]
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.front().text)
+            if (run.text.starts_with(U"Keys"))
+                return run.style.foreground == Role::Dim;
+        return false;
+    };
+    const auto warned = [&]
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& region : frame)
+            for (const auto& run : region.text)
+                if (run.text.find(U"Input not found") != std::u32string::npos)
+                    return true;
+        return false;
+    };
+    CHECK(dimmed());
+    CHECK(warned());
+    available = true;
+    routed.update(p.document.song());
+    CHECK_FALSE(dimmed());
+    CHECK_FALSE(warned());
+    p.press(Key::of(NamedKey::Enter));
+    const auto frame = p.ws.frame();
+    for (const auto& region : frame)
+        for (const auto& run : region.text)
+            CHECK(run.text.find(U"not found") == std::u32string::npos);
 }

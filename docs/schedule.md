@@ -29,7 +29,7 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 - [x] **Done** — Before 8.2: fix moved Visual selections, including off-grid snapping and separate undo steps for separate selections; all six Linux configurations pass, and the real-window trials were accepted on 10 November 2026.
 - [x] **Done** — Before 8.2: extract input-port ownership, ID mapping and asynchronous reset into a component tested with fake ports; six focused tests and GCC/Clang Debug pass.
 - [x] **Done** — Before 8.2: bound and fairly schedule engine input processing, preserve SysEx/recording stamps and keep collecting until the backlog is drained; all six Linux configurations pass.
-- [ ] **To do** — Step 8.2: each track's input selection and Input column, input activity/last-note display, and the machine-wide Thru control. Behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring); implementation has not started.
+- [ ] **Doing** — Step 8.2: each track's input selection and Input column, input activity/last-note display, and the machine-wide Thru control. Behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring); implemented locally; all six Linux configurations pass and the UI/MIDI trial is pending.
 - [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end; clear recording state in the transport/status line.
 - [ ] **To do** — GUI metronome controls, count-in and pre-roll; distinguish playback start from recording start.
 - [ ] **To do** — Finish held notes and pedals correctly; show recorded material immediately; one pass, including song extension, is one undo step.

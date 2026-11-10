@@ -65,7 +65,7 @@ private:
     std::vector<std::size_t> portMatches() const;
     std::optional<bool> runPortChoice(std::string_view command);
     // Whether a track names a port that wasn't found, as a song from elsewhere may.
-    bool portMissing(const core::Track& track) const;
+    bool portMissing(const core::Track& track, bool input = false) const;
     void addPortChoice(Frame& frame) const;
 
     // Flips a button on the cursor's row, and any selected rows to match it.
@@ -87,6 +87,7 @@ private:
     // track names that wasn't found stays on the list until something else is chosen.
     struct PortChoice
     {
+        bool input = false;
         std::vector<std::string> ports;
         std::string current;
         std::u32string typed;

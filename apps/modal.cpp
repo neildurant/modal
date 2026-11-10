@@ -166,10 +166,17 @@ public:
             lookedUp_ = true;
             player_.forgetPorts();
         }
+        const auto oldInputs = player_.missingInputs();
         player_.update(song);
+        std::string inputWarning;
+        if (lookUp || oldInputs != player_.missingInputs())
+        {
+            for (const auto& name : player_.missingInputs())
+                inputWarning += (inputWarning.empty() ? "Inputs not found: " : ", ") + name;
+        }
         if (!lookUp)
         {
-            return {};
+            return inputWarning;
         }
         std::string missing;
         for (const auto& name : player_.missingPorts())
@@ -179,7 +186,10 @@ public:
                         : port_.empty() ? std::string{"any output, for tracks without a port"}
                                         : port_ + ", for tracks without a port");
         }
-        return missing.empty() ? missing : "Ports not found, so not played: " + missing;
+        const auto outputWarning =
+            missing.empty() ? missing : "Ports not found, so not played: " + missing;
+        return outputWarning + (outputWarning.empty() || inputWarning.empty() ? "" : "; ") +
+               inputWarning;
     }
 
     // Modal's own ports, then the system's output ports.
@@ -254,6 +264,13 @@ public:
     {
         return inputs_->setInputs(settings_.text("inputs"), ui::sdl::Window::now());
     }
+    std::vector<std::string> inputPorts() const
+    {
+        std::vector<std::string> names;
+        for (const auto& port : inputs_->ports())
+            names.push_back(port.name);
+        return names;
+    }
     std::optional<std::int64_t> inputDeadline() const { return inputs_->deadline(); }
     std::string pollInputs(std::int64_t now) { return inputs_->poll(now); }
 
@@ -294,7 +311,8 @@ private:
     platform::MidiOutputs outputs_;
     platform::SystemClock clock_;
     core::Engine engine_{outputs_, clock_};
-    core::Player player_{engine_, [this](std::string_view name) { return open(name); }};
+    core::Player player_{engine_, [this](std::string_view name) { return open(name); },
+                         [this](std::string_view name) { return inputs_->inputId(name); }};
     std::thread thread_;
     std::string priorityError_;
     // Reset explicitly before engine shutdown; callbacks can still arrive until it closes.
@@ -419,6 +437,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
                                            : ui::Workspace::QuantizePedal::Follow);
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
+    view.setThru(settings.flag("thru"));
     view.setQuantizeMarks(settings.flag("quantizemarks"));
     if (auto own = playback.openOwnPorts(); error.empty())
     {
@@ -594,6 +613,7 @@ int main(int argc, char* argv[])
                            });
     }
     view.show(ui::ViewKind::Arrangement); // the home view
+    view.setInputPorts([&] { return playback.inputPorts(); });
     view.setPortFinder(
         [&](std::string_view name)
         {
@@ -767,10 +787,18 @@ int main(int argc, char* argv[])
                 .wake =
                     [&](std::int64_t now)
                 {
-                    const bool changed = view.wake(now);
+                    bool changed = view.wake(now);
                     if (const auto due = playback.inputDeadline(); due && now >= *due)
                     {
-                        if (auto error = playback.pollInputs(now); !error.empty())
+                        auto error = playback.pollInputs(now);
+                        if (!playback.inputDeadline())
+                        {
+                            auto missing = playback.update(document.song());
+                            if (error.empty())
+                                error = std::move(missing);
+                            changed = true;
+                        }
+                        if (!error.empty())
                         {
                             view.setMessage(std::move(error), ui::MessageKind::Warning);
                             return true;
