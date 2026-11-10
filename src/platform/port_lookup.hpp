@@ -29,6 +29,18 @@ std::optional<libremidi::API> usableApi();
 // The observer for that API, seeing every port, including other applications' virtual ones.
 libremidi::observer makeObserver(libremidi::API api);
 
+// The ports' labels (see platform::portLabels), from what libremidi says of them.
+template <class Port>
+std::vector<std::string> portLabels(const std::vector<Port>& ports)
+{
+    std::vector<NamedPort> named;
+    for (const auto& port : ports)
+    {
+        named.push_back({portName(port), port.device_name});
+    }
+    return platform::portLabels(named);
+}
+
 template <class Port>
 struct FoundPort
 {
@@ -45,9 +57,9 @@ FoundPort<Port> findPort(const std::vector<Port>& ports, std::string_view name,
                          std::string_view kind)
 {
     std::vector<MidiPort> names;
-    for (const auto& port : ports)
+    for (auto& label : portLabels(ports))
     {
-        names.push_back({portName(port)});
+        names.push_back({std::move(label)});
     }
     const auto match = matchPort(names, name);
     if (!match.index)

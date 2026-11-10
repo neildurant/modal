@@ -27,6 +27,19 @@ struct MidiPortList
     std::vector<MidiPort> outputs;
 };
 
+// A port as the system names it: its own name, and its device's or client's, if known.
+struct NamedPort
+{
+    std::string name;
+    std::string device;
+};
+
+// Each port's label, unique among the ports listed with it: its name, or where two share one,
+// the name with its device's in brackets, numbered if they're still alike. The same labels serve
+// listing, matching and opening, so a label always opens the port it was listed for (a fix for
+// two ports both called "input", which could be listed but not opened, November 2026).
+std::vector<std::string> portLabels(std::span<const NamedPort> ports);
+
 // Lists the MIDI ports visible through the platform's default MIDI 1.0 API,
 // including virtual ports created by other applications, but not Modal's own.
 MidiPortList listMidiPorts();

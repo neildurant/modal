@@ -20,6 +20,7 @@
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/key.hpp>
 #include <modal/ui/key_notation.hpp>
+#include <modal/ui/ports.hpp>
 #include <modal/ui/prompt.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/themes.hpp>
@@ -156,40 +157,59 @@ public:
     void songReplaced() { lookedUp_ = false; }
 
     // Hands the player the song, looking the ports up the first time, for a new song, and
-    // whenever the port setting has changed. Then returns which ports weren't found, if any.
+    // whenever the ports have changed. Then says which tracks' ports can't be used, and why.
     std::string update(const core::Song& song)
     {
-        const bool lookUp = !lookedUp_ || settings_.text("port") != port_;
+        const bool lookUp = !lookedUp_;
         if (lookUp)
         {
-            port_ = settings_.text("port");
             lookedUp_ = true;
             player_.forgetPorts();
         }
         const auto oldInputs = player_.missingInputs();
         player_.update(song);
-        std::string inputWarning;
+        std::string warning;
+        const auto add = [&](std::string text)
+        {
+            if (!text.empty())
+                warning += (warning.empty() ? "" : "; ") + text;
+        };
+        if (lookUp)
+        {
+            add(unusable(ui::PortDirection::Output, player_.missingPorts()));
+        }
         if (lookUp || oldInputs != player_.missingInputs())
         {
-            for (const auto& name : player_.missingInputs())
-                inputWarning += (inputWarning.empty() ? "Inputs not found: " : ", ") + name;
+            add(unusable(ui::PortDirection::Input, player_.missingInputs()));
         }
-        if (!lookUp)
-        {
-            return inputWarning;
-        }
-        std::string missing;
-        for (const auto& name : player_.missingPorts())
-        {
-            missing += (missing.empty() ? "" : ", ") +
-                       (!name.empty()   ? name
-                        : port_.empty() ? std::string{"any output, for tracks without a port"}
-                                        : port_ + ", for tracks without a port");
-        }
-        const auto outputWarning =
-            missing.empty() ? missing : "Ports not found, so not played: " + missing;
-        return outputWarning + (outputWarning.empty() || inputWarning.empty() ? "" : "; ") +
-               inputWarning;
+        return warning;
+    }
+
+    // The ports of this machine, as the Ports view sets them, and where to keep them when they
+    // change. Looks for the ports there are now.
+    void setPorts(ui::PortTable ports, std::function<void(const ui::PortTable&)> save)
+    {
+        ports_ = std::move(ports);
+        savePorts_ = std::move(save);
+        detectPorts();
+    }
+    const ui::PortTable& ports() const { return ports_; }
+
+    // Notes the ports the system lists now, adding new ones, disabled, and keeping the file.
+    void detectPorts()
+    {
+        const auto system = platform::listMidiPorts();
+        std::vector<std::string> inputs;
+        for (const auto& port : system.inputs)
+            inputs.push_back(port.name);
+        std::vector<std::string> outputs;
+        for (const auto& port : allPorts(system.outputs))
+            outputs.push_back(port.name);
+        const bool addedIn = ports_.detected(ui::PortDirection::Input, inputs);
+        const bool addedOut = ports_.detected(ui::PortDirection::Output, outputs);
+        if ((addedIn || addedOut) && savePorts_)
+            savePorts_(ports_);
+        lookedUp_ = false;
     }
 
     // Modal's own ports, then the system's output ports.
@@ -242,6 +262,7 @@ public:
             }
             own_.emplace_back(name, made.destination);
         }
+        detectPorts(); // Modal's own are outputs like any other, enabled in the Ports view
         if (!problem.empty())
         {
             problem[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(problem[0])));
@@ -260,51 +281,62 @@ public:
 
     // Input ownership, ID mapping and reset acknowledgements share one testable session.
     void setInputWake(std::function<void()> wake) { inputs_->setWake(std::move(wake)); }
+    // Listens to the enabled inputs there are.
     std::string openInputs()
     {
-        return inputs_->setInputs(settings_.text("inputs"), ui::sdl::Window::now());
-    }
-    std::vector<std::string> inputPorts() const
-    {
-        std::vector<std::string> names;
-        for (const auto& port : inputs_->ports())
-            names.push_back(port.name);
-        return names;
+        return inputs_->setInputs(ports_.usable(ui::PortDirection::Input), ui::sdl::Window::now());
     }
     std::optional<std::int64_t> inputDeadline() const { return inputs_->deadline(); }
     std::string pollInputs(std::int64_t now) { return inputs_->poll(now); }
 
 private:
-    // A track's port, or for one without a port, the port setting's or the first found.
+    // A track's port, or for one without a port, the default output: an enabled port there now,
+    // by alias or detected name, or none.
     std::optional<core::DestinationId> open(std::string_view name)
     {
-        std::string wanted{name.empty() ? std::string_view{port_} : name};
-        const auto system = platform::listMidiPorts().outputs;
-        if (wanted.empty())
-        {
-            if (system.empty())
-            {
-                return std::nullopt;
-            }
-            wanted = system.front().name;
-        }
-        // Modal's own ports first, then the system's, matched as :port matches them.
-        const auto ports = allPorts(system);
-        const auto match = platform::matchPort(ports, wanted);
-        if (!match.index)
+        const auto resolved = ports_.resolve(ui::PortDirection::Output, name);
+        if (!resolved.port)
         {
             return std::nullopt;
         }
-        if (*match.index < own_.size())
+        const auto own = std::ranges::find(own_, *resolved.port,
+                                           &std::pair<std::string, core::DestinationId>::first);
+        if (own != own_.end())
         {
-            return own_[*match.index].second;
+            return own->second;
         }
-        const auto opened = outputs_.open(ports[*match.index].name);
+        const auto opened = outputs_.open(*resolved.port);
         return opened.ok() ? std::optional{opened.destination} : std::nullopt;
     }
 
+    // Which of the tracks' ports can't be used, by why: not found, or disabled.
+    std::string unusable(ui::PortDirection direction, const std::vector<std::string>& names) const
+    {
+        std::string missing;
+        std::string disabled;
+        for (const auto& name : names)
+        {
+            const auto resolved = ports_.resolve(direction, name);
+            const auto shown = name.empty() ? std::string{"no default output is set, for tracks "
+                                                          "without a port"}
+                                            : name;
+            auto& list = resolved.problem == ui::PortProblem::Disabled ? disabled : missing;
+            list += (list.empty() ? "" : ", ") + shown;
+        }
+        const bool input = direction == ui::PortDirection::Input;
+        std::string text;
+        if (!missing.empty())
+            text = (input ? "Inputs not found: " : "Ports not found, so not played: ") + missing;
+        if (!disabled.empty())
+            text += (text.empty() ? "" : "; ") +
+                    std::string{input ? "Inputs disabled: " : "Ports disabled, so not played: "} +
+                    disabled + " (enable them in the Ports view)";
+        return text;
+    }
+
     const ui::Settings& settings_;
-    std::string port_; // the port setting when ports were last looked up
+    ui::PortTable ports_;
+    std::function<void(const ui::PortTable&)> savePorts_;
     bool lookedUp_ = false;
     std::vector<std::pair<std::string, core::DestinationId>> own_; // Modal's own ports
     std::vector<std::string> ownWanted_;                           // as the settings last asked
@@ -312,7 +344,11 @@ private:
     platform::SystemClock clock_;
     core::Engine engine_{outputs_, clock_};
     core::Player player_{engine_, [this](std::string_view name) { return open(name); },
-                         [this](std::string_view name) { return inputs_->inputId(name); }};
+                         [this](std::string_view name) -> std::optional<core::InputId>
+                         {
+                             const auto resolved = ports_.resolve(ui::PortDirection::Input, name);
+                             return resolved.port ? inputs_->inputId(*resolved.port) : std::nullopt;
+                         }};
     std::thread thread_;
     std::string priorityError_;
     // Reset explicitly before engine shutdown; callbacks can still arrive until it closes.
@@ -579,6 +615,38 @@ int main(int argc, char* argv[])
         message = message.empty() ? warning : message + "; " + warning;
     }
 
+    // The machine's MIDI ports, as the Ports view sets them, kept in the state directory and
+    // written back after each change: a file that may be missing, or deleted, at any time.
+    {
+        ui::PortTable ports;
+        std::function<void(const ui::PortTable&)> save;
+        if (const auto stateDirectory = platform::stateDirectory())
+        {
+            const auto file = *stateDirectory / "ports";
+            std::ifstream in{file, std::ios::binary};
+            const std::string text{std::istreambuf_iterator<char>{in},
+                                   std::istreambuf_iterator<char>{}};
+            std::vector<std::string> errors;
+            ports = ui::PortTable::read(text, &errors);
+            for (const auto& error : errors)
+            {
+                std::fprintf(stderr, "%s\n", error.c_str());
+            }
+            if (!errors.empty())
+            {
+                message = message.empty() ? errors.front() : message + "; " + errors.front();
+            }
+            save = [file](const ui::PortTable& table)
+            {
+                std::error_code error;
+                std::filesystem::create_directories(file.parent_path(), error);
+                std::ofstream out{file, std::ios::binary | std::ios::trunc};
+                out << table.text();
+            };
+        }
+        playback.setPorts(std::move(ports), std::move(save));
+    }
+
     // The song: the file given, or a new song, or with --demo the demo song from the
     // arrangement sketch.
     core::Document document{demo ? ui::demoSong() : ui::newSong()};
@@ -613,26 +681,28 @@ int main(int argc, char* argv[])
                            });
     }
     view.show(ui::ViewKind::Arrangement); // the home view
-    view.setInputPorts([&] { return playback.inputPorts(); });
+    // The Tracks choosers and :port offer the enabled ports, by alias where they have one.
+    view.setInputPorts([&] { return playback.ports().offered(ui::PortDirection::Input); });
     view.setPortFinder(
         [&](std::string_view name)
         {
-            const auto outputs = playback.allPorts();
             ui::Workspace::PortLookup lookup;
-            for (const auto& port : outputs)
-            {
-                lookup.ports.push_back(port.name);
-            }
+            lookup.ports = playback.ports().offered(ui::PortDirection::Output);
             if (!name.empty())
             {
-                const auto match = platform::matchPort(outputs, name);
+                std::vector<platform::MidiPort> offered;
+                for (const auto& port : lookup.ports)
+                {
+                    offered.push_back({port});
+                }
+                const auto match = platform::matchPort(offered, name);
                 if (match.index)
                 {
-                    lookup.port = outputs[*match.index].name;
+                    lookup.port = lookup.ports[*match.index];
                 }
                 for (const auto i : match.candidates)
                 {
-                    lookup.candidates.push_back(outputs[i].name);
+                    lookup.candidates.push_back(lookup.ports[i]);
                 }
             }
             return lookup;
@@ -675,6 +745,13 @@ int main(int argc, char* argv[])
     {
         std::fprintf(stderr, "%s\n", error.c_str());
         message = message.empty() ? error : message + "; " + error;
+    }
+    // Every port starts disabled, so say why nothing plays or listens until some are enabled.
+    if (playback.ports().offered(ui::PortDirection::Input).empty() &&
+        playback.ports().offered(ui::PortDirection::Output).empty())
+    {
+        const std::string none = "No MIDI ports are enabled: choose them in the Ports view (, v p)";
+        message = message.empty() ? none : none + "; " + message;
     }
     if (!message.empty())
     {

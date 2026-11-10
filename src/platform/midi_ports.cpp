@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <string>
 
 namespace modal::platform
 {
@@ -111,15 +113,37 @@ MidiPortList listMidiPorts()
     const auto observer = detail::makeObserver(*api);
 
     list.api = std::string{libremidi::get_api_display_name(*api)};
-    for (const auto& port : detail::othersPorts(observer.get_input_ports()))
+    for (auto& label : detail::portLabels(detail::othersPorts(observer.get_input_ports())))
     {
-        list.inputs.push_back({detail::portName(port)});
+        list.inputs.push_back({std::move(label)});
     }
-    for (const auto& port : detail::othersPorts(observer.get_output_ports()))
+    for (auto& label : detail::portLabels(detail::othersPorts(observer.get_output_ports())))
     {
-        list.outputs.push_back({detail::portName(port)});
+        list.outputs.push_back({std::move(label)});
     }
     return list;
+}
+
+std::vector<std::string> portLabels(std::span<const NamedPort> ports)
+{
+    std::vector<std::string> labels;
+    for (const auto& port : ports)
+    {
+        const bool shared = std::ranges::count(ports, port.name, &NamedPort::name) > 1;
+        labels.push_back(shared && !port.device.empty() && port.device != port.name
+                             ? port.name + " (" + port.device + ")"
+                             : port.name);
+    }
+    for (std::size_t i = 0; i < labels.size(); ++i)
+    {
+        const auto before =
+            std::count(labels.begin(), labels.begin() + static_cast<std::ptrdiff_t>(i), labels[i]);
+        if (before > 0)
+        {
+            labels[i] += " " + std::to_string(before + 1);
+        }
+    }
+    return labels;
 }
 
 PortMatch matchPort(std::span<const MidiPort> ports, std::string_view name)

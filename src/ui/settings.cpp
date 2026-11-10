@@ -145,15 +145,7 @@ Settings::Settings()
                   std::int64_t{1}, 0, 16),
           setting("ownportname", "The name of Modal's own ports; several are numbered after it",
                   std::string{"Modal"}),
-          setting("port",
-                  "The output port for tracks without one: its name, or part of it, or empty "
-                  "for the first port found",
-                  std::string{}),
           setting("thru", "Send MIDI input through to armed tracks with Thru enabled", true),
-          setting("inputs",
-                  "The MIDI input ports to listen to, for recording and thru: their names, or "
-                  "parts of them, separated by commas, or empty for every input port found",
-                  std::string{}),
           setting("quantizemarks",
                   "Whether the piano roll marks where a note of a track quantised as it plays "
                   "will be heard, when that's far from where it's stored",

@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -94,4 +95,15 @@ TEST_CASE("a port name matching no port, or no name, picks out none")
         CHECK(match.candidates.empty());
     }
     CHECK_FALSE(matchPort({}, "loopMIDI").index);
+}
+
+TEST_CASE("ports sharing a name are told apart by their device, then numbered")
+{
+    using modal::platform::NamedPort;
+    const std::vector<NamedPort> ports{{"input", "Arturia"}, {"input", "Novation"},
+                                       {"Xkey 1", ""},       {"MIDI", "Thing"},
+                                       {"MIDI", "Thing"},    {"Synth", "Synth"}};
+    CHECK(modal::platform::portLabels(ports) ==
+          std::vector<std::string>{"input (Arturia)", "input (Novation)", "Xkey 1", "MIDI (Thing)",
+                                   "MIDI (Thing) 2", "Synth"});
 }

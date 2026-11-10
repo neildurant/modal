@@ -13,24 +13,6 @@ namespace modal::platform
 namespace
 {
 
-std::vector<std::string> commaSeparated(std::string_view list)
-{
-    std::vector<std::string> parts;
-    while (!list.empty())
-    {
-        const auto comma = list.find(',');
-        auto part = list.substr(0, comma);
-        list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
-        while (!part.empty() && part.front() == ' ')
-            part.remove_prefix(1);
-        while (!part.empty() && part.back() == ' ')
-            part.remove_suffix(1);
-        if (!part.empty())
-            parts.emplace_back(part);
-    }
-    return parts;
-}
-
 struct SystemInput final : MidiInputSession::Port
 {
     explicit SystemInput(MidiInput::Callback callback)
@@ -59,11 +41,11 @@ MidiInputSession::MidiInputSession(core::Engine& engine, Backend backend)
         };
 }
 
-std::string MidiInputSession::setInputs(std::string_view wanted, std::int64_t now)
+std::string MidiInputSession::setInputs(std::vector<std::string> wanted, std::int64_t now)
 {
     if (opened_ && wanted == wanted_)
         return {};
-    wanted_ = wanted;
+    wanted_ = std::move(wanted);
     if (due_)
         return {}; // complete the reset, then open the latest requested set
     if (!connections_.empty())
@@ -117,11 +99,7 @@ std::string MidiInputSession::openRequested()
         if (std::ranges::find(names, name) == names.end())
             names.push_back(name);
     };
-    const auto named = commaSeparated(wanted_);
-    if (named.empty())
-        for (const auto& port : available)
-            add(port.name);
-    for (const auto& name : named)
+    for (const auto& name : wanted_)
     {
         const auto match = matchPort(available, name);
         if (match.index)

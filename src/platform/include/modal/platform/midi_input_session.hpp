@@ -49,10 +49,12 @@ public:
     // Set before opening any ports. Called on the input thread, after queuing its message.
     void setWake(std::function<void()> wake) { wake_ = std::move(wake); }
 
-    // Comma-separated names, matched as output ports are, or empty for all. Replacing inputs
-    // closes the old callbacks, then awaits an engine reset before reusing their IDs. Further
-    // edits while waiting replace the requested set. Returns any opening/matching problems.
-    std::string setInputs(std::string_view wanted, std::int64_t now);
+    // The ports to listen to, by name, matched as output ports are: the enabled inputs of the
+    // Ports view; none listens to nothing (decided November 2026, when listening to every input
+    // heard a virtual port's own output). Replacing inputs closes the old callbacks, then awaits
+    // an engine reset before reusing their IDs. Further edits while waiting replace the
+    // requested set. Returns any opening/matching problems.
+    std::string setInputs(std::vector<std::string> wanted, std::int64_t now);
     std::optional<std::int64_t> deadline() const { return due_; }
     std::string poll(std::int64_t now);
 
@@ -76,7 +78,7 @@ private:
     // Declared after callback dependencies, so callbacks finish while engine_/wake_ are valid.
     std::vector<Connection> connections_;
     bool opened_ = false;
-    std::string wanted_;
+    std::vector<std::string> wanted_;
     std::optional<std::uint64_t> reset_;
     std::optional<std::int64_t> due_;
 };

@@ -102,7 +102,7 @@ struct Listening
 TEST_CASE("an input session matches and deduplicates names in stable input ID order")
 {
     Listening l;
-    CHECK(l.session.setInputs("  Keyboard B, keyboard a, Keyboard B , ", 0).empty());
+    CHECK(l.session.setInputs({"Keyboard B", "keyboard a", "Keyboard B"}, 0).empty());
     CHECK(l.inputs.log == std::vector<std::string>{"open Keyboard B", "open Keyboard A"});
     CHECK(l.session.inputId("Keyboard B") == core::InputId{0});
     CHECK(l.session.inputId("keyboard a") == core::InputId{1});
@@ -115,19 +115,19 @@ TEST_CASE("an input session matches and deduplicates names in stable input ID or
     const auto received = l.engine.nextReceived();
     REQUIRE(received);
     CHECK(received->input == core::InputId{1});
-    CHECK(l.session.setInputs("  Keyboard B, keyboard a, Keyboard B , ", 1).empty());
+    CHECK(l.session.setInputs({"Keyboard B", "keyboard a", "Keyboard B"}, 1).empty());
     CHECK(l.inputs.log.size() == 2); // unchanged settings don't close or reset anything
 }
 
 TEST_CASE("an input session closes callbacks and releases held state before reusing IDs")
 {
     Listening l;
-    REQUIRE(l.session.setInputs("Keyboard A", 0).empty());
+    REQUIRE(l.session.setInputs({"Keyboard A"}, 0).empty());
     l.note("Keyboard A", 60);
     l.engine.step();
     // The callback's final message is allowed to arrive while close is joining it.
     l.inputs.finalMessage = std::array<std::uint8_t, 3>{0xB0, 64, 100};
-    CHECK(l.session.setInputs("Keyboard B", 1).empty());
+    CHECK(l.session.setInputs({"Keyboard B"}, 1).empty());
     l.inputs.finalMessage.reset();
     CHECK(l.inputs.callbacks.empty());
     CHECK(l.session.ports().empty());
@@ -154,11 +154,11 @@ TEST_CASE("an input session closes callbacks and releases held state before reus
 TEST_CASE("an input session retries a full command queue and stays closed until acknowledged")
 {
     Listening l;
-    REQUIRE(l.session.setInputs("Keyboard A", 0).empty());
+    REQUIRE(l.session.setInputs({"Keyboard A"}, 0).empty());
     while (l.engine.stop())
     {
     }
-    CHECK(l.session.setInputs("Keyboard B", 1).empty());
+    CHECK(l.session.setInputs({"Keyboard B"}, 1).empty());
     REQUIRE(l.session.deadline());
     auto due = *l.session.deadline();
     CHECK(l.session.poll(due).empty());
@@ -177,10 +177,10 @@ TEST_CASE("an input session retries a full command queue and stays closed until 
 TEST_CASE("an input session opens the latest request after a delayed reset")
 {
     Listening l;
-    REQUIRE(l.session.setInputs("Keyboard A", 0).empty());
-    CHECK(l.session.setInputs("Keyboard B", 1).empty());
-    CHECK(l.session.setInputs("Keyboard C", 2).empty());
-    CHECK(l.session.setInputs("Keyboard A,Keyboard C", 3).empty());
+    REQUIRE(l.session.setInputs({"Keyboard A"}, 0).empty());
+    CHECK(l.session.setInputs({"Keyboard B"}, 1).empty());
+    CHECK(l.session.setInputs({"Keyboard C"}, 2).empty());
+    CHECK(l.session.setInputs({"Keyboard A", "Keyboard C"}, 3).empty());
     CHECK(l.inputs.callbacks.empty());
     l.engine.step();
     CHECK(l.session.poll(*l.session.deadline()).empty());
@@ -195,7 +195,7 @@ TEST_CASE("input sessions report missing, ambiguous and failed ports without lea
     Listening l;
     l.inputs.fail = "Keyboard B";
     const auto message =
-        l.session.setInputs("missing,Keyboard,Keyboard A,Keyboard B,Keyboard C", 0);
+        l.session.setInputs({"missing", "Keyboard", "Keyboard A", "Keyboard B", "Keyboard C"}, 0);
     CHECK(message.find("missing not found") != std::string::npos);
     CHECK(message.find("Keyboard matches several") != std::string::npos);
     CHECK(message.find("can't open Keyboard B") != std::string::npos);
@@ -209,13 +209,25 @@ TEST_CASE("input sessions report missing, ambiguous and failed ports without lea
     CHECK(received->input == core::InputId{1});
 }
 
-TEST_CASE("input sessions open all ports by default up to the engine limit")
+TEST_CASE("input sessions listen to none when given none")
+{
+    Listening l;
+    CHECK(l.session.setInputs({}, 0).empty());
+    CHECK(l.session.ports().empty());
+    CHECK(l.inputs.callbacks.empty());
+}
+
+TEST_CASE("input sessions open the ports given up to the engine limit")
 {
     Listening l;
     l.inputs.available.clear();
+    std::vector<std::string> all;
     for (std::size_t i = 0; i < core::Engine::kMaxInputs + 1; ++i)
+    {
         l.inputs.available.push_back({"Input " + std::to_string(i)});
-    const auto message = l.session.setInputs(" ,  , ", 0);
+        all.push_back("Input " + std::to_string(i));
+    }
+    const auto message = l.session.setInputs(all, 0);
     CHECK(l.session.ports().size() == core::Engine::kMaxInputs);
     CHECK(l.inputs.callbacks.size() == core::Engine::kMaxInputs);
     CHECK(message.find("only " + std::to_string(core::Engine::kMaxInputs) +

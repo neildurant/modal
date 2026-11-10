@@ -94,9 +94,11 @@ TEST_CASE("Modal has one port of its own, Modal, unless set otherwise")
     CHECK(settings.set("ownports", "17") == "ownports must be a whole number from 0 to 16");
 }
 
-TEST_CASE("the port for tracks without one is the first found, unless set")
+TEST_CASE("ports aren't settings: the Ports view sets them")
 {
-    CHECK(Settings{}.text("port").empty());
+    // Removed November 2026, the Ports view choosing the inputs and the default output.
+    CHECK(Settings{}.find("port") == nullptr);
+    CHECK(Settings{}.find("inputs") == nullptr);
 }
 
 TEST_CASE("undolevels is a thousand by default")

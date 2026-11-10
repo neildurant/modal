@@ -10,6 +10,7 @@ add_library(modal_ui STATIC
     commands.cpp
     completion.cpp
     palette.cpp
+    ports.cpp
     remembered.cpp
     config.cpp
     demo_song.cpp
