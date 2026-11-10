@@ -79,6 +79,11 @@ bool Document::edit(std::string title, const EditPlace& place,
     return true;
 }
 
+void Document::breakMerge() noexcept
+{
+    mergeKey_.clear();
+}
+
 void Document::beginGroup(std::string title, const EditPlace& place)
 {
     if (groupDepth_++ == 0)

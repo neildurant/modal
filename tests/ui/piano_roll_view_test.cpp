@@ -2171,3 +2171,84 @@ TEST_CASE("a moved selection covers all of its notes after snapping changes thei
         CHECK(noteAt(2 * step, 64));
     }
 }
+
+TEST_CASE("separate Visual move gestures undo separately")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto step = r.t.sixteenth();
+    r.document.edit("Test notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(id,
+                                          [&](core::EventList& events)
+                                          {
+                                              events = {};
+                                              events.insert({0, core::Note{60, 100, step / 2}});
+                                              events.insert(
+                                                  {3 * step, core::Note{62, 90, step / 2}});
+                                          });
+                    });
+    r.document.markSaved();
+    const auto original = r.document.song();
+    r.ws.pianoRoll().setCursor({id, 0, 60});
+    r.type(U"v");
+    r.press(Key::of(NamedKey::Right, kAlt));
+    r.press(Key::of(NamedKey::Right, kAlt));
+    const auto first = r.document.song();
+    REQUIRE(first != original);
+
+    bool secondNoteMoves = false;
+    SECTION("a different Visual selection")
+    {
+        r.press(Key::of(NamedKey::Escape));
+        r.ws.pianoRoll().setCursor({id, 3 * step, 62});
+        r.type(U"v");
+        secondNoteMoves = true;
+    }
+    SECTION("recalling a selection after Escape")
+    {
+        r.press(Key::of(NamedKey::Escape));
+        r.type(U"gv");
+    }
+    SECTION("choosing another object")
+    {
+        r.type(U"ib");
+        secondNoteMoves = true;
+    }
+    SECTION("selecting a new area from the leader")
+    {
+        r.type(U",St");
+        secondNoteMoves = true;
+    }
+    SECTION("changing Visual kind")
+    {
+        r.press(Key::typed(U'v', kCtrl));
+    }
+    SECTION("extending the selection with cursor movement")
+    {
+        r.type(U"l");
+    }
+    REQUIRE(r.ws.mode() == Mode::Visual);
+    r.press(Key::of(NamedKey::Right, kAlt));
+    r.press(Key::of(NamedKey::Right, kAlt));
+    const auto second = r.document.song();
+    REQUIRE(second != first);
+    if (secondNoteMoves)
+    {
+        const auto& last = second.events(id).all().back();
+        CHECK(last.tick == 5 * step);
+        CHECK(std::get<core::Note>(last.data).pitch == 62);
+    }
+    r.type(U"u"); // undo while still in Visual mode
+    CHECK(r.document.song() == first);
+    CHECK(r.document.modified());
+    r.type(U"u");
+    CHECK(r.document.song() == original);
+    CHECK_FALSE(r.document.modified());
+    r.press(Key::typed(U'r', kCtrl));
+    CHECK(r.document.song() == first);
+    r.press(Key::typed(U'r', kCtrl));
+    CHECK(r.document.song() == second);
+}

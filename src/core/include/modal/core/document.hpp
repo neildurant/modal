@@ -78,6 +78,10 @@ public:
     bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change,
               std::string_view mergeKey);
 
+    // Ends coalescing with the previous edit without changing the song or undo/redo history.
+    // An explicit outer group remains one step, as a macro or recording pass requires.
+    void breakMerge() noexcept;
+
     // Makes the edits until the matching end one undo step, with this title and place, as a
     // recording pass, a macro or a repeat with . will; with no title, its last edit's, as when
     // notes are cut at a range's edges before an operator. Groups can nest; the outermost

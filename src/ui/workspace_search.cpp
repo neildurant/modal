@@ -130,6 +130,7 @@ bool Workspace::select(std::string_view command)
             refuse("Nothing selected to keep the matches in", MessageKind::Information);
             return true;
         }
+        document_.breakMerge();
         selection_->movedNotes.reset(); // explicitly selecting again replaces fixed membership
         selection_->filter = searching_.query;
         return true;
@@ -148,6 +149,11 @@ bool Workspace::select(std::string_view command)
                                .cut = false};
     }
     view().selectObject(object, 0, *selection_);
+    if (!refused_)
+    {
+        document_.breakMerge();
+        selection_->movedNotes.reset();
+    }
     selection_->filter = matches ? searching_.query : std::nullopt;
     mode_ = Mode::Visual;
     return true;
@@ -303,6 +309,8 @@ bool Workspace::selectMatch()
     }
     view().selectObject(where() == Where::Tracks ? "object-bar-contents" : "object-note", 0,
                         *selection_);
+    document_.breakMerge();
+    selection_->movedNotes.reset();
     selection_->filter = searching_.query;
     mode_ = Mode::Visual;
     setMessage("The match selected · an operator changes it", MessageKind::Information);

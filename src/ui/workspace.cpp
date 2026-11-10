@@ -1466,6 +1466,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
         const auto kind = selectionKind(command);
+        document_.breakMerge();
         selection_ =
             Selection{.anchor = view().cursor(),
                       .kind = kind,
@@ -1485,6 +1486,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             return true;
         }
         const auto saved = *lastSelection_;
+        document_.breakMerge();
         const auto here = saved.selection.where;
         show(here == Where::TrackList   ? ViewKind::Tracks
              : here == Where::EventList ? ViewKind::EventList
@@ -2036,6 +2038,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         }
         else
         {
+            document_.breakMerge();
             selection_->kind = kind;
             selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
             selection_->starts.reset();
@@ -2139,6 +2142,7 @@ void Workspace::selectObject(std::string_view command, int count)
         beforeObject_ = previousBefore;
         return;
     }
+    document_.breakMerge(); // deliberately replacing an object's members starts another gesture
     // Taking a v selection's place, it's the object's; with V or Ctrl-v, which chose the rows, it
     // sets only their time, and operators take the selection.
     if (base.kind == SelectionKind::Range)
@@ -2204,6 +2208,7 @@ void Workspace::widenSelection()
     if (mode_ == Mode::Visual && selection_ && selection_->movedNotes &&
         view().place() != selection_->movedNotes->after)
     {
+        document_.breakMerge();
         selection_->movedNotes.reset();
     }
     if (mode_ != Mode::Visual || !selection_ || !selection_->object ||
@@ -2211,6 +2216,7 @@ void Workspace::widenSelection()
     {
         return;
     }
+    document_.breakMerge();
     selection_->object.reset();
     selection_->starts.reset();
     selection_->span = selection_->kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
@@ -2391,6 +2397,7 @@ void Workspace::endVisual()
     if (selection_)
     {
         lastSelection_ = SavedSelection{*selection_, view().cursor(), beforeObject_};
+        document_.breakMerge();
     }
     selection_.reset();
     beforeObject_.reset();

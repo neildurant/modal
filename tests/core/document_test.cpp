@@ -361,3 +361,48 @@ TEST_CASE("a group whose edits undo each other, saved before it ends, is still s
     e.document.endGroup();
     CHECK_FALSE(e.document.modified());
 }
+
+TEST_CASE("an explicit merge boundary separates gestures without making an edit")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Edited e{ppqn};
+    e.document.markSaved();
+    const auto original = e.document.song();
+    const auto grid = [&](std::int64_t denominator)
+    {
+        REQUIRE(e.document.edit(
+            "Grid", {}, [&](Song& song)
+            { song.updateTrack(e.bass(), [&](Track& track) { track.grid = {1, denominator}; }); },
+            "grid"));
+    };
+    grid(8);
+    grid(4);
+    const auto first = e.document.song();
+    e.document.breakMerge();
+    CHECK(e.document.song() == first);
+    grid(2);
+    grid(1);
+    REQUIRE(e.document.undo());
+    CHECK(e.document.song() == first);
+    REQUIRE(e.document.undo());
+    CHECK(e.document.song() == original);
+    CHECK_FALSE(e.document.modified());
+    e.document.breakMerge(); // doesn't consume redo history or dirty the saved document
+    CHECK_FALSE(e.document.modified());
+    REQUIRE(e.document.redo());
+    CHECK(e.document.song() == first);
+}
+
+TEST_CASE("breaking a merge leaves an explicit outer undo group intact")
+{
+    Edited e;
+    const auto original = e.document.song();
+    e.document.beginGroup("Macro", {});
+    REQUIRE(e.addNote(0));
+    e.document.breakMerge();
+    REQUIRE(e.addNote(e.document.song().ppqn().quarter()));
+    e.document.endGroup();
+    REQUIRE(e.document.undo());
+    CHECK(e.document.song() == original);
+    CHECK_FALSE(e.document.canUndo());
+}
