@@ -1183,16 +1183,16 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     const auto line = [&] { return encodeUtf8(v.ws.commandLine().text()); };
     const auto press = [&](NamedKey key) { v.ws.handle(Key::of(key), 0); };
 
-    // Left and Right go across the columns, six rows down, stopping at the ends.
+    // The first nearest the line, so Up goes on through them, as Tab does, and Down back.
     type(v.ws, U":bar-insert ");
     press(NamedKey::Tab); // shown, none chosen
     CHECK(line() == "bar-insert ");
     press(NamedKey::Tab);
     CHECK(line() == "bar-insert 2/4");
-    press(NamedKey::Right);
-    CHECK(line() == "bar-insert 3/8"); // the next column's first
-    press(NamedKey::Left);
-    press(NamedKey::Left);
+    press(NamedKey::Up);
+    const auto second = line();
+    CHECK(second != "bar-insert 2/4");
+    press(NamedKey::Down);
     CHECK(line() == "bar-insert 2/4");
     press(NamedKey::Escape);
 
@@ -1222,15 +1222,15 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     CHECK(v.ws.completions()->matches == std::vector<std::string>{"bar-delete", "bar-insert"});
     press(NamedKey::Escape);
 
-    // In a small window the columns scroll to keep the one chosen in view.
-    v.ws.resize(60 * kCell.width, 12 * kCell.height, kCell);
+    // More than the popup holds scroll, Page Up a popup of them on, to keep the one chosen
+    // in view, with a ▼ for those passed.
     type(v.ws, U":");
     press(NamedKey::Tab);
     REQUIRE(v.ws.completions());
     CHECK(v.ws.completions()->scroll == 0u);
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 2; ++i)
     {
-        press(NamedKey::PageDown);
+        press(NamedKey::PageUp);
     }
     REQUIRE(v.ws.completions());
     CHECK(v.ws.completions()->scroll > 0u);
@@ -1239,8 +1239,45 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
                               [](const Region& r)
                               {
                                   return std::ranges::any_of(r.text, [](const TextRun& run)
-                                                             { return run.text == U"◀"; });
+                                                             { return run.text == U"▼"; });
                               }));
+}
+
+TEST_CASE("completion's matches are a popup above the word, the first nearest the line")
+{
+    Viewing v;
+    type(v.ws, U":bar-insert ");
+    v.ws.handle(Key::of(NamedKey::Tab), 0);
+    const auto shown = v.ws.completions();
+    REQUIRE(shown);
+    const auto frame = v.ws.frame();
+    const auto& status = frame.back().bounds;
+    const auto& line = frame[frame.size() - 2];
+    // The line on a row of its own, above the status line, which it leaves alone.
+    CHECK(line.bounds.y + line.bounds.height == status.y);
+    CHECK(encodeUtf8(line.text.front().text) == ":");
+    // The popup on the line, over the word, as wide as the longest match and a cell either side.
+    const auto popup = std::ranges::find_if(
+        frame, [&](const Region& r)
+        { return r.background == Role::Panel && r.bounds.y + r.bounds.height == line.bounds.y; });
+    REQUIRE(popup != frame.end());
+    const auto word = std::u32string_view{U":bar-insert "}.size();
+    CHECK(popup->bounds.x == line.text.front().x + static_cast<int>(word - 1) * kCell.width);
+    std::size_t widest = 0;
+    for (const auto& match : shown->matches)
+    {
+        widest = std::max(widest, decodeUtf8(match).size());
+    }
+    CHECK(popup->bounds.width ==
+          static_cast<int>(widest + (shown->matches.size() > 10 ? 4 : 2)) * kCell.width);
+    // The first match at the bottom, the next above it.
+    const auto at = [&](const std::string& text)
+    {
+        const auto run = std::ranges::find(popup->text, decodeUtf8(text), &TextRun::text);
+        return run == popup->text.end() ? -1 : run->y;
+    };
+    CHECK(at(shown->matches[0]) > at(shown->matches[1]));
+    CHECK(at(shown->matches[1]) >= 0);
 }
 
 TEST_CASE("a message too long for the status line is shown whole above it until the next key")

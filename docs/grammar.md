@@ -276,4 +276,5 @@ The leader is `,` (the `leader` setting). Its groups:
 - **A yes-or-no question** takes `y`, `n` or Escape; any other key shows it again.
 - **A question at the prompt** shows its default in brackets, which Enter takes ("how many (1)").
 - **In any line typed into,** Escape gives it up; Backspace on an empty line does nothing, so a press too many can't throw away what's being asked.
-- **`Ctrl-p`** opens the command palette: type part of a command's name or what it does. A first `@`, `#`, `'` or `?` searches sections, tracks, labels and marks, or settings.
+- **`Ctrl-p`** opens the command palette: type part of a command's name or what it does. A first `@`, `#`, `'` or `?` searches sections, tracks, labels and marks, or settings. What's typed is at the palette's top, the best match first under it; Down and Ctrl-n go to the next, Up and Ctrl-p back.
+- The `:` prompt, search and questions are typed on a row of their own above the status line, which nothing covers; Tab's matches show in a small popup above the word, the first nearest the line, Up going on through them.

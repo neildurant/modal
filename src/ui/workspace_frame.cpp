@@ -44,7 +44,7 @@ Region Workspace::listingRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
     const int height = static_cast<int>(listing_.size()) * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
+    const auto status = panelBase();
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
                   .text = {},
@@ -110,8 +110,11 @@ Frame Workspace::frame() const
     {
         frame.push_back(freezeChoiceRegion());
     }
-    frame.push_back(mode_ == Mode::CommandLine && !view().typing() ? promptRegion()
-                                                                   : statusRegion());
+    if (mode_ == Mode::CommandLine && !view().typing())
+    {
+        frame.push_back(promptRegion());
+    }
+    frame.push_back(statusRegion()); // last, never covered
     return frame;
 }
 
@@ -232,7 +235,7 @@ Region Workspace::messageRegion(const std::vector<std::string>& lines) const
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
     const int height = static_cast<int>(lines.size()) * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
+    const auto status = panelBase();
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
                   .text = {},
@@ -252,11 +255,12 @@ Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
-    const std::string mode = freezeChoice_           ? " FREEZE "
-                             : trackMove_            ? " MOVE "
-                             : view().typing()       ? " EDIT "
-                             : mode_ == Mode::Visual ? " VISUAL "
-                                                     : " NORMAL ";
+    const std::string mode = freezeChoice_     ? " FREEZE "
+                             : trackMove_      ? " MOVE "
+                             : view().typing() ? " EDIT "
+                             : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_)
+                                 ? " VISUAL "
+                                 : " NORMAL ";
     bottom.left = {{mode, {Role::ModeText, Role::Mode, kBold}}};
     // As wide as the widest mode, so the transport after it stays put.
     bottom.left.push_back(

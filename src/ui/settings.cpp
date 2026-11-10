@@ -93,6 +93,9 @@ Settings::Settings()
                   "Whether the hint menu shows, after a pause, the keys that can follow those "
                   "typed",
                   true),
+          setting("palettelines",
+                  "How many matches the command palette (Ctrl-p) shows below what's typed",
+                  std::int64_t{10}, 3, 40),
           setting("hintdelay",
                   "How long to wait, in milliseconds, after keys that start longer bindings, "
                   "before the hint menu shows what can follow",

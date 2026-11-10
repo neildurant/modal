@@ -114,25 +114,18 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         std::swap(prompt_.line, prompt_.searchLine);
         return command != "command-line-run" || search(text);
     }
-    // While the matches show, Down and Up go round them too, as Tab and Shift-Tab do; Left and
-    // Right go across the columns, and Page Down and Up a screen of them.
+    // While the matches show, above the line with the first nearest it, Up goes on through
+    // them as Tab does and Down back as Shift-Tab does, and Page Up and Down a popup of them.
     if (const auto shown = completions())
     {
         if (command == "command-line-newer" || command == "command-line-older")
         {
-            return complete(command == "command-line-newer" ? 1 : -1);
-        }
-        const auto columns = matchColumns(shown->matches);
-        const auto rows = static_cast<std::ptrdiff_t>(columns.rows);
-        if (command == "command-line-right" || command == "command-line-left")
-        {
-            return chooseMatch(command == "command-line-right" ? rows : -rows);
+            return complete(command == "command-line-older" ? 1 : -1);
         }
         if (command == "command-line-page-down" || command == "command-line-page-up")
         {
-            const auto page =
-                rows * static_cast<std::ptrdiff_t>(columnsShown(columns, shown->scroll));
-            return chooseMatch(command == "command-line-page-down" ? page : -page);
+            const auto page = static_cast<std::ptrdiff_t>(completionRows(shown->matches.size()));
+            return chooseMatch(command == "command-line-page-up" ? page : -page);
         }
         if (command == "command-line-backspace" || command == "command-line-delete")
         {
@@ -557,15 +550,14 @@ void Workspace::chooseIndex(std::size_t to)
     c.chosen = to;
     prompt_.line.replace(c.start, prompt_.line.cursor(), decodeUtf8(c.matches[to]));
     c.line = prompt_.line.text();
-    const auto columns = matchColumns(c.matches);
-    const auto column = to / static_cast<std::size_t>(columns.rows);
-    if (column < c.scroll)
+    const auto rows = completionRows(c.matches.size());
+    if (to < c.scroll)
     {
-        c.scroll = column;
+        c.scroll = to;
     }
-    while (column >= c.scroll + columnsShown(columns, c.scroll))
+    else if (to >= c.scroll + rows)
     {
-        ++c.scroll;
+        c.scroll = to - rows + 1;
     }
 }
 
@@ -589,49 +581,66 @@ void Workspace::refilter()
 
 Region Workspace::completionRegion(const Completions& shown) const
 {
-    // Above the prompt, as the hint menu is: the matches down and then across, each column as
-    // wide as what's in it, the one chosen in the cursor's colours; with more than fit across,
-    // those in view, a ◀ or ▶ at the side with more.
+    // A small popup above the word being completed, as wide as the longest match, growing up
+    // from the line with the first match nearest it (decided November 2026, as lighter than the
+    // palette); the one chosen in the cursor's colours, and a ▲ or ▼ where there are more.
     const int margin = BarSpacing::forCell(cell_).margin;
-    const auto columns = matchColumns(shown.matches);
-    const auto count = columnsShown(columns, shown.scroll);
     const int pad = cell_.height / 4;
-    const int height = columns.rows * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
-    Region region{.bounds = {status.x, status.y - height, status.width, height},
+    const auto rows = completionRows(shown.matches.size());
+    std::size_t widest = 0;
+    for (const auto& match : shown.matches)
+    {
+        widest = std::max(widest, decodeUtf8(match).size());
+    }
+    const bool more = shown.matches.size() > rows;
+    const int width = (static_cast<int>(widest) + (more ? 4 : 2)) * cell_.width;
+    const int height = static_cast<int>(rows) * cell_.height + 2 * pad;
+    // Over the word's first character on the line, kept within the window.
+    const auto label = promptLabel().size();
+    const auto room = static_cast<std::size_t>(
+        std::max((width_ - 2 * margin) / cell_.width - 1 - static_cast<int>(label), 1));
+    const auto cursor = prompt_.line.cursor();
+    const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
+    const auto start = prompt_.completing ? prompt_.completing->start : 0;
+    const int wordX =
+        margin + static_cast<int>(label + (start > first ? start - first : 0) - 1) * cell_.width;
+    const int x = std::clamp(wordX, 0, std::max(width_ - width, 0));
+    const auto base = panelBase();
+    Region region{.bounds = {x, base.y - height, width, height},
                   .background = Role::Panel,
                   .text = {},
                   .under = {},
                   .over = {}};
     const Style plain{Role::Text, Role::Panel, kPlain};
     const Style chosen{Role::CursorText, Role::Cursor, kPlain};
-    const Style more{Role::Dim, Role::Panel, kPlain};
-    int left = 0;
-    if (shown.scroll > 0)
+    const Style dim{Role::Dim, Role::Panel, kPlain};
+    for (std::size_t r = 0; r < rows; ++r)
     {
-        region.text.push_back({margin, pad, U"◀", more});
-        left = 2;
-    }
-    const auto end = std::min(shown.scroll + count, columns.widths.size());
-    for (auto c = shown.scroll; c < end; ++c)
-    {
-        for (int row = 0; row < columns.rows; ++row)
+        const auto i = shown.scroll + r;
+        if (i >= shown.matches.size())
         {
-            const auto i =
-                c * static_cast<std::size_t>(columns.rows) + static_cast<std::size_t>(row);
-            if (i >= shown.matches.size())
-            {
-                break;
-            }
-            region.text.push_back({margin + left * cell_.width, pad + row * cell_.height,
-                                   decodeUtf8(shown.matches[i]),
-                                   shown.chosen == i ? chosen : plain});
+            break;
         }
-        left += columns.widths[c] + 3;
+        const int y = pad + static_cast<int>(rows - 1 - r) * cell_.height; // the first lowest
+        if (shown.chosen == i)
+        {
+            region.under.push_back({{0, y, width, cell_.height}, Role::Cursor, 255});
+        }
+        region.text.push_back(
+            {cell_.width, y, decodeUtf8(shown.matches[i]), shown.chosen == i ? chosen : plain});
     }
-    if (end < columns.widths.size())
+    if (more)
     {
-        region.text.push_back({margin + (columns.room - 1) * cell_.width, pad, U"▶", more});
+        const int side = width - 2 * cell_.width;
+        if (shown.scroll + rows < shown.matches.size())
+        {
+            region.text.push_back({side, pad, U"▲", dim});
+        }
+        if (shown.scroll > 0)
+        {
+            region.text.push_back(
+                {side, pad + static_cast<int>(rows - 1) * cell_.height, U"▼", dim});
+        }
     }
     return region;
 }
@@ -861,13 +870,13 @@ bool Workspace::runPalette(std::string_view command)
     if (command == "command-line-older" || command == "command-line-newer" ||
         command == "command-line-page-up" || command == "command-line-page-down")
     {
-        // Up and Down the way the list looks: for commands up is away from the line, to the
-        // matches after the best; in song order up is earlier.
-        const std::ptrdiff_t up = inSongOrder() ? -1 : 1;
-        const std::ptrdiff_t by = command == "command-line-older"     ? up
-                                  : command == "command-line-newer"   ? -up
-                                  : command == "command-line-page-up" ? up * kPaletteRows
-                                                                      : -up * kPaletteRows;
+        // Up and Down the way the list looks, from the best, or the song's first, at the top
+        // under the line (decided November 2026, after use, as Doom Emacs's M-x has it).
+        const auto page = static_cast<std::ptrdiff_t>(paletteRows());
+        const std::ptrdiff_t by = command == "command-line-older"     ? -1
+                                  : command == "command-line-newer"   ? 1
+                                  : command == "command-line-page-up" ? -page
+                                                                      : page;
         // From none chosen, the best.
         prompt_.palette->chosen =
             !prompt_.palette->chosen
@@ -879,9 +888,8 @@ bool Workspace::runPalette(std::string_view command)
     }
     if (command == "command-line-start" || command == "command-line-end")
     {
-        // Home and End: the top and the bottom of the list as it looks.
-        const bool top = command == "command-line-start";
-        prompt_.palette->chosen = top == inSongOrder() ? 0 : last;
+        // Home and End: the top and the bottom of the list.
+        prompt_.palette->chosen = command == "command-line-start" ? 0 : last;
         return true;
     }
     if (command == "command-line-run" || command == "command-line-next")
@@ -934,21 +942,32 @@ bool Workspace::runPalette(std::string_view command)
     return edited.value_or(false);
 }
 
+std::size_t Workspace::paletteRows() const
+{
+    // As many as set, or as fit above the status line with the line above them.
+    const auto wanted = settings_ != nullptr ? settings_->integer("palettelines") : 10;
+    const int pad = cell_.height / 4;
+    const int room = (layout_.bottom[0].y - cell_.height - 2 * pad) / std::max(cell_.height, 1);
+    return static_cast<std::size_t>(
+        std::max<std::int64_t>(std::min<std::int64_t>(wanted, room), 1));
+}
+
 Region Workspace::paletteRegion() const
 {
-    // Above the prompt, as completion's matches are: the best nearest the line, or in song order
-    // from the top down, each with its keys and what it does; the one chosen in the cursor's
-    // colours; those that do nothing here dimmed; a ▲ or ▼ at the side where there are more.
+    // Under its line, which is at the top (decided November 2026, after use, as Doom Emacs's
+    // M-x has it): the best first, or in song order, each with its keys and what it does; the
+    // one chosen in the cursor's colours; those that do nothing here dimmed; a ▲ or ▼ at the side
+    // where there are more. Always as high, so the line stays put as the matches narrow.
     const auto shown = paletteShown();
     // The row chosen, as an index, or past the matches if none is.
     const auto chosen = prompt_.palette->chosen ? std::min(*prompt_.palette->chosen,
                                                            shown.empty() ? 0 : shown.size() - 1)
                                                 : shown.size();
-    const auto rows = std::min<std::size_t>(shown.size(), kPaletteRows);
+    const auto rows = paletteRows();
     const auto first = chosen < shown.size() && chosen >= rows ? chosen - rows + 1 : 0;
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
-    const int height = std::max<int>(static_cast<int>(rows), 1) * cell_.height + 2 * pad;
+    const int height = static_cast<int>(rows) * cell_.height + 2 * pad;
     const auto& status = layout_.bottom[0];
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
@@ -961,10 +980,11 @@ Region Workspace::paletteRegion() const
             {margin, pad, U"No command matches", {Role::Dim, Role::Panel, kPlain}});
         return region;
     }
+    const auto count = std::min(rows, shown.size() - first);
     std::size_t titleWidth = 0;
     std::size_t keysWidth = 0;
     std::vector<std::string> keys;
-    for (auto i = first; i < first + rows; ++i)
+    for (auto i = first; i < first + count; ++i)
     {
         keys.push_back(keysFor(shown[i].name));
         titleWidth = std::max(
@@ -974,12 +994,11 @@ Region Workspace::paletteRegion() const
     }
     const auto x = [&](std::size_t column)
     { return margin + static_cast<int>(column) * cell_.width; };
-    for (std::size_t r = 0; r < rows; ++r)
+    for (std::size_t r = 0; r < count; ++r)
     {
         const auto i = first + r;
         const auto& item = shown[i];
-        const auto row = inSongOrder() ? r : rows - 1 - r; // the best at the bottom
-        const int y = pad + static_cast<int>(row) * cell_.height;
+        const int y = pad + static_cast<int>(r) * cell_.height;
         const bool isChosen = i == chosen;
         const auto background = isChosen ? Role::Cursor : Role::Panel;
         if (isChosen)
@@ -1006,21 +1025,16 @@ Region Workspace::paletteRegion() const
                                decodeUtf8(item.description),
                                {isChosen ? Role::CursorText : Role::Dim, background, kPlain}});
     }
-    // More before the first shown, or after the last, at the side they'd be.
+    // More before the first shown, or after the last.
     const int side = region.bounds.width - margin - cell_.width;
     const Style more{Role::Dim, Role::Panel, kPlain};
-    const bool before = first > 0;
-    const bool after = first + rows < shown.size();
-    const bool down = inSongOrder();
-    const int top = pad;
-    const int bottom = pad + static_cast<int>(rows - 1) * cell_.height;
-    if (down ? before : after)
+    if (first > 0)
     {
-        region.text.push_back({side, top, U"▲", more});
+        region.text.push_back({side, pad, U"▲", more});
     }
-    if (down ? after : before)
+    if (first + count < shown.size())
     {
-        region.text.push_back({side, bottom, U"▼", more});
+        region.text.push_back({side, pad + static_cast<int>(rows - 1) * cell_.height, U"▼", more});
     }
     return region;
 }
@@ -1050,9 +1064,26 @@ std::u32string Workspace::promptLabel() const
     return U":";
 }
 
+bool Workspace::promptRowShown() const
+{
+    return mode_ == Mode::CommandLine && !view().typing() && !prompt_.palette;
+}
+
+Rect Workspace::panelBase() const
+{
+    auto base = layout_.bottom[0];
+    if (promptRowShown())
+    {
+        base.y -= cell_.height;
+    }
+    return base;
+}
+
 Region Workspace::promptRegion() const
 {
-    // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own.
+    // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own;
+    // on a row of its own above the status line, or above the palette's matches with how many
+    // there are at its right (decided November 2026, so nothing covers the status line).
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto& text = prompt_.line.text();
     const auto cursor = prompt_.line.cursor();
@@ -1060,8 +1091,20 @@ Region Workspace::promptRegion() const
     const auto room = static_cast<std::size_t>(
         std::max((width_ - 2 * margin) / cell_.width - 1 - static_cast<int>(label.size()), 1));
     const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
-    Region region{
-        .bounds = layout_.bottom[0], .background = Role::Bar, .text = {}, .under = {}, .over = {}};
+    auto bounds = layout_.bottom[0];
+    bounds.y -= cell_.height;
+    std::string count;
+    if (prompt_.palette)
+    {
+        const int pad = cell_.height / 4;
+        bounds.y -= static_cast<int>(paletteRows()) * cell_.height + 2 * pad;
+        const auto matches = paletteShown().size();
+        count = prompt_.palette->chosen && matches > 0
+                    ? std::to_string(std::min(*prompt_.palette->chosen, matches - 1) + 1) + "/" +
+                          std::to_string(matches)
+                    : std::to_string(matches);
+    }
+    Region region{.bounds = bounds, .background = Role::Bar, .text = {}, .under = {}, .over = {}};
     const auto x = [&](std::size_t column)
     { return margin + static_cast<int>(column) * cell_.width; };
     const auto lead = label.size();
@@ -1081,6 +1124,14 @@ Region Workspace::promptRegion() const
         region.text.push_back({x(lead + end - first + (spaced ? 0 : 1)),
                                0,
                                decodeUtf8(hint),
+                               {Role::Dim, Role::Bar, kPlain}});
+    }
+    // The palette's count, as its position among the matches once one is chosen: 3/120.
+    if (!count.empty())
+    {
+        region.text.push_back({width_ - margin - static_cast<int>(count.size()) * cell_.width,
+                               0,
+                               decodeUtf8(count),
                                {Role::Dim, Role::Bar, kPlain}});
     }
     return region;

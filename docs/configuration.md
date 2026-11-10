@@ -27,7 +27,7 @@ If a command fails, the first error shows in the status line until you press a k
 
 `:` opens a prompt in the bottom bar, as in Vim, where any of the commands below can be typed, and Enter runs them. They take effect at once: a new theme, font size or key binding applies straight away. Escape closes the prompt, Up and Down recall the lines run before (for the session), and Backspace, Delete, the arrow keys, Home, End and `Ctrl-U` edit the line.
 
-Tab completes the word under the cursor: a command's name, or its argument, such as a setting and its value (`set theme=<Tab>`), a theme colour's role, an output port, a file or folder, a section, a meter or a note length. The first Tab completes as far as the matches agree, listing them above the prompt; Tab after that goes round them and Shift-Tab back, as do Down and Up while they show; Left and Right go across their columns, and Page Down and Up a screen of them, the list scrolling to keep the one chosen in view. Typing or deleting while they show narrows or widens them to what's typed. Only the commands that do something where the cursor is are offered. One match is completed with a space after it, ready for the next word. A word matches a name it starts, or else the start of a word in it, so `strip<Tab>` gives `section-strip`.
+Tab completes the word under the cursor: a command's name, or its argument, such as a setting and its value (`set theme=<Tab>`), a theme colour's role, an output port, a file or folder, a section, a meter or a note length. The first Tab completes as far as the matches agree, listing them in a small popup above the word, the first nearest the line; Tab after that goes round them and Shift-Tab back, as do Up and Down while they show, and Page Up and Down a popup's worth, the list scrolling to keep the one chosen in view. Typing or deleting while they show narrows or widens them to what's typed. Only the commands that do something where the cursor is are offered. One match is completed with a space after it, ready for the next word. A word matches a name it starts, or else the start of a word in it, so `strip<Tab>` gives `section-strip`.
 
 As well as the commands below, the prompt takes:
 
@@ -96,6 +96,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `timeoutlen` | `500`   | How long to wait, in milliseconds, for the rest of a key sequence (0 to 10000) |
 | `leader` | `,` | The leader key, which `<leader>` stands for in key bindings: one key, such as `,` or `<Space>` |
 | `hints` | `on` | Whether the hint menu shows, after a pause, the keys that can follow those typed |
+| `palettelines` | `10` | How many matches the command palette (`Ctrl-p`) shows below what's typed (3 to 40); it's always this high, so the line stays put |
 | `hintdelay` | `400` | How long to wait, in milliseconds, before the hint menu shows (0 to 10000; 0 shows it at once) |
 | `timingunit` | `grid` | Note-inspector coarse timing units: follow each track’s grid, or a fixed fraction such as `1/16` (1/128 to 8/1); display only |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |

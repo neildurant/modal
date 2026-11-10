@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -141,17 +142,17 @@ struct Paletting
     void press(const Key& key) { ws.handle(key, 0); }
     void open() { press(Key::typed(U'p', kCtrl)); }
 
-    // The palette's rows, best first, as text, and the one chosen.
+    // The palette's rows, from the top, under the line: best first, or in song order.
     std::vector<std::u32string> rows() const
     {
         std::vector<std::pair<int, std::u32string>> found;
         const auto frame = ws.frame();
-        const auto& prompt = frame.back().bounds;
+        const auto& status = frame.back().bounds;
         for (const auto& region : frame)
         {
-            // The panel just above the prompt, its first run each row's title.
+            // The panel just above the status line, its first run each row's title.
             if (region.background != Role::Panel || region.text.empty() ||
-                region.bounds.y + region.bounds.height != prompt.y)
+                region.bounds.y + region.bounds.height != status.y)
             {
                 continue;
             }
@@ -163,7 +164,7 @@ struct Paletting
                 }
             }
         }
-        std::ranges::sort(found, std::greater{}); // from the bottom
+        std::ranges::sort(found); // from the top
         std::vector<std::u32string> result;
         for (const auto& [y, text] : found)
         {
@@ -172,11 +173,12 @@ struct Paletting
         return result;
     }
 
+    // The prompt's line, on its row above the palette or the status line.
     std::u32string prompt() const
     {
         std::u32string text;
         const auto frame = ws.frame();
-        for (const auto& run : frame.back().text)
+        for (const auto& run : frame[frame.size() - 2].text)
         {
             text += run.text;
         }
@@ -220,7 +222,7 @@ TEST_CASE("in the palette, Up and Down choose, Tab puts the command on the promp
     p.type(U"zoom");
     const auto rows = p.rows();
     REQUIRE(rows.size() >= 2);
-    p.press(Key::of(NamedKey::Up)); // away from the line, to the next match
+    p.press(Key::of(NamedKey::Down)); // away from the line, to the next match
     p.press(Key::typed(U'p', kCtrl));
     p.press(Key::typed(U'n', kCtrl));
     p.press(Key::of(NamedKey::Tab));
@@ -249,7 +251,14 @@ TEST_CASE("in the palette, Up and Down choose, Tab puts the command on the promp
 TEST_CASE("the palette from Visual mode runs commands as their keys would there")
 {
     Paletting p;
-    const auto statusOf = [&] { return p.prompt(); };
+    const auto statusOf = [&]
+    {
+        std::u32string text;
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            text += run.text;
+        return text;
+    };
     p.type(U"vl");
     p.open();
     CHECK(p.prompt().starts_with(U"Command on bars 1–2 on every track: "));
@@ -371,7 +380,7 @@ TEST_CASE("a first character searches other things: @ sections, # tracks, ' labe
     const auto last = song.tracks().size() - 1;
     p.open();
     p.type(U"#");
-    CHECK(p.rows().size() == std::min<std::size_t>(song.tracks().size(), 12)); // as fit
+    CHECK(p.rows().size() == std::min<std::size_t>(song.tracks().size(), 10)); // as fit
     // As the palette names it: by its name, or its number if it has none.
     const auto& named = song.tracks()[last]->name;
     p.type(decodeUtf8(named.empty() ? "Track " + std::to_string(last + 1) : named));
@@ -403,7 +412,7 @@ TEST_CASE(
     Paletting p;
     const auto& song = p.document.song();
     const auto tracks = song.tracks().size();
-    REQUIRE(tracks > 12);
+    REQUIRE(tracks > 10);
     const auto name = [&](std::size_t i)
     {
         const auto& named = song.tracks()[i]->name;
@@ -411,20 +420,19 @@ TEST_CASE(
     };
     p.open();
     p.type(U"#");
-    // From the top, the conductor first, then the arrangement's order; rows() lists them from
-    // the bottom.
+    // From the top, the conductor first, then the arrangement's order.
     auto rows = p.rows();
-    REQUIRE(rows.size() == 12);
-    CHECK(rows.back() == U"Conductor");
-    CHECK(rows[10] == name(0));
-    CHECK(rows.front() == name(10));
+    REQUIRE(rows.size() == 10);
+    CHECK(rows.front() == U"Conductor");
+    CHECK(rows[1] == name(0));
+    CHECK(rows.back() == name(8));
 
     // Down from none chosen is the first; End the last, the list scrolling to it.
     p.press(Key::of(NamedKey::Down));
     p.press(Key::of(NamedKey::Down));
     p.press(Key::of(NamedKey::End));
     rows = p.rows();
-    CHECK(rows.front() == name(tracks - 1));
+    CHECK(rows.back() == name(tracks - 1));
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.arrangement().page().track() == tracks - 1);
 
@@ -438,11 +446,11 @@ TEST_CASE(
     CHECK(p.ws.eventList().track() == 0);
     p.type(U"ga");
 
-    // For commands, the best is at the bottom: Home goes up to the worst, End back down.
+    // For commands too, the best is at the top: End goes down to the worst, Home back up.
     p.open();
     p.type(U"zoom");
-    p.press(Key::of(NamedKey::Home));
     p.press(Key::of(NamedKey::End));
+    p.press(Key::of(NamedKey::Home));
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.message() == "Also: zi"); // Zoom in, the best match
 }
@@ -454,7 +462,7 @@ TEST_CASE("the : prompt shows the arguments a command takes, and the palette ask
     {
         std::u32string dimmed;
         const auto frame = p.ws.frame();
-        for (const auto& run : frame.back().text)
+        for (const auto& run : frame[frame.size() - 2].text)
         {
             if (run.style.foreground == Role::Dim)
             {
@@ -508,4 +516,35 @@ TEST_CASE("the palette says what a command does in the view the cursor is in")
     p.open();
     p.type(U"cursor-left-scroll");
     CHECK(shows(U"Move to the field before, scrolling to keep the cursor in place"));
+}
+
+TEST_CASE(
+    "the palette's line is at its top, as high however many match, with how many at its right")
+{
+    Paletting p;
+    p.open();
+    const auto layout = [&]
+    {
+        const auto frame = p.ws.frame();
+        const auto& status = frame.back().bounds;
+        const auto& line = frame[frame.size() - 2];
+        std::u32string text;
+        for (const auto& run : line.text)
+            text += run.text;
+        return std::tuple{status.y - line.bounds.y, text, line.bounds.y + line.bounds.height};
+    };
+    const auto [tall, all, lineEnd] = layout();
+    // The matches under the line, down to the status line, which nothing covers.
+    const auto frame = p.ws.frame();
+    CHECK(std::ranges::any_of(frame,
+                              [&](const Region& r)
+                              {
+                                  return r.background == Role::Panel && r.bounds.y == lineEnd &&
+                                         r.bounds.y + r.bounds.height == frame.back().bounds.y;
+                              }));
+    CHECK(all.find(U"Command: ") == 0);
+    p.type(U"zoom in");
+    const auto [narrowed, text, end] = layout();
+    CHECK(narrowed == tall); // the line stays put
+    CHECK(text.ends_with(U"1/" + decodeUtf8(std::to_string(p.rows().size()))));
 }

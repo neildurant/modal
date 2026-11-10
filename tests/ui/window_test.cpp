@@ -331,6 +331,26 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     }
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-arrangement.bmp"));
+    // The palette, its line at the top, and the : prompt's completion popup.
+    view.handle(Key::typed(U'p', kCtrl), 0);
+    for (const char32_t key : std::u32string_view{U"zo"})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-palette.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-palette-light.bmp"));
+    view.handle(Key::of(NamedKey::Escape), 0);
+    for (const char32_t key : std::u32string_view{U":bar-insert "})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    view.handle(Key::of(NamedKey::Tab), 0);
+    view.handle(Key::of(NamedKey::Tab), 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-complete.bmp"));
+    view.handle(Key::of(NamedKey::Escape), 0);
     view.setPlayer(nullptr);
     view.run("track-previous", 0);
     window->draw(view.frame(), *builtInTheme("dark"));

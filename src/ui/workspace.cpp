@@ -2442,63 +2442,6 @@ bool Workspace::undoOrRedo(bool undo)
     return true;
 }
 
-Workspace::MatchColumns Workspace::matchColumns(const std::vector<std::string>& matches) const
-{
-    // Six rows down and then across, as the hint menu is; more rows while they don't fit
-    // across, up to the main area's height, and then they scroll.
-    const int margin = BarSpacing::forCell(cell_).margin;
-    MatchColumns columns;
-    columns.room = std::max((width_ - 2 * margin) / cell_.width, 1);
-    const auto count = static_cast<int>(matches.size());
-    const int most = std::max(layout_.main.height / cell_.height - 1, 1);
-    const auto lay = [&](int rows)
-    {
-        std::vector<int> widths;
-        int total = 0;
-        for (int i = 0; i < count; ++i)
-        {
-            if (i % rows == 0)
-            {
-                widths.push_back(0);
-            }
-            widths.back() =
-                std::max(widths.back(),
-                         static_cast<int>(decodeUtf8(matches[static_cast<std::size_t>(i)]).size()));
-        }
-        for (const auto w : widths)
-        {
-            total += w + 3;
-        }
-        return std::pair{widths, total};
-    };
-    columns.rows = std::max(std::min(count, std::min(6, most)), 1);
-    auto [widths, total] = lay(columns.rows);
-    while (total > columns.room && columns.rows < std::min(count, most))
-    {
-        std::tie(widths, total) = lay(++columns.rows);
-    }
-    columns.widths = std::move(widths);
-    return columns;
-}
-
-std::size_t Workspace::columnsShown(const MatchColumns& columns, std::size_t first) const
-{
-    // As many as fit, leaving room for the markers of more either side; at least one.
-    int used = first > 0 ? 2 : 0;
-    std::size_t shown = 0;
-    for (auto c = first; c < columns.widths.size(); ++c)
-    {
-        const bool last = c + 1 == columns.widths.size();
-        if (used + columns.widths[c] + (last ? 0 : 2) > columns.room && shown > 0)
-        {
-            break;
-        }
-        used += columns.widths[c] + 3;
-        ++shown;
-    }
-    return std::max<std::size_t>(shown, 1);
-}
-
 bool Workspace::transport(std::string_view command)
 {
     if (player_ == nullptr)

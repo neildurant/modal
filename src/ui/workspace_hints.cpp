@@ -746,7 +746,7 @@ Region Workspace::operatorHintRegion(const std::vector<Hint>& hints, std::size_t
     const int shown = std::min(lines, most + 1);
     const int pad = cell_.height / 4;
     const int height = (shown + 1) * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
+    const auto status = panelBase();
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
                   .text = {},
@@ -881,7 +881,7 @@ Region Workspace::hintRegion(const std::vector<Hint>& hints) const
 
     const int pad = cell_.height / 4;
     const int height = (rows + 1) * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
+    const auto status = panelBase();
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
                   .text = {},

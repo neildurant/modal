@@ -287,16 +287,9 @@ TEST_CASE("^ asks how to change the velocity: a value, a change or a percentage"
     Operating o;
     const auto prompt = [&]
     {
-        // The bottom line's text.
+        // The prompt's row, just above the status line.
         const auto frame = o.ws.frame();
-        const auto* bottom = &frame.front();
-        for (const auto& region : frame)
-        {
-            if (region.bounds.y > bottom->bounds.y)
-            {
-                bottom = &region;
-            }
-        }
+        const auto* bottom = &frame[frame.size() - 2];
         std::u32string text;
         for (const auto& run : bottom->text)
         {
@@ -1349,7 +1342,7 @@ TEST_CASE("Each setting a transform asks for shows how it's written, and Tab its
     {
         std::u32string dimmed;
         const auto frame = o.ws.frame();
-        for (const auto& run : frame.back().text)
+        for (const auto& run : frame[frame.size() - 2].text)
         {
             if (run.style.foreground == Role::Dim)
             {
@@ -1454,7 +1447,7 @@ TEST_CASE("The search prompt says what a search can look for, and Tab completes 
     {
         std::u32string dimmed;
         const auto frame = o.ws.frame();
-        for (const auto& run : frame.back().text)
+        for (const auto& run : frame[frame.size() - 2].text)
         {
             if (run.style.foreground == Role::Dim)
             {
@@ -1535,7 +1528,7 @@ TEST_CASE("The menu's quantise asks for the grid, strength, swing and what to mo
     const auto label = [&]
     {
         const auto frame = o.ws.frame();
-        return frame.back().text.front().text;
+        return frame[frame.size() - 2].text.front().text;
     };
     // The C2 a sixty-fourth after bar 5's start, the pedal just after it.
     o.type(U"gr4]b!!q");

@@ -519,7 +519,14 @@ private:
     CommandResult labelsToSections(core::Tick from, core::Tick to);
     CommandResult renameSection(std::string_view name);
 
+    // The prompt's line, on a row of its own above the status line, or at the top of the
+    // palette, which never covers the status line; and whether it shows on its own row.
     Region promptRegion() const;
+    bool promptRowShown() const;
+    // What panels above the status line stand on: the status line, or the prompt's row.
+    Rect panelBase() const;
+    // How many of the palette's matches show, the same however many match.
+    std::size_t paletteRows() const;
     Region statusRegion() const;
     std::string operatorAbout() const;
     // The status line, without the message when it is shown above it instead.
@@ -574,7 +581,6 @@ private:
     {
         std::optional<std::size_t> chosen; // among the matches, 0 the best; none at first
     };
-    static constexpr std::ptrdiff_t kPaletteRows = 12;
     Remembered remembered_;
     const Settings* settings_ = nullptr;
     std::function<void(const Remembered&)> rememberedChanged_;
@@ -887,7 +893,7 @@ private:
         std::optional<std::size_t> chosen;
         std::size_t start = 0;
         std::u32string line;
-        std::size_t scroll = 0; // the first column shown, when they don't all fit across
+        std::size_t scroll = 0; // the first match shown, when they don't all fit
     };
     // The prompt's state, together (gathered November 2026, after a code review): the : line,
     // and the lines that take its place for a search and a key, each with its own history, as
@@ -926,16 +932,12 @@ private:
     void chooseIndex(std::size_t to);
     // After the line is edited while the matches show, they're the matches of the word now.
     void refilter();
-    // The matches in columns: how many rows, each column's width, and how many fit across from
-    // the first shown.
-    struct MatchColumns
+    // The most matches the : prompt's completion shows at once, and how many it shows now.
+    static constexpr std::size_t kCompletionRows = 10;
+    static std::size_t completionRows(std::size_t matches)
     {
-        int rows = 1;
-        std::vector<int> widths;
-        int room = 1;
-    };
-    MatchColumns matchColumns(const std::vector<std::string>& matches) const;
-    std::size_t columnsShown(const MatchColumns& columns, std::size_t first) const;
+        return std::min(matches, kCompletionRows);
+    }
     Region completionRegion(const Completions& shown) const;
     Region keysRegion() const;
     Region hintRegion(const std::vector<Hint>& hints) const;
