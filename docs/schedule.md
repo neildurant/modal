@@ -25,23 +25,22 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 
 - [x] **Done** — Fix input replacement so held Thru notes/pedals are released and the engine acknowledges reset before IDs are reused; all six Linux configurations pass and the functional trial was accepted on 10 November 2026.
 
-- [ ] **Doing** — GUI MIDI input, input-port selection and track arming. Step 8.1: the `inputs` setting, input collected in the GUI, Arm and Thru buttons in Tracks and `, r a` / `, r t`; decisions settled 9 November 2026. Step 8.1 tried and pushed 9 November 2026; step 8.2 (each track's input, input activity, try-out controls) next.
-- [ ] **To do** — Per-track Thru and monitoring while stopped or playing; input activity and controls for trying an instrument before recording.
-- [ ] **To do** — Arm and Thru columns in Tracks, input selection, and clear armed/recording state in the transport and status line.
-- [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end.
+- [x] **Done** — Step 8.1: GUI MIDI input and the machine's input-port selection, independent track arming, per-track Thru while stopped or playing, and Arm/Thru buttons in Tracks. Tried and published; validation is in status.md.
+- [ ] **To do** — Step 8.2: each track's input selection and Input column, input activity/last-note display, and the machine-wide Thru control. Behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring); implementation has not started.
+- [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end; clear recording state in the transport/status line.
 - [ ] **To do** — GUI metronome controls, count-in and pre-roll; distinguish playback start from recording start.
-- [ ] **To do** — Finish held notes and pedals correctly; show the recorded material immediately; one pass, including any song extension, is one undo step.
-- [ ] **To do** — Safe stop and panic, unavailable-input handling and input-queue overflow reporting.
-- [ ] **To do** — Save the relevant track and song recording settings.
-- [ ] **To do** — Automated coverage and real MIDI recording trials; record measured results in status.md.
+- [ ] **To do** — Finish held notes and pedals correctly; show recorded material immediately; one pass, including song extension, is one undo step.
+- [ ] **To do** — Complete unavailable-input and input-overflow handling for recording, building on the existing input-loss warning and safe stop/panic.
+- [ ] **To do** — Save the remaining track and song recording settings.
+- [ ] **To do** — Automated coverage and real MIDI trials for the remaining recording features; preserve measured results in status.md.
 
-Settled 9 November 2026 (see design.md, Recording in the GUI): `R` records from the play-from marker, the `, r` group, replace/overdub a song setting shown in the status line, the `inputs` setting and independent arming with a note naming other armed tracks. Settled 10 November 2026 for step 8.2: each track's input in an Input column after Output port, input activity as an `In` light with the last note on the status line, and a `thru` setting with `, T t` (see design.md). Still to settle: the remaining saved settings. Review bounded, fair processing of heavy input here. Resolve blocking Windows SysEx delivery if needed for this work.
+The input foundation precedes step entry and loops. Behaviour and unresolved recording choices are in [design.md](design.md#input-and-recording) and [To decide](design.md#to-decide). Related engineering work is listed below.
 
 ## 9. Controllers, drums and folding
 
 - [ ] **To do** — Editable lanes for CCs, pitch bend and aftertouch, with selections, transforms and search highlighting.
 - [ ] **To do** — Switch-controller regions for sustain, sostenuto, soft pedal and similar controllers; preserve imported half-pedal values.
-- [ ] **To do** — Program-change event markers in the ruler.
+- [x] **Done** — Program-change event markers in the piano-roll ruler, delivered with bank/program setup; validation and the accepted trial are recorded in status.md.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
@@ -62,7 +61,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
 - [ ] **To do** — Song-format compatibility policy between versions.
 
-Settle buffer and history lifetimes, what counts as a jump, paste-history contents and mapping rules. Measure large-song edits and playback-plan rebuild costs here before choosing optimisations.
+Resolve the related [design questions](design.md#to-decide) before implementation. Large-song measurements support this milestone; see Engineering work as needed.
 
 ## 11. Step entry and remaining input features
 
@@ -85,7 +84,7 @@ Deliver in this order, building on linear recording:
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
 - [ ] **To do** — Count-in and pre-roll choices between passes, with each pass an undo step.
 
-Settle take resizing, loop boundaries, the erase key and pass/undo behaviour. Take lanes and comping follow in milestone 16.
+Resolve the related [design questions](design.md#to-decide) before implementation. Take lanes and comping follow in milestone 16.
 
 ## 13. Views and section navigation
 
@@ -100,7 +99,7 @@ Settle take resizing, loop boundaries, the erase key and pass/undo behaviour. Ta
 - [ ] **To do** — Hand-picked note selections.
 - [ ] **To do** — Remaining pitch-navigation commands: next sounding note above/below and direct pitch jumps.
 
-Settle ghost colours and their interaction with folding, pane limits, outline keys, cue-slot defaults and jump boundaries. Cueing requires the transport work, not an outline-first implementation.
+Resolve the related [design questions](design.md#to-decide) before implementation. Cueing follows the transport work and can be delivered independently of the outline.
 
 ## 14. Daily-use polish and version-1 completion
 
@@ -122,7 +121,8 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 
 - [ ] **To do** — Arbitrary and nested tuplets.
 - [ ] **To do** — Euclidean rhythm generation.
-- [ ] **To do** — Stretch/compress a range to a percentage or target length.
+- [x] **Done** — Existing time-stretch transform with ratio/percentage input, delivered with the full grammar.
+- [ ] **To do** — Extend time stretching/compression with a target length in beats or bars; settle range and ripple semantics before implementation.
 - [ ] **To do** — Half-speed recording, independently usable before free-time tempo fitting.
 - [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines.
 - [ ] **To do** — Chord/key track, including changes over time.
@@ -139,7 +139,7 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 - [ ] **To do** — Optional fitting to the destination key and timing, using milestone 15's foundations.
 - [ ] **To do** — Undo tree.
 
-Settle notebook storage and its relationship to registers and paste history. The notebook does not require retrospective capture.
+Notebook design details and open questions are in [design.md](design.md#feature-notes). It does not require retrospective capture.
 
 ## 17. Alternative song structures and views
 

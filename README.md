@@ -15,7 +15,7 @@ Early: it plays, opens, edits and saves songs, but it isn't yet ready for making
 
 ![The event list, playing](docs/screenshot.png)
 
-Milestone 7 is complete: Tracks, whole-track copying, musical timing controls, bank/program setup, playback quantise and Freeze. Next is basic GUI recording, followed by controller lanes, drum maps and folding, then multiple songs and editing histories. The ongoing plan and item states, including unscheduled ideas, are in [docs/schedule.md](docs/schedule.md); behaviour is specified in [docs/design.md](docs/design.md).
+The ongoing milestone plan, progress checkboxes and unscheduled ideas are in [docs/schedule.md](docs/schedule.md). See [docs/design.md](docs/design.md) for behaviour and architecture, [docs/grammar.md](docs/grammar.md) for editing keys, and [docs/status.md](docs/status.md) for the current handoff and validation results.
 
 ## Building
 

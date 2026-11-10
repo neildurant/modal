@@ -451,3 +451,135 @@ Three ways to reach any action: keys, for speed and muscle memory; the hint menu
 **Recording first and an actively maintained plan (decided 9 November 2026).** Close milestone 7 with Tracks and Freeze, then begin with basic GUI recording so new material can be recorded and Modal used in daily work. Input, arming, Thru, linear recording, metronome, count-in, pre-roll and pass-level undo precede controllers/drums/folding, multiple songs and histories, step entry, and loops/takes. Move the outline beside the later view and cueing work; it is not a dependency of basic recording. Group the remaining features by shared architecture, with version-1 completion after daily-use polish. The full agreed order is in schedule.md.
 
 Keep schedule.md as the source of truth for milestone order and To do/Doing/Done states, including completed history and an explicit unscheduled someday maybe list. Read it at session start and update it with status.md as work starts or lands. Product details and unresolved choices remain in design.md and grammar.md. In particular, folding may show named drum-map rows even if they contain no events; settle the exact controls before implementation. MIDI clock output and transport/sync leave version-1 scope and remain unscheduled with MIDI clock input/MTC. Recording and the notebook do not depend on retrospective capture, and playlist mode does not depend on patterns or linked sections.
+
+**One home for each kind of information (decided 10 November 2026).** Keep work order, item states and the someday maybe list only in schedule.md. Keep behaviour and unresolved design choices in design.md, implemented keys in grammar.md, configuration in configuration.md, and the current handoff and validation evidence in status.md. Retire design.md's parallel milestone/backlog lists and settled decision checkboxes, preserving their historical context below. Split mixed schedule entries so delivered work is not still marked To do and agreed but unbuilt behaviour is not mistaken for completed implementation.
+
+## Earlier design record
+
+Archived 10 November 2026 when schedule.md became the only maintained work plan. The material below records the earlier milestone sequence and settled choices from October–November 2026. It is historical, not a second progress checklist; old future-tense statements and milestone references describe the plan at the time. Current behaviour is in design.md and grammar.md, and current work status is in schedule.md. Unqualified cross-references in these extracts refer to sections of design.md unless they name another file.
+
+### Earlier milestone sequence
+
+Each milestone ends with something runnable and testable on both platforms. Timing is proven before any UI is built on top of it.
+
+1. **Engine and MIDI layer.** Song model, SMF import, playback through libremidi, command-line player. Loopback timing tool with jitter measurements on Linux and Windows. *Done, October 2026, measured on Windows and Linux.*
+2. **Recording.** Timestamped input, record to track, metronome, count-in and pre-roll, SMF export. Command-line recorder, verified against the loopback tool. *Done, October 2026, measured on Windows and Linux.*
+3. **Grid renderer.** SDL3 window, cell grid, font rendering, cursor, scrolling, high-DPI, keyboard input layer, keymap and theme files, resizable grid. Until the event list arrives in milestone 4, the program shows a test view (decided in milestone 3): a large scrollable grid of labelled cells under a pixel-region demo of bar lines in two meters, a sketch of the arrangement with a made-up song, and samples of each theme role, with counted Vim motions, a `modalrc` with settings, key bindings and themes, text-size keys and a minimal `:` prompt. *Done, October 2026, except the Linux checks.*
+4. **Event list view and core grammar.** The command registry, sections and the conductor track in the song model, navigation, motions, delete/yank/put, undo, transport keys, native song format save/load, inspector panel. First version usable for real work. *Done, October 2026, except the Linux checks:* the command registry; sections, the conductor and the `.modal` format; the document with undo; the event list with its motions, operators, register and field editing; the inspector; playback with the play-from marker, rewind and `:port`; the file commands and dialogs; and `:section`. Modal's own MIDI output ports on Linux followed (see Modal's own ports).
+5. **Piano roll and arrangement views.** The shared cursor and selection model first, then the arrangement as the home view, the piano roll with its velocity lane, view switching, the section strip, and taking time out and putting it in (`dab`, `P`), which ripple to the section's end. *Done, October 2026, except the Linux checks:* the workspace shared by the views with one cursor; the arrangement with its section strip and section operations; the piano roll with its pages, ruler, velocity lane, per-track grid and default note, and note editing; the grammar of ranges, objects and putting (`]b`, `ib` / `ab` / `in`, `dab`, `p` / `P`), brought forward from milestone 6 for the views; `:bar-delete` and `:bar-insert`; editing in the inspector with `e`; and markers into sections. Built on milestone 4's grammar (motions, `d` / `y` / `p`, counts, undo), so the views come before the rest of the grammar (decided October 2026): much of that grammar is about time and pitch (`ib`, `ic`, Visual blocks across tracks, transpose, quantise, velocity), and should be shaped by the views it's used in rather than by the event list alone.
+6. **Full grammar,** across all three views. Remaining operators, text objects and MIDI transforms (velocity and pedalling tools among them), Visual modes, search, leader key and hint menu, command palette, counts, `.` repeat, registers, macros, command line with completion. Parts that depend on no view (the hint menu, the palette, completion) may come earlier, where the views need them. The leader key and hint menu come first in milestone 6 (decided October 2026), the hint menu after operators with them, since they depend on nothing else planned for it (the command registry, the keymap's waiting for longer bindings, and the bars come from milestones 3 and 4) and help with learning the rest as it comes; the leader tree grows as commands are added. The order after them (decided October 2026): completion at the prompt, the other operators, the other objects, Visual modes, then the command palette (moved up, since it needs only the registry, the bindings and completion's matching, and helps with finding the rest), then `.`, registers, macros, marks and `f` / `F`, search, the MIDI transforms, the key map review, and the wrap-up. *Done, November 2026, except the Linux checks:* the grammar as it is is in grammar.md, and how it was decided in decisions.md. Added in October 2026, where they fit:
+   - **With Visual modes:** a quick way to select the whole song, as an object (its key to choose), and commands that take the selection as their range, as Vim's `:'<,'>` does, so `:marker-to-section` over a selection turns every marker in it and `:marker-to-section-all` can go: tools that compose rather than special cases.
+   - **Beside them, a small step of its own:** a stop that keeps its place with rewind on, for a single stop (its key to choose), for when playback reaches something to fix far from the play-from marker.
+   - **With marks:** to-do markers, brought forward from the ideas into version 1, then dropped once built (November 2026; see the views' marks above).
+   - **In the key map review:** `marker-set` renamed to say what it sets, the play-from marker (`play-from-set`, say), with the other commands' names looked over for the same. `field-edit` split as `J` was (one command per meaning): Enter edits the field in the event list, opens the bar in the piano roll on the arrangement's tracks, and plays from the section on the strip, all under the one name and description. *(Built November 2026: `field-edit`, `bar-open` and `section-play`, Enter bound to all three; Visual mode now takes every command a key is bound to, as Normal mode does, where it took only the first.)* `marker-set` *(built: renamed `play-from-set`)*. Descriptions that read differently in different views made to say what the command does in the view the cursor is in (decided October 2026): shared commands' descriptions are long when one sentence has to cover every view, as "Move left, scrolling to keep the cursor in place (in the event list, to the field before)". *(Built November 2026: a command can say what it does in each place, which the palette shows where the cursor is.)* The keys waiting for a character saying what they want, as `f` does (noted November 2026): `Q` "a–z : the macro to record into", `@` "a–z : the macro to play" and "@ : the last again", `"` the register (a capital to add to it), `m` the mark to set, `'` and `` ` `` the mark to go to and `'` back. `gn` and `gv` described as the "go" commands they are, going somewhere and selecting what's there (decided November 2026, as `g` reads as "go" from the rest of its menu): "Go to the next match, selected" and "Go back to the last selection" in place of "Select the next match" and "Last selection", perhaps under a heading of their own in the `g` menu.
+7. **Tracks and playback transforms.** Tracks settings, whole-track copying, musical offsets and timing controls, bank/program setup, track reordering, playback quantise and Freeze. *Done, November 2026; UI trials accepted.* The former remainder of milestone 7 has been rescheduled below.
+
+### Settled choices from the former checklist
+
+**Milestones 1–2: engine and recording**
+
+- Scheduler look-ahead. The engine sends each event itself at its exact time. Since the playback plan already holds every event's send time, there is no window to prepare: the engine sends whatever is due when it wakes, and any edit, mute or tempo change during playback applies to every event not yet sent. If milestone 1's loopback measurements show too much jitter on a platform (p99 send lateness or loopback jitter above about 1 ms), that backend switches to OS-timestamped delivery (around 50 ms ahead, recalled on stop or edit). The MIDI interface is designed to allow either. Windows measured well under the threshold (see Measured timing, Windows); Linux is still to be measured (below).
+- Panic key: `Ctrl-.`.
+- Record input: all MIDI inputs by default, optional per-track input. MIDI thru on by default, changeable.
+- Milestone 2's recording, pedal, metronome, export and tool decisions (October 2026): see Input and recording, Playback and recording behaviour, Metronome and count-in, Other files, Architecture, and Build and tooling.
+- Build tooling: vcpkg (simplest CMake and MSVC integration, all planned libraries in its registry) and Catch2 v3 (its generators make tests at several PPQNs simple).
+- Linux timing and recording, measured in October 2026 on a native install with a Roland UM-ONE and a loopback cable: plain, with chords, without the spin and with `--record` (see Measured timing, Linux). Linux stays engine-timed, as Windows does.
+- An imported SMF's time signatures apply to all tracks; a change that falls mid-bar starts a remainder bar. (Moved up from milestones 3–4, since import needs it.)
+
+**Milestones 3–4: grid and first editing view**
+
+- Milestone 3's rendering, font, DPI, key, config and test-view decisions (October 2026): see Views, Customisation, Architecture and Build and tooling.
+- Song file grammar (decided for milestone 4): see File formats.
+- Default keymap: the full set of single-key bindings, designed for muscle memory. Milestone 4 binds only its own keys (see Editing grammar and Views); the whole map was reviewed in milestone 6 (November 2026), once the leader menu could hold the rest: see grammar.md.
+- Undo granularity (decided for milestone 4): see Registers, macros and undo in decisions.md.
+- Cursor mapping when switching between arrangement, piano roll and event list: one cursor shared by the views (decided for milestone 5); see Views.
+- Default note length keys: `+` / `_` dropped; `, n` takes the current note's as the default note, and `:len` sets it (decided for milestone 5). `=` / `-` lengthen and shorten the current note.
+- Remainder bars are always the exact leftover (e.g. 1/4, 5/16). To get something else, the user selects the bars and applies a meter again, e.g. a 3/4 bar plus a 1/4 remainder re-barred as one 4/4 bar.
+- How the arrangement ruler and per-track bar lines are drawn when meters differ, at different zoom levels (settled in milestone 5; see The arrangement, as built in milestone 5). The approach is settled (time-based columns, each track's bar lines in a pixel region; see Views), and milestone 3's test view sketches the blocks, gaps, markers and ruler; the zoom levels and ruler details are confirmed in milestone 5.
+- Delete can leave silence (`dib`) or close the gap (`dab`); put can merge (`p`) or insert (`P`) (revised October 2026, from `d` / `D`; see Ranges, objects and putting in decisions.md).
+- Cut-at-edges key is `|` (rarely used, so its reach doesn't matter; rebindable like everything else).
+- Content storage (October 2026): per section, with a flattened timeline for playback and the views; see Data model.
+- Bar lines realign at section boundaries, with bar numbers running on through the song; a split mid-bar makes a remainder bar, so sections are whole bars on every track (October 2026).
+- A conductor track holds the tempo and reference meter, rather than a reference-track setting; tracks follow its meter unless they have their own, section by section (October 2026).
+- Markers belong to their section, with names unique within it; duplicated sections are numbered, in brackets ("Chorus (2)") (October 2026).
+- Ripple is section-local (October 2026); see How far ripple reaches in decisions.md.
+- The command registry is built early in milestone 4 (October 2026); see Architecture.
+- SMF export writes section starts as marker meta events and bookmarks as cue point events, so import can tell them apart (decided in milestone 4; see Markers and cue points).
+- Import keeps a file's markers as markers (decided October 2026); a command will turn a single marker into a section start, rather than an import option or a question when a file has markers.
+- Notes sustaining past a section's end when sections are reordered are kept whole (decided October 2026), with no option to cut them.
+- `D` within a section leaves the silence at the section's end (decided October 2026); filling it by looping the last bar was dropped as of doubtful use.
+
+**Milestone 5: piano roll and arrangement views**
+
+- The shared cursor and selection model (decided for milestone 5): one cursor shown by each view, Backspace to go back, and the selection as an area; see Views.
+- Grid finer / coarser: `zh` / `zl`, and `z` with Left / Right (decided for milestone 5, the way round settled in use), in the `z` family with the zoom keys, since Ctrl with `hjkl` scrolls; `Ctrl-t` toggles triplets.
+- Velocity used by `o`: a per-track default note, after Sequencer Plus Gold (decided for milestone 5, in principle): a length and a velocity, saved with the track, which new notes take, set from a note: a key takes the current note's length and velocity as the track's default (decided October 2026; the key is `, n`, for now). Changing the default on an empty spot with the note keys was proposed and dropped, since there's no note to see there, so a length or velocity would have to be judged from numbers rather than by eye. Deterministic, as drum programming needs, rather than copying the note before.
+- `zz` centres on the cursor in the views, as Vim's centres the line (October 2026), rather than the test view's `z` to centre and `zz` to reset the zoom; zoom reset needs another key.
+- The semitone motion that ignores scale lock: waits with scale lock (see Later milestones).
+- Velocity step keys in the piano roll: `Ctrl-A` / `Ctrl-X` step the current note's velocity, with counts, as they step values in the event list and numbers in Vim (decided for milestone 5); `^` comes with milestone 6. In the event list they step the field under the cursor (`number-increase` / `number-decrease`), in the piano roll the current note's velocity (`velocity-up` / `velocity-down`), by 1 a press, with counts for more (decided October 2026).
+- The length of a new empty section from `i` / `a`: 4 bars, or the count (decided for milestone 5).
+- The grammar of ranges, objects and putting (decided October 2026, replacing `D` over a motion): see Ranges, objects and putting in decisions.md.
+
+**Milestone 6: full grammar**
+
+- Section strip: keys for selecting several sections, with Visual mode (moved from milestone 5): `v` and `h` / `l` there, and `is`, `as` and `ie` (built in milestone 6).
+- Whether `#` in the palette, in the arrangement, moves the cursor to the track or opens it in the piano roll: moves the cursor to it, the piano roll and the event list switching to it (built in milestone 6).
+- Clearing search highlights: `/` and Enter, `:noh` and `, s c`, now `, S c` (decided November 2026; see Search in decisions.md).
+- Whether `g/` takes the page, the section or the track by default: none, the key chooses, in the leader's `, s` group in place of `g/` (decided November 2026; see Search in decisions.md).
+- Where the palette's frecency ranking is stored, and whether it can be reset: in `remembered`, in the state directory apart from the config directory, and `:palette-forget` forgets it (built in milestone 6).
+- Velocity transforms: the default soft-knee width (how near the limits the easing starts), the default averaging window for compress, expand and shape, and interactive step sizes per transform (decided November 2026, to be tuned in use; see MIDI transforms).
+- Re-pedal gaps: in milliseconds, as timing is heard, the pedal lifting 10 ms before a chord change and going down 60 ms after it, set by `pedallift` and `pedaldown` and in the command (decided November 2026, to be tuned in use).
+- Default parameters for each transform, and how they appear in the hint menu and command line (moved from later milestones; decided November 2026, see MIDI transforms).
+- Keys for the in-key transforms: asked each time, not a song setting; scales beyond major and minor (decided November 2026; see MIDI transforms).
+- Visual mode's side of the questions settled for Normal mode in milestone 5 (see Ranges, objects and putting in decisions.md): a selection's contents or its time, laying over or putting in, and keeping to bars: `d` leaves silence and `D` takes the time out within each section, `p` and `P` put in place of the selection, and an object's selection is exactly what its operator takes (settled in milestone 6; see grammar.md).
+
+**Milestone 7: Tracks and playback transforms (complete)**
+
+- A dedicated Tracks view first: existing settings, then numeric bank/program setup, then playback quantise. Mute/solo beside the name; shared column definitions leave room for later per-view visibility in `modalrc` and reusable instrument program tables (decided November 2026; see Views). The first settings/copying step is complete, with its revised UI trial confirmed on 6 November 2026.
+- Tracks view on `, v t`; note chasing moved from the inspector into its own column after Solo after the first UI trial (November 2026). Arm/Thru remain deferred to GUI recording and MIDI input.
+- Column order is easy to change in code: one ordered list, with stable column identities and drawing/navigation following that list (decided November 2026).
+- `gt` and `, v t` open Tracks; `3gt` selects track 3 there. Ctrl-PageDown / Ctrl-PageUp switch to next/previous track, leaving `]t` / `[t` for takes (decided November 2026).
+- First implementation includes `V` track-row selection, `y` copying complete tracks with settings and per-section content, and Normal-mode `p` / `P` inserting copies after / before. Preserve copied routing and mute/solo settings (decided November 2026).
+- Bulk absolute edits, relative per-track steps and one undo step; names individually. Visual paste replaces selected track rows (decided November 2026).
+- Preserve musical versus millisecond offset semantics through save/load, show explicit units and accept musical composites such as `+1/16-22t` (decided November 2026).
+- Offset limits: ±1000 ms or ±64 whole notes; explicit units and musical composites. Grid/fine stepping as described above (November 2026). Playback quantise interaction remains part of its later step.
+- Musical units plus signed fine ticks in the inspector, with exact bars:beats:ticks readily available; display units may be fixed or follow the editing grid, without moving notes (decided November 2026).
+- Timing inspector: aligned Start/Length coarse/fine pairs, pitch/velocities grouped on the left and exact timing on the right; follows the grid by default, fixed units through `timingunit`, separately editable fields with `e` (revised November 2026 after use).
+- Freeze: whole current track or selected Tracks rows, All or one playback transform, stopped transport, atomic batches, refusal of invalid results, cross-section movement and nearest-tick millisecond rounding (November 2026; see Freeze above).
+- Bank/program numbers, initial setup, precedence over events, live changes and shared channels: see Bank and program setup above.
+- `, e` for `:event-insert`, a stop-gap for inserting any event but a note, and tempo changes, until the controller lanes and so on have ways of their own: one key that asks, with the kinds completed, as a key per kind would run out of letters among program, pressure and polypressure (November 2026).
+- Reordering tracks (requested and built November 2026): see Reordering tracks above.
+- Playback quantise: see Playback quantise above (November 2026).
+
+**Milestone 8: basic GUI recording**
+
+- Recording keys, record point and replace/overdub indication: `R` from the play-from marker, the `, r` group, replace or overdub a song setting shown in the status line (decided November 2026; see Recording in the GUI).
+- Input selection and arming: the `inputs` setting in `modalrc`, every input by default; independent arming, with a gentle note when others are armed (decided November 2026).
+- Each track's own input, input activity and switching Thru everywhere (decided 10 November 2026, for step 8.2): a track's `input` names an input port, as `port` names an output, or is empty for every input listened to; saved with the song (`input="…"`), resolved when the plan is built as output ports are, so thru and recording take a track's input only from its port; a track naming an input not found is left out of thru and the input reported missing. An Input column after Output port in Tracks, with the same chooser, listing the input ports; dim with a warning in the inspector when not found. Input activity: `In` on the status line's right, lit for a moment as input arrives, with the last note played (`In C4 96`), in every view. A `thru` setting in `modalrc`, on by default, the machine's (as for a keyboard with local control on), with `, T t` to switch it; the status line says when it's off.
+
+**Later milestones**
+
+- Behaviour when a song's saved port isn't present on this machine: the track keeps the name and plays to nothing, the status line names the missing ports, and `:port` reassigns it (decided for milestone 4; see A port that isn't there).
+
+## Decisions and open questions
+
+- Most important from SPG: a fast, stable key-binding model that builds muscle memory.
+- Vim-like modal editing, plus a Doom Emacs-style leader key with a hint menu.
+- Leader key is `,`, with Ctrl-Space as an alternative leader in Insert mode (milestone 11; in Normal mode it plays from the cursor, decided in milestone 6); Space stays play/stop.
+- `q` is quantise; macros move to another key (`Q` proposed).
+- 960 PPQN, fixed internally, matching the common DAW editing resolution; kept as one constant so it can be raised later.
+- Arrangement is the home view; piano roll for editing a track.
+- Patterns are a nice-to-have, not version 1.
+- In-process plugin hosting is wanted eventually.
+- Configuration is a Vim-style command file, sharing the `:` command language.
+- Sections are the song's structure and markers are bookmarks (October 2026); see Sections and labels. Markers renamed labels (November 2026).
+- The velocity operator is `^`, since `v` is Visual mode, and `!` is the general transform operator (October 2026).
+- Vim uses `,` to repeat an `f` search backwards, `,` being the leader here: `f` and `F` repeat a find instead, as Doom Emacs's evil-snipe does (decided October 2026; changed November 2026 to `;` the same way and `Alt-;` the other). The scale-lock key is still to choose (see To decide, Later milestones).
+- Piano roll navigation, grid and default note length (October 2026): a crosshair cursor; `{` / `}` keep the position in the bar, with bar lines on `[b` / `]b` (`[[` / `]]` until October 2026); `gg` / `G` go to the start and end of the track; pitch motions and scale lock; Alt plus a motion moves notes; a per-track grid and default note length; the piano roll shows pages of whole bars. See Editing grammar and Views.
+- Licence: GPL-3.0-or-later (October 2026), which keeps forks open and allows JUCE's AGPLv3 terms if plugins are hosted with it. The repository is public on GitHub; third-party licences are in `licenses/`, and every C++ file carries an SPDX line.
+- The name is Modal (October 2026), settled with the repository public, knowing that Modal Electronics (synthesisers) and Modal Labs (cloud computing) use the name too.
+- Language: C++20 throughout. C# was considered, but GC pauses in the real-time engine, weak Linux MIDI support in .NET libraries, and C++-only plugin hosting all favour C++, as does day-to-day familiarity.
+
+### Performance considerations from the November 2026 review
+
+The review identified bounded, round-robin processing of input so controller floods cannot hold up playback; off-thread Windows SysEx sending because WinMM blocks; a note-off heap if polyphony measurements justify it; reducing the command-line tools' 20–50 ms keyboard polling; separating core/UI/platform/SDL test executables; and measuring `Song::updateEvents` copying track events and full playback-plan compilation after each edit before deciding whether to skip or coalesce rebuilds. These were deferred pending a need or measurement; their current assignments are in schedule.md. By this documentation cleanup, transform definitions were centralised, workspace state was gathered and its implementation split by responsibility, undo used named/tagged view state, and command outcomes were separated from warning severity so warnings no longer failed macros.

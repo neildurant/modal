@@ -4,24 +4,13 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 *Last updated 10 November 2026: reviewed through `5e2885b`; the input-replacement fix is locally validated and its functional trial accepted. The ongoing plan is in [schedule.md](schedule.md). Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
-## Milestones
+## Current handoff
 
-| Milestone | State |
-| --- | --- |
-| 1. Engine and MIDI layer | Done; timing measured on Windows and Linux |
-| 2. Recording | Done; measured on Windows and Linux |
-| 3. Grid renderer | Done, except the Linux checks |
-| 4. Event list and core grammar | Done, except the Linux checks |
-| 5. Piano roll and arrangement | Done, except the Linux checks |
-| 6. Full grammar | Done (November 2026), except the Linux checks |
-| 7. Tracks and playback transforms | Done; Tracks steps and Freeze complete, UI trials confirmed |
-| 8. Basic GUI recording | Doing; step 8.1 (input, arming, Thru) done and tried |
-
-Milestone order and To do/Doing/Done item states are maintained in [schedule.md](schedule.md). Behaviour and open design questions remain in [design.md](design.md).
+Read [schedule.md](schedule.md) for the current milestone, item states and next work. Read [design.md](design.md) for behaviour and unresolved choices. The sections below preserve validation evidence and accepted trials; their historical feature summaries do not define the current specification.
 
 ## Pending
 
-- **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, and the views. Neil runs these.
+- **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
 ## Review findings
@@ -186,11 +175,9 @@ Trial accepted on 10 November 2026. Steps retained for reference, using `build/l
 
 ## Next
 
-Next is step 8.2, its choices settled 10 November 2026 but nothing built yet: each track's own input (an Input column after Output port, saved with the song, thru and recording filtered by it in the core), an `In` light with the last note on the status line, and a `thru` setting with `, T t`; see design.md's milestone 8 To-decide list. CI for `8da3d60` was cancelled; the superseding run for `5e2885b` passed (checked 10 November 2026). The input-replacement fix above is validated and its trial accepted. Linear recording with `R`, the metronome, count-in and pre-roll follow. Step entry and loops remain later milestones.
+Continue from [schedule.md's basic GUI recording milestone](schedule.md#8-basic-gui-recording). The next implementation step is 8.2; its input and monitoring behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring). Propose a small implementation plan before coding. The input-replacement fix and trial above are complete; check the latest CI result before starting.
 
-Controller lanes, drum maps and folding follow in milestone 9, including folding to named drum-map rows even without events. Multiple songs, backups, jump history and paste history follow in milestone 10. Outline and other additional views move later. MIDI clock output and transport/sync are now explicitly unscheduled, alongside the other someday maybe items. Column configuration and song-tempo fallback wait for polish. No whole-track Loop column is planned. The recent playback features still need the real MIDI trials noted above.
-
-Schedule documentation checks: local Markdown links, the milestone sequence, checkbox states, whole-tree formatting and `git diff --check` pass. This change only updates documentation; no application builds or tests were rerun.
+The documentation ownership cleanup on 10 November 2026 removed parallel milestone/progress lists from design.md and this handoff. Historical decisions were preserved in decisions.md; unresolved design choices remain in design.md. The schedule now separates delivered input/Arm/Thru work from step 8.2 and records the already-delivered program markers and ratio/percentage stretch transform. This cleanup changes no application behaviour or agreed feature order. Local Markdown links/anchors, preservation of all 80 settled checklist entries, schedule numbering and the unscheduled list were checked. Whole-tree formatting and `git diff --check` pass. No application builds or tests were rerun for the documentation-only changes.
 
 ## Contribution environment checked on 5 November 2026
 
@@ -204,7 +191,7 @@ Schedule documentation checks: local Markdown links, the milestone sequence, che
 
 ## Things to know
 
-- **The grammar** is described as it is in [grammar.md](grammar.md); the reasons for it are in [decisions.md](decisions.md). design.md's Editing grammar section holds only its principles and what's still to come. design.md's other sections (Views, MIDI transforms and the rest) still mix their current spec with dated decisions; splitting them the same way is open, if wanted.
+- **The grammar** is described as it is in [grammar.md](grammar.md); the reasons for it are in [decisions.md](decisions.md). design.md's Editing grammar section holds only its principles and what's still to come. The remaining feature sections retain some dated context; work order and progress are maintained only in schedule.md.
 - **Commands** are registered with a `CommandInfo` (name, description, per-view descriptions in `here`, where it's offered in the `where` table in `src/ui/workspace_commands.cpp`), bound in `assets/config/modalrc`, and run by the `Workspace` or the view. A key bound to several commands means the one offered where the cursor is.
 - **Refusals:** a command that doesn't do what was asked calls `refuse()` (which stops a macro); `setMessage()` only reports.
 - **Visual selections made by an object** remember it (`Selection::object`), and operators on them run as that operator with that object; a table-driven test in `tests/ui/visual_test.cpp` checks `v{count}{object}d` against `d{count}{object}` everywhere.

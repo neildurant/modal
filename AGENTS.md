@@ -15,7 +15,8 @@ These are the instructions for any AI coding agent working on Modal (Claude Code
 
 - Work one milestone at a time, in the order given in `docs/schedule.md`. Don't build ahead into later milestones.
 - Before writing code for a milestone or any substantial change, propose a short plan and wait for approval.
-- Check the design's "To decide" section for the current milestone. Raise any open items before implementing the parts they affect.
+- Check the feature questions in the design's "To decide" section before implementing the current schedule item. Raise open items before implementing the parts they affect.
+- Keep each kind of information in its home: schedule.md for work order, item states and unscheduled ideas; design.md for behaviour and unresolved design choices; grammar.md for implemented keys; configuration.md for configuration; decisions.md for dated reasoning; status.md for the current handoff and validation evidence. Link to the owning document instead of maintaining parallel progress lists. An agreed design does not mean its implementation is Done.
 - Keep changes small and reviewable. One logical change per commit, with a clear message.
 - Ask before committing a change that embeds a choice Neil might have an opinion on (behaviour, naming, keys, layout, style, dependencies), rather than only carrying out one already agreed.
 - When a decision is made during implementation that the design doesn't cover, record it: the current behaviour in `docs/design.md` (and `docs/grammar.md` for keys and editing), and the decision, dated, with its reason, in `docs/decisions.md`. Say when a decision was made ("decided November 2026", "decided after use"), never who made it: no people's names in code, docs or commit messages.
