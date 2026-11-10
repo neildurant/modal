@@ -282,14 +282,23 @@ public:
     // has changed since they were opened. Returns what couldn't be opened, if anything.
     std::string openInputs()
     {
+        if (inputResetDue_)
+        {
+            return {}; // finish the reset before opening the latest setting's ports
+        }
         const auto& wanted = settings_.text("inputs");
         if (inputsOpened_ && wanted == inputsWanted_)
         {
             return {};
         }
+        if (!inputs_.empty())
+        {
+            inputs_.clear(); // wait for their callbacks before requesting the engine reset
+            inputResetDue_ = ui::sdl::Window::now();
+            return pollInputs(*inputResetDue_);
+        }
         inputsOpened_ = true;
         inputsWanted_ = wanted;
-        inputs_.clear(); // each closed before another uses its place in the engine
 
         // The ports' full names, each once, in the order named or, for all, as listed.
         const auto available = platform::listMidiPorts().inputs;
@@ -353,6 +362,31 @@ public:
         return text.empty() ? text : "MIDI inputs: " + text;
     }
 
+    // Reconfiguration never waits on the engine on the window thread. A full command queue
+    // is retried, and input IDs stay unused until the engine has released their old state.
+    std::optional<std::int64_t> inputDeadline() const { return inputResetDue_; }
+
+    std::string pollInputs(std::int64_t now)
+    {
+        if (!inputResetDue_)
+        {
+            return {};
+        }
+        if (!inputResetRequest_)
+        {
+            inputResetRequest_ = engine_.resetInputs();
+        }
+        if (!inputResetRequest_ || !engine_.inputsReset(*inputResetRequest_))
+        {
+            inputResetDue_ = now + 10;
+            return {};
+        }
+        inputResetRequest_.reset();
+        inputResetDue_.reset();
+        inputsOpened_ = false;
+        return openInputs(); // use the latest setting, including edits made while waiting
+    }
+
 private:
     // A track's port, or for one without a port, the port setting's or the first found.
     std::optional<core::DestinationId> open(std::string_view name)
@@ -396,6 +430,8 @@ private:
     std::function<void()> inputWake_;
     bool inputsOpened_ = false;
     std::string inputsWanted_; // the inputs setting when they were opened
+    std::optional<std::uint64_t> inputResetRequest_;
+    std::optional<std::int64_t> inputResetDue_;
     // After the engine, as they send to it; the order is their InputId.
     std::vector<std::unique_ptr<platform::MidiInput>> inputs_;
 };
@@ -853,8 +889,29 @@ int main(int argc, char* argv[])
                     w.draw(view.frame(), theme);
                 },
                 .key = [&](const ui::Key& key, std::int64_t now) { return view.handle(key, now); },
-                .deadline = [&] { return view.deadline(); },
-                .wake = [&](std::int64_t now) { return view.wake(now); },
+                .deadline =
+                    [&]
+                {
+                    const auto viewDue = view.deadline();
+                    const auto inputDue = playback.inputDeadline();
+                    return viewDue && inputDue ? std::optional{std::min(*viewDue, *inputDue)}
+                           : viewDue           ? viewDue
+                                               : inputDue;
+                },
+                .wake =
+                    [&](std::int64_t now)
+                {
+                    const bool changed = view.wake(now);
+                    if (const auto due = playback.inputDeadline(); due && now >= *due)
+                    {
+                        if (auto error = playback.pollInputs(now); !error.empty())
+                        {
+                            view.setMessage(std::move(error), ui::MessageKind::Warning);
+                            return true;
+                        }
+                    }
+                    return changed;
+                },
                 .closing = closing,
                 .woken = [&](std::int64_t now) { return view.inputWoken(now); }});
     return 0;

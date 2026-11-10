@@ -66,6 +66,22 @@ bool Engine::panic()
     return woken(commands_.tryPush({Command::Kind::Panic}));
 }
 
+std::optional<std::uint64_t> Engine::resetInputs()
+{
+    const auto request = inputResetRequests_ + 1;
+    if (!woken(commands_.tryPush({Command::Kind::ResetInputs, request})))
+    {
+        return std::nullopt;
+    }
+    inputResetRequests_ = request;
+    return request;
+}
+
+bool Engine::inputsReset(std::uint64_t request) const noexcept
+{
+    return request != 0 && inputsReset_.load(std::memory_order_acquire) >= request;
+}
+
 bool Engine::quit()
 {
     return woken(commands_.tryPush({Command::Kind::Quit}));
@@ -189,15 +205,15 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
     case Command::Kind::Play:
     {
         const Snapshot* snapshot = snapshots_.current();
-        if (snapshot == nullptr || snapshot->playRequest < command.playRequest)
+        if (snapshot == nullptr || snapshot->playRequest < command.request)
         {
             return false;
         }
-        if (snapshot->playRequest == command.playRequest) // otherwise a later Play replaced it
+        if (snapshot->playRequest == command.request) // otherwise a later Play replaced it
         {
             noteStop(now);
             scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get());
-            currentPlay_ = command.playRequest;
+            currentPlay_ = command.request;
         }
         return true;
     }
@@ -211,6 +227,13 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         thru_.endAll(now);
         scheduler_.panic(now);
         currentPlay_ = 0;
+        return true;
+    case Command::Kind::ResetInputs:
+        // A producer may have sent its last message after this step's first takeInput(),
+        // before it was closed and this command was queued. Drain again before releasing.
+        takeInput();
+        thru_.endAll(clock_.now());
+        inputsReset_.store(command.request, std::memory_order_release);
         return true;
     case Command::Kind::Quit:
         noteStop(now);

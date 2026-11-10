@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -582,4 +583,157 @@ TEST_CASE("a plan, play, stop or panic wakes the engine at once")
     CHECK(engine.stop());
     CHECK(engine.panic());
     CHECK(clock.wakes == before + 4);
+}
+
+TEST_CASE("resetting inputs releases notes and pedals before input IDs can be reused")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.setPlan(armedPlan(ppqn)));
+    engine.step();
+    REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{1}, std::vector<std::uint8_t>{0x90, 64, 100}, clock.time));
+    for (const std::uint8_t pedal : {64, 66, 67})
+    {
+        REQUIRE(
+            engine.receive(InputId{0}, std::vector<std::uint8_t>{0xB0, pedal, 100}, clock.time));
+    }
+    SECTION("input already taken")
+    {
+        engine.step();
+    }
+    SECTION("old messages still queued") {}
+    // Producers are now closed; no new device may use these IDs until acknowledged.
+    const auto request = engine.resetInputs();
+    REQUIRE(request);
+    CHECK_FALSE(engine.inputsReset(*request));
+    CHECK_FALSE(engine.inputsReset(0));
+    engine.step();
+    REQUIRE(engine.inputsReset(*request));
+    CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x91, 60, 100},
+                                                                    {0xB1, 64, 100},
+                                                                    {0xB1, 66, 100},
+                                                                    {0xB1, 67, 100},
+                                                                    {0x91, 64, 100},
+                                                                    {0x81, 60, 64},
+                                                                    {0x81, 64, 64},
+                                                                    {0xB1, 64, 0},
+                                                                    {0xB1, 66, 0},
+                                                                    {0xB1, 67, 0}});
+    // Old input is still available to the recorder/control side, including queued messages.
+    std::size_t received = 0;
+    while (engine.nextReceived())
+    {
+        ++received;
+    }
+    CHECK(received == 5);
+    sink.sent.clear();
+    REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x80, 60, 64}, clock.time));
+    REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 67, 100}, clock.time));
+    engine.step();
+    CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{{0x91, 67, 100}});
+    // A later reset needs its own acknowledgement and releases the replacement's note.
+    const auto again = engine.resetInputs();
+    REQUIRE(again);
+    CHECK(*again > *request);
+    CHECK_FALSE(engine.inputsReset(*again));
+    engine.step();
+    CHECK(engine.inputsReset(*again));
+    CHECK(sink.messages() ==
+          std::vector<std::vector<std::uint8_t>>{{0x91, 67, 100}, {0x81, 67, 64}});
+}
+
+TEST_CASE("an input reset retries a full command queue without acknowledging it early")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    while (engine.stop())
+    {
+    }
+    CHECK_FALSE(engine.resetInputs());
+    CHECK_FALSE(engine.inputsReset(1));
+    engine.step();
+    const auto request = engine.resetInputs();
+    REQUIRE(request);
+    CHECK(*request == 1); // the refused request didn't consume a ticket
+    CHECK_FALSE(engine.inputsReset(*request));
+    engine.step();
+    CHECK(engine.inputsReset(*request));
+}
+
+TEST_CASE("resetting inputs keeps playback running without a global controller reset")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track) { track.events.insert({0, Note{72, 100, ppqn.quarter()}}); });
+    addTrack(song, 2, [](EditTrack& track) { track.arm = true; });
+    REQUIRE(engine.setPlan(std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName))));
+    REQUIRE(engine.play(0));
+    engine.step();
+    REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, clock.time));
+    engine.step();
+    const auto play = engine.lastPlay();
+    const auto request = engine.resetInputs();
+    REQUIRE(request);
+    engine.step();
+    CHECK(engine.inputsReset(*request));
+    CHECK(engine.status().playing);
+    CHECK_FALSE(engine.stoppedAt(play));
+    CHECK(sink.messages() ==
+          std::vector<std::vector<std::uint8_t>>{{0x90, 72, 100}, {0x91, 60, 100}, {0x81, 60, 64}});
+    runUntil(engine, clock, kStart + 501ms);
+    CHECK(sink.messages().back() == std::vector<std::uint8_t>{0x80, 72, 64});
+}
+
+TEST_CASE("an input reset drains a final callback after the step's normal input pass")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    struct FinalCallbackSink : RecordingSink
+    {
+        std::function<void()> onStop;
+        void send(DestinationId destination, std::span<const std::uint8_t> bytes,
+                  nanoseconds due) noexcept override
+        {
+            RecordingSink::send(destination, bytes, due);
+            if (bytes[0] == 0x80 && onStop)
+            {
+                auto callback = std::move(onStop);
+                callback();
+            }
+        }
+    } sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track) { track.events.insert({0, Note{72, 100, ppqn.quarter()}}); });
+    addTrack(song, 2, [](EditTrack& track) { track.arm = true; });
+    REQUIRE(engine.setPlan(std::make_shared<const PlaybackPlan>(compilePlan(song, byPortName))));
+    REQUIRE(engine.play(0));
+    engine.step();
+    std::optional<std::uint64_t> request;
+    bool received = false;
+    // While Stop is sending its note-off, emulate the final input callback, then the
+    // control side closing its producer and queuing the reset. The normal input pass has
+    // already finished, so the reset itself must drain this message before acknowledging.
+    sink.onStop = [&]
+    {
+        received = engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, clock.time);
+        request = engine.resetInputs();
+    };
+    REQUIRE(engine.stop());
+    engine.step();
+    REQUIRE(received);
+    REQUIRE(request);
+    CHECK(engine.inputsReset(*request));
+    CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{
+                                 {0x90, 72, 100}, {0x80, 72, 64}, {0x91, 60, 100}, {0x81, 60, 64}});
+    CHECK(engine.nextReceived().has_value());
 }

@@ -104,9 +104,10 @@ struct EngineCommand
         Stop,
         Panic,
         Quit,
+        ResetInputs,
     };
     Kind kind = Kind::Stop;
-    std::uint64_t playRequest = 0; // for Play: the snapshot that carries it
+    std::uint64_t request = 0; // Play: its snapshot; ResetInputs: its acknowledgement
 };
 
 } // namespace detail
@@ -152,6 +153,12 @@ public:
     // Stops, sends All Notes Off and Reset All Controllers (see Scheduler::panic), and ends
     // every held thru note and pedal.
     [[nodiscard]] bool panic();
+
+    // Close all input producers before requesting this, and keep them closed until the
+    // acknowledgement. Drains their queued messages and releases held thru notes and pedals,
+    // without stopping playback. No request is made if the command queue is full; retry later.
+    [[nodiscard]] std::optional<std::uint64_t> resetInputs();
+    bool inputsReset(std::uint64_t request) const noexcept;
 
     // Turns MIDI thru on or off for every track (on to begin with). Notes and pedals already
     // held still end where they went.
@@ -228,6 +235,7 @@ private:
     // Control side.
     std::shared_ptr<const Snapshot> latest_;
     std::uint64_t playRequests_ = 0;
+    std::uint64_t inputResetRequests_ = 0;
 
     // Shared.
     SnapshotExchange<Snapshot, 8> snapshots_;
@@ -249,6 +257,7 @@ private:
     bool quit_ = false;
 
     // Status, written by the engine thread only.
+    std::atomic<std::uint64_t> inputsReset_{0}; // acknowledgement, after releasing held input
     std::atomic<bool> playing_{false};
     std::atomic<bool> finished_{false};
     static constexpr Tick kNoPosition = -1;
