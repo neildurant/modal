@@ -9,9 +9,10 @@
 namespace modal::core
 {
 
-Player::Player(Engine& engine, PortResolver resolvePort)
+Player::Player(Engine& engine, PortResolver resolvePort, InputResolver resolveInput)
     : engine_(engine)
     , resolvePort_(std::move(resolvePort))
+    , resolveInput_(std::move(resolveInput))
 {
 }
 
@@ -32,7 +33,21 @@ std::optional<DestinationId> Player::destination(const std::string& port)
 void Player::update(const Song& song)
 {
     missingPorts_.clear();
+    missingInputs_.clear();
+    // Resolve on every update: input IDs are unavailable during an asynchronous replacement.
+    std::map<std::string, std::optional<InputId>, std::less<>> inputs;
+    for (const auto& track : song.tracks())
+    {
+        if (!track->input.empty() && !inputs.contains(track->input))
+        {
+            const auto id = resolveInput_ ? resolveInput_(track->input) : std::nullopt;
+            inputs.emplace(track->input, id);
+            if (!id)
+                missingInputs_.push_back(track->input);
+        }
+    }
     PlanOptions options;
+    options.resolveInput = [&](std::string_view name) { return inputs.find(name)->second; };
     options.bypassQuantize = bypassQuantize_;
     auto plan = std::make_shared<const PlaybackPlan>(
         compilePlan(song, [&](const Track& track) { return destination(track.port); }, options));
@@ -113,6 +128,12 @@ std::size_t Player::takeInput()
     while (const auto stamped = engine_.nextReceived())
     {
         messages += stamped->first ? 1 : 0;
+        const auto& chunk = stamped->chunk;
+        if (stamped->first && !chunk.more && chunk.size == 3 && (chunk.bytes[0] & 0xF0) == 0x90 &&
+            chunk.bytes[2] > 0)
+        {
+            lastInputNote_ = InputNote{chunk.bytes[1], chunk.bytes[2]};
+        }
     }
     return messages;
 }

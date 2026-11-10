@@ -268,3 +268,61 @@ TEST_CASE("a play or stop the engine can't take changes nothing")
     }
     FAIL("the engine's queue never filled");
 }
+
+TEST_CASE("player resolves named inputs on each update without affecting playback destinations")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = fourNotes(ppqn);
+    const auto id = song.tracks()[0]->id();
+    song.updateTrack(id,
+                     [](Track& track)
+                     {
+                         track.arm = true;
+                         track.input = "Keys";
+                     });
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    std::optional<InputId> input = InputId{1};
+    Player player{engine, [](std::string_view) { return DestinationId{1}; },
+                  [&](std::string_view name)
+                  {
+                      CHECK(name == "Keys");
+                      return input;
+                  }};
+    player.update(song);
+    CHECK(player.missingInputs().empty());
+    engine.step();
+    REQUIRE(engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0x90, 60, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 62, 95}, clock.time));
+    engine.step();
+    REQUIRE(sink.sent.size() == 1);
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x90, 62, 95});
+    CHECK(player.takeInput() == 2); // monitoring sees all inputs, before per-track filtering
+    REQUIRE(player.lastInputNote());
+    CHECK(player.lastInputNote()->pitch == 62);
+    CHECK(player.lastInputNote()->velocity == 95);
+    input.reset();
+    player.update(song);
+    CHECK(player.missingInputs() == std::vector<std::string>{"Keys"});
+    engine.step();
+    sink.sent.clear();
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 64, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x80, 62, 0}, clock.time));
+    engine.step();
+    REQUIRE(sink.sent.size() == 1); // the original held note still releases
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x80, 62, 0});
+    REQUIRE(player.play());
+    engine.step();
+    CHECK(sink.sent.size() > 1); // missing input doesn't silence the stored song
+    input = InputId{2};
+    player.update(song);
+    CHECK(player.missingInputs().empty());
+    engine.step();
+    sink.sent.clear();
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 65, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{2}, std::array<std::uint8_t, 3>{0x90, 67, 100}, clock.time));
+    engine.step();
+    REQUIRE(sink.sent.size() == 1);
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x90, 67, 100});
+}

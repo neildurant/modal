@@ -509,6 +509,7 @@ int record(const Options& options, Prepared prepared)
     core::Engine engine{outputs, clock};
     engine.setThru(!options.noThru);
 
+    std::vector<platform::MidiPort> inputPorts;
     std::vector<std::unique_ptr<platform::MidiInput>> inputs;
     for (std::size_t i = 0; i < options.inputs.size(); ++i)
     {
@@ -522,12 +523,22 @@ int record(const Options& options, Prepared prepared)
             std::cerr << "modal-record: " << opened.error << '\n';
             return 1;
         }
+        inputPorts.push_back({opened.portName});
         std::cout << "In:    " << opened.portName << '\n';
     }
 
+    const core::InputResolver resolveInput =
+        [&](std::string_view name) -> std::optional<core::InputId>
+    {
+        const auto match = platform::matchPort(inputPorts, name);
+        return match.index ? std::optional{core::InputId{static_cast<std::uint32_t>(*match.index)}}
+                           : std::nullopt;
+    };
     const auto plan = std::make_shared<const core::PlaybackPlan>(
         core::compilePlan(song, [&](const core::Track&) { return out.destination; },
-                          {.recording = true, .metronomeDestination = clickDestination}));
+                          {.recording = true,
+                           .metronomeDestination = clickDestination,
+                           .resolveInput = resolveInput}));
     auto start = core::planRecordStart(song, *recordPoint, clickDestination);
     const nanoseconds countInLength = start.countIn ? start.countIn->length : 0ns;
 
@@ -558,8 +569,8 @@ int record(const Options& options, Prepared prepared)
     const auto play = engine.lastPlay();
     const auto countInEnds = platform::now() + countInLength;
     core::Recorder recorder{song, play, *recordPoint,
-                            options.overdub ? core::RecordMode::Overdub
-                                            : core::RecordMode::Replace};
+                            options.overdub ? core::RecordMode::Overdub : core::RecordMode::Replace,
+                            resolveInput};
 
     std::signal(SIGINT, onInterrupt);
     Ending ending = Ending::Save;

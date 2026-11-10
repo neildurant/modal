@@ -135,7 +135,8 @@ public:
     }
 
     std::string name;
-    std::string port; // output port name, resolved through the machine's port aliases
+    std::string port;  // output port name, resolved through the machine's port aliases
+    std::string input; // empty takes every open input, otherwise only the named port
     int channel = kMinChannel;
     bool mute = false;
     bool solo = false;

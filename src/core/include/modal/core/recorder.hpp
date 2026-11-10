@@ -4,6 +4,7 @@
 
 #include <modal/core/event.hpp>
 #include <modal/core/input_queue.hpp>
+#include <modal/core/playback_plan.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
@@ -27,7 +28,8 @@ enum class RecordMode : std::uint8_t
 // Turns MIDI input stamped by the engine into a take on each armed track, and applies it to
 // the song when recording stops. It runs on the control side, not the engine thread.
 //
-// Each armed track gets the whole take, on its own channel, with its time offset taken off so
+// Each armed track takes its chosen input (or all inputs), on its own channel, with its time
+// offset taken off so
 // the take plays back as it was heard. Input before the record point (during a count-in or
 // pre-roll) is dropped, except notes and pedals still held there, which start there. Notes
 // and pedals still held when recording stops end there. A new note on a pitch already
@@ -37,8 +39,10 @@ class Recorder
 {
 public:
     // Records the input that arrives during the given play (see Engine::lastPlay) onto the
-    // song's armed tracks, from the record point `start`.
-    Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode = RecordMode::Replace);
+    // song's armed tracks, from the record point `start`. Named inputs are resolved once for
+    // this pass; a missing input leaves its track untouched, including in replace mode.
+    Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode = RecordMode::Replace,
+             InputResolver resolveInput = {});
 
     // Input from another play, or from none, is ignored.
     void receive(const StampedInput& input);
@@ -68,6 +72,7 @@ private:
     {
         TrackId track;
         TimeOffset timeOffset;
+        std::optional<InputId> input;
         std::vector<TakeEvent> events;
         std::vector<HeldNote> held;
         std::array<std::optional<std::size_t>, 128> latestNote; // the last note on each pitch

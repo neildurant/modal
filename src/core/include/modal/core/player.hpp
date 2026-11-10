@@ -30,7 +30,7 @@ public:
     // the default port (see the port setting).
     using PortResolver = std::function<std::optional<DestinationId>(std::string_view port)>;
 
-    Player(Engine& engine, PortResolver resolvePort);
+    Player(Engine& engine, PortResolver resolvePort, InputResolver resolveInput = {});
 
     // Compiles the song and hands the plan to the engine, in playback too. Each port's name is
     // looked up once, until forgetPorts(). A plan the engine can't take yet, its queue full, is
@@ -54,6 +54,17 @@ public:
     // The ports the tracks name that weren't found at the last update, in song order, each
     // once; "" for the default port.
     const std::vector<std::string>& missingPorts() const { return missingPorts_; }
+
+    const std::vector<std::string>& missingInputs() const { return missingInputs_; }
+
+    void setThru(bool on) { engine_.setThru(on); }
+
+    struct InputNote
+    {
+        std::uint8_t pitch;
+        std::uint8_t velocity;
+    };
+    const std::optional<InputNote>& lastInputNote() const { return lastInputNote_; }
 
     // Where playback starts from.
     Tick marker() const { return marker_; }
@@ -108,6 +119,9 @@ private:
 
     Engine& engine_;
     PortResolver resolvePort_;
+    InputResolver resolveInput_;
+    std::vector<std::string> missingInputs_;
+    std::optional<InputNote> lastInputNote_;
     std::map<std::string, std::optional<DestinationId>, std::less<>> ports_;
     std::vector<std::string> missingPorts_;
     std::vector<QuantizeWarning> quantizeWarnings_;

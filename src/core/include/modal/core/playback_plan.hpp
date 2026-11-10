@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/input_queue.hpp>
 #include <modal/core/meter_map.hpp>
 #include <modal/core/playback_transform.hpp>
 #include <modal/core/song.hpp>
@@ -19,6 +20,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -86,6 +88,7 @@ struct ThruTarget
     std::uint8_t channel; // 0-15
     int transpose;
     int velocityOffset;
+    std::optional<InputId> input = std::nullopt; // none takes every open input
 
     friend bool operator==(const ThruTarget&, const ThruTarget&) = default;
 };
@@ -169,11 +172,14 @@ struct PlaybackPlan
 // Chooses a destination for a track, or none to leave it out.
 using DestinationResolver = std::function<std::optional<DestinationId>(const Track&)>;
 
+using InputResolver = std::function<std::optional<InputId>(std::string_view)>;
+
 struct PlanOptions
 {
     bool recording = false; // whether this playback records, for the metronome's When
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
     bool bypassQuantize = false;                       // play every track as stored, to compare
+    InputResolver resolveInput = {}; // named inputs only; an empty name takes all inputs
 };
 
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise

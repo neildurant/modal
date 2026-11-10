@@ -174,3 +174,64 @@ TEST_CASE("with nothing armed, thru sends nothing")
     CHECK(thru.heldNotes() == 0);
     CHECK(thru.heldPedals() == 0);
 }
+
+TEST_CASE("thru filters every channel message by input but retains original releases")
+{
+    RecordingSink sink;
+    Thru thru{sink};
+    auto a = target(1, 0);
+    a.input = InputId{0};
+    auto b = target(2, 1);
+    b.input = InputId{1};
+    std::vector targets{a, b, target(3, 2)};
+    thru.setTargets(targets);
+    for (const auto& bytes :
+         {Bytes{0x90, 60, 100}, Bytes{0xA0, 60, 80}, Bytes{0xB0, 1, 90}, Bytes{0xB0, 64, 127},
+          Bytes{0xC0, 5}, Bytes{0xD0, 70}, Bytes{0xE0, 0, 64}})
+    {
+        sink.sent.clear();
+        thru.receive(InputId{1}, bytes, 1ms);
+        REQUIRE(sink.sent.size() == 2);
+        CHECK(sink.sent[0].destination == DestinationId{2});
+        CHECK(sink.sent[1].destination == DestinationId{3});
+    }
+    targets = {a}; // the old target is no longer selected
+    thru.setTargets(targets);
+    sink.sent.clear();
+    thru.receive(InputId{0}, Bytes{0x80, 60, 0}, 2ms);
+    CHECK(sink.sent.empty()); // a different input cannot release the held note
+    thru.receive(InputId{1}, Bytes{0x80, 60, 0}, 2ms);
+    REQUIRE(sink.sent.size() == 2);
+    CHECK(sink.sent[0].destination == DestinationId{2});
+    CHECK(sink.sent[1].destination == DestinationId{3});
+    sink.sent.clear();
+    thru.receive(InputId{1}, Bytes{0xB0, 64, 0}, 3ms);
+    REQUIRE(sink.sent.size() == 2);
+    CHECK(thru.heldNotes() == 0);
+    CHECK(thru.heldPedals() == 0);
+}
+
+TEST_CASE("disabling global thru blocks new messages while held notes and pedals finish")
+{
+    RecordingSink sink;
+    Thru thru{sink};
+    const std::vector targets{target(1, 0)};
+    thru.setTargets(targets);
+    thru.receive(kInput, Bytes{0x90, 60, 100}, 1ms);
+    thru.receive(kInput, Bytes{0xB0, 64, 127}, 1ms);
+    thru.setEnabled(false);
+    sink.sent.clear();
+    thru.receive(kInput, Bytes{0x90, 62, 100}, 2ms);
+    thru.receive(kInput, Bytes{0xB0, 64, 127}, 2ms);
+    thru.receive(kInput, Bytes{0xB0, 1, 90}, 2ms);
+    thru.receive(kInput, Bytes{0xD0, 80}, 2ms);
+    CHECK(sink.sent.empty());
+    thru.receive(kInput, Bytes{0x80, 60, 0}, 3ms);
+    thru.receive(kInput, Bytes{0xB0, 64, 0}, 3ms);
+    CHECK(sink.messages() == std::vector<Bytes>{{0x80, 60, 0}, {0xB0, 64, 0}});
+    CHECK(thru.heldNotes() == 0);
+    CHECK(thru.heldPedals() == 0);
+    thru.setEnabled(true);
+    thru.receive(kInput, Bytes{0x90, 62, 100}, 4ms);
+    CHECK(sink.sent.size() == 3);
+}

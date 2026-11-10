@@ -32,6 +32,9 @@ public:
     // the plan it comes from alive). Held notes and pedals are unaffected.
     void setTargets(std::span<const ThruTarget> targets) noexcept { targets_ = targets; }
 
+    // Disabling blocks new sends while allowing held notes and pedals to finish.
+    void setEnabled(bool enabled) noexcept { enabled_ = enabled; }
+
     // Sends a channel message on. Anything else is ignored.
     void receive(InputId input, std::span<const std::uint8_t> message,
                  std::chrono::nanoseconds time) noexcept;
@@ -76,6 +79,7 @@ private:
 
     MessageSink& sink_;
     std::span<const ThruTarget> targets_;
+    bool enabled_ = true;
     std::vector<HeldNote> notes_;   // reserved up front
     std::vector<HeldPedal> pedals_; // reserved up front
     std::size_t droppedNotes_ = 0;

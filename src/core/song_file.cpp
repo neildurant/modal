@@ -718,6 +718,10 @@ bool Reader::readTrack(std::span<const Token> tokens)
         {
             track.port = std::string{*value};
         }
+        else if (value && name == "input")
+        {
+            track.input = std::string{*value};
+        }
         else if (value && (name == "thru" || name == "chase"))
         {
             if (*value != "on" && *value != "off")
@@ -1600,6 +1604,10 @@ std::string writeSong(const Song& song)
         }
         text += track->mute ? " mute" : "";
         text += track->solo ? " solo" : "";
+        if (!track->input.empty())
+        {
+            text += " input=" + quotedText(track->input);
+        }
         text += track->arm ? " arm" : "";
         text += track->thru ? "" : " thru=off";
         text += track->chaseNotes ? "" : " chase=off";

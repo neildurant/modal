@@ -199,13 +199,16 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     for (const auto& trackPtr : tracks)
     {
         const Track& track = *trackPtr;
-        if (track.arm && track.thru)
+        const auto input = !track.input.empty() && options.resolveInput
+                               ? options.resolveInput(track.input)
+                               : std::nullopt;
+        if (track.arm && track.thru && (track.input.empty() || input))
         {
             if (const auto destination = resolveDestination(track))
             {
                 plan.thru.push_back({track.id(), *destination,
                                      static_cast<std::uint8_t>(track.channel - 1), track.transpose,
-                                     track.velocityOffset});
+                                     track.velocityOffset, input});
             }
         }
 

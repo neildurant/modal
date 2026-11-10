@@ -78,6 +78,8 @@ void Thru::receive(InputId input, std::span<const std::uint8_t> message, nanosec
     {
         for (const auto& target : targets_)
         {
+            if (!enabled_ || (target.input && *target.input != input))
+                continue;
             if (const auto pitch = transposed(data[0], target.transpose))
             {
                 const std::array<std::uint8_t, 2> moved{*pitch, data[1]};
@@ -89,6 +91,8 @@ void Thru::receive(InputId input, std::span<const std::uint8_t> message, nanosec
     {
         for (const auto& target : targets_)
         {
+            if (!enabled_ || (target.input && *target.input != input))
+                continue;
             send(sink_, target.destination, status, target.channel, data, time);
         }
     }
@@ -99,6 +103,8 @@ void Thru::noteOn(InputId input, std::uint8_t inChannel, std::uint8_t pitch, std
 {
     for (const auto& target : targets_)
     {
+        if (!enabled_ || (target.input && *target.input != input))
+            continue;
         const auto outPitch = transposed(pitch, target.transpose);
         if (!outPitch)
         {
@@ -145,6 +151,8 @@ void Thru::pedal(InputId input, std::uint8_t inChannel, std::uint8_t controller,
     {
         for (const auto& target : targets_)
         {
+            if (!enabled_ || (target.input && *target.input != input))
+                continue;
             send(sink_, target.destination, kControlChange, target.channel, data, time);
             const HeldPedal held{input, inChannel, controller, target.destination, target.channel};
             const bool known = std::ranges::any_of(pedals_,
@@ -172,6 +180,8 @@ void Thru::pedal(InputId input, std::uint8_t inChannel, std::uint8_t controller,
     }
     for (const auto& target : targets_)
     {
+        if (!enabled_ || (target.input && *target.input != input))
+            continue;
         const bool sent = std::ranges::any_of(pedals_,
                                               [&](const HeldPedal& p)
                                               {

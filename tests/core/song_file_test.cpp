@@ -47,6 +47,7 @@ Song everything(Ppqn ppqn)
                      [](Track& track)
                      {
                          track.port = "Pro-800";
+                         track.input = "Keys \"A\" \\ input";
                          track.channel = 3;
                          track.transpose = -12;
                          track.velocityOffset = 10;

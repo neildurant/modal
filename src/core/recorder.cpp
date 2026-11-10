@@ -74,7 +74,8 @@ void setEnd(Event& event, Tick end)
 
 } // namespace
 
-Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode)
+Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode,
+                   InputResolver resolveInput)
     : song_(std::move(song))
     , play_(play)
     , start_(start)
@@ -82,9 +83,11 @@ Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode)
 {
     for (const auto& track : song_.tracks())
     {
-        if (track->arm)
+        const auto input =
+            !track->input.empty() && resolveInput ? resolveInput(track->input) : std::nullopt;
+        if (track->arm && (track->input.empty() || input))
         {
-            takes_.push_back({track->id(), track->timeOffset, {}, {}, {}});
+            takes_.push_back({track->id(), track->timeOffset, input, {}, {}, {}});
         }
     }
 }
@@ -174,6 +177,8 @@ void Recorder::receiveMessage(InputId input, std::span<const std::uint8_t> messa
 
     for (auto& take : takes_)
     {
+        if (take.input && *take.input != input)
+            continue;
         const Tick tick = take.timeOffset.undo(song_.tempo(), songTime);
         if (status == 0x90 && b > 0)
         {

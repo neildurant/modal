@@ -272,7 +272,7 @@ Engine::InputBatch Engine::queuedInput() const noexcept
 
 void Engine::takeInput(InputBatch& queued, std::size_t most) noexcept
 {
-    const bool thruOn = thruOn_.load(std::memory_order_relaxed);
+    thru_.setEnabled(thruOn_.load(std::memory_order_relaxed));
     std::size_t received = 0;
     std::size_t unreported = 0;
     std::size_t empty = 0;
@@ -317,7 +317,7 @@ void Engine::takeInput(InputBatch& queued, std::size_t most) noexcept
                     }
                 }
                 const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
-                if (thruOn && first && !more && bytes[0] != 0xF0)
+                if (first && !more && bytes[0] != 0xF0)
                     thru_.receive(InputId{static_cast<std::uint32_t>(i)}, bytes, chunk->time);
                 first = false;
             } while (more);
