@@ -929,6 +929,8 @@ private:
     // Chooses the match some places on or back, as the arrow keys and Page Down and Up do,
     // stopping at the ends.
     bool chooseMatch(std::ptrdiff_t by);
+    // The match shown at the top of completion's popup, the furthest from the line.
+    std::size_t topShown() const;
     void chooseIndex(std::size_t to);
     // After the line is edited while the matches show, they're the matches of the word now.
     void refilter();

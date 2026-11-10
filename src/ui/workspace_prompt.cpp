@@ -115,12 +115,23 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         return command != "command-line-run" || search(text);
     }
     // While the matches show, above the line with the first nearest it, Up goes on through
-    // them as Tab does and Down back as Shift-Tab does, and Page Up and Down a popup of them.
+    // them and Down back, as they look, stopping at the ends; from none chosen, Up takes the one
+    // nearest the line and Down the top one shown (decided November 2026, after use, as going
+    // back from none took the last, far off); Page Up and Down a popup of them.
     if (const auto shown = completions())
     {
-        if (command == "command-line-newer" || command == "command-line-older")
+        if (command == "command-line-older")
         {
-            return complete(command == "command-line-older" ? 1 : -1);
+            return chooseMatch(1);
+        }
+        if (command == "command-line-newer")
+        {
+            if (!shown->chosen)
+            {
+                chooseIndex(topShown());
+                return true;
+            }
+            return chooseMatch(-1);
         }
         if (command == "command-line-page-down" || command == "command-line-page-up")
         {
@@ -493,7 +504,8 @@ bool Workspace::complete(int by)
     {
         const auto count = prompt_.completing->matches.size();
         const auto& chosen = prompt_.completing->chosen;
-        const auto to = !chosen  ? (by > 0 ? 0 : count - 1)
+        // From none chosen, Tab takes the first, and Shift-Tab the top one shown.
+        const auto to = !chosen  ? (by > 0 ? 0 : topShown())
                         : by > 0 ? (*chosen + 1) % count
                                  : (*chosen + count - 1) % count;
         chooseIndex(to);
@@ -533,12 +545,21 @@ bool Workspace::complete(int by)
     return true;
 }
 
+std::size_t Workspace::topShown() const
+{
+    const auto& c = *prompt_.completing;
+    return std::min(c.scroll + completionRows(c.matches.size()), c.matches.size()) - 1;
+}
+
 bool Workspace::chooseMatch(std::ptrdiff_t by)
 {
-    // From the one chosen, or with none yet from before the first (or after the last).
+    // From the one chosen, or with none yet from before the first, or going back, from above
+    // the top one shown.
     const auto& c = *prompt_.completing;
     const auto count = static_cast<std::ptrdiff_t>(c.matches.size());
-    const auto from = c.chosen ? static_cast<std::ptrdiff_t>(*c.chosen) : (by > 0 ? -1 : count);
+    const auto from = c.chosen ? static_cast<std::ptrdiff_t>(*c.chosen)
+                      : by > 0 ? -1
+                               : static_cast<std::ptrdiff_t>(topShown()) + 1;
     chooseIndex(static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(from + by, 0, count - 1)));
     return true;
 }

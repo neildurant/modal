@@ -1130,9 +1130,11 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     CHECK(line() == "bar-insert");
     v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
     CHECK(line() == "bar-delete");
-    v.ws.handle(Key::of(NamedKey::Down), 0); // Down and Up go round them too
+    v.ws.handle(Key::of(NamedKey::Up), 0); // Up and Down go through them as they look
     CHECK(line() == "bar-insert");
-    v.ws.handle(Key::of(NamedKey::Up), 0);
+    v.ws.handle(Key::of(NamedKey::Down), 0);
+    CHECK(line() == "bar-delete");
+    v.ws.handle(Key::of(NamedKey::Down), 0); // stopping at the first, by the line
     CHECK(line() == "bar-delete");
     type(v.ws, U" "); // typing goes on from there
     CHECK_FALSE(v.ws.completions());
@@ -1220,6 +1222,42 @@ TEST_CASE("the matches of completion follow what's typed, and the arrows and pag
     type(v.ws, U"bar-");
     REQUIRE(v.ws.completions());
     CHECK(v.ws.completions()->matches == std::vector<std::string>{"bar-delete", "bar-insert"});
+    press(NamedKey::Escape);
+
+    // With more than the popup holds, Down from none chosen starts at the top one shown,
+    // where the eye starts, and goes down towards the line, stopping at the first; Up from
+    // none takes the first, and stops at the last.
+    type(v.ws, U":");
+    press(NamedKey::Tab);
+    REQUIRE(v.ws.completions());
+    const auto count = v.ws.completions()->matches.size();
+    REQUIRE(count > 10);
+    press(NamedKey::Down);
+    CHECK(v.ws.completions()->chosen == 9u);
+    CHECK(v.ws.completions()->scroll == 0u); // nothing moved
+    press(NamedKey::Down);
+    CHECK(v.ws.completions()->chosen == 8u);
+    for (int i = 0; i < 12; ++i)
+    {
+        press(NamedKey::Down);
+    }
+    CHECK(v.ws.completions()->chosen == 0u);
+    press(NamedKey::Escape);
+    type(v.ws, U":");
+    press(NamedKey::Tab);
+    press(NamedKey::Up);
+    CHECK(v.ws.completions()->chosen == 0u);
+    for (std::size_t i = 0; i < count + 2; ++i)
+    {
+        press(NamedKey::Up);
+    }
+    CHECK(v.ws.completions()->chosen == count - 1);
+    press(NamedKey::Escape);
+    // Shift-Tab from none starts at the top one shown too; Tab goes round.
+    type(v.ws, U":");
+    press(NamedKey::Tab);
+    v.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    CHECK(v.ws.completions()->chosen == 9u);
     press(NamedKey::Escape);
 
     // More than the popup holds scroll, Page Up a popup of them on, to keep the one chosen
