@@ -3,6 +3,7 @@ find_package(Threads REQUIRED)
 
 add_library(modal_platform STATIC
     midi_input.cpp
+    midi_input_session.cpp
     midi_output.cpp
     midi_ports.cpp
 )

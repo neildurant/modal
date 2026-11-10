@@ -9,7 +9,7 @@
 #include <modal/core/song_file.hpp>
 #include <modal/core/version.hpp>
 #include <modal/platform/clock.hpp>
-#include <modal/platform/midi_input.hpp>
+#include <modal/platform/midi_input_session.hpp>
 #include <modal/platform/midi_output.hpp>
 #include <modal/platform/midi_ports.hpp>
 #include <modal/platform/paths.hpp>
@@ -41,7 +41,6 @@
 #include <iterator>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -111,32 +110,6 @@ std::string utcNow()
 
 using namespace modal;
 
-// The parts of a list separated by commas, without the spaces around them, leaving out empty
-// ones: none for a list that's empty or all spaces.
-std::vector<std::string> commaSeparated(std::string_view list)
-{
-    std::vector<std::string> parts;
-    while (!list.empty())
-    {
-        const auto comma = list.find(',');
-        auto part = list.substr(0, comma);
-        list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
-        while (!part.empty() && part.front() == ' ')
-        {
-            part.remove_prefix(1);
-        }
-        while (!part.empty() && part.back() == ' ')
-        {
-            part.remove_suffix(1);
-        }
-        if (!part.empty())
-        {
-            parts.emplace_back(part);
-        }
-    }
-    return parts;
-}
-
 // Playback: the engine on a thread of its own at realtime priority, sending to the MIDI
 // outputs, and the player, which opens the ports the tracks name as they're needed. When it
 // goes, playback stops and the thread ends.
@@ -159,7 +132,7 @@ public:
 
     ~Playback()
     {
-        inputs_.clear(); // before the engine they send to
+        inputs_.reset(); // close callbacks before stopping the engine they send to
         while (!engine_.stop())
         {
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
@@ -275,117 +248,14 @@ public:
         return staying.empty() ? staying : staying + " stay open until Modal restarts";
     }
 
-    // What to call when MIDI input arrives, on the input's own thread, to wake the window.
-    void setInputWake(std::function<void()> wake) { inputWake_ = std::move(wake); }
-
-    // Listens to the input ports the inputs setting names, or every one there is, if the setting
-    // has changed since they were opened. Returns what couldn't be opened, if anything.
+    // Input ownership, ID mapping and reset acknowledgements share one testable session.
+    void setInputWake(std::function<void()> wake) { inputs_->setWake(std::move(wake)); }
     std::string openInputs()
     {
-        if (inputResetDue_)
-        {
-            return {}; // finish the reset before opening the latest setting's ports
-        }
-        const auto& wanted = settings_.text("inputs");
-        if (inputsOpened_ && wanted == inputsWanted_)
-        {
-            return {};
-        }
-        if (!inputs_.empty())
-        {
-            inputs_.clear(); // wait for their callbacks before requesting the engine reset
-            inputResetDue_ = ui::sdl::Window::now();
-            return pollInputs(*inputResetDue_);
-        }
-        inputsOpened_ = true;
-        inputsWanted_ = wanted;
-
-        // The ports' full names, each once, in the order named or, for all, as listed.
-        const auto available = platform::listMidiPorts().inputs;
-        std::vector<std::string> names;
-        std::vector<std::string> problems;
-        const auto add = [&](const std::string& name)
-        {
-            if (std::ranges::find(names, name) == names.end())
-            {
-                names.push_back(name);
-            }
-        };
-        const auto named = commaSeparated(wanted);
-        for (const auto& port : named.empty() ? available : std::vector<platform::MidiPort>{})
-        {
-            add(port.name);
-        }
-        for (const auto& name : named)
-        {
-            const auto match = platform::matchPort(available, name);
-            if (match.index)
-            {
-                add(available[*match.index].name);
-            }
-            else
-            {
-                problems.push_back(name +
-                                   (match.candidates.empty() ? " not found" : " matches several"));
-            }
-        }
-        for (const auto& name : names)
-        {
-            if (inputs_.size() == core::Engine::kMaxInputs)
-            {
-                problems.push_back("only " + std::to_string(core::Engine::kMaxInputs) +
-                                   " inputs can be open, so not " + name);
-                continue;
-            }
-            const core::InputId id{static_cast<std::uint32_t>(inputs_.size())};
-            auto input = std::make_unique<platform::MidiInput>(
-                [this, id](std::span<const std::uint8_t> message, std::chrono::nanoseconds time)
-                {
-                    engine_.receive(id, message, time);
-                    if (inputWake_)
-                    {
-                        inputWake_();
-                    }
-                });
-            if (const auto opened = input->open(name); !opened.ok())
-            {
-                problems.push_back(opened.error);
-                continue;
-            }
-            inputs_.push_back(std::move(input));
-        }
-        std::string text;
-        for (const auto& problem : problems)
-        {
-            text += (text.empty() ? "" : "; ") + problem;
-        }
-        return text.empty() ? text : "MIDI inputs: " + text;
+        return inputs_->setInputs(settings_.text("inputs"), ui::sdl::Window::now());
     }
-
-    // Reconfiguration never waits on the engine on the window thread. A full command queue
-    // is retried, and input IDs stay unused until the engine has released their old state.
-    std::optional<std::int64_t> inputDeadline() const { return inputResetDue_; }
-
-    std::string pollInputs(std::int64_t now)
-    {
-        if (!inputResetDue_)
-        {
-            return {};
-        }
-        if (!inputResetRequest_)
-        {
-            inputResetRequest_ = engine_.resetInputs();
-        }
-        if (!inputResetRequest_ || !engine_.inputsReset(*inputResetRequest_))
-        {
-            inputResetDue_ = now + 10;
-            return {};
-        }
-        inputResetRequest_.reset();
-        inputResetDue_.reset();
-        inputsOpened_ = false;
-        return openInputs(); // use the latest setting, including edits made while waiting
-    }
+    std::optional<std::int64_t> inputDeadline() const { return inputs_->deadline(); }
+    std::string pollInputs(std::int64_t now) { return inputs_->poll(now); }
 
 private:
     // A track's port, or for one without a port, the port setting's or the first found.
@@ -427,13 +297,9 @@ private:
     core::Player player_{engine_, [this](std::string_view name) { return open(name); }};
     std::thread thread_;
     std::string priorityError_;
-    std::function<void()> inputWake_;
-    bool inputsOpened_ = false;
-    std::string inputsWanted_; // the inputs setting when they were opened
-    std::optional<std::uint64_t> inputResetRequest_;
-    std::optional<std::int64_t> inputResetDue_;
-    // After the engine, as they send to it; the order is their InputId.
-    std::vector<std::unique_ptr<platform::MidiInput>> inputs_;
+    // Reset explicitly before engine shutdown; callbacks can still arrive until it closes.
+    std::unique_ptr<platform::MidiInputSession> inputs_ =
+        std::make_unique<platform::MidiInputSession>(engine_);
 };
 
 // The file commands' way to the window: its dialogs, closing it, and the view.
