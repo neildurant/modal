@@ -286,7 +286,10 @@ TEST_CASE("input the engine hasn't kept up with is dropped, for that input only"
     CHECK(engine.receive(InputId{Engine::kMaxInputs - 1}, note, kStart));
     CHECK(engine.status().inputDropped == 1);
 
-    engine.step();
+    for (std::size_t pass = 0;
+         pass <= InputQueue::kCapacity && engine.status().inputReceived < InputQueue::kCapacity + 1;
+         ++pass)
+        engine.step();
     CHECK(engine.status().inputReceived == InputQueue::kCapacity + 1);
     CHECK(engine.receive(InputId{0}, note, kStart)); // room again
 }
@@ -488,7 +491,8 @@ TEST_CASE(
     std::size_t queued = 0;
     while (queued < Engine::kMaxStamped - 2)
     {
-        for (std::size_t i = 0; i < 512 && queued < Engine::kMaxStamped - 2; ++i, ++queued)
+        for (std::size_t i = 0; i < Engine::kInputBatch && queued < Engine::kMaxStamped - 2;
+             ++i, ++queued)
         {
             REQUIRE(engine.receive(InputId{0}, note, kStart));
         }
@@ -737,4 +741,189 @@ TEST_CASE("an input reset drains a final callback after the step's normal input 
     CHECK(sink.messages() == std::vector<std::vector<std::uint8_t>>{
                                  {0x90, 72, 100}, {0x80, 72, 64}, {0x91, 60, 100}, {0x81, 60, 64}});
     CHECK(engine.nextReceived().has_value());
+}
+
+TEST_CASE("input work is bounded and a busy low input does not starve a higher one")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const auto high = static_cast<std::uint32_t>(Engine::kMaxInputs - 1);
+    for (std::size_t i = 0; i < Engine::kInputBatch * 2; ++i)
+    {
+        const std::vector<std::uint8_t> cc{0xB0, 1, static_cast<std::uint8_t>(i)};
+        REQUIRE(engine.receive(InputId{0}, cc, kStart));
+        REQUIRE(engine.receive(InputId{high}, cc, kStart));
+    }
+    CHECK(engine.inputPending());
+    engine.step();
+    CHECK(engine.inputPending());
+    CHECK(engine.status().inputReceived == Engine::kInputBatch);
+    auto first = allReceived(engine);
+    REQUIRE(first.size() == Engine::kInputBatch);
+    CHECK(first[0].input == InputId{0});
+    CHECK(first[Engine::kInputQuantum].input == InputId{high});
+    std::array<std::size_t, Engine::kMaxInputs> seen{};
+    const auto checkOrder = [&](const std::vector<StampedInput>& inputs)
+    {
+        for (const auto& input : inputs)
+        {
+            CHECK(input.chunk.bytes[2] == seen[input.input.value]);
+            ++seen[input.input.value];
+        }
+    };
+    checkOrder(first);
+    for (int i = 0; i < 3; ++i)
+    {
+        engine.step();
+        checkOrder(allReceived(engine));
+    }
+    CHECK(seen[0] == Engine::kInputBatch * 2);
+    CHECK(seen[high] == Engine::kInputBatch * 2);
+    CHECK_FALSE(engine.inputPending());
+}
+
+TEST_CASE("input service rotates across every busy port over successive passes")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::vector<std::uint8_t> cc{0xB0, 1, 64};
+    for (std::uint32_t id = 0; id < Engine::kMaxInputs; ++id)
+        for (std::size_t n = 0; n < Engine::kInputQuantum; ++n)
+            REQUIRE(engine.receive(InputId{id}, cc, kStart));
+    const auto total = Engine::kMaxInputs * Engine::kInputQuantum;
+    for (std::size_t taken = 0; taken < total; taken += Engine::kInputBatch)
+        engine.step();
+    const auto inputs = allReceived(engine);
+    REQUIRE(inputs.size() == total);
+    for (std::size_t i = 0; i < inputs.size(); ++i)
+        CHECK(inputs[i].input.value == i / Engine::kInputQuantum);
+}
+
+TEST_CASE("playback sends due events while a large input backlog remains")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.setPlan(fourNotes(ppqn)));
+    REQUIRE(engine.play(0));
+    engine.step();
+    for (std::size_t n = 0; n < Engine::kInputBatch * 2; ++n)
+        REQUIRE(engine.receive(InputId{0}, std::vector<std::uint8_t>{0xB0, 1, 64}, kStart));
+    clock.time += 500ms;
+    engine.step();
+    CHECK(engine.status().inputReceived == Engine::kInputBatch);
+    CHECK(sink.messages().back() == std::vector<std::uint8_t>{0x90, 62, 100});
+    CHECK(sink.sent.back().due == kStart + 500ms);
+}
+
+TEST_CASE("a producer refilling input cannot keep a transport command in the input loop")
+{
+    struct RefillingSink : RecordingSink
+    {
+        std::function<void()> refill;
+        void send(DestinationId destination, std::span<const std::uint8_t> bytes,
+                  nanoseconds due) noexcept override
+        {
+            RecordingSink::send(destination, bytes, due);
+            if (bytes.size() == 3 && (bytes[0] & 0xF0) == 0xB0 && bytes[1] == 1 && refill)
+                refill();
+        }
+    } sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.setPlan(armedPlan(kPpqn)));
+    REQUIRE(engine.play(0));
+    engine.step();
+    const std::vector<std::uint8_t> cc{0xB0, 1, 64};
+    const auto captured = Engine::kInputBatch * 2;
+    for (std::size_t n = 0; n < captured; ++n)
+        REQUIRE(engine.receive(InputId{0}, cc, kStart));
+    std::size_t refilled = 0;
+    bool kept = true;
+    sink.refill = [&]
+    {
+        // A finite cap also makes this regression safe against the old unbounded loop.
+        if (refilled < InputQueue::kCapacity * 2)
+        {
+            kept = engine.receive(InputId{0}, cc, kStart) && kept;
+            ++refilled;
+        }
+    };
+    REQUIRE(engine.stop());
+    engine.step();
+    CHECK_FALSE(engine.status().playing);
+    CHECK(kept);
+    CHECK(refilled == captured);
+    CHECK(engine.status().inputReceived == captured);
+    const auto beforeStop = allReceived(engine);
+    REQUIRE(beforeStop.size() == captured);
+    for (const auto& input : beforeStop)
+        CHECK(input.play == engine.lastPlay());
+    sink.refill = {};
+    engine.step();
+    const auto afterStop = allReceived(engine);
+    REQUIRE(afterStop.size() == Engine::kInputBatch);
+    for (const auto& input : afterStop)
+        CHECK(input.play == 0);
+}
+
+TEST_CASE("transport drains the captured backlog before changing its recording stamp")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.setPlan(fourNotes(ppqn)));
+    REQUIRE(engine.play(0));
+    engine.step();
+    const auto total = Engine::kInputBatch + 5;
+    for (std::size_t n = 0; n < total; ++n)
+        REQUIRE(
+            engine.receive(InputId{0}, std::vector<std::uint8_t>{0x90, 60, 100}, kStart + 100ms));
+    clock.time += 200ms;
+    REQUIRE(engine.stop());
+    engine.step();
+    CHECK_FALSE(engine.status().playing);
+    const auto inputs = allReceived(engine);
+    REQUIRE(inputs.size() == total);
+    for (const auto& input : inputs)
+    {
+        CHECK(input.play == engine.lastPlay());
+        CHECK(input.tick == ppqn.quarter() / 5);
+        CHECK(input.songTime == 100ms);
+    }
+}
+
+TEST_CASE("input batching keeps a complete SysEx together at the message budget boundary")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::vector<std::uint8_t> note{0x90, 60, 100};
+    for (std::size_t n = 0; n < Engine::kInputBatch - 1; ++n)
+        REQUIRE(engine.receive(InputId{0}, note, kStart));
+    const auto chunks = Engine::kInputBatch * 2;
+    std::vector<std::uint8_t> sysex(chunks * InputChunk::kMaxBytes, 1);
+    sysex.front() = 0xF0;
+    sysex.back() = 0xF7;
+    REQUIRE(engine.receive(InputId{0}, sysex, kStart));
+    REQUIRE(engine.receive(InputId{0}, note, kStart));
+    engine.step();
+    CHECK(engine.status().inputReceived == Engine::kInputBatch);
+    const auto inputs = allReceived(engine);
+    REQUIRE(inputs.size() == Engine::kInputBatch - 1 + chunks);
+    for (std::size_t i = 0; i < chunks; ++i)
+    {
+        const auto& input = inputs[Engine::kInputBatch - 1 + i];
+        CHECK(input.first == (i == 0));
+        CHECK(input.chunk.more == (i + 1 != chunks));
+    }
+    engine.step();
+    const auto last = allReceived(engine);
+    REQUIRE(last.size() == 1);
+    CHECK(last[0].first);
+    CHECK(last[0].chunk.bytes[0] == 0x90);
 }

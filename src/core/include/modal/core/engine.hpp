@@ -169,6 +169,10 @@ public:
 
     EngineStatus status() const;
 
+    // Accepted messages not yet passed through the engine. Read before collecting stamped
+    // input: once false, all prior messages' stamped chunks have been published.
+    bool inputPending() const noexcept;
+
     // Engine thread. Runs until quit.
     void run() noexcept;
 
@@ -188,6 +192,11 @@ public:
     static constexpr std::chrono::nanoseconds kMaxSleep = std::chrono::milliseconds{1};
     static constexpr std::size_t kMaxInputs = 16;
     static constexpr std::size_t kMaxStamped = 4096; // chunks waiting for nextReceived()
+    // Normal input work per pass, in whole messages, rotating ports after each quantum.
+    // Before transport commands, the remaining captured backlog is drained; later arrivals
+    // wait for the next pass, so commands cannot be held up by a producer refilling a queue.
+    static constexpr std::size_t kInputBatch = 32;
+    static constexpr std::size_t kInputQuantum = 8;
 
 private:
     using Snapshot = detail::EngineSnapshot;
@@ -228,7 +237,9 @@ private:
     bool publish(Snapshot snapshot);
     bool woken(bool taken) noexcept;
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
-    void takeInput() noexcept;
+    using InputBatch = std::array<std::size_t, kMaxInputs>;
+    InputBatch queuedInput() const noexcept;
+    void takeInput(InputBatch& queued, std::size_t most = kInputBatch) noexcept;
     void publishStatus(std::chrono::nanoseconds now) noexcept;
     void noteStop(std::chrono::nanoseconds now) noexcept;
 
@@ -241,7 +252,8 @@ private:
     SnapshotExchange<Snapshot, 8> snapshots_;
     SpscQueue<Command, 64> commands_;
     std::unique_ptr<std::array<InputQueue, kMaxInputs>> inputs_; // too big for the stack
-    std::atomic<std::size_t> inputDropped_{0};                   // written by input threads
+    std::atomic<std::size_t> inputQueued_{0};  // accepted whole messages, from all input threads
+    std::atomic<std::size_t> inputDropped_{0}; // written by input threads
     std::atomic<bool> thruOn_{true};
     std::unique_ptr<SpscQueue<StampedInput, kMaxStamped>> stamped_;
 
@@ -254,6 +266,7 @@ private:
     Thru thru_{thruSink_};
     std::optional<Command> pending_; // a Play waiting for its snapshot
     std::uint64_t currentPlay_ = 0;  // 0 while stopped
+    std::size_t nextInput_ = 0; // rotating input service, shared by normal and transport drains
     bool quit_ = false;
 
     // Status, written by the engine thread only.

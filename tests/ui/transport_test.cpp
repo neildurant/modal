@@ -555,7 +555,7 @@ TEST_CASE("MIDI input lost for want of taking it is reported once")
     for (std::size_t i = 0; i < sent; ++i)
     {
         REQUIRE(p.engine.receive(core::InputId{0}, cc, p.clock.time));
-        if (i % 500 == 499) // within the input's own queue
+        if (i % core::Engine::kInputBatch == core::Engine::kInputBatch - 1) // let each batch drain
         {
             test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
         }
@@ -567,4 +567,31 @@ TEST_CASE("MIDI input lost for want of taking it is reported once")
                                 " messages, arriving faster than it was taken");
     CHECK(p.ws.messageKind() == MessageKind::Warning);
     CHECK_FALSE(p.ws.inputWoken(p.now)); // nothing more lost
+}
+
+TEST_CASE("an idle workspace collects every bounded input batch before stopping its timer")
+{
+    Playing p;
+    const std::array<std::uint8_t, 3> cc{0xB0, 1, 64};
+    for (std::size_t n = 0; n < core::Engine::kInputBatch * 2; ++n)
+        REQUIRE(p.engine.receive(core::InputId{0}, cc, p.clock.time));
+    p.ws.inputWoken(p.now);
+    // The engine may not yet have run when the first settle deadline arrives.
+    p.now += Workspace::kInputSettle;
+    p.ws.wake(p.now);
+    REQUIRE(p.ws.deadline());
+    CHECK(*p.ws.deadline() == p.now + Workspace::kInputSettle);
+    p.engine.step();
+    CHECK(p.player.inputPending());
+    p.now += Workspace::kInputSettle;
+    p.ws.wake(p.now);
+    CHECK_FALSE(p.engine.nextReceived());
+    REQUIRE(p.ws.deadline()); // still has an engine backlog
+    p.engine.step();
+    CHECK_FALSE(p.player.inputPending());
+    p.now += Workspace::kInputSettle;
+    p.ws.wake(p.now);
+    CHECK_FALSE(p.engine.nextReceived()); // final batch was collected too
+    CHECK_FALSE(p.ws.deadline());         // back to an idle window
+    CHECK(p.ws.message().empty());
 }

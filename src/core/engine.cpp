@@ -115,6 +115,7 @@ bool Engine::receive(InputId input, std::span<const std::uint8_t> message,
     switch ((*inputs_)[input.value].push(message, time))
     {
     case InputQueue::Result::Pushed:
+        inputQueued_.fetch_add(1, std::memory_order_release);
         clock_.wake();
         return true;
     case InputQueue::Result::Ignored:
@@ -124,6 +125,12 @@ bool Engine::receive(InputId input, std::span<const std::uint8_t> message,
         return false;
     }
     return true;
+}
+
+bool Engine::inputPending() const noexcept
+{
+    return inputQueued_.load(std::memory_order_acquire) !=
+           inputReceived_.load(std::memory_order_acquire);
 }
 
 bool Engine::woken(bool taken) noexcept
@@ -170,9 +177,10 @@ EngineWake Engine::step() noexcept
         thru_.setTargets(plan.thru);
     }
 
-    // Input first: it arrived before the commands below take effect, now, so it belongs to
-    // the play it arrived during, even if a stop was given meanwhile.
-    takeInput();
+    // Capture a finite backlog: producers can only append behind it. Whole messages stay
+    // together and ports take turns, so a flood cannot trap playback in the input loop.
+    auto input = queuedInput();
+    takeInput(input);
 
     // Commands are carried out in order; a Play whose snapshot hasn't arrived yet waits, and
     // so do the commands after it.
@@ -183,6 +191,9 @@ EngineWake Engine::step() noexcept
         {
             break;
         }
+        // Finish input captured before this transport boundary while its play/mapping is
+        // still current. This is bounded by queue capacities, not by ongoing input traffic.
+        takeInput(input, kMaxInputs * InputQueue::kCapacity);
         if (!carryOut(*command, now))
         {
             pending_ = command;
@@ -229,12 +240,15 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         currentPlay_ = 0;
         return true;
     case Command::Kind::ResetInputs:
-        // A producer may have sent its last message after this step's first takeInput(),
-        // before it was closed and this command was queued. Drain again before releasing.
-        takeInput();
+    {
+        // Producers are closed. Capture any final callback after the step's initial snapshot
+        // and finish its messages before releasing state and allowing IDs to be reused.
+        auto input = queuedInput();
+        takeInput(input, kMaxInputs * InputQueue::kCapacity);
         thru_.endAll(clock_.now());
         inputsReset_.store(command.request, std::memory_order_release);
         return true;
+    }
     case Command::Kind::Quit:
         noteStop(now);
         scheduler_.stop(now);
@@ -248,63 +262,75 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
 
 // Stamps input and passes it back, and sends channel messages thru. SysEx isn't sent thru,
 // since WinMM blocks while sending it.
-void Engine::takeInput() noexcept
+Engine::InputBatch Engine::queuedInput() const noexcept
+{
+    InputBatch result{};
+    for (std::size_t i = 0; i < kMaxInputs; ++i)
+        result[i] = (*inputs_)[i].available();
+    return result;
+}
+
+void Engine::takeInput(InputBatch& queued, std::size_t most) noexcept
 {
     const bool thruOn = thruOn_.load(std::memory_order_relaxed);
     std::size_t received = 0;
     std::size_t unreported = 0;
-    for (std::uint32_t i = 0; i < kMaxInputs; ++i)
+    std::size_t empty = 0;
+    while (received < most && empty < kMaxInputs)
     {
-        // Pushes are all or nothing (see InputQueue::push), so a SysEx's chunks come together.
-        bool continuing = false;
-        bool dropping = false; // the rest of a SysEx that couldn't all be passed back
-        while (const auto chunk = (*inputs_)[i].pop())
+        const auto i = nextInput_;
+        nextInput_ = (nextInput_ + 1) % kMaxInputs;
+        if (queued[i] == 0)
         {
-            const bool first = !continuing;
-            continuing = chunk->more;
-            if (first)
+            ++empty;
+            continue;
+        }
+        empty = 0;
+        for (std::size_t message = 0; message < kInputQuantum && received < most && queued[i] > 0;
+             ++message)
+        {
+            // SysEx is pushed atomically and finished before yielding to another port or
+            // transport command, so its framing and recording stamp cannot be split.
+            bool first = true;
+            bool dropping = false;
+            bool more = false;
+            do
             {
-                dropping = false;
-            }
-
-            if (!dropping)
-            {
-                StampedInput stamped{InputId{i}, *chunk, first, currentPlay_};
-                if (currentPlay_ != 0)
+                const auto chunk = (*inputs_)[i].pop();
+                assert(chunk && queued[i] > 0);
+                --queued[i];
+                more = chunk->more;
+                if (!dropping)
                 {
-                    stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
-                    stamped.songTime = scheduler_.songTimeAt(chunk->time).value_or(nanoseconds{0});
+                    StampedInput stamped{InputId{static_cast<std::uint32_t>(i)}, *chunk, first,
+                                         currentPlay_};
+                    if (currentPlay_ != 0)
+                    {
+                        stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
+                        stamped.songTime =
+                            scheduler_.songTimeAt(chunk->time).value_or(nanoseconds{0});
+                    }
+                    if (!stamped_->tryPush(std::move(stamped)))
+                    {
+                        ++unreported;
+                        dropping = more;
+                    }
                 }
-                if (!stamped_->tryPush(std::move(stamped)))
-                {
-                    ++unreported;
-                    dropping = chunk->more;
-                }
-            }
-
-            if (chunk->more)
-            {
-                continue;
-            }
+                const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
+                if (thruOn && first && !more && bytes[0] != 0xF0)
+                    thru_.receive(InputId{static_cast<std::uint32_t>(i)}, bytes, chunk->time);
+                first = false;
+            } while (more);
             ++received;
-            const std::span<const std::uint8_t> bytes{chunk->bytes.data(), chunk->size};
-            if (thruOn && first && bytes[0] != 0xF0)
-            {
-                thru_.receive(InputId{i}, bytes, chunk->time);
-            }
         }
     }
     if (unreported > 0)
-    {
         inputUnreported_.store(inputUnreported_.load(std::memory_order_relaxed) + unreported,
                                std::memory_order_relaxed);
-    }
     thruDroppedNotes_.store(thru_.droppedNotes(), std::memory_order_relaxed);
     if (received > 0)
-    {
         inputReceived_.store(inputReceived_.load(std::memory_order_relaxed) + received,
-                             std::memory_order_relaxed);
-    }
+                             std::memory_order_release);
 }
 
 void Engine::noteStop(nanoseconds now) noexcept

@@ -159,3 +159,19 @@ TEST_CASE("values pushed together are seen together, or not at all")
     producer.join();
     CHECK(together);
 }
+
+TEST_CASE("the consumer can snapshot queue contents without admitting later pushes")
+{
+    SpscQueue<int, 4> queue;
+    CHECK(queue.available() == 0);
+    REQUIRE(queue.tryPush(1));
+    REQUIRE(queue.tryPush(2));
+    const auto captured = queue.available();
+    REQUIRE(captured == 2);
+    CHECK(queue.tryPop() == 1);
+    REQUIRE(queue.tryPush(3));
+    CHECK(queue.tryPop() == 2);
+    CHECK(queue.available() == 1); // the captured pair ended before the new value
+    CHECK(queue.tryPop() == 3);
+    CHECK(queue.available() == 0);
+}

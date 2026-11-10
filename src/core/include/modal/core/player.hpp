@@ -84,6 +84,10 @@ public:
     // fills, and returns how many messages there were. Recording keeps them, in a later step.
     std::size_t takeInput();
 
+    // Whether more accepted input is still waiting for the engine. Check before takeInput()
+    // so the final published batch is collected before an idle GUI stops polling.
+    bool inputPending() const noexcept { return engine_.inputPending(); }
+
     // How many input messages have been lost so far: dropped because the engine didn't keep up,
     // or not passed back because takeInput() didn't.
     std::size_t inputLost() const;

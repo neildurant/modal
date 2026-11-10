@@ -1197,7 +1197,11 @@ bool Workspace::wake(std::int64_t now)
     }
     if (inputDue_ && now >= *inputDue_)
     {
-        inputDue_.reset();
+        // Check before draining: observing that the engine has finished publishes its final
+        // batch too. A large burst may take several bounded engine passes while stopped.
+        inputDue_ = player_ != nullptr && player_->inputPending()
+                        ? std::optional{now + kInputSettle}
+                        : std::nullopt;
         changed = takeInput() || changed;
     }
     else if (wasPlaying_)

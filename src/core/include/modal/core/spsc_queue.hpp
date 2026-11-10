@@ -96,6 +96,13 @@ public:
         return value;
     }
 
+    // Consumer only: values available at this instant. Later pushes cannot take these away,
+    // so this many pops form a finite snapshot even if the producer keeps filling the queue.
+    std::size_t available() const noexcept
+    {
+        return tail_.load(std::memory_order_acquire) - head_.load(std::memory_order_relaxed);
+    }
+
     // Consumer only: whether a pop would fail now.
     bool empty() const noexcept
     {

@@ -79,6 +79,8 @@ public:
 
     // Consumer.
     std::optional<InputChunk> pop() noexcept { return chunks_.tryPop(); }
+    // Whole-message pushes mean a snapshot always ends at a message boundary.
+    std::size_t available() const noexcept { return chunks_.available(); }
 
 private:
     SpscQueue<InputChunk, kCapacity> chunks_;
