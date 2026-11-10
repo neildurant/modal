@@ -26,6 +26,9 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 - [x] **Done** — Fix input replacement so held Thru notes/pedals are released and the engine acknowledges reset before IDs are reused; all six Linux configurations pass and the functional trial was accepted on 10 November 2026.
 
 - [x] **Done** — Step 8.1: GUI MIDI input and the machine's input-port selection, independent track arming, per-track Thru while stopped or playing, and Arm/Thru buttons in Tracks. Tried and published; validation is in status.md.
+- [ ] **Doing** — Before 8.2: fix moved Visual selections so they retain their notes instead of collecting neighbours; verify moves, highlighting, subsequent edits, gv and undo.
+- [ ] **To do** — Before 8.2: extract input-port ownership, ID mapping and asynchronous reset into a component tested with fake ports.
+- [ ] **To do** — Before 8.2: bound and fairly schedule engine input processing, preserving SysEx and allowing playback/transport commands to progress under load.
 - [ ] **To do** — Step 8.2: each track's input selection and Input column, input activity/last-note display, and the machine-wide Thru control. Behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring); implementation has not started.
 - [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end; clear recording state in the transport/status line.
 - [ ] **To do** — GUI metronome controls, count-in and pre-roll; distinguish playback start from recording start.
@@ -160,7 +163,6 @@ Each is a substantial, separately reviewed step:
 
 These support the milestones rather than forming a separate feature milestone. Start them when the related feature or a measurement justifies the work.
 
-- [ ] **To do** — Review bounded, fair MIDI input processing with milestone 8.
 - [ ] **To do** — Resolve blocking Windows SysEx delivery if needed for input/recording.
 - [ ] **To do** — Measure large-song edits and playback-plan rebuilds with milestone 10; optimise only where warranted.
 - [ ] **To do** — Improve note-off scheduling if density measurements justify it.

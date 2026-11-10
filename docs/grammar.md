@@ -220,7 +220,7 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 | `+` `_` | Lengthen, shorten it by a nudge |
 | `Ctrl-a` `Ctrl-x` | Velocity up, down |
 
-On a Visual selection, the moving and length keys act on every note it takes, refused as a whole if a note would overlap another of its pitch, and the selection moves with them; moves one after another undo together.
+On a Visual selection, the moving and length keys act on every note it takes, refused as a whole if a note would overlap another of its pitch, and the selection moves with them; moves one after another undo together. After the first move, it retains those notes: passing over another note does not collect it. Deleting, yanking and transforms take that same moved set, including after Escape and `gv`. Deliberately extending the selection, changing its Visual kind or choosing another object selects an area again.
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |
 
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.

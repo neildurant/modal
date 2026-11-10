@@ -2036,6 +2036,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
             selection_->span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt;
             selection_->starts.reset();
             selection_->object.reset();
+            selection_->movedNotes.reset();
             sayWholeRows();
         }
         return true;
@@ -2068,6 +2069,12 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         selection_->anchor = view().cursor();
         selection_->index = view().selectionIndex();
         view().setCursor(other);
+        if (selection_->movedNotes)
+        {
+            auto notes = std::make_shared<Selection::MovedNotes>(*selection_->movedNotes);
+            notes->after = view().place();
+            selection_->movedNotes = std::move(notes);
+        }
         if (selection_->object)
         {
             selection_->object->after = view().place(); // still the object's
@@ -2116,6 +2123,7 @@ void Workspace::selectObject(std::string_view command, int count)
     const auto at = view().place();
     const auto base = *selection_;
     message_.clear();
+    selection_->movedNotes.reset(); // choosing another object deliberately replaces its members
     view().selectObject(command, count, *selection_);
     const auto& now = *selection_;
     if (!message_.empty() && view().place() == at && now.anchor == base.anchor &&
@@ -2135,7 +2143,8 @@ void Workspace::selectObject(std::string_view command, int count)
     }
 }
 
-void Workspace::moveSelection(core::Tick by, int pitches)
+void Workspace::moveSelection(core::Tick by, int pitches,
+                              std::vector<Selection::NotePosition> notes)
 {
     if (!selection_)
     {
@@ -2160,6 +2169,12 @@ void Workspace::moveSelection(core::Tick by, int pitches)
         }
     };
     shift(*selection_);
+    if (by != 0 || pitches != 0 || selection_->movedNotes)
+    {
+        std::ranges::sort(notes);
+        selection_->movedNotes = std::make_shared<const Selection::MovedNotes>(
+            Selection::MovedNotes{*view().cursor().track, std::move(notes), view().place()});
+    }
     if (selection_->object)
     {
         auto& object = *selection_->object;
@@ -2182,6 +2197,11 @@ void Workspace::widenSelection()
 {
     // Once the cursor moves, the selection is from its anchor to the cursor again, as v's, the
     // object's exact time and starts let go: V's whole rows, or the rest's ends.
+    if (mode_ == Mode::Visual && selection_ && selection_->movedNotes &&
+        view().place() != selection_->movedNotes->after)
+    {
+        selection_->movedNotes.reset();
+    }
     if (mode_ != Mode::Visual || !selection_ || !selection_->object ||
         view().place() == selection_->object->after)
     {

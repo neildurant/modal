@@ -391,6 +391,11 @@ bool PianoRollView::takes(core::Tick tick, std::uint8_t pitch) const
     const auto span = selected();
     const auto pitches = selectedPitches();
     const auto selection = host_.selection();
+    if (selection && selection->movedNotes)
+    {
+        const auto id = trackId();
+        return id && selection->movedNotes->contains(*id, tick, pitch);
+    }
     const auto starts = selection && selection->starts ? selection->starts : span;
     return starts && tick >= starts->first && tick < starts->second &&
            (!pitches || (pitch >= pitches->first && pitch <= pitches->second));
@@ -908,7 +913,7 @@ bool PianoRollView::changeSelected(std::string_view verb,
     {
         const auto* note = std::get_if<core::Note>(&events[i].data);
         if (note != nullptr && takes(events[i].tick, note->pitch) &&
-            (!selection || !selection->filter ||
+            (!selection || !selection->filter || selection->movedNotes ||
              core::matches(*selection->filter, events[i].data, song.ppqn())))
         {
             which.push_back(i);
@@ -969,7 +974,13 @@ bool PianoRollView::changeSelected(std::string_view verb,
         [&](core::EventList& list) { list = working; }, "selected-" + std::string{verb});
     moveTo(time_ + by);
     moveToPitch(std::clamp(int{pitch_} + up, 0, 127));
-    host_.moveSelection(by, up);
+    std::vector<Selection::NotePosition> notes;
+    notes.reserve(moves.size());
+    for (const auto& [was, to] : moves)
+    {
+        notes.emplace_back(to.tick, pitchOf(to));
+    }
+    host_.moveSelection(by, up, std::move(notes));
     return true;
 }
 
@@ -2096,11 +2107,13 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
     std::size_t notes = 0;
     std::optional<std::size_t> only;
     const auto pitches = motion == "visual" ? selectedPitches() : std::nullopt;
+    const auto selection = host_.selection();
+    const bool moved = motion == "visual" && selection && selection->movedNotes;
     for (std::size_t i = 0; i < events.size(); ++i)
     {
         // With V, only the notes at its pitches, not the controllers with them.
         const auto* note = std::get_if<core::Note>(&events[i].data);
-        if (pitches && (note == nullptr || !takes(events[i].tick, note->pitch)))
+        if ((pitches || moved) && (note == nullptr || !takes(events[i].tick, note->pitch)))
         {
             continue;
         }
@@ -2608,7 +2621,7 @@ void PianoRollView::addRegions(Frame& frame) const
             // those starting in it, and only those, even the one under the cursor.
             const bool picked =
                 span ? takes(event.tick, note->pitch) &&
-                           (!selection || !selection->filter ||
+                           (!selection || !selection->filter || selection->movedNotes ||
                             core::matches(*selection->filter, event.data, song.ppqn()))
                      : current == i;
             const Role role = picked ? Role::NoteSelected : Role::Note;

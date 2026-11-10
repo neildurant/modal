@@ -130,6 +130,7 @@ bool Workspace::select(std::string_view command)
             refuse("Nothing selected to keep the matches in", MessageKind::Information);
             return true;
         }
+        selection_->movedNotes.reset(); // explicitly selecting again replaces fixed membership
         selection_->filter = searching_.query;
         return true;
     }
@@ -159,8 +160,18 @@ bool Workspace::onlyMatches(OperatorTarget& target)
     for (auto& part : target.parts)
     {
         const auto& events = song.events(part.track);
-        std::erase_if(part.events, [&](std::size_t i)
-                      { return !core::matches(*selection_->filter, events[i].data, song.ppqn()); });
+        std::erase_if(part.events,
+                      [&](std::size_t i)
+                      {
+                          if (selection_->movedNotes)
+                          {
+                              const auto* note = std::get_if<core::Note>(&events[i].data);
+                              return note == nullptr ||
+                                     !selection_->movedNotes->contains(part.track, events[i].tick,
+                                                                       note->pitch);
+                          }
+                          return !core::matches(*selection_->filter, events[i].data, song.ppqn());
+                      });
         count += part.events.size();
     }
     if (count == 0)

@@ -134,6 +134,23 @@ struct Selection
         bool moved = false; // operators take the moved selection rather than resolving it again
     };
     std::optional<Object> object = std::nullopt;
+
+    // After moving, retain the notes originally taken rather than adopting whatever the
+    // moved area crosses. Start/pitch pairs identify notes in the track; imported identical
+    // notes at a start are selected together. Shared immutable state keeps view queries cheap.
+    using NotePosition = std::pair<core::Tick, std::uint8_t>;
+    struct MovedNotes
+    {
+        core::TrackId track;
+        std::vector<NotePosition> positions; // sorted, at their current places
+        core::EditPlace after; // explicit cursor movement starts an area selection again
+
+        bool contains(core::TrackId id, core::Tick tick, std::uint8_t pitch) const
+        {
+            return id == track && std::ranges::binary_search(positions, NotePosition{tick, pitch});
+        }
+    };
+    std::shared_ptr<const MovedNotes> movedNotes = nullptr;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -236,7 +253,8 @@ public:
     virtual std::optional<Selection> selection() const = 0;
     // Moves it with what it took, as its notes moved: its start and pitch, the cursor being
     // moved by the view itself.
-    virtual void moveSelection(core::Tick by, int pitches) = 0;
+    virtual void moveSelection(core::Tick by, int pitches,
+                               std::vector<Selection::NotePosition> notes) = 0;
 
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.

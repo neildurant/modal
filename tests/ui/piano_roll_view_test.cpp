@@ -1923,7 +1923,7 @@ TEST_CASE("operators and replacement objects follow a moved note selection")
     }
 }
 
-TEST_CASE("deleting a moved bar selection takes its new time")
+TEST_CASE("deleting a moved bar selection keeps the notes it passed over")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
@@ -1932,8 +1932,10 @@ TEST_CASE("deleting a moved bar selection takes its new time")
     r.press(Key::typed(U'}', kAlt));
     REQUIRE(r.document.song().events(id)[0].tick == r.t.bar(2));
     r.type(U"d");
-    CHECK(r.document.song().events(id).size() == 2);
-    CHECK(r.document.song().events(id)[0].tick == r.t.bar(5) + 7);
+    CHECK(r.document.song().events(id).size() == 3);
+    CHECK(r.document.song().events(id)[0].tick == r.t.bar(2));
+    CHECK(std::get<core::Note>(r.document.song().events(id)[0].data).pitch == 45);
+    CHECK(r.document.song().events(id)[1].tick == r.t.bar(5) + 7);
 }
 
 TEST_CASE("a selected nudge before the song is refused without moving any notes")
@@ -1960,4 +1962,149 @@ TEST_CASE("a selected nudge before the song is refused without moving any notes"
     r.press(Key::of(NamedKey::Escape));
     r.type(U"u");
     CHECK(r.document.song() == before);
+}
+
+TEST_CASE("moving a Visual selection does not collect neighbouring notes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto step = r.t.sixteenth();
+    r.document.edit("Test notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(id,
+                                          [&](core::EventList& events)
+                                          {
+                                              events = {};
+                                              events.insert({0, core::Note{60, 100, step / 2}});
+                                              events.insert({step, core::Note{62, 90, step / 2}});
+                                          });
+                    });
+    const auto original = r.document.song();
+    const auto noteAt = [&](core::Tick tick, int pitch)
+    {
+        return std::ranges::any_of(r.document.song().events(id).all(),
+                                   [&](const core::Event& e)
+                                   {
+                                       const auto* note = std::get_if<core::Note>(&e.data);
+                                       return e.tick == tick && note && note->pitch == pitch;
+                                   });
+    };
+    r.ws.pianoRoll().setCursor({id, 0, 60});
+    r.type(U"v");
+    r.press(Key::of(NamedKey::Right, kAlt)); // the box now includes the unselected D4
+    REQUIRE(noteAt(step, 60));
+    REQUIRE(noteAt(step, 62));
+
+    SECTION("repeated moves retain their notes, including when moving back")
+    {
+        r.press(Key::of(NamedKey::Right, kAlt));
+        CHECK(noteAt(2 * step, 60));
+        CHECK(noteAt(step, 62));
+        r.press(Key::of(NamedKey::Left, kAlt));
+        r.press(Key::of(NamedKey::Left, kAlt));
+        CHECK(r.document.song() == original);
+    }
+    SECTION("delete takes only the moved notes")
+    {
+        r.type(U"d");
+        CHECK_FALSE(noteAt(step, 60));
+        CHECK(noteAt(step, 62));
+        CHECK(r.document.song().events(id).size() == 1);
+    }
+    SECTION("recalling and yanking the moved selection retains its notes")
+    {
+        r.press(Key::of(NamedKey::Escape));
+        r.type(U"gvy");
+        r.ws.pianoRoll().setCursor({id, 4 * step, 60});
+        r.type(U"p");
+        CHECK(r.document.song().events(id).size() == 3);
+        CHECK(noteAt(4 * step, 60));
+        CHECK_FALSE(noteAt(4 * step, 62));
+        CHECK(noteAt(step, 62));
+    }
+    SECTION("colon transforms take only the moved notes")
+    {
+        r.ws.setLineHandler([&](const std::string& line)
+                            { r.ws.report(r.registry.runLine(line)); });
+        r.type(U":transpose +1");
+        r.press(Key::of(NamedKey::Enter));
+        CHECK(noteAt(step, 61));
+        CHECK(noteAt(step, 62));
+        CHECK_FALSE(noteAt(step, 63));
+    }
+    SECTION("deliberate cursor extension selects the new area")
+    {
+        r.type(U"l");
+        r.press(Key::of(NamedKey::Right, kAlt));
+        CHECK(noteAt(2 * step, 60));
+        CHECK(noteAt(2 * step, 62));
+    }
+    SECTION("a collision refusal keeps the selected set and all events")
+    {
+        r.press(Key::of(NamedKey::Up, kAlt));
+        REQUIRE(noteAt(step, 61));
+        const auto beforeRefusal = r.document.song();
+        r.press(Key::of(NamedKey::Up, kAlt)); // into the unselected D4
+        CHECK(r.document.song() == beforeRefusal);
+        CHECK(r.ws.message().find("Would") != std::string::npos);
+        r.press(Key::of(NamedKey::Down, kAlt));
+        CHECK(noteAt(step, 60));
+        CHECK(noteAt(step, 62));
+    }
+    SECTION("undo restores the original events")
+    {
+        r.press(Key::of(NamedKey::Right, kAlt));
+        r.press(Key::of(NamedKey::Escape));
+        r.type(U"u");
+        CHECK(r.document.song() == original);
+    }
+}
+
+TEST_CASE("moving selected pitch rows does not collect notes in their gaps")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const bool box = GENERATE(false, true);
+    const bool swapEnds = GENERATE(false, true);
+    CAPTURE(box, swapEnds);
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto step = r.t.sixteenth();
+    r.document.edit("Test notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(id,
+                                          [&](core::EventList& events)
+                                          {
+                                              events = {};
+                                              events.insert({0, core::Note{60, 100, step / 2}});
+                                              events.insert({step, core::Note{61, 90, step / 2}});
+                                          });
+                    });
+    r.ws.pianoRoll().setCursor({id, 0, 60});
+    if (box)
+    {
+        r.press(Key::typed(U'v', kCtrl));
+        r.type(U"l");
+    }
+    else
+    {
+        r.type(U"V");
+    }
+    r.press(Key::of(NamedKey::Up, kAlt));
+    if (swapEnds)
+    {
+        r.type(U"o");
+    }
+    r.press(Key::of(NamedKey::Up, kAlt));
+    const auto& events = r.document.song().events(id);
+    REQUIRE(events.size() == 2);
+    CHECK(std::get<core::Note>(events[0].data).pitch == 62);
+    CHECK(std::get<core::Note>(events[1].data).pitch == 61);
+    r.type(U"d");
+    INFO(r.ws.message());
+    REQUIRE(r.document.song().events(id).size() == 1);
+    CHECK(r.document.song().events(id)[0].tick == step);
+    CHECK(std::get<core::Note>(r.document.song().events(id)[0].data).pitch == 61);
 }
