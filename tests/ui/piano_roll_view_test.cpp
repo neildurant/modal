@@ -2108,3 +2108,66 @@ TEST_CASE("moving selected pitch rows does not collect notes in their gaps")
     CHECK(r.document.song().events(id)[0].tick == step);
     CHECK(std::get<core::Note>(r.document.song().events(id)[0].data).pitch == 61);
 }
+
+TEST_CASE("a moved selection covers all of its notes after snapping changes their spacing")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto id = r.document.song().tracks()[0]->id();
+    const auto step = r.t.sixteenth();
+    r.document.edit("Off-grid test notes", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            id,
+                            [&](core::EventList& events)
+                            {
+                                events = {};
+                                events.insert({step - 1, core::Note{60, 100, step / 2}});
+                                events.insert({step, core::Note{62, 90, step / 2}});
+                                events.insert({2 * step, core::Note{64, 80, step / 2}});
+                            });
+                    });
+    const auto noteAt = [&](core::Tick tick, int pitch)
+    {
+        return std::ranges::any_of(r.document.song().events(id).all(),
+                                   [&](const core::Event& e)
+                                   {
+                                       const auto* note = std::get_if<core::Note>(&e.data);
+                                       return e.tick == tick && note && note->pitch == pitch;
+                                   });
+    };
+    r.ws.pianoRoll().setCursor({id, step - 1, 60});
+    r.type(U"vl");
+    r.press(Key::of(NamedKey::Right, kAlt));
+    r.press(Key::of(NamedKey::Right, kAlt));
+    REQUIRE(noteAt(2 * step, 60));
+    REQUIRE(noteAt(3 * step, 62));
+    REQUIRE(noteAt(2 * step, 64)); // not part of the original selection
+    SECTION("deleting takes both retained notes")
+    {
+        r.type(U"d");
+        CHECK(r.document.song().events(id).size() == 1);
+        CHECK(noteAt(2 * step, 64));
+    }
+    SECTION("yanking takes both retained notes")
+    {
+        r.type(U"y");
+        r.ws.pianoRoll().setCursor({id, 6 * step, 60});
+        r.type(U"p");
+        CHECK(r.document.song().events(id).size() == 5);
+        CHECK(noteAt(6 * step, 60));
+        CHECK(noteAt(7 * step, 62));
+        CHECK_FALSE(noteAt(6 * step, 64));
+    }
+    SECTION("a colon transform takes both retained notes")
+    {
+        r.ws.setLineHandler([&](const std::string& line)
+                            { r.ws.report(r.registry.runLine(line)); });
+        r.type(U":transpose +1");
+        r.press(Key::of(NamedKey::Enter));
+        CHECK(noteAt(2 * step, 61));
+        CHECK(noteAt(3 * step, 63));
+        CHECK(noteAt(2 * step, 64));
+    }
+}

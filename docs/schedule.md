@@ -26,7 +26,7 @@ First make it possible to record new material in Modal for daily use. Reuse the 
 - [x] **Done** — Fix input replacement so held Thru notes/pedals are released and the engine acknowledges reset before IDs are reused; all six Linux configurations pass and the functional trial was accepted on 10 November 2026.
 
 - [x] **Done** — Step 8.1: GUI MIDI input and the machine's input-port selection, independent track arming, per-track Thru while stopped or playing, and Arm/Thru buttons in Tracks. Tried and published; validation is in status.md.
-- [ ] **Doing** — Before 8.2: fix moved Visual selections so they retain their notes instead of collecting neighbours; verify moves, highlighting, subsequent edits, gv and undo.
+- [ ] **Doing** — Before 8.2: fix moved Visual selections so they retain their notes instead of collecting neighbours, including off-grid snapping; full Linux validation passes, real-window trial pending.
 - [x] **Done** — Before 8.2: extract input-port ownership, ID mapping and asynchronous reset into a component tested with fake ports; six focused tests and GCC/Clang Debug pass.
 - [x] **Done** — Before 8.2: bound and fairly schedule engine input processing, preserve SysEx/recording stamps and keep collecting until the backlog is drained; all six Linux configurations pass.
 - [ ] **To do** — Step 8.2: each track's input selection and Input column, input activity/last-note display, and the machine-wide Thru control. Behaviour is agreed in [design.md](design.md#per-track-input-and-monitoring); implementation has not started.

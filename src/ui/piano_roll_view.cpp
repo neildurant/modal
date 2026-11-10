@@ -357,20 +357,35 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::selected() const
     {
         return std::nullopt;
     }
+    std::pair<core::Tick, core::Tick> span;
     if (selection->kind == SelectionKind::Rows)
     {
         // V: the page's time when it started, or an object's.
-        return selection->span.value_or(std::pair{page().start, page().end});
+        span = selection->span.value_or(std::pair{page().start, page().end});
     }
-    if (selection->kind == SelectionKind::Box && selection->span)
+    else if (selection->kind == SelectionKind::Box && selection->span)
     {
         // A note's or a chord's, as an object selected it, its time; takes() keeps to its
         // starts.
-        return selection->span;
+        span = *selection->span;
     }
-    const auto from = std::min(selection->anchor.tick, time_);
-    const auto last = std::max(selection->anchor.tick, time_);
-    return std::pair{from, std::max(gridAfter(last), last + 1)};
+    else
+    {
+        const auto from = std::min(selection->anchor.tick, time_);
+        const auto last = std::max(selection->anchor.tick, time_);
+        span = {from, std::max(gridAfter(last), last + 1)};
+    }
+    if (const auto& moved = selection->movedNotes;
+        moved && moved->track == *trackId() && !moved->positions.empty())
+    {
+        // Snapping off-grid notes needn't translate them all by the same amount. Keep the
+        // visible/editable span around every retained start, without collecting its neighbours.
+        span.first = std::min(span.first, moved->positions.front().first);
+        const auto last = moved->positions.back().first;
+        if (last >= span.second)
+            span.second = gridAfter(last);
+    }
+    return span;
 }
 
 std::optional<std::pair<std::uint8_t, std::uint8_t>> PianoRollView::selectedPitches() const
