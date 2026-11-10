@@ -85,11 +85,50 @@ struct Rolling
 
     const PianoRollView& view() const { return ws.pianoRoll(); }
 
+    // The status line's text.
+    std::u32string statusText() const
+    {
+        std::u32string text;
+        const auto frame = ws.frame();
+        for (const auto& run : frame.back().text)
+        {
+            text += run.text;
+        }
+        return text;
+    }
+
+    // The inspector's text, row by row, a | between rows, its runs in order across.
+    std::u32string inspectorRows() const
+    {
+        const auto frame = ws.frame();
+        std::vector<TextRun> runs;
+        for (const auto& region : frame)
+        {
+            if (region.background == Role::Panel)
+            {
+                runs.insert(runs.end(), region.text.begin(), region.text.end());
+            }
+        }
+        std::ranges::sort(runs, [](const TextRun& a, const TextRun& b)
+                          { return a.y != b.y ? a.y < b.y : a.x < b.x; });
+        std::u32string text;
+        for (std::size_t i = 0; i < runs.size(); ++i)
+        {
+            text += (i > 0 && runs[i].y != runs[i - 1].y ? U"|" : U" ") + runs[i].text;
+        }
+        return text;
+    }
+
     // The view's bar in a window wide enough for all of it, which 120 cells isn't.
     std::u32string barText()
     {
         ws.resize(240 * kCell.width, 30 * kCell.height, kCell);
-        auto text = textOn(Role::Bar);
+        std::u32string text; // the bar's colour, but not the status line, the last
+        const auto frame = ws.frame();
+        for (std::size_t r = 0; r + 1 < frame.size(); ++r)
+            if (frame[r].background == Role::Bar)
+                for (const auto& run : frame[r].text)
+                    text += run.text + U" ";
         ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
         return text;
     }
@@ -661,10 +700,12 @@ TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
     CHECK(r.view().grid() == core::NoteFraction{1, 32});
     r.type(U"2zl");
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
-    CHECK(contains(r.barText(), U"1/8"));
+    // In the status line, with the settings, not the bar above.
+    CHECK(contains(r.statusText(), U"Grid 1/8 "));
+    CHECK_FALSE(contains(r.barText(), U"Grid"));
     r.press(Key::typed(U't', kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 12});
-    CHECK(contains(r.barText(), U"1/8t"));
+    CHECK(contains(r.statusText(), U"Grid 1/8t"));
     r.type(U"l");
     CHECK(r.view().time() == t.quarters(1) / 3);
     r.press(Key::typed(U't', kCtrl));
@@ -692,7 +733,10 @@ TEST_CASE("the default note key takes the current note's length and velocity, as
 {
     Rolling r;
     const auto& bass = [&]() -> const core::Track& { return *r.document.song().tracks()[0]; };
-    CHECK(contains(r.barText(), U"grid v100"));
+    // The note o would add, stacked at the inspector's right.
+    CHECK(contains(r.inspectorRows(), U"New note|"));
+    CHECK(contains(r.inspectorRows(), U"Length: grid|"));
+    CHECK(contains(r.inspectorRows(), U"Velocity: 100"));
     r.type(U",n"); // on no note
     CHECK(r.ws.message() == "No note here to take as the default");
     CHECK_FALSE(bass().noteLength);
@@ -702,7 +746,8 @@ TEST_CASE("the default note key takes the current note's length and velocity, as
     CHECK(bass().noteLength == core::NoteFraction{1, 8});
     CHECK(bass().noteVelocity == 96);
     CHECK(r.ws.message() == "Default note: 1/8, velocity 96");
-    CHECK(contains(r.barText(), U"1/8 v96"));
+    CHECK(contains(r.inspectorRows(), U"Length: 1/8"));
+    CHECK(contains(r.inspectorRows(), U"Velocity: 96"));
     r.type(U"u");
     CHECK_FALSE(bass().noteLength);
     CHECK(bass().noteVelocity == 100);

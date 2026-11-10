@@ -2757,8 +2757,9 @@ void PianoRollView::addRegions(Frame& frame) const
                            .over = {}});
     frame.push_back(std::move(ruler));
 
-    // The view's bar: the track, then the page, its section and bars, the grid and the note
-    // a new one would be, and where the cursor is.
+    // The view's bar: the track, then the page, its section and bars, and where the cursor
+    // is. The grid is in the status line, with the settings, and the note a new one would be
+    // in the inspector, being the cursor's (decided November 2026, after use).
     std::vector<BarPair> left;
     std::vector<BarPair> right;
     if (trackId())
@@ -2775,17 +2776,62 @@ void PianoRollView::addRegions(Frame& frame) const
                          ? std::to_string(p.firstBar)
                          : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar),
                      kDropBars});
-    right.push_back({"Grid:", core::toString(grid()), kDropViewSettings});
-    if (trackId())
-    {
-        right.push_back({"Note:", noteText(*song.tracks()[track_]), kDropViewSettings});
-    }
     std::ranges::move(cursorPlacePairs(song, meter(), time_), std::back_inserter(right));
     frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
 
-    frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
-                                    static_cast<int>(positionText(meter(), lastTick()).size()),
-                                    &editor_));
+    auto inspector =
+        inspectorRegion(inspection(), layout_.top[1], width_, cell_,
+                        static_cast<int>(positionText(meter(), lastTick()).size()), &editor_);
+    if (trackId())
+    {
+        addNewNote(inspector, *song.tracks()[track_]);
+    }
+    frame.push_back(std::move(inspector));
+}
+
+void PianoRollView::addNewNote(Region& inspector, const core::Track& track) const
+{
+    // At the inspector's right, stacked: the note o would add where the cursor is, its length
+    // and velocity, dim as e doesn't edit them; left out where the fields need the room.
+    const Style label{Role::Dim, Role::Panel, kPlain};
+    const std::array<std::pair<std::u32string, std::u32string>, 2> rows{{
+        {U"Length:", decodeUtf8(track.noteLength ? core::toString(*track.noteLength) : "grid")},
+        {U"Velocity:", decodeUtf8(std::to_string(track.noteVelocity))},
+    }};
+    const std::u32string title = U"New note";
+    std::size_t labels = 0;
+    std::size_t values = 0;
+    for (const auto& [name, value] : rows)
+    {
+        labels = std::max(labels, name.size());
+        values = std::max(values, value.size());
+    }
+    const auto wide = std::max(title.size(), labels + 1 + std::max<std::size_t>(values, 4));
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const int x = inspector.bounds.width - margin - static_cast<int>(wide) * cell_.width;
+    int used = 0;
+    for (const auto& run : inspector.text)
+    {
+        used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+    }
+    if (x < used + 3 * cell_.width || cell_.height * 3 > inspector.bounds.height)
+    {
+        return;
+    }
+    const int top = cell_.height / 4;
+    inspector.text.push_back({x, top, title, label});
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        const int y = top + static_cast<int>(i + 1) * cell_.height;
+        inspector.text.push_back({x, y, rows[i].first, label});
+        inspector.text.push_back(
+            {x + static_cast<int>(labels + 1) * cell_.width, y, rows[i].second, label});
+    }
+}
+
+std::optional<std::string> PianoRollView::gridStatus() const
+{
+    return trackId() ? std::optional{core::toString(grid())} : std::nullopt;
 }
 
 std::string PianoRollView::position(core::Tick tick) const

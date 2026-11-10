@@ -1790,6 +1790,7 @@ TEST_CASE("In the piano roll, d0 and d$ take from the bar's start, and to its en
 TEST_CASE("While an operator waits, the status line says what it will do, and what doubled takes")
 {
     Operating o;
+    o.ws.resize(160 * kCell.width, 30 * kCell.height, kCell); // room for all of it
     const auto status = [&]
     {
         std::string text;

@@ -341,6 +341,12 @@ Bar Workspace::statusBar(bool withMessage) const
     {
         bottom.right.push_back({"Quantise bypassed   ", {Role::Warning, Role::Bar, kPlain}});
     }
+    // The view's grid, the one setting that's the view's, padded so Rewind stays put.
+    if (const auto grid = view().gridStatus())
+    {
+        bottom.right.push_back({"Grid ", label});
+        bottom.right.push_back({padText(*grid, 5, false) + "   ", kBarText});
+    }
     bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();

@@ -407,6 +407,9 @@ public:
     virtual bool typing() const { return false; }
     // What can be typed into the field being edited, and what the keys do, for the status line.
     virtual std::optional<std::string> typingHint() const { return std::nullopt; }
+
+    // The editing grid the view steps by, for the status line's settings, if it has one.
+    virtual std::optional<std::string> gridStatus() const { return std::nullopt; }
     virtual void type(char32_t /*character*/) {}
     virtual std::optional<bool> runTyping(std::string_view /*command*/) { return std::nullopt; }
 };
