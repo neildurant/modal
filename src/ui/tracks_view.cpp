@@ -184,17 +184,6 @@ std::string TracksView::position(core::Tick tick) const
 {
     return positionText(cursorMeter(), tick);
 }
-std::string TracksView::timeStatus(core::Tick tick) const
-{
-    return placeText(document_.song(), cursorMeter(), tick);
-}
-std::string TracksView::cursorStatus() const
-{
-    return document_.song().tracks().empty()
-               ? "No tracks"
-               : "Track " + std::to_string(row() + 1) + "  " + timeStatus(cursor_.tick);
-}
-
 core::EditPlace TracksView::place() const
 {
     return placeWith(cursor_.track, cursor_.tick, TracksState{top_, column_, left_, cursor_.pitch});
@@ -1174,7 +1163,8 @@ void TracksView::addRegions(Frame& frame) const
     {
         return;
     }
-    frame.push_back(trackBarRegion(document_.song(), tracks.empty() ? 0 : row() + 1, cursor_.tick,
+    // No place in time: the view has no timeline.
+    frame.push_back(trackBarRegion(document_.song(), tracks.empty() ? 0 : row() + 1, std::nullopt,
                                    cursorMeter(), layout_.top[0], width_, cell_));
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9,
                                     quantizeEditing_ ? &editor_ : nullptr));

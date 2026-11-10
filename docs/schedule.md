@@ -23,7 +23,7 @@ Change an item's state when work starts or finishes, and update status.md in the
 
 First make it possible to record new material in Modal for daily use. Reuse the measured engine and recorder; step entry, loops and take management follow later.
 
-- [ ] **Doing** — GUI MIDI input, input-port selection and track arming. Step 8.1: the `inputs` setting, input collected in the GUI, Arm and Thru buttons in Tracks and `, r a` / `, r t`; decisions settled 9 November 2026.
+- [ ] **Doing** — GUI MIDI input, input-port selection and track arming. Step 8.1: the `inputs` setting, input collected in the GUI, Arm and Thru buttons in Tracks and `, r a` / `, r t`; decisions settled 9 November 2026. Step 8.1 tried and pushed 9 November 2026; step 8.2 (each track's input, input activity, try-out controls) next.
 - [ ] **To do** — Per-track Thru and monitoring while stopped or playing; input activity and controls for trying an instrument before recording.
 - [ ] **To do** — Arm and Thru columns in Tracks, input selection, and clear armed/recording state in the transport and status line.
 - [ ] **To do** — Linear recording into armed tracks, replace or overdub, starting at the chosen record position and continuing beyond the song's end.

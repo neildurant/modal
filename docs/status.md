@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 9 November 2026: milestone 8 has started. Its first step (MIDI input, arming and Thru in the GUI) is built and awaiting its UI trial; see Basic GUI recording, below. The ongoing plan is in [schedule.md](schedule.md). Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
+*Last updated 9 November 2026: milestone 8 has started. Its first step (MIDI input, arming and Thru in the GUI) passed its UI trial, with a MIDI keyboard on Windows; a change to the status line awaits its trial; see Basic GUI recording, below. The ongoing plan is in [schedule.md](schedule.md). Current cross-platform results are in [CI for main](https://github.com/neildurant/modal/actions/workflows/ci.yml?query=branch%3Amain).*
 
 ## Milestones
 
@@ -15,7 +15,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 | 5. Piano roll and arrangement | Done, except the Linux checks |
 | 6. Full grammar | Done (November 2026), except the Linux checks |
 | 7. Tracks and playback transforms | Done; Tracks steps and Freeze complete, UI trials confirmed |
-| 8. Basic GUI recording | Doing; step 8.1 (input, arming, Thru) built, awaiting its UI trial |
+| 8. Basic GUI recording | Doing; step 8.1 (input, arming, Thru) done and tried |
 
 Milestone order and To do/Doing/Done item states are maintained in [schedule.md](schedule.md). Behaviour and open design questions remain in [design.md](design.md).
 
@@ -153,19 +153,20 @@ Run `build/linux-gcc/apps/Debug/modal --demo`, or use a disposable song, with pl
 
 Milestone 8's decisions were settled on 9 November 2026 (design.md, Recording in the GUI; decisions.md, Input and recording): the `inputs` setting in `modalrc`, every input by default; independent arming, with a warning naming other armed tracks; `R` to record from the play-from marker; the `, r` group; replace/overdub as a song setting shown in the status line. Still to settle: each track's own input and the remaining saved settings.
 
-### Step 8.1: MIDI input, arming and Thru (built, awaiting UI trial)
+### Step 8.1: MIDI input, arming and Thru (done, tried 9 November 2026)
 
 - **Inputs:** `modal` opens the input ports the `inputs` setting names (comma-separated, matched as `:port` matches), or every one, up to 16, reopening them when the setting changes; names not found are reported in the status line. Modal's own ALSA ports are left out of the input and output lists, so Thru can't loop through them.
 - **Collecting input:** each input's thread wakes the window through `Window::waker()` (one SDL event at a time, so idle stays idle), and the workspace takes what the engine passed back then, again 10 ms later, and every frame while playing, through `Player::takeInput()`. Nothing is kept yet; recording will. Lost input (dropped or not passed back) is reported once as a warning.
 - **Tracks view:** Arm (`R`) and Thru (`T`) buttons after Mute and Solo. As requested during the step, the buttons lost their headings and sit closer (4 cells), each showing its letter grey when off; Thru on an unarmed track is its letter in its colour, unfilled. The inspector starts with "About", a short description of the column under the cursor. New theme roles `track-arm` and `track-thru`.
-- **After the first look:** Arm became bright red and Mute a lighter pink, as Arm's orange sat too close to Thru; the inspector no longer ends with the track's name, which the bar above shows; Q's description reads "Quantise notes live during playback"; and Time offset keeps two blank cells before Quantise. Real MIDI input and Thru are still to be tried.
+- **After the first look:** Arm became bright red and Mute a lighter pink, as Arm's orange sat too close to Thru; the inspector no longer ends with the track's name, which the bar above shows; Q's description reads "Quantise notes live during playback"; and Time offset keeps two blank cells before Quantise. Tried with a MIDI keyboard on Windows: arming and Thru work as expected, Thru taking the track's transpose and velocity offset. Pushed as `c96cfbf`.
+- **Where things go, after the trial (awaiting its own trial):** the top bar is where the cursor is (track, section, bars, position, time, meter; Tracks the track alone), the inspector what's under it, and the status line the transport: ■ and the play-from marker stopped, ▶ and the playhead playing, with meter, tempo and section, in a fixed place after the mode, messages after it. Fields are padded so nothing moves; the top bar leaves out quantise, program, bank, grid and note, bars, then section where it's narrow. Next, in this order: the `:` and Ctrl-P prompts get a row of their own (Ctrl-P's input on top, best match first, a fixed height and a count; `:` completions a small popup above the word), then the piano roll's grid moves to the status line and its new-note defaults to the inspector.
 - **Commands:** `, r a` (`track-arm-toggle`) and `, r t` (`track-thru-toggle`) from any view with a track, and `tracks-arm-toggle` / `tracks-thru-toggle` on `V` rows; Enter on the buttons too. Arming while others are armed says "Armed: X; also armed: Y" as a warning.
 - **Tests:** Windows Debug passes (851 tests, 2 platform skips), after the first-look changes too: arming messages and undo, Visual rows, Thru's look and messages, the inspector's descriptions for every column and no name there, the gap before Quantise, input taken on waking and at the settle deadline, and lost input reported once. Tracks tests now go to columns by field rather than by counts. The dark and light Tracks samples were rendered offscreen and looked at; the light theme's arm/thru colours were separated after that.
-- **Not checked:** real MIDI input and Thru, which need Neil's hardware; the exclusion of Modal's own ALSA ports, which needs native Linux (no ALSA sequencer in WSL or CI). Note that listening to every input can loop Thru round a loopback port, such as loopMIDI on Windows, if a track also plays to it; the `inputs` setting then names the ports to use.
+- **Not checked:** the exclusion of Modal's own ALSA ports, which needs native Linux (no ALSA sequencer in WSL or CI). Note that listening to every input can loop Thru round a loopback port, such as loopMIDI on Windows, if a track also plays to it; the `inputs` setting then names the ports to use.
 
 ## Next
 
-Next is the UI trial of step 8.1, then step 8.2: each track's own input, input activity and controls for trying an instrument. Linear recording with `R`, the metronome, count-in and pre-roll follow. Step entry and loops remain later milestones.
+Next is the trial of the change to where things go, then the prompt row and the piano roll's grid and new-note defaults (agreed 10 November 2026), then step 8.2: each track's own input, input activity and controls for trying an instrument. Linear recording with `R`, the metronome, count-in and pre-roll follow. Step entry and loops remain later milestones.
 
 Controller lanes, drum maps and folding follow in milestone 9, including folding to named drum-map rows even without events. Multiple songs, backups, jump history and paste history follow in milestone 10. Outline and other additional views move later. MIDI clock output and transport/sync are now explicitly unscheduled, alongside the other someday maybe items. Column configuration and song-tempo fallback wait for polish. No whole-track Loop column is planned. The recent playback features still need the real MIDI trials noted above.
 

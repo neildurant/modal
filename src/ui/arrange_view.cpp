@@ -90,11 +90,6 @@ constexpr std::array kCommands{
     CommandInfo{.name = "zoom-reset", .description = "Go back to the zoom the view starts at"},
 };
 
-std::string signatureText(core::TimeSignature signature)
-{
-    return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
-}
-
 } // namespace
 
 std::span<const CommandInfo> ArrangeView::commands()
@@ -1364,15 +1359,14 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
     const auto first = m.toBarBeatTick(start).bar;
     const auto last = m.toBarBeatTick(end - 1).bar;
     const auto bars = last - first + 1;
+    // Its start's place and meter are in the bar above, the cursor being there.
     Inspection result{.kind = "Section", .fields = {}};
-    result.fields.push_back({"Position", positionText(m, start)});
     result.fields.push_back({.heading = "Section",
                              .value = song.sections()[section]->name(),
                              .editable = true,
                              .editText = song.sections()[section]->name(),
                              .underKind = true});
     result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
-    result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     result.fields.push_back(
         {.heading = "Length",
          .value = std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") +
@@ -1533,8 +1527,8 @@ Inspection ArrangeView::inspection() const
     {
         return sectionInspection(*section);
     }
-    // The cursor's bar: where it is, its meter, and how many notes and other events start in
-    // it, which together are what shade it.
+    // The cursor's bar: which of the song's it is, and how many notes and other events start
+    // in it, which together are what shade it. Its place and meter are in the bar above.
     const auto& song = document_.song();
     const auto& m = meter();
     const auto bar = m.toBarBeatTick(page_.time()).bar;
@@ -1542,9 +1536,7 @@ Inspection ArrangeView::inspection() const
     const auto end = std::min(m.barStart(bar + 1), song.end());
     const auto last = m.toBarBeatTick(std::max<core::Tick>(song.end() - 1, 0)).bar;
     Inspection result{.kind = "Bar", .fields = {}};
-    result.fields.push_back({"Position", positionText(m, start)});
     result.fields.push_back({"Bar", std::to_string(bar) + " of " + std::to_string(last)});
-    result.fields.push_back({"Meter", signatureText(m.signatureAt(start))});
     if (const auto id = trackId())
     {
         std::size_t notes = 0;
@@ -1571,8 +1563,12 @@ void ArrangeView::addRegions(Frame& frame) const
     page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt,
                      selected, host_.movingTracks());
     const auto track = trackId() ? page_.track() + 1 : 0;
-    frame.push_back(trackBarRegion(document_.song(), track, page_.time(), meter(), layout_.top[0],
-                                   width_, cell_));
+    // Where the cursor is: its bar's start, or on the strip its section's.
+    const auto strip = page_.stripCursor();
+    const auto at = strip ? document_.song().sectionStart(*strip)
+                          : meter().barStart(meter().toBarBeatTick(page_.time()).bar);
+    frame.push_back(
+        trackBarRegion(document_.song(), track, at, meter(), layout_.top[0], width_, cell_));
     const auto last = std::max<core::Tick>(document_.song().end() - 1, 0);
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
                                     static_cast<int>(positionText(meter(), last).size()),
@@ -1582,22 +1578,6 @@ void ArrangeView::addRegions(Frame& frame) const
 std::string ArrangeView::position(core::Tick tick) const
 {
     return positionText(meter(), tick);
-}
-
-std::string ArrangeView::timeStatus(core::Tick tick) const
-{
-    const auto& song = document_.song();
-    return placeText(song, meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
-           song.sections()[song.sectionAt(tick)]->name();
-}
-
-std::string ArrangeView::cursorStatus() const
-{
-    if (const auto section = page_.stripCursor())
-    {
-        return timeStatus(document_.song().sectionStart(*section));
-    }
-    return timeStatus(meter().barStart(meter().toBarBeatTick(page_.time()).bar));
 }
 
 SongCursor ArrangeView::cursor() const

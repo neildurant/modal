@@ -680,16 +680,41 @@ TEST_CASE("M, S and the track commands toggle the current track from every view"
     CHECK(t.track().chaseNotes != chase);
 }
 
-TEST_CASE("the status line shows the cursor's time in every view, and the inspector doesn't")
+TEST_CASE("the bar above says where the cursor is in a view with a timeline, and no other does")
 {
     const auto view = GENERATE(as<std::u32string>{}, U"gt", U"ga", U"gr", U"ge");
     Tracking t;
     t.type(view);
     const auto frame = t.ws.frame();
+    std::u32string bar; // the view's bar: those on the bar's colour but the status line
+    for (std::size_t r = 0; r + 1 < frame.size(); ++r)
+        if (frame[r].background == Role::Bar)
+            for (const auto& run : frame[r].text)
+                bar += run.text;
     std::u32string status;
     for (const auto& run : frame.back().text)
         status += run.text;
-    CHECK(status.find(U"1:1:000  0:00.000") != std::u32string::npos);
+    const auto section = decodeUtf8(t.document.song().sections().front()->name());
+    CHECK(bar.find(U"Track 1:") != std::u32string::npos);
+    if (view == U"gt")
+    {
+        // No timeline, so no place in time.
+        CHECK(bar.find(U"Position:") == std::u32string::npos);
+        CHECK(bar.find(U"Section:") == std::u32string::npos);
+    }
+    else
+    {
+        // Each right-aligned to the song's widest.
+        CHECK(bar.find(U"Position:") != std::u32string::npos);
+        CHECK(bar.find(U"1:1:000   Time:") != std::u32string::npos);
+        CHECK(bar.find(U"0:00.000   Meter:") != std::u32string::npos);
+        CHECK(bar.find(U"Meter: 4/4") != std::u32string::npos);
+        CHECK(bar.find(U"Section: " + section) != std::u32string::npos);
+    }
+    // With no player, the status line has no transport, and nothing else of the cursor's.
+    CHECK(status.find(U"1:1:000") == std::u32string::npos);
+    CHECK(status.find(section) == std::u32string::npos);
+    CHECK(status.find(U"Track ") == std::u32string::npos);
     for (const auto& region : frame)
         if (region.background == Role::Panel)
             for (const auto& run : region.text)
@@ -1121,7 +1146,9 @@ TEST_CASE("the bar shows a track's setup when it has one")
     CHECK(inspectorHas(t.ws.frame(), U"Bank:"));
     CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
 
+    // In a view with a timeline too, where there's room beside where the cursor is.
     t.type(U"ge");
+    t.ws.resize(2000, 600, {10, 20});
     CHECK(inspectorHas(t.ws.frame(), U"Program:"));
     CHECK(inspectorHas(t.ws.frame(), U" 3/-"));
 }

@@ -128,7 +128,8 @@ TEST_CASE("Space plays from the marker and stops where it is; with rewind, the m
     CHECK(p.ws.deadline() == std::nullopt);
     CHECK(contains(p.status(), U"Rewind on"));
 
-    CHECK(contains(p.status(), U"From 1:1:000"));
+    CHECK(contains(p.status(), U"■"));
+    CHECK(contains(p.status(), U"1:1:000"));
     CHECK(p.markerRow() == 3); // the last of the rows at the start: section, meter, tempo
     p.type(U" ");
     CHECK(p.player.playing());
@@ -370,19 +371,81 @@ TEST_CASE("a setup edited in playback says when a track's own program change hol
     CHECK(p.document.song().tracks()[0]->programSetup.program == 6);
 }
 
-TEST_CASE("the status line shows the tempo at the cursor, and at the playhead while playing")
+TEST_CASE("the transport shows the tempo at the marker, and at the playhead while playing")
 {
     Playing p;
-    CHECK(p.status().find(U"Tempo 120") != std::u32string::npos);
-    p.type(U"'a"); // the demo song's mark, in its slower bridge
-    CHECK(p.status().find(U"Tempo 96") != std::u32string::npos);
+    CHECK(contains(p.status(), U"120 BPM"));
+    p.type(U"'a"); // the demo song's mark, in its slower bridge: the cursor isn't the transport's
+    CHECK(contains(p.status(), U"120 BPM"));
 
+    const auto bridge = p.document.song().marks().front().tick;
+    p.player.setMarker(bridge);
     p.type(U"gg");
-    CHECK(p.status().find(U"Tempo 120") != std::u32string::npos);
-    p.player.setMarker(p.document.song().marks().front().tick);
+    CHECK(contains(p.status(), U" 96 BPM")); // padded to the song's widest tempo
+    const auto section = p.document.song().sectionAt(bridge);
+    CHECK(contains(p.status(), decodeUtf8(p.document.song().sections()[section]->name())));
     p.press(Key::typed(U' '));
     p.runFor(100ms);
-    CHECK(p.status().find(U"Tempo 96") != std::u32string::npos);
+    CHECK(contains(p.status(), U"96 BPM"));
+}
+
+TEST_CASE("the transport keeps its place, playing or stopped, with a message after it")
+{
+    Playing p;
+    const auto runs = [&]
+    {
+        const auto frame = p.ws.frame();
+        return frame.back().text;
+    };
+    const auto at = [](const std::vector<TextRun>& text, std::u32string_view start)
+    {
+        const auto run = std::ranges::find_if(text, [&](const TextRun& candidate)
+                                              { return candidate.text.starts_with(start); });
+        return run == text.end() ? -1 : run->x;
+    };
+    const auto stopped = runs();
+    const int glyph = at(stopped, U"■");
+    REQUIRE(glyph > 0);
+    p.press(Key::typed(U' '));
+    p.runFor(100ms);
+    const auto playing = runs();
+    CHECK(at(playing, U"▶") == glyph);
+    // What follows the glyph is as long, playing or stopped, as each part is padded.
+    const auto after = [&](const std::vector<TextRun>& text)
+    {
+        const auto run = std::ranges::find_if(text, [&](const TextRun& candidate)
+                                              { return candidate.x > glyph; });
+        return run == text.end() ? std::size_t{0} : run->text.size();
+    };
+    CHECK(after(playing) == after(stopped));
+    // A message goes after it, leaving it shown.
+    p.type(U"yy");
+    REQUIRE_FALSE(p.ws.message().empty());
+    CHECK(at(runs(), U"▶") == glyph);
+    std::u32string shown; // in the status line, or above it if too long for it
+    for (const auto& region : p.ws.frame())
+        for (const auto& run : region.text)
+            shown += run.text;
+    CHECK(contains(shown, decodeUtf8(p.ws.message())));
+    p.press(Key::typed(U' '));
+}
+
+TEST_CASE("the mode takes the same room whichever it is, so the transport after it stays put")
+{
+    Playing p;
+    const auto glyphAt = [&]
+    {
+        const auto frame = p.ws.frame();
+        const auto& text = frame.back().text;
+        const auto run = std::ranges::find_if(text, [](const TextRun& candidate)
+                                              { return candidate.text.starts_with(U"■"); });
+        return run == text.end() ? -1 : run->x;
+    };
+    const int normal = glyphAt();
+    REQUIRE(normal > 0);
+    p.type(U"v");
+    REQUIRE(p.ws.mode() == Mode::Visual);
+    CHECK(glyphAt() == normal);
 }
 
 TEST_CASE("a track's port that wasn't found is dim in the table, and explained in the inspector")

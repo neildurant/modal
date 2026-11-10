@@ -50,6 +50,18 @@ struct Arranging
         return document.song().meter(document.song().tracks()[track]->id());
     }
 
+    // The view's bar above: the text of the bars but the status line, the last.
+    std::u32string barText() const
+    {
+        std::u32string text;
+        const auto frame = ws.frame();
+        for (std::size_t r = 0; r + 1 < frame.size(); ++r)
+            if (frame[r].background == Role::Bar)
+                for (const auto& run : frame[r].text)
+                    text += run.text;
+        return text;
+    }
+
     std::u32string status() const
     {
         std::u32string text;
@@ -79,7 +91,7 @@ TEST_CASE("the arrangement's cursor is a bar of a track, moved by bars and track
     REQUIRE(a.ws.shown() == ViewKind::Arrangement);
     CHECK(a.page().track() == 0);
     CHECK(a.page().bar() == 1);
-    CHECK(contains(a.status(), U"1:1:000"));
+    CHECK(contains(a.barText(), U"1:1:000   Time:"));
 
     a.type(U"3l");
     CHECK(a.page().bar() == 4);
@@ -1134,7 +1146,7 @@ const TextRun& inspectorRun(const Frame& frame, std::u32string_view text)
 }
 } // namespace
 
-TEST_CASE("a section's name goes under its heading, its Bars and Meter where a bar's are")
+TEST_CASE("a section's name goes under its heading, its Bars and Length where a bar's are")
 {
     Arranging a;
     const auto onBar = a.ws.frame();
@@ -1150,9 +1162,15 @@ TEST_CASE("a section's name goes under its heading, its Bars and Meter where a b
                                              { return run.text == U"Bar" && run.x > 100; });
     REQUIRE(column != barRuns.end());
     CHECK(inspectorRun(onStrip, U"Bars").x == column->x);
-    CHECK(inspectorRun(onStrip, U"Meter").x == inspectorRun(onBar, U"Meter").x);
     CHECK(inspectorRun(onStrip, U"Length").x == inspectorRun(onBar, U"Notes").x);
     CHECK(inspectorRun(onStrip, U"Bars").x > name.x + 13 * kCell.width);
+    // Neither says where it is or its meter, which the bar above does.
+    for (const auto* frame : {&onBar, &onStrip})
+    {
+        const auto& runs = (*frame)[frame->size() - 2].text;
+        CHECK(std::ranges::find(runs, U"Position", &TextRun::text) == runs.end());
+        CHECK(std::ranges::find(runs, U"Meter", &TextRun::text) == runs.end());
+    }
 }
 
 TEST_CASE(

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -327,54 +328,222 @@ void addMarkDot(Region& region, int x, int y, CellSize cell)
     region.under.push_back({{x + ring, top, side, side}, Role::Text, 255});
 }
 
-Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,
-                      const core::MeterMap& meter, Rect bounds, int width, CellSize cell)
+std::string padText(std::string text, std::size_t width, bool alignRight)
 {
-    const auto section = song.sectionAt(tick);
-    const Style label{Role::Dim, Role::Bar, kPlain};
-
-    // The track's bar: each value after its label.
-    Bar top;
-    const auto pair = [&](std::vector<Segment>& group, std::string name, std::string value)
+    const auto length = decodeUtf8(text).size();
+    if (length >= width)
     {
-        group.push_back({std::move(name), label});
-        group.push_back({" " + std::move(value) + "     ", kBarText});
+        return text;
+    }
+    const std::string padding(width - length, ' ');
+    return alignRight ? padding + text : text + padding;
+}
+
+namespace
+{
+
+std::string meterText(core::TimeSignature signature)
+{
+    return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
+}
+
+// Text cut short with an ellipsis at a number of characters.
+std::string cutText(const std::string& text, std::size_t most)
+{
+    auto characters = decodeUtf8(text);
+    if (characters.size() <= most)
+    {
+        return text;
+    }
+    characters.resize(most - 1);
+    characters += U'…';
+    return encodeUtf8(characters);
+}
+
+constexpr std::size_t kSectionNameWidth = 16;
+constexpr std::size_t kTrackNameWidth = 32; // as the Tracks view's Name column
+constexpr std::size_t kPortNameWidth = 24;  // as its Output port column
+constexpr std::size_t kMeterWidth = 5;      // up to 12/16
+
+} // namespace
+
+PlaceParts placeParts(const core::Song& song, const core::MeterMap& meter, core::Tick tick)
+{
+    // The song's last place is the widest a place in it needs; a time past it, its own.
+    const auto last = std::max(song.end(), tick);
+    const auto time = [&](core::Tick at) { return songTime(song.tempo().toTime(at)); };
+    auto position = positionText(meter, tick);
+    auto clock = time(tick);
+    const auto positionWidth = decodeUtf8(positionText(meter, last)).size();
+    const auto timeWidth = decodeUtf8(time(last)).size();
+    return {padText(std::move(position), positionWidth, true),
+            padText(std::move(clock), timeWidth, true),
+            padText(meterText(meter.signatureAt(tick)), kMeterWidth, false)};
+}
+
+std::string tempoText(const core::Song& song, core::Tick tick)
+{
+    std::size_t widest = 0;
+    for (const auto& change : song.tempo().changes())
+    {
+        widest = std::max(widest, core::bpmText(change.tempo).size());
+    }
+    return padText(core::bpmText(song.tempo().tempoAt(tick)), widest, true) + " BPM";
+}
+
+std::string sectionText(const core::Song& song, core::Tick tick)
+{
+    std::size_t longest = 0;
+    for (const auto& section : song.sections())
+    {
+        longest = std::max(longest, decodeUtf8(section->name()).size());
+    }
+    longest = std::min(longest, kSectionNameWidth);
+    return padText(cutText(song.sections()[song.sectionAt(tick)]->name(), kSectionNameWidth),
+                   longest, false);
+}
+
+Region labelledBar(const std::vector<BarPair>& left, const std::vector<BarPair>& right, Rect bounds,
+                   int width, CellSize cell)
+{
+    constexpr std::size_t kBetween = 3; // spaces between one pair and the next
+    const auto spacing = BarSpacing::forCell(cell);
+    const auto room =
+        cell.width > 0 ? static_cast<std::size_t>(
+                             std::max((width - 2 * spacing.margin - spacing.gap) / cell.width, 0))
+                       : std::size_t{0};
+    const auto length = [](const BarPair& pair)
+    {
+        return decodeUtf8(pair.label).size() +
+               (pair.value.empty() ? 0 : 1 + decodeUtf8(pair.value).size());
     };
-    if (track == 0)
+    // Shown unless it's among those left out: those dropped at `dropped` or higher.
+    const auto shown = [](const BarPair& pair, int dropped)
+    { return pair.drop == 0 || pair.drop < dropped; };
+    const auto needs = [&](int dropped)
     {
-        pair(top.left, "Track 0:", "Conductor");
-    }
-    else
+        std::size_t total = 0;
+        for (const auto* group : {&left, &right})
+        {
+            std::size_t count = 0;
+            for (const auto& pair : *group)
+            {
+                if (shown(pair, dropped))
+                {
+                    total += length(pair) + (count++ > 0 ? kBetween : 0);
+                }
+            }
+        }
+        return total;
+    };
+    // Leaving out the first to go, then the next, until it fits or only what stays is left.
+    int highest = 0;
+    for (const auto* group : {&left, &right})
     {
-        const auto& shown = *song.tracks()[track - 1];
-        pair(top.left, "Track " + std::to_string(track) + ":", shown.name);
-        pair(top.left, "Channel:", std::to_string(shown.channel));
-        pair(top.left, "Port:", shown.port.empty() ? "default" : shown.port);
-        if (shown.quantize.on)
+        for (const auto& pair : *group)
         {
-            pair(top.left, "Quantise:", quantizeSummary(shown));
-        }
-        const auto& setup = shown.programSetup;
-        if (setup.program)
-        {
-            pair(top.left, "Program:", std::to_string(*setup.program));
-        }
-        if (setup.bankMsb || setup.bankLsb)
-        {
-            const auto part = [](std::optional<std::uint8_t> value)
-            { return value ? std::to_string(*value) : std::string{"-"}; };
-            pair(top.left, "Bank:", part(setup.bankMsb) + "/" + part(setup.bankLsb));
+            highest = std::max(highest, pair.drop);
         }
     }
-    const auto first = meter.toBarBeatTick(song.sectionStart(section)).bar;
-    const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
-    pair(top.right, "Section:", song.sections()[section]->name());
-    pair(top.right, "Bars:", std::to_string(first) + "–" + std::to_string(last));
-    top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
-
-    auto region = layoutBar(top, width, cell, BarSpacing::forCell(cell));
+    int dropped = highest + 1; // nothing left out
+    while (dropped > 1 && needs(dropped) > room)
+    {
+        --dropped;
+    }
+    const Style label{Role::Dim, Role::Bar, kPlain};
+    Bar bar;
+    const auto add = [&](std::vector<Segment>& segments, const std::vector<BarPair>& pairs)
+    {
+        for (const auto& pair : pairs)
+        {
+            if (!shown(pair, dropped))
+            {
+                continue;
+            }
+            if (!segments.empty())
+            {
+                segments.push_back({std::string(kBetween, ' '), kBarText});
+            }
+            segments.push_back({pair.label, label});
+            if (!pair.value.empty())
+            {
+                segments.push_back({" " + pair.value, kBarText});
+            }
+        }
+    };
+    add(bar.left, left);
+    add(bar.right, right);
+    auto region = layoutBar(bar, width, cell, spacing);
     region.bounds = bounds;
     return region;
+}
+
+std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track)
+{
+    const auto tracks = song.tracks();
+    std::size_t longestName = 0;
+    std::size_t longestPort = 0;
+    for (const auto& each : tracks)
+    {
+        longestName = std::max(longestName, decodeUtf8(each->name).size());
+        longestPort =
+            std::max(longestPort, decodeUtf8(each->port.empty() ? "default" : each->port).size());
+    }
+    const auto numberWidth = std::string{"Track :"}.size() + std::to_string(tracks.size()).size();
+    if (track == 0 || track > tracks.size())
+    {
+        return {{padText("Track 0:", numberWidth, false), "Conductor"}};
+    }
+    const auto& shown = *tracks[track - 1];
+    std::vector<BarPair> pairs{{padText("Track " + std::to_string(track) + ":", numberWidth, false),
+                                padText(shown.name, std::min(longestName, kTrackNameWidth), false)},
+                               {"Channel:", padText(std::to_string(shown.channel), 2, true)},
+                               {"Port:", padText(shown.port.empty() ? "default" : shown.port,
+                                                 std::min(longestPort, kPortNameWidth), false)}};
+    // Last, as they come and go from track to track.
+    if (shown.quantize.on)
+    {
+        pairs.push_back({"Quantise:", quantizeSummary(shown), kDropQuantise});
+    }
+    const auto& setup = shown.programSetup;
+    if (setup.program)
+    {
+        pairs.push_back({"Program:", std::to_string(*setup.program), kDropProgram});
+    }
+    if (setup.bankMsb || setup.bankLsb)
+    {
+        const auto part = [](std::optional<std::uint8_t> value)
+        { return value ? std::to_string(*value) : std::string{"-"}; };
+        pairs.push_back({"Bank:", part(setup.bankMsb) + "/" + part(setup.bankLsb), kDropBank});
+    }
+    return pairs;
+}
+
+std::vector<BarPair> cursorPlacePairs(const core::Song& song, const core::MeterMap& meter,
+                                      core::Tick tick)
+{
+    auto parts = placeParts(song, meter, tick);
+    return {{"Position:", std::move(parts.position)},
+            {"Time:", std::move(parts.time)},
+            {"Meter:", std::move(parts.meter)}};
+}
+
+Region trackBarRegion(const core::Song& song, std::size_t track, std::optional<core::Tick> tick,
+                      const core::MeterMap& meter, Rect bounds, int width, CellSize cell)
+{
+    std::vector<BarPair> right;
+    if (tick)
+    {
+        // The section and its bars, which vary, before the cursor's place, whose widths are
+        // fixed, so nothing to their right moves.
+        const auto section = song.sectionAt(*tick);
+        const auto first = meter.toBarBeatTick(song.sectionStart(section)).bar;
+        const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
+        right.push_back({"Section:", song.sections()[section]->name(), kDropSection});
+        right.push_back({"Bars:", std::to_string(first) + "–" + std::to_string(last), kDropBars});
+        std::ranges::move(cursorPlacePairs(song, meter, *tick), std::back_inserter(right));
+    }
+    return labelledBar(trackPairs(song, track), right, bounds, width, cell);
 }
 
 Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at)

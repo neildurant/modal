@@ -19,8 +19,6 @@ public:
     std::optional<bool> run(std::string_view command, int count) override;
     bool operate(std::string_view op, std::string_view motion, int count) override;
     void addRegions(Frame& frame) const override;
-    std::string cursorStatus() const override;
-    std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override { return cursor_; }
     void setCursor(const SongCursor& cursor) override;

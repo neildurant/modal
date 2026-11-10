@@ -154,11 +154,6 @@ std::string fitted(std::string_view text, int width)
     return encodeUtf8(characters);
 }
 
-std::string signatureText(core::TimeSignature signature)
-{
-    return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
-}
-
 } // namespace
 
 std::span<const CommandInfo> EventListView::commands()
@@ -1693,22 +1688,6 @@ std::string EventListView::position(core::Tick tick) const
     return positionText(list_.meter(), tick);
 }
 
-std::string EventListView::timeStatus(core::Tick tick) const
-{
-    const auto& song = document_.song();
-    return placeText(song, list_.meter(), tick) + "  " +
-           signatureText(list_.meter().signatureAt(tick)) + "  " +
-           song.sections()[song.sectionAt(tick)]->name();
-}
-
-std::string EventListView::cursorStatus() const
-{
-    const auto& song = document_.song();
-    const auto tick = list_.rows()[row_].tick;
-    return list_.text(row_)[Column::Position] + "  " + songTime(song.tempo().toTime(tick)) + "  " +
-           signatureText(list_.meter().signatureAt(tick)) + "  " +
-           song.sections()[song.sectionAt(tick)]->name();
-}
 Region EventListView::listRegion() const
 {
     const Rect& main = layout_.main;

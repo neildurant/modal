@@ -252,12 +252,31 @@ Bar Workspace::statusBar(bool withMessage) const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
-    bottom.left = {{freezeChoice_           ? " FREEZE "
-                    : trackMove_            ? " MOVE "
-                    : view().typing()       ? " EDIT "
-                    : mode_ == Mode::Visual ? " VISUAL "
-                                            : " NORMAL ",
-                    {Role::ModeText, Role::Mode, kBold}}};
+    const std::string mode = freezeChoice_           ? " FREEZE "
+                             : trackMove_            ? " MOVE "
+                             : view().typing()       ? " EDIT "
+                             : mode_ == Mode::Visual ? " VISUAL "
+                                                     : " NORMAL ";
+    bottom.left = {{mode, {Role::ModeText, Role::Mode, kBold}}};
+    // As wide as the widest mode, so the transport after it stays put.
+    bottom.left.push_back(
+        {std::string(std::string_view{" NORMAL "}.size() - mode.size() + 1, ' '), kBarText});
+    if (player_ != nullptr)
+    {
+        // The transport, always shown: stopped, where Space plays from; playing, the playhead.
+        // Its parts are as wide as the song needs, so what follows doesn't move as it counts.
+        const auto& song = document_.song();
+        const auto playing = player_->position();
+        const auto at = playing.value_or(player_->marker());
+        const auto place = placeParts(song, view().cursorMeter(), at);
+        const Style style = playing ? Style{Role::Accent, Role::Bar, kBold}
+                                    : Style{Role::BarText, Role::Bar, kPlain};
+        bottom.left.push_back(
+            {playing ? "▶ " : "■ ", playing ? style : Style{Role::Dim, Role::Bar, kPlain}});
+        bottom.left.push_back({place.position + "  " + place.time + "  " + place.meter + "  " +
+                                   tempoText(song, at) + "  " + sectionText(song, at),
+                               style});
+    }
     if (macros_.recording != 0)
     {
         const auto ends = keysFor("macro-record");
@@ -283,11 +302,6 @@ Bar Workspace::statusBar(bool withMessage) const
     {
         bottom.left.push_back({"  " + *hint, kBarText});
     }
-    else if (const auto at = player_ != nullptr ? player_->position() : std::nullopt)
-    {
-        // While playing, where the playhead is.
-        bottom.left.push_back({"  ▶ " + view().timeStatus(*at), {Role::Accent, Role::Bar, kBold}});
-    }
     else if (operator_ && mode_ == Mode::OperatorPending)
     {
         // What the operator waiting will do, and what its doubled key takes.
@@ -309,10 +323,6 @@ Bar Workspace::statusBar(bool withMessage) const
             bottom.left.push_back({"; only the matches", {Role::Accent, Role::Bar, kPlain}});
         }
     }
-    else
-    {
-        bottom.left.push_back({"  " + view().cursorStatus(), kBarText});
-    }
     if (const auto keys = pending(); !keys.empty())
     {
         bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
@@ -322,18 +332,7 @@ Bar Workspace::statusBar(bool withMessage) const
         bottom.right.push_back({"/" + searching_.text + " ", label});
         bottom.right.push_back({view().matchStatus(*searching_.query) + "   ", kBarText});
     }
-    // The tempo where the playhead is, or else the cursor, as nothing else shows it.
-    const auto playing = player_ != nullptr ? player_->position() : std::nullopt;
-    bottom.right.push_back({"Tempo ", label});
-    bottom.right.push_back(
-        {core::bpmText(document_.song().tempo().tempoAt(playing.value_or(view().cursor().tick))) +
-             "   ",
-         kBarText});
-    if (player_ != nullptr)
-    {
-        bottom.right.push_back({"From ", label});
-        bottom.right.push_back({view().position(player_->marker()) + "   ", kBarText});
-    }
+    // Aligned to the right, so what comes and goes is at the left, and moves nothing else.
     if (player_ != nullptr && player_->bypassQuantize())
     {
         bottom.right.push_back({"Quantise bypassed   ", {Role::Warning, Role::Bar, kPlain}});
@@ -345,7 +344,8 @@ Bar Workspace::statusBar(bool withMessage) const
     const auto name = file       ? utf8Text(file->filename())
                       : imported ? utf8Text(imported->filename()) + " (imported)"
                                  : std::string{"No file"};
-    bottom.right.push_back({name + (document_.modified() ? " [+]" : ""), kBarText});
+    // Room kept for [+], so nothing moves as it comes and goes.
+    bottom.right.push_back({name + (document_.modified() ? " [+]" : "    "), kBarText});
     return bottom;
 }
 

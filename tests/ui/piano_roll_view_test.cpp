@@ -85,6 +85,15 @@ struct Rolling
 
     const PianoRollView& view() const { return ws.pianoRoll(); }
 
+    // The view's bar in a window wide enough for all of it, which 120 cells isn't.
+    std::u32string barText()
+    {
+        ws.resize(240 * kCell.width, 30 * kCell.height, kCell);
+        auto text = textOn(Role::Bar);
+        ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
+        return text;
+    }
+
     // The text of the regions on a background, such as the inspector's panel.
     std::u32string textOn(Role background) const
     {
@@ -141,8 +150,14 @@ TEST_CASE("the piano roll opens on the track at the cursor, centred on its notes
           PianoRollView::Page{
               .firstBar = 1, .lastBar = 4, .start = 0, .end = r.t.bar(5), .section = 0});
     CHECK(contains(r.textOn(Role::Bar), U"Bass"));
-    CHECK(contains(r.textOn(Role::Bar), U"1–4"));
-    CHECK(contains(r.status(), U"1:1:000  0:00.000  C2"));
+    CHECK(contains(r.barText(), U"1–4"));
+    // Where the cursor is, in the bar above; its pitch in the inspector.
+    // Right-aligned to the song's widest, as the counter is.
+    CHECK(contains(r.textOn(Role::Bar), U"Position:"));
+    CHECK(contains(r.textOn(Role::Bar), U"1:1:000"));
+    CHECK(contains(r.textOn(Role::Bar), U"Time:"));
+    CHECK(contains(r.textOn(Role::Bar), U"0:00.000"));
+    CHECK_FALSE(contains(r.status(), U"C2"));
 }
 
 TEST_CASE("Enter on a bar in the arrangement opens it in the piano roll, at its start")
@@ -229,7 +244,7 @@ TEST_CASE("zz centres the piano roll on the cursor in time, and turning keeps th
     CHECK(r.view().page().end == t.bar(7) + t.quarters(1));
     CHECK(r.view().page().firstBar == 3);
     CHECK(r.view().page().lastBar == 7);
-    CHECK(contains(r.textOn(Role::Bar), U"3–7"));
+    CHECK(contains(r.barText(), U"3–7"));
     r.type(U"2}"); // past the right edge: on by four bars, still at beat 2
     CHECK(r.view().page().start == t.bar(7) + t.quarters(1));
     r.type(U"3{"); // back past the left edge
@@ -646,10 +661,10 @@ TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
     CHECK(r.view().grid() == core::NoteFraction{1, 32});
     r.type(U"2zl");
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
-    CHECK(contains(r.textOn(Role::Bar), U"1/8"));
+    CHECK(contains(r.barText(), U"1/8"));
     r.press(Key::typed(U't', kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 12});
-    CHECK(contains(r.textOn(Role::Bar), U"1/8t"));
+    CHECK(contains(r.barText(), U"1/8t"));
     r.type(U"l");
     CHECK(r.view().time() == t.quarters(1) / 3);
     r.press(Key::typed(U't', kCtrl));
@@ -677,7 +692,7 @@ TEST_CASE("the default note key takes the current note's length and velocity, as
 {
     Rolling r;
     const auto& bass = [&]() -> const core::Track& { return *r.document.song().tracks()[0]; };
-    CHECK(contains(r.textOn(Role::Bar), U"grid v100"));
+    CHECK(contains(r.barText(), U"grid v100"));
     r.type(U",n"); // on no note
     CHECK(r.ws.message() == "No note here to take as the default");
     CHECK_FALSE(bass().noteLength);
@@ -687,7 +702,7 @@ TEST_CASE("the default note key takes the current note's length and velocity, as
     CHECK(bass().noteLength == core::NoteFraction{1, 8});
     CHECK(bass().noteVelocity == 96);
     CHECK(r.ws.message() == "Default note: 1/8, velocity 96");
-    CHECK(contains(r.textOn(Role::Bar), U"1/8 v96"));
+    CHECK(contains(r.barText(), U"1/8 v96"));
     r.type(U"u");
     CHECK_FALSE(bass().noteLength);
     CHECK(bass().noteVelocity == 100);

@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -153,11 +154,6 @@ constexpr std::uint8_t kBand = 80;      // the opacity of the crosshair's row an
 constexpr std::uint8_t kBlackKeys = 64; // and of the black keys' rows, just apart
 constexpr std::uint8_t kFaint = 96;     // and of labels' lines, as in the arrangement
 constexpr std::uint8_t kDimmed = 150;   // and of the shade over a note's part outside a range
-
-std::string signatureText(core::TimeSignature signature)
-{
-    return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
-}
 
 bool isBlackKey(int pitch)
 {
@@ -2761,39 +2757,31 @@ void PianoRollView::addRegions(Frame& frame) const
                            .over = {}});
     frame.push_back(std::move(ruler));
 
-    // The view's bar: the track, then the page, its section and bars, and the grid.
-    const Style label{Role::Dim, Role::Bar, kPlain};
-    const Style value{Role::BarText, Role::Bar, kPlain};
-    Bar top;
-    const auto pair = [&](std::vector<Segment>& group, std::string name, std::string text)
+    // The view's bar: the track, then the page, its section and bars, the grid and the note
+    // a new one would be, and where the cursor is.
+    std::vector<BarPair> left;
+    std::vector<BarPair> right;
+    if (trackId())
     {
-        group.push_back({std::move(name), label});
-        group.push_back({" " + std::move(text) + "     ", value});
-    };
-    if (const auto id = trackId())
-    {
-        const auto& track = *song.tracks()[track_];
-        pair(top.left, "Track " + std::to_string(track_ + 1) + ":", track.name);
-        pair(top.left, "Channel:", std::to_string(track.channel));
-        pair(top.left, "Port:", track.port.empty() ? "default" : track.port);
+        left = trackPairs(song, track_ + 1);
     }
     else
     {
-        top.left.push_back({"No tracks", label});
+        left.push_back({"No tracks", {}});
     }
-    pair(top.right, "Section:", song.sections()[p.section]->name());
-    pair(top.right, "Bars:",
-         p.firstBar == p.lastBar ? std::to_string(p.firstBar)
-                                 : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar));
-    pair(top.right, "Grid:", core::toString(grid()));
+    right.push_back({"Section:", song.sections()[p.section]->name(), kDropSection});
+    right.push_back({"Bars:",
+                     p.firstBar == p.lastBar
+                         ? std::to_string(p.firstBar)
+                         : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar),
+                     kDropBars});
+    right.push_back({"Grid:", core::toString(grid()), kDropViewSettings});
     if (trackId())
     {
-        pair(top.right, "Note:", noteText(*song.tracks()[track_]));
+        right.push_back({"Note:", noteText(*song.tracks()[track_]), kDropViewSettings});
     }
-    top.right.back().text.resize(top.right.back().text.size() - 5); // no space after the last
-    auto bar = layoutBar(top, width_, cell_, BarSpacing::forCell(cell_));
-    bar.bounds = layout_.top[0];
-    frame.push_back(std::move(bar));
+    std::ranges::move(cursorPlacePairs(song, meter(), time_), std::back_inserter(right));
+    frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
 
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
                                     static_cast<int>(positionText(meter(), lastTick()).size()),
@@ -2803,21 +2791,6 @@ void PianoRollView::addRegions(Frame& frame) const
 std::string PianoRollView::position(core::Tick tick) const
 {
     return positionText(meter(), tick);
-}
-
-std::string PianoRollView::timeStatus(core::Tick tick) const
-{
-    const auto& song = document_.song();
-    return placeText(song, meter(), tick) + "  " + signatureText(meter().signatureAt(tick)) + "  " +
-           song.sections()[song.sectionAt(tick)]->name();
-}
-
-std::string PianoRollView::cursorStatus() const
-{
-    const auto& song = document_.song();
-    return placeText(song, meter(), time_) + "  " + core::pitchName(pitch_) + "  " +
-           signatureText(meter().signatureAt(time_)) + "  " +
-           song.sections()[song.sectionAt(time_)]->name();
 }
 
 SongCursor PianoRollView::cursor() const

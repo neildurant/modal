@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/ui/bar.hpp>
+#include <modal/ui/view_parts.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -138,4 +139,37 @@ TEST_CASE("the left group never runs into the right, however narrow the bar")
         CAPTURE(columns);
         CHECK(leftEnd <= rightStart);
     }
+}
+
+TEST_CASE("a view's bar leaves out what may go, the first to go first, until it fits")
+{
+    const std::vector<BarPair> left{
+        {"Track:", "Bass"}, {"Bank:", "1/2", kDropBank}, {"Quantise:", "1/16 100%", kDropQuantise}};
+    const std::vector<BarPair> right{{"Section:", "Verse", kDropSection},
+                                     {"Bars:", "9-16", kDropBars},
+                                     {"Position:", "3:2:000"}};
+    const auto text = [&](int columns)
+    {
+        // The width the text needs, with BarSpacing::forCell's margins and gap.
+        const auto region = labelledBar(left, right, {0, 0, columns * kCell.width, kCell.height},
+                                        columns * kCell.width + 3 * kCell.width, kCell);
+        std::u32string all;
+        for (const auto& run : region.text)
+            all += run.text;
+        return all;
+    };
+    // Everything: 11 + 3 + 9 + 3 + 19 on the left, 14 + 3 + 10 + 3 + 17 on the right.
+    CHECK(text(92) == U"Track: Bass   Bank: 1/2   Quantise: 1/16 100%Section: Verse   Bars: 9-16   "
+                      U"Position: 3:2:000");
+    // Quantise first, then the bank, then the bars, then the section; never the rest.
+    CHECK(text(91).find(U"Quantise") == std::u32string::npos);
+    CHECK(text(91).find(U"Bank") != std::u32string::npos);
+    CHECK(text(69).find(U"Bank") == std::u32string::npos);
+    CHECK(text(69).find(U"Bars") != std::u32string::npos);
+    CHECK(text(57).find(U"Bars") == std::u32string::npos);
+    CHECK(text(57).find(U"Section") != std::u32string::npos);
+    const auto least = text(28);
+    CHECK(least.find(U"Section") == std::u32string::npos);
+    CHECK(least.find(U"Track: Bass") != std::u32string::npos);
+    CHECK(least.find(U"Position: 3:2:000") != std::u32string::npos);
 }

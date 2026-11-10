@@ -58,8 +58,6 @@ public:
     std::optional<core::EventQuery> queryHere() const override;
     std::string matchStatus(const core::EventQuery& query) const override;
     std::optional<OperatorTarget::Part> matchesHere(const core::EventQuery& query) const override;
-    std::string cursorStatus() const override;
-    std::string timeStatus(core::Tick tick) const override;
     std::string position(core::Tick tick) const override;
     SongCursor cursor() const override;
     const core::MeterMap& cursorMeter() const override;

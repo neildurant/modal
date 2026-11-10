@@ -373,10 +373,7 @@ public:
         }
     }
 
-    // For the status line: where the cursor is, and where a time is, each as its position,
-    // the meter there and its section, in the view's own bars; and a time's position alone.
-    virtual std::string cursorStatus() const = 0;
-    virtual std::string timeStatus(core::Tick tick) const = 0;
+    // A time's position, in the view's own bars.
     virtual std::string position(core::Tick tick) const = 0;
 
     // The shared cursor, and putting it somewhere, as when coming from another view.

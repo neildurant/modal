@@ -134,7 +134,11 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(contains(rowText(frame[1], 0), U"Track 1: Bass"));
     CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
     CHECK(contains(rowText(frame[1], 0), U"Section: Section 1"));
-    CHECK(contains(rowText(frame[1], 0), U"Bars: 1–1"));
+    CHECK(contains(rowText(frame[1], 0), U"Position: 1:1:000"));
+    // The section's bars too, where there's room for them.
+    v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
+    CHECK(contains(rowText(v.ws.frame()[1], 0), U"Bars: 1–1"));
+    v.ws.resize(120 * kCell.width, 24 * kCell.height, kCell);
 
     // The inspector, on a panel of its own: the kind of row, then headings above their values.
     CHECK(frame[2].background == Role::Panel);
@@ -176,7 +180,9 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(contains(rowText(list, 5), U"E1 (28)"));
     CHECK(contains(rowText(list, 5), U"1/8"));
     CHECK(contains(rowText(frame[3], 0), U"NORMAL"));
-    CHECK(contains(rowText(frame[3], 0), U"1:1:000  0:00.000  4/4  Section 1"));
+    // Where the cursor is is in the bar above, not here.
+    CHECK_FALSE(contains(rowText(frame[3], 0), U"1:1:000"));
+    CHECK_FALSE(contains(rowText(frame[3], 0), U"Section 1"));
 
     // The conductor's rows are dimmed; the cursor's field is in the cursor's colours.
     CHECK(styleAt(list, 2, 1).background == Role::Cursor);

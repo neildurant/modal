@@ -5,6 +5,7 @@
 #include <modal/core/meter_map.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
+#include <modal/ui/bar.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/inspector_edit.hpp>
@@ -88,9 +89,62 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor = nullptr);
 
-// The bar naming a track, its channel and port (track 0 is the conductor), and the section
-// holding a time with its bars in a meter, each value after its label.
-Region trackBarRegion(const core::Song& song, std::size_t track, core::Tick tick,
+// Text padded with spaces to a number of characters, on its left (aligning it right) or its
+// right; text already as long is left as it is.
+std::string padText(std::string text, std::size_t width, bool alignRight);
+
+// A time's place in a meter: its position, the time from the song's start and the meter
+// there, each padded to the widest the song needs, so what follows stays put as it changes.
+struct PlaceParts
+{
+    std::string position;
+    std::string time;
+    std::string meter;
+};
+PlaceParts placeParts(const core::Song& song, const core::MeterMap& meter, core::Tick tick);
+
+// The tempo at a time, as `120 BPM`, its number padded to the song's widest tempo.
+std::string tempoText(const core::Song& song, core::Tick tick);
+
+// The name of the section holding a time, padded to the song's longest name, which is cut
+// short at 16 characters.
+std::string sectionText(const core::Song& song, core::Tick tick);
+
+// A value in a view's bar after its label, dim; or a label alone. Where the bar is too narrow
+// for everything, those with the highest drop are left out first, and those at 0 never.
+struct BarPair
+{
+    std::string label;
+    std::string value;
+    int drop = 0;
+};
+
+// What may be left out of a view's bar, from the first to go to the last: a track's
+// quantise, program and bank, which come and go, quantise the longest; the piano roll's grid
+// and note; the section's bars; and the section.
+inline constexpr int kDropQuantise = 6;
+inline constexpr int kDropProgram = 5;
+inline constexpr int kDropBank = 4;
+inline constexpr int kDropViewSettings = 3;
+inline constexpr int kDropBars = 2;
+inline constexpr int kDropSection = 1;
+
+// A view's bar of labelled values, on the left and the right, leaving out what it must.
+Region labelledBar(const std::vector<BarPair>& left, const std::vector<BarPair>& right, Rect bounds,
+                   int width, CellSize cell);
+
+// A track's number and name, channel and port (track 0 being the conductor), the names padded
+// to the song's longest so what follows them stays put from track to track; then its
+// playback quantise, program and bank where it has them.
+std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track);
+
+// Where the cursor is: its position, time and meter, fixed in width.
+std::vector<BarPair> cursorPlacePairs(const core::Song& song, const core::MeterMap& meter,
+                                      core::Tick tick);
+
+// The bar naming a track; and, in a view with a timeline, where the cursor is at the right:
+// its section and the section's bars, then its place.
+Region trackBarRegion(const core::Song& song, std::size_t track, std::optional<core::Tick> tick,
                       const core::MeterMap& meter, Rect bounds, int width, CellSize cell);
 
 // A character drawn at a time in a row, as a mark's letter (ma) or the play-from marker.
