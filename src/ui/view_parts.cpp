@@ -399,7 +399,8 @@ std::string countInText(const core::CountInSettings& countIn)
         return "Count-in " +
                (countIn.beats > 0 ? count(countIn.beats, "beat") : count(countIn.bars, "bar"));
     case core::CountInSettings::Mode::PreRoll:
-        return "Pre-roll " + count(countIn.preRollBars, "bar");
+        return "Pre-roll " + (countIn.preRollBeats > 0 ? count(countIn.preRollBeats, "beat")
+                                                       : count(countIn.preRollBars, "bar"));
     }
     return "No count-in";
 }

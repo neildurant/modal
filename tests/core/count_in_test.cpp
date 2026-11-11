@@ -159,4 +159,10 @@ TEST_CASE("a pre-roll starts bars before the record point, but not before the so
     song.countIn.preRollBars = 2;
     CHECK(planRecordStart(song, 4 * q, kClick).playFrom == 0); // only one bar to go back
     CHECK(planRecordStart(song, 0, kClick).playFrom == 0);
+
+    // In beats of the meter at the record point, the bars left aside.
+    song.countIn.preRollBeats = 2;
+    CHECK(planRecordStart(song, 14 * q, kClick).playFrom == 12 * q);
+    CHECK(planRecordStart(song, 9 * q, kClick).playFrom == 7 * q); // back over the meter change
+    CHECK(planRecordStart(song, q, kClick).playFrom == 0);
 }

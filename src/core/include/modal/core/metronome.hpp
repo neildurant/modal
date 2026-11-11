@@ -54,11 +54,15 @@ struct CountInSettings
     };
 
     Mode mode = Mode::CountIn;
-    int bars = 1;        // of the meter at the record point
-    int beats = 0;       // a custom count-in, used instead of bars when above 0
-    int preRollBars = 1; // fewer if the record point is nearer the song's start
+    int bars = 1;         // of the meter at the record point
+    int beats = 0;        // a custom count-in, used instead of bars when above 0
+    int preRollBars = 1;  // fewer if the record point is nearer the song's start
+    int preRollBeats = 0; // of the meter at the record point, used instead of bars when above 0
 
-    bool isValid() const { return bars >= 0 && beats >= 0 && preRollBars >= 0; }
+    bool isValid() const
+    {
+        return bars >= 0 && beats >= 0 && preRollBars >= 0 && preRollBeats >= 0;
+    }
 
     friend bool operator==(const CountInSettings&, const CountInSettings&) = default;
 };

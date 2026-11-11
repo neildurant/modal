@@ -40,6 +40,7 @@ Song everything(Ppqn ppqn)
     song.countIn.bars = 2;
     song.countIn.beats = 3;
     song.countIn.preRollBars = 4;
+    song.countIn.preRollBeats = 5;
 
     const auto bass = song.addTrack("Bass");
     const auto lead = song.addTrack("Lead");

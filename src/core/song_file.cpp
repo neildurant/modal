@@ -677,10 +677,11 @@ bool Reader::readCountIn(std::span<const Token> tokens)
             countIn_.mode = static_cast<CountInSettings::Mode>(it - kModes.begin());
             continue;
         }
-        int* field = name == "bars"      ? &countIn_.bars
-                     : name == "beats"   ? &countIn_.beats
-                     : name == "preroll" ? &countIn_.preRollBars
-                                         : nullptr;
+        int* field = name == "bars"           ? &countIn_.bars
+                     : name == "beats"        ? &countIn_.beats
+                     : name == "preroll"      ? &countIn_.preRollBars
+                     : name == "prerollbeats" ? &countIn_.preRollBeats
+                                              : nullptr;
         if (field == nullptr)
         {
             return fail("unknown count-in setting \"" + std::string{name} + "\"");
@@ -1611,9 +1612,13 @@ std::string writeSong(const Song& song)
     }
     line(0, metronomeLine);
     const auto& countIn = song.countIn;
+    // A pre-roll in beats only when it is one, so songs without stay readable by earlier
+    // versions.
     line(0, "countin mode=" + std::string{kModes[static_cast<std::size_t>(countIn.mode)]} +
                 " bars=" + std::to_string(countIn.bars) + " beats=" +
-                std::to_string(countIn.beats) + " preroll=" + std::to_string(countIn.preRollBars));
+                std::to_string(countIn.beats) + " preroll=" + std::to_string(countIn.preRollBars) +
+                (countIn.preRollBeats > 0 ? " prerollbeats=" + std::to_string(countIn.preRollBeats)
+                                          : std::string{}));
     if (song.recordMode == RecordMode::Overdub)
     {
         line(0, "record mode=overdub");

@@ -918,10 +918,16 @@ TEST_CASE("the leader then m sets the metronome and count-in, and :countin and :
     CHECK(p.registry.runLine("countin").message == "Count-in 3 beats");
     CHECK(p.registry.runLine("preroll 2").message == "Pre-roll 2 bars");
     CHECK(song().countIn.preRollBars == 2);
+    CHECK(p.registry.runLine("preroll 3 beats").message == "Pre-roll 3 beats");
+    CHECK(song().countIn.preRollBeats == 3);
+    CHECK(song().countIn.preRollBars == 2);
+    CHECK(p.registry.runLine("preroll 2").message == "Pre-roll 2 bars");
+    CHECK(song().countIn.preRollBeats == 0);
     CHECK(p.registry.runLine("countin off").message == "No count-in");
     CHECK(p.registry.runLine("countin 0").message == "Bars should be from 1 to 99");
     CHECK(p.registry.runLine("countin two").message == "countin takes BARS, BEATS beats, or off");
-    CHECK(p.registry.runLine("preroll 2 beats").message == "preroll takes BARS, or off");
+    CHECK(p.registry.runLine("preroll 2 bats").message ==
+          "preroll takes BARS, BEATS beats, or off");
 }
 
 TEST_CASE("with tracks armed, the status line says what comes before recording, and PRE shows "

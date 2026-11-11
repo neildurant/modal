@@ -12,8 +12,16 @@ namespace
 
 using CountInMode = CountInSettings::Mode;
 
-Tick preRollStart(const MeterMap& meter, Tick recordPoint, int bars)
+Tick preRollStart(const Song& song, Tick recordPoint, const CountInSettings& settings)
 {
+    const auto& meter = song.meter();
+    if (settings.preRollBeats > 0)
+    {
+        // Beats of the meter at the record point, back to the song's start at most.
+        const Tick beat = meter.signatureAt(recordPoint).beatLength().toTicks(song.ppqn());
+        return std::max(recordPoint - beat * settings.preRollBeats, Tick{0});
+    }
+    const auto bars = settings.preRollBars;
     const auto bar = meter.toBarBeatTick(recordPoint).bar;
     if (bar - bars < 1)
     {
@@ -84,7 +92,7 @@ RecordStart planRecordStart(const Song& song, Tick recordPoint,
         }
         break;
     case CountInMode::PreRoll:
-        return {preRollStart(song.meter(), recordPoint, settings.preRollBars), std::nullopt};
+        return {preRollStart(song, recordPoint, settings), std::nullopt};
     }
     return {recordPoint, std::nullopt};
 }

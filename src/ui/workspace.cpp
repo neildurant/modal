@@ -3053,8 +3053,8 @@ CommandResult Workspace::countIn(std::string_view arguments, bool preRoll)
     {
         return {false, countInText(settings), false};
     }
-    const auto usage = preRoll ? std::string{"preroll takes BARS, or off"}
-                               : std::string{"countin takes BARS, BEATS beats, or off"};
+    const auto usage =
+        std::string{preRoll ? "preroll" : "countin"} + " takes BARS, BEATS beats, or off";
     if (words.size() == 1 && words[0] == "off")
     {
         settings.mode = core::CountInSettings::Mode::None;
@@ -3065,8 +3065,7 @@ CommandResult Workspace::countIn(std::string_view arguments, bool preRoll)
         const auto& digits = words[0];
         const auto [end, problem] =
             std::from_chars(digits.data(), digits.data() + digits.size(), number);
-        const bool beats =
-            !preRoll && words.size() == 2 && (words[1] == "beats" || words[1] == "beat");
+        const bool beats = words.size() == 2 && (words[1] == "beats" || words[1] == "beat");
         if (problem != std::errc{} || end != digits.data() + digits.size() || words.size() > 2 ||
             (words.size() == 2 && !beats))
         {
@@ -3080,7 +3079,8 @@ CommandResult Workspace::countIn(std::string_view arguments, bool preRoll)
         if (preRoll)
         {
             settings.mode = core::CountInSettings::Mode::PreRoll;
-            settings.preRollBars = number;
+            settings.preRollBars = beats ? settings.preRollBars : number;
+            settings.preRollBeats = beats ? number : 0;
         }
         else
         {
