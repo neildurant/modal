@@ -213,13 +213,13 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Small fixes from the 8.2 trial (11 November 2026; local, to try)
+## Small fixes from the 8.2 trial (11 November 2026; accepted and published)
 
 Three commits on `84d2cf4`: the `In` light shows the last channel message in but a note-off, with its channel, always 13 characters (`In  1 C4      96`, `In 10 CC64   127`, `Prog`, `Pres`, `PPrs`, `Bend +8191`), the player keeping the message (`Player::lastInput`) and `inputText` formatting it; Tab completes a setting's value in quotes when it has spaces (`set ownportname="My Modal"`); `:write-config modalrc!` is refused, saying `!` goes after the command. The wider light leaves less room at the status line's left, so a 60-column test of short messages now runs at 70.
 
 **Validation.** Windows Debug passes 908 tests (906, 2 skipped), WSL linux-clang-debug 909: the player's kept message by kind, `inputText` for each kind and its width, the status line keeping still across messages, completion's quoting and the refused `!`.
 
-**To try:** play notes, move a controller, the pitch bend wheel and change program on the keyboard: the light should show each with its channel, the status line not moving, and letting a note go should leave it shown. `:set ownportname=` then Tab with a name with spaces set; `:write-config modalrc!`.
+**Accepted** on trial with the keyboard, and published. Next is linear recording (schedule.md, milestone 8).
 
 ## The Ports view, step 3 (11 November 2026; accepted and published)
 
