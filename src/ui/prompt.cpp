@@ -141,6 +141,14 @@ void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Co
                      {
                          return CommandResult::error("write-config needs FILE");
                      }
+                     // The ! meant to overwrite, put after the file rather than the command.
+                     if (arguments[0].ends_with('!'))
+                     {
+                         return CommandResult::error(
+                             "! goes after the command: write-config! " +
+                             std::string{arguments[0].substr(0, arguments[0].size() - 1)} +
+                             " overwrites it");
+                     }
                      const auto file = directory / utf8Path(arguments[0]);
                      if (auto error = writeConfigFile(
                              file, configText(config, registry, configDirectory), call.bang);

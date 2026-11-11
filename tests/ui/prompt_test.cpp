@@ -127,5 +127,9 @@ TEST_CASE("write-config writes the config, relative to the config directory")
     CHECK(refused.message.ends_with("exists already; write-config! overwrites it"));
     CHECK(prompt.run("write-config! modalrc").message == "wrote " + utf8Text(file));
     CHECK(prompt.run("write-config") == CommandResult::error("write-config needs FILE"));
+    // ! after the file, meant for the command, is refused rather than naming a file with it.
+    CHECK(prompt.run("write-config modalrc!") ==
+          CommandResult::error("! goes after the command: write-config! modalrc overwrites it"));
+    CHECK_FALSE(std::filesystem::exists(file.parent_path() / "modalrc!"));
     std::filesystem::remove_all(directory);
 }
