@@ -65,6 +65,11 @@ struct ConfigError
 // with \" and \\ for a quote and a backslash, so set font="C:/My Fonts/Mono.ttf" works; but
 // a map command's keys are taken as they are, since " is a key. A command that fails is
 // reported with its file and line, and the rest still run.
+
+// An argument as a command line takes it: in double quotes, with \" and \ inside, if it has
+// spaces, quotes or backslashes, or is empty.
+std::string quotedArgument(std::string_view text);
+
 class ConfigReader
 {
 public:

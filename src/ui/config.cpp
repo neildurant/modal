@@ -553,6 +553,16 @@ std::string quotedIfNeeded(std::string_view text, bool always)
     return out + "\"";
 }
 
+} // namespace
+
+std::string quotedArgument(std::string_view text)
+{
+    return quotedIfNeeded(text, false);
+}
+
+namespace
+{
+
 // The lines that change a default keymap into another: map commands for bindings added or
 // changed, unmap commands for those removed.
 std::string keymapChanges(const Keymap& keymap, const Keymap& defaults)

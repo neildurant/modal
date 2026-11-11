@@ -80,6 +80,10 @@ TEST_CASE("set completes settings' names, and then their values")
     CHECK(settingChoices(settings, "rewind=", themes) == Strings{"rewind=on", "rewind=off"});
     CHECK(settingChoices(settings, "fontsize=", themes) == Strings{"fontsize=12"});
     CHECK(settingChoices(settings, "nosuch=", themes).empty());
+    // A value with spaces in quotes, as set takes it.
+    Settings named;
+    REQUIRE(named.set("ownportname", "My Modal").empty());
+    CHECK(settingChoices(named, "ownportname=", themes) == Strings{"ownportname=\"My Modal\""});
     // A name typed whole, and no other's start, goes on to its values.
     CHECK(settingChoices(settings, "fontsize", themes) == Strings{"fontsize=12"});
     CHECK(settingChoices(settings, "font", themes).size() > 1);

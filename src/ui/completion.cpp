@@ -170,7 +170,7 @@ std::vector<std::string> settingChoices(const Settings& settings, std::string_vi
         return found;
     }
     const auto with = [&](std::string_view value)
-    { return std::string{name} + "=" + std::string{value}; };
+    { return std::string{name} + "=" + quotedArgument(value); };
     if (name == "theme")
     {
         for (const auto& theme : themes)
