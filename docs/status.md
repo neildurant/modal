@@ -213,13 +213,15 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Linear recording in the GUI (11 November 2026; local, to try)
+## Linear recording in the GUI (11 November 2026; accepted and published)
 
 `Player::record` plans the pass with the metronome (the song's metronome port, or the default output) and the song's count-in or pre-roll, starts the engine and keeps a `Recorder`, fed by `takeInput`; recording carries on past the song's end. When the engine says where it stopped, the workspace applies the take to the song as it is then (`Recorder::finish(Song, Tick)`) as one undo step, `Record onto NAME`. `R` records (refused with nothing armed, while playing, or already recording), `, r m` switches the song's `recordMode` (saved as `record mode=overdub`), and the status line shows `● REC` / `● ODUB` in place of the transport's symbol, and `Armed N Replace` beside the `In` light while stopped. The recorder now takes an empty input as the default input and `*` as every input, as the plan does.
 
 **Validation.** Windows Debug passes 912 tests (910, 2 skipped): workspace tests through the engine on a fake clock for recording after a count-in that clicks on channel 10, the take as one undo step, replace and overdub, the refusals, stopping in the count-in, and recording past the song's end; the recorder's inputs by default, All and name; the record mode's file line and its errors.
 
-**To try:** arm a track (`, r a`), check the status line says `Armed 1 Replace`, press `R`: a bar's count-in clicks on the loopMIDI output's channel 10 (the default output), then play; Space stops and the take appears, `u` takes it away. `, r m` and record again over it to overdub. Record from near the song's end past it. Check the click's sound in the host, and that Thru still works while recording.
+**Trial, 11 November 2026:** recording, replace and overdub, undo and recording past the end worked with the keyboard. Fixed after it: the arrangement didn't show the take until shown again (the take is put in outside a command, so the views weren't told); `R` with nothing armed now says `, r a` arms "a track", as "this one" made no sense from the strip; the `, r` menu's titles say they toggle. No click was heard at first because no default output was set, so Modal said there'd be no click; with one set, the count-in and click reached the host. Accepted.
+
+**Next:** the remaining milestone 8 items in schedule.md, starting with the GUI metronome controls, count-in and pre-roll.
 
 ## Small fixes from the 8.2 trial (11 November 2026; accepted and published)
 
