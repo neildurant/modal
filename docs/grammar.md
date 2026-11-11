@@ -262,6 +262,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, t` | Tracks: `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
 | `, v m` `gm` | The Ports view: this machine's MIDI ports, to enable, alias and choose the default input and output |
 | `, r` | Recording: `a` arm this track, `t` its Thru, `m` replace or overdub |
+| `, m` | Metronome: `m` off, while recording or always; `c` count-in, pre-roll or neither; `s` the Metronome page; `p` the click's port there |
 | `, S` | Select |
 | `, x` | Transforms |
 | `, v` | Views: `t` Tracks, `a` arrangement, `p` piano roll, `e` event list |
@@ -272,7 +273,11 @@ The leader is `,` (the `leader` setting). Its groups:
 
 ## Playing
 
-`Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it.
+`Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it. `:countin 2`, `:countin 3 beats`, `:countin off` and `:preroll 2` set what comes before recording.
+
+## The Metronome page
+
+`, m s` or `:metronome`. `j` / `k` move between settings and `h` / `l` between a click's note and velocity; Enter edits in place, Up and Down step the value, Enter sets it and Escape leaves it. Changing a click's note or velocity plays it. Each change is an undo step.
 
 ## Questions and lines typed into
 

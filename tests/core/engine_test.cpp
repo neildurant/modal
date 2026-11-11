@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -926,4 +927,35 @@ TEST_CASE("input batching keeps a complete SysEx together at the message budget 
     REQUIRE(last.size() == 1);
     CHECK(last[0].first);
     CHECK(last[0].chunk.bytes[0] == 0x90);
+}
+
+TEST_CASE("an auditioned note sounds now and ends after its length, or as the next starts")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.audition(DestinationId{3}, 9, 76, 110, 50ms));
+    engine.step();
+    REQUIRE(sink.sent.size() == 1);
+    CHECK(sink.sent[0].destination == DestinationId{3});
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x99, 76, 110});
+    // Woken for its end, which goes when due.
+    const auto wake = engine.step();
+    CHECK(wake.nextEvent == std::optional{sink.sent[0].due + 50ms});
+    runUntil(engine, clock, clock.time + 60ms);
+    REQUIRE(sink.sent.size() == 2);
+    CHECK(sink.sent[1].bytes == std::vector<std::uint8_t>{0x89, 76, 0});
+
+    // Another before the first ends ends it first; panic ends one still sounding.
+    sink.sent.clear();
+    REQUIRE(engine.audition(DestinationId{3}, 9, 76, 110, 1s));
+    REQUIRE(engine.audition(DestinationId{3}, 9, 77, 80, 1s));
+    engine.step();
+    REQUIRE(sink.sent.size() == 3);
+    CHECK(sink.sent[1].bytes == std::vector<std::uint8_t>{0x89, 76, 0});
+    CHECK(sink.sent[2].bytes == std::vector<std::uint8_t>{0x99, 77, 80});
+    REQUIRE(engine.panic());
+    engine.step();
+    CHECK(std::ranges::any_of(sink.sent, [](const Sent& sent)
+                              { return sent.bytes == std::vector<std::uint8_t>{0x89, 77, 0}; }));
 }

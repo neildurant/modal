@@ -107,6 +107,21 @@ bool Player::record(const Song& song)
     return true;
 }
 
+bool Player::auditionClick(const Song& song, bool downbeat)
+{
+    const auto& metronome = song.metronome;
+    const auto destination = lookUp(metronome.port);
+    if (!destination || !metronome.isValid())
+    {
+        return false;
+    }
+    const auto length =
+        song.tempo().toTime(std::max(metronome.length.toTicks(song.ppqn()), Tick{1}));
+    return engine_.audition(*destination, static_cast<std::uint8_t>(metronome.channel - 1),
+                            downbeat ? metronome.downbeatNote : metronome.beatNote,
+                            downbeat ? metronome.downbeatVelocity : metronome.beatVelocity, length);
+}
+
 std::optional<Player::RecordPhase> Player::recordPhase() const
 {
     if (!recording())

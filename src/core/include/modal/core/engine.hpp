@@ -106,9 +106,14 @@ struct EngineCommand
         Panic,
         Quit,
         ResetInputs,
+        Audition,
     };
     Kind kind = Kind::Stop;
     std::uint64_t request = 0; // Play: its snapshot; ResetInputs: its acknowledgement
+    // Audition: the note-on, where to and for how long.
+    DestinationId destination{0};
+    std::array<std::uint8_t, 3> note{};
+    std::chrono::nanoseconds length{};
 };
 
 } // namespace detail
@@ -164,6 +169,12 @@ public:
     // Turns MIDI thru on or off for every track (on to begin with). Notes and pedals already
     // held still end where they went.
     void setThru(bool on) { thruOn_.store(on, std::memory_order_relaxed); }
+
+    // Plays one note now, ending it after a length, as when trying the click's sound; one
+    // still sounding from before ends first. It's not playback, so stop doesn't end it early,
+    // but panic and quit do.
+    [[nodiscard]] bool audition(DestinationId destination, std::uint8_t channel, std::uint8_t pitch,
+                                std::uint8_t velocity, std::chrono::nanoseconds length);
 
     // Ends run() once the commands before it have been carried out.
     [[nodiscard]] bool quit();
@@ -266,8 +277,17 @@ private:
     ThruSink thruSink_{*this};
     Thru thru_{thruSink_};
     std::optional<Command> pending_; // a Play waiting for its snapshot
-    std::uint64_t currentPlay_ = 0;  // 0 while stopped
-    std::size_t nextInput_ = 0; // rotating input service, shared by normal and transport drains
+    // The auditioned note still sounding: where, its note-off, and when that's due.
+    struct Auditioned
+    {
+        DestinationId destination;
+        std::array<std::uint8_t, 3> off;
+        std::chrono::nanoseconds due;
+    };
+    std::optional<Auditioned> auditioned_;
+    void endAudition(std::chrono::nanoseconds now) noexcept;
+    std::uint64_t currentPlay_ = 0; // 0 while stopped
+    std::size_t nextInput_ = 0;     // rotating input service, shared by normal and transport drains
     bool quit_ = false;
 
     // Status, written by the engine thread only.

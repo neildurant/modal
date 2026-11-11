@@ -12,6 +12,7 @@ add_library(modal_ui STATIC
     palette.cpp
     ports.cpp
     ports_view.cpp
+    metronome_view.cpp
     remembered.cpp
     config.cpp
     demo_song.cpp

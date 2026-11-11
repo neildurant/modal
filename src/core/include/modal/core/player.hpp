@@ -121,6 +121,11 @@ public:
     // where it stopped, applied to the song as it is now. Nothing until recordingStopped().
     std::optional<Take> finishRecording(const Song& song);
 
+    // Plays the song's click once, the downbeat's or the other beats', on its port (the
+    // default output where it names none), as long as it is at the song's first tempo. Returns
+    // false if there's nowhere for it to go, or the engine is busy.
+    [[nodiscard]] bool auditionClick(const Song& song, bool downbeat);
+
     // Space: stops if playing, and otherwise plays.
     [[nodiscard]] bool toggle();
 

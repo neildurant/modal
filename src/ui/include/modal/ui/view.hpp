@@ -68,6 +68,7 @@ enum class ViewKind : std::uint8_t
     EventList,
     Tracks,
     Ports,
+    Metronome,
 };
 
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
@@ -233,6 +234,8 @@ public:
     // changing them, which saves them and puts them into use; and looking for the ports there
     // are now, as when a device is plugged in.
     virtual const PortTable* portTable() const { return nullptr; }
+    // Plays the song's click once, the downbeat's or the other beats', to hear it.
+    virtual void auditionClick(bool) {}
     virtual void changePorts(const PortTable&) {}
     virtual void lookForPorts() {}
 

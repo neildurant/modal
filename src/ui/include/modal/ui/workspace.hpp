@@ -15,6 +15,7 @@
 #include <modal/ui/key.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/layout.hpp>
+#include <modal/ui/metronome_view.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/ports_view.hpp>
@@ -140,6 +141,8 @@ public:
     const TracksView& tracks() const { return *tracks_; }
     PortsView& portsView() { return *ports_; }
     const PortsView& portsView() const { return *ports_; }
+    MetronomeView& metronomeView() { return *metronome_; }
+    const MetronomeView& metronomeView() const { return *metronome_; }
 
     // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
     // goes back to (decided for milestone 5).
@@ -436,6 +439,7 @@ private:
         if (portControl_.change)
             portControl_.change(table);
     }
+    void auditionClick(bool downbeat) override;
     void lookForPorts() override
     {
         if (portControl_.look)
@@ -590,6 +594,7 @@ private:
     std::unique_ptr<PianoRollView> pianoRoll_;
     std::unique_ptr<TracksView> tracks_;
     std::unique_ptr<PortsView> ports_;
+    std::unique_ptr<MetronomeView> metronome_;
     PortControl portControl_;
     View* current_ = nullptr;
     std::vector<View*> history_; // the views shown before, for Backspace

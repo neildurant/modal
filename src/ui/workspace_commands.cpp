@@ -330,6 +330,12 @@ constexpr std::array kSharedCommands{
                                "the count-in; Space stops"},
     CommandInfo{.name = "metronome-cycle",
                 .description = "The metronome for this song: off, while recording, or always"},
+    CommandInfo{.name = "view-metronome",
+                .description = "The metronome page: the song's click and what comes before "
+                               "recording",
+                .aliases = "metronome"},
+    CommandInfo{.name = "metronome-port",
+                .description = "Choose where the click goes, on the metronome page"},
     CommandInfo{.name = "countin-cycle",
                 .description = "What comes before recording, for this song: nothing, a count-in, "
                                "or a pre-roll"},
@@ -650,7 +656,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"zoom-in", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},
-            {"field-edit", onlyIn({EventList, TrackList, PortList})},
+            {"field-edit", onlyIn({EventList, TrackList, PortList, MetronomePage})},
             {"bar-open", onlyIn({Tracks})},
             {"section-play", onlyIn({Strip})},
             {"field-increase", onlyIn({EventList, TrackList})},
@@ -764,6 +770,14 @@ std::span<const CommandInfo> Workspace::commands()
             {"event-delete", "Forget a port that isn't there now"},
             {"go-first", "Go to the first port"},
         }};
+        const std::array<std::pair<std::string_view, std::string_view>, 6> metronomeDescriptions{{
+            {"cursor-down", "Move down a setting"},
+            {"cursor-up", "Move up a setting"},
+            {"cursor-left", "Move to a click's note"},
+            {"cursor-right", "Move to a click's velocity"},
+            {"field-edit", "Edit the setting, Up and Down stepping it"},
+            {"inspector-edit", "Edit the setting, Up and Down stepping it"},
+        }};
         for (auto& info : result)
         {
             for (const auto& [name, description] : trackDescriptions)
@@ -781,6 +795,9 @@ std::span<const CommandInfo> Workspace::commands()
             for (const auto& [name, description] : portDescriptions)
                 if (info.name == name)
                     info.here[static_cast<std::size_t>(PortList)] = description;
+            for (const auto& [name, description] : metronomeDescriptions)
+                if (info.name == name)
+                    info.here[static_cast<std::size_t>(MetronomePage)] = description;
         }
         return result;
     }();

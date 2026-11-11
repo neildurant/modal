@@ -780,7 +780,8 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
     CHECK(contains(p.status(), U"● COUNT  ")); // counting in, then recording
     const auto x = [&](std::u32string_view starts)
     {
-        for (const auto& run : p.ws.frame().back().text)
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
             if (run.text.starts_with(starts))
                 return run.x;
         return -1;

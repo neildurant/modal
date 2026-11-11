@@ -141,6 +141,7 @@ Whole-track paste initially requires the same PPQN and section names/order/lengt
 | `, T Space` | Rewind on or off: whether the play-from marker stays put when playback stops, so Space plays the same again, or moves to where it stopped, so Space carries on |
 | `Ctrl-.` | Panic: stop, and All Notes Off and Reset All Controllers on every channel |
 | `R` | Record onto the armed tracks (`, r a` arms one) from the play-from marker, after a count-in; Space stops. `, r m` switches between replace and overdub |
+| `, m s`, `:metronome` | The Metronome page: the click's port, channel, notes, velocities and length, and the count-in or pre-roll; `, m m` and `, m c` cycle the metronome and count-in |
 | `ga`, `ge`, Backspace | The arrangement, the event list, and back to the view before |
 | `,` | The leader key, for commands used now and then: after any keys that start longer ones, or an operator, a pause shows a menu of what can follow |
 | `, ?` | List the keys that do something here, in groups |

@@ -87,6 +87,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , pianoRoll_(std::make_unique<PianoRollView>(document, static_cast<ViewHost&>(*this)))
     , tracks_(std::make_unique<TracksView>(document, static_cast<ViewHost&>(*this)))
     , ports_(std::make_unique<PortsView>(document, static_cast<ViewHost&>(*this)))
+    , metronome_(std::make_unique<MetronomeView>(document, static_cast<ViewHost&>(*this)))
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
@@ -366,6 +367,7 @@ void Workspace::refresh()
     pianoRoll_->refresh();
     tracks_->refresh();
     ports_->refresh();
+    metronome_->refresh();
 }
 
 void Workspace::showSong()
@@ -375,6 +377,7 @@ void Workspace::showSong()
     pianoRoll_->showSong();
     tracks_->showSong();
     ports_->showSong();
+    metronome_->showSong();
     history_.clear();
     layOut();
 }
@@ -384,6 +387,7 @@ ViewKind Workspace::shown() const
     return current_ == arrange_.get()     ? ViewKind::Arrangement
            : current_ == tracks_.get()    ? ViewKind::Tracks
            : current_ == ports_.get()     ? ViewKind::Ports
+           : current_ == metronome_.get() ? ViewKind::Metronome
            : current_ == pianoRoll_.get() ? ViewKind::PianoRoll
                                           : ViewKind::EventList;
 }
@@ -408,6 +412,9 @@ void Workspace::show(ViewKind kind)
         lookForPorts(); // as they may have come or gone since
         switchTo(*ports_, true);
         break;
+    case ViewKind::Metronome:
+        switchTo(*metronome_, true);
+        break;
     }
 }
 
@@ -415,6 +422,7 @@ void Workspace::open(ViewKind kind)
 {
     switchTo(kind == ViewKind::Tracks        ? static_cast<View&>(*tracks_)
              : kind == ViewKind::Ports       ? static_cast<View&>(*ports_)
+             : kind == ViewKind::Metronome   ? static_cast<View&>(*metronome_)
              : kind == ViewKind::Arrangement ? static_cast<View&>(*arrange_)
              : kind == ViewKind::PianoRoll   ? static_cast<View&>(*pianoRoll_)
                                              : static_cast<View&>(*eventList_),
@@ -1102,6 +1110,8 @@ Where Workspace::where() const
         return Where::TrackList;
     case ViewKind::Ports:
         return Where::PortList;
+    case ViewKind::Metronome:
+        return Where::MetronomePage;
     case ViewKind::EventList:
         break;
     }
@@ -1418,13 +1428,14 @@ bool Workspace::sayWhereFor(std::string_view command)
         }
     }
     std::vector<std::string> places;
-    constexpr std::array<std::pair<Where, std::string_view>, 6> kPlaces{{
+    constexpr std::array<std::pair<Where, std::string_view>, 7> kPlaces{{
         {Where::Tracks, "the arrangement's tracks"},
         {Where::Strip, "the section strip"},
         {Where::PianoRoll, "the piano roll"},
         {Where::EventList, "the event list"},
         {Where::TrackList, "the tracks view"},
         {Where::PortList, "the ports view"},
+        {Where::MetronomePage, "the metronome page"},
     }};
     for (const auto& [place, name] : kPlaces)
     {
@@ -1892,6 +1903,13 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "view-ports")
     {
         show(ViewKind::Ports);
+        return true;
+    }
+    if (command == "view-metronome" || command == "metronome-port")
+    {
+        if (command == "metronome-port")
+            metronome_->go(MetronomeView::Setting::Port);
+        show(ViewKind::Metronome);
         return true;
     }
     if (command == "view-tracks")
@@ -2674,6 +2692,14 @@ bool Workspace::record()
                                                               : MessageKind::Information);
     showPlayhead();
     return true;
+}
+
+void Workspace::auditionClick(bool downbeat)
+{
+    if (player_ != nullptr && !player_->auditionClick(document_.song(), downbeat) && !clickPort())
+    {
+        setMessage("No click to hear: no metronome port or default output", MessageKind::Warning);
+    }
 }
 
 bool Workspace::clickPort() const

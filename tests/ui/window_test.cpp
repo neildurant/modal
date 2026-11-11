@@ -349,6 +349,16 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     CHECK(window->saveFrame(base + "-ports.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-ports-light.bmp"));
+    // The metronome page, the cursor on the downbeat's note.
+    view.run("view-metronome", 0);
+    for (const char32_t key : std::u32string_view{U"3j"})
+    {
+        view.handle(Key::typed(key), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-metronome.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-metronome-light.bmp"));
     // Tracks on those ports: Default and All dim, a port by alias, one gone and one disabled.
     view.run("view-tracks", 0);
     const auto beforePorts = document.song();

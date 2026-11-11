@@ -66,6 +66,27 @@ bool Engine::panic()
     return woken(commands_.tryPush({Command::Kind::Panic}));
 }
 
+bool Engine::audition(DestinationId destination, std::uint8_t channel, std::uint8_t pitch,
+                      std::uint8_t velocity, nanoseconds length)
+{
+    Command command{Command::Kind::Audition};
+    command.destination = destination;
+    command.note = {static_cast<std::uint8_t>(0x90 | (channel & 0x0F)),
+                    static_cast<std::uint8_t>(pitch & 0x7F),
+                    static_cast<std::uint8_t>(std::clamp<int>(velocity, 1, 127))};
+    command.length = length;
+    return woken(commands_.tryPush(command));
+}
+
+void Engine::endAudition(nanoseconds now) noexcept
+{
+    if (auditioned_)
+    {
+        sink_.send(auditioned_->destination, auditioned_->off, now);
+        auditioned_.reset();
+    }
+}
+
 std::optional<std::uint64_t> Engine::resetInputs()
 {
     const auto request = inputResetRequests_ + 1;
@@ -204,9 +225,17 @@ EngineWake Engine::step() noexcept
 
     const auto sendTime = clock_.now();
     scheduler_.sendDue(sendTime);
+    if (auditioned_ && sendTime >= auditioned_->due)
+    {
+        endAudition(sendTime);
+    }
     publishStatus(sendTime);
 
-    const auto next = scheduler_.nextWakeTime();
+    auto next = scheduler_.nextWakeTime();
+    if (auditioned_)
+    {
+        next = std::min(next.value_or(nanoseconds::max()), auditioned_->due);
+    }
     return {std::min(sendTime + kMaxSleep, next.value_or(nanoseconds::max())), next};
 }
 
@@ -234,7 +263,16 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         scheduler_.stop(now);
         currentPlay_ = 0;
         return true;
+    case Command::Kind::Audition:
+        endAudition(now);
+        sink_.send(command.destination, command.note, now);
+        auditioned_ = Auditioned{
+            command.destination,
+            {static_cast<std::uint8_t>(0x80 | (command.note[0] & 0x0F)), command.note[1], 0},
+            now + command.length};
+        return true;
     case Command::Kind::Panic:
+        endAudition(now);
         noteStop(now);
         thru_.endAll(now);
         scheduler_.panic(now);
@@ -251,6 +289,7 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         return true;
     }
     case Command::Kind::Quit:
+        endAudition(now);
         noteStop(now);
         scheduler_.stop(now);
         currentPlay_ = 0;
