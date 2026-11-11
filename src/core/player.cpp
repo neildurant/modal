@@ -16,21 +16,33 @@ Player::Player(Engine& engine, PortResolver resolvePort, InputResolver resolveIn
 {
 }
 
-std::optional<DestinationId> Player::destination(const std::string& port)
+std::optional<DestinationId> Player::lookUp(const std::string& port)
 {
     auto it = ports_.find(port);
     if (it == ports_.end())
     {
         it = ports_.emplace(port, resolvePort_(port)).first;
     }
-    if (!it->second && std::ranges::find(missingPorts_, port) == missingPorts_.end())
-    {
-        missingPorts_.push_back(port);
-    }
     return it->second;
 }
 
+std::optional<DestinationId> Player::destination(const std::string& port)
+{
+    const auto found = lookUp(port);
+    if (!found && std::ranges::find(missingPorts_, port) == missingPorts_.end())
+    {
+        missingPorts_.push_back(port);
+    }
+    return found;
+}
+
 void Player::update(const Song& song)
+{
+    auto plan = compile(song);
+    waiting_ = engine_.setPlan(plan) ? nullptr : std::move(plan);
+}
+
+std::shared_ptr<const PlaybackPlan> Player::compile(const Song& song)
 {
     missingPorts_.clear();
     missingInputs_.clear();
@@ -55,10 +67,54 @@ void Player::update(const Song& song)
         options.resolveInput = [&](std::string_view name) { return inputs.find(name)->second; };
     }
     options.bypassQuantize = bypassQuantize_;
+    // While recording, the plan keeps the metronome, as edits replace it.
+    options.recording = recorder_.has_value();
+    options.metronomeDestination = recorder_ ? click_ : std::nullopt;
     auto plan = std::make_shared<const PlaybackPlan>(
         compilePlan(song, [&](const Track& track) { return destination(track.port); }, options));
     quantizeWarnings_ = plan->quantizeWarnings;
-    waiting_ = engine_.setPlan(plan) ? nullptr : std::move(plan);
+    return plan;
+}
+
+bool Player::record(const Song& song)
+{
+    if (playing_ || recorder_)
+    {
+        return false;
+    }
+    const auto click = lookUp(song.metronome.port);
+    auto start = planRecordStart(song, marker_, click);
+    recorder_.emplace(song, 0, marker_, song.recordMode, resolveInput_);
+    click_ = click;
+    auto plan = compile(song);
+    if (!engine_.setPlan(plan) || !engine_.play(start.playFrom, std::move(start.countIn)))
+    {
+        // The plan, if taken, records nothing without a play; the next update replaces it.
+        recorder_.reset();
+        click_.reset();
+        waiting_ = std::move(plan);
+        return false;
+    }
+    waiting_.reset();
+    play_ = engine_.lastPlay();
+    recorder_.emplace(song, play_, marker_, song.recordMode, resolveInput_);
+    playing_ = true;
+    stopExact_ = true;
+    started_ = start.playFrom;
+    return true;
+}
+
+std::optional<Player::Take> Player::finishRecording(const Song& song)
+{
+    if (!recordingStopped())
+    {
+        return std::nullopt;
+    }
+    takeInput();
+    Take take{recorder_->finish(song, stoppedAt_), recorder_->tracks()};
+    recorder_.reset();
+    click_.reset();
+    return take;
 }
 
 bool Player::play()
@@ -134,6 +190,10 @@ std::size_t Player::takeInput()
     while (const auto stamped = engine_.nextReceived())
     {
         messages += stamped->first ? 1 : 0;
+        if (recorder_)
+        {
+            recorder_->receive(*stamped);
+        }
         const auto& chunk = stamped->chunk;
         const auto kind = chunk.bytes[0] & 0xF0;
         const bool noteOff =
@@ -168,10 +228,12 @@ bool Player::poll()
         if (const auto at = engine_.stoppedAt(play_))
         {
             stoppedAt(*at);
+            stoppedAt_ = *at;
             stopExact_ = true;
         }
     }
-    if (playing_ && engine_.status().finished)
+    // Recording carries on past the song's end until stopped.
+    if (playing_ && !recorder_ && engine_.status().finished)
     {
         // Resuming from the end would play nothing, so without rewind, back to the start. The
         // engine has finished, so if it can't take the stop now, nothing more sounds anyway.

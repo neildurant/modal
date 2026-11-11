@@ -94,6 +94,7 @@ keysection "Recording"
 ngroup <leader>r "Recording"
 nmap <leader>ra track-arm-toggle  "Arm this track, or disarm it"
 nmap <leader>rt track-thru-toggle "Thru to this track, or stop"
+nmap <leader>rm record-mode-toggle "Replace or overdub"
 vgroup <leader>r "Recording"
 vmap <leader>ra tracks-arm-toggle "Arm the selected tracks, or disarm them"
 vmap <leader>rt tracks-thru-toggle "Thru to the selected tracks, or stop"
@@ -400,9 +401,11 @@ nmap <leader>xPk transform-pedal-bake    "Bake the sustain into notes"
 " started. m Space puts the marker at the cursor, and Ctrl-Space puts it there and plays.
 " With rewind (on by default) the marker stays put, so Space plays the same again; without,
 " it moves to where playback stops, so Space carries on. , T Space turns rewind on or off.
+" R records onto the armed tracks from the marker, after the song's count-in; Space stops.
 " Ctrl-. panics, in every mode: All Notes Off and Reset All Controllers on every channel.
 keysection "Playing"
 nmap <Space>    play-toggle       "Play or stop"
+nmap R          record            "Record"
 nmap <S-Space>  play-stop-back    "Stop and go back"
 nmap <C-Space>  play-cursor       "Play from the cursor"
 nmap m<Space>   play-from-set     "Play from here"

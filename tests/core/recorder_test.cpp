@@ -439,20 +439,27 @@ TEST_CASE("recording removes a musical offset across tempo changes")
     CHECK(eventsOf(recorder.finish(4 * q), id) == std::vector<Event>{note(q, 60, q / 2)});
 }
 
-TEST_CASE("recording filters named inputs and leaves missing-input tracks unchanged")
+TEST_CASE("recording filters named inputs, the default for none and every one for All, and "
+          "leaves missing-input tracks unchanged")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = songAt(ppqn);
     const auto all = addTrack(song, 1);
     const auto keys = addTrack(song, 2);
     const auto missing = addTrack(song, 3);
+    const auto standard = addTrack(song, 4); // the default input, InputId 0 here
+    song.updateTrack(all, [](Track& track) { track.input = Track::kAllInputs; });
     song.updateTrack(keys, [](Track& track) { track.input = "Keys"; });
     song.updateTrack(missing, [](Track& track) { track.input = "Gone"; });
     song.updateEvents(missing,
                       [&](EventList& events) { events.insert({0, Note{50, 90, ppqn.quarter()}}); });
     Recorder recorder{song, kPlay, 0, RecordMode::Replace,
                       [](std::string_view name) -> std::optional<InputId>
-                      { return name == "Keys" ? std::optional{InputId{1}} : std::nullopt; }};
+                      {
+                          return name == "Keys" ? std::optional{InputId{1}}
+                                 : name.empty() ? std::optional{InputId{0}}
+                                                : std::nullopt;
+                      }};
     recorder.receive(stamped(0ms, {0x90, 60, 100}, InputId{0}));
     recorder.receive(stamped(0ms, {0x90, 62, 90}, InputId{1}));
     recorder.receive(stamped(50ms, {0xB0, 1, 80}, InputId{0}));
@@ -465,4 +472,6 @@ TEST_CASE("recording filters named inputs and leaves missing-input tracks unchan
     REQUIRE(result.events(keys).size() == 3);
     CHECK(std::get<Note>(result.events(keys).all()[0].data).pitch == 62);
     CHECK(std::get<ControlChange>(result.events(keys).all()[1].data).controller == 64);
+    REQUIRE(result.events(standard).size() == 2); // input 0's note and CC
+    CHECK(std::get<Note>(result.events(standard).all()[0].data).pitch == 60);
 }

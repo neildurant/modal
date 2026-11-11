@@ -276,8 +276,18 @@ Bar Workspace::statusBar(bool withMessage) const
         const auto place = placeParts(song, view().cursorMeter(), at);
         const Style style = playing ? Style{Role::Accent, Role::Bar, kBold}
                                     : Style{Role::BarText, Role::Bar, kPlain};
-        bottom.left.push_back(
-            {playing ? "▶ " : "■ ", playing ? style : Style{Role::Dim, Role::Bar, kPlain}});
+        // Recording, and how, straight after the symbol, so it shows however narrow.
+        const bool overdub = song.recordMode == core::RecordMode::Overdub;
+        if (player_->recording())
+        {
+            bottom.left.push_back(
+                {overdub ? "● ODUB  " : "● REC  ", {Role::Warning, Role::Bar, kBold}});
+        }
+        else
+        {
+            bottom.left.push_back(
+                {playing ? "▶ " : "■ ", playing ? style : Style{Role::Dim, Role::Bar, kPlain}});
+        }
         bottom.left.push_back({place.position + "  " + place.time + "  " + place.meter + "  " +
                                    tempoText(song, at) + "  " + sectionText(song, at),
                                style});
@@ -350,6 +360,18 @@ Bar Workspace::statusBar(bool withMessage) const
     }
     if (!thru_)
         bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
+    // Stopped with tracks armed, how many and how they'd record, beside what's coming in.
+    if (const auto armed = std::ranges::count_if(document_.song().tracks(),
+                                                 [](const auto& track) { return track->arm; });
+        armed > 0 && player_ != nullptr && !player_->playing())
+    {
+        bottom.right.push_back(
+            {"Armed " + std::to_string(armed) + " " +
+                 (document_.song().recordMode == core::RecordMode::Overdub ? "Overdub"
+                                                                           : "Replace") +
+                 "   ",
+             label});
+    }
     bottom.right.push_back({"In", {inputLitUntil_ ? Role::Accent : Role::Dim, Role::Bar, kPlain}});
     // The last message in, fixed in width so nothing after it moves (decided November 2026).
     std::span<const std::uint8_t> last;

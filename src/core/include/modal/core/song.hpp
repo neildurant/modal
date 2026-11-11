@@ -21,6 +21,13 @@
 namespace modal::core
 {
 
+// What recording does to what's already in the recorded range of the armed tracks.
+enum class RecordMode : std::uint8_t
+{
+    Replace, // what was in the recorded range goes
+    Overdub, // the take is merged with it
+};
+
 // A bookmark: a named position with no structural meaning.
 struct Label
 {
@@ -156,6 +163,7 @@ public:
     std::string title;
     MetronomeSettings metronome;
     CountInSettings countIn;
+    RecordMode recordMode = RecordMode::Replace;
 
     // Tracks in display order; track 1 is tracks()[0].
     std::span<const std::shared_ptr<const Track>> tracks() const { return tracks_; }
@@ -330,6 +338,7 @@ public:
         std::string title;
         MetronomeSettings metronome;
         CountInSettings countIn;
+        RecordMode recordMode;
         std::vector<std::shared_ptr<const Track>> tracks;
         std::vector<std::shared_ptr<const Section>> sections;
         std::uint64_t nextTrackId;

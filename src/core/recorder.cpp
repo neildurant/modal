@@ -83,9 +83,12 @@ Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode,
 {
     for (const auto& track : song_.tracks())
     {
-        const auto input =
-            !track->input.empty() && resolveInput ? resolveInput(track->input) : std::nullopt;
-        if (track->arm && (track->input.empty() || input))
+        // As the plan takes a track's input: every input for All, or without a machine to ask
+        // (an empty name then too); otherwise the port named, or the default for empty.
+        const bool all =
+            track->input == Track::kAllInputs || (track->input.empty() && !resolveInput);
+        const auto input = !all && resolveInput ? resolveInput(track->input) : std::nullopt;
+        if (track->arm && (all || input))
         {
             takes_.push_back({track->id(), track->timeOffset, input, {}, {}, {}});
         }
@@ -236,7 +239,21 @@ void Recorder::noteOff(TrackTake& take, InputId input, std::uint8_t inChannel, s
 
 Song Recorder::finish(Tick stop) const
 {
-    Song song = song_;
+    return finish(song_, stop);
+}
+
+std::vector<TrackId> Recorder::tracks() const
+{
+    std::vector<TrackId> ids;
+    for (const auto& take : takes_)
+    {
+        ids.push_back(take.track);
+    }
+    return ids;
+}
+
+Song Recorder::finish(Song song, Tick stop) const
+{
     if (stop <= start_)
     {
         return song;

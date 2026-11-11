@@ -19,12 +19,6 @@
 namespace modal::core
 {
 
-enum class RecordMode : std::uint8_t
-{
-    Replace, // what was in the recorded range goes
-    Overdub, // the take is merged with it
-};
-
 // Turns MIDI input stamped by the engine into a take on each armed track, and applies it to
 // the song when recording stops. It runs on the control side, not the engine thread.
 //
@@ -50,6 +44,13 @@ public:
     // The song with the take applied, recording having stopped at `stop`. If that's not after
     // the record point, the song is unchanged.
     Song finish(Tick stop) const;
+
+    // The same, onto the song as it is when recording stops, so edits made while recording
+    // stay: the take goes onto those of the armed tracks it still has.
+    Song finish(Song song, Tick stop) const;
+
+    // The tracks being recorded onto, in song order.
+    std::vector<TrackId> tracks() const;
 
 private:
     // One event of a take, as it arrived; a note's duration is known once it has ended.

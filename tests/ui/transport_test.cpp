@@ -730,3 +730,143 @@ TEST_CASE("an unavailable input is in the warning colour with an inspector warni
         for (const auto& run : region.text)
             CHECK(run.text.find(U"not found") == std::u32string::npos);
 }
+
+namespace
+{
+// The track armed, and its events, for the recording tests.
+const core::Track* armed(const core::Document& document)
+{
+    for (const auto& track : document.song().tracks())
+        if (track->arm)
+            return track.get();
+    return nullptr;
+}
+
+bool hasPitch(const core::Song& song, core::TrackId id, std::uint8_t pitch)
+{
+    for (const auto& event : song.events(id).all())
+        if (const auto* note = std::get_if<core::Note>(&event.data); note && note->pitch == pitch)
+            return true;
+    return false;
+}
+
+// Plays a note in on the keyboard, held for a while.
+void playNote(Playing& p, std::uint8_t pitch)
+{
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, pitch, 100},
+                             p.clock.time));
+    p.runFor(200ms);
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x80, pitch, 0},
+                             p.clock.time));
+    p.runFor(100ms);
+}
+} // namespace
+
+TEST_CASE("R records onto the armed track after a count-in, Space stops, and it's one undo step")
+{
+    Playing p;
+    p.type(U"R");
+    CHECK(p.ws.message() == "No track is armed: , r a arms this one");
+    p.type(U",ra");
+    const auto* track = armed(p.document);
+    REQUIRE(track != nullptr);
+    const auto id = track->id();
+    const auto name = track->name;
+    CHECK(contains(p.status(), U"Armed 1 Replace"));
+
+    p.type(U"R");
+    CHECK(p.player.recording());
+    CHECK(p.ws.message() == "Recording onto " + name);
+    CHECK(contains(p.status(), U"● REC"));
+    p.type(U"R");
+    CHECK(p.ws.message() == "Already recording: Space stops");
+    // The count-in clicks on the default output's channel 10, a bar at the song's tempo.
+    p.runFor(2100ms);
+    CHECK(std::ranges::any_of(p.sink.sent, [](const auto& sent)
+                              { return !sent.bytes.empty() && sent.bytes[0] == 0x99; }));
+    playNote(p, 99);
+    CHECK_FALSE(hasPitch(p.document.song(), id, 99)); // put in once stopped
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK_FALSE(p.player.recording());
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK(p.ws.message() == "Recorded onto " + name);
+    CHECK_FALSE(contains(p.status(), U"● REC"));
+    p.type(U"u");
+    CHECK(p.ws.message() == "Undid: Record onto " + name);
+    CHECK_FALSE(hasPitch(p.document.song(), id, 99));
+}
+
+TEST_CASE("the leader then r and m switches the song between replace and overdub")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    const auto before = p.document.song().events(id).size();
+    REQUIRE(before > 0);
+    p.type(U",rm");
+    CHECK(p.document.song().recordMode == core::RecordMode::Overdub);
+    CHECK(p.ws.message() == "Overdub: what's recorded is added to what's there");
+    CHECK(contains(p.status(), U"Armed 1 Overdub"));
+    p.type(U"R");
+    CHECK(p.ws.message().starts_with("Overdubbing onto "));
+    CHECK(contains(p.status(), U"● ODUB"));
+    p.runFor(2100ms);
+    playNote(p, 99);
+    p.runFor(4s);
+    p.type(U" ");
+    p.runFor(10ms);
+    // Overdubbed: what was there stays.
+    CHECK(p.document.song().events(id).size() == before + 1);
+    p.type(U"u");
+    p.type(U",rm");
+    CHECK(p.document.song().recordMode == core::RecordMode::Replace);
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    p.runFor(4s);
+    p.type(U" ");
+    p.runFor(10ms);
+    // Replaced: what was in the recorded range went.
+    CHECK(p.document.song().events(id).size() < before + 1);
+    CHECK(hasPitch(p.document.song(), id, 99));
+}
+
+TEST_CASE("recording isn't started while playing, and stopping in the count-in records nothing")
+{
+    Playing p;
+    p.type(U",ra");
+    p.type(U" ");
+    p.type(U"R");
+    CHECK(p.ws.message() == "Stop first to record");
+    CHECK_FALSE(p.player.recording());
+    p.type(U" ");
+    p.runFor(10ms);
+    const auto version = p.document.version();
+    p.type(U"R");
+    p.runFor(500ms);
+    p.press(Key::typed(U' ', kCtrl)); // playing from elsewhere would end the pass
+    CHECK(p.ws.message() == "Recording: Space stops it first");
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(p.ws.message() == "Nothing recorded: stopped before the record point");
+    CHECK(p.document.version() == version);
+}
+
+TEST_CASE("recording carries on past the song's end, which grows to hold the take")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    const auto end = p.document.song().end();
+    p.type(U"G");
+    p.type(U"m ");
+    p.type(U"R");
+    p.runFor(30s);
+    CHECK(p.player.recording());
+    playNote(p, 99);
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(p.document.song().end() > end);
+    CHECK(hasPitch(p.document.song(), id, 99));
+}

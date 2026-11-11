@@ -29,6 +29,7 @@ Song everything(Ppqn ppqn)
     song.title = "Everything \"quoted\" \\ and \xE9 raw";
     song.metronome.when = MetronomeSettings::When::Always;
     song.metronome.port = "Drum Module";
+    song.recordMode = RecordMode::Overdub;
     song.metronome.channel = 9;
     song.metronome.downbeatNote = 37;
     song.metronome.downbeatVelocity = 127;
@@ -321,6 +322,9 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + section + "metronome when=off\n", "line 7", "before the sections"},
         {header + "metronome when=sometimes\n", "line 4", "off, recording or always"},
         {header + "countin bars=-1\n", "line 4", "0 to 999"},
+        {header + "record mode=sometimes\n", "line 4", "replace or overdub"},
+        {header + "record take=1\n", "line 4", "unknown record setting"},
+        {header + section + "record mode=overdub\n", "line 7", "before the sections"},
         {header + "bogus\n", "line 4", "unknown line"},
         {header + section + "  mark A 1:1:0\n", "line 7", "letter from a to z"},
         {header + section + "  mark a 1:1:0\n  mark a 2:1:0\n", "line 8", "already a mark a"},

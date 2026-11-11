@@ -24,8 +24,11 @@
 #include <cctype>
 #include <charconv>
 #include <map>
+#include <span>
+#include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace modal::ui
 {
@@ -1207,6 +1210,7 @@ bool Workspace::wake(std::int64_t now)
     {
         player_->poll();
         showPlayhead();
+        finishRecording();
         changed = true;
     }
     else if (player_ != nullptr && player_->planWaiting())
@@ -1575,6 +1579,27 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         command == "play-from-set" || command == "panic")
     {
         return transport(command);
+    }
+    if (command == "record")
+    {
+        return record();
+    }
+    if (command == "record-mode-toggle")
+    {
+        if (player_ != nullptr && player_->recording())
+        {
+            refuse("Recording: stop first to change the record mode");
+            return true;
+        }
+        const bool overdub = document_.song().recordMode == core::RecordMode::Replace;
+        document_.edit(
+            overdub ? "Record mode: Overdub" : "Record mode: Replace", view().place(),
+            [&](core::Song& song)
+            { song.recordMode = overdub ? core::RecordMode::Overdub : core::RecordMode::Replace; });
+        setMessage(overdub ? "Overdub: what's recorded is added to what's there"
+                           : "Replace: what's recorded replaces what's there",
+                   MessageKind::Information);
+        return true;
     }
     if (command == "playhead-follow")
     {
@@ -2531,6 +2556,12 @@ bool Workspace::transport(std::string_view command)
         taken = player_->toggle();
         returning_ = taken ? was : returning_;
     }
+    else if (command == "play-cursor" && player_->recording())
+    {
+        // Playing from elsewhere would end the pass without saying so.
+        refuse("Recording: Space stops it first");
+        return true;
+    }
     else if (command == "play-cursor" || command == "play-from-set")
     {
         player_->setMarker(view().cursor().tick);
@@ -2550,6 +2581,89 @@ bool Workspace::transport(std::string_view command)
     }
     showPlayhead();
     return true;
+}
+
+namespace
+{
+// Tracks by name, in song order, or "track 3" for one without: "Bass, Piano".
+std::string trackNames(const core::Song& song, std::span<const core::TrackId> ids)
+{
+    std::string text;
+    const auto tracks = song.tracks();
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        if (std::ranges::find(ids, tracks[i]->id()) != ids.end())
+        {
+            text += (text.empty() ? "" : ", ") +
+                    (tracks[i]->name.empty() ? "track " + std::to_string(i + 1) : tracks[i]->name);
+        }
+    }
+    return text;
+}
+} // namespace
+
+bool Workspace::record()
+{
+    if (player_ == nullptr)
+    {
+        refuse("Nothing to record from", MessageKind::Warning);
+        return true;
+    }
+    if (player_->playing() || player_->stopping())
+    {
+        refuse(player_->recording() ? "Already recording: Space stops" : "Stop first to record");
+        return true;
+    }
+    std::vector<core::TrackId> armed;
+    for (const auto& track : document_.song().tracks())
+    {
+        if (track->arm)
+            armed.push_back(track->id());
+    }
+    if (armed.empty())
+    {
+        refuse("No track is armed: , r a arms this one");
+        return true;
+    }
+    if (!player_->record(document_.song()))
+    {
+        refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
+        return true;
+    }
+    const bool overdub = document_.song().recordMode == core::RecordMode::Overdub;
+    auto text =
+        (overdub ? "Overdubbing onto " : "Recording onto ") + trackNames(document_.song(), armed);
+    if (!player_->clicking())
+        text += "; no click, with no metronome port or default output";
+    // Several armed is often a mistake, so said as a warning (see Arming in the design).
+    setMessage(text, armed.size() > 1 || !player_->clicking() ? MessageKind::Warning
+                                                              : MessageKind::Information);
+    showPlayhead();
+    return true;
+}
+
+void Workspace::finishRecording()
+{
+    if (player_ == nullptr || !player_->recordingStopped())
+    {
+        return;
+    }
+    auto take = player_->finishRecording(document_.song());
+    if (!take)
+    {
+        return;
+    }
+    if (take->song == document_.song())
+    {
+        setMessage("Nothing recorded: stopped before the record point", MessageKind::Information);
+        return;
+    }
+    const auto names = trackNames(document_.song(), take->tracks);
+    const auto title = take->tracks.size() == 1
+                           ? "Record onto " + names
+                           : "Record onto " + std::to_string(take->tracks.size()) + " tracks";
+    document_.edit(title, view().place(), [&](core::Song& song) { song = std::move(take->song); });
+    setMessage("Recorded onto " + names, MessageKind::Information);
 }
 
 void Workspace::setPlayer(core::Player* player)

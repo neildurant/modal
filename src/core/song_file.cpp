@@ -346,6 +346,7 @@ private:
     bool readSong(std::span<const Token> tokens);
     bool readMetronome(std::span<const Token> tokens);
     bool readCountIn(std::span<const Token> tokens);
+    bool readRecord(std::span<const Token> tokens);
     bool readTrack(std::span<const Token> tokens);
     bool readSection(std::span<const Token> tokens);
     bool readMeter(std::span<const Token> tokens);
@@ -411,6 +412,7 @@ private:
     std::string title_;
     MetronomeSettings metronome_;
     CountInSettings countIn_;
+    RecordMode recordMode_ = RecordMode::Replace;
     std::vector<Track> tracks_;
     std::vector<Section> sections_;
     std::optional<OpenSection> section_;
@@ -467,6 +469,7 @@ SongReadResult Reader::read(std::string_view text)
     result.song->title = std::move(title_);
     result.song->metronome = std::move(metronome_);
     result.song->countIn = countIn_;
+    result.song->recordMode = recordMode_;
     return result;
 }
 
@@ -493,13 +496,15 @@ bool Reader::readLine(std::span<const Token> tokens)
     {
         return stage_ == Stage::Header ? readTrack(tokens) : readBlock(tokens);
     }
-    if (word == "metronome" || word == "countin")
+    if (word == "metronome" || word == "countin" || word == "record")
     {
         if (stage_ != Stage::Header)
         {
             return fail(word + " comes before the sections");
         }
-        return word == "metronome" ? readMetronome(tokens) : readCountIn(tokens);
+        return word == "metronome" ? readMetronome(tokens)
+               : word == "countin" ? readCountIn(tokens)
+                                   : readRecord(tokens);
     }
     // marker: labels' old name, so songs saved before they were renamed still open.
     if (word == "meter" || word == "tempo" || word == "label" || word == "marker" || word == "mark")
@@ -630,6 +635,25 @@ bool Reader::readMetronome(std::span<const Token> tokens)
         {
             return fail("unknown metronome setting \"" + std::string{name} + "\"");
         }
+    }
+    return true;
+}
+
+// record mode=overdub: the song's record mode, left out for replace.
+bool Reader::readRecord(std::span<const Token> tokens)
+{
+    for (const auto& token : tokens.subspan(1))
+    {
+        const auto [name, value] = settingOf(token);
+        if (!value || name != "mode")
+        {
+            return fail("unknown record setting \"" + token.text + "\"");
+        }
+        if (*value != "replace" && *value != "overdub")
+        {
+            return fail("record mode should be replace or overdub");
+        }
+        recordMode_ = *value == "overdub" ? RecordMode::Overdub : RecordMode::Replace;
     }
     return true;
 }
@@ -1553,6 +1577,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.title = song.title;
     result.metronome = song.metronome;
     result.countIn = song.countIn;
+    result.recordMode = song.recordMode;
     return result;
 }
 
@@ -1589,6 +1614,10 @@ std::string writeSong(const Song& song)
     line(0, "countin mode=" + std::string{kModes[static_cast<std::size_t>(countIn.mode)]} +
                 " bars=" + std::to_string(countIn.bars) + " beats=" +
                 std::to_string(countIn.beats) + " preroll=" + std::to_string(countIn.preRollBars));
+    if (song.recordMode == RecordMode::Overdub)
+    {
+        line(0, "record mode=overdub");
+    }
 
     if (!song.tracks().empty())
     {

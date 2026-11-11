@@ -4,6 +4,7 @@
 
 #include <modal/core/engine.hpp>
 #include <modal/core/playback_plan.hpp>
+#include <modal/core/recorder.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 
@@ -85,6 +86,31 @@ public:
     [[nodiscard]] bool play();
     [[nodiscard]] bool stop();
 
+    // Records from the marker onto the song's armed tracks (see Recorder), in the song's record
+    // mode, after its count-in or pre-roll, the metronome clicking on the song's metronome port,
+    // or the default output where it names none (until the metronome has controls of its own,
+    // decided November 2026). Stopping as playback stops; recording carries on past the song's
+    // end until then. Returns whether the engine took it; not while playing, or while the last
+    // pass is still to be finished.
+    [[nodiscard]] bool record(const Song& song);
+
+    // Whether recording, from record() until stopped; and whether the pass has a click, which
+    // it hasn't without a metronome port or default output, nor a count-in then.
+    bool recording() const { return recorder_.has_value() && playing_; }
+    bool clicking() const { return click_.has_value(); }
+
+    // A pass recorded: the song with its take, and the tracks it went onto.
+    struct Take
+    {
+        Song song;
+        std::vector<TrackId> tracks;
+    };
+    // Whether a pass has stopped and the engine has said where, so finishRecording() can end it.
+    bool recordingStopped() const { return recorder_.has_value() && !playing_ && stopExact_; }
+    // Ends the stopped pass, taking any input still to come: the take, from the record point to
+    // where it stopped, applied to the song as it is now. Nothing until recordingStopped().
+    std::optional<Take> finishRecording(const Song& song);
+
     // Space: stops if playing, and otherwise plays.
     [[nodiscard]] bool toggle();
 
@@ -118,6 +144,9 @@ public:
 
 private:
     std::optional<DestinationId> destination(const std::string& port);
+    // A port's destination, looked up once, without noting it missing.
+    std::optional<DestinationId> lookUp(const std::string& port);
+    std::shared_ptr<const PlaybackPlan> compile(const Song& song);
 
     // Notes that playback stopped: where the engine was last seen, until it says where.
     void noteStopped();
@@ -136,9 +165,12 @@ private:
     Tick marker_ = 0;
     bool rewind_ = true;
     bool playing_ = false;
-    std::uint64_t play_ = 0; // the engine's id for the last play
-    Tick started_ = 0;       // where the last play started
-    bool stopExact_ = true;  // whether the engine has said where the last play stopped
+    std::uint64_t play_ = 0;             // the engine's id for the last play
+    Tick started_ = 0;                   // where the last play started
+    bool stopExact_ = true;              // whether the engine has said where the last play stopped
+    Tick stoppedAt_ = 0;                 // where it said
+    std::optional<Recorder> recorder_;   // the pass being recorded, until finished
+    std::optional<DestinationId> click_; // the metronome's while recording
 };
 
 } // namespace modal::core

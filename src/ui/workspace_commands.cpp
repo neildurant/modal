@@ -325,6 +325,11 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "play-cursor",
                 .description = "Put the play-from marker at the cursor, and play from there"},
     CommandInfo{.name = "play-from-set", .description = "Put the play-from marker at the cursor"},
+    CommandInfo{.name = "record",
+                .description = "Record onto the armed tracks from the play-from marker, after "
+                               "the count-in; Space stops"},
+    CommandInfo{.name = "record-mode-toggle",
+                .description = "Record replacing what's there, or overdubbing it, for this song"},
     CommandInfo{.name = "panic",
                 .description = "Stop, and send All Notes Off and Reset All Controllers"},
     CommandInfo{.name = "playhead-follow",

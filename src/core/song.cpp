@@ -194,6 +194,7 @@ Song::Song(Parts parts)
     : title(std::move(parts.title))
     , metronome(std::move(parts.metronome))
     , countIn(parts.countIn)
+    , recordMode(parts.recordMode)
     , tracks_(std::move(parts.tracks))
     , sections_(std::move(parts.sections))
     , nextTrackId_(parts.nextTrackId)
@@ -207,14 +208,16 @@ Song::Song(Parts parts)
 
 Song::Parts Song::parts() const
 {
-    return {ppqn(), title, metronome, countIn, tracks_, sections_, nextTrackId_, identity_};
+    return {ppqn(),  title,     metronome,    countIn,  recordMode,
+            tracks_, sections_, nextTrackId_, identity_};
 }
 
 bool operator==(const Song& a, const Song& b)
 {
     const auto same = [](const auto& x, const auto& y) { return x == y || *x == *y; };
     return a.ppqn() == b.ppqn() && a.title == b.title && a.metronome == b.metronome &&
-           a.countIn == b.countIn && std::ranges::equal(a.tracks_, b.tracks_, same) &&
+           a.countIn == b.countIn && a.recordMode == b.recordMode &&
+           std::ranges::equal(a.tracks_, b.tracks_, same) &&
            std::ranges::equal(a.sections_, b.sections_, same);
 }
 

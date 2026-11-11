@@ -526,6 +526,10 @@ private:
     // Runs a transport command; then shows the playhead, or where playback stopped.
     bool transport(std::string_view command);
     void showPlayhead();
+    // Records from the play-from marker onto the armed tracks (R); and once the engine has
+    // said where recording stopped, puts the take into the song as one undo step.
+    bool record();
+    void finishRecording();
 
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);

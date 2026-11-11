@@ -261,7 +261,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, s` | Sections, on the cursor's section |
 | `, t` | Tracks: `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
 | `, v m` `gm` | The Ports view: this machine's MIDI ports, to enable, alias and choose the default input and output |
-| `, r` | Recording: `a` arm this track, `t` its Thru |
+| `, r` | Recording: `a` arm this track, `t` its Thru, `m` replace or overdub |
 | `, S` | Select |
 | `, x` | Transforms |
 | `, v` | Views: `t` Tracks, `a` arrangement, `p` piano roll, `e` event list |
@@ -272,7 +272,7 @@ The leader is `,` (the `leader` setting). Its groups:
 
 ## Playing
 
-`Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics.
+`Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it.
 
 ## Questions and lines typed into
 
