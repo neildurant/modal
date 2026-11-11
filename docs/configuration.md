@@ -135,7 +135,7 @@ The roles are:
 | `mode`, `mode-text` | the mode indicator, such as NORMAL |
 | `track-mute`, `track-solo`, `track-chase`, `track-quantize`, `track-arm`, `track-thru`, `toggle-text` | active Mute/Solo/Chase/Quant/Arm/Thru button backgrounds and their text |
 | `event-sign` | a sign in a ruler for a program or tempo change |
-| `field` | the background of a field free text is typed into, such as a track's name or a port's alias, so it shows as one even when empty |
+| `field` | the background of a field free text is typed into, such as a track's name or a port's alias, so it shows as one even when empty, and of a field chosen from a drop-down list |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `label` | notes, and labels |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |

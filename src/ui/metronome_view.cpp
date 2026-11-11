@@ -778,8 +778,8 @@ void MetronomeView::addRegions(Frame& frame) const
             shown.append(padding, U' ');
         if (listed)
             shown += std::u32string{U' ', ChoiceList::kArrow};
-        else if (!here)
-            addField(page, x, y, width, cell_); // typed into, so shown as a field
+        if (!here)
+            addField(page, x, y, width, cell_); // typed into or chosen, so shown as a field
         Style style = plain;
         if (setting == Setting::Port)
         {

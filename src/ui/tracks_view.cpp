@@ -1086,10 +1086,10 @@ void TracksView::addRegions(Frame& frame) const
             }
             else
             {
-                if (track && column.field == TrackField::Name &&
+                if (track && (column.field == TrackField::Name || listed) &&
                     style.background == Role::Background)
                 {
-                    addField(table, x, y, room, cell_); // typed as free text
+                    addField(table, x, y, room, cell_); // typed as free text, or chosen
                 }
                 table.text.push_back({x, y, std::move(text), style});
             }

@@ -126,6 +126,21 @@ TEST_CASE("on the metronome page, Enter edits a setting, Up and Down step it, ea
     CHECK(c.ws.message() == "Count-in 3 bars");
 }
 
+TEST_CASE("a drop-down list's value has a field's background as a typed value does")
+{
+    Clicking c;
+    REQUIRE(c.ws.metronomeView().setting() == Setting::Plays); // the cursor away from Port
+    const auto frame = c.ws.frame();
+    bool shown = false;
+    for (const auto& region : frame)
+        for (const auto& run : region.text)
+            if (run.text.starts_with(U"Default") && run.text.ends_with(U"▾"))
+                for (const auto& shape : region.under)
+                    shown = shown || (shape.role == Role::Field && shape.rect.x == run.x &&
+                                      shape.rect.y >= run.y && shape.rect.y < run.y + 20);
+    CHECK(shown);
+}
+
 TEST_CASE("a choice on the metronome page is made from a drop-down list")
 {
     Clicking c;

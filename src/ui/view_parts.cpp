@@ -162,6 +162,9 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
         else
             text.resize(box - 2, U' ');
         text += std::u32string{U' ', ChoiceList::kArrow};
+        // A control, as a typed field is: its value and arrow on one field.
+        if (!edited && field.editable)
+            addField(region, x, y, columns, cell);
         region.text.push_back({x, y, std::move(text),
                                edited           ? Style{Role::Text, Role::Selection, kPlain}
                                : field.warning  ? Style{Role::Warning, Role::Panel, kPlain}
