@@ -213,13 +213,15 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## The Ports view, step 3 (11 November 2026; local, to try)
+## The Ports view, step 3 (11 November 2026; local, column swap to try)
 
 The Tracks cells, as design.md (Ports, The Tracks choosers) has them: the heading **Output** (was Output port), with three blank cells before Input; `Default` and `All` dim; a port that can't be used in the warning colour (was dim), the inspector saying why: not found, disabled (and `(disabled)` in the chooser), no default set, the default not found or disabled, and for All no input enabled or none of them connected. The cells now ask the ports table (`TracksView::portTrouble`) rather than the player's missing names. Also `gm` opens the Ports view, as asked during the work.
 
 **Validation.** Windows Debug passes 906 tests (904, 2 skipped): a new Tracks test covers each colour, inspector warning and the `(disabled)` label; the two transport tests of missing ports now use a ports table; the Ports view test opens it with `gm`. Dark and light renders of Tracks with ports set (`-tracks-ports`) were looked at.
 
-**To try:** in Tracks, with no default output set, the Output cells should be in the warning colour, the inspector warning "No default output" and "Choose one in the Ports view"; set one with `gm` and they turn dim. Set a track to a disabled port, and one to a port that's unplugged; set Input to All with no input enabled. Check there's room between Output and Input.
+**After trying it, the same day:** accepted. Asked for then, and done: the Input cell's About text says `Input:` as Output's says `Output:`; Input comes before Output, the three cells between them; the bar says `Output:` (was `Port:`), and the inspector `Output not found` / `Output disabled`. The bar, two characters longer, leaves out the section at 120 columns, so the bar test runs at 124. Windows Debug passes 906 (904, 2 skipped); renders looked at.
+
+**To try:** in Tracks, with no default output set, the Output cells should be in the warning colour, the inspector warning "No default output" and "Choose one in the Ports view"; set one with `gm` and they turn dim. Set a track to a disabled port, and one to a port that's unplugged; set Input to All with no input enabled. Check there's room between Input and Output, and that Tab goes from Input to Output to Ch.
 
 ## Next
 

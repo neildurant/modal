@@ -112,7 +112,7 @@ TEST_CASE("the left group never runs into the right, however narrow the bar")
     const Style value{Role::BarText, Role::Bar, kPlain};
     Bar bar;
     bar.left = {{"Track 1:", label}, {" Bass     ", value}, {"Channel:", label},
-                {" 10     ", value}, {"Port:", label},      {" Pro-800     ", value}};
+                {" 10     ", value}, {"Output:", label},    {" Pro-800     ", value}};
     bar.right = {
         {"Section:", label}, {" Chorus 2     ", value}, {"Bars:", label}, {" 36–47", value}};
     for (int columns = 40; columns <= 90; ++columns)

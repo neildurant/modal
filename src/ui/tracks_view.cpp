@@ -303,7 +303,7 @@ Inspection TracksView::inspection() const
     {
         const bool input = field == TrackField::Input;
         const auto& name = input ? track.input : track.port;
-        const std::string kind = input ? "Input" : "Port";
+        const std::string kind = input ? "Input" : "Output";
         const std::string which = input ? "input" : "output";
         std::optional<InspectorField> trouble;
         switch (portTrouble(track, input))

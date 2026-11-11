@@ -684,6 +684,7 @@ TEST_CASE("the bar above says where the cursor is in a view with a timeline, and
 {
     const auto view = GENERATE(as<std::u32string>{}, U"gt", U"ga", U"gr", U"ge");
     Tracking t;
+    t.ws.resize(1240, 600, {10, 20}); // room for everything, the section included
     t.type(view);
     const auto frame = t.ws.frame();
     std::u32string bar; // the view's bar: those on the bar's colour but the status line
@@ -1271,9 +1272,12 @@ TEST_CASE("a track's port is chosen from a list of the ports there are")
         t.press(NamedKey::Down);
         t.press(NamedKey::Tab);
         CHECK(t.track().port == "loopMIDI Port 1");
-        CHECK(t.ws.tracks().choosingPort()); // Input follows Output
+        CHECK(t.ws.tracks().inspectorEditor().heading() == "Ch"); // Ch follows Output
+        t.press(NamedKey::Escape);
+        t.column(TrackField::Input);
+        t.press(NamedKey::Enter);
         t.press(NamedKey::Tab);
-        CHECK(t.ws.tracks().inspectorEditor().heading() == "Ch");
+        CHECK(t.ws.tracks().choosingPort()); // Output follows Input
         t.press(NamedKey::Escape);
     }
 }
@@ -1635,7 +1639,7 @@ TEST_CASE("the quantise grid steps through the triplets, from anywhere")
 }
 
 TEST_CASE(
-    "the button columns are evenly spaced, and Output fits its names, three cells before Input")
+    "the button columns are evenly spaced, and Input fits its names, three cells before Output")
 {
     Tracking t;
     const auto headingX = [&](std::u32string_view heading)
@@ -1673,19 +1677,20 @@ TEST_CASE(
         CHECK(badges[i] - badges[i - 1] == 4 * 10);
     }
 
-    const auto port = headingX(U"Output");
-    const auto input = [&] { return headingX(U"Input"); };
-    const auto narrow = input() - port;
-    t.document.edit("A long port", {},
+    // Input, then three cells before Output, growing with the longest input a track names.
+    const auto input = headingX(U"Input");
+    const auto output = [&] { return headingX(U"Output"); };
+    const auto narrow = output() - input;
+    t.document.edit("A long input", {},
                     [&](core::Song& song)
                     {
                         song.updateTrack(
                             song.tracks()[0]->id(), [](core::Track& track)
-                            { track.port = "A port with quite a long name, longer than room"; });
+                            { track.input = "An input with quite a long name, longer than room"; });
                     });
-    CHECK(input() - port == (24 + 3) * 10);
+    CHECK(output() - input == (24 + 3) * 10);
     CHECK(narrow ==
-          std::ranges::find(trackColumns(), TrackField::Port, &TrackColumn::field)->width * 10);
+          std::ranges::find(trackColumns(), TrackField::Input, &TrackColumn::field)->width * 10);
 }
 
 TEST_CASE("arming a track says so, and names any others still armed")
@@ -1932,13 +1937,13 @@ TEST_CASE("a track's Default and All are dim, and a port that can't be used is i
     t.set(false, "Other synth");
     CHECK(t.colour(TrackField::Port) == Role::Warning);
     t.column(TrackField::Port);
-    CHECK(inspectorHas(t.ws.frame(), U"Port disabled"));
+    CHECK(inspectorHas(t.ws.frame(), U"Output disabled"));
     CHECK(inspectorHas(t.ws.frame(), U"Enable it in the Ports view"));
     t.press(NamedKey::Enter);
     CHECK(t.listed().back() == U"Other synth (disabled)");
     t.press(NamedKey::Escape);
     t.set(false, "Elsewhere");
-    CHECK(inspectorHas(t.ws.frame(), U"Port not found"));
+    CHECK(inspectorHas(t.ws.frame(), U"Output not found"));
     t.type(U"0");
     CHECK(t.colour(TrackField::Port) == Role::Warning);
 

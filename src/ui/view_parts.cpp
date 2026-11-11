@@ -512,8 +512,8 @@ std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track)
     std::vector<BarPair> pairs{{padText("Track " + std::to_string(track) + ":", numberWidth, false),
                                 padText(shown.name, std::min(longestName, kTrackNameWidth), false)},
                                {"Channel:", padText(std::to_string(shown.channel), 2, true)},
-                               {"Port:", padText(shown.port.empty() ? "Default" : shown.port,
-                                                 std::min(longestPort, kPortNameWidth), false)}};
+                               {"Output:", padText(shown.port.empty() ? "Default" : shown.port,
+                                                   std::min(longestPort, kPortNameWidth), false)}};
     // Last, as they come and go from track to track.
     if (shown.quantize.on)
     {

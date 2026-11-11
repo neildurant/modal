@@ -488,13 +488,13 @@ TEST_CASE("a track's port that wasn't found is in the warning colour, and explai
     };
     REQUIRE(find(U"Gone"));
     CHECK(find(U"Gone")->style.foreground == Role::Warning);
-    CHECK_FALSE(find(U"Port not found"));
+    CHECK_FALSE(find(U"Output not found"));
 
     for (const char32_t key : U"k" + toColumn(TrackField::Port))
     {
         ws.handle(Key::typed(key), 0);
     }
-    REQUIRE(find(U"Port not found"));
+    REQUIRE(find(U"Output not found"));
     bool warned = false;
     for (const auto& region : ws.frame())
     {
