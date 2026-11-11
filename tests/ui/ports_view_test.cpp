@@ -203,7 +203,7 @@ TEST_CASE("Enter on the alias edits it in place, unique among its direction's po
     CHECK(p.ws.message() == "Xkey 1 has no alias");
 }
 
-TEST_CASE("Enter on a port's detected name or status does nothing as they're read only")
+TEST_CASE("Enter on a port's detected name does nothing as it's read only")
 {
     Porting p;
     p.type(U"G0lll");
@@ -212,13 +212,18 @@ TEST_CASE("Enter on a port's detected name or status does nothing as they're rea
     p.press(NamedKey::Enter);
     CHECK_FALSE(p.ws.portsView().typing());
     CHECK(p.ws.message() == before);
-    p.type(U"l");
-    REQUIRE(p.ws.portsView().column() == PortsView::Column::Status);
-    p.press(NamedKey::Enter);
-    CHECK_FALSE(p.ws.portsView().typing());
     p.type(U"k"); // the cursor still moves
-    CHECK(p.ws.portsView().column() == PortsView::Column::Status);
+    CHECK(p.ws.portsView().column() == PortsView::Column::Name);
     CHECK_FALSE(p.ws.portsView().typing());
+}
+
+TEST_CASE("the cursor stops at a port's name and doesn't go on to its status")
+{
+    Porting p;
+    p.type(U"G0llll");
+    CHECK(p.ws.portsView().column() == PortsView::Column::Name);
+    p.type(U"0$");
+    CHECK(p.ws.portsView().column() == PortsView::Column::Name);
 }
 
 TEST_CASE("x forgets a port that isn't there, not one that is")

@@ -356,7 +356,7 @@ void PortsView::act()
                          MessageKind::Information);
         return;
     }
-    case Column::Name: // the detected name and the status are the port's own, not to change
+    case Column::Name: // the detected name is the port's own, not to change
     case Column::Status:
         return;
     case Column::Alias:
@@ -415,7 +415,7 @@ std::optional<bool> PortsView::run(std::string_view command, int count)
     }
     else if (command == "cursor-right")
     {
-        column_ = std::min(column_ + n, kColumns.size() - 1);
+        column_ = std::min(column_ + n, kLastColumn);
     }
     else if (command == "cursor-first")
     {
@@ -423,7 +423,7 @@ std::optional<bool> PortsView::run(std::string_view command, int count)
     }
     else if (command == "cursor-last")
     {
-        column_ = kColumns.size() - 1;
+        column_ = kLastColumn;
     }
     else if (command == "go-first")
     {

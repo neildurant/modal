@@ -60,6 +60,9 @@ public:
 
     static constexpr std::array<Column, 5> kColumns{Column::Enabled, Column::Default, Column::Alias,
                                                     Column::Name, Column::Status};
+    // The last column the cursor goes to: the status after the name is only something to read,
+    // blank while the port is there, the inspector saying why one can't be used.
+    static constexpr std::size_t kLastColumn = 3;
 
 private:
     // The table's lines: each group's heading, a blank, its columns' headings, then its ports by
