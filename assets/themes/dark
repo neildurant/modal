@@ -41,3 +41,7 @@ highlight track-arm #ff2a2a
 highlight track-thru #e0af68
 highlight toggle-text #1a1b26
 highlight event-sign #bb9af7
+
+" A field free text is typed into, between the background and the panel so it shows on
+" either.
+highlight field #292c3f

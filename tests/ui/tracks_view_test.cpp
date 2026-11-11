@@ -1191,7 +1191,7 @@ TEST_CASE("a track's port is chosen from a list of the ports there are")
     ChoosingPorts t;
     t.press(NamedKey::Enter);
     REQUIRE(t.ws.tracks().choosingPort());
-    CHECK(t.listed() == std::vector<std::u32string>{U"default", U"Pro-800", U"loopMIDI Port 1",
+    CHECK(t.listed() == std::vector<std::u32string>{U"Default", U"Pro-800", U"loopMIDI Port 1",
                                                     U"loopMIDI Port 2"});
 
     t.press(NamedKey::Down);
@@ -1774,14 +1774,15 @@ TEST_CASE("the inspector says what the column under the cursor is")
     }
 }
 
-TEST_CASE("the Input column chooses all or one active input and changes are undoable")
+TEST_CASE("the Input column chooses the default, all or one input and changes are undoable")
 {
     ChoosingPorts t;
     t.ws.setInputPorts([] { return std::vector<std::string>{"Keyboard A", "Keyboard B"}; });
     t.column(TrackField::Input);
     CHECK(t.track().input.empty());
     t.press(NamedKey::Enter);
-    CHECK(t.listed() == std::vector<std::u32string>{U"All inputs", U"Keyboard A", U"Keyboard B"});
+    CHECK(t.listed() ==
+          std::vector<std::u32string>{U"Default", U"All", U"Keyboard A", U"Keyboard B"});
     t.type(U"Keyboard B");
     t.press(NamedKey::Enter);
     CHECK(t.track().input == "Keyboard B");
@@ -1795,9 +1796,13 @@ TEST_CASE("the Input column chooses all or one active input and changes are undo
     t.press(NamedKey::Enter);
     t.press(NamedKey::Down);
     t.press(NamedKey::Enter);
+    CHECK(t.track().input == core::Track::kAllInputs);
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Enter);
     CHECK(t.track().input == "Keyboard A");
     t.press(NamedKey::Enter);
-    t.press(NamedKey::Up);
+    t.type(U"default");
     t.press(NamedKey::Enter);
     CHECK(t.track().input.empty());
 }
@@ -1811,7 +1816,8 @@ TEST_CASE("input choices retain a missing saved name without substituting all in
         { song.updateTrack(id, [](core::Track& track) { track.input = "Absent keys"; }); });
     t.column(TrackField::Input);
     t.press(NamedKey::Enter);
-    CHECK(t.listed() == std::vector<std::u32string>{U"All inputs", U"Absent keys (not found)"});
+    CHECK(t.listed() ==
+          std::vector<std::u32string>{U"Default", U"All", U"Absent keys (not found)"});
     t.press(NamedKey::Enter);
     CHECK(t.track().input == "Absent keys");
 }
@@ -1824,6 +1830,7 @@ TEST_CASE("a Visual track selection takes one chosen input with one undo step")
     t.type(U"Vj");
     const auto before = t.document.song();
     t.press(NamedKey::Enter);
+    t.press(NamedKey::Down); // past Default and All
     t.press(NamedKey::Down);
     t.press(NamedKey::Enter);
     CHECK(t.track(0).input == "Keys");

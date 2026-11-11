@@ -39,3 +39,7 @@ highlight track-arm #e00000
 highlight track-thru #7a6a00
 highlight toggle-text #ffffff
 highlight event-sign #9854f1
+
+" A field free text is typed into, lighter than the background and the panel, as fields
+" usually are.
+highlight field #f3f4f7

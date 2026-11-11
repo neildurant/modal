@@ -536,7 +536,11 @@ bool TracksView::openField()
     PortChoice choice;
     choice.input = trackColumns()[column_].field == TrackField::Input;
     choice.current = choice.input ? track.input : track.port;
-    choice.ports.emplace_back();
+    choice.ports.emplace_back(); // the default
+    if (choice.input)
+    {
+        choice.ports.emplace_back(core::Track::kAllInputs);
+    }
     for (auto& port : choice.input ? host_.inputPorts() : host_.outputPorts())
     {
         choice.ports.push_back(std::move(port));
@@ -603,9 +607,7 @@ std::vector<std::size_t> TracksView::portMatches() const
     for (std::size_t i = 0; i < portChoice_->ports.size(); ++i)
     {
         const auto& port = portChoice_->ports[i];
-        if (folded(
-                decodeUtf8(port.empty() ? (portChoice_->input ? "All inputs" : "default") : port))
-                .find(wanted) != std::u32string::npos)
+        if (folded(decodeUtf8(portLabel(port))).find(wanted) != std::u32string::npos)
         {
             result.push_back(i);
         }
@@ -694,6 +696,11 @@ std::optional<bool> TracksView::runPortChoice(std::string_view command)
     return true;
 }
 
+std::string TracksView::portLabel(const std::string& port)
+{
+    return port.empty() ? "Default" : port == core::Track::kAllInputs ? "All" : port;
+}
+
 bool TracksView::portMissing(const core::Track& track, bool input) const
 {
     const auto* player = host_.player();
@@ -712,9 +719,8 @@ void TracksView::addPortChoice(Frame& frame) const
     const auto label = [&](std::size_t match)
     {
         const auto& port = portChoice_->ports[matches[match]];
-        return decodeUtf8(port.empty() ? std::string{portChoice_->input ? "All inputs" : "default"}
-                          : matches[match] == portChoice_->gone ? port + " (not found)"
-                                                                : port);
+        return decodeUtf8(matches[match] == portChoice_->gone ? port + " (not found)"
+                                                              : portLabel(port));
     };
 
     // At the cell, below it, or above where there's no room; as wide as the longest in view.
@@ -1124,6 +1130,11 @@ void TracksView::addRegions(Frame& frame) const
             }
             else
             {
+                if (track && column.field == TrackField::Name &&
+                    style.background == Role::Background)
+                {
+                    addField(table, x, y, room, cell_); // typed as free text
+                }
                 table.text.push_back({x, y, std::move(text), style});
             }
             if (toggle)

@@ -7,6 +7,7 @@
 #include <modal/ui/view_parts.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -21,13 +22,24 @@ std::string_view heading(PortsView::Column column)
 {
     switch (column)
     {
+    case PortsView::Column::Enabled:
+        return "On";
+    case PortsView::Column::Default:
+        return "Default";
     case PortsView::Column::Alias:
         return "Alias";
     case PortsView::Column::Name:
         return "Port";
-    default:
+    case PortsView::Column::Status:
         return {};
     }
+    return {};
+}
+
+// Where in its column a button's mark goes: under the middle of the heading.
+int markOffset(PortsView::Column column)
+{
+    return column == PortsView::Column::Default ? 3 : 0;
 }
 
 std::string_view about(PortsView::Column column, PortDirection direction)
@@ -36,11 +48,11 @@ std::string_view about(PortsView::Column column, PortDirection direction)
     switch (column)
     {
     case PortsView::Column::Enabled:
-        return input ? "Enabled: listened to, for Thru, recording and the In light"
-                     : "Enabled: offered to tracks to play to";
+        return input ? "On: listened to, for Thru, recording and the In light"
+                     : "On: offered to tracks to play to";
     case PortsView::Column::Default:
-        return input ? "Default: only an output can be the default"
-                     : "Default: the output for tracks without one of their own";
+        return input ? "Default: the input of tracks set to Default, one at a time"
+                     : "Default: the output of tracks set to Default, one at a time";
     case PortsView::Column::Alias:
         return "Alias: what tracks and songs call it, if not its detected name";
     case PortsView::Column::Name:
@@ -83,7 +95,14 @@ std::vector<PortsView::Line> PortsView::lines() const
     const auto* table = host_.portTable();
     for (const auto direction : {PortDirection::Input, PortDirection::Output})
     {
-        result.push_back({direction, std::nullopt});
+        if (direction == PortDirection::Output)
+        {
+            result.push_back({PortDirection::Input, LineKind::Blank});
+            result.push_back({PortDirection::Input, LineKind::Blank});
+        }
+        result.push_back({direction, LineKind::Heading});
+        result.push_back({direction, LineKind::Blank});
+        result.push_back({direction, LineKind::Columns});
         bool any = false;
         if (table != nullptr)
         {
@@ -91,14 +110,14 @@ std::vector<PortsView::Line> PortsView::lines() const
             {
                 if (table->ports()[i].direction == direction)
                 {
-                    result.push_back({direction, i});
+                    result.push_back({direction, LineKind::Port, i});
                     any = true;
                 }
             }
         }
         if (!any)
         {
-            result.push_back({direction, std::nullopt}); // "None found"
+            result.push_back({direction, LineKind::None});
         }
     }
     return result;
@@ -165,10 +184,15 @@ void PortsView::go(std::size_t to, int towards)
 
 void PortsView::ensureVisible()
 {
-    const auto rows = static_cast<std::size_t>(std::max(layout_.fullRows - 1, 1));
+    const auto rows = static_cast<std::size_t>(std::max(layout_.fullRows, 1));
     const auto at = line();
-    // A group's heading stays in view above its first port.
-    const auto want = at > 0 && !lines()[at - 1].port ? at - 1 : at;
+    // A group's headings stay in view above its first port.
+    const auto all = lines();
+    auto want = at;
+    while (want > 0 && !all[want - 1].port && all[want - 1].direction == all[at].direction)
+    {
+        --want;
+    }
     top_ = std::min(top_, want);
     if (at >= top_ + rows)
     {
@@ -194,8 +218,9 @@ int PortsView::columnWidth(Column column) const
     switch (column)
     {
     case Column::Enabled:
-    case Column::Default:
         return 4;
+    case Column::Default:
+        return 9;
     case Column::Alias:
         return std::max(longest([](const KnownPort& p) { return p.alias; }), 16) + 3;
     case Column::Name:
@@ -256,7 +281,21 @@ std::optional<std::string> PortsView::setAlias(const std::string& typed)
     auto alias = typed;
     alias.erase(0, alias.find_first_not_of(" \t"));
     alias.erase(alias.find_last_not_of(" \t") + 1);
-    // Unique among its direction's, as a track names a port by it.
+    // Not the choosers' own words, and unique among its direction's, as a track names a port
+    // by it.
+    for (const std::string_view taken : {"Default", "All", "*"})
+    {
+        if (alias.size() == taken.size() &&
+            std::ranges::equal(alias, taken,
+                               [](char a, char b)
+                               {
+                                   return std::tolower(static_cast<unsigned char>(a)) ==
+                                          std::tolower(static_cast<unsigned char>(b));
+                               }))
+        {
+            return "Tracks' choosers use " + std::string{taken} + " for themselves";
+        }
+    }
     for (const auto& other : table->ports())
     {
         if (!alias.empty() && other.direction == port->direction && &other != port &&
@@ -305,18 +344,18 @@ void PortsView::act()
         return;
     }
     case Column::Default:
-        if (port->direction == PortDirection::Input)
-        {
-            host_.refuse("Only an output can be the default");
-            return;
-        }
-        changed.setDefaultOutput(table->defaultOutput() == name ? std::string{} : name);
+    {
+        const auto direction = port->direction;
+        const bool input = direction == PortDirection::Input;
+        changed.setDefault(direction, table->defaultPort(direction) == name ? std::string{} : name);
         change(changed);
-        host_.setMessage(changed.defaultOutput().empty()
-                             ? "No default output: tracks without a port aren't played"
-                             : "Default output: " + shown,
+        host_.setMessage(changed.defaultPort(direction).empty()
+                             ? (input ? "No default input: tracks set to Default hear nothing"
+                                      : "No default output: tracks set to Default aren't played")
+                             : (input ? "Default input: " : "Default output: ") + shown,
                          MessageKind::Information);
         return;
+    }
     default:
         if (editor_.open({.kind = "Port",
                           .fields = {{.heading = "Alias",
@@ -487,8 +526,8 @@ std::optional<bool> PortsView::runTyping(std::string_view command)
 
 Inspection PortsView::inspection() const
 {
-    // What the column under the cursor is, then the port's detected name whole, and whether it
-    // can be used.
+    // What the column under the cursor is, then whether the port can be used, and its detected
+    // name whole.
     const auto* port = current();
     if (port == nullptr)
     {
@@ -524,76 +563,68 @@ void PortsView::addRegions(Frame& frame) const
     const auto* ports = host_.portTable();
     const auto all = lines();
     const auto at = line();
-    const auto edge = hairline(cell_);
     const Style dim{Role::Dim, Role::Background, kPlain};
-
-    // The headings, over the text columns; the buttons' letters say what they are.
-    int x = cell_.width;
-    for (const auto column : kColumns)
-    {
-        if (const auto text = heading(column); !text.empty())
-        {
-            table.text.push_back({x, 0, decodeUtf8(text), dim});
-        }
-        x += columnWidth(column) * cell_.width;
-    }
+    const Style cursor{Role::CursorText, Role::Cursor, kPlain};
 
     const auto rows = static_cast<std::size_t>(std::max(layout_.rows, 1));
-    for (auto i = top_; i < all.size() && i - top_ + 1 < rows; ++i)
+    for (auto i = top_; i < all.size() && i - top_ < rows; ++i)
     {
-        const int y = static_cast<int>(i - top_ + 1) * cell_.height;
+        const int y = static_cast<int>(i - top_) * cell_.height;
         const auto& entry = all[i];
-        if (!entry.port)
+        int x = cell_.width;
+        switch (entry.kind)
         {
-            const bool groupHeading = i == 0 || all[i - 1].direction != entry.direction;
-            table.text.push_back(groupHeading ? TextRun{cell_.width,
-                                                        y,
-                                                        decodeUtf8(groupName(entry.direction)),
-                                                        {Role::Accent, Role::Background, kBold}}
-                                              : TextRun{cell_.width * 5, y, U"None found", dim});
+        case LineKind::Blank:
             continue;
+        case LineKind::Heading:
+            table.text.push_back({x,
+                                  y,
+                                  decodeUtf8(groupName(entry.direction)),
+                                  {Role::Accent, Role::Background, kBold}});
+            continue;
+        case LineKind::Columns:
+            for (const auto column : kColumns)
+            {
+                if (const auto text = heading(column); !text.empty())
+                {
+                    table.text.push_back({x, y, decodeUtf8(text), dim});
+                }
+                x += columnWidth(column) * cell_.width;
+            }
+            continue;
+        case LineKind::None:
+            x += (columnWidth(Column::Enabled) + columnWidth(Column::Default)) * cell_.width;
+            table.text.push_back({x, y, U"None found", dim});
+            continue;
+        case LineKind::Port:
+            break;
         }
         const auto& port = ports->ports()[*entry.port];
-        x = cell_.width;
         for (std::size_t c = 0; c < kColumns.size(); ++c)
         {
             const auto column = kColumns[c];
             const bool here = i == at && c == column_;
+            const int room = columnWidth(column) -
+                             (column == Column::Enabled || column == Column::Default ? 2 : 3);
             if (column == Column::Enabled || column == Column::Default)
             {
-                const bool output = port.direction == PortDirection::Output;
-                if (column == Column::Default && !output)
-                {
-                    if (here)
-                    {
-                        table.text.push_back(
-                            {x, y, U"   ", {Role::CursorText, Role::Cursor, kPlain}});
-                    }
-                    x += columnWidth(column) * cell_.width;
-                    continue;
-                }
-                const bool on =
-                    column == Column::Enabled ? port.enabled : ports->defaultOutput() == port.name;
-                const auto colour = column == Column::Enabled ? Role::TrackSolo : Role::TrackChase;
-                const int w = 3 * cell_.width;
-                table.under.push_back({{x, y + edge, w, std::max(1, cell_.height - 2 * edge)},
-                                       on ? colour : Role::Panel});
-                table.text.push_back(
-                    {x,
-                     y,
-                     column == Column::Enabled ? U" E " : U" D ",
-                     {on ? Role::ToggleText : Role::Dim, Role::Background, kBold}});
-                if (here)
-                {
-                    table.over.push_back({{x, y, w, edge}, Role::Cursor});
-                    table.over.push_back({{x, y + cell_.height - edge, w, edge}, Role::Cursor});
-                    table.over.push_back({{x, y, edge, cell_.height}, Role::Cursor});
-                    table.over.push_back({{x + w - edge, y, edge, cell_.height}, Role::Cursor});
-                }
+                // A tick or cross for on, and a radio button for the default, one at a time;
+                // the cursor fills the heading's width.
+                const bool on = column == Column::Enabled
+                                    ? port.enabled
+                                    : ports->defaultPort(port.direction) == port.name;
+                std::u32string mark(static_cast<std::size_t>(room), U' ');
+                mark[static_cast<std::size_t>(markOffset(column))] =
+                    column == Column::Enabled ? (on ? U'✓' : U'✗') : (on ? U'•' : U'◦');
+                const auto colour = !on                         ? Role::Dim
+                                    : column == Column::Enabled ? Role::TrackSolo
+                                    : port.enabled              ? Role::Accent
+                                                                : Role::Dim;
+                table.text.push_back({x, y, std::move(mark),
+                                      here ? cursor : Style{colour, Role::Background, kPlain}});
                 x += columnWidth(column) * cell_.width;
                 continue;
             }
-            const int room = columnWidth(column) - 3;
             auto text = decodeUtf8(column == Column::Alias  ? port.alias
                                    : column == Column::Name ? port.name
                                    : port.present           ? std::string{}
@@ -605,7 +636,8 @@ void PortsView::addRegions(Frame& frame) const
             }
             text.resize(static_cast<std::size_t>(std::max(room, 0)), U' ');
             // Grey while disabled, as is a port that isn't there; but one enabled and not there
-            // says so in the warning colour, as a song may be counting on it.
+            // says so in the warning colour, as a song may be counting on it. The alias is typed,
+            // so shows as a field.
             Style style{port.enabled && port.present ? Role::Text : Role::Dim, Role::Background,
                         kPlain};
             if (column == Column::Status && port.enabled && !port.present)
@@ -618,11 +650,11 @@ void PortsView::addRegions(Frame& frame) const
             }
             else
             {
-                if (here)
+                if (column == Column::Alias && !here)
                 {
-                    style = {Role::CursorText, Role::Cursor, kPlain};
+                    addField(table, x, y, room, cell_);
                 }
-                table.text.push_back({x, y, std::move(text), style});
+                table.text.push_back({x, y, std::move(text), here ? cursor : style});
             }
             x += columnWidth(column) * cell_.width;
         }
@@ -652,11 +684,6 @@ void PortsView::addRegions(Frame& frame) const
         }
         right.push_back({groupName(direction) + ":",
                          std::to_string(enabled) + " of " + std::to_string(known) + " enabled"});
-    }
-    if (ports != nullptr && !ports->defaultOutput().empty())
-    {
-        const auto* port = ports->find(PortDirection::Output, ports->defaultOutput());
-        right.push_back({"Default output:", port != nullptr ? port->shown() : std::string{}});
     }
     frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9, nullptr));

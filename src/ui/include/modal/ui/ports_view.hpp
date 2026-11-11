@@ -13,10 +13,11 @@
 namespace modal::ui
 {
 
-// The Ports view (, v p, decided November 2026): this machine's MIDI ports, the inputs and the
-// outputs in groups of their own, each with an E button for whether it's enabled, an alias edited
-// in place, its detected name and whether it's there now, and for outputs a D button for the
-// default output. Its changes are the machine's, not the song's, so they aren't undo steps.
+// The Ports view (, v m, decided November 2026): this machine's MIDI ports, the inputs and the
+// outputs in groups of their own, each port with a tick or cross for whether it's enabled, a
+// radio button for its direction's default, an alias edited in place, its detected name and
+// whether it's there now. Its changes are the machine's, not the song's, so they aren't undo
+// steps.
 class PortsView final : public View
 {
 public:
@@ -61,11 +62,21 @@ public:
                                                     Column::Name, Column::Status};
 
 private:
-    // The table's lines: a group's heading, or a port, by its index among the table's ports.
+    // The table's lines: each group's heading, a blank, its columns' headings, then its ports by
+    // their index among the table's, or a line saying there are none; two blanks between groups.
+    enum class LineKind
+    {
+        Heading,
+        Blank,
+        Columns,
+        Port,
+        None,
+    };
     struct Line
     {
         PortDirection direction;
-        std::optional<std::size_t> port;
+        LineKind kind;
+        std::optional<std::size_t> port = {};
     };
     std::vector<Line> lines() const;
     // The cursor's line among them, always a port's when there is one.

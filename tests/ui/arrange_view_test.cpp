@@ -1136,11 +1136,17 @@ TEST_CASE("The leader's Bars group deletes and inserts bars on every track, with
 
 namespace
 {
-// A run of the inspector's text, by what it says exactly.
+// A run of the inspector's text, by what it says, a field's filled out to its width.
 const TextRun& inspectorRun(const Frame& frame, std::u32string_view text)
 {
     const auto& region = frame[frame.size() - 2];
-    const auto run = std::ranges::find(region.text, text, &TextRun::text);
+    const auto run = std::ranges::find_if(region.text,
+                                          [&](const TextRun& r)
+                                          {
+                                              return r.text.starts_with(text) &&
+                                                     r.text.find_first_not_of(U' ', text.size()) ==
+                                                         std::u32string::npos;
+                                          });
     REQUIRE(run != region.text.end());
     return *run;
 }

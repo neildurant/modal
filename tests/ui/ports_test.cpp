@@ -85,19 +85,27 @@ TEST_CASE("a track's port resolves by alias, then detected name, if enabled and 
     CHECK(table.resolve(In, "loopMIDI Port 1").problem == PortProblem::Missing);
 }
 
-TEST_CASE("an empty name is the default output, or every enabled input")
+TEST_CASE("an empty name is the default port of its direction, each set apart")
 {
     PortTable table;
     table.detected(Out, names({"Host"}));
+    table.detected(In, names({"Keys", "Host"}));
     CHECK(table.resolve(Out, "").problem == PortProblem::Missing); // no default set
+    CHECK(table.resolve(In, "").problem == PortProblem::Missing);
     table.setEnabled(Out, "Host", true);
-    CHECK(table.setDefaultOutput("Host"));
+    CHECK(table.setDefault(Out, "Host"));
     CHECK(table.resolve(Out, "").port == "Host");
-    CHECK_FALSE(table.setDefaultOutput("Unknown"));
-    CHECK(table.resolve(In, "") == PortResolution{});
-    // Forgetting the default's port leaves no default.
+    CHECK_FALSE(table.setDefault(Out, "Unknown"));
+    CHECK_FALSE(table.setDefault(Out, "Keys")); // an input, not an output
+    CHECK(table.resolve(In, "").problem == PortProblem::Missing);
+    table.setEnabled(In, "Keys", true);
+    CHECK(table.setDefault(In, "Keys"));
+    CHECK(table.resolve(In, "").port == "Keys");
+    CHECK(table.resolve(Out, "").port == "Host");
+    // Forgetting the default's port leaves no default, of that direction only.
     CHECK(table.forget(Out, "Host"));
-    CHECK(table.defaultOutput().empty());
+    CHECK(table.defaultPort(Out).empty());
+    CHECK(table.defaultPort(In) == "Keys");
 }
 
 TEST_CASE("the ports file keeps the ports, their aliases, enabling and the default")
@@ -109,10 +117,11 @@ TEST_CASE("the ports file keeps the ports, their aliases, enabling and the defau
     table.setAlias(In, "Xkey 1", "Keys");
     table.setEnabled(Out, "loopMIDI Port 1", true);
     table.setAlias(Out, "loopMIDI Port 1", "Plugin host");
-    table.setDefaultOutput("loopMIDI Port 1");
+    table.setDefault(Out, "loopMIDI Port 1");
+    table.setDefault(In, "Xkey 1");
 
     const auto text = table.text();
-    CHECK(text.find("input \"Xkey 1\" on alias=\"Keys\"\n") != std::string::npos);
+    CHECK(text.find("input \"Xkey 1\" on default alias=\"Keys\"\n") != std::string::npos);
     CHECK(text.find("output \"loopMIDI Port 1\" on default alias=\"Plugin host\"\n") !=
           std::string::npos);
     CHECK(text.find("output \"Microsoft GS Wavetable Synth\" off\n") != std::string::npos);

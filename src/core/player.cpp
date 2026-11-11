@@ -38,7 +38,10 @@ void Player::update(const Song& song)
     std::map<std::string, std::optional<InputId>, std::less<>> inputs;
     for (const auto& track : song.tracks())
     {
-        if (!track->input.empty() && !inputs.contains(track->input))
+        // Every input but all of them, the default's too when there's a machine to ask.
+        const bool all =
+            track->input == Track::kAllInputs || (track->input.empty() && !resolveInput_);
+        if (!all && !inputs.contains(track->input))
         {
             const auto id = resolveInput_ ? resolveInput_(track->input) : std::nullopt;
             inputs.emplace(track->input, id);
@@ -47,7 +50,10 @@ void Player::update(const Song& song)
         }
     }
     PlanOptions options;
-    options.resolveInput = [&](std::string_view name) { return inputs.find(name)->second; };
+    if (resolveInput_)
+    {
+        options.resolveInput = [&](std::string_view name) { return inputs.find(name)->second; };
+    }
     options.bypassQuantize = bypassQuantize_;
     auto plan = std::make_shared<const PlaybackPlan>(
         compilePlan(song, [&](const Track& track) { return destination(track.port); }, options));

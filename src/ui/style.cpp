@@ -18,7 +18,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "density-4",      "hint-key",   "hint-group", "note-selected",
     "match",          "track-mute", "track-solo", "track-chase",
     "track-quantize", "track-arm",  "track-thru", "toggle-text",
-    "event-sign",
+    "event-sign",     "field",
 };
 
 std::optional<int> hexDigit(char c)

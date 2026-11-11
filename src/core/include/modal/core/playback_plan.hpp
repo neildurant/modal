@@ -179,7 +179,9 @@ struct PlanOptions
     bool recording = false; // whether this playback records, for the metronome's When
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
     bool bypassQuantize = false;                       // play every track as stored, to compare
-    InputResolver resolveInput = {}; // named inputs only; an empty name takes all inputs
+    // A track's input, the default's being empty; without one, as for a machine without
+    // ports, an empty name takes all inputs, as kAllInputs does.
+    InputResolver resolveInput = {};
 };
 
 // Compiles the song's audible tracks: if any track is soloed, the soloed tracks; otherwise

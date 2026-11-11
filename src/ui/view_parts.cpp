@@ -129,6 +129,13 @@ int inspectorHeight(CellSize cell)
     return 2 * cell.height + (cell.height / 4) * 2;
 }
 
+void addField(Region& region, int x, int y, int columns, CellSize cell)
+{
+    const auto edge = hairline(cell);
+    region.under.push_back(
+        {{x, y + edge, columns * cell.width, std::max(1, cell.height - 2 * edge)}, Role::Field});
+}
+
 void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
                     int columns, CellSize cell, const InspectorEditor* editor, bool rightAligned)
 {
@@ -169,6 +176,13 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
     {
         if (text.size() > box)
             text = text.substr(0, box - 1) + U'…';
+        // Free text to type shows as a field, across its room, even when empty.
+        const bool asField = field.freeText && field.editable;
+        if (asField)
+        {
+            text.resize(box, U' ');
+            addField(region, x, y, columns, cell);
+        }
         if (rightAligned)
             x += static_cast<int>(box - text.size()) * cell.width;
         region.text.push_back({x,
@@ -487,7 +501,7 @@ std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track)
     {
         longestName = std::max(longestName, decodeUtf8(each->name).size());
         longestPort =
-            std::max(longestPort, decodeUtf8(each->port.empty() ? "default" : each->port).size());
+            std::max(longestPort, decodeUtf8(each->port.empty() ? "Default" : each->port).size());
     }
     const auto numberWidth = std::string{"Track :"}.size() + std::to_string(tracks.size()).size();
     if (track == 0 || track > tracks.size())
@@ -498,7 +512,7 @@ std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track)
     std::vector<BarPair> pairs{{padText("Track " + std::to_string(track) + ":", numberWidth, false),
                                 padText(shown.name, std::min(longestName, kTrackNameWidth), false)},
                                {"Channel:", padText(std::to_string(shown.channel), 2, true)},
-                               {"Port:", padText(shown.port.empty() ? "default" : shown.port,
+                               {"Port:", padText(shown.port.empty() ? "Default" : shown.port,
                                                  std::min(longestPort, kPortNameWidth), false)}};
     // Last, as they come and go from track to track.
     if (shown.quantize.on)

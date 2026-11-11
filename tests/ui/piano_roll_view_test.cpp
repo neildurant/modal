@@ -1664,7 +1664,7 @@ TEST_CASE("A value on the left of its inspector box stays there when edited")
         for (const auto& region : ws.frame())
             if (region.background == Role::Panel)
                 for (const auto& run : region.text)
-                    if (run.text == text)
+                    if (run.text.starts_with(text)) // a field, filled out to its width
                         return run.x;
         return -1;
     };

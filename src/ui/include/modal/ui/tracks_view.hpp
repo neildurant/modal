@@ -66,6 +66,8 @@ private:
     std::optional<bool> runPortChoice(std::string_view command);
     // Whether a track names a port that wasn't found, as a song from elsewhere may.
     bool portMissing(const core::Track& track, bool input = false) const;
+    // How the chooser shows a port: the default, every input, or by name.
+    static std::string portLabel(const std::string& port);
     void addPortChoice(Frame& frame) const;
 
     // Flips a button on the cursor's row, and any selected rows to match it.

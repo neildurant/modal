@@ -199,10 +199,11 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     for (const auto& trackPtr : tracks)
     {
         const Track& track = *trackPtr;
-        const auto input = !track.input.empty() && options.resolveInput
-                               ? options.resolveInput(track.input)
-                               : std::nullopt;
-        if (track.arm && track.thru && (track.input.empty() || input))
+        const bool all =
+            track.input == Track::kAllInputs || (track.input.empty() && !options.resolveInput);
+        const auto input =
+            !all && options.resolveInput ? options.resolveInput(track.input) : std::nullopt;
+        if (track.arm && track.thru && (all || input))
         {
             if (const auto destination = resolveDestination(track))
             {

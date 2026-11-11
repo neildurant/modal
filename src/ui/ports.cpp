@@ -164,21 +164,20 @@ bool PortTable::forget(PortDirection direction, std::string_view name)
     const auto removed =
         std::erase_if(ports_, [&](const KnownPort& port)
                       { return port.direction == direction && port.name == name; });
-    if (removed > 0 && direction == PortDirection::Output && defaultOutput_ == name)
+    if (removed > 0 && defaultOf(direction) == name)
     {
-        defaultOutput_.clear();
+        defaultOf(direction).clear();
     }
     return removed > 0;
 }
 
-bool PortTable::setDefaultOutput(std::string name)
+bool PortTable::setDefault(PortDirection direction, std::string name)
 {
-    if (name == defaultOutput_ ||
-        (!name.empty() && findPort(PortDirection::Output, name) == nullptr))
+    if (name == defaultOf(direction) || (!name.empty() && findPort(direction, name) == nullptr))
     {
         return false;
     }
-    defaultOutput_ = std::move(name);
+    defaultOf(direction) = std::move(name);
     return true;
 }
 
@@ -213,16 +212,12 @@ PortResolution PortTable::resolve(PortDirection direction, std::string_view name
     PortResolution result;
     if (name.empty())
     {
-        if (direction == PortDirection::Input)
-        {
-            return result; // every enabled input
-        }
-        if (defaultOutput_.empty())
+        if (defaultPort(direction).empty())
         {
             result.problem = PortProblem::Missing;
             return result;
         }
-        name = defaultOutput_;
+        name = defaultPort(direction);
     }
     result.named = std::string{name};
     // An alias first, then a detected name, each as :port matches: exactly, then ignoring case,
@@ -293,7 +288,7 @@ std::string PortTable::text() const
     {
         text += std::string{directionWord(port.direction)} + " " + quoted(port.name) +
                 (port.enabled ? " on" : " off");
-        if (port.direction == PortDirection::Output && port.name == defaultOutput_)
+        if (port.name == defaultPort(port.direction))
         {
             text += " default";
         }
@@ -351,7 +346,7 @@ PortTable PortTable::read(std::string_view text, std::vector<std::string>* error
             {
                 port.enabled = word == "on";
             }
-            else if (word == "default" && direction == PortDirection::Output)
+            else if (word == "default")
             {
                 isDefault = true;
             }
@@ -371,7 +366,7 @@ PortTable PortTable::read(std::string_view text, std::vector<std::string>* error
         }
         if (isDefault)
         {
-            table.defaultOutput_ = port.name;
+            table.defaultOf(direction) = port.name;
         }
         const auto after = std::ranges::find_if(table.ports_.rbegin(), table.ports_.rend(),
                                                 [&](const KnownPort& known)

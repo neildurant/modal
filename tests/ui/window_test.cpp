@@ -339,7 +339,8 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     ports.setEnabled(PortDirection::Output, "Babyface Midi Port 1", true);
     ports.setAlias(PortDirection::Output, "Babyface Midi Port 1", "Babyface Out");
     ports.setEnabled(PortDirection::Output, "Old Synth", true);
-    ports.setDefaultOutput("loopMIDI Port 1");
+    ports.setDefault(PortDirection::Output, "loopMIDI Port 1");
+    ports.setDefault(PortDirection::Input, "Xkey 1");
     view.setPortControl({.table = [&] { return &ports; },
                          .change = [&](const modal::ui::PortTable& changed) { ports = changed; },
                          .look = [] {}});

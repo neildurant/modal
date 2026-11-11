@@ -81,9 +81,11 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
     case TrackField::Thru:
         return track.thru ? "T" : "-";
     case TrackField::Port:
-        return track.port;
+        return track.port.empty() ? "Default" : track.port;
     case TrackField::Input:
-        return track.input.empty() ? "All inputs" : track.input;
+        return track.input.empty()                      ? "Default"
+               : track.input == core::Track::kAllInputs ? "All"
+                                                        : track.input;
     case TrackField::Channel:
         return std::to_string(track.channel);
     case TrackField::Transpose:
@@ -158,9 +160,9 @@ std::string_view trackFieldDescription(TrackField field)
     case TrackField::Quantize:
         return "Quantise notes live during playback";
     case TrackField::Port:
-        return "Output port";
+        return "Output port: Default, or one by name";
     case TrackField::Input:
-        return "Input port: All inputs or one named port";
+        return "Input port: Default, All, or one by name";
     case TrackField::Channel:
         return "MIDI channel";
     case TrackField::BankMsb:

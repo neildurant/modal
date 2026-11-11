@@ -135,8 +135,11 @@ public:
     }
 
     std::string name;
-    std::string port;  // output port name, resolved through the machine's port aliases
-    std::string input; // empty takes every open input, otherwise only the named port
+    std::string port; // output port name, resolved through the machine's port aliases
+    // The input port: empty for the machine's default input, kAllInputs for every open input,
+    // otherwise only the named port.
+    std::string input;
+    static constexpr std::string_view kAllInputs = "*";
     int channel = kMinChannel;
     bool mute = false;
     bool solo = false;

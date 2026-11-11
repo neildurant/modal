@@ -73,6 +73,11 @@ std::optional<core::EventQuery> queryFor(const core::EventData& data);
 // The inspector's height: two lines, with a quarter of a line's padding above and below.
 int inspectorHeight(CellSize cell);
 
+// The background of a field free text is typed into, columns wide at x, y: inset by a hairline
+// above and below so fields in rows one under another show apart. Text over it keeps the
+// view's background, which shapes are painted over.
+void addField(Region& region, int x, int y, int columns, CellSize cell);
+
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.
 // Each column is as wide as its longest value can be, so the columns stay put as the cursor
 // moves, a position or end as wide as positionWidth; a value that doesn't fit is cut short,

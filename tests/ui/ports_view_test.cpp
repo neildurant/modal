@@ -134,20 +134,25 @@ TEST_CASE("Enter on E enables a port, and again disables it, saying so")
     CHECK_FALSE(p.document.canUndo());
 }
 
-TEST_CASE("Enter on D makes an output the default, and again leaves none; inputs can't be")
+TEST_CASE("Enter on Default makes a port its direction's default, one at a time, and again none")
 {
     Porting p;
     p.type(U"l");
     CHECK(p.ws.portsView().column() == PortsView::Column::Default);
     p.press(NamedKey::Enter);
-    CHECK(p.ws.message() == "Only an output can be the default");
-    CHECK(p.changes == 0);
+    CHECK(p.table.defaultPort(In) == "Xkey 1");
+    CHECK(p.ws.message() == "Default input: Xkey 1");
     p.type(U"G");
     p.press(NamedKey::Enter);
-    CHECK(p.table.defaultOutput() == "Babyface Midi Port 1");
+    CHECK(p.table.defaultPort(Out) == "Babyface Midi Port 1");
     CHECK(p.ws.message() == "Default output: Babyface Midi Port 1");
+    CHECK(p.table.defaultPort(In) == "Xkey 1"); // each direction its own
+    p.type(U"k");
     p.press(NamedKey::Enter);
-    CHECK(p.table.defaultOutput().empty());
+    CHECK(p.table.defaultPort(Out) == "loopMIDI Port 1"); // the other gives way
+    p.press(NamedKey::Enter);
+    CHECK(p.table.defaultPort(Out).empty());
+    CHECK(p.ws.message() == "No default output: tracks set to Default aren't played");
 }
 
 TEST_CASE("Enter on the alias edits it in place, unique among its direction's ports")
@@ -178,6 +183,14 @@ TEST_CASE("Enter on the alias edits it in place, unique among its direction's po
     p.press(NamedKey::Enter);
     CHECK(p.table.find(In, "Xkey 1")->alias == "Babyface Out");
 
+    // The choosers' own words aren't aliases.
+    p.press(NamedKey::Enter);
+    p.press(NamedKey::Backspace);
+    p.type(U"default");
+    p.press(NamedKey::Enter);
+    CHECK(p.ws.message() == "Tracks' choosers use Default for themselves");
+    p.press(NamedKey::Escape);
+
     // Nothing clears it, the detected name showing again.
     p.press(NamedKey::Enter);
     p.press(NamedKey::Backspace);
@@ -204,11 +217,11 @@ TEST_CASE("the ports view's inspector says what the column is, and why a port ca
 {
     Porting p;
     auto text = p.text();
-    CHECK(contains(text, U"Enabled: listened to, for Thru, recording and the In light"));
+    CHECK(contains(text, U"On: listened to, for Thru, recording and the In light"));
     CHECK(contains(text, U"not listened to"));
     p.type(U"jj");
     text = p.text();
     CHECK(contains(text, U"Not connected"));
     p.type(U"l");
-    CHECK(contains(p.text(), U"Default: the output for tracks without one of their own"));
+    CHECK(contains(p.text(), U"Default: the output of tracks set to Default, one at a time"));
 }

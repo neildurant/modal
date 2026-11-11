@@ -1365,7 +1365,8 @@ Inspection ArrangeView::sectionInspection(std::size_t section) const
                              .value = song.sections()[section]->name(),
                              .editable = true,
                              .editText = song.sections()[section]->name(),
-                             .underKind = true});
+                             .underKind = true,
+                             .freeText = true});
     result.fields.push_back({"Bars", std::to_string(first) + "–" + std::to_string(last)});
     result.fields.push_back(
         {.heading = "Length",

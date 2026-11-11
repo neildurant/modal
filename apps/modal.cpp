@@ -328,9 +328,11 @@ private:
         for (const auto& name : names)
         {
             const auto resolved = ports_.resolve(direction, name);
-            const auto shown = name.empty() ? std::string{"no default output is set, for tracks "
-                                                          "without a port"}
-                                            : name;
+            const auto shown =
+                !name.empty() ? name
+                : direction == ui::PortDirection::Input
+                    ? std::string{"no default input is set, for tracks set to Default"}
+                    : std::string{"no default output is set, for tracks set to Default"};
             auto& list = resolved.problem == ui::PortProblem::Disabled ? disabled : missing;
             list += (list.empty() ? "" : ", ") + shown;
         }

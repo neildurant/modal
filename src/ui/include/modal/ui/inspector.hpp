@@ -27,7 +27,8 @@ struct InspectorField
     bool editable = false;
     std::string editText = {};
     bool underKind = false;
-    bool warning = false; // something to put right, in the warning colour
+    bool warning = false;  // something to put right, in the warning colour
+    bool freeText = false; // typed as text, such as a name: an editable one shows as a field
 
     friend bool operator==(const InspectorField&, const InspectorField&) = default;
 };

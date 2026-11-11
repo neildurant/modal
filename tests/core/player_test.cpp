@@ -326,3 +326,50 @@ TEST_CASE("player resolves named inputs on each update without affecting playbac
     REQUIRE(sink.sent.size() == 1);
     CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x90, 67, 100});
 }
+
+TEST_CASE("a track's empty input is the machine's default, and * every input")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = fourNotes(ppqn);
+    const auto id = song.tracks()[0]->id();
+    song.updateTrack(id, [](Track& track) { track.arm = true; });
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    std::optional<InputId> byDefault;
+    Player player{engine, [](std::string_view) { return DestinationId{1}; },
+                  [&](std::string_view name)
+                  {
+                      CHECK(name.empty());
+                      return byDefault;
+                  }};
+    // No default input: the track hears nothing, and says so.
+    player.update(song);
+    CHECK(player.missingInputs() == std::vector<std::string>{""});
+    engine.step();
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 60, 100}, clock.time));
+    engine.step();
+    CHECK(sink.sent.empty());
+
+    byDefault = InputId{2};
+    player.update(song);
+    CHECK(player.missingInputs().empty());
+    engine.step();
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 62, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{2}, std::array<std::uint8_t, 3>{0x90, 64, 100}, clock.time));
+    engine.step();
+    REQUIRE(sink.sent.size() == 1);
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x90, 64, 100});
+
+    // Every input, with nothing to resolve.
+    song.updateTrack(id, [](Track& track) { track.input = std::string{Track::kAllInputs}; });
+    byDefault.reset();
+    player.update(song);
+    CHECK(player.missingInputs().empty());
+    engine.step();
+    sink.sent.clear();
+    REQUIRE(engine.receive(InputId{1}, std::array<std::uint8_t, 3>{0x90, 65, 100}, clock.time));
+    REQUIRE(engine.receive(InputId{3}, std::array<std::uint8_t, 3>{0x90, 67, 100}, clock.time));
+    engine.step();
+    CHECK(sink.sent.size() == 2);
+}

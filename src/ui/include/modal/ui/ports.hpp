@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <array>
 #include <optional>
 #include <span>
 #include <string>
@@ -43,13 +44,12 @@ enum class PortProblem
     Disabled, // the port is known but not enabled in the Ports view
 };
 
-// What a track's port name comes to: the detected name to open, or why there's none. For an
-// input, an empty name is every enabled input, with no port of its own and no problem.
+// What a track's port name comes to: the detected name to open, or why there's none.
 struct PortResolution
 {
     std::optional<std::string> port;
     PortProblem problem = PortProblem::None;
-    std::string named; // the name looked for: the track's, or the default output's
+    std::string named; // the name looked for: the track's, or the default port's
 
     friend bool operator==(const PortResolution&, const PortResolution&) = default;
 };
@@ -75,9 +75,13 @@ public:
     bool setEnabled(PortDirection direction, std::string_view name, bool enabled);
     bool forget(PortDirection direction, std::string_view name);
 
-    // The output for tracks without a port of their own, by detected name, or empty for none.
-    const std::string& defaultOutput() const { return defaultOutput_; }
-    bool setDefaultOutput(std::string name);
+    // The port of each direction for tracks without one of their own, by detected name, or
+    // empty for none (a default input decided November 2026, as outputs had one).
+    const std::string& defaultPort(PortDirection direction) const
+    {
+        return defaults_[direction == PortDirection::Input ? 0 : 1];
+    }
+    bool setDefault(PortDirection direction, std::string name);
 
     // The detected names of the enabled ports there now: the inputs to listen to, or the
     // outputs that can be opened.
@@ -87,7 +91,7 @@ public:
     std::vector<std::string> offered(PortDirection direction) const;
 
     // A track's port name: an alias, or else a detected name, exactly, then ignoring case, then
-    // a part of one, as :port has always matched; empty for the default output, or every input.
+    // a part of one, as :port has always matched; empty for the default port.
     PortResolution resolve(PortDirection direction, std::string_view name) const;
 
     // As the file has it, and from it. A line it can't read is passed over and said in errors.
@@ -99,8 +103,13 @@ public:
 private:
     KnownPort* findPort(PortDirection direction, std::string_view name);
 
+    std::string& defaultOf(PortDirection direction)
+    {
+        return defaults_[direction == PortDirection::Input ? 0 : 1];
+    }
+
     std::vector<KnownPort> ports_;
-    std::string defaultOutput_;
+    std::array<std::string, 2> defaults_; // the input's, then the output's
 };
 
 } // namespace modal::ui
