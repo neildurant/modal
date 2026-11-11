@@ -1062,6 +1062,14 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
             return true;
         }
     }
+    // A digit on a view's number field starts typing it rather than a count, where the view
+    // takes it (decided November 2026), so a number can be typed without Enter first.
+    if (mode_ == Mode::Normal && keys_.pending().empty() && key.named == NamedKey::None &&
+        (key.modifiers & (kCtrl | kAlt)) == 0 && key.character >= U'0' && key.character <= U'9' &&
+        view().typeToEdit(key.character))
+    {
+        return true;
+    }
     const auto before = pending();
     const auto typedIn = mode_;
     const auto& keymap = mode_ == Mode::OperatorPending || mode_ == Mode::Visual
@@ -1905,10 +1913,8 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         show(ViewKind::Ports);
         return true;
     }
-    if (command == "view-metronome" || command == "metronome-port")
+    if (command == "view-metronome")
     {
-        if (command == "metronome-port")
-            metronome_->go(MetronomeView::Setting::Port);
         show(ViewKind::Metronome);
         return true;
     }
@@ -3037,7 +3043,8 @@ CommandResult Workspace::port(std::string_view name)
 
 CommandResult Workspace::countIn(std::string_view arguments, bool preRoll)
 {
-    // :countin 2, :countin 3 beats, :countin off; :preroll 2. Alone, says what it is.
+    // :countin 2, :countin 3 beats, :countin off; :preroll 2, :preroll 3 beats. Alone, says
+    // what it is.
     std::vector<std::string> words;
     for (std::size_t at = 0; at < arguments.size();)
     {

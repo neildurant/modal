@@ -5,6 +5,7 @@
 #include <modal/ui/view.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 #include <vector>
 
@@ -64,6 +65,27 @@ void InspectorEditor::show(const Inspection& inspection, std::size_t index)
     last_ = field.heading;
     line_.open(decodeUtf8(editText(field)));
     fresh_ = true;
+    list_.reset();
+    choices_ = field.choices;
+    shown_ = field.value;
+    if (!field.choices.empty())
+    {
+        // Opening on what it's set to, by its words whatever their case.
+        const auto lower = [](std::string text)
+        {
+            for (auto& c : text)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return text;
+        };
+        const auto current = lower(editText(field));
+        const auto at = std::ranges::find(field.choices, current, lower);
+        list_.emplace(
+            field.choices,
+            static_cast<std::size_t>(at == field.choices.end() ? 0 : at - field.choices.begin()),
+            field.narrowing);
+        list_->name(lower(field.heading)); // "No port matches"
+        current_ = list_->chosen();
+    }
 }
 
 void InspectorEditor::move(const Inspection& inspection, int by)
@@ -90,6 +112,11 @@ void InspectorEditor::move(const Inspection& inspection, int by)
 
 void InspectorEditor::type(char32_t character)
 {
+    if (list_)
+    {
+        list_->type(character);
+        return;
+    }
     if (std::exchange(fresh_, false))
     {
         line_.clear(); // typing replaces the value, as in a spreadsheet
@@ -106,6 +133,36 @@ std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& hos
         host.stopTyping();
         return true;
     };
+    if (list_ && (command == "command-line-run" || command == "command-line-next" ||
+                  command == "command-line-previous"))
+    {
+        // The one highlighted is set, unless it's what it was.
+        const auto chosen = list_->chosen();
+        if (!chosen)
+        {
+            host.refuse(list_->nothing(), MessageKind::Warning);
+            return true;
+        }
+        if (chosen != current_)
+        {
+            if (auto why = hooks.set(*heading_, choices_[*chosen]))
+            {
+                host.refuse(std::move(*why), MessageKind::Warning);
+                return true;
+            }
+        }
+        if (command == "command-line-run")
+        {
+            return leave();
+        }
+        move(hooks.inspection(), command == "command-line-next" ? 1 : -1);
+        return true;
+    }
+    if (list_ && command != "command-line-cancel")
+    {
+        list_->run(command);
+        return true;
+    }
     if (command == "command-line-run" || command == "command-line-next" ||
         command == "command-line-previous")
     {

@@ -6,6 +6,7 @@ add_library(modal_ui STATIC
     bar_lines.cpp
     block_glyphs.cpp
     cell_grid.cpp
+    choice_list.cpp
     command_line.cpp
     commands.cpp
     completion.cpp

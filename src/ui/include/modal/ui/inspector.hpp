@@ -29,6 +29,10 @@ struct InspectorField
     bool underKind = false;
     bool warning = false;  // something to put right, in the warning colour
     bool freeText = false; // typed as text, such as a name: an editable one shows as a field
+    // A fixed set to choose from, as it's shown, which editing offers as a drop-down list; and
+    // whether typing narrows the list, as for ports, rather than choosing by first letter.
+    std::vector<std::string> choices = {};
+    bool narrowing = false;
 
     friend bool operator==(const InspectorField&, const InspectorField&) = default;
 };

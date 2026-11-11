@@ -213,6 +213,35 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
+## Drop-down lists and the Metronome page after trial (11 November 2026; local, to try)
+
+The first trial of the metronome commits (`26b8a6a`, `1615355`) went well, and asked for these changes:
+
+- **Drop-down lists:** `ChoiceList` (`choice_list.hpp`) is one drop-down list for every field with fixed choices. The Tracks view's port list is moved onto it unchanged, and `InspectorEditor` opens one for any `InspectorField` with `choices`. A short list has no filter: `j` / `k` move and a letter jumps. A port list narrows to what's typed. Every list field shows `▾`.
+- **Fields using the lists:** quantise's Moves, and on the Metronome page Plays, Port, Before and Bars/Beats.
+- **Metronome page:**
+  - A Test button on each click.
+  - The count-in and pre-roll are each a number, then a Bars/Beats list.
+  - Typed fields have a cell for the cursor.
+  - A digit on a number field starts typing it (`View::typeToEdit`).
+- **Pre-roll in beats:** `CountInSettings::preRollBeats`, `prerollbeats=` in the song file only when set, and `:preroll 3 beats`.
+- **Keys:** `, m p` removed; `, v p` became `, v r`.
+
+**Validation:**
+- Windows Debug: 925 test cases (923 passed, 2 skipped).
+- WSL linux-clang-debug: 926 test cases (923 passed, 3 skipped).
+- New tests: choosing from the lists (Escape, letters, `j` / `k`), the port list narrowing and saying nothing matches, Bars/Beats keeping the number, digits starting to type, a three-digit velocity, the Test buttons, quantise Moves, `, v r`, pre-roll in beats in recording, the file and `:preroll`.
+- Renders of the page, with the port list open, and of the Tracks view's arrows looked at.
+
+**To try:**
+- `, m s`: Enter on Plays, Before, Port and Bars/Beats to see the lists.
+- Type a digit on Channel or a velocity without Enter.
+- Type `127` into a velocity.
+- Press Enter on each Test button.
+- Set a pre-roll in beats and record.
+- Check quantise Moves (`$`, Enter, Shift-Tab) and the Tracks Output/Input arrows.
+- `, v r`.
+
 ## Metronome controls and the Metronome page (11 November 2026; local, to try)
 
 Two commits on `bd459f9`. First: `, m m` cycles the metronome (off, while recording, always), `, m c` what comes before recording (nothing, count-in, pre-roll), `:countin` and `:preroll` set lengths; the engine reports when it's counting in (`EngineStatus::countingIn`), so the status line shows `● COUNT`, `● PRE`, then `● REC` / `● ODUB`, all one width; armed, the right shows what comes before recording (dropped first when the line's full, measured without messages) and `No click` in the warning colour. Second: the Metronome page (`MetronomeView`, `, m s`, `:metronome`, `, m p` on Port), every setting a row edited in place with Up/Down steps, the click's General MIDI drum name beside its note, and a change of note or velocity played through a new engine command, `Engine::audition`, which sends a note and ends it when due (or at the next, panic or quit).

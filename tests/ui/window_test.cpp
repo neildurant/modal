@@ -359,6 +359,13 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     CHECK(window->saveFrame(base + "-metronome.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-metronome-light.bmp"));
+    // Its port's drop-down list open.
+    view.handle(Key::typed(U'k'), 0);
+    view.handle(Key::typed(U'k'), 0);
+    view.handle(Key::of(NamedKey::Enter), 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-metronome-list.bmp"));
+    view.handle(Key::of(NamedKey::Escape), 0);
     // Tracks on those ports: Default and All dim, a port by alias, one gone and one disabled.
     view.run("view-tracks", 0);
     const auto beforePorts = document.song();

@@ -334,8 +334,6 @@ constexpr std::array kSharedCommands{
                 .description = "The metronome page: the song's click and what comes before "
                                "recording",
                 .aliases = "metronome"},
-    CommandInfo{.name = "metronome-port",
-                .description = "Choose where the click goes, on the metronome page"},
     CommandInfo{.name = "countin-cycle",
                 .description = "What comes before recording, for this song: nothing, a count-in, "
                                "or a pre-roll"},

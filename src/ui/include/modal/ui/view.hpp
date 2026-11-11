@@ -443,6 +443,10 @@ public:
     // The editing grid the view steps by, for the status line's settings, if it has one.
     virtual std::optional<std::string> gridStatus() const { return std::nullopt; }
     virtual void type(char32_t /*character*/) {}
+    // A digit typed in Normal mode with no count or keys before it, which a view may take to
+    // start editing a number field with, rather than it starting a count (decided November
+    // 2026); false to leave it as a count.
+    virtual bool typeToEdit(char32_t /*digit*/) { return false; }
     virtual std::optional<bool> runTyping(std::string_view /*command*/) { return std::nullopt; }
 };
 

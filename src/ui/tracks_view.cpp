@@ -105,7 +105,9 @@ int TracksView::columnWidth(const TrackColumn& column) const
                 longest,
                 decodeUtf8(column.field == TrackField::Input ? track->input : track->port).size());
         }
-        return std::clamp(static_cast<int>(longest) + column.gap, column.width, 24 + column.gap);
+        // Two more for the arrow that shows it's chosen from a list, and the space before it.
+        return std::clamp(static_cast<int>(longest) + 2 + column.gap, column.width,
+                          26 + column.gap);
     }
     if (column.field != TrackField::Name)
     {
@@ -398,6 +400,8 @@ Inspection TracksView::quantizeFields() const
         auto text = trackFieldText(field, track, row());
         auto edit = text.ends_with('%') ? text.substr(0, text.size() - 1) : text;
         result.fields.push_back({std::string{heading}, std::move(text), true, std::move(edit)});
+        if (field == TrackField::QuantizeMove)
+            result.fields.back().choices = {"starts", "ends", "both", "lengths"};
     }
     return result;
 }
@@ -520,6 +524,10 @@ std::optional<std::string> TracksView::typingHint() const
     {
         return std::nullopt;
     }
+    if (editor_.list() != nullptr)
+    {
+        return "Up and Down choose, Enter or Tab takes it, Escape leaves it";
+    }
     if (quantizeEditing_)
     {
         const auto& heading = editor_.heading();
@@ -531,7 +539,6 @@ std::optional<std::string> TracksView::typingHint() const
         if (heading == "Swing")
             return "25% to 75%: 50% straight, 66% a triplet feel, under 50% pushed; Up and Down "
                    "step 1%";
-        return "starts, ends, both or lengths; Up and Down go through them";
     }
     switch (fieldFor(editor_.heading()))
     {
@@ -568,36 +575,42 @@ bool TracksView::openField()
         return editor_.open(editableFields(), trackColumns()[column_].heading);
     }
     const auto& track = *document_.song().track(*cursor_.track);
-    PortChoice choice;
-    choice.input = trackColumns()[column_].field == TrackField::Input;
-    choice.current = choice.input ? track.input : track.port;
-    choice.ports.emplace_back(); // the default
-    if (choice.input)
+    const bool input = trackColumns()[column_].field == TrackField::Input;
+    auto current = input ? track.input : track.port;
+    std::vector<std::string> ports{""}; // the default
+    if (input)
     {
-        choice.ports.emplace_back(core::Track::kAllInputs);
+        ports.emplace_back(core::Track::kAllInputs);
     }
-    for (auto& port : choice.input ? host_.inputPorts() : host_.outputPorts())
+    for (auto& port : input ? host_.inputPorts() : host_.outputPorts())
     {
-        choice.ports.push_back(std::move(port));
+        ports.push_back(std::move(port));
     }
-    const auto at = std::ranges::find(choice.ports, choice.current);
-    if (at == choice.ports.end())
+    const auto at = std::ranges::find(ports, current);
+    const auto chosen = static_cast<std::size_t>(at - ports.begin());
+    std::optional<std::size_t> gone;
+    bool goneDisabled = false;
+    if (at == ports.end())
     {
-        choice.ports.push_back(choice.current);
-        choice.chosen = choice.ports.size() - 1;
+        ports.push_back(current);
         // Unless it still resolves, as a part of a port's name may.
-        const auto trouble = portTrouble(track, choice.input);
+        const auto trouble = portTrouble(track, input);
         if (host_.portTable() == nullptr || trouble != PortTrouble::None)
-            choice.gone = choice.chosen;
-        choice.goneDisabled = trouble == PortTrouble::Disabled;
+            gone = chosen;
+        goneDisabled = trouble == PortTrouble::Disabled;
     }
-    else
+    std::vector<std::string> labels;
+    for (const auto& port : ports)
     {
-        choice.chosen = static_cast<std::size_t>(at - choice.ports.begin());
+        labels.push_back(portLabel(port));
     }
-    constexpr std::size_t kShown = 8;
-    choice.top = choice.chosen >= kShown ? choice.chosen - kShown + 1 : 0;
-    portChoice_ = std::move(choice);
+    ChoiceList list{std::move(labels), chosen, true};
+    list.name("port");
+    if (gone)
+    {
+        list.warn(*gone, goneDisabled ? "(disabled)" : "(not found)");
+    }
+    portChoice_.emplace(PortChoice{input, std::move(ports), std::move(current), std::move(list)});
     return true;
 }
 
@@ -620,9 +633,7 @@ void TracksView::type(char32_t character)
 {
     if (portChoice_)
     {
-        portChoice_->typed += character;
-        portChoice_->chosen = 0;
-        portChoice_->top = 0;
+        portChoice_->list.type(character);
     }
     else
     {
@@ -630,89 +641,24 @@ void TracksView::type(char32_t character)
     }
 }
 
-std::vector<std::size_t> TracksView::portMatches() const
-{
-    const auto folded = [](std::u32string text)
-    {
-        for (auto& c : text)
-        {
-            c = c < 128 ? static_cast<char32_t>(std::tolower(static_cast<int>(c))) : c;
-        }
-        return text;
-    };
-    const auto wanted = folded(portChoice_->typed);
-    std::vector<std::size_t> result;
-    for (std::size_t i = 0; i < portChoice_->ports.size(); ++i)
-    {
-        const auto& port = portChoice_->ports[i];
-        if (folded(decodeUtf8(portLabel(port))).find(wanted) != std::u32string::npos)
-        {
-            result.push_back(i);
-        }
-    }
-    return result;
-}
-
 std::optional<bool> TracksView::runPortChoice(std::string_view command)
 {
-    constexpr std::size_t kShown = 8;
     auto& choice = *portChoice_;
-    const auto matches = portMatches();
-    const auto moveBy = [&](std::ptrdiff_t by)
-    {
-        if (matches.empty())
-        {
-            return;
-        }
-        const auto last = static_cast<std::ptrdiff_t>(matches.size()) - 1;
-        choice.chosen = static_cast<std::size_t>(
-            std::clamp(static_cast<std::ptrdiff_t>(choice.chosen) + by, std::ptrdiff_t{0}, last));
-        choice.top = std::min(choice.top, choice.chosen);
-        choice.top = choice.chosen >= choice.top + kShown ? choice.chosen - kShown + 1 : choice.top;
-    };
     if (command == "command-line-cancel")
     {
         portChoice_.reset();
         host_.stopTyping();
     }
-    else if (command == "command-line-older")
-    {
-        moveBy(-1);
-    }
-    else if (command == "command-line-newer")
-    {
-        moveBy(1);
-    }
-    else if (command == "command-line-page-up")
-    {
-        moveBy(-static_cast<std::ptrdiff_t>(kShown));
-    }
-    else if (command == "command-line-page-down")
-    {
-        moveBy(static_cast<std::ptrdiff_t>(kShown));
-    }
-    else if (command == "command-line-backspace" || command == "command-line-clear")
-    {
-        if (command == "command-line-clear")
-        {
-            choice.typed.clear();
-        }
-        else if (!choice.typed.empty())
-        {
-            choice.typed.pop_back();
-        }
-        choice.chosen = 0;
-        choice.top = 0;
-    }
     else if (command == "command-line-run" || command == "command-line-next" ||
              command == "command-line-previous")
     {
-        if (matches.empty())
+        const auto chosen = choice.list.chosen();
+        if (!chosen)
         {
-            host_.refuse("No port matches that");
+            host_.refuse(choice.list.nothing());
             return true;
         }
-        const auto port = choice.ports[matches[choice.chosen]];
+        const auto port = choice.ports[*chosen];
         const auto field = choice.input ? TrackField::Input : TrackField::Port;
         // On a selection, the others may not have it yet even if the cursor's track does.
         const bool changed = port != choice.current || selected().size() > 1;
@@ -730,6 +676,10 @@ std::optional<bool> TracksView::runPortChoice(std::string_view command)
         {
             nextField(command == "command-line-next");
         }
+    }
+    else
+    {
+        choice.list.run(command);
     }
     return true;
 }
@@ -763,69 +713,6 @@ TracksView::PortTrouble TracksView::portTrouble(const core::Track& track, bool i
     return !name.empty()            ? PortTrouble::Missing
            : resolved.named.empty() ? PortTrouble::NoDefault
                                     : PortTrouble::DefaultMissing;
-}
-
-void TracksView::addPortChoice(Frame& frame) const
-{
-    constexpr std::size_t kShown = 8;
-    const auto matches = portMatches();
-    const auto rows = std::clamp<std::size_t>(matches.size(), 1, kShown);
-    const auto label = [&](std::size_t match)
-    {
-        const auto& port = portChoice_->ports[matches[match]];
-        return decodeUtf8(matches[match] == portChoice_->gone
-                              ? port + (portChoice_->goneDisabled ? " (disabled)" : " (not found)")
-                              : portLabel(port));
-    };
-
-    // At the cell, below it, or above where there's no room; as wide as the longest in view.
-    int x = (1 - left_) * cell_.width;
-    int cellWidth = 0;
-    for (std::size_t c = 0; c < trackColumns().size(); ++c)
-    {
-        cellWidth = columnWidth(trackColumns()[c]);
-        if (c == column_)
-        {
-            break;
-        }
-        x += cellWidth * cell_.width;
-    }
-    std::size_t widest = static_cast<std::size_t>(cellWidth);
-    for (std::size_t i = 0; i < matches.size(); ++i)
-    {
-        widest = std::max(widest, label(i).size() + 2);
-    }
-    const int width = std::min(static_cast<int>(widest) * cell_.width, layout_.main.width);
-    x = std::clamp(x, 0, layout_.main.width - width);
-    const int height = static_cast<int>(rows) * cell_.height;
-    const int cellY = static_cast<int>(row() - top_ + 1) * cell_.height;
-    const int y = cellY + cell_.height + height <= layout_.main.height
-                      ? cellY + cell_.height
-                      : std::max(cellY - height, 0);
-
-    Region list{.bounds = {layout_.main.x + x, layout_.main.y + y, width, height},
-                .background = Role::Panel,
-                .text = {},
-                .under = {},
-                .over = {}};
-    if (matches.empty())
-    {
-        list.text.push_back({cell_.width, 0, U"No port matches", {Role::Dim, Role::Panel, kPlain}});
-    }
-    for (std::size_t i = portChoice_->top; i < matches.size() && i < portChoice_->top + rows; ++i)
-    {
-        auto text = label(i);
-        const bool here = i == portChoice_->chosen;
-        const bool missing = text.ends_with(U"(not found)");
-        text.insert(0, 1, U' ');
-        text.resize(static_cast<std::size_t>(width / cell_.width), U' ');
-        list.text.push_back({0, static_cast<int>(i - portChoice_->top) * cell_.height,
-                             std::move(text),
-                             here      ? Style{Role::CursorText, Role::Cursor, kPlain}
-                             : missing ? Style{Role::Warning, Role::Panel, kPlain}
-                                       : Style{Role::Text, Role::Panel, kPlain}});
-    }
-    frame.push_back(std::move(list));
 }
 
 std::optional<bool> TracksView::run(std::string_view command, int count)
@@ -1102,6 +989,7 @@ void TracksView::addRegions(Frame& frame) const
     {
         chosen = selected();
     }
+    Rect listAt{}; // the cell a port is being chosen at
     const auto draw = [&](std::size_t index, int y, const core::Track* track)
     {
         int x = (1 - left_) * cell_.width;
@@ -1119,16 +1007,22 @@ void TracksView::addRegions(Frame& frame) const
             {
                 text += programEvents(document_.song(), track->id()).count > 0 ? U'•' : U' ';
             }
-            if (text.size() > static_cast<std::size_t>(room))
+            // A port is chosen from a list, which the arrow at its right says.
+            const bool listed =
+                track && (column.field == TrackField::Port || column.field == TrackField::Input);
+            const int textRoom = listed ? room - 2 : room;
+            if (text.size() > static_cast<std::size_t>(textRoom))
             {
-                text.resize(static_cast<std::size_t>(room - 1));
+                text.resize(static_cast<std::size_t>(textRoom - 1));
                 text += U'…';
             }
-            const auto padding = static_cast<std::size_t>(room) - text.size();
+            const auto padding = static_cast<std::size_t>(textRoom) - text.size();
             if (column.numeric) // the heading too, over its values
                 text.insert(0, padding, U' ');
             else
                 text.append(padding, U' ');
+            if (listed)
+                text += std::u32string{U' ', ChoiceList::kArrow};
             const bool toggle = track && isToggle(column.field);
             if (toggle)
                 text.assign(static_cast<std::size_t>(room), U' ');
@@ -1165,15 +1059,16 @@ void TracksView::addRegions(Frame& frame) const
             }
             if (track && portChoice_ && index == row() && c == column_)
             {
+                listAt = {layout_.main.x + x, layout_.main.y + y, wide * cell_.width, cell_.height};
                 // What's typed to narrow the list, or else the port it's on now, with a cursor.
-                auto shown = portChoice_->typed.empty() ? decodeUtf8(portChoice_->current)
-                                                        : portChoice_->typed;
+                const auto& typed = portChoice_->list.typed();
+                auto shown = typed.empty() ? decodeUtf8(portChoice_->current) : typed;
                 const auto box = static_cast<std::size_t>(room);
                 if (shown.size() >= box)
                 {
                     shown = shown.substr(shown.size() - box + 1);
                 }
-                const auto at = portChoice_->typed.empty() ? std::size_t{0} : shown.size();
+                const auto at = typed.empty() ? std::size_t{0} : shown.size();
                 const Style editing{Role::Text, Role::Selection, kPlain};
                 auto filled = shown;
                 filled.resize(box, U' ');
@@ -1244,7 +1139,7 @@ void TracksView::addRegions(Frame& frame) const
     frame.push_back(std::move(table));
     if (portChoice_)
     {
-        addPortChoice(frame);
+        frame.push_back(portChoice_->list.region(listAt, layout_.main, cell_));
     }
     if (layout_.top.size() < 2)
     {
@@ -1253,7 +1148,11 @@ void TracksView::addRegions(Frame& frame) const
     // No place in time: the view has no timeline.
     frame.push_back(trackBarRegion(document_.song(), tracks.empty() ? 0 : row() + 1, std::nullopt,
                                    cursorMeter(), layout_.top[0], width_, cell_));
+    Rect fieldAt{};
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9,
-                                    quantizeEditing_ ? &editor_ : nullptr));
+                                    quantizeEditing_ ? &editor_ : nullptr, &fieldAt));
+    if (quantizeEditing_)
+        addChoiceList(frame, &editor_, fieldAt,
+                      {0, 0, width_, layout_.main.y + layout_.main.height}, cell_);
 }
 } // namespace modal::ui

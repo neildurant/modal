@@ -137,12 +137,38 @@ void addField(Region& region, int x, int y, int columns, CellSize cell)
 }
 
 void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
-                    int columns, CellSize cell, const InspectorEditor* editor, bool rightAligned)
+                    int columns, CellSize cell, const InspectorEditor* editor, bool rightAligned,
+                    Rect* listAt)
 {
     if (columns < 1)
         return;
     const bool edited = editor && editor->active() && editor->heading() == field.heading;
     const auto box = static_cast<std::size_t>(columns);
+    // A field chosen from a list: its value, then an arrow at its right.
+    const bool listed = !field.choices.empty() || (edited && editor->list() != nullptr);
+    if (listed && box >= 3)
+    {
+        if (edited)
+        {
+            text = decodeUtf8(editor->shown());
+            if (listAt != nullptr)
+                *listAt = {region.bounds.x + x, region.bounds.y + y, columns * cell.width,
+                           cell.height};
+        }
+        if (text.size() > box - 2)
+            text = text.substr(0, box - 3) + U'…';
+        if (rightAligned)
+            text.insert(0, box - 2 - text.size(), U' ');
+        else
+            text.resize(box - 2, U' ');
+        text += std::u32string{U' ', ChoiceList::kArrow};
+        region.text.push_back({x, y, std::move(text),
+                               edited           ? Style{Role::Text, Role::Selection, kPlain}
+                               : field.warning  ? Style{Role::Warning, Role::Panel, kPlain}
+                               : field.editable ? Style{Role::Text, Role::Panel, kPlain}
+                                                : Style{Role::Dim, Role::Panel, kPlain}});
+        return;
+    }
     if (edited)
     {
         text = editor->line().text();
@@ -195,8 +221,15 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
     }
 }
 
+void addChoiceList(Frame& frame, const InspectorEditor* editor, Rect listAt, Rect within,
+                   CellSize cell)
+{
+    if (editor != nullptr && editor->active() && editor->list() != nullptr)
+        frame.push_back(editor->list()->region(listAt, within, cell));
+}
+
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
-                       int positionWidth, const InspectorEditor* editor)
+                       int positionWidth, const InspectorEditor* editor, Rect* listAt)
 {
     if (inspection.kind == "Note" &&
         std::ranges::find(inspection.fields, "Units", &InspectorField::heading) !=
@@ -255,7 +288,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         auto text = decodeUtf8(field.value);
         const bool edited =
             editor != nullptr && editor->active() && editor->heading() == field.heading;
-        if (edited)
+        if (edited && editor->list() == nullptr)
         {
             text = editor->line().text();
         }
@@ -274,11 +307,12 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         };
         cut(title);
         region.text.push_back({x(at), top, title, heading});
-        const int wide =
-            std::max({static_cast<int>(title.size()),
-                      static_cast<int>(text.size()) + (edited ? 1 : 0), widthOf(field.heading)});
+        // Room for the cursor while editing, and for a list's arrow.
+        const int extra = !field.choices.empty() ? 2 : edited ? 1 : 0;
+        const int wide = std::max({static_cast<int>(title.size()),
+                                   static_cast<int>(text.size()) + extra, widthOf(field.heading)});
         inspectorValue(region, field, std::move(text), x(at), top + cell.height,
-                       std::min(wide, room), cell, editor);
+                       std::min(wide, room), cell, editor, false, listAt);
         at += wide + 3;
     }
     return region;

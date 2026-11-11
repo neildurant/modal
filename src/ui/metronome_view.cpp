@@ -28,10 +28,12 @@ using When = core::MetronomeSettings::When;
 using CountInMode = core::CountInSettings::Mode;
 
 constexpr int kLabelWidth = 14;
-constexpr int kValueWidth = 22; // room for a port's alias, and "While recording"
+constexpr int kValueWidth = 24; // room for a port's alias, and "While recording", and an arrow
 constexpr int kNoteWidth = 6;   // a click's note, then its drum name, then its velocity
 constexpr int kDrumWidth = 19;
-constexpr int kVelocityWidth = 4;
+constexpr int kVelocityWidth = 5; // a cell more than the digits for the cursor, as for others
+constexpr int kNumberWidth = 4;   // a count-in's or pre-roll's, then whether bars or beats
+constexpr int kUnitWidth = 9;
 
 // The General MIDI percussion names, which most drum sounds follow, from 35 to 81.
 std::string_view drumName(std::uint8_t note)
@@ -123,20 +125,24 @@ std::string_view about(Setting setting, Field field)
     case Setting::Channel:
         return "The click's MIDI channel, 10 for General MIDI drums";
     case Setting::Downbeat:
-        return field == Field::Value ? "The note clicked on each bar's first beat"
-                                     : "How hard the first beat is clicked, 1 to 127";
+        return field == Field::Value      ? "The note clicked on each bar's first beat"
+               : field == Field::Velocity ? "How hard the first beat is clicked, 1 to 127"
+                                          : "Plays the first beat's click, to hear it";
     case Setting::Beat:
-        return field == Field::Value ? "The note clicked on the other beats"
-                                     : "How hard the other beats are clicked, 1 to 127";
+        return field == Field::Value      ? "The note clicked on the other beats"
+               : field == Field::Velocity ? "How hard the other beats are clicked, 1 to 127"
+                                          : "Plays the other beats' click, to hear it";
     case Setting::Length:
         return "How long each click lasts, cut short where the next comes sooner";
     case Setting::Mode:
         return "Before recording: nothing, a count-in (clicks, the song silent), or a pre-roll "
                "(the song)";
     case Setting::CountIn:
-        return "How long the count-in is: bars, or beats (3 beats)";
+        return field == Field::Value ? "How long the count-in is, 1 to 99"
+                                     : "Whether the count-in is counted in bars or beats";
     case Setting::PreRoll:
-        return "How many bars of the song a pre-roll plays";
+        return field == Field::Value ? "How much of the song a pre-roll plays, 1 to 99"
+                                     : "Whether the pre-roll is counted in bars or beats";
     }
     return {};
 }
@@ -144,6 +150,29 @@ std::string_view about(Setting setting, Field field)
 bool isClick(Setting setting)
 {
     return setting == Setting::Downbeat || setting == Setting::Beat;
+}
+
+bool hasUnit(Setting setting)
+{
+    return setting == Setting::CountIn || setting == Setting::PreRoll;
+}
+
+// The fields of a row, left to right.
+std::vector<Field> fieldsOf(Setting setting)
+{
+    if (isClick(setting))
+        return {Field::Value, Field::Velocity, Field::Test};
+    if (hasUnit(setting))
+        return {Field::Value, Field::Unit};
+    return {Field::Value};
+}
+
+// Whether a field is a number, or a length as 1/32, which a digit starts typing straight away.
+bool numeric(Setting setting, Field field)
+{
+    return (field == Field::Value && setting != Setting::Plays && setting != Setting::Port &&
+            setting != Setting::Mode) ||
+           field == Field::Velocity;
 }
 
 std::string lower(std::string text)
@@ -178,7 +207,9 @@ std::string whenWord(When when)
 
 std::string modeWord(CountInMode mode)
 {
-    return mode == CountInMode::None ? "Nothing" : mode == CountInMode::CountIn ? "Count-in" : "Pre-roll";
+    return mode == CountInMode::None      ? "Nothing"
+           : mode == CountInMode::CountIn ? "Count-in"
+                                          : "Pre-roll";
 }
 
 std::string count(int n, std::string_view one)
@@ -239,12 +270,6 @@ void MetronomeView::restore(const core::EditPlace& place)
     songCursor_.tick = place.tick;
 }
 
-void MetronomeView::go(Setting setting)
-{
-    row_ = static_cast<std::size_t>(std::ranges::find(kSettings, setting) - kSettings.begin());
-    field_ = Field::Value;
-}
-
 std::vector<std::string> MetronomeView::ports() const
 {
     std::vector<std::string> result{""}; // the default
@@ -287,11 +312,58 @@ std::string MetronomeView::text(Setting setting, Field field) const
     case Setting::Mode:
         return modeWord(countIn.mode);
     case Setting::CountIn:
-        return countIn.beats > 0 ? count(countIn.beats, "beat") : count(countIn.bars, "bar");
+        if (field == Field::Unit)
+            return countIn.beats > 0 ? "Beats" : "Bars";
+        return std::to_string(countIn.beats > 0 ? countIn.beats : countIn.bars);
     case Setting::PreRoll:
-        return count(countIn.preRollBars, "bar");
+        if (field == Field::Unit)
+            return countIn.preRollBeats > 0 ? "Beats" : "Bars";
+        return std::to_string(countIn.preRollBeats > 0 ? countIn.preRollBeats
+                                                       : countIn.preRollBars);
     }
     return {};
+}
+
+InspectorField MetronomeView::editField(Setting setting, Field field) const
+{
+    const auto shown = text(setting, field);
+    InspectorField result{.heading = std::string{label(setting)},
+                          .value = shown,
+                          .editable = true,
+                          .editText = shown};
+    if (field == Field::Unit)
+    {
+        result.choices = {"Bars", "Beats"};
+    }
+    else if (field == Field::Value && setting == Setting::Plays)
+    {
+        result.choices = {"Off", "While recording", "Always"};
+    }
+    else if (field == Field::Value && setting == Setting::Mode)
+    {
+        result.choices = {"Nothing", "Count-in", "Pre-roll"};
+    }
+    else if (field == Field::Value && setting == Setting::Port)
+    {
+        // Narrowed by typing, as a track's port is.
+        for (const auto& port : ports())
+            result.choices.push_back(port.empty() ? "Default" : port);
+        result.narrowing = true;
+    }
+    return result;
+}
+
+bool MetronomeView::startEditing()
+{
+    if (field_ == Field::Test)
+    {
+        host_.auditionClick(setting() == Setting::Downbeat);
+        return false;
+    }
+    if (!editor_.open({.kind = "Metronome", .fields = {editField(setting(), field_)}}))
+        return false;
+    host_.startTyping();
+    return true;
 }
 
 void MetronomeView::change(const std::string& what, const core::Song& changed)
@@ -344,11 +416,14 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
         }
         else
         {
-            // An enabled output by name, or the start of one.
+            // An enabled output by name, or else the start of one.
             const auto all = ports();
-            const auto match =
-                std::ranges::find_if(all, [&](const std::string& name)
-                                     { return !name.empty() && lower(name).starts_with(word); });
+            auto match = std::ranges::find_if(all, [&](const std::string& name)
+                                              { return !name.empty() && lower(name) == word; });
+            if (match == all.end())
+                match = std::ranges::find_if(
+                    all, [&](const std::string& name)
+                    { return !name.empty() && lower(name).starts_with(word); });
             if (match == all.end())
                 return "No enabled output is called " + text;
             metronome.port = *match;
@@ -414,27 +489,29 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
     case Setting::CountIn:
     case Setting::PreRoll:
     {
-        // A number of bars, or for the count-in "3 beats".
-        const auto space = text.find(' ');
-        const auto n = number(text.substr(0, space));
-        const auto unit =
-            space == std::string::npos ? std::string{} : lower(trimmed(text.substr(space)));
-        const bool beats = unit == "beats" || unit == "beat";
-        const bool bars = unit.empty() || unit == "bars" || unit == "bar";
         const bool preRoll = setting() == Setting::PreRoll;
-        if (!n || (!bars && (!beats || preRoll)))
-            return preRoll ? "A number of bars" : "A number of bars, or of beats (3 beats)";
-        if (*n < 1 || *n > 99)
-            return "From 1 to 99";
-        if (preRoll)
-            countIn.preRollBars = *n;
+        auto& bars = preRoll ? countIn.preRollBars : countIn.bars;
+        auto& beats = preRoll ? countIn.preRollBeats : countIn.beats;
+        if (field_ == Field::Unit)
+        {
+            // In bars or beats, keeping the number.
+            const bool toBeats = startsWith("beats");
+            if (!toBeats && !startsWith("bars"))
+                return "Bars or beats";
+            if (toBeats && beats == 0)
+                beats = bars;
+            else if (!toBeats && beats > 0)
+                bars = std::exchange(beats, 0);
+        }
         else
         {
-            countIn.beats = beats ? *n : 0;
-            countIn.bars = beats ? countIn.bars : *n;
+            const auto n = number(text);
+            if (!n || *n < 1 || *n > 99)
+                return "A number from 1 to 99";
+            (beats > 0 ? beats : bars) = *n;
         }
         change(std::string{preRoll ? "Pre-roll " : "Count-in "} +
-                   (beats ? count(*n, "beat") : count(*n, "bar")),
+                   (beats > 0 ? count(beats, "beat") : count(bars, "bar")),
                song);
         return std::nullopt;
     }
@@ -473,6 +550,8 @@ std::optional<std::string> MetronomeView::step(int steps)
     case Setting::Beat:
     {
         const bool down = setting() == Setting::Downbeat;
+        if (field_ == Field::Test)
+            break;
         if (field_ == Field::Value)
         {
             auto& note = down ? metronome.downbeatNote : metronome.beatNote;
@@ -503,16 +582,28 @@ std::optional<std::string> MetronomeView::step(int steps)
         change(countInText(countIn), song);
         break;
     case Setting::CountIn:
-        if (countIn.beats > 0)
-            countIn.beats = clamp(countIn.beats, 1, 99);
-        else
-            countIn.bars = clamp(countIn.bars, 1, 99);
-        change("Count-in " + text(Setting::CountIn, Field::Value), song);
-        break;
     case Setting::PreRoll:
-        countIn.preRollBars = clamp(countIn.preRollBars, 1, 99);
-        change("Pre-roll " + count(countIn.preRollBars, "bar"), song);
+    {
+        const bool preRoll = setting() == Setting::PreRoll;
+        auto& bars = preRoll ? countIn.preRollBars : countIn.bars;
+        auto& beats = preRoll ? countIn.preRollBeats : countIn.beats;
+        if (field_ == Field::Unit)
+        {
+            if (beats > 0)
+                bars = std::exchange(beats, 0);
+            else
+                beats = bars;
+        }
+        else
+        {
+            auto& n = beats > 0 ? beats : bars;
+            n = clamp(n, 1, 99);
+        }
+        change(std::string{preRoll ? "Pre-roll " : "Count-in "} +
+                   (beats > 0 ? count(beats, "beat") : count(bars, "bar")),
+               song);
         break;
+    }
     }
     return std::nullopt;
 }
@@ -521,11 +612,14 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
 {
     const auto n = static_cast<std::size_t>(std::max(count, 1));
     const auto last = kSettings.size() - 1;
+    // Keeping the field where the row has it, as from one click to the other.
     const auto settle = [&]
     {
-        if (!isClick(setting()))
+        if (const auto all = fieldsOf(setting()); std::ranges::find(all, field_) == all.end())
             field_ = Field::Value;
     };
+    const auto fields = fieldsOf(setting());
+    const auto at = static_cast<std::size_t>(std::ranges::find(fields, field_) - fields.begin());
     if (command == "cursor-down")
     {
         row_ = std::min(row_ + n, last);
@@ -536,13 +630,21 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
         row_ -= std::min(row_, n);
         settle();
     }
-    else if (command == "cursor-left" || command == "cursor-first")
+    else if (command == "cursor-left")
+    {
+        field_ = fields[at - std::min(at, n)];
+    }
+    else if (command == "cursor-right")
+    {
+        field_ = fields[std::min(at + n, fields.size() - 1)];
+    }
+    else if (command == "cursor-first")
     {
         field_ = Field::Value;
     }
-    else if (command == "cursor-right" || command == "cursor-last")
+    else if (command == "cursor-last")
     {
-        field_ = isClick(setting()) ? Field::Velocity : Field::Value;
+        field_ = fields.back();
     }
     else if (command == "go-first")
     {
@@ -556,15 +658,7 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
     }
     else if (command == "field-edit" || command == "inspector-edit")
     {
-        const auto shown = text(setting(), field_);
-        if (editor_.open({.kind = "Metronome",
-                          .fields = {{.heading = std::string{label(setting())},
-                                      .value = shown,
-                                      .editable = true,
-                                      .editText = shown}}}))
-        {
-            host_.startTyping();
-        }
+        startEditing();
     }
     else
     {
@@ -583,6 +677,9 @@ std::optional<std::string> MetronomeView::typingHint() const
 {
     if (!editor_.active())
         return std::nullopt;
+    if (const auto* list = editor_.list())
+        return std::string{list->narrowing() ? "Type to narrow the list; " : ""} +
+               "Up and Down choose, Enter takes it, Escape leaves it";
     return std::string{about(setting(), field_)} + "; Up and Down step it, Enter sets it";
 }
 
@@ -591,21 +688,21 @@ void MetronomeView::type(char32_t character)
     editor_.type(character);
 }
 
+bool MetronomeView::typeToEdit(char32_t digit)
+{
+    if (!numeric(setting(), field_) || !startEditing())
+        return false;
+    editor_.type(digit);
+    return true;
+}
+
 std::optional<bool> MetronomeView::runTyping(std::string_view command)
 {
     return editor_.run(
         command, host_,
         {
-            .inspection =
-                [this]
-            {
-                const auto shown = text(setting(), field_);
-                return Inspection{.kind = "Metronome",
-                                  .fields = {{.heading = std::string{label(setting())},
-                                              .value = shown,
-                                              .editable = true,
-                                              .editText = shown}}};
-            },
+            .inspection = [this]
+            { return Inspection{.kind = "Metronome", .fields = {editField(setting(), field_)}}; },
             .set = [this](const std::string&, const std::string& typed) { return set(typed); },
             .step = [this](const std::string&, int steps) { return step(steps); },
         });
@@ -648,31 +745,41 @@ void MetronomeView::addRegions(Frame& frame) const
             {cell_.width, y, std::move(text), {Role::Accent, Role::Background, kBold}});
         y += 2 * cell_.height;
     };
-    // A field, padded to its width, the cursor's highlighted, or being edited in place.
-    const auto field = [&](Setting setting, Field which, int x, int width, bool numeric)
+    // A field, padded to its width, the cursor's highlighted, or being edited in place; one with
+    // choices shows an arrow at its right, and the Test button is a button.
+    Rect listAt{};
+    const auto field = [&](Setting setting, Field which, int x, int width, bool alignRight)
     {
         const bool here = setting == this->setting() && which == field_;
+        const auto edited = editField(setting, which);
         if (here && editor_.active())
         {
-            inspectorValue(page, {std::string{label(setting)}, {}}, {}, x, y, width, cell_,
-                           &editor_);
+            inspectorValue(page, edited, {}, x, y, width, cell_, &editor_, alignRight, &listAt);
             return;
         }
-        auto shown = decodeUtf8(text(setting, which));
-        if (shown.size() > static_cast<std::size_t>(width))
+        if (which == Field::Test)
         {
-            shown.resize(static_cast<std::size_t>(width - 1));
+            page.text.push_back(
+                {x, y, U" Test ", here ? cursor : Style{Role::Text, Role::Panel, kPlain}});
+            return;
+        }
+        const bool listed = !edited.choices.empty();
+        const int room = listed ? width - 2 : width;
+        auto shown = decodeUtf8(edited.value);
+        if (shown.size() > static_cast<std::size_t>(room))
+        {
+            shown.resize(static_cast<std::size_t>(room - 1));
             shown += U'…';
         }
-        const auto padding = static_cast<std::size_t>(width) - shown.size();
-        if (numeric)
+        const auto padding = static_cast<std::size_t>(room) - shown.size();
+        if (alignRight)
             shown.insert(0, padding, U' ');
         else
             shown.append(padding, U' ');
-        // Typed into, so shown as fields; the choosers are stepped.
-        const bool typed = setting != Setting::Plays && setting != Setting::Mode;
-        if (typed && !here)
-            addField(page, x, y, width, cell_);
+        if (listed)
+            shown += std::u32string{U' ', ChoiceList::kArrow};
+        else if (!here)
+            addField(page, x, y, width, cell_); // typed into, so shown as a field
         Style style = plain;
         if (setting == Setting::Port)
         {
@@ -703,16 +810,20 @@ void MetronomeView::addRegions(Frame& frame) const
             const auto note = down ? song.metronome.downbeatNote : song.metronome.beatNote;
             page.text.push_back(
                 {valueX + kNoteWidth * cell_.width, y, decodeUtf8(drumName(note)), dim});
-            field(setting, Field::Velocity, valueX + (kNoteWidth + kDrumWidth) * cell_.width,
-                  kVelocityWidth - 1, true);
+            const int velocityX = valueX + (kNoteWidth + kDrumWidth) * cell_.width;
+            field(setting, Field::Velocity, velocityX, kVelocityWidth - 1, true);
+            field(setting, Field::Test, velocityX + kVelocityWidth * cell_.width, 6, false);
+        }
+        else if (hasUnit(setting))
+        {
+            field(setting, Field::Value, valueX, kNumberWidth - 1, true);
+            field(setting, Field::Unit, valueX + kNumberWidth * cell_.width, kUnitWidth - 1, false);
         }
         else
         {
-            const int width = setting == Setting::Channel   ? 2
-                              : setting == Setting::Length  ? 5
-                              : setting == Setting::CountIn ? 9
-                              : setting == Setting::PreRoll ? 9
-                                                            : kValueWidth - 1;
+            const int width = setting == Setting::Channel  ? 3
+                              : setting == Setting::Length ? 6
+                                                           : kValueWidth - 1;
             field(setting, Field::Value, valueX, width, setting == Setting::Channel);
         }
         y += cell_.height;
@@ -720,6 +831,7 @@ void MetronomeView::addRegions(Frame& frame) const
             y += cell_.height;
     }
     frame.push_back(std::move(page));
+    addChoiceList(frame, &editor_, listAt, layout_.main, cell_);
     if (layout_.top.size() < 2)
     {
         return;

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/ui/choice_list.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/inspector.hpp>
 
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace modal::ui
 {
@@ -22,7 +24,9 @@ class ViewHost;
 // round from the last to the first; Enter sets it and leaves; Escape leaves it as it was, the
 // fields set before it staying set. Up and Down step the value where it can be stepped. Each
 // field set is an undo step of its own. It opens on the field it was last on, so going through
-// notes changing one property is e, a value and Enter each time.
+// notes changing one property is e, a value and Enter each time. A field with a fixed set of
+// choices opens a drop-down list of them instead (decided November 2026), Enter or Tab setting
+// the one highlighted.
 class InspectorEditor
 {
 public:
@@ -40,7 +44,11 @@ public:
     // Starts editing, on the field it was last on if there is one, or else the first that can be;
     // false if none can.
     bool open(const Inspection& inspection, std::string_view heading = {});
-    void close() { heading_.reset(); }
+    void close()
+    {
+        heading_.reset();
+        list_.reset();
+    }
     bool active() const { return heading_.has_value(); }
 
     // The field being edited, by its heading, and what's typed in it.
@@ -48,6 +56,10 @@ public:
     const CommandLine& line() const { return line_; }
     // Whether the next character typed replaces the value, shown by highlighting all of it.
     bool replacing() const { return fresh_; }
+    // The list being chosen from, on a field with choices.
+    const ChoiceList* list() const { return list_ ? &*list_ : nullptr; }
+    // What the field is set to as editing started, shown in it while the list is open.
+    const std::string& shown() const { return shown_; }
 
     void type(char32_t character);
 
@@ -63,6 +75,10 @@ private:
     std::string last_; // the heading of the field it was last on
     CommandLine line_;
     bool fresh_ = true; // typing, Backspace and Delete replace the value; other keys keep it
+    std::optional<ChoiceList> list_;
+    std::vector<std::string> choices_;
+    std::string shown_;
+    std::optional<std::size_t> current_; // the choice it was on as the list opened
 };
 
 } // namespace modal::ui

@@ -86,13 +86,21 @@ void addField(Region& region, int x, int y, int columns, CellSize cell);
 // Start, Length and Ends, across their coarse, fine and exact values. With an editor, its field
 // is boxed.
 // A value in a box of some columns: what's being typed if the editor is on its field, with the
-// cursor, or else the value itself, cut short if need be.
+// cursor, or else the value itself, cut short if need be. A field with choices shows an arrow at
+// its right, and while its list is open, where the field is goes in listAt, for the list to drop
+// from (see listRegion).
 void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
                     int columns, CellSize cell, const InspectorEditor* editor,
-                    bool rightAligned = false);
+                    bool rightAligned = false, Rect* listAt = nullptr);
 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
-                       int positionWidth, const InspectorEditor* editor = nullptr);
+                       int positionWidth, const InspectorEditor* editor = nullptr,
+                       Rect* listAt = nullptr);
+
+// The editor's drop-down list, if it has one open, from the field at listAt, kept within a
+// space; to go in the frame after what it covers.
+void addChoiceList(Frame& frame, const InspectorEditor* editor, Rect listAt, Rect within,
+                   CellSize cell);
 
 // Text padded with spaces to a number of characters, on its left (aligning it right) or its
 // right; text already as long is left as it is.

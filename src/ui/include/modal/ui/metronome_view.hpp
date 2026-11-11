@@ -16,8 +16,9 @@ namespace modal::ui
 // The Metronome page (, m s, decided November 2026): the song's metronome and what comes before
 // recording, a labelled row for each setting, in two groups as the Ports view has them, so
 // every setting can be seen and found. Enter edits the field under the cursor in place, Up and
-// Down stepping it, and changing a click's note or velocity plays it. Its settings are the
-// song's, saved with it, so each change is an undo step.
+// Down stepping it, or opens a list of choices; a digit starts typing a number field straight
+// away. Changing a click's note or velocity plays it, as its Test button does. Its settings are
+// the song's, saved with it, so each change is an undo step.
 class MetronomeView final : public View
 {
 public:
@@ -34,11 +35,14 @@ public:
         CountIn,
         PreRoll,
     };
-    // The fields a row has: its value, and for a click its velocity too.
+    // The fields a row may have: its value; for a click its velocity and a button to play it;
+    // for a count-in or pre-roll whether it's in bars or beats.
     enum class Field
     {
         Value,
         Velocity,
+        Test,
+        Unit,
     };
 
     MetronomeView(core::Document& document, ViewHost& host);
@@ -62,12 +66,11 @@ public:
     bool typing() const override { return editor_.active(); }
     std::optional<std::string> typingHint() const override;
     void type(char32_t character) override;
+    bool typeToEdit(char32_t digit) override;
     std::optional<bool> runTyping(std::string_view command) override;
 
     Setting setting() const { return kSettings[row_]; }
     Field field() const { return field_; }
-    // Puts the cursor on a row, as , m p does on Port.
-    void go(Setting setting);
 
     static constexpr std::array<Setting, 9> kSettings{
         Setting::Plays,  Setting::Port, Setting::Channel, Setting::Downbeat, Setting::Beat,
@@ -76,6 +79,10 @@ public:
 private:
     // What a field shows, and what editing it starts with.
     std::string text(Setting setting, Field field) const;
+    // A field as the editor has it, with its choices if it has a list of them.
+    InspectorField editField(Setting setting, Field field) const;
+    // Starts editing the field under the cursor; false if it has nothing to edit.
+    bool startEditing();
     // Sets a field from what's typed, or steps it; why not, if it can't.
     std::optional<std::string> set(const std::string& typed);
     std::optional<std::string> step(int steps);

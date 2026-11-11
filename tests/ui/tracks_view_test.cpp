@@ -187,6 +187,13 @@ TEST_CASE("whole-track material cannot replace event selections or sections")
     }
 }
 
+TEST_CASE("the leader then v and r shows the piano roll, as gr does")
+{
+    Tracking t;
+    t.type(U",vr");
+    CHECK(t.ws.shown() == ViewKind::PianoRoll);
+}
+
 TEST_CASE("the tracks view keeps time and pitch while changing rows and views")
 {
     Tracking t;
@@ -1612,8 +1619,34 @@ TEST_CASE("the status line says what a field takes while it's edited")
     CHECK(inspectorHas(t.ws.frame(), U"or 1/8t for a triplet"));
     t.press(NamedKey::Tab, kShift); // round to Moves
     CHECK(
-        inspectorHas(t.ws.frame(), U"starts, ends, both or lengths; Up and Down go through them"));
+        inspectorHas(t.ws.frame(), U"Up and Down choose, Enter or Tab takes it, Escape leaves it"));
     t.press(NamedKey::Escape);
+}
+
+TEST_CASE("what playback quantise moves is chosen from a drop-down list")
+{
+    Tracking t;
+    t.type(U"$");
+    t.press(NamedKey::Enter);
+    t.press(NamedKey::Tab, kShift); // round to Moves
+    const auto& editor = t.ws.tracks().inspectorEditor();
+    REQUIRE(editor.heading() == "Moves");
+    REQUIRE(editor.list() != nullptr);
+    // Below the inspector's field, over the table.
+    const auto frame = t.ws.frame();
+    std::vector<std::u32string> rows;
+    for (const auto& run : frame[3].text)
+    {
+        auto text = run.text;
+        text.erase(text.find_last_not_of(U' ') + 1);
+        rows.push_back(text.substr(text.find_first_not_of(U' ')));
+    }
+    CHECK(rows == std::vector<std::u32string>{U"starts", U"ends", U"both", U"lengths"});
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Down);
+    t.press(NamedKey::Enter);
+    CHECK(t.track().quantize.move == core::QuantizeMove::Both);
+    CHECK_FALSE(t.ws.tracks().editingQuantize());
 }
 
 TEST_CASE("the quantise grid steps through the triplets, from anywhere")
@@ -1688,7 +1721,7 @@ TEST_CASE(
                             song.tracks()[0]->id(), [](core::Track& track)
                             { track.input = "An input with quite a long name, longer than room"; });
                     });
-    CHECK(output() - input == (24 + 3) * 10);
+    CHECK(output() - input == (26 + 3) * 10); // with the list's arrow
     CHECK(narrow ==
           std::ranges::find(trackColumns(), TrackField::Input, &TrackColumn::field)->width * 10);
 }

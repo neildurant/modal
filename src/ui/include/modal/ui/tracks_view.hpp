@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/ui/choice_list.hpp>
 #include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/view.hpp>
@@ -61,8 +62,6 @@ private:
     // Goes on to the next or previous column that can be edited, and opens it.
     void nextField(bool forwards);
 
-    // The ports to choose from, narrowed by what's typed: indexes into the choice's list.
-    std::vector<std::size_t> portMatches() const;
     std::optional<bool> runPortChoice(std::string_view command);
     // Why a track's output or input can't be used, as the Ports view has the machine's ports:
     // a port named that isn't found (as a song from elsewhere may name) or is disabled; Default
@@ -82,7 +81,6 @@ private:
     PortTrouble portTrouble(const core::Track& track, bool input) const;
     // How the chooser shows a port: the default, every input, or by name.
     static std::string portLabel(const std::string& port);
-    void addPortChoice(Frame& frame) const;
 
     // Flips a button on the cursor's row, and any selected rows to match it.
     void toggle(TrackField field);
@@ -106,11 +104,7 @@ private:
         bool input = false;
         std::vector<std::string> ports;
         std::string current;
-        std::u32string typed;
-        std::size_t chosen = 0;          // among the matches
-        std::size_t top = 0;             // the first match shown
-        std::optional<std::size_t> gone; // the port on the list that can't be used
-        bool goneDisabled = false;       // as it's disabled, rather than not found
+        ChoiceList list;
     };
     std::optional<PortChoice> portChoice_;
 };
