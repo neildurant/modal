@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 10 November 2026: step 8.2 passes all six Linux configurations; its trial is accepted with live MIDI input-light testing deferred, and publication is authorised. Duplicate MIDI port names are a known follow-up (below). See [schedule.md](schedule.md) for work order. The preceding hardening is published and passed Linux/Windows CI.*
+*Last updated 11 November 2026: the metronome controls, Metronome page and drop-down lists are accepted and published. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Drop-down lists and the Metronome page after trial (11 November 2026; local, to try)
+## Drop-down lists and the Metronome page after trial (11 November 2026; accepted and published)
+
+**Accepted** on a second trial, 11 November 2026, with the metronome controls and page below, and published; Windows Debug passes 928 tests (926, 2 skipped) at `ee965b0`. Next is the following milestone 8 item in schedule.md.
 
 The first trial of the metronome commits (`26b8a6a`, `1615355`) went well, and asked for these changes:
 
@@ -244,7 +246,7 @@ The first trial of the metronome commits (`26b8a6a`, `1615355`) went well, and a
 - Check quantise Moves (`$`, Enter, Shift-Tab) and the Tracks Output/Input arrows.
 - `, v r`.
 
-## Metronome controls and the Metronome page (11 November 2026; local, to try)
+## Metronome controls and the Metronome page (11 November 2026; accepted and published)
 
 Two commits on `bd459f9`. First: `, m m` cycles the metronome (off, while recording, always), `, m c` what comes before recording (nothing, count-in, pre-roll), `:countin` and `:preroll` set lengths; the engine reports when it's counting in (`EngineStatus::countingIn`), so the status line shows `● COUNT`, `● PRE`, then `● REC` / `● ODUB`, all one width; armed, the right shows what comes before recording (dropped first when the line's full, measured without messages) and `No click` in the warning colour. Second: the Metronome page (`MetronomeView`, `, m s`, `:metronome`, `, m p` on Port), every setting a row edited in place with Up/Down steps, the click's General MIDI drum name beside its note, and a change of note or velocity played through a new engine command, `Engine::audition`, which sends a note and ends it when due (or at the next, panic or quit).
 
