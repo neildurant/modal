@@ -227,9 +227,10 @@ The first trial of the metronome commits (`26b8a6a`, `1615355`) went well, and a
 - **Pre-roll in beats:** `CountInSettings::preRollBeats`, `prerollbeats=` in the song file only when set, and `:preroll 3 beats`.
 - **Keys:** `, m p` removed; `, v p` became `, v r`.
 - **After a second trial:** list fields have the `field` background, as typed fields do, on the Metronome page, in the inspector and in the Tracks view's Input and Output columns.
+- **Ports view:** Enter on a port's detected name or status does nothing. It used to open the alias's editor out of sight, holding the cursor.
 
 **Validation:**
-- Windows Debug: 926 test cases (924 passed, 2 skipped).
+- Windows Debug: 927 test cases (925 passed, 2 skipped).
 - WSL linux-clang-debug: 926 test cases (923 passed, 3 skipped).
 - New tests: choosing from the lists (Escape, letters, `j` / `k`), the port list narrowing and saying nothing matches, Bars/Beats keeping the number, digits starting to type, a three-digit velocity, the Test buttons, quantise Moves, `, v r`, pre-roll in beats in recording, the file and `:preroll`.
 - Renders of the page, with the port list open, and of the Tracks view's arrows looked at.

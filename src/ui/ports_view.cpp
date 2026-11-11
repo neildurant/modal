@@ -356,7 +356,10 @@ void PortsView::act()
                          MessageKind::Information);
         return;
     }
-    default:
+    case Column::Name: // the detected name and the status are the port's own, not to change
+    case Column::Status:
+        return;
+    case Column::Alias:
         if (editor_.open({.kind = "Port",
                           .fields = {{.heading = "Alias",
                                       .value = port->alias,

@@ -203,6 +203,24 @@ TEST_CASE("Enter on the alias edits it in place, unique among its direction's po
     CHECK(p.ws.message() == "Xkey 1 has no alias");
 }
 
+TEST_CASE("Enter on a port's detected name or status does nothing as they're read only")
+{
+    Porting p;
+    p.type(U"G0lll");
+    REQUIRE(p.ws.portsView().column() == PortsView::Column::Name);
+    const auto before = p.ws.message();
+    p.press(NamedKey::Enter);
+    CHECK_FALSE(p.ws.portsView().typing());
+    CHECK(p.ws.message() == before);
+    p.type(U"l");
+    REQUIRE(p.ws.portsView().column() == PortsView::Column::Status);
+    p.press(NamedKey::Enter);
+    CHECK_FALSE(p.ws.portsView().typing());
+    p.type(U"k"); // the cursor still moves
+    CHECK(p.ws.portsView().column() == PortsView::Column::Status);
+    CHECK_FALSE(p.ws.portsView().typing());
+}
+
 TEST_CASE("x forgets a port that isn't there, not one that is")
 {
     Porting p;
