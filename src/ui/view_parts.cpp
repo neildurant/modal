@@ -376,7 +376,7 @@ std::string cutText(const std::string& text, std::size_t most)
 
 constexpr std::size_t kSectionNameWidth = 16;
 constexpr std::size_t kTrackNameWidth = 32; // as the Tracks view's Name column
-constexpr std::size_t kPortNameWidth = 24;  // as its Output port column
+constexpr std::size_t kPortNameWidth = 24;  // as its Output column
 constexpr std::size_t kMeterWidth = 5;      // up to 12/16
 
 } // namespace

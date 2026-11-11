@@ -25,7 +25,8 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::Thru, "Thru", 4},
     TrackColumn{TrackField::ChaseNotes, "Chase", 4},
     TrackColumn{TrackField::Quantize, "Quant", 4},
-    TrackColumn{TrackField::Port, "Output port", 12},
+    // Three blank cells after it, setting the ports apart (decided November 2026).
+    TrackColumn{TrackField::Port, "Output", 14, false, 3},
     TrackColumn{TrackField::Input, "Input", 12},
     TrackColumn{TrackField::Channel, "Ch", 4, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
@@ -160,7 +161,7 @@ std::string_view trackFieldDescription(TrackField field)
     case TrackField::Quantize:
         return "Quantise notes live during playback";
     case TrackField::Port:
-        return "Output port: Default, or one by name";
+        return "Output: Default, or one by name";
     case TrackField::Input:
         return "Input port: Default, All, or one by name";
     case TrackField::Channel:

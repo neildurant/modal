@@ -786,7 +786,7 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
         return std::ranges::any_of(frame.front().text, [&](const TextRun& run)
                                    { return run.text.find(text) != run.text.npos; });
     };
-    // The buttons after Name have no headings, so measure to Output port, past them.
+    // The buttons after Name have no headings, so measure to Output, past them.
     int buttons = 0;
     bool afterName = false;
     for (const auto& column : trackColumns())
@@ -797,7 +797,7 @@ TEST_CASE("the name column grows with the longest name, up to a limit")
             buttons += column.width * 10;
         afterName = afterName || column.field == TrackField::Name;
     }
-    const auto nameEnd = [&] { return headingX(U"Output port") - buttons; };
+    const auto nameEnd = [&] { return headingX(U"Output") - buttons; };
     const int start = headingX(U"Name");
     const int usual = nameEnd();
     CHECK(usual - start == trackColumns()[1].width * 10);
@@ -1155,7 +1155,7 @@ TEST_CASE("the bar shows a track's setup when it has one")
 
 namespace
 {
-// A workspace with some output ports, on the Output port column.
+// A workspace with some output ports, on the Output column.
 struct ChoosingPorts : Tracking
 {
     ChoosingPorts()
@@ -1271,7 +1271,7 @@ TEST_CASE("a track's port is chosen from a list of the ports there are")
         t.press(NamedKey::Down);
         t.press(NamedKey::Tab);
         CHECK(t.track().port == "loopMIDI Port 1");
-        CHECK(t.ws.tracks().choosingPort()); // Input follows Output port
+        CHECK(t.ws.tracks().choosingPort()); // Input follows Output
         t.press(NamedKey::Tab);
         CHECK(t.ws.tracks().inspectorEditor().heading() == "Ch");
         t.press(NamedKey::Escape);
@@ -1634,7 +1634,8 @@ TEST_CASE("the quantise grid steps through the triplets, from anywhere")
     t.press(NamedKey::Escape);
 }
 
-TEST_CASE("the button columns are evenly spaced, and Output port fits its names")
+TEST_CASE(
+    "the button columns are evenly spaced, and Output fits its names, three cells before Input")
 {
     Tracking t;
     const auto headingX = [&](std::u32string_view heading)
@@ -1672,7 +1673,7 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
         CHECK(badges[i] - badges[i - 1] == 4 * 10);
     }
 
-    const auto port = headingX(U"Output port");
+    const auto port = headingX(U"Output");
     const auto input = [&] { return headingX(U"Input"); };
     const auto narrow = input() - port;
     t.document.edit("A long port", {},
@@ -1682,7 +1683,7 @@ TEST_CASE("the button columns are evenly spaced, and Output port fits its names"
                             song.tracks()[0]->id(), [](core::Track& track)
                             { track.port = "A port with quite a long name, longer than room"; });
                     });
-    CHECK(input() - port == 25 * 10);
+    CHECK(input() - port == (24 + 3) * 10);
     CHECK(narrow ==
           std::ranges::find(trackColumns(), TrackField::Port, &TrackColumn::field)->width * 10);
 }
@@ -1837,4 +1838,116 @@ TEST_CASE("a Visual track selection takes one chosen input with one undo step")
     CHECK(t.track(1).input == "Keys");
     t.type(U"u");
     CHECK(t.document.song() == before);
+}
+
+namespace
+{
+constexpr auto kIn = PortDirection::Input;
+constexpr auto kOut = PortDirection::Output;
+
+// Tracks with a machine's ports: a keyboard and a synth, enabled, a second synth disabled, and an
+// input enabled but unplugged; no defaults set yet.
+struct PortTroubles : ChoosingPorts
+{
+    PortTroubles()
+    {
+        type(U"0");
+        table.detected(kIn, std::vector<std::string>{"Keys", "Pads"});
+        table.detected(kIn, std::vector<std::string>{"Keys"}); // Pads unplugged
+        table.detected(kOut, std::vector<std::string>{"Synth", "Other synth"});
+        table.setEnabled(kIn, "Keys", true);
+        table.setEnabled(kIn, "Pads", true);
+        table.setEnabled(kOut, "Synth", true);
+        ws.setPortControl({.table = [this] { return &table; },
+                           .change = [this](const PortTable& changed) { table = changed; },
+                           .look = [] {}});
+    }
+    void set(bool input, std::string name)
+    {
+        document.edit("Port", {},
+                      [&](core::Song& song)
+                      {
+                          song.updateTrack(song.tracks()[0]->id(), [&](core::Track& track)
+                                           { (input ? track.input : track.port) = name; });
+                      });
+    }
+    // The colour of the first track's cell in a column, the cursor being elsewhere.
+    Role colour(TrackField field)
+    {
+        const auto columns = trackColumns();
+        const auto frame = ws.frame();
+        int x = -1;
+        for (const auto& run : frame.front().text)
+        {
+            const auto heading = std::ranges::find(columns, field, &TrackColumn::field)->heading;
+            if (run.y == 0 && run.text.starts_with(decodeUtf8(heading) + U" "))
+                x = run.x;
+        }
+        REQUIRE(x >= 0);
+        for (const auto& run : frame.front().text)
+        {
+            if (run.y == 20 && run.x == x)
+                return run.style.foreground;
+        }
+        FAIL("no cell");
+        return Role::Text;
+    }
+    PortTable table;
+};
+} // namespace
+
+TEST_CASE("a track's Default and All are dim, and a port that can't be used is in the warning "
+          "colour, the inspector saying why")
+{
+    PortTroubles t;
+    // Default with no default set.
+    CHECK(t.colour(TrackField::Port) == Role::Warning);
+    CHECK(t.colour(TrackField::Input) == Role::Warning);
+    t.column(TrackField::Port);
+    CHECK(inspectorHas(t.ws.frame(), U"No default output"));
+    CHECK(inspectorHas(t.ws.frame(), U"Choose one in the Ports view"));
+    t.column(TrackField::Input);
+    CHECK(inspectorHas(t.ws.frame(), U"No default input"));
+    t.type(U"0");
+
+    // Default with one set, dim; a default disabled or unplugged, warned of.
+    t.table.setDefault(kOut, "Synth");
+    t.table.setDefault(kIn, "Pads");
+    CHECK(t.colour(TrackField::Port) == Role::Dim);
+    CHECK(t.colour(TrackField::Input) == Role::Warning);
+    t.column(TrackField::Input);
+    CHECK(inspectorHas(t.ws.frame(), U"Default input not found"));
+    t.table.setEnabled(kIn, "Pads", false);
+    CHECK(inspectorHas(t.ws.frame(), U"Default input disabled"));
+    t.table.setDefault(kIn, "Keys");
+    CHECK_FALSE(inspectorHas(t.ws.frame(), U"Default input"));
+    t.type(U"0");
+    CHECK(t.colour(TrackField::Input) == Role::Dim);
+
+    // A port by name: ordinary text, or warned of as disabled or not found.
+    t.set(false, "Synth");
+    CHECK(t.colour(TrackField::Port) == Role::Text);
+    t.set(false, "Other synth");
+    CHECK(t.colour(TrackField::Port) == Role::Warning);
+    t.column(TrackField::Port);
+    CHECK(inspectorHas(t.ws.frame(), U"Port disabled"));
+    CHECK(inspectorHas(t.ws.frame(), U"Enable it in the Ports view"));
+    t.press(NamedKey::Enter);
+    CHECK(t.listed().back() == U"Other synth (disabled)");
+    t.press(NamedKey::Escape);
+    t.set(false, "Elsewhere");
+    CHECK(inspectorHas(t.ws.frame(), U"Port not found"));
+    t.type(U"0");
+    CHECK(t.colour(TrackField::Port) == Role::Warning);
+
+    // All: dim while an input is enabled and there, warned of when none is.
+    t.set(true, std::string{core::Track::kAllInputs});
+    CHECK(t.colour(TrackField::Input) == Role::Dim);
+    t.table.setEnabled(kIn, "Keys", false);
+    t.table.setEnabled(kIn, "Pads", true); // enabled, but unplugged
+    CHECK(t.colour(TrackField::Input) == Role::Warning);
+    t.column(TrackField::Input);
+    CHECK(inspectorHas(t.ws.frame(), U"No inputs connected"));
+    t.table.setEnabled(kIn, "Pads", false);
+    CHECK(inspectorHas(t.ws.frame(), U"No inputs enabled"));
 }

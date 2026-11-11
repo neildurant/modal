@@ -449,19 +449,9 @@ TEST_CASE("the mode takes the same room whichever it is, so the transport after 
     CHECK(glyphAt() == normal);
 }
 
-TEST_CASE("a track's port that wasn't found is dim in the table, and explained in the inspector")
+TEST_CASE("a track's port that wasn't found is in the warning colour, and explained in the "
+          "inspector")
 {
-    test::RecordingSink sink;
-    test::FakeClock clock;
-    core::Engine engine{sink, clock};
-    core::Player player{engine, [](std::string_view name) -> std::optional<core::DestinationId>
-                        {
-                            if (name == "Gone")
-                            {
-                                return std::nullopt;
-                            }
-                            return core::DestinationId{1};
-                        }};
     core::Document document{demoSong()};
     document.edit("Set a port", {},
                   [&](core::Song& song)
@@ -469,12 +459,15 @@ TEST_CASE("a track's port that wasn't found is dim in the table, and explained i
                       song.updateTrack(song.tracks()[0]->id(),
                                        [](core::Track& track) { track.port = "Gone"; });
                   });
-    player.update(document.song());
+    PortTable table;
+    table.detected(PortDirection::Output, std::vector<std::string>{"Synth"});
+    table.setEnabled(PortDirection::Output, "Synth", true);
+    table.setDefault(PortDirection::Output, "Synth");
     CommandRegistry registry;
     registry.add(windowCommands());
     Workspace ws{registry, document};
     ws.resize(120 * kCell.width, 24 * kCell.height, kCell);
-    ws.setPlayer(&player);
+    ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
     for (const char32_t key : std::u32string_view{U"gtj"})
     {
         ws.handle(Key::typed(key), 0);
@@ -494,7 +487,7 @@ TEST_CASE("a track's port that wasn't found is dim in the table, and explained i
         return std::nullopt;
     };
     REQUIRE(find(U"Gone"));
-    CHECK(find(U"Gone")->style.foreground == Role::Dim);
+    CHECK(find(U"Gone")->style.foreground == Role::Warning);
     CHECK_FALSE(find(U"Port not found"));
 
     for (const char32_t key : U"k" + toColumn(TrackField::Port))
@@ -664,27 +657,28 @@ TEST_CASE("global Thru is a machine control and held notes can end while it is o
     CHECK_FALSE(contains(p.status(), U"Thru off"));
 }
 
-TEST_CASE("an unavailable input is dimmed with an inspector warning and a resolved alias is not")
+TEST_CASE("an unavailable input is in the warning colour with an inspector warning, and one "
+          "found by a part of its name is not")
 {
     Playing p;
     const auto id = p.document.song().tracks()[0]->id();
     p.document.edit("Input", {}, [&](core::Song& song)
                     { song.updateTrack(id, [](core::Track& track) { track.input = "Keys"; }); });
-    bool available = false;
-    core::Player routed{p.engine, [](std::string_view) { return core::DestinationId{1}; },
-                        [&](std::string_view) -> std::optional<core::InputId>
-                        { return available ? std::optional{core::InputId{0}} : std::nullopt; }};
-    routed.update(p.document.song());
-    p.ws.setPlayer(&routed);
+    PortTable table;
+    table.detected(PortDirection::Input, std::vector<std::string>{"My Keys"});
+    table.setEnabled(PortDirection::Input, "My Keys", true);
+    table.detected(PortDirection::Input, std::vector<std::string>{}); // unplugged
+    p.ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
     p.ws.setInputPorts([] { return std::vector<std::string>{"My Keys"}; });
     p.type(U"gt");
+    p.type(U"j"); // the cursor off the cell, to see its colour
     p.type(toColumn(TrackField::Input));
-    const auto dimmed = [&]
+    const auto warning = [&]
     {
         const auto frame = p.ws.frame();
         for (const auto& run : frame.front().text)
-            if (run.text.starts_with(U"Keys"))
-                return run.style.foreground == Role::Dim;
+            if (run.text.starts_with(U"Keys") && run.y == kCell.height)
+                return run.style.foreground == Role::Warning;
         return false;
     };
     const auto warned = [&]
@@ -696,12 +690,14 @@ TEST_CASE("an unavailable input is dimmed with an inspector warning and a resolv
                     return true;
         return false;
     };
-    CHECK(dimmed());
+    CHECK(warning());
+    p.type(U"k");
     CHECK(warned());
-    available = true;
-    routed.update(p.document.song());
-    CHECK_FALSE(dimmed());
+    table.detected(PortDirection::Input, std::vector<std::string>{"My Keys"});
     CHECK_FALSE(warned());
+    p.type(U"j");
+    CHECK_FALSE(warning());
+    p.type(U"k");
     p.press(Key::of(NamedKey::Enter));
     const auto frame = p.ws.frame();
     for (const auto& region : frame)

@@ -349,6 +349,30 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     CHECK(window->saveFrame(base + "-ports.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-ports-light.bmp"));
+    // Tracks on those ports: Default and All dim, a port by alias, one gone and one disabled.
+    view.run("view-tracks", 0);
+    const auto beforePorts = document.song();
+    document.edit("Example ports", {},
+                  [](modal::core::Song& song)
+                  {
+                      const auto set = [&](std::size_t i, std::string port, std::string input)
+                      {
+                          song.updateTrack(song.tracks()[i]->id(),
+                                           [&](modal::core::Track& track)
+                                           {
+                                               track.port = port;
+                                               track.input = input;
+                                           });
+                      };
+                      set(1, "Babyface Out", "Keys");
+                      set(2, "Old Synth", std::string{modal::core::Track::kAllInputs});
+                      set(3, "Microsoft GS Wavetable Synth", "Pads");
+                  });
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-tracks-ports.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-tracks-ports-light.bmp"));
+    document.edit("Restore sample song", {}, [&](modal::core::Song& song) { song = beforePorts; });
     view.run("view-arrangement", 0);
     for (const char32_t key : std::u32string_view{U"jj8l"})
     {

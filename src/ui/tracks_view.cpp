@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/ports.hpp>
 #include <modal/ui/tracks_view.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/view_state.hpp>
@@ -104,7 +105,7 @@ int TracksView::columnWidth(const TrackColumn& column) const
                 longest,
                 decodeUtf8(column.field == TrackField::Input ? track->input : track->port).size());
         }
-        return std::clamp(static_cast<int>(longest) + 1, column.width, 24 + 1);
+        return std::clamp(static_cast<int>(longest) + column.gap, column.width, 24 + column.gap);
     }
     if (column.field != TrackField::Name)
     {
@@ -298,13 +299,47 @@ Inspection TracksView::inspection() const
     {
         result.fields.push_back({"Not armed", "Thru reaches it once it's armed"});
     }
-    if ((field == TrackField::Port || field == TrackField::Input) &&
-        portMissing(track, field == TrackField::Input))
+    if (field == TrackField::Port || field == TrackField::Input)
     {
-        InspectorField missing{field == TrackField::Input ? "Input not found" : "Port not found",
-                               field == TrackField::Input ? track.input : track.port};
-        missing.warning = true;
-        result.fields.push_back(std::move(missing));
+        const bool input = field == TrackField::Input;
+        const auto& name = input ? track.input : track.port;
+        const std::string kind = input ? "Input" : "Port";
+        const std::string which = input ? "input" : "output";
+        std::optional<InspectorField> trouble;
+        switch (portTrouble(track, input))
+        {
+        case PortTrouble::None:
+            break;
+        case PortTrouble::Missing:
+            trouble = InspectorField{kind + " not found", name};
+            break;
+        case PortTrouble::Disabled:
+            trouble = InspectorField{kind + " disabled", "Enable it in the Ports view"};
+            break;
+        case PortTrouble::NoDefault:
+            trouble = InspectorField{"No default " + which, "Choose one in the Ports view"};
+            break;
+        case PortTrouble::DefaultMissing:
+            trouble = InspectorField{"Default " + which + " not found",
+                                     host_.portTable()->defaultPort(input ? PortDirection::Input
+                                                                          : PortDirection::Output)};
+            break;
+        case PortTrouble::DefaultDisabled:
+            trouble =
+                InspectorField{"Default " + which + " disabled", "Enable it in the Ports view"};
+            break;
+        case PortTrouble::NoInputs:
+            trouble = InspectorField{"No inputs enabled", "Enable one in the Ports view"};
+            break;
+        case PortTrouble::NoInputsConnected:
+            trouble = InspectorField{"No inputs connected", "Those enabled aren't plugged in"};
+            break;
+        }
+        if (trouble)
+        {
+            trouble->warning = true;
+            result.fields.push_back(std::move(*trouble));
+        }
     }
     if (field == TrackField::Program || field == TrackField::BankMsb ||
         field == TrackField::BankLsb)
@@ -550,8 +585,11 @@ bool TracksView::openField()
     {
         choice.ports.push_back(choice.current);
         choice.chosen = choice.ports.size() - 1;
-        if (!choice.input || host_.player() == nullptr || portMissing(track, true))
+        // Unless it still resolves, as a part of a port's name may.
+        const auto trouble = portTrouble(track, choice.input);
+        if (host_.portTable() == nullptr || trouble != PortTrouble::None)
             choice.gone = choice.chosen;
+        choice.goneDisabled = trouble == PortTrouble::Disabled;
     }
     else
     {
@@ -701,14 +739,30 @@ std::string TracksView::portLabel(const std::string& port)
     return port.empty() ? "Default" : port == core::Track::kAllInputs ? "All" : port;
 }
 
-bool TracksView::portMissing(const core::Track& track, bool input) const
+TracksView::PortTrouble TracksView::portTrouble(const core::Track& track, bool input) const
 {
-    const auto* player = host_.player();
-    if (!player)
-        return false;
+    const auto* table = host_.portTable();
+    if (table == nullptr)
+        return PortTrouble::None;
+    const auto direction = input ? PortDirection::Input : PortDirection::Output;
     const auto& name = input ? track.input : track.port;
-    const auto& missing = input ? player->missingInputs() : player->missingPorts();
-    return !name.empty() && std::ranges::find(missing, name) != missing.end();
+    if (input && name == core::Track::kAllInputs)
+        return table->offered(direction).empty()  ? PortTrouble::NoInputs
+               : table->usable(direction).empty() ? PortTrouble::NoInputsConnected
+                                                  : PortTrouble::None;
+    const auto resolved = table->resolve(direction, name);
+    switch (resolved.problem)
+    {
+    case PortProblem::None:
+        return PortTrouble::None;
+    case PortProblem::Disabled:
+        return name.empty() ? PortTrouble::DefaultDisabled : PortTrouble::Disabled;
+    case PortProblem::Missing:
+        break;
+    }
+    return !name.empty()            ? PortTrouble::Missing
+           : resolved.named.empty() ? PortTrouble::NoDefault
+                                    : PortTrouble::DefaultMissing;
 }
 
 void TracksView::addPortChoice(Frame& frame) const
@@ -719,8 +773,9 @@ void TracksView::addPortChoice(Frame& frame) const
     const auto label = [&](std::size_t match)
     {
         const auto& port = portChoice_->ports[matches[match]];
-        return decodeUtf8(matches[match] == portChoice_->gone ? port + " (not found)"
-                                                              : portLabel(port));
+        return decodeUtf8(matches[match] == portChoice_->gone
+                              ? port + (portChoice_->goneDisabled ? " (disabled)" : " (not found)")
+                              : portLabel(port));
     };
 
     // At the cell, below it, or above where there's no room; as wide as the longest in view.
@@ -1082,6 +1137,15 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style.foreground = Role::Warning;
             }
+            if (track && (column.field == TrackField::Port || column.field == TrackField::Input))
+            {
+                // Following the default dim, and one that can't be used in the warning colour.
+                const auto& name = column.field == TrackField::Input ? track->input : track->port;
+                if (portTrouble(*track, column.field == TrackField::Input) != PortTrouble::None)
+                    style.foreground = Role::Warning;
+                else if (name.empty() || name == core::Track::kAllInputs)
+                    style.foreground = Role::Dim;
+            }
             if (track && std::ranges::find(chosen, track->id()) != chosen.end())
             {
                 style.background = Role::Selection;
@@ -1095,10 +1159,7 @@ void TracksView::addRegions(Frame& frame) const
             {
                 style = {Role::CursorText, Role::Cursor, kPlain};
             }
-            if (track &&
-                (((column.field == TrackField::Port || column.field == TrackField::Input) &&
-                  portMissing(*track, column.field == TrackField::Input)) ||
-                 (column.field == TrackField::QuantizeSummary && !track->quantize.on)))
+            if (track && column.field == TrackField::QuantizeSummary && !track->quantize.on)
             {
                 style.foreground = Role::Dim;
             }
