@@ -163,7 +163,7 @@ std::string_view trackFieldDescription(TrackField field)
     case TrackField::Port:
         return "Output: Default, or one by name";
     case TrackField::Input:
-        return "Input port: Default, All, or one by name";
+        return "Input: Default, All, or one by name";
     case TrackField::Channel:
         return "MIDI channel";
     case TrackField::BankMsb:

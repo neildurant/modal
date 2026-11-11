@@ -1906,8 +1906,10 @@ TEST_CASE("a track's Default and All are dim, and a port that can't be used is i
     t.column(TrackField::Port);
     CHECK(inspectorHas(t.ws.frame(), U"No default output"));
     CHECK(inspectorHas(t.ws.frame(), U"Choose one in the Ports view"));
+    CHECK(inspectorHas(t.ws.frame(), U"Output: Default, or one by name"));
     t.column(TrackField::Input);
     CHECK(inspectorHas(t.ws.frame(), U"No default input"));
+    CHECK(inspectorHas(t.ws.frame(), U"Input: Default, All, or one by name"));
     t.type(U"0");
 
     // Default with one set, dim; a default disabled or unplugged, warned of.
