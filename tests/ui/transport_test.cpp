@@ -766,7 +766,7 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
 {
     Playing p;
     p.type(U"R");
-    CHECK(p.ws.message() == "No track is armed: , r a arms this one");
+    CHECK(p.ws.message() == "No track is armed: , r a arms a track");
     p.type(U",ra");
     const auto* track = armed(p.document);
     REQUIRE(track != nullptr);
@@ -865,8 +865,10 @@ TEST_CASE("recording carries on past the song's end, which grows to hold the tak
     p.runFor(30s);
     CHECK(p.player.recording());
     playNote(p, 99);
+    p.ws.show(ViewKind::Arrangement); // shown as recording stops, it shows the song grown
     p.type(U" ");
     p.runFor(10ms);
     CHECK(p.document.song().end() > end);
+    CHECK(p.ws.arrangement().page().end() == p.document.song().end());
     CHECK(hasPitch(p.document.song(), id, 99));
 }

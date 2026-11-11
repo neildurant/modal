@@ -190,6 +190,11 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
     {
         return "Rewind: " + onOff(rewind_);
     }
+    if (command == "record-mode-toggle")
+    {
+        return std::string{"Toggle replace/overdub: "} +
+               (document_.song().recordMode == core::RecordMode::Overdub ? "overdub" : "replace");
+    }
     const auto id = view().cursor().track;
     const auto* track = id ? document_.song().track(*id) : nullptr;
     if (track == nullptr)
@@ -214,11 +219,11 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
     }
     if (command == "track-arm-toggle")
     {
-        return std::string{"Arm this track: "} + (track->arm ? "armed" : "off");
+        return std::string{"Toggle arming this track: "} + (track->arm ? "armed" : "off");
     }
     if (command == "track-thru-toggle")
     {
-        return "Thru to this track: " + onOff(track->thru);
+        return "Toggle Thru to this track: " + onOff(track->thru);
     }
     return std::nullopt;
 }

@@ -2622,7 +2622,7 @@ bool Workspace::record()
     }
     if (armed.empty())
     {
-        refuse("No track is armed: , r a arms this one");
+        refuse("No track is armed: , r a arms a track");
         return true;
     }
     if (!player_->record(document_.song()))
@@ -2663,6 +2663,8 @@ void Workspace::finishRecording()
                            ? "Record onto " + names
                            : "Record onto " + std::to_string(take->tracks.size()) + " tracks";
     document_.edit(title, view().place(), [&](core::Song& song) { song = std::move(take->song); });
+    // Made outside a command, so every view is told, as the song may have grown too.
+    refresh();
     setMessage("Recorded onto " + names, MessageKind::Information);
 }
 

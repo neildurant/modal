@@ -1550,4 +1550,14 @@ TEST_CASE("the hint menu says what each toggle is set to now")
     type(v.ws, U",tm,t");
     CHECK(has("Mute this track: on"));
     v.ws.handle(Key::of(NamedKey::Escape), 0);
+
+    // Recording's, saying they switch (decided after use).
+    type(v.ws, U",r");
+    CHECK(has("Toggle arming this track: off"));
+    CHECK(has("Toggle Thru to this track: on"));
+    CHECK(has("Toggle replace/overdub: replace"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U",rm,r");
+    CHECK(has("Toggle replace/overdub: overdub"));
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
 }
