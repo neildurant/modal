@@ -105,15 +105,16 @@ nmap m          mark-set          "Mark"
 nmap '          mark-go           "Go to a mark"
 nmap `          mark-go           "Go to a mark"
 
-" Views: the arrangement, piano roll, event list and track settings, each at the cursor, and
-" Backspace back to the view before; zooming, and following the playhead again after moving
-" away from it while playing.
+" Views: the arrangement, piano roll, event list, track settings and MIDI ports, each at the
+" cursor, and Backspace back to the view before; zooming, and following the playhead again
+" after moving away from it while playing.
 keysection "Views"
 nmap gt         view-tracks       "Tracks"
 nmap ga         view-arrangement  "Arrangement"
 nmap gr         view-piano-roll   "Piano roll"
 nmap ge         view-events       "Event list"
 nmap gc         view-conductor    "Conductor's list"
+nmap gm         view-ports        "MIDI ports"
 nmap <BS>       view-back         "Back"
 ngroup <leader>v "Views"
 nmap <leader>vt  view-tracks       "Tracks"

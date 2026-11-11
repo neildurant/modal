@@ -77,8 +77,8 @@ bool contains(const std::u32string& text, std::u32string_view part)
 
 } // namespace
 
-TEST_CASE(
-    "the leader, v and m open the ports view, looking for ports, the inputs and outputs apart")
+TEST_CASE("the leader, v and m, or gm, open the ports view, looking for ports, the inputs and "
+          "outputs apart")
 {
     Porting p;
     CHECK(p.ws.shown() == ViewKind::Ports);
@@ -97,6 +97,10 @@ TEST_CASE(
     p.type(U"ga");
     p.registry.runLine("ports");
     CHECK(p.ws.shown() == ViewKind::Ports);
+    // And gm, as ga and gt open theirs.
+    p.type(U"gagm");
+    CHECK(p.ws.shown() == ViewKind::Ports);
+    CHECK(p.looks == 3);
 }
 
 TEST_CASE("in the ports view, j and k go from port to port, past the groups' headings")
