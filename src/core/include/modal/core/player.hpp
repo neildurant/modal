@@ -7,6 +7,8 @@
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 
+#include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -59,12 +61,16 @@ public:
 
     void setThru(bool on) { engine_.setThru(on); }
 
-    struct InputNote
+    // The last channel message that came in, for the In light: a note-on, controller, program,
+    // pressure or bend, but not a note-off, so the note played stays shown after it's let go.
+    struct InputMessage
     {
-        std::uint8_t pitch;
-        std::uint8_t velocity;
+        std::array<std::uint8_t, 3> bytes{};
+        std::uint8_t size = 0;
+
+        friend bool operator==(const InputMessage&, const InputMessage&) = default;
     };
-    const std::optional<InputNote>& lastInputNote() const { return lastInputNote_; }
+    const std::optional<InputMessage>& lastInput() const { return lastInput_; }
 
     // Where playback starts from.
     Tick marker() const { return marker_; }
@@ -121,7 +127,7 @@ private:
     PortResolver resolvePort_;
     InputResolver resolveInput_;
     std::vector<std::string> missingInputs_;
-    std::optional<InputNote> lastInputNote_;
+    std::optional<InputMessage> lastInput_;
     std::map<std::string, std::optional<DestinationId>, std::less<>> ports_;
     std::vector<std::string> missingPorts_;
     std::vector<QuantizeWarning> quantizeWarnings_;

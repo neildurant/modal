@@ -135,10 +135,17 @@ std::size_t Player::takeInput()
     {
         messages += stamped->first ? 1 : 0;
         const auto& chunk = stamped->chunk;
-        if (stamped->first && !chunk.more && chunk.size == 3 && (chunk.bytes[0] & 0xF0) == 0x90 &&
-            chunk.bytes[2] > 0)
+        const auto kind = chunk.bytes[0] & 0xF0;
+        const bool noteOff =
+            kind == 0x80 || (kind == 0x90 && chunk.size == 3 && chunk.bytes[2] == 0);
+        const auto size = kind == 0xC0 || kind == 0xD0 ? 2 : 3;
+        if (stamped->first && !chunk.more && kind >= 0x80 && kind < 0xF0 && !noteOff &&
+            chunk.size == size)
         {
-            lastInputNote_ = InputNote{chunk.bytes[1], chunk.bytes[2]};
+            InputMessage message;
+            std::copy_n(chunk.bytes.begin(), size, message.bytes.begin());
+            message.size = static_cast<std::uint8_t>(size);
+            lastInput_ = message;
         }
     }
     return messages;

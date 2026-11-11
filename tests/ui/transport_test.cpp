@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace modal;
 using namespace modal::ui;
@@ -601,7 +602,7 @@ TEST_CASE("input activity and the last note are visible in every view and the li
     REQUIRE(p.engine.receive(core::InputId{0}, on, p.clock.time));
     p.engine.step();
     CHECK(p.ws.inputWoken(p.now));
-    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK(contains(p.status(), U"In  1 C4      96"));
     const auto light = [&]
     {
         const auto frame = p.ws.frame();
@@ -612,19 +613,44 @@ TEST_CASE("input activity and the last note are visible in every view and the li
     };
     CHECK(light() == Role::Accent);
     p.ws.show(ViewKind::Tracks);
-    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK(contains(p.status(), U"In  1 C4      96"));
     p.ws.show(ViewKind::PianoRoll);
-    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK(contains(p.status(), U"In  1 C4      96"));
     p.ws.show(ViewKind::Arrangement);
-    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK(contains(p.status(), U"In  1 C4      96"));
     // The short collection deadline precedes the light's deadline.
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
     CHECK(light() == Role::Dim);
-    CHECK(contains(p.status(), U"In C4 96"));
+    CHECK(contains(p.status(), U"In  1 C4      96"));
     CHECK_FALSE(p.ws.deadline());
+
+    // Any channel message but a note-off, with its channel, keeping what follows still.
+    const auto rewindX = [&]
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            if (run.text.starts_with(U"Rewind"))
+                return run.x;
+        return -1;
+    };
+    const auto before = rewindX();
+    const auto in = [&](std::vector<std::uint8_t> bytes)
+    {
+        REQUIRE(p.engine.receive(core::InputId{0}, bytes, p.clock.time));
+        p.engine.step();
+        p.ws.inputWoken(p.now);
+    };
+    in({0x80, 60, 0});
+    CHECK(contains(p.status(), U"In  1 C4      96"));
+    in({0xB9, 64, 127});
+    CHECK(contains(p.status(), U"In 10 CC64   127"));
+    CHECK(rewindX() == before);
+    in({0xE0, 0x7F, 0x7F});
+    CHECK(contains(p.status(), U"In  1 Bend +8191"));
+    CHECK(rewindX() == before);
 }
 
 TEST_CASE("global Thru is a machine control and held notes can end while it is off")

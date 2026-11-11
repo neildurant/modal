@@ -1321,7 +1321,7 @@ TEST_CASE("completion's matches are a popup above the word, the first nearest th
 TEST_CASE("a message too long for the status line is shown whole above it until the next key")
 {
     Viewing v;
-    v.ws.resize(60 * kCell.width, 24 * kCell.height, kCell);
+    v.ws.resize(70 * kCell.width, 24 * kCell.height, kCell); // room for a short one
     const auto panel = [&]() -> std::u32string
     {
         std::u32string text;

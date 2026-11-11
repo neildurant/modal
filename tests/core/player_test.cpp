@@ -9,7 +9,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -299,9 +301,8 @@ TEST_CASE("player resolves named inputs on each update without affecting playbac
     REQUIRE(sink.sent.size() == 1);
     CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x90, 62, 95});
     CHECK(player.takeInput() == 2); // monitoring sees all inputs, before per-track filtering
-    REQUIRE(player.lastInputNote());
-    CHECK(player.lastInputNote()->pitch == 62);
-    CHECK(player.lastInputNote()->velocity == 95);
+    REQUIRE(player.lastInput());
+    CHECK(player.lastInput()->bytes == std::array<std::uint8_t, 3>{0x90, 62, 95});
     input.reset();
     player.update(song);
     CHECK(player.missingInputs() == std::vector<std::string>{"Keys"});
@@ -372,4 +373,31 @@ TEST_CASE("a track's empty input is the machine's default, and * every input")
     REQUIRE(engine.receive(InputId{3}, std::array<std::uint8_t, 3>{0x90, 67, 100}, clock.time));
     engine.step();
     CHECK(sink.sent.size() == 2);
+}
+
+TEST_CASE("the player keeps the last channel message in, but a note-off or system message")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    Player player{engine, [](std::string_view) { return DestinationId{1}; }};
+    const auto in = [&](std::vector<std::uint8_t> bytes)
+    {
+        engine.step();
+        REQUIRE(engine.receive(InputId{0}, bytes, clock.time));
+        engine.step();
+        player.takeInput();
+        REQUIRE(player.lastInput());
+        const auto& last = *player.lastInput();
+        return std::vector<std::uint8_t>(last.bytes.begin(), last.bytes.begin() + last.size);
+    };
+    CHECK(in({0x91, 60, 100}) == std::vector<std::uint8_t>{0x91, 60, 100});
+    CHECK(in({0x81, 60, 0}) == std::vector<std::uint8_t>{0x91, 60, 100});
+    CHECK(in({0x91, 60, 0}) == std::vector<std::uint8_t>{0x91, 60, 100}); // a note-off too
+    CHECK(in({0xF8}) == std::vector<std::uint8_t>{0x91, 60, 100});        // clock
+    CHECK(in({0xB9, 64, 127}) == std::vector<std::uint8_t>{0xB9, 64, 127});
+    CHECK(in({0xC0, 5}) == std::vector<std::uint8_t>{0xC0, 5});
+    CHECK(in({0xD0, 64}) == std::vector<std::uint8_t>{0xD0, 64});
+    CHECK(in({0xA0, 60, 30}) == std::vector<std::uint8_t>{0xA0, 60, 30});
+    CHECK(in({0xE0, 0x7F, 0x7F}) == std::vector<std::uint8_t>{0xE0, 0x7F, 0x7F});
 }

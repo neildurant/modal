@@ -24,6 +24,7 @@
 #include <cctype>
 #include <charconv>
 #include <map>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -350,15 +351,11 @@ Bar Workspace::statusBar(bool withMessage) const
     if (!thru_)
         bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
     bottom.right.push_back({"In", {inputLitUntil_ ? Role::Accent : Role::Dim, Role::Bar, kPlain}});
-    if (player_ && player_->lastInputNote())
-    {
-        const auto note = *player_->lastInputNote();
-        bottom.right.push_back(
-            {" " + core::pitchName(note.pitch) + " " + std::to_string(note.velocity) + "   ",
-             kBarText});
-    }
-    else
-        bottom.right.push_back({"          ", kBarText});
+    // The last message in, fixed in width so nothing after it moves (decided November 2026).
+    std::span<const std::uint8_t> last;
+    if (player_ && player_->lastInput())
+        last = std::span{player_->lastInput()->bytes}.first(player_->lastInput()->size);
+    bottom.right.push_back({" " + inputText(last) + "   ", kBarText});
     bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
     // The song's file, and [+] if it has changes not saved, as in Vim.
     const auto& file = document_.file();

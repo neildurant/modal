@@ -5,6 +5,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 using namespace modal;
 using namespace modal::ui;
 
@@ -59,4 +63,22 @@ TEST_CASE("a length close to a common note value shows it in brackets")
     CHECK(value(ticks({1, 32})).empty());
     CHECK(value(ticks({1, 24})).empty()); // 1/16t
     CHECK(value(0).empty());
+}
+
+TEST_CASE("a message in is shown for the In light in 13 characters, with its channel")
+{
+    using Bytes = std::vector<std::uint8_t>;
+    CHECK(inputText(Bytes{0x90, 61, 127}) == " 1 C#4    127");
+    CHECK(inputText(Bytes{0x90, 1, 5}) == " 1 C#-1     5");
+    CHECK(inputText(Bytes{0xB9, 64, 127}) == "10 CC64   127");
+    CHECK(inputText(Bytes{0xBF, 127, 0}) == "16 CC127    0");
+    CHECK(inputText(Bytes{0xC0, 5}) == " 1 Prog     5");
+    CHECK(inputText(Bytes{0xD0, 64}) == " 1 Pres    64");
+    CHECK(inputText(Bytes{0xA0, 60, 64}) == " 1 PPrs    64");
+    CHECK(inputText(Bytes{0xE0, 0x7F, 0x7F}) == " 1 Bend +8191");
+    CHECK(inputText(Bytes{0xE0, 0x00, 0x40}) == " 1 Bend     0");
+    CHECK(inputText(Bytes{0xE0, 0x00, 0x00}) == " 1 Bend -8192");
+    CHECK(inputText(Bytes{}) == std::string(13, ' '));
+    for (const auto& bytes : {Bytes{0x90, 61, 127}, Bytes{0xE0, 0, 0}, Bytes{0xBF, 127, 127}})
+        CHECK(inputText(bytes).size() == 13);
 }
