@@ -99,6 +99,16 @@ public:
     bool recording() const { return recorder_.has_value() && playing_; }
     bool clicking() const { return click_.has_value(); }
 
+    // Where a pass is: counting in, the song silent; playing the pre-roll, before the record
+    // point; or recording. Nothing when not recording.
+    enum class RecordPhase : std::uint8_t
+    {
+        CountIn,
+        PreRoll,
+        Recording,
+    };
+    std::optional<RecordPhase> recordPhase() const;
+
     // A pass recorded: the song with its take, and the tracks it went onto.
     struct Take
     {
@@ -171,6 +181,8 @@ private:
     Tick stoppedAt_ = 0;                 // where it said
     std::optional<Recorder> recorder_;   // the pass being recorded, until finished
     std::optional<DestinationId> click_; // the metronome's while recording
+    Tick recordPoint_ = 0;               // where the pass records from
+    bool countIn_ = false;               // whether it counts in
 };
 
 } // namespace modal::core

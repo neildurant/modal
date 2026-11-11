@@ -92,6 +92,7 @@ EngineStatus Engine::status() const
     EngineStatus status;
     status.playing = playing_.load(std::memory_order_relaxed);
     status.finished = finished_.load(std::memory_order_relaxed);
+    status.countingIn = countingIn_.load(std::memory_order_relaxed);
     if (const Tick position = position_.load(std::memory_order_relaxed); position != kNoPosition)
     {
         status.position = position;
@@ -356,6 +357,7 @@ void Engine::publishStatus(nanoseconds now) noexcept
 {
     playing_.store(scheduler_.isPlaying(), std::memory_order_relaxed);
     finished_.store(scheduler_.finished(), std::memory_order_relaxed);
+    countingIn_.store(scheduler_.countingIn(now), std::memory_order_relaxed);
     position_.store(scheduler_.position(now).value_or(kNoPosition), std::memory_order_relaxed);
     droppedNotes_.store(scheduler_.droppedNotes(), std::memory_order_relaxed);
 }

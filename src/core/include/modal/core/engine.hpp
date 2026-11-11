@@ -60,6 +60,7 @@ struct EngineStatus
 {
     bool playing = false;
     bool finished = false;        // every event sent and every note ended
+    bool countingIn = false;      // in a count-in, before the record point
     std::optional<Tick> position; // while playing
     std::size_t droppedNotes = 0; // see Scheduler::droppedNotes
 
@@ -273,6 +274,7 @@ private:
     std::atomic<std::uint64_t> inputsReset_{0}; // acknowledgement, after releasing held input
     std::atomic<bool> playing_{false};
     std::atomic<bool> finished_{false};
+    std::atomic<bool> countingIn_{false};
     static constexpr Tick kNoPosition = -1;
     std::atomic<Tick> position_{kNoPosition};
     std::atomic<std::size_t> droppedNotes_{0};

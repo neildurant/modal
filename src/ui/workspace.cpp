@@ -11,6 +11,7 @@
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
+#include <modal/ui/ports.hpp>
 #include <modal/ui/settings.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/view_parts.hpp>
@@ -99,6 +100,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                          if (name == "port")
                          {
                              return port(call.arguments);
+                         }
+                         if (name == "countin" || name == "preroll")
+                         {
+                             return countIn(call.arguments, name == "preroll");
                          }
                          if (name == "event-insert")
                          {
@@ -1584,6 +1589,35 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         return record();
     }
+    if (command == "metronome-cycle" || command == "countin-cycle")
+    {
+        // Song settings, so undo steps, as the record mode is.
+        const bool metronome = command == "metronome-cycle";
+        auto song = document_.song();
+        std::string text;
+        if (metronome)
+        {
+            using enum core::MetronomeSettings::When;
+            const auto when = song.metronome.when;
+            song.metronome.when = when == Off ? Recording : when == Recording ? Always : Off;
+            text = "Metronome " + whenText(song.metronome.when);
+        }
+        else
+        {
+            using enum core::CountInSettings::Mode;
+            const auto mode = song.countIn.mode;
+            song.countIn.mode = mode == None ? CountIn : mode == CountIn ? PreRoll : None;
+            text = countInText(song.countIn);
+        }
+        document_.edit(text, view().place(),
+                       [&](core::Song& changed)
+                       {
+                           changed.metronome = song.metronome;
+                           changed.countIn = song.countIn;
+                       });
+        setMessage(text, MessageKind::Information);
+        return true;
+    }
     if (command == "record-mode-toggle")
     {
         if (player_ != nullptr && player_->recording())
@@ -2642,6 +2676,13 @@ bool Workspace::record()
     return true;
 }
 
+bool Workspace::clickPort() const
+{
+    const auto* table = portTable();
+    return table == nullptr ||
+           table->resolve(PortDirection::Output, document_.song().metronome.port).port.has_value();
+}
+
 void Workspace::finishRecording()
 {
     if (player_ == nullptr || !player_->recordingStopped())
@@ -2966,6 +3007,68 @@ CommandResult Workspace::port(std::string_view name)
                    { song.updateTrack(*id, [&](core::Track& t) { t.port = full; }); });
     view().refresh();
     return {true, who + " plays to " + full, false};
+}
+
+CommandResult Workspace::countIn(std::string_view arguments, bool preRoll)
+{
+    // :countin 2, :countin 3 beats, :countin off; :preroll 2. Alone, says what it is.
+    std::vector<std::string> words;
+    for (std::size_t at = 0; at < arguments.size();)
+    {
+        const auto from = arguments.find_first_not_of(" 	", at);
+        if (from == std::string_view::npos)
+            break;
+        const auto to = std::min(arguments.find_first_of(" 	", from), arguments.size());
+        words.emplace_back(arguments.substr(from, to - from));
+        at = to;
+    }
+    auto settings = document_.song().countIn;
+    if (words.empty())
+    {
+        return {false, countInText(settings), false};
+    }
+    const auto usage = preRoll ? std::string{"preroll takes BARS, or off"}
+                               : std::string{"countin takes BARS, BEATS beats, or off"};
+    if (words.size() == 1 && words[0] == "off")
+    {
+        settings.mode = core::CountInSettings::Mode::None;
+    }
+    else
+    {
+        int number = 0;
+        const auto& digits = words[0];
+        const auto [end, problem] =
+            std::from_chars(digits.data(), digits.data() + digits.size(), number);
+        const bool beats =
+            !preRoll && words.size() == 2 && (words[1] == "beats" || words[1] == "beat");
+        if (problem != std::errc{} || end != digits.data() + digits.size() || words.size() > 2 ||
+            (words.size() == 2 && !beats))
+        {
+            return CommandResult::error(usage);
+        }
+        if (number < 1 || number > 99)
+        {
+            return CommandResult::error(std::string{beats ? "Beats" : "Bars"} +
+                                        " should be from 1 to 99");
+        }
+        if (preRoll)
+        {
+            settings.mode = core::CountInSettings::Mode::PreRoll;
+            settings.preRollBars = number;
+        }
+        else
+        {
+            settings.mode = core::CountInSettings::Mode::CountIn;
+            settings.bars = beats ? settings.bars : number;
+            settings.beats = beats ? number : 0;
+        }
+    }
+    const auto text = countInText(settings);
+    if (settings != document_.song().countIn)
+    {
+        document_.edit(text, view().place(), [&](core::Song& song) { song.countIn = settings; });
+    }
+    return {true, text, false};
 }
 
 CommandResult Workspace::sectionHere(std::string_view command, int count)

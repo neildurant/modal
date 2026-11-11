@@ -328,6 +328,19 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "record",
                 .description = "Record onto the armed tracks from the play-from marker, after "
                                "the count-in; Space stops"},
+    CommandInfo{.name = "metronome-cycle",
+                .description = "The metronome for this song: off, while recording, or always"},
+    CommandInfo{.name = "countin-cycle",
+                .description = "What comes before recording, for this song: nothing, a count-in, "
+                               "or a pre-roll"},
+    CommandInfo{.name = "countin",
+                .description = "Count in before recording, for this song: bars, beats, or off; "
+                               "alone, say what's set",
+                .usage = "[BARS|BEATS beats|off]"},
+    CommandInfo{.name = "preroll",
+                .description = "Play some bars before recording, for this song, or off; alone, "
+                               "say what's set",
+                .usage = "[BARS|off]"},
     CommandInfo{.name = "record-mode-toggle",
                 .description = "Record replacing what's there, or overdubbing it, for this song"},
     CommandInfo{.name = "panic",

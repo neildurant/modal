@@ -530,9 +530,14 @@ private:
     // said where recording stopped, puts the take into the song as one undo step.
     bool record();
     void finishRecording();
+    // Whether the click has a port to go to: the song's metronome port, or the default output.
+    // Without the machine's ports to ask, as in tests, it's taken to have.
+    bool clickPort() const;
 
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
+    // :countin and :preroll set what comes before recording; alone, they say what it is.
+    CommandResult countIn(std::string_view arguments, bool preRoll);
     // The adjoining tracks a track command acts on, as first and count: the selected ones, or the
     // cursor's. None on the conductor or the section strip.
     std::optional<std::pair<std::size_t, std::size_t>> trackBlock() const;

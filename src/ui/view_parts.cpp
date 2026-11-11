@@ -381,6 +381,29 @@ constexpr std::size_t kMeterWidth = 5;      // up to 12/16
 
 } // namespace
 
+std::string whenText(core::MetronomeSettings::When when)
+{
+    using enum core::MetronomeSettings::When;
+    return when == Off ? "off" : when == Recording ? "while recording" : "always";
+}
+
+std::string countInText(const core::CountInSettings& countIn)
+{
+    const auto count = [](int n, std::string_view one)
+    { return std::to_string(n) + " " + std::string{one} + (n == 1 ? "" : "s"); };
+    switch (countIn.mode)
+    {
+    case core::CountInSettings::Mode::None:
+        break;
+    case core::CountInSettings::Mode::CountIn:
+        return "Count-in " +
+               (countIn.beats > 0 ? count(countIn.beats, "beat") : count(countIn.bars, "bar"));
+    case core::CountInSettings::Mode::PreRoll:
+        return "Pre-roll " + count(countIn.preRollBars, "bar");
+    }
+    return "No count-in";
+}
+
 PlaceParts placeParts(const core::Song& song, const core::MeterMap& meter, core::Tick tick)
 {
     // The song's last place is the widest a place in it needs; a time past it, its own.

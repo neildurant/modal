@@ -108,6 +108,13 @@ struct PlaceParts
 };
 PlaceParts placeParts(const core::Song& song, const core::MeterMap& meter, core::Tick tick);
 
+// What comes before recording, as the song's settings have it: "Count-in 1 bar", "Count-in 3
+// beats", "Pre-roll 2 bars", or "No count-in".
+std::string countInText(const core::CountInSettings& countIn);
+
+// When the metronome plays: "off", "while recording" or "always".
+std::string whenText(core::MetronomeSettings::When when);
+
 // The tempo at a time, as `120 BPM`, its number padded to the song's widest tempo.
 std::string tempoText(const core::Song& song, core::Tick tick);
 

@@ -190,6 +190,14 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
     {
         return "Rewind: " + onOff(rewind_);
     }
+    if (command == "metronome-cycle")
+    {
+        return "Cycle metronome: " + whenText(document_.song().metronome.when);
+    }
+    if (command == "countin-cycle")
+    {
+        return "Cycle count-in: " + countInText(document_.song().countIn);
+    }
     if (command == "record-mode-toggle")
     {
         return std::string{"Toggle replace/overdub: "} +

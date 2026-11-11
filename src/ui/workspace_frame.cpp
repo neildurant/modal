@@ -278,10 +278,18 @@ Bar Workspace::statusBar(bool withMessage) const
                                     : Style{Role::BarText, Role::Bar, kPlain};
         // Recording, and how, straight after the symbol, so it shows however narrow.
         const bool overdub = song.recordMode == core::RecordMode::Overdub;
-        if (player_->recording())
+        if (const auto phase = player_->recordPhase())
         {
-            bottom.left.push_back(
-                {overdub ? "● ODUB  " : "● REC  ", {Role::Warning, Role::Bar, kBold}});
+            // Each as wide as the others, so the transport doesn't move as one gives way to the
+            // next (decided November 2026).
+            using enum core::Player::RecordPhase;
+            const std::string_view word = *phase == CountIn   ? "COUNT"
+                                          : *phase == PreRoll ? "PRE"
+                                          : overdub           ? "ODUB"
+                                                              : "REC";
+            auto text = "● " + std::string{word};
+            text.resize(std::string_view{"● COUNT"}.size(), ' ');
+            bottom.left.push_back({text + "  ", {Role::Warning, Role::Bar, kBold}});
         }
         else
         {
@@ -292,6 +300,10 @@ Bar Workspace::statusBar(bool withMessage) const
                                    tempoText(song, at) + "  " + sectionText(song, at),
                                style});
     }
+    // How much the left needs, before messages and such, which come and go.
+    std::size_t leftLength = 0;
+    for (const auto& run : bottom.left)
+        leftLength += decodeUtf8(run.text).size();
     if (macros_.recording != 0)
     {
         const auto ends = keysFor("macro-record");
@@ -360,17 +372,31 @@ Bar Workspace::statusBar(bool withMessage) const
     }
     if (!thru_)
         bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
-    // Stopped with tracks armed, how many and how they'd record, beside what's coming in.
-    if (const auto armed = std::ranges::count_if(document_.song().tracks(),
-                                                 [](const auto& track) { return track->arm; });
+    std::optional<std::size_t> countInRun;
+    // Stopped with tracks armed, how many, how they'd record and what comes first, and if the
+    // click has nowhere to go, saying so until it has; or the metronome playing always.
+    const auto& song = document_.song();
+    if (const auto armed =
+            std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
         armed > 0 && player_ != nullptr && !player_->playing())
     {
         bottom.right.push_back(
             {"Armed " + std::to_string(armed) + " " +
-                 (document_.song().recordMode == core::RecordMode::Overdub ? "Overdub"
-                                                                           : "Replace") +
-                 "   ",
+                 (song.recordMode == core::RecordMode::Overdub ? "Overdub" : "Replace") + "  ",
              label});
+        countInRun = bottom.right.size();
+        bottom.right.push_back({countInText(song.countIn) + " ", label});
+        bottom.right.push_back({"  ", label});
+        // A count-in clicks whatever the metronome's set to.
+        if ((song.metronome.when != core::MetronomeSettings::When::Off ||
+             song.countIn.mode == core::CountInSettings::Mode::CountIn) &&
+            !clickPort())
+            bottom.right.push_back({"No click   ", {Role::Warning, Role::Bar, kPlain}});
+    }
+    else if (player_ != nullptr && player_->playing() && !player_->recording() &&
+             song.metronome.when == core::MetronomeSettings::When::Always)
+    {
+        bottom.right.push_back({"Click   ", label});
     }
     bottom.right.push_back({"In", {inputLitUntil_ ? Role::Accent : Role::Dim, Role::Bar, kPlain}});
     // The last message in, fixed in width so nothing after it moves (decided November 2026).
@@ -387,6 +413,19 @@ Bar Workspace::statusBar(bool withMessage) const
                                  : std::string{"No file"};
     // Room kept for [+], so nothing moves as it comes and goes.
     bottom.right.push_back({name + (document_.modified() ? " [+]" : "    "), kBarText});
+    // The count-in is the first to go where the line's too full for it, the mode, the transport
+    // and the rest on the right, as it's on the Metronome page and the leader's menu too.
+    if (countInRun)
+    {
+        auto length = leftLength;
+        for (const auto& run : bottom.right)
+            length += decodeUtf8(run.text).size();
+        const auto spacing = BarSpacing::forCell(cell_);
+        const auto columns =
+            static_cast<std::size_t>(std::max((width_ - 2 * spacing.margin) / cell_.width, 1));
+        if (length > columns)
+            bottom.right.erase(bottom.right.begin() + static_cast<std::ptrdiff_t>(*countInRun));
+    }
     return bottom;
 }
 

@@ -777,13 +777,23 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
     p.type(U"R");
     CHECK(p.player.recording());
     CHECK(p.ws.message() == "Recording onto " + name);
-    CHECK(contains(p.status(), U"● REC"));
+    CHECK(contains(p.status(), U"● COUNT  ")); // counting in, then recording
+    const auto x = [&](std::u32string_view starts)
+    {
+        for (const auto& run : p.ws.frame().back().text)
+            if (run.text.starts_with(starts))
+                return run.x;
+        return -1;
+    };
+    const auto place = x(U"1:");
     p.type(U"R");
     CHECK(p.ws.message() == "Already recording: Space stops");
     // The count-in clicks on the default output's channel 10, a bar at the song's tempo.
     p.runFor(2100ms);
     CHECK(std::ranges::any_of(p.sink.sent, [](const auto& sent)
                               { return !sent.bytes.empty() && sent.bytes[0] == 0x99; }));
+    CHECK(contains(p.status(), U"● REC    "));
+    CHECK(x(U"1:") == place); // the same width, so the place doesn't move
     playNote(p, 99);
     CHECK_FALSE(hasPitch(p.document.song(), id, 99)); // put in once stopped
     p.type(U" ");
@@ -810,8 +820,8 @@ TEST_CASE("the leader then r and m switches the song between replace and overdub
     CHECK(contains(p.status(), U"Armed 1 Overdub"));
     p.type(U"R");
     CHECK(p.ws.message().starts_with("Overdubbing onto "));
-    CHECK(contains(p.status(), U"● ODUB"));
     p.runFor(2100ms);
+    CHECK(contains(p.status(), U"● ODUB"));
     playNote(p, 99);
     p.runFor(4s);
     p.type(U" ");
@@ -871,4 +881,78 @@ TEST_CASE("recording carries on past the song's end, which grows to hold the tak
     CHECK(p.document.song().end() > end);
     CHECK(p.ws.arrangement().page().end() == p.document.song().end());
     CHECK(hasPitch(p.document.song(), id, 99));
+}
+
+TEST_CASE("the leader then m sets the metronome and count-in, and :countin and :preroll their "
+          "lengths, each an undo step")
+{
+    Playing p;
+    const auto& song = [&]() -> const core::Song& { return p.document.song(); };
+    using When = core::MetronomeSettings::When;
+    using Mode = core::CountInSettings::Mode;
+    REQUIRE(song().metronome.when == When::Recording);
+    p.type(U",mm");
+    CHECK(song().metronome.when == When::Always);
+    CHECK(p.ws.message() == "Metronome always");
+    p.type(U",mm");
+    CHECK(song().metronome.when == When::Off);
+    p.type(U",mm");
+    CHECK(song().metronome.when == When::Recording);
+    p.type(U"u");
+    CHECK(song().metronome.when == When::Off);
+
+    REQUIRE(song().countIn.mode == Mode::CountIn);
+    p.type(U",mc");
+    CHECK(song().countIn.mode == Mode::PreRoll);
+    CHECK(p.ws.message() == "Pre-roll 1 bar");
+    p.type(U",mc");
+    CHECK(song().countIn.mode == Mode::None);
+    CHECK(p.ws.message() == "No count-in");
+
+    CHECK(p.registry.runLine("countin 2").message == "Count-in 2 bars");
+    CHECK(song().countIn.mode == Mode::CountIn);
+    CHECK(song().countIn.bars == 2);
+    CHECK(p.registry.runLine("countin 3 beats").message == "Count-in 3 beats");
+    CHECK(song().countIn.beats == 3);
+    CHECK(p.registry.runLine("countin").message == "Count-in 3 beats");
+    CHECK(p.registry.runLine("preroll 2").message == "Pre-roll 2 bars");
+    CHECK(song().countIn.preRollBars == 2);
+    CHECK(p.registry.runLine("countin off").message == "No count-in");
+    CHECK(p.registry.runLine("countin 0").message == "Bars should be from 1 to 99");
+    CHECK(p.registry.runLine("countin two").message == "countin takes BARS, BEATS beats, or off");
+    CHECK(p.registry.runLine("preroll 2 beats").message == "preroll takes BARS, or off");
+}
+
+TEST_CASE("with tracks armed, the status line says what comes before recording, and PRE shows "
+          "through a pre-roll")
+{
+    Playing p;
+    p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
+    p.type(U",ra");
+    CHECK(contains(p.status(), U"Armed 1 Replace  Count-in 1 bar"));
+    p.registry.runLine("preroll 1");
+    CHECK(contains(p.status(), U"Armed 1 Replace  Pre-roll 1 bar"));
+    // Recording from the third bar, after a bar of the song before it.
+    p.player.setMarker(2 * p.document.song().ppqn().whole());
+    p.type(U"R");
+    p.runFor(10ms);
+    CHECK(contains(p.status(), U"● PRE    "));
+    p.runFor(2100ms);
+    CHECK(contains(p.status(), U"● REC    "));
+    p.type(U" ");
+    p.runFor(10ms);
+}
+
+TEST_CASE("the status line says when the click has nowhere to go")
+{
+    Playing p;
+    p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
+    PortTable table;
+    table.detected(PortDirection::Output, std::vector<std::string>{"Synth"});
+    table.setEnabled(PortDirection::Output, "Synth", true);
+    p.ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
+    p.type(U",ra");
+    CHECK(contains(p.status(), U"No click"));
+    table.setDefault(PortDirection::Output, "Synth");
+    CHECK_FALSE(contains(p.status(), U"No click"));
 }

@@ -96,6 +96,12 @@ public:
     // a metronome that carries on past the end (when recording) is clicking.
     bool finished() const noexcept;
 
+    // Whether a count-in is still counting, before the record point.
+    bool countingIn(std::chrono::nanoseconds now) const noexcept
+    {
+        return playing_ && countIn_ != nullptr && now < recordPoint_;
+    }
+
     // The tick being played at a time, or none if stopped. During a lead-in, this is before
     // the start tick, and never before tick 0.
     std::optional<Tick> position(std::chrono::nanoseconds now) const noexcept;

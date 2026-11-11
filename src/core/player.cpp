@@ -87,6 +87,7 @@ bool Player::record(const Song& song)
     recorder_.emplace(song, 0, marker_, song.recordMode, resolveInput_);
     click_ = click;
     auto plan = compile(song);
+    const bool countIn = start.countIn.has_value();
     if (!engine_.setPlan(plan) || !engine_.play(start.playFrom, std::move(start.countIn)))
     {
         // The plan, if taken, records nothing without a play; the next update replaces it.
@@ -97,11 +98,29 @@ bool Player::record(const Song& song)
     }
     waiting_.reset();
     play_ = engine_.lastPlay();
+    recordPoint_ = marker_;
+    countIn_ = countIn;
     recorder_.emplace(song, play_, marker_, song.recordMode, resolveInput_);
     playing_ = true;
     stopExact_ = true;
     started_ = start.playFrom;
     return true;
+}
+
+std::optional<Player::RecordPhase> Player::recordPhase() const
+{
+    if (!recording())
+    {
+        return std::nullopt;
+    }
+    const auto status = engine_.status();
+    // Until the engine has started, as it will start.
+    if (status.countingIn || (!status.playing && countIn_))
+    {
+        return RecordPhase::CountIn;
+    }
+    const auto at = status.playing ? status.position : std::optional{started_};
+    return at && *at < recordPoint_ ? RecordPhase::PreRoll : RecordPhase::Recording;
 }
 
 std::optional<Player::Take> Player::finishRecording(const Song& song)
