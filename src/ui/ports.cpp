@@ -97,8 +97,9 @@ std::string_view directionWord(PortDirection direction)
 
 KnownPort* PortTable::findPort(PortDirection direction, std::string_view name)
 {
-    const auto it = std::ranges::find_if(ports_, [&](const KnownPort& port)
-                                         { return port.direction == direction && port.name == name; });
+    const auto it =
+        std::ranges::find_if(ports_, [&](const KnownPort& port)
+                             { return port.direction == direction && port.name == name; });
     return it == ports_.end() ? nullptr : &*it;
 }
 
@@ -124,13 +125,12 @@ bool PortTable::detected(PortDirection direction, std::span<const std::string> n
             continue;
         }
         // After the last of its direction, so inputs stay before outputs.
-        const auto after = std::ranges::find_if(ports_.rbegin(), ports_.rend(),
-                                                [&](const KnownPort& port)
-                                                { return port.direction == direction; });
-        const auto at = after != ports_.rend() ? after.base()
-                        : direction == PortDirection::Input
-                            ? ports_.begin()
-                            : ports_.end();
+        const auto after =
+            std::ranges::find_if(ports_.rbegin(), ports_.rend(), [&](const KnownPort& port)
+                                 { return port.direction == direction; });
+        const auto at = after != ports_.rend()              ? after.base()
+                        : direction == PortDirection::Input ? ports_.begin()
+                                                            : ports_.end();
         ports_.insert(at, KnownPort{direction, name, {}, false, true});
         added = true;
     }
@@ -161,8 +161,9 @@ bool PortTable::setEnabled(PortDirection direction, std::string_view name, bool 
 
 bool PortTable::forget(PortDirection direction, std::string_view name)
 {
-    const auto removed = std::erase_if(ports_, [&](const KnownPort& port)
-                                       { return port.direction == direction && port.name == name; });
+    const auto removed =
+        std::erase_if(ports_, [&](const KnownPort& port)
+                      { return port.direction == direction && port.name == name; });
     if (removed > 0 && direction == PortDirection::Output && defaultOutput_ == name)
     {
         defaultOutput_.clear();
@@ -259,9 +260,11 @@ PortResolution PortTable::resolve(PortDirection direction, std::string_view name
                     { return !p.alias.empty() && equalIgnoringCase(p.alias, name); }) ||
         tryMatching([&](const KnownPort& p) { return p.name == name; }) ||
         tryMatching([&](const KnownPort& p) { return equalIgnoringCase(p.name, name); }) ||
-        tryMatching([&](const KnownPort& p)
-                    { return containsIgnoringCase(p.shown(), name) ||
-                             containsIgnoringCase(p.name, name); });
+        tryMatching(
+            [&](const KnownPort& p)
+            {
+                return containsIgnoringCase(p.shown(), name) || containsIgnoringCase(p.name, name);
+            });
     if (!matched || found == nullptr)
     {
         result.problem = PortProblem::Missing;
@@ -283,8 +286,9 @@ PortResolution PortTable::resolve(PortDirection direction, std::string_view name
 
 std::string PortTable::text() const
 {
-    std::string text = "# The MIDI ports of this machine, as the Ports view (, v p) sets them. Written "
-                       "by Modal; safe to delete.\n";
+    std::string text =
+        "# The MIDI ports of this machine, as the Ports view (, v m) sets them. Written "
+        "by Modal; safe to delete.\n";
     for (const auto& port : ports_)
     {
         text += std::string{directionWord(port.direction)} + " " + quoted(port.name) +
@@ -372,10 +376,9 @@ PortTable PortTable::read(std::string_view text, std::vector<std::string>* error
         const auto after = std::ranges::find_if(table.ports_.rbegin(), table.ports_.rend(),
                                                 [&](const KnownPort& known)
                                                 { return known.direction == direction; });
-        const auto place = after != table.ports_.rend() ? after.base()
-                           : direction == PortDirection::Input
-                               ? table.ports_.begin()
-                               : table.ports_.end();
+        const auto place = after != table.ports_.rend()        ? after.base()
+                           : direction == PortDirection::Input ? table.ports_.begin()
+                                                               : table.ports_.end();
         table.ports_.insert(place, std::move(port));
     }
     return table;

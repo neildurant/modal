@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace modal::platform
@@ -95,6 +96,33 @@ std::string errorText(const stdx::error& error)
 }
 
 } // namespace detail
+
+struct PortWatcher::Impl
+{
+    std::optional<libremidi::observer> observer;
+};
+
+PortWatcher::PortWatcher(std::function<void()> changed)
+    : impl_(std::make_unique<Impl>())
+{
+    const auto api = detail::usableApi();
+    if (!api)
+    {
+        return;
+    }
+    libremidi::observer_configuration config;
+    config.track_any = true;
+    config.notify_in_constructor = false;
+    config.input_added = [changed](const libremidi::input_port&) { changed(); };
+    config.input_removed = [changed](const libremidi::input_port&) { changed(); };
+    config.output_added = [changed](const libremidi::output_port&) { changed(); };
+    config.output_removed = [changed](const libremidi::output_port&) { changed(); };
+    auto apiConfig = libremidi::observer_configuration_for(*api);
+    detail::nameClient(apiConfig);
+    impl_->observer.emplace(std::move(config), std::move(apiConfig));
+}
+
+PortWatcher::~PortWatcher() = default;
 
 bool canCreateOwnPorts()
 {

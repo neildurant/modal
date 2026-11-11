@@ -53,6 +53,7 @@ add_executable(modal_tests
     ui/completion_test.cpp
     ui/palette_test.cpp
     ui/ports_test.cpp
+    ui/ports_view_test.cpp
     ui/remembered_test.cpp
     ui/config_test.cpp
     ui/demo_song_test.cpp

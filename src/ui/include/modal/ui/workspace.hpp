@@ -17,6 +17,7 @@
 #include <modal/ui/layout.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/piano_roll_view.hpp>
+#include <modal/ui/ports_view.hpp>
 #include <modal/ui/remembered.hpp>
 #include <modal/ui/tracks_view.hpp>
 #include <modal/ui/view.hpp>
@@ -137,6 +138,8 @@ public:
 
     TracksView& tracks() { return *tracks_; }
     const TracksView& tracks() const { return *tracks_; }
+    PortsView& portsView() { return *ports_; }
+    const PortsView& portsView() const { return *ports_; }
 
     // Shows a view, its cursor where the cursor was in the view shown before, which Backspace
     // goes back to (decided for milestone 5).
@@ -236,6 +239,16 @@ public:
     {
         inputPorts_ = std::move(ports);
     }
+
+    // This machine's MIDI ports, for the Ports view: the table as it is, putting a changed one
+    // into use, and looking for the ports there are now.
+    struct PortControl
+    {
+        std::function<const PortTable*()> table;
+        std::function<void(const PortTable&)> change;
+        std::function<void()> look;
+    };
+    void setPortControl(PortControl control) { portControl_ = std::move(control); }
 
     // Where completion at the : prompt finds the choices of a kind of argument, from the word
     // typed so far (the workspace has those of commands, sections, roles, meters, lengths and
@@ -414,6 +427,20 @@ private:
     {
         return inputPorts_ ? inputPorts_() : std::vector<std::string>{};
     }
+    const PortTable* portTable() const override
+    {
+        return portControl_.table ? portControl_.table() : nullptr;
+    }
+    void changePorts(const PortTable& table) override
+    {
+        if (portControl_.change)
+            portControl_.change(table);
+    }
+    void lookForPorts() override
+    {
+        if (portControl_.look)
+            portControl_.look();
+    }
 
     View& view() const { return *current_; }
 
@@ -553,6 +580,8 @@ private:
     std::unique_ptr<ArrangeView> arrange_;
     std::unique_ptr<PianoRollView> pianoRoll_;
     std::unique_ptr<TracksView> tracks_;
+    std::unique_ptr<PortsView> ports_;
+    PortControl portControl_;
     View* current_ = nullptr;
     std::vector<View*> history_; // the views shown before, for Backspace
     Keymap keymap_;

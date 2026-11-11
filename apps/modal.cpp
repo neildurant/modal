@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdint>
@@ -194,6 +195,16 @@ public:
         detectPorts();
     }
     const ui::PortTable& ports() const { return ports_; }
+
+    // Puts a changed table into use, from the Ports view: keeps it, listens to the inputs it
+    // enables, and has the tracks' ports looked up again.
+    void changePorts(const ui::PortTable& table)
+    {
+        ports_ = table;
+        if (savePorts_)
+            savePorts_(ports_);
+        lookedUp_ = false;
+    }
 
     // Notes the ports the system lists now, adding new ones, disabled, and keeping the file.
     void detectPorts()
@@ -681,6 +692,40 @@ int main(int argc, char* argv[])
                            });
     }
     view.show(ui::ViewKind::Arrangement); // the home view
+    // The Ports view's table, and what changing it or looking again does: listen to the
+    // enabled inputs, look the tracks' ports up again, and say what can't be used.
+    const auto portsChanged = [&]
+    {
+        auto problem = playback.openInputs();
+        auto missing = playback.update(document.song());
+        if (problem.empty())
+            problem = std::move(missing);
+        if (!problem.empty())
+            view.setMessage(std::move(problem), ui::MessageKind::Warning);
+    };
+    view.setPortControl({.table = [&] { return &playback.ports(); },
+                         .change =
+                             [&](const ui::PortTable& table)
+                         {
+                             playback.changePorts(table);
+                             portsChanged();
+                         },
+                         .look =
+                             [&]
+                         {
+                             playback.detectPorts();
+                             portsChanged();
+                         }});
+    // Ports plugged in or out while Modal runs: the watcher's thread wakes the window, which
+    // looks again.
+    std::atomic<bool> portsMoved{false};
+    const auto wakeWindow = window.waker();
+    const platform::PortWatcher portWatcher{[&portsMoved, wakeWindow]
+                                            {
+                                                portsMoved.store(true);
+                                                wakeWindow();
+                                            }};
+
     // The Tracks choosers and :port offer the enabled ports, by alias where they have one.
     view.setInputPorts([&] { return playback.ports().offered(ui::PortDirection::Input); });
     view.setPortFinder(
@@ -750,7 +795,7 @@ int main(int argc, char* argv[])
     if (playback.ports().offered(ui::PortDirection::Input).empty() &&
         playback.ports().offered(ui::PortDirection::Output).empty())
     {
-        const std::string none = "No MIDI ports are enabled: choose them in the Ports view (, v p)";
+        const std::string none = "No MIDI ports are enabled: choose them in the Ports view (, v m)";
         message = message.empty() ? none : none + "; " + message;
     }
     if (!message.empty())
@@ -865,6 +910,13 @@ int main(int argc, char* argv[])
                     [&](std::int64_t now)
                 {
                     bool changed = view.wake(now);
+                    if (portsMoved.exchange(false))
+                    {
+                        playback.detectPorts();
+                        portsChanged();
+                        view.refresh();
+                        changed = true;
+                    }
                     if (const auto due = playback.inputDeadline(); due && now >= *due)
                     {
                         auto error = playback.pollInputs(now);

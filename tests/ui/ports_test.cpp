@@ -51,7 +51,7 @@ TEST_CASE("ports seen for the first time start disabled, and are marked present 
     CHECK_FALSE(xkey->present);
     CHECK(xkey->enabled);
     CHECK(xkey->alias == "Keys");
-    CHECK(table.usable(In).empty()); // enabled but not there
+    CHECK(table.usable(In).empty());             // enabled but not there
     CHECK(table.offered(In) == names({"Keys"})); // still offered, to keep a track's choice
     CHECK_FALSE(table.detected(In, names({"Xkey 1", "loopMIDI Port 1"})));
     CHECK(table.usable(In) == names({"Xkey 1"}));

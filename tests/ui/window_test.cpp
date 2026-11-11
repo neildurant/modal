@@ -324,6 +324,30 @@ TEST_CASE("a sample of the event list, the arrangement and the piano roll", "[.s
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-tracks-light.bmp"));
     document.edit("Restore sample song", {}, [&](modal::core::Song& song) { song = beforeTracks; });
+    // The Ports view, with a machine's ports: some enabled, aliased, one the default, one gone.
+    modal::ui::PortTable ports;
+    using modal::ui::PortDirection;
+    ports.detected(PortDirection::Output, std::vector<std::string>{"Old Synth"});
+    ports.detected(PortDirection::Input, std::vector<std::string>{"Xkey 1", "loopMIDI Port 1"});
+    ports.detected(PortDirection::Output,
+                   std::vector<std::string>{"loopMIDI Port 1", "Babyface Midi Port 1",
+                                            "Microsoft GS Wavetable Synth"});
+    ports.setEnabled(PortDirection::Input, "Xkey 1", true);
+    ports.setAlias(PortDirection::Input, "Xkey 1", "Keys");
+    ports.setEnabled(PortDirection::Output, "loopMIDI Port 1", true);
+    ports.setAlias(PortDirection::Output, "loopMIDI Port 1", "Host");
+    ports.setEnabled(PortDirection::Output, "Babyface Midi Port 1", true);
+    ports.setAlias(PortDirection::Output, "Babyface Midi Port 1", "Babyface Out");
+    ports.setEnabled(PortDirection::Output, "Old Synth", true);
+    ports.setDefaultOutput("loopMIDI Port 1");
+    view.setPortControl({.table = [&] { return &ports; },
+                         .change = [&](const modal::ui::PortTable& changed) { ports = changed; },
+                         .look = [] {}});
+    view.run("view-ports", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-ports.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-ports-light.bmp"));
     view.run("view-arrangement", 0);
     for (const char32_t key : std::u32string_view{U"jj8l"})
     {

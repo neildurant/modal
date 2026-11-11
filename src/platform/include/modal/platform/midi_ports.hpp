@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -43,6 +45,22 @@ std::vector<std::string> portLabels(std::span<const NamedPort> ports);
 // Lists the MIDI ports visible through the platform's default MIDI 1.0 API,
 // including virtual ports created by other applications, but not Modal's own.
 MidiPortList listMidiPorts();
+
+// Says when MIDI ports come or go, where the system tells of it (on Windows by looking ten times
+// a second, on Linux as ALSA announces it), by calling back on a thread of its own: so the call
+// should be quick, such as waking the window to look again. Nothing if MIDI isn't available.
+class PortWatcher
+{
+public:
+    explicit PortWatcher(std::function<void()> changed);
+    ~PortWatcher();
+    PortWatcher(const PortWatcher&) = delete;
+    PortWatcher& operator=(const PortWatcher&) = delete;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
 
 // Whether the MIDI API in use lets Modal create ports of its own (see MidiOutputs::openOwn):
 // ALSA on Linux does, WinMM on Windows doesn't.

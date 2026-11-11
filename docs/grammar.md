@@ -259,6 +259,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, e` | Insert an event at the cursor, asking which |
 | `, s` | Sections, on the cursor's section |
 | `, t` | Tracks: `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
+| `, v m` | The Ports view: this machine's MIDI ports, to enable, alias and choose the default output |
 | `, r` | Recording: `a` arm this track, `t` its Thru |
 | `, S` | Select |
 | `, x` | Transforms |

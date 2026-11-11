@@ -27,6 +27,8 @@
 namespace modal::ui
 {
 
+class PortTable;
+
 // A message in the status line: information in the message colour, or a warning.
 enum class MessageKind : std::uint8_t
 {
@@ -65,6 +67,7 @@ enum class ViewKind : std::uint8_t
     PianoRoll,
     EventList,
     Tracks,
+    Ports,
 };
 
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
@@ -225,6 +228,13 @@ public:
     // The output ports there are now, to choose from.
     virtual std::vector<std::string> outputPorts() const = 0;
     virtual std::vector<std::string> inputPorts() const { return {}; }
+
+    // This machine's MIDI ports, as the Ports view sets them, or none where there are no ports;
+    // changing them, which saves them and puts them into use; and looking for the ports there
+    // are now, as when a device is plugged in.
+    virtual const PortTable* portTable() const { return nullptr; }
+    virtual void changePorts(const PortTable&) {}
+    virtual void lookForPorts() {}
 
     // Shows another view at the cursor; or opens it afresh there, as Enter on a bar in the
     // arrangement does (see View::open).

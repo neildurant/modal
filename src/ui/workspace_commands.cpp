@@ -475,6 +475,11 @@ constexpr std::array kSharedCommands{
                 .description = "Show track settings, at track {count} if given",
                 .count = true},
     CommandInfo{.name = "view-arrangement", .description = "Show the arrangement"},
+    CommandInfo{.name = "view-ports",
+                .description = "Show this machine's MIDI ports, to enable and name them",
+                .aliases = "ports"},
+    CommandInfo{.name = "ports-refresh",
+                .description = "Look for MIDI ports again, as after plugging one in"},
     CommandInfo{.name = "view-piano-roll", .description = "Show the piano roll"},
     CommandInfo{.name = "view-events", .description = "Show the event list"},
     CommandInfo{.name = "view-conductor",
@@ -563,7 +568,8 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 131> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 132> where{{
+            {"ports-refresh", onlyIn({PortList})},
             {"tracks-mute-toggle", onlyIn({TrackList})},
             {"tracks-solo-toggle", onlyIn({TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
@@ -626,7 +632,7 @@ std::span<const CommandInfo> Workspace::commands()
             {"zoom-in", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-out", onlyIn({Tracks, Strip, PianoRoll})},
             {"zoom-reset", onlyIn({Tracks, Strip, PianoRoll})},
-            {"field-edit", onlyIn({EventList, TrackList})},
+            {"field-edit", onlyIn({EventList, TrackList, PortList})},
             {"bar-open", onlyIn({Tracks})},
             {"section-play", onlyIn({Strip})},
             {"field-increase", onlyIn({EventList, TrackList})},
@@ -730,6 +736,16 @@ std::span<const CommandInfo> Workspace::commands()
              "Insert whole tracks before this row; in Visual mode, replace the selected tracks"},
             {"inspector-edit", "Edit the selected track field"},
         }};
+        const std::array<std::pair<std::string_view, std::string_view>, 6> portDescriptions{{
+            {"cursor-down", "Move down a port"},
+            {"cursor-up", "Move up a port"},
+            {"field-edit", "Enable or disable a port, make it the default output, or edit its "
+                           "alias"},
+            {"inspector-edit", "Enable or disable a port, make it the default output, or edit "
+                               "its alias"},
+            {"event-delete", "Forget a port that isn't there now"},
+            {"go-first", "Go to the first port"},
+        }};
         for (auto& info : result)
         {
             for (const auto& [name, description] : trackDescriptions)
@@ -741,6 +757,12 @@ std::span<const CommandInfo> Workspace::commands()
                  info.name == "bar-insert" || info.name.starts_with("section-") ||
                  info.name == "label-to-section"))
                 info.where = onlyIn({Tracks, Strip, PianoRoll, EventList});
+            // x forgets a port that isn't there, in the Ports view.
+            if (info.name == "event-delete")
+                info.where |= whereBit(PortList);
+            for (const auto& [name, description] : portDescriptions)
+                if (info.name == name)
+                    info.here[static_cast<std::size_t>(PortList)] = description;
         }
         return result;
     }();

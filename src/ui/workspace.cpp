@@ -82,6 +82,7 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     , arrange_(std::make_unique<ArrangeView>(document, static_cast<ViewHost&>(*this)))
     , pianoRoll_(std::make_unique<PianoRollView>(document, static_cast<ViewHost&>(*this)))
     , tracks_(std::make_unique<TracksView>(document, static_cast<ViewHost&>(*this)))
+    , ports_(std::make_unique<PortsView>(document, static_cast<ViewHost&>(*this)))
     , current_(eventList_.get())
     , keymap_(std::move(keymap))
     , keys_(timeout)
@@ -356,6 +357,7 @@ void Workspace::refresh()
     arrange_->refresh();
     pianoRoll_->refresh();
     tracks_->refresh();
+    ports_->refresh();
 }
 
 void Workspace::showSong()
@@ -364,6 +366,7 @@ void Workspace::showSong()
     arrange_->showSong();
     pianoRoll_->showSong();
     tracks_->showSong();
+    ports_->showSong();
     history_.clear();
     layOut();
 }
@@ -372,6 +375,7 @@ ViewKind Workspace::shown() const
 {
     return current_ == arrange_.get()     ? ViewKind::Arrangement
            : current_ == tracks_.get()    ? ViewKind::Tracks
+           : current_ == ports_.get()     ? ViewKind::Ports
            : current_ == pianoRoll_.get() ? ViewKind::PianoRoll
                                           : ViewKind::EventList;
 }
@@ -392,12 +396,17 @@ void Workspace::show(ViewKind kind)
     case ViewKind::PianoRoll:
         switchTo(*pianoRoll_, true);
         break;
+    case ViewKind::Ports:
+        lookForPorts(); // as they may have come or gone since
+        switchTo(*ports_, true);
+        break;
     }
 }
 
 void Workspace::open(ViewKind kind)
 {
     switchTo(kind == ViewKind::Tracks        ? static_cast<View&>(*tracks_)
+             : kind == ViewKind::Ports       ? static_cast<View&>(*ports_)
              : kind == ViewKind::Arrangement ? static_cast<View&>(*arrange_)
              : kind == ViewKind::PianoRoll   ? static_cast<View&>(*pianoRoll_)
                                              : static_cast<View&>(*eventList_),
@@ -1083,6 +1092,8 @@ Where Workspace::where() const
         return Where::PianoRoll;
     case ViewKind::Tracks:
         return Where::TrackList;
+    case ViewKind::Ports:
+        return Where::PortList;
     case ViewKind::EventList:
         break;
     }
@@ -1398,12 +1409,13 @@ bool Workspace::sayWhereFor(std::string_view command)
         }
     }
     std::vector<std::string> places;
-    constexpr std::array<std::pair<Where, std::string_view>, 5> kPlaces{{
+    constexpr std::array<std::pair<Where, std::string_view>, 6> kPlaces{{
         {Where::Tracks, "the arrangement's tracks"},
         {Where::Strip, "the section strip"},
         {Where::PianoRoll, "the piano roll"},
         {Where::EventList, "the event list"},
         {Where::TrackList, "the tracks view"},
+        {Where::PortList, "the ports view"},
     }};
     for (const auto& [place, name] : kPlaces)
     {
@@ -1817,6 +1829,11 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             return *done;
         }
         return view().operate("operator-yank", "object-note", count);
+    }
+    if (command == "view-ports")
+    {
+        show(ViewKind::Ports);
+        return true;
     }
     if (command == "view-tracks")
     {
