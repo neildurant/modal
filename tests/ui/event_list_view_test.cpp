@@ -167,8 +167,10 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(xOf(v.ws.frame()[2], U"Position") == position);
     type(v.ws, U"gg");
 
-    // The status line names the song's file, with [+] once it has changes not saved.
-    CHECK(contains(rowText(frame[3], 0), U"No file"));
+    // The status line names the song's file, with [+] once it has changes not saved, where it's
+    // wide enough.
+    v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
+    CHECK(contains(rowText(v.ws.frame()[3], 0), U"No file"));
     type(v.ws, U"4jx");
     CHECK(contains(rowText(v.ws.frame()[3], 0), U"No file [+]"));
     type(v.ws, U"u");
@@ -835,6 +837,7 @@ TEST_CASE("a count shows until a key uses it or Escape gives it up")
 TEST_CASE("a message shows in the status line until the next key")
 {
     Viewing v;
+    v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
     v.ws.setMessage("modalrc:3: unknown setting", MessageKind::Warning);
     CHECK(contains(rowText(v.ws.frame()[3], 0), U"modalrc:3: unknown setting"));
     CHECK(v.ws.handle(Key::typed(U'x'), 0)); // unbound, but the message goes

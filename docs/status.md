@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: auditioning notes in the piano roll is accepted and published, finishing the three steps agreed that day; next is the following milestone 8 item in schedule.md. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the status line's indicators (step 1 of rearranging the status line) are built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,16 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## The status line's indicators (12 November 2026; local, to try)
+
+The first of four steps rearranging the status line (schedule.md, milestone 8; design.md, The status line's indicators). The right side is now a row of indicators, each always in its place at a fixed width, dim or lit: `ARM`, `REPLACE` / `OVERDUB`, the count-in, `CLICK`; `THRU`, `AUDITION`, `REWIND`, `Q BYPASS`; `IN` with the last message; the file's name. Eleven theme roles (`indicator`, `indicator-text`, `indicator-lit-text` and one per indicator) are in both built-in themes. As they're wider than what they replace, they give way where the line's too narrow, in provisional steps (the file's name, the input's message, short words, the settings, the `IN` light), measured without any message, which goes above when it doesn't fit; so at 120 columns the file's name has gone and a short message more often goes above. `Armed 1 Replace  Count-in 1 bar`, `Thru off`, `Audition off`, `Quantise bypassed`, `No click` and `Click` are gone from the status line.
+
+Renders (`[.sample]` "a sample of the status line's indicators") show the line as a song opens, armed with audition off, and narrower, in both themes, with two colour variants: the settings in a muted blue, and each indicator its own colour. Every lit indicator shares one text colour, so a variant with dark text on the settings also puts it on the red `ARM`.
+
+**Validation.** Windows Debug passes 941 tests (939, 2 skipped); WSL linux-clang-debug builds without warnings, none failing. New and changed tests: each indicator dim, lit or warning as its state changes (rewind, thru, audition, quantise bypass, arm, replace and overdub, count-in and pre-roll in bars and beats, the click lit, and warning without a port), short words when narrower, and the indicators keeping their places as arming, the record mode, the count-in and audition change; the input light lit and dim with the file's name staying put as the message changes.
+
+**To try:** look at the status line as a song opens, then arm a track (`, r a`), switch replace and overdub (`, r m`), cycle the count-in (`, m c`), turn audition, rewind and thru on and off (`, T a`, `, T Space`, `, T t`), bypass quantise (`, T q`), and play a note in: each indicator should light and dim in place, nothing moving. Narrow the window to see them give way. Say which colours work, or which of the variants appeals; they're theme roles, so trying others is quick.
 
 ## Auditioning notes in the piano roll (12 November 2026; accepted and published)
 

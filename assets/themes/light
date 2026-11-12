@@ -43,3 +43,17 @@ highlight event-sign #9854f1
 " A field free text is typed into or chosen from a list, lighter than the background and the panel, as fields
 " usually are.
 highlight field #f3f4f7
+
+" The status line's indicators: always in their places, dim when off and lit in their own colours
+" when on; red for arming, the warm colours for recording, a quiet blue for settings simply on.
+highlight indicator             #e6e8ef
+highlight indicator-text        #9399b8
+highlight indicator-lit-text    #ffffff
+highlight indicator-arm         #e00000
+highlight indicator-record-mode #b15c00
+highlight indicator-count       #8c6c3e
+highlight indicator-click       #8c6c3e
+highlight indicator-thru        #2e7de9
+highlight indicator-audition    #2e7de9
+highlight indicator-rewind      #2e7de9
+highlight indicator-input       #587539

@@ -119,6 +119,31 @@ bool contains(const std::u32string& text, std::u32string_view part)
     return text.find(part) != std::u32string::npos;
 }
 
+// How a status line indicator shows, found by its word: dim, lit, in the warning colour, or
+// not there at all. Wide enough for them all.
+enum class Shown : std::uint8_t
+{
+    Absent,
+    Off,
+    Lit,
+    Warning,
+};
+Shown indicator(Playing& p, std::u32string_view word)
+{
+    p.ws.resize(220 * kCell.width, 24 * kCell.height, kCell);
+    const auto frame = p.ws.frame();
+    for (const auto& run : frame.back().text)
+    {
+        if (run.text.find(word) != std::u32string::npos && run.style.background != Role::Bar)
+        {
+            return run.style.background == Role::Indicator ? Shown::Off
+                   : run.style.background == Role::Warning ? Shown::Warning
+                                                           : Shown::Lit;
+        }
+    }
+    return Shown::Absent;
+}
+
 } // namespace
 
 TEST_CASE("Space plays from the marker and stops where it is; with rewind, the marker stays")
@@ -127,7 +152,7 @@ TEST_CASE("Space plays from the marker and stops where it is; with rewind, the m
     REQUIRE(p.ws.rewind());
     p.type(U"5j");
     CHECK(p.ws.deadline() == std::nullopt);
-    CHECK(contains(p.status(), U"Rewind on"));
+    CHECK(indicator(p, U"REWIND") == Shown::Lit);
 
     CHECK(contains(p.status(), U"■"));
     CHECK(contains(p.status(), U"1:1:000"));
@@ -170,7 +195,7 @@ TEST_CASE("without rewind, the cursor follows the playhead, and the marker moves
 {
     Playing p;
     p.ws.setRewind(false);
-    CHECK(contains(p.status(), U"Rewind off"));
+    CHECK(indicator(p, U"REWIND") == Shown::Off);
     p.type(U" ");
     p.runFor(10s);
     const auto row = *p.view.playheadRow();
@@ -510,14 +535,14 @@ TEST_CASE("a track's port that wasn't found is in the warning colour, and explai
 TEST_CASE("bypassing playback quantise plays every track as stored, and says so")
 {
     Playing p;
-    CHECK(p.status().find(U"Quantise bypassed") == std::u32string::npos);
+    CHECK(indicator(p, U"Q BYPASS") == Shown::Off);
     p.type(U",Tq");
     CHECK(p.player.bypassQuantize());
-    CHECK(p.status().find(U"Quantise bypassed") != std::u32string::npos);
+    CHECK(indicator(p, U"Q BYPASS") == Shown::Warning);
     p.press(Key::typed(U'j'));
     p.type(U",Tq");
     CHECK_FALSE(p.player.bypassQuantize());
-    CHECK(p.status().find(U"Quantise bypassed") == std::u32string::npos);
+    CHECK(indicator(p, U"Q BYPASS") == Shown::Off);
 }
 
 TEST_CASE("MIDI input is taken from the engine when it arrives, and again shortly after")
@@ -598,45 +623,46 @@ TEST_CASE("an idle workspace collects every bounded input batch before stopping 
 TEST_CASE("input activity and the last note are visible in every view and the light expires")
 {
     Playing p;
+    p.ws.resize(220 * kCell.width, 24 * kCell.height, kCell);
     const std::array<std::uint8_t, 3> on{0x90, 60, 96};
     REQUIRE(p.engine.receive(core::InputId{0}, on, p.clock.time));
     p.engine.step();
     CHECK(p.ws.inputWoken(p.now));
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     const auto light = [&]
     {
         const auto frame = p.ws.frame();
         for (const auto& run : frame.back().text)
-            if (run.text == U"In")
-                return run.style.foreground;
+            if (run.text == U" IN ")
+                return run.style.background;
         return Role::Warning;
     };
-    CHECK(light() == Role::Accent);
+    CHECK(light() == Role::IndicatorInput);
     p.ws.show(ViewKind::Tracks);
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     p.ws.show(ViewKind::PianoRoll);
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     p.ws.show(ViewKind::Arrangement);
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     // The short collection deadline precedes the light's deadline.
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
-    CHECK(light() == Role::Dim);
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(light() == Role::Indicator);
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     CHECK_FALSE(p.ws.deadline());
 
     // Any channel message but a note-off, with its channel, keeping what follows still.
-    const auto rewindX = [&]
+    const auto fileX = [&]
     {
         const auto frame = p.ws.frame();
         for (const auto& run : frame.back().text)
-            if (run.text.starts_with(U"Rewind"))
+            if (run.text.starts_with(U" No file"))
                 return run.x;
         return -1;
     };
-    const auto before = rewindX();
+    const auto before = fileX();
     const auto in = [&](std::vector<std::uint8_t> bytes)
     {
         REQUIRE(p.engine.receive(core::InputId{0}, bytes, p.clock.time));
@@ -644,13 +670,13 @@ TEST_CASE("input activity and the last note are visible in every view and the li
         p.ws.inputWoken(p.now);
     };
     in({0x80, 60, 0});
-    CHECK(contains(p.status(), U"In  1 C4      96"));
+    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     in({0xB9, 64, 127});
-    CHECK(contains(p.status(), U"In 10 CC64   127"));
-    CHECK(rewindX() == before);
+    CHECK(contains(p.status(), U" IN  10 CC64   127 "));
+    CHECK(fileX() == before);
     in({0xE0, 0x7F, 0x7F});
-    CHECK(contains(p.status(), U"In  1 Bend +8191"));
-    CHECK(rewindX() == before);
+    CHECK(contains(p.status(), U" IN   1 Bend +8191 "));
+    CHECK(fileX() == before);
 }
 
 TEST_CASE("global Thru is a machine control and held notes can end while it is off")
@@ -669,7 +695,7 @@ TEST_CASE("global Thru is a machine control and held notes can end while it is o
     REQUIRE(p.sink.sent.size() == 1);
     p.type(U",Tt");
     CHECK(p.document.song() == before);
-    CHECK(contains(p.status(), U"Thru off"));
+    CHECK(indicator(p, U"THRU") == Shown::Off);
     p.sink.sent.clear();
     REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 62, 96},
                              p.clock.time));
@@ -680,7 +706,7 @@ TEST_CASE("global Thru is a machine control and held notes can end while it is o
     CHECK((p.sink.sent[0].bytes[0] & 0xF0) == 0x80);
     p.type(U",Tt");
     CHECK(p.ws.message() == "Thru on");
-    CHECK_FALSE(contains(p.status(), U"Thru off"));
+    CHECK(indicator(p, U"THRU") == Shown::Lit);
 }
 
 TEST_CASE("an unavailable input is in the warning colour with an inspector warning, and one "
@@ -772,7 +798,8 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
     REQUIRE(track != nullptr);
     const auto id = track->id();
     const auto name = track->name;
-    CHECK(contains(p.status(), U"Armed 1 Replace"));
+    CHECK(indicator(p, U"ARM 1") == Shown::Lit);
+    CHECK(indicator(p, U"REPLACE") == Shown::Lit);
 
     p.type(U"R");
     CHECK(p.player.recording());
@@ -820,7 +847,7 @@ TEST_CASE("the leader then r and m switches the song between replace and overdub
     p.type(U",rm");
     CHECK(p.document.song().recordMode == core::RecordMode::Overdub);
     CHECK(p.ws.message() == "Overdub: what's recorded is added to what's there");
-    CHECK(contains(p.status(), U"Armed 1 Overdub"));
+    CHECK(indicator(p, U"OVERDUB") == Shown::Lit);
     p.type(U"R");
     CHECK(p.ws.message().starts_with("Overdubbing onto "));
     p.runFor(2100ms);
@@ -1139,10 +1166,21 @@ TEST_CASE("with tracks armed, the status line says what comes before recording, 
 {
     Playing p;
     p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
+    CHECK(indicator(p, U"ARM") == Shown::Off);
+    CHECK(indicator(p, U"COUNT 1 BAR") == Shown::Off);
     p.type(U",ra");
-    CHECK(contains(p.status(), U"Armed 1 Replace  Count-in 1 bar"));
+    CHECK(indicator(p, U"ARM 1") == Shown::Lit);
+    CHECK(indicator(p, U"COUNT 1 BAR") == Shown::Lit);
     p.registry.runLine("preroll 1");
-    CHECK(contains(p.status(), U"Armed 1 Replace  Pre-roll 1 bar"));
+    CHECK(indicator(p, U"PRE 1 BAR") == Shown::Lit);
+    p.registry.runLine("preroll 3 beats");
+    CHECK(indicator(p, U"PRE 3 BEATS") == Shown::Lit);
+    p.registry.runLine("preroll 1");
+    // Narrower, in short words.
+    p.ws.resize(100 * kCell.width, 24 * kCell.height, kCell);
+    CHECK(contains(p.status(), U" PRE 1 "));
+    CHECK(contains(p.status(), U" REPL "));
+    p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
     // Recording from the third bar, after a bar of the song before it.
     p.player.setMarker(2 * p.document.song().ppqn().whole());
     p.type(U"R");
@@ -1162,10 +1200,11 @@ TEST_CASE("the status line says when the click has nowhere to go")
     table.detected(PortDirection::Output, std::vector<std::string>{"Synth"});
     table.setEnabled(PortDirection::Output, "Synth", true);
     p.ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
+    CHECK(indicator(p, U"CLICK") == Shown::Off);
     p.type(U",ra");
-    CHECK(contains(p.status(), U"No click"));
+    CHECK(indicator(p, U"CLICK") == Shown::Warning);
     table.setDefault(PortDirection::Output, "Synth");
-    CHECK_FALSE(contains(p.status(), U"No click"));
+    CHECK(indicator(p, U"CLICK") == Shown::Lit);
 }
 
 namespace
@@ -1233,13 +1272,13 @@ TEST_CASE("audition is off with , T a, said in the status line, and silent while
     p.type(U",Ta");
     CHECK(notesSent(p).empty());
     CHECK_FALSE(p.ws.audition());
-    CHECK(contains(p.status(), U"Audition off"));
+    CHECK(indicator(p, U"AUDITION") == Shown::Off);
     p.press(Key::of(NamedKey::Tab));
     REQUIRE(p.ws.pianoRoll().currentNote());
     CHECK(notesSent(p).empty());
     p.type(U",Ta");
     CHECK(p.ws.audition());
-    CHECK_FALSE(contains(p.status(), U"Audition off"));
+    CHECK(indicator(p, U"AUDITION") == Shown::Lit);
     // A Visual selection growing over notes is silent.
     p.type(U"v");
     p.press(Key::of(NamedKey::Tab));
@@ -1292,4 +1331,37 @@ TEST_CASE("audition is silent while playing, as through a count-in, when only th
     }
     p.type(U" ");
     p.runFor(10ms);
+}
+
+TEST_CASE("the status line's indicators keep their places whatever they say, dim or lit")
+{
+    Playing p;
+    p.ws.resize(220 * kCell.width, 24 * kCell.height, kCell);
+    const auto xOf = [&](std::u32string_view word)
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            if (run.text.find(word) != std::u32string::npos)
+                return run.x;
+        return -1;
+    };
+    const auto places = [&]
+    {
+        return std::array{xOf(U"CLICK"), xOf(U"THRU"), xOf(U"AUDITION"), xOf(U"REWIND"),
+                          xOf(U" IN ")};
+    };
+    const auto before = places();
+    CHECK(before[0] > 0);
+    p.type(U",ra");
+    CHECK(places() == before);
+    p.type(U",rm");
+    CHECK(indicator(p, U"OVERDUB") == Shown::Lit);
+    CHECK(places() == before);
+    p.registry.runLine("preroll 2");
+    CHECK(places() == before);
+    p.registry.runLine("countin off");
+    CHECK(indicator(p, U"NO COUNT") == Shown::Off);
+    CHECK(places() == before);
+    p.type(U",Ta");
+    CHECK(places() == before);
 }

@@ -63,9 +63,22 @@ enum class Role : std::uint8_t
     EventSign, // a sign in a ruler for something in the song: a program or tempo change
     Field,     // the background of a field free text is typed into, such as a name, so it shows
                // as one even when empty
+    // The status line's indicators (decided 12 November 2026): one that's off, its text, and
+    // the text of one that's lit; then each one's own colour when lit.
+    Indicator,
+    IndicatorText,
+    IndicatorLitText,
+    IndicatorArm,
+    IndicatorRecordMode,
+    IndicatorCount,
+    IndicatorClick,
+    IndicatorThru,
+    IndicatorAudition,
+    IndicatorRewind,
+    IndicatorInput,
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Field) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::IndicatorInput) + 1;
 
 // A role's name, as themes and highlight write it: lower case with hyphens, such as
 // cursor-text or density-1; and the role of a name, if there is one.

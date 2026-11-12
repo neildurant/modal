@@ -300,10 +300,10 @@ Bar Workspace::statusBar(bool withMessage) const
                                    tempoText(song, at) + "  " + sectionText(song, at),
                                style});
     }
-    // How much the left needs, before messages and such, which come and go.
-    std::size_t leftLength = 0;
-    for (const auto& run : bottom.left)
-        leftLength += decodeUtf8(run.text).size();
+
+    // A message that doesn't fit goes above (see messageLines), so the indicators don't give way
+    // to it.
+    std::size_t messageChars = 0;
     if (macros_.recording != 0)
     {
         const auto ends = keysFor("macro-record");
@@ -324,6 +324,7 @@ Bar Workspace::statusBar(bool withMessage) const
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
         bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
+        messageChars = decodeUtf8(bottom.left.back().text).size();
     }
     else if (const auto hint = view().typingHint())
     {
@@ -359,75 +360,159 @@ Bar Workspace::statusBar(bool withMessage) const
         bottom.right.push_back({"/" + searching_.text + " ", label});
         bottom.right.push_back({view().matchStatus(*searching_.query) + "   ", kBarText});
     }
-    // Aligned to the right, so what comes and goes is at the left, and moves nothing else.
-    if (player_ != nullptr && player_->bypassQuantize())
-    {
-        bottom.right.push_back({"Quantise bypassed   ", {Role::Warning, Role::Bar, kPlain}});
-    }
-    // The view's grid, the one setting that's the view's, padded so Rewind stays put.
+    // The view's grid, the one setting that's the view's, padded so what follows stays put.
     if (const auto grid = view().gridStatus())
     {
         bottom.right.push_back({"Grid ", label});
         bottom.right.push_back({padText(*grid, 5, false) + "   ", kBarText});
     }
-    if (!thru_)
-        bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
-    if (!audition_)
-        bottom.right.push_back({"Audition off   ", kBarText});
-    std::optional<std::size_t> countInRun;
-    // Stopped with tracks armed, how many, how they'd record and what comes first, and if the
-    // click has nowhere to go, saying so until it has; or the metronome playing always.
+    // The indicators (decided 12 November 2026): each always in its place, as wide whatever it
+    // says, dim when off and lit in its own colour when on, or the warning colour when something's
+    // wrong; in groups, recording, then the settings, then the input, then the file. Where the
+    // line's too narrow for them beside the rest, they give way in steps: the file's name, the
+    // input's last message, then short words, then the settings, then the input light.
     const auto& song = document_.song();
-    if (const auto armed =
-            std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
-        armed > 0 && player_ != nullptr && !player_->playing())
+    const auto armed =
+        std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
+    const auto indicators = [&](int step)
     {
-        bottom.right.push_back(
-            {"Armed " + std::to_string(armed) + " " +
-                 (song.recordMode == core::RecordMode::Overdub ? "Overdub" : "Replace") + "  ",
-             label});
-        countInRun = bottom.right.size();
-        bottom.right.push_back({countInText(song.countIn) + " ", label});
-        bottom.right.push_back({"  ", label});
-        // A count-in clicks whatever the metronome's set to.
-        if ((song.metronome.when != core::MetronomeSettings::When::Off ||
-             song.countIn.mode == core::CountInSettings::Mode::CountIn) &&
-            !clickPort())
-            bottom.right.push_back({"No click   ", {Role::Warning, Role::Bar, kPlain}});
-    }
-    else if (player_ != nullptr && player_->playing() && !player_->recording() &&
-             song.metronome.when == core::MetronomeSettings::When::Always)
+        std::vector<Segment> segments;
+        const bool brief = step >= 3;
+        enum class Lit : std::uint8_t
+        {
+            Off,
+            On,
+            Warning,
+        };
+        const auto indicator = [&](std::string_view full, std::string_view shortText,
+                                   std::size_t width, std::size_t shortWidth, Lit lit, Role colour)
+        {
+            const Style style =
+                lit == Lit::Off       ? Style{Role::IndicatorText, Role::Indicator, kPlain}
+                : lit == Lit::Warning ? Style{Role::IndicatorLitText, Role::Warning, kBold}
+                                      : Style{Role::IndicatorLitText, colour, kBold};
+            segments.push_back({" " +
+                                    padText(std::string{brief ? shortText : full},
+                                            brief ? shortWidth : width, false) +
+                                    " ",
+                                style});
+            segments.push_back({" ", kBarText});
+        };
+        const auto gap = [&] { segments.push_back({" ", kBarText}); };
+        const auto lit = [](bool on) { return on ? Lit::On : Lit::Off; };
+
+        const auto arm = armed > 0 ? "ARM " + std::to_string(armed) : std::string{"ARM"};
+        indicator(arm, arm, 5, 5, lit(armed > 0), Role::IndicatorArm);
+        const bool overdub = song.recordMode == core::RecordMode::Overdub;
+        indicator(overdub ? "OVERDUB" : "REPLACE", overdub ? "ODUB" : "REPL", 7, 4, lit(armed > 0),
+                  Role::IndicatorRecordMode);
+        {
+            using enum core::CountInSettings::Mode;
+            const auto& countIn = song.countIn;
+            const auto count = [](int n, std::string_view one)
+            { return std::to_string(n) + " " + std::string{one} + (n == 1 ? "" : "S"); };
+            const bool beats =
+                countIn.mode == CountIn ? countIn.beats > 0 : countIn.preRollBeats > 0;
+            const int n = countIn.mode == CountIn
+                              ? (beats ? countIn.beats : countIn.bars)
+                              : (beats ? countIn.preRollBeats : countIn.preRollBars);
+            const auto word = std::string{countIn.mode == CountIn ? "COUNT " : "PRE "};
+            const auto full = countIn.mode == None ? std::string{"NO COUNT"}
+                                                   : word + count(n, beats ? "BEAT" : "BAR");
+            const auto shortText = countIn.mode == None
+                                       ? std::string{"NO CNT"}
+                                       : (countIn.mode == CountIn ? "CNT " : "PRE ") +
+                                             std::to_string(n) + (beats ? "B" : "");
+            indicator(full, shortText, 13, 6, lit(armed > 0 && countIn.mode != None),
+                      Role::IndicatorCount);
+        }
+        {
+            // Lit when the click will sound: always, or with tracks armed while recording or for
+            // a count-in, which clicks whatever the metronome's set to; the warning colour if it
+            // has nowhere to go.
+            using When = core::MetronomeSettings::When;
+            const auto when = song.metronome.when;
+            const bool clicks =
+                when == When::Always ||
+                (armed > 0 && (when == When::Recording ||
+                               song.countIn.mode == core::CountInSettings::Mode::CountIn));
+            indicator("CLICK", "CLK", 5, 3,
+                      !clicks       ? Lit::Off
+                      : clickPort() ? Lit::On
+                                    : Lit::Warning,
+                      Role::IndicatorClick);
+        }
+        if (step < 4)
+        {
+            gap();
+            indicator("THRU", "THR", 4, 3, lit(thru_), Role::IndicatorThru);
+            indicator("AUDITION", "AUD", 8, 3, lit(audition_), Role::IndicatorAudition);
+            indicator("REWIND", "RWD", 6, 3, lit(rewind_), Role::IndicatorRewind);
+            // Quantise bypassed is never simply on: dim, or the warning colour as a reminder
+            // that what's heard isn't what's set.
+            indicator("Q BYPASS", "QBY", 8, 3,
+                      player_ != nullptr && player_->bypassQuantize() ? Lit::Warning : Lit::Off,
+                      Role::Warning);
+        }
+        if (step < 5)
+        {
+            // The input light, and the last message in, fixed in width so nothing after it
+            // moves (decided November 2026).
+            gap();
+            segments.push_back(
+                {" IN ", inputLitUntil_ ? Style{Role::IndicatorLitText, Role::IndicatorInput, kBold}
+                                        : Style{Role::IndicatorText, Role::Indicator, kPlain}});
+            if (step < 2)
+            {
+                std::span<const std::uint8_t> last;
+                if (player_ && player_->lastInput())
+                    last = std::span{player_->lastInput()->bytes}.first(player_->lastInput()->size);
+                segments.push_back(
+                    {" " + inputText(last) + " ", {Role::BarText, Role::Indicator, kPlain}});
+            }
+            segments.push_back({" ", kBarText});
+        }
+        if (step < 1)
+        {
+            // The song's file, and [+] if it has changes not saved, as in Vim, with room kept
+            // for [+] so nothing moves as it comes and goes.
+            const auto& file = document_.file();
+            const auto& imported = document_.importedFrom();
+            const auto name = file       ? utf8Text(file->filename())
+                              : imported ? utf8Text(imported->filename()) + " (imported)"
+                                         : std::string{"No file"};
+            gap();
+            segments.push_back({" " + name + (document_.modified() ? " [+] " : "     "),
+                                {Role::BarText, Role::Indicator, kPlain}});
+        }
+        // No space after the last.
+        if (!segments.empty() && segments.back().text == " ")
+            segments.pop_back();
+        return segments;
+    };
+    const auto length = [](const std::vector<Segment>& segments)
     {
-        bottom.right.push_back({"Click   ", label});
-    }
-    bottom.right.push_back({"In", {inputLitUntil_ ? Role::Accent : Role::Dim, Role::Bar, kPlain}});
-    // The last message in, fixed in width so nothing after it moves (decided November 2026).
-    std::span<const std::uint8_t> last;
-    if (player_ && player_->lastInput())
-        last = std::span{player_->lastInput()->bytes}.first(player_->lastInput()->size);
-    bottom.right.push_back({" " + inputText(last) + "   ", kBarText});
-    bottom.right.push_back({rewind_ ? "Rewind on   " : "Rewind off   ", kBarText});
-    // The song's file, and [+] if it has changes not saved, as in Vim.
-    const auto& file = document_.file();
-    const auto& imported = document_.importedFrom();
-    const auto name = file       ? utf8Text(file->filename())
-                      : imported ? utf8Text(imported->filename()) + " (imported)"
-                                 : std::string{"No file"};
-    // Room kept for [+], so nothing moves as it comes and goes.
-    bottom.right.push_back({name + (document_.modified() ? " [+]" : "    "), kBarText});
-    // The count-in is the first to go where the line's too full for it, the mode, the transport
-    // and the rest on the right, as it's on the Metronome page and the leader's menu too.
-    if (countInRun)
+        std::size_t n = 0;
+        for (const auto& segment : segments)
+            n += decodeUtf8(segment.text).size();
+        return n;
+    };
+    const auto spacing = BarSpacing::forCell(cell_);
+    const auto columns = static_cast<std::size_t>(
+        std::max((width_ - 2 * spacing.margin) / std::max(cell_.width, 1), 1));
+    const auto gapColumns =
+        static_cast<std::size_t>((spacing.gap + cell_.width - 1) / std::max(cell_.width, 1));
+    const auto needed = length(bottom.left) - messageChars + gapColumns + length(bottom.right);
+    auto chosen = indicators(5);
+    for (int step = 0; step < 5; ++step)
     {
-        auto length = leftLength;
-        for (const auto& run : bottom.right)
-            length += decodeUtf8(run.text).size();
-        const auto spacing = BarSpacing::forCell(cell_);
-        const auto columns =
-            static_cast<std::size_t>(std::max((width_ - 2 * spacing.margin) / cell_.width, 1));
-        if (length > columns)
-            bottom.right.erase(bottom.right.begin() + static_cast<std::ptrdiff_t>(*countInRun));
+        if (auto shown = indicators(step); needed + length(shown) <= columns)
+        {
+            chosen = std::move(shown);
+            break;
+        }
     }
+    bottom.right.insert(bottom.right.end(), chosen.begin(), chosen.end());
     return bottom;
 }
 

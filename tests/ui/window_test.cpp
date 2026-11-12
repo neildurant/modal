@@ -679,6 +679,66 @@ TEST_CASE("closing a window ends its event loop once the events in hand are done
     CHECK(keys >= 1); // and it returned, with no quit event
 }
 
+// Hidden: writes the status line's indicators to look at, in the built-in themes and in
+// variants of their colours, to MODAL_SAMPLE_BMP with "-status-…" before its extension, or to
+// sample-status-….bmp: as a song opens, and armed to record with the click and a setting off.
+TEST_CASE("a sample of the status line's indicators", "[.sample]")
+{
+    auto window = offscreen(1900, 120);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    modal::test::RecordingSink sink;
+    modal::test::FakeClock clock;
+    modal::core::Engine engine{sink, clock};
+    modal::core::Player player{engine,
+                               [](std::string_view) { return modal::core::DestinationId{1}; }};
+    player.update(document.song());
+    view.setPlayer(&player);
+
+    // Variants: as built in; the settings in a muted blue with light text; each its own colour.
+    const auto variants = [](Theme theme, bool dark)
+    {
+        std::vector<std::pair<std::string, Theme>> all{{"", theme}};
+        auto muted = theme;
+        const auto quiet = *parseColour(dark ? "#3d59a1" : "#9fb3e0");
+        for (const auto role :
+             {Role::IndicatorThru, Role::IndicatorAudition, Role::IndicatorRewind})
+            muted.set(role, quiet);
+        muted.set(Role::IndicatorLitText, *parseColour(dark ? "#e6e9f5" : "#1f2a52"));
+        all.emplace_back("-muted", muted);
+        auto own = theme;
+        own.set(Role::IndicatorThru, theme[Role::TrackThru]);
+        own.set(Role::IndicatorAudition, theme[Role::TrackSolo]);
+        own.set(Role::IndicatorRewind, theme[Role::TrackChase]);
+        own.set(Role::IndicatorCount, theme[Role::TrackQuantize]);
+        all.emplace_back("-own", own);
+        return all;
+    };
+    const auto save = [&](const std::string& state)
+    {
+        for (const auto& [name, dark] : {std::pair{"dark", true}, std::pair{"light", false}})
+            for (const auto& [variant, theme] : variants(*builtInTheme(name), dark))
+            {
+                window->draw(view.frame(), theme);
+                CHECK(window->saveFrame(base + "-status-" + state + (dark ? "" : "-light") +
+                                        variant + ".bmp"));
+            }
+    };
+    save("open");
+    for (const char32_t key : std::u32string_view{U",ra,Ta"})
+        view.handle(Key::typed(key), 0);
+    view.handle(Key::of(NamedKey::Escape), 0);
+    save("armed");
+    // Narrower, as the indicators give way.
+    view.resize(window->pixelWidth() * 11 / 19, window->pixelHeight(), window->cellSize());
+    save("narrow");
+}
 TEST_CASE("a sample of marks in each view", "[.sample]")
 {
     auto window = offscreen(1000, 600);
