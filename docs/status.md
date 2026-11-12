@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: auditioning notes in the piano roll is built locally, to try. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: auditioning notes in the piano roll is accepted and published, finishing the three steps agreed that day; next is the following milestone 8 item in schedule.md. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,15 +213,15 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Auditioning notes in the piano roll (12 November 2026; local, to try)
+## Auditioning notes in the piano roll (12 November 2026; accepted and published)
 
-**First trial,** 12 November 2026: good, but for a 25 ms note on a guitar instrument that went on sounding; Modal sent its note-off 25 ms after the note-on, and the instrument, which gives each note a string, missed it (a piano played it as expected). Auditions now last at least 150 ms, so very short notes are heard too.
+**First trial,** 12 November 2026: good, but for a 25 ms note on a guitar instrument that went on sounding; Modal sent its note-off 25 ms after the note-on, and the instrument, which gives each note a string, missed it (a piano played it as expected). Auditions now last at least 150 ms, so very short notes are heard too. **Accepted** on a second trial the same day, the note sounding properly on the guitar instrument, and published.
 
 The last of the three steps. `Player::auditionNote` plays one of a track's notes through `Engine::audition` on the track's port and channel, transposed and with its velocity offset as playback would, for its length at its place in the tempo map, at least 150 ms and at most a second. The piano roll asks the workspace (`ViewHost::auditionNote`) as `o` or `O` adds a note (the first of several) and as a single note moves to a new pitch. After each key, the workspace compares the note under the piano roll's cursor, by track, tick and pitch, with the one after the last key, and plays it if it's another, unless the song changed (an edit or undo), Visual mode is on, or it's playing, stopping or recording; switching views notes the note the cursor opens on, so it isn't heard. The `audition` setting (on) and `, T a` (`audition-toggle`) turn it off, with `Audition off` in the status line; grid-advance moved to `, T g`.
 
 **Validation.** Windows Debug passes 940 tests (938, 2 skipped); WSL linux-clang-debug 941 (938, 3 skipped), no warnings. New tests: the player's audition at both PPQNs (port, channel, transpose, velocity offset, the note's length, the 150 ms minimum and the one-second cap, a missing port and a note transposed out of range refused); through the workspace on a fake clock, landing on a note heard once and not again at a key that leaves the cursor there, the next heard; `, T a` turning it off with the status line saying so, the note opened on not heard, a Visual selection silent; `o` and `Alt-k` heard, `Alt-l` and undo not; nothing but the click during a count-in.
 
-**To try:** in the piano roll, Tab, `j` / `k` and `h` / `l` onto notes, and switch tracks: each note landed on should play once, on the track's sound, for 150 ms to a second, the next cutting it off; moving within a long note shouldn't play it again. `o` and `O` should play the note added, `Alt-k` / `Alt-j` the note at its new pitch; `Alt-h` / `Alt-l` and undo shouldn't. In Visual mode, nothing. While playing or recording, nothing. `, T a` turns it off (`Audition off` in the status line) and on again; `, T g` is now grid advance. `set noaudition` in modalrc should start with it off.
+**Tried:** in the piano roll, Tab, `j` / `k` and `h` / `l` onto notes, and switch tracks: each note landed on should play once, on the track's sound, for 150 ms to a second, the next cutting it off; moving within a long note shouldn't play it again. `o` and `O` should play the note added, `Alt-k` / `Alt-j` the note at its new pitch; `Alt-h` / `Alt-l` and undo shouldn't. In Visual mode, nothing. While playing or recording, nothing. `, T a` turns it off (`Audition off` in the status line) and on again; `, T g` is now grid advance. `set noaudition` in modalrc should start with it off.
 
 ## Recorded tracks silent while replacing (12 November 2026; accepted and published)
 
