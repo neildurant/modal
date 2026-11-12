@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: recording's handling of inputs that can't be used and input lost is accepted and published; saving the remaining recording settings is next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: recording's input handling is accepted and published, and the recording settings were found already saved (design.md, Which recording settings are whose); automated coverage and real MIDI trials for recording are next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
