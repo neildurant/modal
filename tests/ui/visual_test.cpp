@@ -704,14 +704,15 @@ TEST_CASE("ie takes the whole song on the section strip, every track; on a track
 namespace
 {
 
+// The two rows along the bottom, the message row and the status line.
 std::u32string statusLine(const Selecting& s)
 {
     std::u32string text;
     const auto frame = s.ws.frame();
-    for (const auto& run : frame.back().text)
-    {
-        text += run.text;
-    }
+    for (const auto& region : frame)
+        if (region.bounds.y >= frame.back().bounds.y - frame.back().bounds.height)
+            for (const auto& run : region.text)
+                text += run.text;
     return text;
 }
 

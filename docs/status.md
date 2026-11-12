@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the status line's indicators (step 1 of rearranging the status line) are accepted and published; a permanent message row is proposed next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the message row (step 2 of rearranging the status line) is built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## The message row (12 November 2026; local, to try)
+
+Step 2 of rearranging the status line (design.md, The message row). The window has two rows along the bottom: the message row, always there on the new `message-line` panel, and the status line under it. The row holds a message (a warning with a mark at its left edge), or else the freeze choice's or a track move's keys, a hint while a field is edited, what an operator waiting will do, or the Visual selection and its warnings; at its right, the search and its count, keys waiting, and `recording @a`. The `:` prompt is drawn on it; the palette's matches, the hint menu, completions, listings, the freeze choice and long messages stand on it. The status line holds the mode, the transport and place, the piano roll's grid and the indicators, so the indicators give way only to the window's width. The view is a row shorter.
+
+**Validation.** Windows Debug passes 942 tests (940, 2 skipped); WSL linux-clang-debug 943 (940, 3 skipped), no warnings. A new test checks the row is always there just above the status line, holds a long message, a field's hint, a Visual selection and the prompt, and that the status line's indicators stay where they were through each; tests that read messages, hints or the prompt from the status line, or counted the frame's regions or the view's rows, now read the row or allow for it. Renders of the row with a message, a warning, the prompt and Visual mode were looked at in both themes.
+
+**To try:** edit the count-in on the Metronome page (`, m s`), whose hint pushed the indicators before: it should show on the row above, the indicators staying put. Then look at messages (`u`, `, T a`), a warning (an edit refused while recording), the `:` prompt, `Ctrl-p`'s palette, the hint menu (`,`), a Visual selection, an operator waiting (`d`), keys waiting (`2`), a search (`/`), and `Qa` recording a macro: each on the row, the status line still.
 
 ## The status line's indicators (12 November 2026; accepted and published)
 

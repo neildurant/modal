@@ -58,3 +58,6 @@ highlight indicator-thru        #2e7de9
 highlight indicator-audition    #2e7de9
 highlight indicator-rewind      #2e7de9
 highlight indicator-input       #587539
+
+" The row above the status line for messages, hints and the : prompt, a panel always there.
+highlight message-line #e6e8ef

@@ -356,7 +356,7 @@ void Workspace::layOut()
     }
     // The view's own bar and the inspector, each with half a line after it, then the view, and
     // the status line at the bottom.
-    layout_ = layoutWindow(width_, height_, cell_, view().topHeights(cell_), 1, cell_.height / 2);
+    layout_ = layoutWindow(width_, height_, cell_, view().topHeights(cell_), 2, cell_.height / 2);
     view().resize(layout_, width_, cell_);
 }
 

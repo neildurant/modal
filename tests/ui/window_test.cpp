@@ -735,6 +735,20 @@ TEST_CASE("a sample of the status line's indicators", "[.sample]")
         view.handle(Key::typed(key), 0);
     view.handle(Key::of(NamedKey::Escape), 0);
     save("armed");
+    // The message row: a message, a warning, the prompt, and a Visual selection.
+    view.setMessage("Armed Bass to record", MessageKind::Information);
+    save("message");
+    view.setMessage("Bass is being recorded: change it once recording stops", MessageKind::Warning);
+    save("warning");
+    view.handle(Key::of(NamedKey::Escape), 0);
+    for (const char32_t key : std::u32string_view{U":countin 2"})
+        view.handle(Key::typed(key), 0);
+    save("prompt");
+    view.handle(Key::of(NamedKey::Escape), 0);
+    for (const char32_t key : std::u32string_view{U"Vjj"})
+        view.handle(Key::typed(key), 0);
+    save("visual");
+    view.handle(Key::of(NamedKey::Escape), 0);
     // Narrower, as the indicators give way.
     view.resize(window->pixelWidth() * 11 / 19, window->pixelHeight(), window->cellSize());
     save("narrow");

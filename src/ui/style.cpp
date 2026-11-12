@@ -58,6 +58,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "indicator-audition",
     "indicator-rewind",
     "indicator-input",
+    "message-line",
 };
 
 std::optional<int> hexDigit(char c)

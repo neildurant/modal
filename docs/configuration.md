@@ -21,7 +21,7 @@ modal --write-config modalrc
 
 which won't overwrite a file unless you add `--force`. Whatever you've changed from the defaults (in your `modalrc`, or since starting) is written as commands; everything else is there commented out at its default, with what it does. Uncomment and change only the lines you want, and the rest keep following Modal's defaults as they improve.
 
-If a command fails, the first error shows in the status line until you press a key, as `modalrc:12: unknown setting "fontsiz"`, and the rest of the file still runs. On Linux all errors are also printed to stderr.
+If a command fails, the first error shows on the message row, above the status line, until you press a key, as `modalrc:12: unknown setting "fontsiz"`, and the rest of the file still runs. On Linux all errors are also printed to stderr.
 
 ## The : prompt
 
@@ -77,7 +77,7 @@ Keys are written as in Vim. A typed character stands for itself (`j`, `G`, `$`);
 
 When a sequence is bound as well as a longer one starting with it (such as `z` and `zz`), Modal waits up to `timeoutlen` milliseconds for the next key before running the shorter.
 
-After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the status line: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists what each range and object would take in the view you're in: the objects, the operator's own key first (`d` for `dd`), under "Objects", and the motions under "Motions", side by side with a faint rule between them, or one under the other in a narrow window. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
+After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and after an operator such as `d`, a pause of `hintdelay` milliseconds shows the hint menu above the message row: each key that can come next and what it does, keys that start more marked `+` with their group's title. After an operator it lists what each range and object would take in the view you're in: the objects, the operator's own key first (`d` for `dd`), under "Objects", and the motions under "Motions", side by side with a faint rule between them, or one under the other in a narrow window. Keep typing to go on, or Escape to give the keys up. `set nohints` turns it off.
 
 `, ?` lists every key that does something where the cursor is, in groups (Moving the cursor, Editing fields and so on), each command once with all its keys. Each group is kept whole in one column: one that doesn't fit below the last starts the next column, and only a group longer than a whole column goes on in the next, its title repeated as continued. A binding without a hint isn't listed beside one of the same command that has one, so giving only one of several keys a hint lists that one. `q`, Escape or `?` closes it, and `j` and `k` turn its pages when it needs more than one.
 
@@ -126,7 +126,7 @@ The roles are:
 | Role | For |
 |------|-----|
 | `background`, `text`, `dim`, `accent`, `warning` | the window and its text |
-| `message` | a message in the status line, such as the new text size |
+| `message` | a message on the message row, such as the new text size |
 | `cursor`, `cursor-text` | the cursor and the text on it |
 | `selection` | the background of what's selected |
 | `playhead` | the background of what's playing, such as the event list's row |
@@ -138,6 +138,7 @@ The roles are:
 | `event-sign` | a sign in a ruler for a program or tempo change |
 | `indicator`, `indicator-text` | a status line indicator that's off, and its text |
 | `indicator-lit-text` | the text of an indicator that's lit |
+| `message-line` | the row above the status line for messages, hints and the `:` prompt |
 | `indicator-arm`, `indicator-record-mode`, `indicator-count`, `indicator-click`, `indicator-thru`, `indicator-audition`, `indicator-rewind`, `indicator-input` | each indicator's colour when lit: ARM, REPLACE or OVERDUB, the count-in, CLICK, THRU, AUDITION, REWIND and IN; one in the warning colour uses `warning` |
 | `field` | the background of a field free text is typed into, such as a track's name or a port's alias, so it shows as one even when empty, and of a field chosen from a drop-down list |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |

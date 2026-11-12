@@ -147,10 +147,11 @@ struct Paletting
     {
         std::vector<std::pair<int, std::u32string>> found;
         const auto frame = ws.frame();
-        const auto& status = frame.back().bounds;
+        const auto& status =
+            std::ranges::find(frame, Role::MessageLine, &Region::background)->bounds;
         for (const auto& region : frame)
         {
-            // The panel just above the status line, its first run each row's title.
+            // The panel just above the message row, its first run each row's title.
             if (region.background != Role::Panel || region.text.empty() ||
                 region.bounds.y + region.bounds.height != status.y)
             {
@@ -255,8 +256,10 @@ TEST_CASE("the palette from Visual mode runs commands as their keys would there"
     {
         std::u32string text;
         const auto frame = p.ws.frame();
-        for (const auto& run : frame.back().text)
-            text += run.text;
+        for (const auto* region :
+             {&*std::ranges::find(frame, Role::MessageLine, &Region::background), &frame.back()})
+            for (const auto& run : region->text)
+                text += run.text;
         return text;
     };
     p.type(U"vl");
@@ -534,13 +537,14 @@ TEST_CASE(
         return std::tuple{status.y - line.bounds.y, text, line.bounds.y + line.bounds.height};
     };
     const auto [tall, all, lineEnd] = layout();
-    // The matches under the line, down to the status line, which nothing covers.
+    // The matches under the line, down to the message row; nothing covers it or the status line.
     const auto frame = p.ws.frame();
+    const auto row = std::ranges::find(frame, Role::MessageLine, &Region::background)->bounds;
     CHECK(std::ranges::any_of(frame,
                               [&](const Region& r)
                               {
                                   return r.background == Role::Panel && r.bounds.y == lineEnd &&
-                                         r.bounds.y + r.bounds.height == frame.back().bounds.y;
+                                         r.bounds.y + r.bounds.height == row.y;
                               }));
     CHECK(all.find(U"Command: ") == 0);
     p.type(U"zoom in");

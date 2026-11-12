@@ -76,6 +76,19 @@ void type(Workspace& view, std::u32string_view keys)
 }
 
 // A row of a region, as text, from the text runs on that row.
+std::u32string rowText(const Region& region, int row);
+
+// The two rows along the bottom: the message row, or the prompt on it, then the status line.
+std::u32string bottomText(const Frame& frame)
+{
+    std::u32string text;
+    const auto top = frame.back().bounds.y - frame.back().bounds.height;
+    for (const auto& region : frame)
+        if (region.bounds.y >= top)
+            text += rowText(region, 0) + U'|';
+    return text;
+}
+
 std::u32string rowText(const Region& region, int row)
 {
     std::u32string line(static_cast<std::size_t>(region.bounds.width / kCell.width + 1), U' ');
@@ -130,7 +143,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(v.view.field() == Column::Position);
 
     const auto frame = v.ws.frame();
-    REQUIRE(frame.size() == 4);
+    REQUIRE(frame.size() == 5);
     CHECK(contains(rowText(frame[1], 0), U"Track 1: Bass"));
     CHECK(contains(rowText(frame[1], 0), U"Pro-800"));
     CHECK(contains(rowText(frame[1], 0), U"Section: Section 1"));
@@ -170,21 +183,21 @@ TEST_CASE("the event list opens on track 1, at its first row")
     // The status line names the song's file, with [+] once it has changes not saved, where it's
     // wide enough.
     v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U"No file"));
+    CHECK(contains(bottomText(v.ws.frame()), U"No file"));
     type(v.ws, U"4jx");
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U"No file [+]"));
+    CHECK(contains(bottomText(v.ws.frame()), U"No file [+]"));
     type(v.ws, U"u");
-    CHECK_FALSE(contains(rowText(v.ws.frame()[3], 0), U"[+]"));
+    CHECK_FALSE(contains(bottomText(v.ws.frame()), U"[+]"));
     const auto list = frame[0];
     CHECK(contains(rowText(list, 0), U"Position"));
     CHECK(contains(rowText(list, 0), U"Release"));
     CHECK(contains(rowText(list, 5), U"note"));
     CHECK(contains(rowText(list, 5), U"E1 (28)"));
     CHECK(contains(rowText(list, 5), U"1/8"));
-    CHECK(contains(rowText(frame[3], 0), U"NORMAL"));
+    CHECK(contains(bottomText(frame), U"NORMAL"));
     // Where the cursor is is in the bar above, not here.
-    CHECK_FALSE(contains(rowText(frame[3], 0), U"1:1:000"));
-    CHECK_FALSE(contains(rowText(frame[3], 0), U"Section 1"));
+    CHECK_FALSE(contains(bottomText(frame), U"1:1:000"));
+    CHECK_FALSE(contains(bottomText(frame), U"Section 1"));
 
     // The conductor's rows are dimmed; the cursor's field is in the cursor's colours.
     CHECK(styleAt(list, 2, 1).background == Role::Cursor);
@@ -548,7 +561,7 @@ TEST_CASE("Enter edits a field in place: typing replaces it, and Enter sets it")
     CHECK(rowText(v.ws.frame()[0], 5).find(U"96") == before); // right-justified as it was
     CHECK(v.ws.mode() == Mode::CommandLine);
     CHECK(v.view.fieldLine().text() == U"96");
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U"EDIT"));
+    CHECK(contains(bottomText(v.ws.frame()), U"EDIT"));
     // Highlighted whole while typing would replace it, then with a cursor once it's moved.
     const auto column = static_cast<int>(before);
     CHECK(styleAt(v.ws.frame()[0], column, 5).background == Role::Cursor);
@@ -742,6 +755,7 @@ TEST_CASE("Ctrl-PageDown and Ctrl-PageUp go through the tracks, the conductor as
 TEST_CASE("the event list scrolls by half and whole pages, and Ctrl with j and k keep place")
 {
     Viewing v{demoSong()};
+    v.ws.resize(120 * kCell.width, 25 * kCell.height, kCell); // a row for the message row
     REQUIRE(v.view.viewRows() == 15); // below the inspector, the track's bar and the headings
     v.ws.handle(Key::typed(U'd', kCtrl), 0);
     CHECK(v.view.row() == 7);
@@ -825,7 +839,7 @@ TEST_CASE("a count shows until a key uses it or Escape gives it up")
     CHECK(v.ws.handle(Key::typed(U'4'), 0));
     CHECK(v.ws.handle(Key::typed(U'0'), 0));
     CHECK(v.ws.pending() == "40");
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U"40"));
+    CHECK(contains(bottomText(v.ws.frame()), U"40"));
     CHECK(v.ws.handle(Key::of(NamedKey::Escape), 0));
     CHECK(v.ws.pending().empty());
     type(v.ws, U"5x"); // a key with no binding gives the count up too
@@ -839,7 +853,7 @@ TEST_CASE("a message shows in the status line until the next key")
     Viewing v;
     v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
     v.ws.setMessage("modalrc:3: unknown setting", MessageKind::Warning);
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U"modalrc:3: unknown setting"));
+    CHECK(contains(bottomText(v.ws.frame()), U"modalrc:3: unknown setting"));
     CHECK(v.ws.handle(Key::typed(U'x'), 0)); // unbound, but the message goes
     CHECK(v.ws.message().empty());
 }
@@ -874,7 +888,7 @@ TEST_CASE("colon opens a prompt where keys are typed, and Enter hands the line o
     CHECK(v.ws.commandLine().text() == U"set fontsize=14j");
     CHECK(v.view.row() == 0);
     v.ws.handle(Key::of(NamedKey::Backspace), 0);
-    CHECK(contains(rowText(v.ws.frame()[3], 0), U":set fontsize=14"));
+    CHECK(contains(bottomText(v.ws.frame()), U":set fontsize=14"));
     v.ws.handle(Key::of(NamedKey::Enter), 0);
     CHECK(v.ws.mode() == Mode::Normal);
     CHECK(lines == std::vector<std::string>{"set fontsize=14"});
@@ -1348,12 +1362,8 @@ TEST_CASE("a message too long for the status line is shown whole above it until 
     const auto shown = panel();
     CHECK(shown.find(U"conductor's meter first|") != std::u32string::npos);
     CHECK(std::ranges::count(shown, U'|') >= 2); // wrapped onto lines
-    // And only there, not cut short on the status line as well.
-    const auto frame = v.ws.frame();
-    for (const auto& run : frame.back().text)
-    {
-        CHECK(run.text.find(U"Bass's bars") == std::u32string::npos);
-    }
+    // And only there, not cut short on the message row as well.
+    CHECK(bottomText(v.ws.frame()).find(U"Bass's bars") == std::u32string::npos);
     v.ws.handle(Key::typed(U'j'), 0);
     CHECK(panel().empty());
 }

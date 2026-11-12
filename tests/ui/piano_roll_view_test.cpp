@@ -1554,7 +1554,7 @@ TEST_CASE("the list of keys keeps each group whole in one column")
         }
         return hints;
     };
-    r.ws.resize(120 * kCell.width, 16 * kCell.height, kCell);
+    r.ws.resize(120 * kCell.width, 17 * kCell.height, kCell);
     const std::vector<Workspace::KeyGroup> groups{
         {"First", keys(3)}, {"Second", keys(4)}, {"Long", keys(30)}, {"Last", keys(2)}};
     const auto pages = r.ws.keyPages(groups);

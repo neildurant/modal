@@ -66,10 +66,10 @@ struct Arranging
     {
         std::u32string text;
         const auto frame = ws.frame();
-        for (const auto& run : frame.back().text)
-        {
-            text += run.text;
-        }
+        for (const auto& region : frame) // the message row and the status line
+            if (region.bounds.y >= frame.back().bounds.y - frame.back().bounds.height)
+                for (const auto& run : region.text)
+                    text += run.text;
         return text;
     }
 
@@ -116,13 +116,13 @@ TEST_CASE("the arrangement's cursor is a bar of a track, moved by bars and track
     // The view's bar names the cursor's track, and the inspector its bar.
     const auto frame = a.ws.frame();
     std::u32string bar;
-    for (const auto& run : frame[frame.size() - 3].text)
+    for (const auto& run : frame[frame.size() - 4].text)
     {
         bar += run.text;
     }
     CHECK(contains(bar, U"Track 2:"));
     std::u32string inspector;
-    for (const auto& run : frame[frame.size() - 2].text)
+    for (const auto& run : frame[frame.size() - 3].text)
     {
         inspector += run.text + U" ";
     }
@@ -500,7 +500,7 @@ TEST_CASE("k from the first track, or gs, goes onto the section strip, and j bac
     REQUIRE(s.strip() == 1u);
     std::u32string inspector;
     const auto frame = s.ws.frame();
-    for (const auto& run : frame[frame.size() - 2].text)
+    for (const auto& run : frame[frame.size() - 3].text)
     {
         inspector += run.text + U" ";
     }
@@ -1139,7 +1139,7 @@ namespace
 // A run of the inspector's text, by what it says, a field's filled out to its width.
 const TextRun& inspectorRun(const Frame& frame, std::u32string_view text)
 {
-    const auto& region = frame[frame.size() - 2];
+    const auto& region = frame[frame.size() - 3];
     const auto run = std::ranges::find_if(region.text,
                                           [&](const TextRun& r)
                                           {
@@ -1163,7 +1163,7 @@ TEST_CASE("a section's name goes under its heading, its Bars and Length where a 
     CHECK(name.x == kind.x);
     CHECK(name.y == kind.y + kCell.height);
     // The bar's column, after its kind, which says the same.
-    const auto& barRuns = onBar[onBar.size() - 2].text;
+    const auto& barRuns = onBar[onBar.size() - 3].text;
     const auto column = std::ranges::find_if(barRuns, [](const TextRun& run)
                                              { return run.text == U"Bar" && run.x > 100; });
     REQUIRE(column != barRuns.end());
@@ -1173,7 +1173,7 @@ TEST_CASE("a section's name goes under its heading, its Bars and Length where a 
     // Neither says where it is or its meter, which the bar above does.
     for (const auto* frame : {&onBar, &onStrip})
     {
-        const auto& runs = (*frame)[frame->size() - 2].text;
+        const auto& runs = (*frame)[frame->size() - 3].text;
         CHECK(std::ranges::find(runs, U"Position", &TextRun::text) == runs.end());
         CHECK(std::ranges::find(runs, U"Meter", &TextRun::text) == runs.end());
     }
@@ -1199,7 +1199,7 @@ TEST_CASE(
     const auto valueUnder = [&](std::u32string_view heading)
     {
         const auto& title = inspectorRun(frame, heading);
-        const auto& region = frame[frame.size() - 2];
+        const auto& region = frame[frame.size() - 3];
         const auto run = std::ranges::find_if(
             region.text, [&](const TextRun& candidate)
             { return candidate.x == title.x && candidate.y == title.y + kCell.height; });
@@ -1208,7 +1208,7 @@ TEST_CASE(
     };
     CHECK(valueUnder(U"Notes") == U"1");
     CHECK(valueUnder(U"Other events") == U"3");
-    const auto& region = frame[frame.size() - 2];
+    const auto& region = frame[frame.size() - 3];
     CHECK(std::ranges::find(region.text, U"Section", &TextRun::text) == region.text.end());
 }
 

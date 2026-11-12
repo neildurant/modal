@@ -111,6 +111,7 @@ Frame Workspace::frame() const
     {
         frame.push_back(freezeChoiceRegion());
     }
+    frame.push_back(messageRowRegion());
     if (mode_ == Mode::CommandLine && !view().typing())
     {
         frame.push_back(promptRegion());
@@ -181,22 +182,37 @@ std::string Workspace::operatorAbout() const
 
 Region Workspace::statusRegion() const
 {
+    auto region = layoutBar(statusBar(), width_, cell_, BarSpacing::forCell(cell_));
+    region.bounds = statusRow();
+    return region;
+}
+
+Region Workspace::messageRowRegion() const
+{
+    // A panel always there, so what's said has a place; a warning marked at its left edge too.
     // A message too long for it is shown above it alone, not cut short here as well.
-    auto region =
-        layoutBar(statusBar(messageLines().empty()), width_, cell_, BarSpacing::forCell(cell_));
-    region.bounds = layout_.bottom[0];
+    const bool above = !messageLines().empty();
+    auto region = layoutBar(messageBar(!above), width_, cell_, BarSpacing::forCell(cell_));
+    region.bounds = messageRow();
+    if (!above && !message_.empty() && messageKind_ == MessageKind::Warning && !promptRowShown())
+    {
+        region.under.push_back(
+            {{0, 0, std::max(BarSpacing::forCell(cell_).margin / 2, 2), cell_.height},
+             Role::Warning,
+             255});
+    }
     return region;
 }
 
 std::vector<std::string> Workspace::messageLines() const
 {
-    // Whether the status line holds it, with what's beside it; if not, its words in lines as
+    // Whether the message row holds it, with what's beside it; if not, its words in lines as
     // wide as the window.
-    if (message_.empty())
+    if (message_.empty() || promptRowShown())
     {
         return {};
     }
-    const auto bar = statusBar();
+    const auto bar = messageBar();
     const auto spacing = BarSpacing::forCell(cell_);
     const int columns = std::max((width_ - 2 * spacing.margin) / cell_.width, 1);
     int used = (spacing.gap + cell_.width - 1) / cell_.width;
@@ -252,7 +268,83 @@ Region Workspace::messageRegion(const std::vector<std::string>& lines) const
     return region;
 }
 
-Bar Workspace::statusBar(bool withMessage) const
+Bar Workspace::messageBar(bool withMessage) const
+{
+    // Everything whose length varies, so the status line under it never moves (decided
+    // 12 November 2026): what was just said, or else what's going on; and at the right, keys
+    // waiting, the search and macro recording.
+    Bar row;
+    row.background = Role::MessageLine;
+    if (promptRowShown())
+    {
+        return row; // the prompt is drawn here instead
+    }
+    const Style text{Role::BarText, Role::MessageLine, kPlain};
+    const Style dim{Role::Dim, Role::MessageLine, kPlain};
+    const Style accent{Role::Accent, Role::MessageLine, kPlain};
+    if (!message_.empty())
+    {
+        const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
+        if (withMessage)
+            row.left.push_back({message_, {role, Role::MessageLine, kPlain}});
+    }
+    else if (freezeChoice_)
+    {
+        row.left.push_back({"Up and Down choose, Enter freezes, Escape cancels", text});
+    }
+    else if (trackMove_)
+    {
+        row.left.push_back({"j and k move, Enter accepts, Escape puts back", text});
+    }
+    else if (const auto hint = view().typingHint())
+    {
+        row.left.push_back({*hint, text});
+    }
+    else if (operator_ && mode_ == Mode::OperatorPending)
+    {
+        // What the operator waiting will do, and what its doubled key takes.
+        row.left.push_back({operatorAbout(), text});
+    }
+    else if (const auto selected = mode_ == Mode::Visual ? view().selectionStatus() : std::nullopt)
+    {
+        row.left.push_back({*selected, text});
+        if (const auto warning = view().selectionWarning())
+        {
+            row.left.push_back({"; " + *warning, {Role::Warning, Role::MessageLine, kPlain}});
+        }
+        if (selection_ && selection_->cut)
+        {
+            row.left.push_back({"; cutting at the edges", accent});
+        }
+        if (selection_ && selection_->filter)
+        {
+            row.left.push_back({"; only the matches", accent});
+        }
+    }
+    if (searching_.query)
+    {
+        row.right.push_back({"/" + searching_.text + " ", dim});
+        row.right.push_back({view().matchStatus(*searching_.query), text});
+    }
+    if (const auto keys = pending(); !keys.empty())
+    {
+        if (!row.right.empty())
+            row.right.push_back({"   ", text});
+        row.right.push_back({keys, {Role::Accent, Role::MessageLine, kBold}});
+    }
+    if (macros_.recording != 0)
+    {
+        const auto ends = keysFor("macro-record");
+        if (!row.right.empty())
+            row.right.push_back({"   ", text});
+        row.right.push_back({"recording " + macroName(macros_.recording) + ", " +
+                                 (ends.empty() ? std::string{":macro-record"} : ends) + " ends it",
+                             {Role::Accent, Role::MessageLine, kBold}});
+    }
+    return row;
+}
+
+Bar Workspace::statusBar() const
 {
     const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
@@ -301,65 +393,6 @@ Bar Workspace::statusBar(bool withMessage) const
                                style});
     }
 
-    // A message that doesn't fit goes above (see messageLines), so the indicators don't give way
-    // to it.
-    std::size_t messageChars = 0;
-    if (macros_.recording != 0)
-    {
-        const auto ends = keysFor("macro-record");
-        bottom.left.push_back({"  recording " + macroName(macros_.recording) + ", " +
-                                   (ends.empty() ? std::string{":macro-record"} : ends) +
-                                   " ends it",
-                               {Role::Accent, Role::Bar, kBold}});
-    }
-    if (freezeChoice_ && (!withMessage || message_.empty()))
-    {
-        bottom.left.push_back({"  Up and Down choose, Enter freezes, Escape cancels", kBarText});
-    }
-    else if (trackMove_)
-    {
-        bottom.left.push_back({"  j and k move, Enter accepts, Escape puts back", kBarText});
-    }
-    else if (withMessage && !message_.empty())
-    {
-        const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
-        bottom.left.push_back({"  " + message_, {role, Role::Bar, kPlain}});
-        messageChars = decodeUtf8(bottom.left.back().text).size();
-    }
-    else if (const auto hint = view().typingHint())
-    {
-        bottom.left.push_back({"  " + *hint, kBarText});
-    }
-    else if (operator_ && mode_ == Mode::OperatorPending)
-    {
-        // What the operator waiting will do, and what its doubled key takes.
-        bottom.left.push_back({"  " + operatorAbout(), kBarText});
-    }
-    else if (const auto selected = mode_ == Mode::Visual ? view().selectionStatus() : std::nullopt)
-    {
-        bottom.left.push_back({"  " + *selected, kBarText});
-        if (const auto warning = view().selectionWarning())
-        {
-            bottom.left.push_back({"; " + *warning, {Role::Warning, Role::Bar, kPlain}});
-        }
-        if (selection_ && selection_->cut)
-        {
-            bottom.left.push_back({"; cutting at the edges", {Role::Accent, Role::Bar, kPlain}});
-        }
-        if (selection_ && selection_->filter)
-        {
-            bottom.left.push_back({"; only the matches", {Role::Accent, Role::Bar, kPlain}});
-        }
-    }
-    if (const auto keys = pending(); !keys.empty())
-    {
-        bottom.right.push_back({keys + "   ", {Role::Accent, Role::Bar, kBold}});
-    }
-    if (searching_.query)
-    {
-        bottom.right.push_back({"/" + searching_.text + " ", label});
-        bottom.right.push_back({view().matchStatus(*searching_.query) + "   ", kBarText});
-    }
     // The view's grid, the one setting that's the view's, padded so what follows stays put.
     if (const auto grid = view().gridStatus())
     {
@@ -502,7 +535,7 @@ Bar Workspace::statusBar(bool withMessage) const
         std::max((width_ - 2 * spacing.margin) / std::max(cell_.width, 1), 1));
     const auto gapColumns =
         static_cast<std::size_t>((spacing.gap + cell_.width - 1) / std::max(cell_.width, 1));
-    const auto needed = length(bottom.left) - messageChars + gapColumns + length(bottom.right);
+    const auto needed = length(bottom.left) + gapColumns + length(bottom.right);
     auto chosen = indicators(5);
     for (int step = 0; step < 5; ++step)
     {

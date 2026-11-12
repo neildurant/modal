@@ -1365,3 +1365,57 @@ TEST_CASE("the status line's indicators keep their places whatever they say, dim
     p.type(U",Ta");
     CHECK(places() == before);
 }
+
+TEST_CASE("the message row is always there, holding messages, hints, selections and the prompt, "
+          "so the status line under it never moves")
+{
+    Playing p;
+    p.ws.resize(150 * kCell.width, 24 * kCell.height, kCell);
+    const auto bottom = [&]
+    {
+        const auto frame = p.ws.frame();
+        const auto row = std::ranges::find(frame, Role::MessageLine, &Region::background);
+        REQUIRE(row != frame.end());
+        CHECK(row->bounds.y + row->bounds.height == frame.back().bounds.y); // just above it
+        std::u32string text;
+        for (const auto& region : frame)
+            if (region.bounds.y == row->bounds.y)
+                for (const auto& run : region.text)
+                    text += run.text;
+        std::vector<std::pair<int, std::u32string>> status;
+        for (const auto& run : frame.back().text)
+            // Leaving out the mode, and the padding after it that keeps the rest in place.
+            if (run.text != U" NORMAL " && run.text != U" EDIT " && run.text != U" VISUAL " &&
+                run.text.find_first_not_of(U' ') != std::u32string::npos)
+                status.emplace_back(run.x, run.text);
+        return std::pair{text, status};
+    };
+    auto [empty, status] = bottom();
+    CHECK(empty.empty());
+    // A long message, a hint while a field is edited, a Visual selection and the prompt each go
+    // on the row, the status line under it as it was.
+    p.ws.setMessage(
+        "A message long enough to have pushed the indicators about when it shared their "
+        "line",
+        MessageKind::Information);
+    CHECK(bottom().first.starts_with(U"A message long enough"));
+    CHECK(bottom().second == status);
+    p.press(Key::of(NamedKey::Escape));
+    while (p.view.list().rows()[p.view.row()].kind != RowKind::Event)
+        p.type(U"j");
+    status = bottom().second; // the cursor's place, on the left, has moved
+    p.press(Key::of(NamedKey::Enter));
+    REQUIRE(p.view.typing());
+    CHECK_FALSE(bottom().first.empty());
+    CHECK(bottom().second == status);
+    p.press(Key::of(NamedKey::Escape));
+    p.type(U"Vj");
+    CHECK_FALSE(bottom().first.empty());
+    CHECK(bottom().second == status);
+    p.press(Key::of(NamedKey::Escape));
+    p.type(U":countin");
+    CHECK(bottom().first.starts_with(U":countin"));
+    CHECK(bottom().second == status);
+    p.press(Key::of(NamedKey::Escape));
+    CHECK(bottom().first.empty());
+}

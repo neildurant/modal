@@ -174,7 +174,7 @@ Region Workspace::freezeChoiceRegion() const
 {
     const auto& choice = *freezeChoice_;
     const auto& reasons = freezeReasons();
-    const auto& bottom = layout_.bottom[0];
+    const auto bottom = messageRow();
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
     const int height = static_cast<int>(kFreezeParts.size() + 1) * cell_.height + 2 * pad;

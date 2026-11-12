@@ -1795,10 +1795,10 @@ TEST_CASE("While an operator waits, the status line says what it will do, and wh
     {
         std::string text;
         const auto frame = o.ws.frame();
-        for (const auto& run : frame.back().text)
-        {
-            text += encodeUtf8(run.text);
-        }
+        for (const auto& region : frame) // the message row and the status line
+            if (region.bounds.y >= frame.back().bounds.y - frame.back().bounds.height)
+                for (const auto& run : region.text)
+                    text += encodeUtf8(run.text);
         return text;
     };
     o.type(U"gr3>");

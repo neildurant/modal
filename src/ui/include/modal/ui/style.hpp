@@ -76,9 +76,10 @@ enum class Role : std::uint8_t
     IndicatorAudition,
     IndicatorRewind,
     IndicatorInput,
+    MessageLine, // the row above the status line for messages, hints and the : prompt
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::IndicatorInput) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::MessageLine) + 1;
 
 // A role's name, as themes and highlight write it: lower case with hyphens, such as
 // cursor-text or density-1; and the role of a name, if there is one.

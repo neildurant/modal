@@ -575,19 +575,30 @@ private:
     CommandResult labelsToSections(core::Tick from, core::Tick to);
     CommandResult renameSection(std::string_view name);
 
-    // The prompt's line, on a row of its own above the status line, or at the top of the
-    // palette, which never covers the status line; and whether it shows on its own row.
+    // The two rows along the bottom (decided 12 November 2026): the message row, always there,
+    // and the status line under it.
+    Rect messageRow() const { return layout_.bottom.front(); }
+    Rect statusRow() const { return layout_.bottom.back(); }
+    // The prompt's line, on the message row, or at the top of the palette, whose matches stand
+    // on the message row.
     Region promptRegion() const;
     bool promptRowShown() const;
-    // What panels above the status line stand on: the status line, or the prompt's row.
+    // What panels above the bottom rows stand on: the message row.
     Rect panelBase() const;
     // How many of the palette's matches show, the same however many match.
     std::size_t paletteRows() const;
     Region statusRegion() const;
     std::string operatorAbout() const;
-    // The status line, without the message when it is shown above it instead.
-    Bar statusBar(bool withMessage = true) const;
-    // A message too long for the status line, shown whole, wrapped, in a panel above it until
+    // The status line: the mode, the transport and place on the left and the indicators on the
+    // right, nothing in it changing in length but as the window's width does.
+    Bar statusBar() const;
+    // The message row: a message, or else what's going on (an operator waiting, a Visual
+    // selection, a hint while editing), with keys waiting, the search and macro recording at
+    // its right; nothing while the prompt is open there. Without the message when it's shown
+    // above instead.
+    Bar messageBar(bool withMessage = true) const;
+    Region messageRowRegion() const;
+    // A message too long for the message row, shown whole, wrapped, in a panel above it until
     // the next key (decided October 2026); its lines, none if it fits.
     std::vector<std::string> messageLines() const;
     Region messageRegion(const std::vector<std::string>& lines) const;

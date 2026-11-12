@@ -101,7 +101,7 @@ A find or search counts (`3fE`, `3n`). After an operator, `f` takes the range th
 - **Counts.** A count before an operator with a "how far" of its own is how far (`3>ib` up three semitones, `2t]b` two grid steps); one after it is the range's (`>3ib` three bars). For `d`, `y`, `q`, `^`, `~` and `!`, counts before and after multiply.
 - **What each takes.** Transposing, velocity, quantising and humanising change notes only. Shifting moves every event in the range, so pedalling and controllers stay with their notes; in the piano roll, which shows only notes, it moves the notes.
 - **Refused whole.** A change that would put a note out of range, an event before the song's start, or a note onto another of its pitch is refused, naming the note, rather than made in part.
-- **While an operator waits,** the status line says what it will do ("Transpose up 3 semitones · then a range or object"), and the hint menu lists the objects and the motions apart, each with what it would take here.
+- **While an operator waits,** the message row says what it will do ("Transpose up 3 semitones · then a range or object"), and the hint menu lists the objects and the motions apart, each with what it would take here.
 - **`x` and `Y`** delete and yank the note or event under the cursor.
 
 ## Ranges
@@ -157,7 +157,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 - What was taken as bars (`dd`, `ib`, `ab`, the arrangement's bars) goes to the start of the cursor's bar; anything else to the cursor. The event list has `p` but not `P`.
 - **At the cursor's pitch,** the notes keep their intervals to the pitch the cursor was on when they were taken (in Visual mode, the pitch the selection was started on; taken outside the piano roll, their lowest), so a riff or chord shape moves to another pitch.
 - **`:put-ending`** (no key) puts the register over what's there so it ends at the cursor, or at its bar line for bars: a sweep ending on a downbeat.
-- After a put the status line says what, how and where ("Put 4 events in Bass at bar 3, over what's there").
+- After a put the message row says what, how and where ("Put 4 events in Bass at bar 3, over what's there").
 - **Registers:** `"a` before a yank, delete or put uses register a; `"A` adds to it. `:registers` lists them.
 
 ## Whole tracks and their settings
@@ -165,7 +165,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$` go to the first/last column; `gg` / `G` go to the first/last track, or track N with a count. Page keys scroll through rows. Space keeps its transport meaning.
 
 - The hint menu gives a toggle's name and what it's set to now, such as `Rewind: on` or `Mute this track: off`.
-- While a field is edited, here and in every view, the status line says what it takes and what the keys do; Up and Down step a value that can be stepped.
+- While a field is edited, here and in every view, the message row says what it takes and what the keys do; Up and Down step a value that can be stepped.
 - Enter or `e` edits the selected field in its cell; while it's highlighted whole, typing replaces the value and Backspace or Delete clears it, and a key that moves the cursor keeps it for editing. Enter commits, Escape leaves it, and Tab/Shift-Tab commit and move to the next/previous editable track column, wrapping at the ends.
 - **Output** (after Input, `▾` at its right) is chosen from a list at the cell, with Default first: typing narrows it, whatever the case, Up and Down move through it, and Enter or Tab takes the one chosen, or Escape leaves it. Only what's listed can be chosen, `:port NAME` still taking a name. `Default` and `All` are dim in the table, as following the machine's choice. A port that can't be used is in the warning colour, with the inspector saying why: not found, disabled (`(disabled)` in the chooser rather than `(not found)`), no default set, the default not found or disabled, or for All no input enabled or connected; it stays until something else is chosen.
 - Grid, Length and Vel are what the piano roll uses for the track: its editing grid, and a new note's length and velocity. Length is a note length, or `grid` to follow the grid.
@@ -287,4 +287,4 @@ The leader is `,` (the `leader` setting). Its groups:
 - **A question at the prompt** shows its default in brackets, which Enter takes ("how many (1)").
 - **In any line typed into,** Escape gives it up; Backspace on an empty line does nothing, so a press too many can't throw away what's being asked.
 - **`Ctrl-p`** opens the command palette: type part of a command's name or what it does. A first `@`, `#`, `'` or `?` searches sections, tracks, labels and marks, or settings. What's typed is at the palette's top, the best match first under it; Down and Ctrl-n go to the next, Up and Ctrl-p back.
-- The `:` prompt, search and questions are typed on a row of their own above the status line, which nothing covers; Tab's matches show in a small popup above the word, the first nearest the line; Up goes on through them and Down back, Down from none chosen starting at the top one shown.
+- The `:` prompt, search and questions are typed on the message row, above the status line, which nothing covers; Tab's matches show in a small popup above the word, the first nearest the line; Up goes on through them and Down back, Down from none chosen starting at the top one shown.

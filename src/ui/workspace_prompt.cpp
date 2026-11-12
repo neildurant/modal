@@ -33,7 +33,6 @@ namespace modal::ui
 namespace
 {
 
-constexpr Style kBarText{Role::BarText, Role::Bar, kPlain};
 constexpr Style kCursor{Role::CursorText, Role::Cursor, kPlain};
 
 } // namespace
@@ -965,10 +964,10 @@ bool Workspace::runPalette(std::string_view command)
 
 std::size_t Workspace::paletteRows() const
 {
-    // As many as set, or as fit above the status line with the line above them.
+    // As many as set, or as fit above the message row with the line above them.
     const auto wanted = settings_ != nullptr ? settings_->integer("palettelines") : 10;
     const int pad = cell_.height / 4;
-    const int room = (layout_.bottom[0].y - cell_.height - 2 * pad) / std::max(cell_.height, 1);
+    const int room = (messageRow().y - cell_.height - 2 * pad) / std::max(cell_.height, 1);
     return static_cast<std::size_t>(
         std::max<std::int64_t>(std::min<std::int64_t>(wanted, room), 1));
 }
@@ -989,7 +988,7 @@ Region Workspace::paletteRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const int pad = cell_.height / 4;
     const int height = static_cast<int>(rows) * cell_.height + 2 * pad;
-    const auto& status = layout_.bottom[0];
+    const auto status = messageRow();
     Region region{.bounds = {status.x, status.y - height, status.width, height},
                   .background = Role::Panel,
                   .text = {},
@@ -1092,19 +1091,14 @@ bool Workspace::promptRowShown() const
 
 Rect Workspace::panelBase() const
 {
-    auto base = layout_.bottom[0];
-    if (promptRowShown())
-    {
-        base.y -= cell_.height;
-    }
-    return base;
+    return messageRow();
 }
 
 Region Workspace::promptRegion() const
 {
     // ":" and the line, from where the cursor still fits, and the cursor as a cell of its own;
-    // on a row of its own above the status line, or above the palette's matches with how many
-    // there are at its right (decided November 2026, so nothing covers the status line).
+    // on the message row (decided 12 November 2026), or above the palette's matches with how
+    // many there are at its right (decided November 2026, so nothing covers the status line).
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto& text = prompt_.line.text();
     const auto cursor = prompt_.line.cursor();
@@ -1112,30 +1106,32 @@ Region Workspace::promptRegion() const
     const auto room = static_cast<std::size_t>(
         std::max((width_ - 2 * margin) / cell_.width - 1 - static_cast<int>(label.size()), 1));
     const std::size_t first = cursor >= room ? cursor - room + 1 : 0;
-    auto bounds = layout_.bottom[0];
-    bounds.y -= cell_.height;
+    auto bounds = messageRow();
     std::string count;
     if (prompt_.palette)
     {
         const int pad = cell_.height / 4;
-        bounds.y -= static_cast<int>(paletteRows()) * cell_.height + 2 * pad;
+        bounds.y -= cell_.height + static_cast<int>(paletteRows()) * cell_.height + 2 * pad;
         const auto matches = paletteShown().size();
         count = prompt_.palette->chosen && matches > 0
                     ? std::to_string(std::min(*prompt_.palette->chosen, matches - 1) + 1) + "/" +
                           std::to_string(matches)
                     : std::to_string(matches);
     }
-    Region region{.bounds = bounds, .background = Role::Bar, .text = {}, .under = {}, .over = {}};
+    // On the message row, its colour; over the palette, the bars'.
+    const auto background = prompt_.palette ? Role::Bar : Role::MessageLine;
+    const Style plain{Role::BarText, background, kPlain};
+    Region region{.bounds = bounds, .background = background, .text = {}, .under = {}, .over = {}};
     const auto x = [&](std::size_t column)
     { return margin + static_cast<int>(column) * cell_.width; };
     const auto lead = label.size();
-    region.text.push_back({x(0), 0, label, kBarText});
-    region.text.push_back({x(lead), 0, text.substr(first, cursor - first), kBarText});
+    region.text.push_back({x(0), 0, label, plain});
+    region.text.push_back({x(lead), 0, text.substr(first, cursor - first), plain});
     const char32_t under = cursor < text.size() ? text[cursor] : U' ';
     region.text.push_back({x(lead + cursor - first), 0, std::u32string(1, under), kCursor});
     if (cursor + 1 < text.size())
     {
-        region.text.push_back({x(lead + 1 + cursor - first), 0, text.substr(cursor + 1), kBarText});
+        region.text.push_back({x(lead + 1 + cursor - first), 0, text.substr(cursor + 1), plain});
     }
     // The command's arguments not yet typed, dimmed after the line ([N] [METER]).
     if (const auto hint = argumentHint(); !hint.empty())
@@ -1145,7 +1141,7 @@ Region Workspace::promptRegion() const
         region.text.push_back({x(lead + end - first + (spaced ? 0 : 1)),
                                0,
                                decodeUtf8(hint),
-                               {Role::Dim, Role::Bar, kPlain}});
+                               {Role::Dim, background, kPlain}});
     }
     // The palette's count, as its position among the matches once one is chosen: 3/120.
     if (!count.empty())
@@ -1153,7 +1149,7 @@ Region Workspace::promptRegion() const
         region.text.push_back({width_ - margin - static_cast<int>(count.size()) * cell_.width,
                                0,
                                decodeUtf8(count),
-                               {Role::Dim, Role::Bar, kPlain}});
+                               {Role::Dim, background, kPlain}});
     }
     return region;
 }
