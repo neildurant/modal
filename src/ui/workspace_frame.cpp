@@ -370,29 +370,29 @@ Bar Workspace::statusBar() const
         const Style panel{Role::BarText, Role::Indicator, kPlain};
         const Style style = playing ? Style{Role::Accent, Role::Indicator, kBold} : panel;
         const auto gap = [&] { bottom.left.push_back({" ", kBarText}); };
-        // Recording, and how, first, lit as arming is, so it shows however narrow.
+        // What the transport's doing, first, as a block always there and as wide whatever it
+        // says, so nothing after it moves (decided November 2026, the block 12 November 2026):
+        // stopped, dim; playing, lit; recording, and how, lit as arming is.
         const bool overdub = song.recordMode == core::RecordMode::Overdub;
+        std::string word = "■ STOP";
+        Style state{Role::IndicatorText, Role::Indicator, kPlain};
         if (const auto phase = player_->recordPhase())
         {
-            // Each as wide as the others, so the transport doesn't move as one gives way to the
-            // next (decided November 2026).
             using enum core::Player::RecordPhase;
-            const std::string_view word = *phase == CountIn   ? "COUNT"
-                                          : *phase == PreRoll ? "PRE"
-                                          : overdub           ? "ODUB"
-                                                              : "REC";
-            auto text = "● " + std::string{word};
-            text.resize(std::string_view{"● COUNT"}.size(), ' ');
-            bottom.left.push_back(
-                {" " + text + " ", {Role::IndicatorLitText, Role::IndicatorArm, kBold}});
-            bottom.left.push_back({" ", style});
+            word = *phase == CountIn   ? "● COUNT"
+                   : *phase == PreRoll ? "● PRE"
+                   : overdub           ? "● ODUB"
+                                       : "● REC";
+            state = {Role::IndicatorLitText, Role::IndicatorArm, kBold};
         }
-        else
+        else if (playing)
         {
-            bottom.left.push_back({playing ? " ▶ " : " ■ ",
-                                   playing ? style : Style{Role::Dim, Role::Indicator, kPlain}});
+            word = "▶ PLAY";
+            state = {Role::IndicatorLitText, Role::Accent, kBold};
         }
-        bottom.left.push_back({place.position + "  " + place.time + " ", style});
+        bottom.left.push_back({" " + padText(word, 7, false) + " ", state});
+        gap();
+        bottom.left.push_back({" " + place.position + "  " + place.time + " ", style});
         gap();
         bottom.left.push_back({" " + place.meter + " ", panel});
         gap();
@@ -547,6 +547,12 @@ Bar Workspace::statusBar() const
         }
     }
     bottom.right.insert(bottom.right.end(), chosen.begin(), chosen.end());
+    // Every field a chip on the bar, a little short of its top and bottom, so the bar reads as
+    // what they stand on however closely they're packed (decided 12 November 2026, after use).
+    for (auto* side : {&bottom.left, &bottom.right})
+        for (auto& segment : *side)
+            if (segment.style.background != bottom.background)
+                segment.style.attributes |= kInset;
     return bottom;
 }
 

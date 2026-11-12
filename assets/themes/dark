@@ -61,5 +61,6 @@ highlight indicator-audition    #7aa2f7
 highlight indicator-rewind      #7aa2f7
 highlight indicator-input       #9ece6a
 
-" The row above the status line for messages, hints and the : prompt, a panel always there.
-highlight message-line #2f3349
+" The row above the status line for messages, hints and the : prompt, always there, in the bar's
+" colour, so the two rows are one band and only the status line's fields stand out as chips.
+highlight message-line #24283b

@@ -173,6 +173,26 @@ TEST_CASE("bold text is heavier, and underlining draws a line across the cells")
     CHECK(window->pixel(cell.width * 3, lineRow) == background);
 }
 
+TEST_CASE(
+    "an inset background stops short of the cell's top and bottom, the region's showing there")
+{
+    auto window = offscreen(320, 200);
+    const auto theme = *builtInTheme("dark");
+    const auto cell = window->cellSize();
+    Region region{.bounds = {0, 0, window->pixelWidth(), cell.height},
+                  .background = Role::Bar,
+                  .text = {},
+                  .under = {},
+                  .over = {}};
+    region.text.push_back({0, 0, U"  ", Style{Role::Text, Role::Indicator, kInset}});
+    region.text.push_back({cell.width * 3, 0, U"  ", Style{Role::Text, Role::Indicator, kPlain}});
+    window->draw({region}, theme);
+    CHECK(window->pixel(1, 0) == theme[Role::Bar]);
+    CHECK(window->pixel(1, cell.height / 2) == theme[Role::Indicator]);
+    CHECK(window->pixel(1, cell.height - 1) == theme[Role::Bar]);
+    CHECK(window->pixel(cell.width * 3 + 1, 0) == theme[Role::Indicator]); // not inset
+}
+
 TEST_CASE("a region is clipped to its bounds, with shapes under and over its text")
 {
     auto window = offscreen(320, 200);

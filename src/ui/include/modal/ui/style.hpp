@@ -96,6 +96,9 @@ inline constexpr Attributes kPlain = 0;
 inline constexpr Attributes kBold = 1;
 inline constexpr Attributes kUnderline = 2;
 inline constexpr Attributes kReverse = 4; // foreground and background swapped
+// The background drawn a little short of the cell's top and bottom, so what's behind shows
+// above and below it, as the status line's fields sit on it as chips (decided 12 November 2026).
+inline constexpr Attributes kInset = 8;
 
 struct Style
 {

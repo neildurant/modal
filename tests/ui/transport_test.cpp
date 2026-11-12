@@ -1440,11 +1440,32 @@ TEST_CASE("the status line's transport, meter, tempo and section are each on a p
     CHECK(background(U" 4/4 ") == Role::Indicator);
     CHECK(background(U" BPM") == Role::Indicator);
     CHECK(background(decodeUtf8(p.document.song().sections()[0]->name())) == Role::Indicator);
+    // Each a chip on the bar.
+    const auto chips = p.ws.frame();
+    for (const auto& run : chips.back().text)
+        if (run.style.background != Role::Bar)
+            CHECK((run.style.attributes & kInset) != 0);
+    // The transport's state a block as wide stopped, playing or recording, so nothing moves.
+    const auto meterX = [&]
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            if (run.text == U" 4/4 ")
+                return run.x;
+        return -1;
+    };
+    const auto stopped = meterX();
+    CHECK(background(U"■ STOP") == Role::Indicator);
     p.type(U",ra");
     p.type(U"R");
     p.runFor(10ms);
     REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::CountIn);
     CHECK(background(U"● COUNT") == Role::IndicatorArm);
+    CHECK(meterX() == stopped);
+    p.runFor(2100ms);
+    REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::Recording);
+    CHECK(background(U"● REC") == Role::IndicatorArm);
+    CHECK(meterX() == stopped);
     p.type(U" ");
     p.runFor(10ms);
 }

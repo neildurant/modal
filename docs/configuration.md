@@ -138,7 +138,7 @@ The roles are:
 | `event-sign` | a sign in a ruler for a program or tempo change |
 | `indicator`, `indicator-text` | a status line indicator that's off, and its text |
 | `indicator-lit-text` | the text of an indicator that's lit |
-| `message-line` | the row above the status line for messages, hints and the `:` prompt |
+| `message-line` | the row above the status line for messages, hints and the `:` prompt (the bar's colour in the built-in themes) |
 | `indicator-arm`, `indicator-record-mode`, `indicator-count`, `indicator-click`, `indicator-thru`, `indicator-audition`, `indicator-rewind`, `indicator-input` | each indicator's colour when lit: ARM, REPLACE or OVERDUB, the count-in, CLICK, THRU, AUDITION, REWIND and IN; one in the warning colour uses `warning` |
 | `field` | the background of a field free text is typed into, such as a track's name or a port's alias, so it shows as one even when empty, and of a field chosen from a drop-down list |
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |

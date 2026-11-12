@@ -176,7 +176,11 @@ void Window::drawRegion(const Region& region, const Theme& theme)
         if (colour != regionBackground)
         {
             const auto width = static_cast<int>(run.text.size()) * cell.width;
-            fill(renderer, offset({run.x, run.y, width, cell.height}, bounds), colour);
+            // An inset background stops about a seventh of the cell short at the top and bottom.
+            const int inset =
+                (run.style.attributes & kInset) != 0 ? std::max(1, (cell.height + 3) / 7) : 0;
+            fill(renderer, offset({run.x, run.y + inset, width, cell.height - 2 * inset}, bounds),
+                 colour);
         }
     }
     for (const auto& shape : region.under)
