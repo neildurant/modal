@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the status line's indicators (step 1 of rearranging the status line) are built locally, to try. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the status line's indicators (step 1 of rearranging the status line) are accepted and published; a permanent message row is proposed next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## The status line's indicators (12 November 2026; local, to try)
+## The status line's indicators (12 November 2026; accepted and published)
+
+**Accepted** on trial, 12 November 2026: the built-in colours rather than the variants, with the click lit in the settings' blue, as it may be left on while composing, and published. Found in the trial: a long hint, such as the Metronome page's `How long the count is, 1-99`, made the indicators give way, as text on the left counts against their room (messages don't). Proposed next, instead of the order first planned: a permanent message row above the status line for everything whose length varies (messages, hints, state, pending keys, the search's count) and the `:` prompt, leaving the status line fixed-width things only; then the left's panels; then narrow windows.
 
 The first of four steps rearranging the status line (schedule.md, milestone 8; design.md, The status line's indicators). The right side is now a row of indicators, each always in its place at a fixed width, dim or lit: `ARM`, `REPLACE` / `OVERDUB`, the count-in, `CLICK`; `THRU`, `AUDITION`, `REWIND`, `Q BYPASS`; `IN` with the last message; the file's name. Eleven theme roles (`indicator`, `indicator-text`, `indicator-lit-text` and one per indicator) are in both built-in themes. As they're wider than what they replace, they give way where the line's too narrow, in provisional steps (the file's name, the input's message, short words, the settings, the `IN` light), measured without any message, which goes above when it doesn't fit; so at 120 columns the file's name has gone and a short message more often goes above. `Armed 1 Replace  Count-in 1 bar`, `Thru off`, `Audition off`, `Quantise bypassed`, `No click` and `Click` are gone from the status line.
 
@@ -221,7 +223,7 @@ Renders (`[.sample]` "a sample of the status line's indicators") show the line a
 
 **Validation.** Windows Debug passes 941 tests (939, 2 skipped); WSL linux-clang-debug builds without warnings, none failing. New and changed tests: each indicator dim, lit or warning as its state changes (rewind, thru, audition, quantise bypass, arm, replace and overdub, count-in and pre-roll in bars and beats, the click lit, and warning without a port), short words when narrower, and the indicators keeping their places as arming, the record mode, the count-in and audition change; the input light lit and dim with the file's name staying put as the message changes.
 
-**To try:** look at the status line as a song opens, then arm a track (`, r a`), switch replace and overdub (`, r m`), cycle the count-in (`, m c`), turn audition, rewind and thru on and off (`, T a`, `, T Space`, `, T t`), bypass quantise (`, T q`), and play a note in: each indicator should light and dim in place, nothing moving. Narrow the window to see them give way. Say which colours work, or which of the variants appeals; they're theme roles, so trying others is quick.
+**Tried:** look at the status line as a song opens, then arm a track (`, r a`), switch replace and overdub (`, r m`), cycle the count-in (`, m c`), turn audition, rewind and thru on and off (`, T a`, `, T Space`, `, T t`), bypass quantise (`, T q`), and play a note in: each indicator should light and dim in place, nothing moving. Narrow the window to see them give way. Say which colours work, or which of the variants appeals; they're theme roles, so trying others is quick.
 
 ## Auditioning notes in the piano roll (12 November 2026; accepted and published)
 
