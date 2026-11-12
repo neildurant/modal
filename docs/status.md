@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: step 4 of rearranging the status line, how it gives way in narrow windows, is committed locally and waiting to be tried; steps 1 to 3 are accepted and published. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: rearranging the status line is done, its fourth step, how it gives way in narrow windows, accepted and published; the rest of milestone 8 is next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Narrow windows (12 November 2026; waiting to be tried)
+## Narrow windows (12 November 2026; accepted and published)
+
+**Accepted** on trial, 12 November 2026, as adapting well to the window's size, and published.
 
 Step 4 of rearranging the status line (design.md, The status line's indicators). The whole line now gives way as one, in the agreed order: the file's name, the input's last message, the section cut short to six characters with `…`, short words for the indicators, the settings, the section, the `IN` light, the meter, then the tempo. The mode, the transport's state, place and time, and the recording group always stay; below about 61 columns even those don't fit, and the line is cut at its end as before.
 
