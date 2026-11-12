@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: layout tweaks to the status line, Tracks, Ports and Metronome pages are committed locally and waiting to be tried; then automated coverage and real MIDI trials for recording. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: layout tweaks to the status line, Tracks, Ports and Metronome pages are accepted and published; automated coverage and real MIDI trials for recording are next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Layout tweaks after use (12 November 2026; waiting to be tried)
+## Layout tweaks after use (12 November 2026; accepted and published)
+
+**Accepted** on trial, 12 November 2026: the groups apparent, Tracks more balanced, the Ports inspector more solid, and the Metronome page more balanced. The Metronome page's tighter spacing for short windows didn't show in the trial, as the smallest window there left room; it stays as a safeguard for windows of fewer rows.
 
 Agreed 12 November 2026 (schedule.md, milestone 8; decisions.md, Layout tweaks after use). The status line's indicator groups are three cells apart, a cell within. The Tracks view has three blank cells after the Q button and two between Input and Output. The Ports inspector shows Port (padded to the longest known name), then State (`Enabled`, `Disabled`, `Not connected`), then About. The Metronome page has a blank row between its groups and half a row between rows, the half rows and then the blank ones going where the window's too short; Channel's, the notes' and the counts' boxes are the same width; velocities are labelled `Vel`; the Test buttons are chips.
 
