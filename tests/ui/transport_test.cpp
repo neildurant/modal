@@ -957,6 +957,238 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
     CHECK_FALSE(hasPitch(p.document.song(), id, 99));
 }
 
+namespace
+{
+// Where the note of that pitch starts on the track, if there is one.
+std::optional<core::Tick> noteAt(const core::Song& song, core::TrackId id, std::uint8_t pitch)
+{
+    for (const auto& event : song.events(id).all())
+        if (const auto* note = std::get_if<core::Note>(&event.data); note && note->pitch == pitch)
+            return event.tick;
+    return std::nullopt;
+}
+
+// Records from the marker with no count-in: R, then a note held for 200 ms after `after`, then
+// a stop.
+void takeWithout(Playing& p, std::chrono::nanoseconds after, std::uint8_t pitch)
+{
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    p.runFor(after);
+    playNote(p, pitch);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE_FALSE(p.player.recording());
+}
+} // namespace
+
+TEST_CASE("a take lands at the right ticks at a coarse resolution too")
+{
+    Playing p;
+    // A song of one armed track at 96 to the quarter, at 120 BPM: a quarter is 500 ms.
+    p.document.edit("Coarse", {},
+                    [](core::Song& song)
+                    {
+                        song = core::Song{core::Ppqn{96}};
+                        song.updateTempo([](core::TempoMap& tempo)
+                                         { tempo.set(0, core::Tempo{500'000}); });
+                        const auto id = song.addTrack();
+                        song.updateTrack(id, [](core::Track& track) { track.arm = true; });
+                    });
+    p.player.update(p.document.song());
+    p.registry.runLine("countin off");
+    const auto id = p.document.song().tracks()[0]->id();
+    takeWithout(p, 500ms, 60);
+    const auto at = noteAt(p.document.song(), id, 60);
+    REQUIRE(at);
+    CHECK(*at >= 96);
+    CHECK(*at <= 96 + 2); // within a few milliseconds of the beat
+}
+
+TEST_CASE("a take through a tempo change lands where the music is, not where the clock was")
+{
+    Playing p;
+    const auto ppqn = p.document.song().ppqn();
+    const auto q = ppqn.quarter();
+    // 120 BPM for the first bar, then 60: bar 2's second beat is 2 s and then 1 s in.
+    p.document.edit("Tempo", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTempo(
+                            [&](core::TempoMap& tempo)
+                            {
+                                tempo.set(0, core::Tempo{500'000});
+                                tempo.set(ppqn.whole(), core::Tempo{1'000'000});
+                            });
+                    });
+    p.player.update(p.document.song());
+    p.registry.runLine("countin off");
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    takeWithout(p, 3s, 99);
+    const auto at = noteAt(p.document.song(), id, 99);
+    REQUIRE(at);
+    CHECK(*at >= ppqn.whole() + q);
+    CHECK(*at <= ppqn.whole() + q + q / 50); // within 20 ms at 60 BPM
+}
+
+TEST_CASE("after a take the marker goes back to the record point with rewind, and stays where "
+          "it stopped without")
+{
+    Playing p;
+    REQUIRE(p.ws.rewind());
+    p.registry.runLine("countin off");
+    p.type(U",ra");
+    const auto from = p.player.marker();
+    takeWithout(p, 1s, 99);
+    CHECK(p.player.marker() == from);
+
+    p.type(U",T ");
+    REQUIRE_FALSE(p.ws.rewind());
+    takeWithout(p, 1s, 98);
+    CHECK(p.player.marker() > from);
+    // The next take starts where the last one stopped.
+    const auto next = p.player.marker();
+    const auto id = armed(p.document)->id();
+    takeWithout(p, 0ms, 97);
+    const auto at = noteAt(p.document.song(), id, 97);
+    REQUIRE(at);
+    CHECK(*at >= next);
+}
+
+TEST_CASE("two takes in a row are an undo step each, the second replacing the first")
+{
+    Playing p;
+    p.registry.runLine("countin off");
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    takeWithout(p, 500ms, 99);
+    REQUIRE(hasPitch(p.document.song(), id, 99));
+    // Over the same bars, so replace takes the first take out.
+    takeWithout(p, 500ms, 98);
+    CHECK(hasPitch(p.document.song(), id, 98));
+    CHECK_FALSE(hasPitch(p.document.song(), id, 99));
+    p.type(U"u");
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK_FALSE(hasPitch(p.document.song(), id, 98));
+    p.type(U"u");
+    CHECK_FALSE(hasPitch(p.document.song(), id, 99));
+    CHECK_FALSE(hasPitch(p.document.song(), id, 98));
+    // Overdubbing, a second take keeps the first.
+    p.type(U",rm");
+    takeWithout(p, 500ms, 99);
+    takeWithout(p, 1s, 98);
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK(hasPitch(p.document.song(), id, 98));
+    p.type(U"u");
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK_FALSE(hasPitch(p.document.song(), id, 98));
+}
+
+TEST_CASE("through a pre-roll, what's played before the record point is left out, a note held "
+          "across it starts there, and the take follows")
+{
+    Playing p;
+    const auto ppqn = p.document.song().ppqn();
+    const auto q = ppqn.quarter();
+    p.document.edit(
+        "Tempo", {}, [](core::Song& song)
+        { song.updateTempo([](core::TempoMap& tempo) { tempo.set(0, core::Tempo{500'000}); }); });
+    p.registry.runLine("preroll 1");
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    p.player.setMarker(ppqn.whole()); // recording from bar 2, the song from bar 1
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    const auto send = [&](std::array<std::uint8_t, 3> bytes)
+    { REQUIRE(p.engine.receive(core::InputId{0}, bytes, p.clock.time)); };
+    p.runFor(500ms);
+    send({0x90, 50, 100}); // played and let go in the pre-roll
+    p.runFor(200ms);
+    send({0x80, 50, 0});
+    p.runFor(800ms);
+    send({0x90, 51, 100}); // held across the record point, 2 s in
+    p.runFor(1000ms);
+    send({0x80, 51, 0});
+    p.runFor(500ms);
+    send({0x90, 52, 100}); // 3 s in, two beats after the record point
+    p.runFor(200ms);
+    send({0x80, 52, 0});
+    p.runFor(100ms);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE_FALSE(p.player.recording());
+    const auto& song = p.document.song();
+    CHECK_FALSE(noteAt(song, id, 50));
+    CHECK(noteAt(song, id, 51) == ppqn.whole());
+    const auto played = noteAt(song, id, 52);
+    REQUIRE(played);
+    CHECK(*played >= ppqn.whole() + 2 * q);
+    CHECK(*played <= ppqn.whole() + 2 * q + q / 25); // within 20 ms
+}
+
+TEST_CASE("while overdubbing a pedal pressed in the count-in and held starts at the record point, "
+          "and what was there stays")
+{
+    Playing p;
+    p.type(U",ra,rm");
+    REQUIRE(p.document.song().recordMode == core::RecordMode::Overdub);
+    const auto id = armed(p.document)->id();
+    const auto old = p.document.song().events(id).all();
+    const std::vector<core::Event> was{old.begin(), old.end()};
+    const auto from = p.player.marker();
+    p.type(U"R");
+    p.runFor(1500ms); // in the count-in
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0xB0, 64, 127},
+                             p.clock.time));
+    p.runFor(1000ms); // into the take
+    playNote(p, 99);
+    REQUIRE(
+        p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0xB0, 64, 0}, p.clock.time));
+    p.runFor(100ms);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE_FALSE(p.player.recording());
+    const auto now = p.document.song().events(id).all();
+    const std::vector<core::Event> after{now.begin(), now.end()};
+    for (const auto& event : was)
+        CHECK(std::ranges::find(after, event) != after.end());
+    const auto down = std::ranges::find_if(
+        after,
+        [&](const core::Event& event)
+        {
+            const auto* cc = std::get_if<core::ControlChange>(&event.data);
+            return cc && cc->controller == 64 && cc->value == 127 && event.tick == from;
+        });
+    CHECK(down != after.end());
+    CHECK(hasPitch(p.document.song(), id, 99));
+}
+
+TEST_CASE("recording onto two armed tracks puts the take on each, and says so as a warning")
+{
+    Playing p;
+    setTrack(p, 0, true, "");
+    setTrack(p, 1, true, "");
+    const auto& tracks = p.document.song().tracks();
+    const auto first = tracks[0]->id();
+    const auto second = tracks[1]->id();
+    const auto names = tracks[0]->name + ", " + tracks[1]->name;
+    p.registry.runLine("countin off");
+    p.type(U"R");
+    CHECK(p.ws.message() == "Recording onto " + names);
+    CHECK(p.ws.messageKind() == MessageKind::Warning);
+    p.runFor(500ms);
+    playNote(p, 99);
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(hasPitch(p.document.song(), first, 99));
+    CHECK(hasPitch(p.document.song(), second, 99));
+    CHECK(p.ws.message() == "Recorded onto " + names);
+    p.type(U"u");
+    CHECK_FALSE(hasPitch(p.document.song(), first, 99));
+    CHECK_FALSE(hasPitch(p.document.song(), second, 99));
+}
+
 TEST_CASE("the leader then r and m switches the song between replace and overdub")
 {
     Playing p;

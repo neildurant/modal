@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: layout tweaks to the status line, Tracks, Ports and Metronome pages are accepted and published; automated coverage and real MIDI trials for recording are next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: recording's automated coverage is filled in and published; its hardware checklist, below, is waiting for runs on Windows and Linux, the last of milestone 8. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,21 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## Recording: coverage and hardware trials (12 November 2026; checklist waiting to be run)
+
+Milestone 8's last item (schedule.md). The audit of recording's tests against the design found the core well covered (the recorder's and count-in's tests all at three resolutions, nearly all the scheduler's, engine's, player's and plan's) and the workspace's end-to-end tests short in places. Added, as workspace tests driving `R` with keys through the engine: a take at 96 PPQN landing on its beat; a take through a tempo change landing where the music is; the marker after a take, back at the record point with rewind and where it stopped without, the next take starting there; two takes in a row, each an undo step, the second replacing the first in replace mode and kept with it in overdub; a pre-roll take, what's played before the record point left out and a note held across it starting there; overdub with a pedal pressed in the count-in, starting at the record point with what was there kept; and two armed tracks recorded at once. All passed as written, finding no fault. Windows Debug passes 955 tests; WSL linux-clang-debug 956, no warnings.
+
+**Hardware checklist**, for Neil on Windows and on the Linux laptop with the UM-ONE. Record each result here, with the date and system.
+
+1. **Recording accuracy, re-run** as the input path changed after October (bounded and fair input taking, input sessions, named inputs, the engine woken at once): `modal-loopback --port NAME --record`, then with `--chord 4`, with the options of October's runs. October's results, for comparison (design.md, Measured recording): Windows all 2,000 notes, 1 to 3 ticks late, median 2; Linux all 2,000, 2 to 5 ticks late, median 3. Expect the same, and nothing lost, out of order or unexpected.
+2. **A take from a keyboard:** arm a track, `R`, play to the click through the count-in and on, Space; play it back and check it sounds as played, and that `u` undoes it.
+3. **Pre-roll and overdub:** a pre-roll take from bar 5, playing along; then the same bars in overdub, adding to it. In replace mode, check the track goes silent from the record point.
+4. **Sustain pedal** held across the record point and across the stop: the take should start and end with it, nothing left held.
+5. **Two tracks armed** on different channels and sounds: one take onto both, each playing its own sound.
+6. **Unplug the keyboard mid-take,** then stop: the stop message should say the input was lost, and what was played before it kept.
+7. **A flood:** sweep the mod wheel and pitch bend hard, with aftertouch if the keyboard sends it, through a take. Nothing should be lost; if anything is, `IN` should turn the warning colour and the stop message say how many.
+8. **Thru while recording:** whether it feels immediate through the count-in and the take.
 
 ## Layout tweaks after use (12 November 2026; accepted and published)
 
