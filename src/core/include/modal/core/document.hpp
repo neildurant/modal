@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace modal::core
@@ -54,7 +55,32 @@ public:
 
     explicit Document(Song song = Song{}, std::optional<std::filesystem::path> file = std::nullopt);
 
-    const Song& song() const { return song_; }
+    // The song as the views show it: the song, or while recording, the song with the take so
+    // far (see setPreview).
+    const Song& song() const;
+
+    // The song itself, beneath any preview: what edits change, undo goes back through, saving
+    // writes and the listener hears.
+    const Song& underlying() const { return song_; }
+
+    // While recording, the views are shown the song with the take so far, as it would be if
+    // recording stopped now (decided November 2026), while edits, undo and saving keep to the
+    // song beneath. `preview` makes what's shown from the song, at once, again whenever the
+    // song changes, and when refreshPreview() is called, as the take grows. Empty to show the
+    // song again.
+    using Preview = std::function<Song(const Song&)>;
+    void setPreview(Preview preview);
+    void refreshPreview();
+
+    // While set, an edit, undo or redo whose result the guard objects to isn't made: the song
+    // and its history stay as they were, and the guard's reason is kept for takeRefusal(), as
+    // edits to the tracks being recorded are refused (decided November 2026). The guard is
+    // given the song before and after.
+    using Guard = std::function<std::optional<std::string>(const Song& before, const Song& after)>;
+    void setGuard(Guard guard) { guard_ = std::move(guard); }
+
+    // Why the last change was refused since last asked, if one was, and forgets it.
+    std::optional<std::string> takeRefusal() { return std::exchange(refusal_, std::nullopt); }
 
     // The file the song was loaded from or last saved to, if any.
     const std::optional<std::filesystem::path>& file() const { return file_; }
@@ -131,12 +157,18 @@ private:
     // Keeps the song as it is now as a new version, dropping any that could have been
     // redone and the oldest beyond the undo levels.
     void record(EditStep step);
-    // Goes to a version, rebuilding the song from its parts.
-    void restore(std::size_t index);
+    // Goes to a version, rebuilding the song from its parts, unless the guard refuses it.
+    bool restore(std::size_t index);
+    // Whether the guard lets the song become `after`, keeping its reason if not.
+    bool allowed(const Song& after);
     void trim();
     void changed();
 
     Song song_;
+    Preview preview_;
+    std::optional<Song> shown_; // the preview, while there is one
+    Guard guard_;
+    std::optional<std::string> refusal_;
     std::optional<std::filesystem::path> file_;
     std::optional<std::filesystem::path> importedFrom_;
     std::deque<State> states_;

@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 11 November 2026: the metronome controls, Metronome page and drop-down lists are accepted and published. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the take shown as it's played is built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,17 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## The take shown as it's played (12 November 2026; local, to try)
+
+The first of three steps agreed on 12 November 2026 (schedule.md, milestone 8): show the take as it's played; then silence recorded tracks in replace mode; then audition notes in the piano roll. Held notes and pedals ending at the stop, and the pass as one undo step, were already built with linear recording, and now have a workspace test too.
+
+- **The preview:** `Document` has a preview layer: `song()` is what the views show, `underlying()` the song that edits, undo, saving, export and the listener use. While recording, the workspace sets the preview to `Player::previewTake`, which is `Recorder::finish` at the playhead, made again each frame of the record phase. Places that copy the whole song and write it back (the Metronome page, `, m m` / `, m c`, Visual put's restore, the search's redo) copy `underlying()`. The preview is made at once and in place, so a reference to `song()` stays good through an edit, as one to the song does.
+- **The guard:** `Document::setGuard` refuses an edit, undo or redo whose result it objects to, leaving the song and history as they were, and keeps the reason; `Workspace::report` refuses with it after any command. While recording, it objects to a change to a recorded track's events.
+
+**Validation.** Windows Debug passes 933 tests (931, 2 skipped). New tests: the document's preview (shown, made again on a change, edits and the listener on the song beneath, cleared) and guard (edit, undo and redo refused with the history kept, other changes made); through the workspace on a fake clock, a held note growing in what's shown while the song is untouched, old events going as the playhead passes in replace mode and the rest kept, a note and pedal held at the stop ending there, and edits and undo refused on the recorded track while the next track's edits are kept, with undo afterwards going back through both.
+
+**To try:** arm a track with notes on it, in replace mode, and record in the piano roll and the arrangement. Notes should appear as they're played, a held one growing; the old notes should go as the playhead passes; recording past the end should grow the song as it goes. While recording, `x` on the recorded track and `u` should be refused, saying it's being recorded; an edit on another track should work. Stop, and `u` should take the whole pass away. Then the same in overdub, the old notes staying.
 
 ## Drop-down lists and the Metronome page after trial (11 November 2026; accepted and published)
 

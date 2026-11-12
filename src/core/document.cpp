@@ -38,12 +38,44 @@ bool Document::edit(std::string title, const EditPlace& place,
     return edit(std::move(title), place, change, {});
 }
 
+const Song& Document::song() const
+{
+    return shown_ ? *shown_ : song_;
+}
+
+void Document::setPreview(Preview preview)
+{
+    preview_ = std::move(preview);
+    shown_.reset();
+    refreshPreview();
+}
+
+void Document::refreshPreview()
+{
+    // Made again in place, so a reference to the song shown stays good through a change, as
+    // one to the song itself does.
+    if (preview_)
+    {
+        shown_ = preview_(song_);
+    }
+}
+
+bool Document::allowed(const Song& after)
+{
+    if (!guard_)
+    {
+        return true;
+    }
+    refusal_ = guard_(song_, after);
+    return !refusal_;
+}
+
 bool Document::edit(std::string title, const EditPlace& place,
                     const std::function<void(Song&)>& change, std::string_view mergeKey)
 {
     Song edited = song_;
     change(edited);
-    if (edited == song_)
+    if (edited == song_ || !allowed(edited))
     {
         return false;
     }
@@ -131,19 +163,21 @@ std::optional<EditStep> Document::undo()
         return std::nullopt;
     }
     auto step = *states_[current_].step;
+    if (!restore(current_ - 1))
+    {
+        return std::nullopt;
+    }
     mergeKey_.clear();
-    restore(current_ - 1);
     return step;
 }
 
 std::optional<EditStep> Document::redo()
 {
-    if (!canRedo() || groupDepth_ > 0)
+    if (!canRedo() || groupDepth_ > 0 || !restore(current_ + 1))
     {
         return std::nullopt;
     }
     mergeKey_.clear();
-    restore(current_ + 1);
     return *states_[current_].step;
 }
 
@@ -171,16 +205,22 @@ void Document::record(EditStep step)
     trim();
 }
 
-void Document::restore(std::size_t index)
+bool Document::restore(std::size_t index)
 {
     auto parts = states_[index].parts;
     // Track IDs are never reused, even for a track added after undoing the one that had it.
     parts.nextTrackId = std::max(parts.nextTrackId, song_.parts().nextTrackId);
-    song_ = Song{std::move(parts)};
+    Song restored{std::move(parts)};
+    if (!allowed(restored))
+    {
+        return false;
+    }
+    song_ = std::move(restored);
     current_ = index;
     songId_ = states_[index].id;
     trim();
     changed();
+    return true;
 }
 
 void Document::trim()
@@ -195,6 +235,7 @@ void Document::trim()
 
 void Document::changed()
 {
+    refreshPreview();
     if (listener_)
     {
         listener_(song_);

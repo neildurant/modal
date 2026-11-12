@@ -115,6 +115,14 @@ public:
         Song song;
         std::vector<TrackId> tracks;
     };
+    // While a pass is being recorded, or until it's finished: the song with the take so far,
+    // as if recording stopped at the playhead (or where it stopped), to show as it's played.
+    // The song as it is otherwise, and before the record point.
+    Song previewTake(const Song& song);
+
+    // The tracks the pass is recording onto, until it's finished; none when not recording.
+    std::vector<TrackId> recordingTracks() const;
+
     // Whether a pass has stopped and the engine has said where, so finishRecording() can end it.
     bool recordingStopped() const { return recorder_.has_value() && !playing_ && stopExact_; }
     // Ends the stopped pass, taking any input still to come: the take, from the record point to
@@ -187,6 +195,7 @@ private:
     std::optional<Recorder> recorder_;   // the pass being recorded, until finished
     std::optional<DestinationId> click_; // the metronome's while recording
     Tick recordPoint_ = 0;               // where the pass records from
+    Tick previewAt_ = 0;                 // where the take was last shown up to
     bool countIn_ = false;               // whether it counts in
 };
 

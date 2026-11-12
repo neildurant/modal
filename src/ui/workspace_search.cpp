@@ -419,7 +419,7 @@ bool Workspace::nameFind(std::string_view command, char32_t letter, int count)
     if (operator_)
     {
         finding_.naming->redo = Redo{.op = *operator_,
-                                     .song = document_.song(),
+                                     .song = document_.underlying(),
                                      .unnamed = register_,
                                      .registers = registers_,
                                      .registerName = registerName_,

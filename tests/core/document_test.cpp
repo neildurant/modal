@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -262,6 +263,86 @@ TEST_CASE("the listener hears every change to the song")
     e.document.redo();
     e.document.edit("Nothing", {}, [](Song&) {});
     CHECK(heard == std::vector<std::size_t>{1, 2, 1, 2});
+}
+
+TEST_CASE("a preview is what's shown, made again as the song changes, while edits, undo and the "
+          "listener keep to the song beneath")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Edited e{ppqn};
+    const auto bass = e.bass(); // asked before, as asking the song makes the preview
+    std::vector<std::size_t> heard;
+    e.document.setListener([&](const Song& song) { heard.push_back(song.events(bass).size()); });
+    int made = 0;
+    Tick at = 0;
+    e.document.setPreview(
+        [&](const Song& song)
+        {
+            ++made;
+            Song shown = song;
+            shown.updateEvents(bass,
+                               [&](EventList& events) { events.insert({at, Note{50, 90, 1}}); });
+            return shown;
+        });
+    CHECK(e.notes() == 1);
+    CHECK(e.document.underlying().events(bass).empty());
+    CHECK(made == 1);
+    CHECK(e.notes() == 1);
+    CHECK(made == 1); // made once until something changes
+
+    REQUIRE(e.addNote(ppqn.quarter()));
+    CHECK(e.notes() == 2);
+    CHECK(e.document.underlying().events(bass).size() == 1);
+    CHECK(heard == std::vector<std::size_t>{1});
+
+    at = ppqn.quarter() * 2;
+    e.document.refreshPreview();
+    CHECK(e.document.song().events(bass).all().back().tick == at);
+    CHECK(e.document.undo());
+    CHECK(e.notes() == 1);
+    CHECK(e.document.underlying().events(bass).empty());
+
+    e.document.setPreview({});
+    CHECK(e.notes() == 0);
+    CHECK(&e.document.song() == &e.document.underlying());
+}
+
+TEST_CASE("a guard refuses edits, undo and redo it objects to, leaving the song and its history")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Edited e{ppqn};
+    REQUIRE(e.addNote(0));
+    REQUIRE(e.addNote(ppqn.quarter()));
+    REQUIRE(e.document.undo());
+    const auto version = e.document.version();
+    e.document.setGuard(
+        [&](const Song& before, const Song& after) -> std::optional<std::string>
+        {
+            if (before.events(e.bass()) == after.events(e.bass()))
+                return std::nullopt;
+            return "Bass is being recorded";
+        });
+    CHECK_FALSE(e.addNote(2 * ppqn.quarter()));
+    CHECK(e.document.takeRefusal() == "Bass is being recorded");
+    CHECK_FALSE(e.document.takeRefusal());
+    CHECK_FALSE(e.document.undo());
+    CHECK(e.document.takeRefusal() == "Bass is being recorded");
+    CHECK_FALSE(e.document.redo());
+    CHECK(e.document.takeRefusal() == "Bass is being recorded");
+    CHECK(e.notes() == 1);
+    CHECK(e.document.version() == version);
+    CHECK(e.document.canUndo());
+    CHECK(e.document.canRedo());
+
+    // Changes it doesn't object to are made.
+    CHECK(e.document.edit("Rename", {}, [&](Song& song) { song.title = "Song"; }));
+    CHECK_FALSE(e.document.takeRefusal());
+    CHECK_FALSE(e.document.canRedo());
+
+    e.document.setGuard({});
+    CHECK(e.document.undo());
+    CHECK(e.document.undo());
+    CHECK(e.notes() == 0);
 }
 
 TEST_CASE("edits made one after another with the same merge key are one step")

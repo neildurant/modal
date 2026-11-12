@@ -210,7 +210,7 @@ private:
 
     CommandResult saved(const std::filesystem::path& file, bool thenQuit)
     {
-        if (auto error = core::writeSongFile(document_.song(), file); !error.empty())
+        if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
         }
@@ -224,7 +224,7 @@ private:
 
     CommandResult exported(const std::filesystem::path& file)
     {
-        const auto result = core::exportSmfFile(document_.song(), file);
+        const auto result = core::exportSmfFile(document_.underlying(), file);
         if (!result.error.empty())
         {
             return CommandResult::error("Can't export " + named(file) + ": " + result.error);

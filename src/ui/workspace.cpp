@@ -1253,6 +1253,14 @@ bool Workspace::wake(std::int64_t now)
     {
         changed = takeInput() || changed; // each frame, as recording will
     }
+    if (player_ != nullptr && player_->recordPhase() == core::Player::RecordPhase::Recording)
+    {
+        // The take as it's played, and what it replaces going as the playhead passes.
+        document_.refreshPreview();
+        view().refresh();
+        showPlayhead(); // as refreshing may have moved the view from it
+        changed = true;
+    }
     if (inputLitUntil_ && now >= *inputLitUntil_)
     {
         inputLitUntil_.reset();
@@ -1285,6 +1293,12 @@ void Workspace::report(const CommandResult& result)
     else if (!result.message.empty())
     {
         setMessage(result.message, kind);
+    }
+    // An edit the document refused, as one to a track being recorded, whatever the command
+    // went on to say.
+    if (auto why = document_.takeRefusal())
+    {
+        refuse(*why);
     }
 }
 
@@ -1612,7 +1626,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     {
         // Song settings, so undo steps, as the record mode is.
         const bool metronome = command == "metronome-cycle";
-        auto song = document_.song();
+        auto song = document_.underlying();
         std::string text;
         if (metronome)
         {
@@ -2457,7 +2471,7 @@ bool Workspace::putOverSelection()
         return true;
     }
     const auto saved = register_;
-    const auto before = document_.song();
+    const auto before = document_.underlying();
     const auto place = view().place();
     const auto selected = SavedSelection{*selection_, view().cursor(), beforeObject_};
     const auto first = span ? document_.song().sectionAt(span->first) : 0;
@@ -2688,6 +2702,25 @@ bool Workspace::record()
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return true;
     }
+    // The take is shown as it's played, and the tracks it goes onto can't be changed meanwhile,
+    // as what's shown would no longer be what's made (decided November 2026).
+    document_.setPreview([this](const core::Song& song) { return player_->previewTake(song); });
+    document_.setGuard(
+        [tracks = player_->recordingTracks()](const core::Song& before,
+                                              const core::Song& after) -> std::optional<std::string>
+        {
+            for (const auto id : tracks)
+            {
+                if (before.track(id) == nullptr)
+                    continue;
+                if (after.track(id) == nullptr || !(after.events(id) == before.events(id)))
+                {
+                    const auto name = trackNames(before, std::span{&id, 1});
+                    return name + " is being recorded: change it once recording stops";
+                }
+            }
+            return std::nullopt;
+        });
     const bool overdub = document_.song().recordMode == core::RecordMode::Overdub;
     auto text =
         (overdub ? "Overdubbing onto " : "Recording onto ") + trackNames(document_.song(), armed);
@@ -2721,11 +2754,13 @@ void Workspace::finishRecording()
     {
         return;
     }
-    auto take = player_->finishRecording(document_.song());
+    auto take = player_->finishRecording(document_.underlying());
     if (!take)
     {
         return;
     }
+    document_.setPreview({});
+    document_.setGuard({});
     if (take->song == document_.song())
     {
         setMessage("Nothing recorded: stopped before the record point", MessageKind::Information);

@@ -99,6 +99,7 @@ bool Player::record(const Song& song)
     waiting_.reset();
     play_ = engine_.lastPlay();
     recordPoint_ = marker_;
+    previewAt_ = marker_;
     countIn_ = countIn;
     recorder_.emplace(song, play_, marker_, song.recordMode, resolveInput_);
     playing_ = true;
@@ -136,6 +137,29 @@ std::optional<Player::RecordPhase> Player::recordPhase() const
     }
     const auto at = status.playing ? status.position : std::optional{started_};
     return at && *at < recordPoint_ ? RecordPhase::PreRoll : RecordPhase::Recording;
+}
+
+Song Player::previewTake(const Song& song)
+{
+    if (!recorder_)
+    {
+        return song;
+    }
+    // Between stopping and the engine saying where, as far as the playhead was last seen.
+    if (const auto at = position())
+    {
+        previewAt_ = std::max(previewAt_, *at);
+    }
+    if (stopExact_ && !playing_)
+    {
+        previewAt_ = stoppedAt_;
+    }
+    return recorder_->finish(song, previewAt_);
+}
+
+std::vector<TrackId> Player::recordingTracks() const
+{
+    return recorder_ ? recorder_->tracks() : std::vector<TrackId>{};
 }
 
 std::optional<Player::Take> Player::finishRecording(const Song& song)

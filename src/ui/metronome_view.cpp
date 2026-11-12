@@ -388,7 +388,7 @@ void MetronomeView::change(const std::string& what, const core::Song& changed)
 
 std::optional<std::string> MetronomeView::set(const std::string& typed)
 {
-    auto song = document_.song();
+    auto song = document_.underlying();
     auto& metronome = song.metronome;
     auto& countIn = song.countIn;
     const auto text = trimmed(typed);
@@ -521,7 +521,7 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
 
 std::optional<std::string> MetronomeView::step(int steps)
 {
-    auto song = document_.song();
+    auto song = document_.underlying();
     auto& metronome = song.metronome;
     auto& countIn = song.countIn;
     const auto cycle = [&](int at, int size) { return ((at + steps) % size + size) % size; };

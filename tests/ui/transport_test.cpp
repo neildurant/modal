@@ -796,7 +796,9 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
     CHECK(contains(p.status(), U"● REC    "));
     CHECK(x(U"1:") == place); // the same width, so the place doesn't move
     playNote(p, 99);
-    CHECK_FALSE(hasPitch(p.document.song(), id, 99)); // put in once stopped
+    // Shown as it's played, and put into the song once stopped.
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK_FALSE(hasPitch(p.document.underlying(), id, 99));
     p.type(U" ");
     p.runFor(10ms);
     CHECK_FALSE(p.player.recording());
@@ -882,6 +884,160 @@ TEST_CASE("recording carries on past the song's end, which grows to hold the tak
     CHECK(p.document.song().end() > end);
     CHECK(p.ws.arrangement().page().end() == p.document.song().end());
     CHECK(hasPitch(p.document.song(), id, 99));
+}
+
+namespace
+{
+// The note on a pitch in a track's events, if there's one.
+std::optional<core::Event> noteOn(const core::Song& song, core::TrackId id, std::uint8_t pitch)
+{
+    for (const auto& event : song.events(id).all())
+        if (const auto* note = std::get_if<core::Note>(&event.data); note && note->pitch == pitch)
+            return event;
+    return std::nullopt;
+}
+
+bool has(const core::Song& song, core::TrackId id, const core::Event& event)
+{
+    return std::ranges::find(song.events(id).all(), event) != song.events(id).all().end();
+}
+} // namespace
+
+TEST_CASE("the take shows as it's played, a held note growing with the playhead and what it "
+          "replaces going as the playhead passes")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    const auto old = p.document.song().events(id).all();
+    p.type(U"R");
+    p.runFor(2100ms); // the count-in
+    REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::Recording);
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 99, 100},
+                             p.clock.time));
+    p.runFor(300ms);
+    const auto first = noteOn(p.document.song(), id, 99);
+    REQUIRE(first.has_value());
+    const auto firstLength = std::get<core::Note>(first->data).duration;
+    CHECK(firstLength > 0);
+    CHECK_FALSE(noteOn(p.document.underlying(), id, 99).has_value());
+
+    // What's shown is what stopping now would make: old events before the playhead gone,
+    // those after it kept.
+    const auto shownAt = [&](core::Tick at)
+    {
+        std::size_t gone = 0;
+        for (const auto& event : old)
+        {
+            const bool shown = has(p.document.song(), id, event);
+            if (event.tick < at)
+            {
+                CHECK_FALSE(shown);
+                gone += shown ? 0 : 1;
+            }
+            else if (event.tick > at)
+            {
+                CHECK(shown);
+            }
+            CHECK(has(p.document.underlying(), id, event));
+        }
+        return gone;
+    };
+    const auto goneFirst = shownAt(*p.player.position());
+    p.runFor(3s);
+    const auto later = noteOn(p.document.song(), id, 99);
+    REQUIRE(later.has_value());
+    CHECK(std::get<core::Note>(later->data).duration > firstLength);
+    const auto goneLater = shownAt(*p.player.position());
+    CHECK(goneLater > goneFirst);
+
+    p.type(U" ");
+    p.runFor(10ms);
+    // Stopped with the note still held: it ends where recording stopped, as shown.
+    const auto taken = noteOn(p.document.song(), id, 99);
+    REQUIRE(taken.has_value());
+    CHECK(p.document.song() == p.document.underlying());
+    CHECK(std::get<core::Note>(taken->data).duration >= std::get<core::Note>(later->data).duration);
+}
+
+TEST_CASE("a note and pedal still held when recording stops end there")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    p.type(U"R");
+    p.runFor(2100ms);
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0xB0, 64, 127},
+                             p.clock.time));
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 98, 100},
+                             p.clock.time));
+    p.runFor(500ms);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE_FALSE(p.player.recording());
+    const auto note = noteOn(p.document.song(), id, 98);
+    REQUIRE(note.has_value());
+    const auto end = note->tick + std::get<core::Note>(note->data).duration;
+    CHECK(has(p.document.song(), id, core::Event{end, core::ControlChange{64, 0}}));
+    // Let go after stopping: nothing more is recorded.
+    const auto version = p.document.version();
+    REQUIRE(
+        p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x80, 98, 0}, p.clock.time));
+    REQUIRE(
+        p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0xB0, 64, 0}, p.clock.time));
+    p.runFor(100ms);
+    CHECK(p.document.version() == version);
+}
+
+TEST_CASE("while recording, edits and undo that would change a track being recorded are refused, "
+          "and other tracks can still be edited")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    const auto name = armed(p.document)->name;
+    const auto other = p.document.song().tracks()[1]->id();
+    REQUIRE(other != id);
+    // x on an event of the track, not on a section's, tempo's or label's row.
+    const auto deleteEvent = [&]
+    {
+        for (int i = 0; i < 50 && p.view.list().rows()[p.view.row()].kind != RowKind::Event; ++i)
+            p.type(U"j");
+        REQUIRE(p.view.list().rows()[p.view.row()].kind == RowKind::Event);
+        p.type(U"x");
+    };
+    deleteEvent(); // a step to undo, on the armed track
+    const auto before = p.document.underlying().events(id);
+    const auto refusal = name + " is being recorded: change it once recording stops";
+
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    deleteEvent();
+    CHECK(p.ws.message() == refusal);
+    CHECK(p.document.underlying().events(id) == before);
+    p.type(U"u");
+    CHECK(p.ws.message() == refusal);
+    CHECK(p.document.underlying().events(id) == before);
+    CHECK(p.player.recording());
+
+    p.press(Key::of(NamedKey::PageDown, kCtrl)); // the next track, not being recorded
+    const auto otherBefore = p.document.underlying().events(other);
+    deleteEvent();
+    CHECK(p.document.underlying().events(other).size() + 1 == otherBefore.size());
+    CHECK(p.document.song().events(other) == p.document.underlying().events(other));
+
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(hasPitch(p.document.song(), id, 99));
+    CHECK(p.document.song().events(other).size() + 1 == otherBefore.size());
+    // Stopped, the track can be changed again, and undo goes back through both.
+    p.type(U"u");
+    CHECK_FALSE(hasPitch(p.document.song(), id, 99));
+    p.type(U"u");
+    CHECK(p.document.song().events(other) == otherBefore);
+    p.type(U"u");
+    CHECK(p.document.song().events(id).size() == before.size() + 1);
 }
 
 TEST_CASE("the leader then m sets the metronome and count-in, and :countin and :preroll their "
