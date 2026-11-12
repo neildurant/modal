@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: silencing recorded tracks in replace mode is accepted and published; auditioning notes in the piano roll is next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: auditioning notes in the piano roll is built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## Auditioning notes in the piano roll (12 November 2026; local, to try)
+
+The last of the three steps. `Player::auditionNote` plays one of a track's notes through `Engine::audition` on the track's port and channel, transposed and with its velocity offset as playback would, for its length at its place in the tempo map, at most a second. The piano roll asks the workspace (`ViewHost::auditionNote`) as `o` or `O` adds a note (the first of several) and as a single note moves to a new pitch. After each key, the workspace compares the note under the piano roll's cursor, by track, tick and pitch, with the one after the last key, and plays it if it's another, unless the song changed (an edit or undo), Visual mode is on, or it's playing, stopping or recording; switching views notes the note the cursor opens on, so it isn't heard. The `audition` setting (on) and `, T a` (`audition-toggle`) turn it off, with `Audition off` in the status line; grid-advance moved to `, T g`.
+
+**Validation.** Windows Debug passes 940 tests (938, 2 skipped); WSL linux-clang-debug 941 (938, 3 skipped), no warnings. New tests: the player's audition at both PPQNs (port, channel, transpose, velocity offset, the note's length and the one-second cap, a missing port and a note transposed out of range refused); through the workspace on a fake clock, landing on a note heard once and not again at a key that leaves the cursor there, the next heard; `, T a` turning it off with the status line saying so, the note opened on not heard, a Visual selection silent; `o` and `Alt-k` heard, `Alt-l` and undo not; nothing but the click during a count-in.
+
+**To try:** in the piano roll, Tab, `j` / `k` and `h` / `l` onto notes, and switch tracks: each note landed on should play once, on the track's sound, for up to a second, the next cutting it off; moving within a long note shouldn't play it again. `o` and `O` should play the note added, `Alt-k` / `Alt-j` the note at its new pitch; `Alt-h` / `Alt-l` and undo shouldn't. In Visual mode, nothing. While playing or recording, nothing. `, T a` turns it off (`Audition off` in the status line) and on again; `, T g` is now grid advance. `set noaudition` in modalrc should start with it off.
 
 ## Recorded tracks silent while replacing (12 November 2026; accepted and published)
 

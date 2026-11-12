@@ -100,7 +100,8 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `hintdelay` | `400` | How long to wait, in milliseconds, before the hint menu shows (0 to 10000; 0 shows it at once) |
 | `timingunit` | `grid` | Note-inspector coarse timing units: follow each track’s grid, or a fixed fraction such as `1/16` (1/128 to 8/1); display only |
 | `chordwindow` | `30`  | How far apart, in milliseconds, events can start and still be one chord, for `(` and `)` (0 to 1000) |
-| `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, T a` turns it on and off |
+| `gridadvance` | `off` | Whether `O` in the piano roll moves the cursor on by the grid step (on) or by the note's length (off); `, T g` turns it on and off |
+| `audition` | `on` | Whether the piano roll plays a note as the cursor lands on it, and as one is added or moved to a new pitch, for up to a second on the track's port and channel; `, T a` turns it on and off, the status line saying `Audition off` while it is |
 | `nudge` | `5` | How far, in milliseconds, `Alt-H` / `Alt-L` nudge a note in the piano roll and `+` / `_` lengthen or shorten it (1 to 1000) |
 | `humanizetime` | `10` | How far, in milliseconds, `~` moves a note in time at most, either way (0 to 1000) |
 | `humanizevel` | `8` | How far `~` changes a note's velocity at most, either way (0 to 127) |

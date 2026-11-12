@@ -195,6 +195,10 @@ public:
     void setRewind(bool rewind);
     void setThru(bool on);
     void setQuantizeMarks(bool marks) { quantizeMarks_ = marks; }
+    // Whether a note in the piano roll is heard as the cursor lands on it, and as one is added
+    // or moved to a new pitch (the audition setting, decided 12 November 2026).
+    void setAudition(bool on) { audition_ = on; }
+    bool audition() const { return audition_; }
 
     // How far ~ moves notes at most, either way: in time (humanizetime) and in velocity
     // (humanizevel).
@@ -440,6 +444,7 @@ private:
             portControl_.change(table);
     }
     void auditionClick(bool downbeat) override;
+    void auditionNote(core::TrackId track, const core::Event& note) override;
     void lookForPorts() override
     {
         if (portControl_.look)
@@ -918,6 +923,22 @@ private:
     core::Player* player_ = nullptr;
     bool rewind_ = true;
     bool thru_ = true;
+    bool audition_ = true;
+    // The note under the piano roll's cursor after the last key, by track, time and pitch, so
+    // that one is heard only as the cursor lands on it.
+    struct Heard
+    {
+        core::TrackId track{};
+        core::Tick tick = 0;
+        std::uint8_t pitch = 0;
+
+        friend bool operator==(const Heard&, const Heard&) = default;
+    };
+    std::optional<Heard> heard_;
+    // The note under the piano roll's cursor, if it's showing; and after a key, plays it if the
+    // cursor has landed on it, as long as the song hasn't changed.
+    std::optional<Heard> noteHeardHere() const;
+    void auditionHere(std::uint64_t versionBefore);
     std::optional<std::int64_t> inputLitUntil_;
     static constexpr std::int64_t kInputLightTime = 150;
     bool wasPlaying_ = false;     // or stopping, until the player knows where it stopped

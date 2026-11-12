@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/playback_transform.hpp>
 #include <modal/core/player.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <memory>
 #include <utility>
 
@@ -129,6 +131,26 @@ bool Player::auditionClick(const Song& song, bool downbeat)
     return engine_.audition(*destination, static_cast<std::uint8_t>(metronome.channel - 1),
                             downbeat ? metronome.downbeatNote : metronome.beatNote,
                             downbeat ? metronome.downbeatVelocity : metronome.beatVelocity, length);
+}
+
+bool Player::auditionNote(const Song& song, TrackId track, Tick tick, const Note& note)
+{
+    const auto* found = song.track(track);
+    if (found == nullptr || !found->hasValidSettings(song.ppqn()))
+    {
+        return false;
+    }
+    const auto destination = lookUp(found->port);
+    const auto pitch = playbackPitch(note.pitch, found->transpose);
+    if (!destination || !pitch)
+    {
+        return false;
+    }
+    const auto& tempo = song.tempo();
+    const auto heard = tempo.toTime(tick + std::max(note.duration, Tick{1})) - tempo.toTime(tick);
+    return engine_.audition(*destination, static_cast<std::uint8_t>(found->channel - 1), *pitch,
+                            playbackVelocity(note.velocity, found->velocityOffset),
+                            std::min<std::chrono::nanoseconds>(heard, std::chrono::seconds{1}));
 }
 
 std::optional<Player::RecordPhase> Player::recordPhase() const

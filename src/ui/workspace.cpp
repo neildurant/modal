@@ -436,6 +436,7 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
         if (fresh)
         {
             view.open(view.cursor());
+            heard_ = noteHeardHere();
         }
         return;
     }
@@ -462,6 +463,8 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
     {
         showPlayhead();
     }
+    // A note the cursor opens on isn't landed on, so it isn't heard.
+    heard_ = noteHeardHere();
 }
 
 bool Workspace::handle(const Key& key, std::int64_t now)
@@ -477,7 +480,56 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         }
         macros_.recorded.push_back(key);
     }
-    return recordChange(key, now);
+    const auto version = document_.version();
+    const bool changed = recordChange(key, now);
+    auditionHere(version);
+    return changed;
+}
+
+std::optional<Workspace::Heard> Workspace::noteHeardHere() const
+{
+    if (current_ != pianoRoll_.get())
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& tracks = song.tracks();
+    const auto index = pianoRoll_->currentNote();
+    if (!index || pianoRoll_->track() >= tracks.size())
+    {
+        return std::nullopt;
+    }
+    const auto id = tracks[pianoRoll_->track()]->id();
+    const auto& event = song.events(id)[*index];
+    return Heard{.track = id, .tick = event.tick, .pitch = std::get<core::Note>(event.data).pitch};
+}
+
+void Workspace::auditionHere(std::uint64_t versionBefore)
+{
+    // Heard as the cursor lands on a note by any move (decided 12 November 2026), but not as a
+    // Visual selection grows, nor as the song changes: an added note or one moved to a new
+    // pitch is heard by the view's asking.
+    const auto here = noteHeardHere();
+    const bool landed =
+        here && here != heard_ && mode_ != Mode::Visual && document_.version() == versionBefore;
+    heard_ = here;
+    if (landed)
+    {
+        auditionNote(here->track, document_.song().events(here->track)[*pianoRoll_->currentNote()]);
+    }
+}
+
+void Workspace::auditionNote(core::TrackId track, const core::Event& note)
+{
+    // Not while playing or recording, when it would be heard over the song.
+    if (!audition_ || player_ == nullptr || player_->playing() || player_->stopping())
+    {
+        return;
+    }
+    if (const auto* played = std::get_if<core::Note>(&note.data))
+    {
+        (void)player_->auditionNote(document_.song(), track, note.tick, *played);
+    }
 }
 
 bool Workspace::takesCharacter(std::string_view command) const
@@ -1872,6 +1924,21 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         }
         setMessage(pianoRoll().gridAdvance() ? "O moves on by the grid step"
                                              : "O moves on by the note's length",
+                   MessageKind::Information);
+        return true;
+    }
+    if (command == "audition-toggle")
+    {
+        if (lineHandler_)
+        {
+            lineHandler_("set audition!");
+        }
+        else
+        {
+            setAudition(!audition_);
+        }
+        setMessage(audition_ ? "Audition on: the piano roll plays notes as the cursor lands on them"
+                             : "Audition off",
                    MessageKind::Information);
         return true;
     }

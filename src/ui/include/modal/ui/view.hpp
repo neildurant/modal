@@ -236,6 +236,8 @@ public:
     virtual const PortTable* portTable() const { return nullptr; }
     // Plays the song's click once, the downbeat's or the other beats', to hear it.
     virtual void auditionClick(bool) {}
+    // Plays a note of a track, as one is added or moved to a new pitch, if audition is on.
+    virtual void auditionNote(core::TrackId, const core::Event&) {}
     virtual void changePorts(const PortTable&) {}
     virtual void lookForPorts() {}
 

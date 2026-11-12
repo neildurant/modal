@@ -372,6 +372,8 @@ Bar Workspace::statusBar(bool withMessage) const
     }
     if (!thru_)
         bottom.right.push_back({"Thru off   ", {Role::Warning, Role::Bar, kPlain}});
+    if (!audition_)
+        bottom.right.push_back({"Audition off   ", kBarText});
     std::optional<std::size_t> countInRun;
     // Stopped with tracks armed, how many, how they'd record and what comes first, and if the
     // click has nowhere to go, saying so until it has; or the metronome playing always.

@@ -111,6 +111,10 @@ Settings::Settings()
                   "Whether O in the piano roll moves the cursor on by the grid step (on) or by "
                   "the note's length (off)",
                   false),
+          setting("audition",
+                  "Whether the piano roll plays a note as the cursor lands on it, and as one is "
+                  "added or moved to a new pitch",
+                  true),
           setting("nudge",
                   "How far, in milliseconds, a nudge moves a note in the piano roll, or "
                   "lengthens or shortens it",

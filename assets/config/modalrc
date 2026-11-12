@@ -182,8 +182,10 @@ nmap c          section-rename-strip "Rename"
 " The piano roll's grid and default note, each track's own and saved with it: zh and zl (or z
 " with Left and Right) make the grid finer and coarser, its steps narrower and wider as h and l
 " go left and right; Ctrl-T turns triplets on and off; , n takes the current note's length and
-" velocity as the default note, which o adds; and , T a turns gridadvance on and off. :grid
-" and :len set them by length, such as 1/8 or 1/16t.
+" velocity as the default note, which o adds; and , T g turns gridadvance on and off. :grid
+" and :len set them by length, such as 1/8 or 1/16t. , T a turns audition on and off: the
+" piano roll playing a note as the cursor lands on it, and as one is added or moved to a new
+" pitch, up to a second of it, on the track's port and channel.
 keysection "The grid and default note"
 nmap zh         grid-finer                "Finer grid"
 nmap z<Left>    grid-finer                "Finer grid"
@@ -194,10 +196,11 @@ nmap <leader>n  default-note-set          "Default note from this one"
 ngroup <leader>T "Toggles"
 nmap <leader>Tq quantize-bypass-toggle "Bypass playback quantise, to compare"
 nmap <leader>Tm quantize-marks-toggle "Marks of where quantised notes play"
-nmap <leader>Ta grid-advance-toggle "O by grid step or note length"
+nmap <leader>Tg grid-advance-toggle "O by grid step or note length"
+nmap <leader>Ta audition-toggle "Audition notes"
 
 " Adding notes in the piano roll: o adds the track's default note at the cursor, and O adds
-" it and moves on, past its end, or with gridadvance (, T a) to the next grid step; 8O adds
+" it and moves on, past its end, or with gridadvance (, T g) to the next grid step; 8O adds
 " eight one after another.
 " Moving notes in the piano roll: Alt-h and Alt-l to the grid steps either side, Alt-H and
 " Alt-L a nudge (the nudge setting, in milliseconds), Alt-{ and Alt-} a bar, Alt-k and Alt-j

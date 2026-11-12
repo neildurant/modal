@@ -134,6 +134,12 @@ public:
     // false if there's nowhere for it to go, or the engine is busy.
     [[nodiscard]] bool auditionClick(const Song& song, bool downbeat);
 
+    // Plays one of a track's notes, stored at a tick, on the track's port and channel, as
+    // playback would with its transpose and velocity offset, for its length up to a second
+    // (decided 12 November 2026), the next cutting it off. Returns false if the track or its
+    // port isn't there, the note is transposed out of range, or the engine is busy.
+    [[nodiscard]] bool auditionNote(const Song& song, TrackId track, Tick tick, const Note& note);
+
     // Space: stops if playing, and otherwise plays.
     [[nodiscard]] bool toggle();
 

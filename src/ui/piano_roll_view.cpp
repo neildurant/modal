@@ -631,6 +631,7 @@ bool PianoRollView::addNote(int count, bool advance)
     const int n = advance ? std::max(count, 1) : 1;
     auto events = song.events(*id);
     auto tick = time_;
+    const core::Event first{tick, core::Note{pitch_, track.noteVelocity, length}};
     int added = 0;
     for (; added < n && tick <= lastTick(); ++added)
     {
@@ -654,6 +655,7 @@ bool PianoRollView::addNote(int count, bool advance)
     {
         moveTo(tick);
     }
+    host_.auditionNote(*id, first); // the first added, if O adds several
     return true;
 }
 
@@ -1035,6 +1037,10 @@ bool PianoRollView::changeNote(std::string_view verb,
     // The cursor at the same place in the note.
     moveTo(time_ + changed.tick - old.tick);
     moveToPitch(pitch);
+    if (pitch != std::get<core::Note>(old.data).pitch)
+    {
+        host_.auditionNote(id, changed); // heard at its new pitch; a selection moved isn't
+    }
     return true;
 }
 

@@ -213,7 +213,7 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 | Keys | Does |
 | --- | --- |
 | `o` | Add the track's default note at the cursor |
-| `O` | Add it and move on, past its end, or with `gridadvance` (`, T a`) to the next grid step; `8O` eight in a row |
+| `O` | Add it and move on, past its end, or with `gridadvance` (`, T g`) to the next grid step; `8O` eight in a row |
 | `Alt-h` `Alt-l` | Move the note onto the grid line before, the next |
 | `Alt-H` `Alt-L` | Nudge it earlier, later (the `nudge` setting, in milliseconds) |
 | `Alt-{` `Alt-}` | Move it a bar |
@@ -226,6 +226,8 @@ On a Visual selection, the moving and length keys act on every note it takes, re
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |
 
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
+
+**Audition:** the cursor landing on a note plays it, by any move but in Visual mode, as does adding one with `o` or `O` (the first, of several) or moving one note to a new pitch, for up to a second, on the track's port and channel; not while playing or recording. `, T a` turns it on and off (the `audition` setting), the status line saying `Audition off` while it is.
 
 ## Sections
 
@@ -266,7 +268,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, S` | Select |
 | `, x` | Transforms |
 | `, v` | Views: `t` Tracks, `a` arrangement, `r` piano roll (as `gr`), `e` event list |
-| `, T` | Toggles: `Space` rewind, `a` grid advance |
+| `, T` | Toggles: `Space` rewind, `a` audition notes, `g` grid advance, `q` bypass playback quantise, `m` quantise marks |
 | `, n` | Default note from this one |
 | `, :` | The command palette (also `Ctrl-p`) |
 | `, ?` | The keys here |

@@ -492,6 +492,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "grid-advance-toggle",
                 .description = "Turn gridadvance on or off: whether O moves on by the grid step "
                                "or the note's length"},
+    CommandInfo{.name = "audition-toggle",
+                .description = "Turn audition on or off: whether the piano roll plays a note "
+                               "as the cursor lands on it, or as it's added or moved"},
     CommandInfo{.name = "command-line", .description = "Open the : command line"},
     CommandInfo{.name = "view-tracks",
                 .description = "Show track settings, at track {count} if given",

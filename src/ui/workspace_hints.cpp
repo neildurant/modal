@@ -184,6 +184,8 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
         return std::string{"O moves on by: "} +
                (pianoRoll().gridAdvance() ? "grid step" : "note length");
     }
+    if (command == "audition-toggle")
+        return "Audition notes: " + onOff(audition_);
     if (command == "thru-toggle")
         return std::string{"Thru: "} + onOff(thru_);
     if (command == "rewind-toggle")

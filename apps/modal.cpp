@@ -486,6 +486,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
                                            : ui::Workspace::QuantizePedal::Follow);
     document.setUndoLevels(static_cast<std::size_t>(settings.integer("undolevels")));
     view.setRewind(settings.flag("rewind"));
+    view.setAudition(settings.flag("audition"));
     view.setThru(settings.flag("thru"));
     view.setQuantizeMarks(settings.flag("quantizemarks"));
     if (auto own = playback.openOwnPorts(); error.empty())

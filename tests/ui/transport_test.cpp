@@ -1167,3 +1167,129 @@ TEST_CASE("the status line says when the click has nowhere to go")
     table.setDefault(PortDirection::Output, "Synth");
     CHECK_FALSE(contains(p.status(), U"No click"));
 }
+
+namespace
+{
+
+// The note-ons sent since the sink was last cleared, after letting the engine run, as
+// pitch and channel.
+std::vector<std::pair<int, int>> notesSent(Playing& p)
+{
+    p.runFor(5ms);
+    std::vector<std::pair<int, int>> notes;
+    for (const auto& sent : p.sink.sent)
+    {
+        if (sent.bytes.size() == 3 && (sent.bytes[0] & 0xF0) == 0x90 && sent.bytes[2] > 0)
+            notes.emplace_back(sent.bytes[1], sent.bytes[0] & 0x0F);
+    }
+    p.sink.sent.clear();
+    return notes;
+}
+
+// Shows the piano roll on a track of the demo song with notes.
+const core::Track& onTrackWithNotes(Playing& p)
+{
+    p.ws.show(ViewKind::PianoRoll);
+    auto& roll = p.ws.pianoRoll();
+    const auto& song = p.document.song();
+    while (song.events(song.tracks()[roll.track()]->id()).empty())
+        p.press(Key::of(NamedKey::PageDown, kCtrl));
+    return *song.tracks()[roll.track()];
+}
+
+} // namespace
+
+TEST_CASE("audition plays the note the piano roll's cursor lands on, once, as playback would")
+{
+    Playing p;
+    const auto& track = onTrackWithNotes(p);
+    auto& roll = p.ws.pianoRoll();
+    REQUIRE(p.ws.audition());
+    notesSent(p);
+    // Tab to the next note, which is heard on the track's channel, transposed as it plays.
+    p.press(Key::of(NamedKey::Tab));
+    const auto index = roll.currentNote();
+    REQUIRE(index);
+    const auto& song = p.document.song();
+    const auto& event = song.events(track.id())[*index];
+    const int pitch = std::get<core::Note>(event.data).pitch + track.transpose;
+    CHECK(notesSent(p) == std::vector<std::pair<int, int>>{{pitch, track.channel - 1}});
+    // A key that leaves the cursor on it plays nothing more.
+    p.press(Key::of(NamedKey::Escape));
+    CHECK(notesSent(p).empty());
+    // The next is heard.
+    p.press(Key::of(NamedKey::Tab));
+    REQUIRE(roll.currentNote() != index);
+    CHECK(notesSent(p).size() == 1);
+}
+
+TEST_CASE("audition is off with , T a, said in the status line, and silent while selecting")
+{
+    Playing p;
+    p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
+    onTrackWithNotes(p);
+    notesSent(p);
+    // The note the piano roll opened on, if any, isn't heard at the next key.
+    p.type(U",Ta");
+    CHECK(notesSent(p).empty());
+    CHECK_FALSE(p.ws.audition());
+    CHECK(contains(p.status(), U"Audition off"));
+    p.press(Key::of(NamedKey::Tab));
+    REQUIRE(p.ws.pianoRoll().currentNote());
+    CHECK(notesSent(p).empty());
+    p.type(U",Ta");
+    CHECK(p.ws.audition());
+    CHECK_FALSE(contains(p.status(), U"Audition off"));
+    // A Visual selection growing over notes is silent.
+    p.type(U"v");
+    p.press(Key::of(NamedKey::Tab));
+    p.press(Key::of(NamedKey::Tab));
+    CHECK(notesSent(p).empty());
+}
+
+TEST_CASE(
+    "audition plays a note added with o, and one moved to a new pitch, but not one moved in time")
+{
+    Playing p;
+    const auto& track = onTrackWithNotes(p);
+    auto& roll = p.ws.pianoRoll();
+    notesSent(p);
+    // An empty pitch at the cursor's time: o adds the track's default note there.
+    p.type(U"0");
+    while (roll.currentNote())
+        p.press(Key::typed(U'k'));
+    notesSent(p);
+    p.type(U"o");
+    REQUIRE(roll.currentNote());
+    const int pitch = roll.pitch() + track.transpose;
+    CHECK(notesSent(p) == std::vector<std::pair<int, int>>{{pitch, track.channel - 1}});
+    p.press(Key::typed(U'k', kAlt));
+    CHECK(notesSent(p) == std::vector<std::pair<int, int>>{{pitch + 1, track.channel - 1}});
+    p.press(Key::typed(U'l', kAlt));
+    CHECK(notesSent(p).empty());
+    // Undo isn't heard either.
+    p.type(U"u");
+    CHECK(notesSent(p).empty());
+}
+
+TEST_CASE("audition is silent while playing, as through a count-in, when only the click sounds")
+{
+    Playing p;
+    onTrackWithNotes(p);
+    const auto& click = p.document.song().metronome;
+    p.type(U",ra");
+    p.type(U"R");
+    p.runFor(10ms);
+    REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::CountIn);
+    notesSent(p);
+    p.press(Key::of(NamedKey::Tab));
+    REQUIRE(p.ws.pianoRoll().currentNote());
+    for (const auto& [pitch, channel] : notesSent(p))
+    {
+        const bool clicked = channel == click.channel - 1 &&
+                             (pitch == click.downbeatNote || pitch == click.beatNote);
+        CHECK(clicked);
+    }
+    p.type(U" ");
+    p.runFor(10ms);
+}

@@ -1195,7 +1195,7 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     CHECK(bassNotes(r).size() == before + 1);
 
     // By the grid step, the notes overlapping a little: another pitch each time.
-    r.type(U",Ta");
+    r.type(U",Tg");
     CHECK(r.ws.message() == "O moves on by the grid step");
     r.type(U"5GkO");
     CHECK(r.view().time() == t.bar(5) + t.sixteenth());
@@ -1205,7 +1205,7 @@ TEST_CASE("O adds notes one after another, moving on by the note's length or the
     r.type(U"3O");
     CHECK(r.ws.message() == "There's a note here already");
     CHECK(bassNotes(r).size() == before + 3);
-    r.type(U",Ta");
+    r.type(U",Tg");
     CHECK(r.ws.message() == "O moves on by the note's length");
 
     // o stays put.
