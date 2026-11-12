@@ -779,9 +779,17 @@ TEST_CASE("a sample of the status line's indicators", "[.sample]")
     view.wake(view.deadline().value_or(0));
     view.show(ViewKind::PianoRoll);
     save("piano");
-    // Narrower, as the indicators give way.
-    view.resize(window->pixelWidth() * 11 / 19, window->pixelHeight(), window->cellSize());
-    save("narrow");
+    // Narrower and narrower, as what's least needed gives way, with a section name long enough
+    // to be cut short.
+    view.show(ViewKind::EventList);
+    document.edit("Rename section", {},
+                  [](modal::core::Song& song) { song.renameSection(0, "Introduction"); });
+    for (const int width : {1900, 1500, 1350, 1200, 1100, 1000, 900, 800, 700, 600})
+    {
+        view.resize(width, window->pixelHeight(), window->cellSize());
+        window->draw(view.frame(), *builtInTheme("dark"));
+        CHECK(window->saveFrame(base + "-status-narrow-" + std::to_string(width) + ".bmp"));
+    }
 }
 TEST_CASE("a sample of marks in each view", "[.sample]")
 {

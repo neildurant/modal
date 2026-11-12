@@ -357,8 +357,16 @@ Bar Workspace::statusBar() const
     // As wide as the widest mode, so the transport after it stays put.
     bottom.left.push_back(
         {std::string(std::string_view{" NORMAL "}.size() - mode.size() + 1, ' '), kBarText});
-    if (player_ != nullptr)
+    // Where the window's too narrow for everything, what's least needed gives way first, in
+    // steps (decided 12 November 2026): the file's name, the input's last message, the section
+    // cut short, short words for the indicators, the settings, the section, the input light,
+    // the meter and last the tempo. The mode, the transport and the recording group stay.
+    constexpr int kSteps = 9;
+    const auto transport = [&](int step)
     {
+        std::vector<Segment> segments;
+        if (player_ == nullptr)
+            return segments;
         // The transport, always shown: stopped, where Space plays from; playing, the playhead.
         // Its parts are as wide as the song needs, so what follows doesn't move as it counts.
         // Each part on a panel of its own (decided 12 November 2026): the transport, then the
@@ -369,7 +377,7 @@ Bar Workspace::statusBar() const
         const auto place = placeParts(song, view().cursorMeter(), at);
         const Style panel{Role::BarText, Role::Indicator, kPlain};
         const Style style = playing ? Style{Role::Accent, Role::Indicator, kBold} : panel;
-        const auto gap = [&] { bottom.left.push_back({" ", kBarText}); };
+        const auto gap = [&] { segments.push_back({" ", kBarText}); };
         // What the transport's doing, first, as a block always there and as wide whatever it
         // says, so nothing after it moves (decided November 2026, the block 12 November 2026):
         // stopped, dim; playing, lit; recording, and how, lit as arming is.
@@ -390,28 +398,36 @@ Bar Workspace::statusBar() const
             word = "▶ PLAY";
             state = {Role::IndicatorLitText, Role::Accent, kBold};
         }
-        bottom.left.push_back({" " + padText(word, 7, false) + " ", state});
+        segments.push_back({" " + padText(word, 7, false) + " ", state});
         gap();
-        bottom.left.push_back({" " + place.position + "  " + place.time + " ", style});
-        gap();
-        bottom.left.push_back({" " + place.meter + " ", panel});
-        gap();
-        bottom.left.push_back({" " + tempoText(song, at) + " ", panel});
-        gap();
-        bottom.left.push_back({" " + sectionText(song, at) + " ", panel});
-    }
+        segments.push_back({" " + place.position + "  " + place.time + " ", style});
+        if (step < 8)
+        {
+            gap();
+            segments.push_back({" " + place.meter + " ", panel});
+        }
+        if (step < 9)
+        {
+            gap();
+            segments.push_back({" " + tempoText(song, at) + " ", panel});
+        }
+        if (step < 6)
+        {
+            gap();
+            segments.push_back({" " + sectionText(song, at, step < 3 ? 16 : 6) + " ", panel});
+        }
+        return segments;
+    };
     // The indicators (decided 12 November 2026): each always in its place, as wide whatever it
     // says, dim when off and lit in its own colour when on, or the warning colour when something's
-    // wrong; in groups, recording, then the settings, then the input, then the file. Where the
-    // line's too narrow for them beside the rest, they give way in steps: the file's name, the
-    // input's last message, then short words, then the settings, then the input light.
+    // wrong; in groups, recording, then the settings, then the input, then the file.
     const auto& song = document_.song();
     const auto armed =
         std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
     const auto indicators = [&](int step)
     {
         std::vector<Segment> segments;
-        const bool brief = step >= 3;
+        const bool brief = step >= 4;
         enum class Lit : std::uint8_t
         {
             Off,
@@ -476,7 +492,7 @@ Bar Workspace::statusBar() const
                                     : Lit::Warning,
                       Role::IndicatorClick);
         }
-        if (step < 4)
+        if (step < 5)
         {
             gap();
             indicator("THRU", "THR", 4, 3, lit(thru_), Role::IndicatorThru);
@@ -488,7 +504,7 @@ Bar Workspace::statusBar() const
                       player_ != nullptr && player_->bypassQuantize() ? Lit::Warning : Lit::Off,
                       Role::Warning);
         }
-        if (step < 5)
+        if (step < 7)
         {
             // The input light, and the last message in, fixed in width so nothing after it
             // moves (decided November 2026).
@@ -536,17 +552,15 @@ Bar Workspace::statusBar() const
         std::max((width_ - 2 * spacing.margin) / std::max(cell_.width, 1), 1));
     const auto gapColumns =
         static_cast<std::size_t>((spacing.gap + cell_.width - 1) / std::max(cell_.width, 1));
-    const auto needed = length(bottom.left) + gapColumns + length(bottom.right);
-    auto chosen = indicators(5);
-    for (int step = 0; step < 5; ++step)
-    {
-        if (auto shown = indicators(step); needed + length(shown) <= columns)
-        {
-            chosen = std::move(shown);
-            break;
-        }
-    }
-    bottom.right.insert(bottom.right.end(), chosen.begin(), chosen.end());
+    int step = 0;
+    while (step < kSteps &&
+           length(bottom.left) + length(transport(step)) + gapColumns + length(indicators(step)) >
+               columns)
+        ++step;
+    const auto left = transport(step);
+    const auto right = indicators(step);
+    bottom.left.insert(bottom.left.end(), left.begin(), left.end());
+    bottom.right.insert(bottom.right.end(), right.begin(), right.end());
     // Every field a chip on the bar, a little short of its top and bottom, so the bar reads as
     // what they stand on however closely they're packed (decided 12 November 2026, after use).
     for (auto* side : {&bottom.left, &bottom.right})

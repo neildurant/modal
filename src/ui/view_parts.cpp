@@ -466,16 +466,16 @@ std::string tempoText(const core::Song& song, core::Tick tick)
     return padText(core::bpmText(song.tempo().tempoAt(tick)), widest, true) + " BPM";
 }
 
-std::string sectionText(const core::Song& song, core::Tick tick)
+std::string sectionText(const core::Song& song, core::Tick tick, std::size_t most)
 {
+    most = std::clamp<std::size_t>(most, 2, kSectionNameWidth);
     std::size_t longest = 0;
     for (const auto& section : song.sections())
     {
         longest = std::max(longest, decodeUtf8(section->name()).size());
     }
-    longest = std::min(longest, kSectionNameWidth);
-    return padText(cutText(song.sections()[song.sectionAt(tick)]->name(), kSectionNameWidth),
-                   longest, false);
+    longest = std::min(longest, most);
+    return padText(cutText(song.sections()[song.sectionAt(tick)]->name(), most), longest, false);
 }
 
 Region labelledBar(const std::vector<BarPair>& left, const std::vector<BarPair>& right, Rect bounds,

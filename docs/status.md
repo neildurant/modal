@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the status line's chips, the transport's state block and the grid in the piano roll's top bar (step 3 of rearranging the status line) are accepted and published; step 4, narrow windows, is next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: step 4 of rearranging the status line, how it gives way in narrow windows, is committed locally and waiting to be tried; steps 1 to 3 are accepted and published. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## Narrow windows (12 November 2026; waiting to be tried)
+
+Step 4 of rearranging the status line (design.md, The status line's indicators). The whole line now gives way as one, in the agreed order: the file's name, the input's last message, the section cut short to six characters with `…`, short words for the indicators, the settings, the section, the `IN` light, the meter, then the tempo. The mode, the transport's state, place and time, and the recording group always stay; below about 61 columns even those don't fit, and the line is cut at its end as before.
+
+**Validation.** Windows Debug passes 945 tests; WSL linux-clang-debug 946, no warnings; formatting clean. A new test narrows the window a column at a time from 220 to 61 columns and checks that nothing comes back once gone, that each part goes in its turn, that everything has gone by the narrowest, and that the mode, transport, position and `ARM` stay throughout. The `[.sample]` render now draws the line at ten widths from 1900 down to 600 pixels, with a section named `Introduction` so the cutting shows; it was looked at.
+
+**To try:** widen the window fully, then narrow it slowly, watching each part go in its turn and the transport and recording group staying; rename a section to something long (in the arrangement) to see it cut short with `…` before it goes.
 
 ## The left's panels and the grid in its bar (12 November 2026; accepted and published)
 

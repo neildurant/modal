@@ -1368,6 +1368,57 @@ TEST_CASE("the status line's indicators keep their places whatever they say, dim
     CHECK(places() == before);
 }
 
+TEST_CASE("the status line gives way in a narrow window, the least needed first, keeping the "
+          "mode, the transport and the recording group")
+{
+    Playing p;
+    p.document.edit("Rename section", {},
+                    [](core::Song& song) { song.renameSection(0, "Introduction"); });
+    // What gives way, in the order it goes.
+    const std::array<std::u32string_view, 9> parts{U"No file", U"input", U"Introduction",
+                                                   U"REPLACE", U"THR",   U"Intro",
+                                                   U" IN ",    U" 4/4 ", U" BPM"};
+    const auto shown = [&](int columns)
+    {
+        p.ws.resize(columns * kCell.width, 24 * kCell.height, kCell);
+        const auto frame = p.ws.frame();
+        const auto& runs = frame.back().text;
+        const auto has = [&](std::u32string_view part)
+        {
+            if (part == U"input") // the last message in, blank as nothing's come
+                return std::ranges::any_of(runs,
+                                           [](const auto& run)
+                                           {
+                                               return run.text == std::u32string(15, U' ') &&
+                                                      run.style.background == Role::Indicator;
+                                           });
+            return std::ranges::any_of(runs, [&](const auto& run)
+                                       { return run.text.find(part) != std::u32string::npos; });
+        };
+        for (const auto kept : {U" NORMAL ", U"■ STOP", U"1:1:000", U"ARM"})
+        {
+            CAPTURE(columns, encodeUtf8(kept));
+            CHECK(has(kept));
+        }
+        std::array<bool, 9> present{};
+        for (std::size_t i = 0; i < parts.size(); ++i)
+            present[i] = has(parts[i]);
+        return present;
+    };
+    CHECK(std::ranges::all_of(shown(220), std::identity{}));
+    bool narrowest = false;
+    for (int columns = 220; columns >= 61; --columns) // as narrow as the rest still fits
+    {
+        const auto present = shown(columns);
+        CAPTURE(columns, present);
+        // Gone in order: none still there after one that's gone.
+        const auto first = std::ranges::find(present, true);
+        CHECK(std::all_of(first, present.end(), std::identity{}));
+        narrowest = narrowest || first == present.end();
+    }
+    CHECK(narrowest);
+}
+
 TEST_CASE("the message row is always there, holding messages, hints, selections and the prompt, "
           "so the status line under it never moves")
 {

@@ -127,8 +127,8 @@ std::string whenText(core::MetronomeSettings::When when);
 std::string tempoText(const core::Song& song, core::Tick tick);
 
 // The name of the section holding a time, padded to the song's longest name, which is cut
-// short at 16 characters.
-std::string sectionText(const core::Song& song, core::Tick tick);
+// short at 16 characters, or fewer where there's less room.
+std::string sectionText(const core::Song& song, core::Tick tick, std::size_t most = 16);
 
 // A value in a view's bar after its label, dim; or a label alone. Where the bar is too narrow
 // for everything, those with the highest drop are left out first, and those at 0 never.
