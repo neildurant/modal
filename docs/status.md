@@ -243,6 +243,29 @@ Recorded 2000 of 2000 notes. Missing 0, extra 0.
   Recorded longer by    min -1.56 ms  median  0.00 ms  p99  0.52 ms  max  0.52 ms
   Off arrival time      0 recorded at a tick other than the one they arrived at
 
+### Results for Windows, 12/11/2026
+Out: UM-ONE MIDI 1
+In:  UM-ONE MIDI 1
+
+Recording 2000 notes, one every 10 ms, spin margin 1.50 ms...
+
+Sent 4000 messages; received 4000 of them. Lost 0, out of order 0, unexpected 0.
+
+  Latency (due to back) min  1.27 ms  median  1.64 ms  p99  2.37 ms  max  2.78 ms
+  Jitter                p99 - median 0.72 ms   standard deviation 0.22 ms
+  After the send call   min  1.26 ms  median  1.62 ms  p99  2.34 ms  max  2.76 ms
+
+  Send lateness         99% within  0.05 ms  max 0.53 ms
+    waking              99% within  0.05 ms  max 0.51 ms
+    sending             99% within  0.05 ms  max 0.06 ms
+
+Recorded 2000 of 2000 notes. Missing 0, extra 0.
+
+  Recorded late by      min  1.04 ms  median  1.56 ms  p99  2.08 ms  max  2.60 ms
+    in ticks            min     2     median     3     p99     4     max     5
+  Recorded longer by    min -1.04 ms  median  0.00 ms  p99  1.04 ms  max  1.04 ms
+  Off arrival time      0 recorded at a tick other than the one they arrived at
+
 2. **A take from a keyboard:** arm a track, `R`, play to the click through the count-in and on, Space; play it back and check it sounds as played, and that `u` undoes it.
 3. **Pre-roll and overdub:** a pre-roll take from bar 5, playing along; then the same bars in overdub, adding to it. In replace mode, check the track goes silent from the record point.
 4. **Sustain pedal** held across the record point and across the stop: the take should start and end with it, nothing left held.
