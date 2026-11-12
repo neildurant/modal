@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: recording's handling of inputs that can't be used and input lost is committed locally and waiting to be tried; rearranging the status line is done and published. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: recording's handling of inputs that can't be used and input lost is accepted and published; saving the remaining recording settings is next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Inputs that can't be used, and input lost, in recording (12 November 2026; waiting to be tried)
+## Inputs that can't be used, and input lost, in recording (12 November 2026; accepted and published)
+
+**Accepted** on trial, 12 November 2026, with `ARM` kept red, the warning messages being alarm enough, and published.
 
 Milestone 8's unavailable-input and input-overflow item (design.md, Inputs that can't be used, and input lost). `R` refuses when no armed track can record, naming each and why, and otherwise names those recording nothing in a warning. Input lost during a take puts `IN` in the warning colour until recording stops, and either that or an input going missing is said with `Recorded onto…`, as a warning. The Tracks view's check for a port that can't be used moved to `ports.hpp` (`portTrouble`, with `portTroubleText` for messages), so `R` and the Input column agree. `ARM` was first in the warning colour too; after trying it, it stays red, the pink reading as less serious (decided 12 November 2026).
 
