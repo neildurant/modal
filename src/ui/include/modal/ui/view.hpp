@@ -442,8 +442,6 @@ public:
     // What can be typed into the field being edited, and what the keys do, for the status line.
     virtual std::optional<std::string> typingHint() const { return std::nullopt; }
 
-    // The editing grid the view steps by, for the status line's settings, if it has one.
-    virtual std::optional<std::string> gridStatus() const { return std::nullopt; }
     virtual void type(char32_t /*character*/) {}
     // A digit typed in Normal mode with no count or keys before it, which a view may take to
     // start editing a number field with, rather than it starting a count (decided November

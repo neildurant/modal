@@ -346,7 +346,6 @@ Bar Workspace::messageBar(bool withMessage) const
 
 Bar Workspace::statusBar() const
 {
-    const Style label{Role::Dim, Role::Bar, kPlain};
     Bar bottom;
     const std::string mode = freezeChoice_     ? " FREEZE "
                              : trackMove_      ? " MOVE "
@@ -362,13 +361,16 @@ Bar Workspace::statusBar() const
     {
         // The transport, always shown: stopped, where Space plays from; playing, the playhead.
         // Its parts are as wide as the song needs, so what follows doesn't move as it counts.
+        // Each part on a panel of its own (decided 12 November 2026): the transport, then the
+        // meter, the tempo and the section there.
         const auto& song = document_.song();
         const auto playing = player_->position();
         const auto at = playing.value_or(player_->marker());
         const auto place = placeParts(song, view().cursorMeter(), at);
-        const Style style = playing ? Style{Role::Accent, Role::Bar, kBold}
-                                    : Style{Role::BarText, Role::Bar, kPlain};
-        // Recording, and how, straight after the symbol, so it shows however narrow.
+        const Style panel{Role::BarText, Role::Indicator, kPlain};
+        const Style style = playing ? Style{Role::Accent, Role::Indicator, kBold} : panel;
+        const auto gap = [&] { bottom.left.push_back({" ", kBarText}); };
+        // Recording, and how, first, lit as arming is, so it shows however narrow.
         const bool overdub = song.recordMode == core::RecordMode::Overdub;
         if (const auto phase = player_->recordPhase())
         {
@@ -381,23 +383,22 @@ Bar Workspace::statusBar() const
                                                               : "REC";
             auto text = "● " + std::string{word};
             text.resize(std::string_view{"● COUNT"}.size(), ' ');
-            bottom.left.push_back({text + "  ", {Role::Warning, Role::Bar, kBold}});
+            bottom.left.push_back(
+                {" " + text + " ", {Role::IndicatorLitText, Role::IndicatorArm, kBold}});
+            bottom.left.push_back({" ", style});
         }
         else
         {
-            bottom.left.push_back(
-                {playing ? "▶ " : "■ ", playing ? style : Style{Role::Dim, Role::Bar, kPlain}});
+            bottom.left.push_back({playing ? " ▶ " : " ■ ",
+                                   playing ? style : Style{Role::Dim, Role::Indicator, kPlain}});
         }
-        bottom.left.push_back({place.position + "  " + place.time + "  " + place.meter + "  " +
-                                   tempoText(song, at) + "  " + sectionText(song, at),
-                               style});
-    }
-
-    // The view's grid, the one setting that's the view's, padded so what follows stays put.
-    if (const auto grid = view().gridStatus())
-    {
-        bottom.right.push_back({"Grid ", label});
-        bottom.right.push_back({padText(*grid, 5, false) + "   ", kBarText});
+        bottom.left.push_back({place.position + "  " + place.time + " ", style});
+        gap();
+        bottom.left.push_back({" " + place.meter + " ", panel});
+        gap();
+        bottom.left.push_back({" " + tempoText(song, at) + " ", panel});
+        gap();
+        bottom.left.push_back({" " + sectionText(song, at) + " ", panel});
     }
     // The indicators (decided 12 November 2026): each always in its place, as wide whatever it
     // says, dim when off and lit in its own colour when on, or the warning colour when something's

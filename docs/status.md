@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the message row (step 2 of rearranging the status line) is accepted and published; step 3, the left's panels and the grid in the piano roll's top bar, is next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the status line's panels and the grid in the piano roll's top bar (step 3 of rearranging the status line) are built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## The left's panels and the grid in its bar (12 November 2026; local, to try)
+
+Step 3 of rearranging the status line. The left side's parts each sit on a panel in the `indicator` colour: the transport (the symbol, position and time), the meter, the tempo and the section. Recording shows `● COUNT`, `● PRE`, `● REC` or `● ODUB` as a block lit in `indicator-arm` red before the transport, rather than in the warning colour on the bar. The piano roll's grid has left the status line for the piano roll's top bar, after the output (`Grid: 1/16`), dropped there after the section's bars and before the section when the bar's narrow (the drop priorities renumbered to fit it); the views' `gridStatus` has gone. The status line is now the same in every view.
+
+**Validation.** Windows Debug passes 943 tests (941, 2 skipped); WSL linux-clang-debug 944 (941, 3 skipped), no warnings. A new test checks the transport, meter, tempo and section are on panels and the count-in block is lit red; the grid test now finds it in the top bar and not the status line; the transport tests find the symbol within its panel. Renders of the left side stopped, with a message, counting in, in the piano roll and narrower, and of the piano roll's top bar, were looked at in both themes.
+
+**To try:** look at the left of the status line in each view, stopped and playing, and record (`R`) through the count-in or pre-roll into recording: each part should sit on its panel without moving, the recording block lit red. In the piano roll, the grid should be in the top bar after the output, changing with `zh`, `zl` and `Ctrl-t`, and gone from the status line; narrowing the window should drop it after the section's bars.
 
 ## The message row (12 November 2026; accepted and published)
 

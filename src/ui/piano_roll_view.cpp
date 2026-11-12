@@ -2791,14 +2791,18 @@ void PianoRollView::addRegions(Frame& frame) const
                            .over = {}});
     frame.push_back(std::move(ruler));
 
-    // The view's bar: the track, then the page, its section and bars, and where the cursor
-    // is. The grid is in the status line, with the settings, and the note a new one would be
-    // in the inspector, being the cursor's (decided November 2026, after use).
+    // The view's bar: the track and its grid, then the page, its section and bars, and where
+    // the cursor is. The grid is here as the track's own, not in the status line with what's
+    // the same in every view (decided 12 November 2026), padded so what follows stays put; the
+    // note a new one would be is in the inspector, being the cursor's (decided November 2026).
     std::vector<BarPair> left;
     std::vector<BarPair> right;
     if (trackId())
     {
         left = trackPairs(song, track_ + 1);
+        // After the output, before what comes and goes from track to track.
+        left.insert(left.begin() + std::min<std::ptrdiff_t>(3, std::ssize(left)),
+                    BarPair{"Grid:", padText(core::toString(grid()), 5, false), kDropGrid});
     }
     else
     {
@@ -2861,11 +2865,6 @@ void PianoRollView::addNewNote(Region& inspector, const core::Track& track) cons
         inspector.text.push_back(
             {x + static_cast<int>(labels + 1) * cell_.width, y, rows[i].second, label});
     }
-}
-
-std::optional<std::string> PianoRollView::gridStatus() const
-{
-    return trackId() ? std::optional{core::toString(grid())} : std::nullopt;
 }
 
 std::string PianoRollView::position(core::Tick tick) const

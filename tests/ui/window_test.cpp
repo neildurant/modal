@@ -749,6 +749,16 @@ TEST_CASE("a sample of the status line's indicators", "[.sample]")
         view.handle(Key::typed(key), 0);
     save("visual");
     view.handle(Key::of(NamedKey::Escape), 0);
+    // Counting in to record, then the piano roll, with its grid in its own bar.
+    view.handle(Key::typed(U'R'), 0);
+    modal::test::runUntil(engine, clock, clock.time + std::chrono::milliseconds{10});
+    view.wake(*view.deadline());
+    save("recording");
+    view.handle(Key::typed(U' '), 0);
+    modal::test::runUntil(engine, clock, clock.time + std::chrono::milliseconds{10});
+    view.wake(view.deadline().value_or(0));
+    view.show(ViewKind::PianoRoll);
+    save("piano");
     // Narrower, as the indicators give way.
     view.resize(window->pixelWidth() * 11 / 19, window->pixelHeight(), window->cellSize());
     save("narrow");

@@ -700,12 +700,12 @@ TEST_CASE("zl, zh and Ctrl-T change the track's grid, which h and l step by")
     CHECK(r.view().grid() == core::NoteFraction{1, 32});
     r.type(U"2zl");
     CHECK(r.view().grid() == core::NoteFraction{1, 8});
-    // In the status line, with the settings, not the bar above.
-    CHECK(contains(r.statusText(), U"Grid 1/8 "));
-    CHECK_FALSE(contains(r.barText(), U"Grid"));
+    // In the bar above, as the track's own, not the status line, which is the same in every view.
+    CHECK(contains(r.barText(), U"Grid:  1/8 ")); // label and value, a space between runs
+    CHECK_FALSE(contains(r.statusText(), U"Grid"));
     r.press(Key::typed(U't', kCtrl));
     CHECK(r.view().grid() == core::NoteFraction{1, 12});
-    CHECK(contains(r.statusText(), U"Grid 1/8t"));
+    CHECK(contains(r.barText(), U"Grid:  1/8t"));
     r.type(U"l");
     CHECK(r.view().time() == t.quarters(1) / 3);
     r.press(Key::typed(U't', kCtrl));

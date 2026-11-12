@@ -426,8 +426,9 @@ TEST_CASE("the transport keeps its place, playing or stopped, with a message aft
     };
     const auto at = [](const std::vector<TextRun>& text, std::u32string_view start)
     {
-        const auto run = std::ranges::find_if(text, [&](const TextRun& candidate)
-                                              { return candidate.text.starts_with(start); });
+        const auto run =
+            std::ranges::find_if(text, [&](const TextRun& candidate)
+                                 { return candidate.text.find(start) != std::u32string::npos; });
         return run == text.end() ? -1 : run->x;
     };
     const auto stopped = runs();
@@ -464,8 +465,9 @@ TEST_CASE("the mode takes the same room whichever it is, so the transport after 
     {
         const auto frame = p.ws.frame();
         const auto& text = frame.back().text;
-        const auto run = std::ranges::find_if(text, [](const TextRun& candidate)
-                                              { return candidate.text.starts_with(U"■"); });
+        const auto run =
+            std::ranges::find_if(text, [](const TextRun& candidate)
+                                 { return candidate.text.find(U"■") != std::u32string::npos; });
         return run == text.end() ? -1 : run->x;
     };
     const int normal = glyphAt();
@@ -1418,4 +1420,31 @@ TEST_CASE("the message row is always there, holding messages, hints, selections 
     CHECK(bottom().second == status);
     p.press(Key::of(NamedKey::Escape));
     CHECK(bottom().first.empty());
+}
+
+TEST_CASE("the status line's transport, meter, tempo and section are each on a panel, and "
+          "recording is lit as arming is")
+{
+    Playing p;
+    p.ws.resize(220 * kCell.width, 24 * kCell.height, kCell);
+    const auto background = [&](std::u32string_view text)
+    {
+        const auto frame = p.ws.frame();
+        for (const auto& run : frame.back().text)
+            if (run.text.find(text) != std::u32string::npos)
+                return run.style.background;
+        return Role::Background;
+    };
+    CHECK(background(U"■") == Role::Indicator);
+    CHECK(background(U"1:1:000") == Role::Indicator);
+    CHECK(background(U" 4/4 ") == Role::Indicator);
+    CHECK(background(U" BPM") == Role::Indicator);
+    CHECK(background(decodeUtf8(p.document.song().sections()[0]->name())) == Role::Indicator);
+    p.type(U",ra");
+    p.type(U"R");
+    p.runFor(10ms);
+    REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::CountIn);
+    CHECK(background(U"● COUNT") == Role::IndicatorArm);
+    p.type(U" ");
+    p.runFor(10ms);
 }

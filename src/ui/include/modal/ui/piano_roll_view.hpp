@@ -127,7 +127,6 @@ public:
     // on by as many, until zooming brings pages back into line.
     void openBars(const SongCursor& cursor, core::Tick from, core::Tick to);
     core::NoteFraction grid() const; // the track's
-    std::optional<std::string> gridStatus() const override;
     void addNewNote(Region& inspector, const core::Track& track) const;
     int noteRows() const; // the pitch rows fully in view
 

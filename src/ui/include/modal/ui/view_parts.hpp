@@ -140,12 +140,13 @@ struct BarPair
 };
 
 // What may be left out of a view's bar, from the first to go to the last: a track's
-// quantise, program and bank, which come and go, quantise the longest; the section's bars;
-// and the section.
-inline constexpr int kDropQuantise = 5;
-inline constexpr int kDropProgram = 4;
-inline constexpr int kDropBank = 3;
-inline constexpr int kDropBars = 2;
+// quantise, program and bank, which come and go, quantise the longest; the section's bars; the
+// piano roll's grid; and the section.
+inline constexpr int kDropQuantise = 6;
+inline constexpr int kDropProgram = 5;
+inline constexpr int kDropBank = 4;
+inline constexpr int kDropBars = 3;
+inline constexpr int kDropGrid = 2;
 inline constexpr int kDropSection = 1;
 
 // A view's bar of labelled values, on the left and the right, leaving out what it must.
