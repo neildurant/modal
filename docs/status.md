@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the status line's panels and the grid in the piano roll's top bar (step 3 of rearranging the status line) are built locally, to try. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the status line's chips, the transport's state block and the grid in the piano roll's top bar (step 3 of rearranging the status line) are accepted and published; step 4, narrow windows, is next. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## The left's panels and the grid in its bar (12 November 2026; local, to try again)
+## The left's panels and the grid in its bar (12 November 2026; accepted and published)
+
+**Accepted** on a second trial, 12 November 2026: the chips help the layout, and the STOP/REC block keeps everything in place; published.
 
 **First trial,** 12 November 2026: the grid in the top bar, and its giving way, as wanted; but the transport moved as recording began, and with so many fields packed close the bar's gaps looked like marks on a light strip. Now the transport starts with a block as wide whatever it says (`■ STOP`, `▶ PLAY`, `● COUNT`, `● PRE`, `● REC`, `● ODUB`), and every field on the status line is a chip, its background a little short of the row's top and bottom (the new `kInset` attribute, drawn by the window), with the message row in the bar's colour: chosen from four rendered ways. Windows Debug passes 944 tests (942, 2 skipped), WSL linux-clang-debug 945 (942, 3 skipped), no warnings; new tests check the state block keeps the meter in place stopped, counting in and recording, the status line's fields are inset, and an inset background is drawn short of the cell's top and bottom.
 
@@ -221,7 +223,7 @@ Step 3 of rearranging the status line. The left side's parts each sit on a panel
 
 **Validation.** Windows Debug passes 943 tests (941, 2 skipped); WSL linux-clang-debug 944 (941, 3 skipped), no warnings. A new test checks the transport, meter, tempo and section are on panels and the count-in block is lit red; the grid test now finds it in the top bar and not the status line; the transport tests find the symbol within its panel. Renders of the left side stopped, with a message, counting in, in the piano roll and narrower, and of the piano roll's top bar, were looked at in both themes.
 
-**To try:** look at the status line as a whole, chips on a band of two rows, in both themes (`:set theme=light`); then the left of the status line in each view, stopped and playing, and record (`R`) through the count-in or pre-roll into recording: each part should sit on its panel without moving, the recording block lit red. In the piano roll, the grid should be in the top bar after the output, changing with `zh`, `zl` and `Ctrl-t`, and gone from the status line; narrowing the window should drop it after the section's bars.
+**Tried:** look at the status line as a whole, chips on a band of two rows, in both themes (`:set theme=light`); then the left of the status line in each view, stopped and playing, and record (`R`) through the count-in or pre-roll into recording: each part should sit on its panel without moving, the recording block lit red. In the piano roll, the grid should be in the top bar after the output, changing with `zh`, `zl` and `Ctrl-t`, and gone from the status line; narrowing the window should drop it after the section's bars.
 
 ## The message row (12 November 2026; accepted and published)
 
