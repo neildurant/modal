@@ -1672,7 +1672,8 @@ TEST_CASE("the quantise grid steps through the triplets, from anywhere")
 }
 
 TEST_CASE(
-    "the button columns are evenly spaced, and Input fits its names, three cells before Output")
+    "the button columns are evenly spaced, three cells before Input, which fits its names, two "
+    "before Output")
 {
     Tracking t;
     const auto headingX = [&](std::u32string_view heading)
@@ -1710,8 +1711,10 @@ TEST_CASE(
         CHECK(badges[i] - badges[i - 1] == 4 * 10);
     }
 
-    // Input, then three cells before Output, growing with the longest input a track names.
+    // Three cells after the last button, then Input, two cells before Output, growing with the
+    // longest input a track names.
     const auto input = headingX(U"Input");
+    CHECK(input - badges.back() == (3 + 3) * 10);
     const auto output = [&] { return headingX(U"Output"); };
     const auto narrow = output() - input;
     t.document.edit("A long input", {},
@@ -1721,7 +1724,7 @@ TEST_CASE(
                             song.tracks()[0]->id(), [](core::Track& track)
                             { track.input = "An input with quite a long name, longer than room"; });
                     });
-    CHECK(output() - input == (26 + 3) * 10); // with the list's arrow
+    CHECK(output() - input == (26 + 2) * 10); // with the list's arrow
     CHECK(narrow ==
           std::ranges::find(trackColumns(), TrackField::Input, &TrackColumn::field)->width * 10);
 }

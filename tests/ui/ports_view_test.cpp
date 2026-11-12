@@ -245,10 +245,41 @@ TEST_CASE("the ports view's inspector says what the column is, and why a port ca
     Porting p;
     auto text = p.text();
     CHECK(contains(text, U"On: listened to, for Thru, recording and the In light"));
-    CHECK(contains(text, U"not listened to"));
+    CHECK(contains(text, U"Disabled"));
     p.type(U"jj");
     text = p.text();
     CHECK(contains(text, U"Not connected"));
     p.type(U"l");
     CHECK(contains(p.text(), U"Default: the output of tracks set to Default, one at a time"));
+}
+
+TEST_CASE("the ports view's inspector keeps its fields in place as the cursor moves, what the "
+          "column is last")
+{
+    Porting p;
+    const auto headings = [&]
+    {
+        // In the inspector, the region with About in it.
+        std::vector<std::pair<std::u32string, int>> found;
+        for (const auto& region : p.ws.frame())
+        {
+            if (std::ranges::none_of(region.text,
+                                     [](const auto& run) { return run.text == U"About"; }))
+                continue;
+            for (const auto& run : region.text)
+                if (run.text == U"Port" || run.text == U"State" || run.text == U"About")
+                    found.emplace_back(run.text, run.x);
+        }
+        return found;
+    };
+    const auto first = headings();
+    REQUIRE(first.size() == 3);
+    CHECK(first[0].first == U"Port");
+    CHECK(first[2].first == U"About");
+    // Down through ports of other lengths, enabled, disabled and gone, and along the columns.
+    for (const auto keys : {U"j", U"j", U"j", U"l", U"l", U"k", U"l", U"k"})
+    {
+        p.type(keys);
+        CHECK(headings() == first);
+    }
 }

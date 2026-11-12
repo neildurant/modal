@@ -32,7 +32,8 @@ constexpr int kValueWidth = 24; // room for a port's alias, and "While recording
 constexpr int kNoteWidth = 6;   // a click's note, then its drum name, then its velocity
 constexpr int kDrumWidth = 19;
 constexpr int kVelocityWidth = 5; // a cell more than the digits for the cursor, as for others
-constexpr int kNumberWidth = 4;   // a count-in's or pre-roll's, then whether bars or beats
+constexpr int kVelocityLabel = 4; // Vel, before it
+constexpr int kNumberWidth = 6;   // a count-in's or pre-roll's, then whether bars or beats
 constexpr int kUnitWidth = 9;
 
 // The General MIDI percussion names, which most drum sounds follow, from 35 to 81.
@@ -759,8 +760,10 @@ void MetronomeView::addRegions(Frame& frame) const
         }
         if (which == Field::Test)
         {
-            page.text.push_back(
-                {x, y, U" Test ", here ? cursor : Style{Role::Text, Role::Panel, kPlain}});
+            // A chip, short of the row's top and bottom, so the two buttons don't run together.
+            Style button = here ? cursor : Style{Role::Text, Role::Panel, kPlain};
+            button.attributes |= kInset;
+            page.text.push_back({x, y, U" Test ", button});
             return;
         }
         const bool listed = !edited.choices.empty();
@@ -792,6 +795,32 @@ void MetronomeView::addRegions(Frame& frame) const
     };
     const auto& song = document_.song();
     const int valueX = (1 + kLabelWidth) * cell_.width;
+    // Spread out where there's room (decided 12 November 2026, after use): a blank row between
+    // the groups of settings, when it plays, where and what, then how recording starts and how
+    // long; and half a row between rows. Where there isn't, the half rows go, then the blank ones.
+    const auto startsGroup = [](Setting setting)
+    {
+        return setting == Setting::Port || setting == Setting::Downbeat ||
+               setting == Setting::CountIn;
+    };
+    const auto heightWith = [&](int spread)
+    {
+        int height = 0;
+        for (const auto setting : kSettings)
+        {
+            if (setting == Setting::Plays || setting == Setting::Mode)
+                height += 2 * cell_.height; // a heading
+            if (setting == Setting::Mode)
+                height += 2 * cell_.height;
+            if (spread >= 1 && startsGroup(setting))
+                height += cell_.height;
+            height += cell_.height + (spread >= 2 ? cell_.height / 2 : 0);
+        }
+        return height;
+    };
+    int spread = 2;
+    while (spread > 0 && heightWith(spread) > layout_.main.height)
+        --spread;
     for (std::size_t i = 0; i < kSettings.size(); ++i)
     {
         const auto setting = kSettings[i];
@@ -799,9 +828,11 @@ void MetronomeView::addRegions(Frame& frame) const
             heading(U"Metronome");
         if (setting == Setting::Mode)
         {
-            y += cell_.height; // two blank lines between the groups
+            y += 2 * cell_.height; // two blank lines between the halves
             heading(U"Before recording");
         }
+        if (spread >= 1 && startsGroup(setting))
+            y += cell_.height;
         page.text.push_back({2 * cell_.width, y, decodeUtf8(label(setting)), dim});
         if (isClick(setting))
         {
@@ -810,7 +841,9 @@ void MetronomeView::addRegions(Frame& frame) const
             const auto note = down ? song.metronome.downbeatNote : song.metronome.beatNote;
             page.text.push_back(
                 {valueX + kNoteWidth * cell_.width, y, decodeUtf8(drumName(note)), dim});
-            const int velocityX = valueX + (kNoteWidth + kDrumWidth) * cell_.width;
+            const int labelX = valueX + (kNoteWidth + kDrumWidth) * cell_.width;
+            page.text.push_back({labelX, y, U"Vel", dim});
+            const int velocityX = labelX + kVelocityLabel * cell_.width;
             field(setting, Field::Velocity, velocityX, kVelocityWidth - 1, true);
             field(setting, Field::Test, velocityX + kVelocityWidth * cell_.width, 6, false);
         }
@@ -821,14 +854,14 @@ void MetronomeView::addRegions(Frame& frame) const
         }
         else
         {
-            const int width = setting == Setting::Channel  ? 3
+            // The channel's box as wide as the notes' below it, so the column's boxes line up,
+            // the number on the right of it as numbers are (decided 12 November 2026).
+            const int width = setting == Setting::Channel  ? kNoteWidth - 1
                               : setting == Setting::Length ? 6
                                                            : kValueWidth - 1;
             field(setting, Field::Value, valueX, width, setting == Setting::Channel);
         }
-        y += cell_.height;
-        if (setting == Setting::Length)
-            y += cell_.height;
+        y += cell_.height + (spread >= 2 ? cell_.height / 2 : 0);
     }
     frame.push_back(std::move(page));
     addChoiceList(frame, &editor_, listAt, layout_.main, cell_);

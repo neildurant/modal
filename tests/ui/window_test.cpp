@@ -11,9 +11,11 @@
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
+#include <modal/ui/ports.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
+#include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <SDL3/SDL.h>
@@ -25,6 +27,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -791,6 +794,54 @@ TEST_CASE("a sample of the status line's indicators", "[.sample]")
         CHECK(window->saveFrame(base + "-status-narrow-" + std::to_string(width) + ".bmp"));
     }
 }
+TEST_CASE("a sample of the Metronome page and the Ports and Tracks views", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    PortTable table;
+    table.detected(PortDirection::Output, std::vector<std::string>{"Gone Synth"});
+    table.detected(PortDirection::Input, std::vector<std::string>{"Xkey 1", "loopMIDI Port 1"});
+    table.detected(PortDirection::Output,
+                   std::vector<std::string>{"loopMIDI Port 1", "Babyface Midi Port 1"});
+    table.setEnabled(PortDirection::Input, "Xkey 1", true);
+    table.setEnabled(PortDirection::Output, "Gone Synth", true);
+    table.setEnabled(PortDirection::Output, "Babyface Midi Port 1", true);
+    table.setDefault(PortDirection::Output, "Babyface Midi Port 1");
+    view.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+            view.handle(Key::typed(key), 0);
+    };
+    // As large as a window that's been made big, and at the smallest a window can be.
+    for (const auto& [name, width, height] : {std::tuple{"large", 1600, 900}, {"small", 1200, 600}})
+    {
+        auto window = offscreen(width, height);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        const auto save = [&](const std::string& page)
+        {
+            window->draw(view.frame(), *builtInTheme("dark"));
+            CHECK(window->saveFrame(base + "-" + page + "-" + name + ".bmp"));
+        };
+        type(U",ms");
+        save("metronome");
+        type(U"jjjl");
+        save("metronome-test");
+        view.handle(Key::of(NamedKey::Escape), 0);
+        type(U",vm");
+        save("ports");
+        type(U"jj");
+        save("ports-gone");
+        type(U"gt");
+        save("tracks");
+    }
+}
+
 TEST_CASE("a sample of marks in each view", "[.sample]")
 {
     auto window = offscreen(1000, 600);

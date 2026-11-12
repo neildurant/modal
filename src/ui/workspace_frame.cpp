@@ -448,7 +448,9 @@ Bar Workspace::statusBar() const
                                 style});
             segments.push_back({" ", kBarText});
         };
-        const auto gap = [&] { segments.push_back({" ", kBarText}); };
+        // Three cells between groups, one within, so the groups read as groups (decided
+        // 12 November 2026, after use).
+        const auto gap = [&] { segments.push_back({"  ", kBarText}); };
         const auto lit = [](bool on) { return on ? Lit::On : Lit::Off; };
 
         const auto arm = armed > 0 ? "ARM " + std::to_string(armed) : std::string{"ARM"};

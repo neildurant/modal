@@ -529,8 +529,9 @@ std::optional<bool> PortsView::runTyping(std::string_view command)
 
 Inspection PortsView::inspection() const
 {
-    // What the column under the cursor is, then whether the port can be used, and its detected
-    // name whole.
+    // The port's detected name whole, then whether it can be used, then what the column under
+    // the cursor is. The name and the state are as wide on every row, and what varies most
+    // comes last, so nothing moves as the cursor does (decided 12 November 2026, after use).
     const auto* port = current();
     if (port == nullptr)
     {
@@ -538,21 +539,19 @@ Inspection PortsView::inspection() const
     }
     Inspection result{.kind = port->direction == PortDirection::Input ? "Input" : "Output",
                       .fields = {}};
+    std::size_t longest = 0;
+    if (const auto* table = host_.portTable())
+        for (const auto& known : table->ports())
+            longest = std::max(longest, decodeUtf8(known.name).size());
+    result.fields.push_back({"Port", padText(port->name, longest, false)});
+    // Not connected, in the warning colour if it's enabled, as it's wanted but can't be used.
+    InspectorField state{"State", padText(!port->present   ? "Not connected"
+                                          : !port->enabled ? "Disabled"
+                                                           : "Enabled",
+                                          13, false)};
+    state.warning = !port->present && port->enabled;
+    result.fields.push_back(std::move(state));
     result.fields.push_back({"About", std::string{about(column(), port->direction)}});
-    // Why it can't be used, before its name, which may be long.
-    if (!port->present)
-    {
-        InspectorField absent{"Not connected", "not usable until it's back"};
-        absent.warning = port->enabled;
-        result.fields.push_back(std::move(absent));
-    }
-    else if (!port->enabled)
-    {
-        result.fields.push_back({"Disabled", port->direction == PortDirection::Input
-                                                 ? "not listened to"
-                                                 : "not offered to tracks"});
-    }
-    result.fields.push_back({"Port", port->name});
     return result;
 }
 

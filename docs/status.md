@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: recording's input handling is accepted and published, and the recording settings were found already saved (design.md, Which recording settings are whose); automated coverage and real MIDI trials for recording are next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: layout tweaks to the status line, Tracks, Ports and Metronome pages are committed locally and waiting to be tried; then automated coverage and real MIDI trials for recording. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## Layout tweaks after use (12 November 2026; waiting to be tried)
+
+Agreed 12 November 2026 (schedule.md, milestone 8; decisions.md, Layout tweaks after use). The status line's indicator groups are three cells apart, a cell within. The Tracks view has three blank cells after the Q button and two between Input and Output. The Ports inspector shows Port (padded to the longest known name), then State (`Enabled`, `Disabled`, `Not connected`), then About. The Metronome page has a blank row between its groups and half a row between rows, the half rows and then the blank ones going where the window's too short; Channel's, the notes' and the counts' boxes are the same width; velocities are labelled `Vel`; the Test buttons are chips.
+
+**Validation.** Windows Debug passes 948 tests; WSL linux-clang-debug 949, no warnings; formatting clean. New and changed tests: the Tracks view's gaps after the buttons and between Input and Output; the Ports inspector's Port, State and About headings staying put as the cursor moves along and between rows of ports of different lengths and states. A new `[.sample]` render, `a sample of the Metronome page and the Ports and Tracks views`, draws the three at 1600 by 900 and at the smallest window, looked at in the dark theme.
+
+**To try:** look at the status line's indicators; the Tracks view's ports; the Ports view, moving up, down and along, watching the inspector stay still; and the Metronome page (`, m s`) in a large window and a small one.
 
 ## Inputs that can't be used, and input lost, in recording (12 November 2026; accepted and published)
 

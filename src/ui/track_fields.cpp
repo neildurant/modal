@@ -24,10 +24,12 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::Arm, "Arm", 4},
     TrackColumn{TrackField::Thru, "Thru", 4},
     TrackColumn{TrackField::ChaseNotes, "Chase", 4},
-    TrackColumn{TrackField::Quantize, "Quant", 4},
+    // Three blank cells after the buttons, setting them apart from the ports.
+    TrackColumn{TrackField::Quantize, "Quant", 6, false, 3},
     // Input before Output, as MIDI flows, beside Arm and Thru; Output beside the channel, bank
-    // and program it plays with, three blank cells setting the two apart (decided November 2026).
-    TrackColumn{TrackField::Input, "Input", 14, false, 3},
+    // and program it plays with (decided November 2026). Two blank cells between them, their
+    // fields' backgrounds keeping them apart (decided 12 November 2026, after use).
+    TrackColumn{TrackField::Input, "Input", 13, false, 2},
     TrackColumn{TrackField::Port, "Output", 12},
     TrackColumn{TrackField::Channel, "Ch", 4, true},
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
