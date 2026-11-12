@@ -220,6 +220,29 @@ Milestone 8's last item (schedule.md). The audit of recording's tests against th
 **Hardware checklist**, for Neil on Windows and on the Linux laptop with the UM-ONE. Record each result here, with the date and system.
 
 1. **Recording accuracy, re-run** as the input path changed after October (bounded and fair input taking, input sessions, named inputs, the engine woken at once): as October's were, with the default stream and spin and a Release build: on Windows, with the Babyface's out cabled to its in, `cmake --build --preset windows-msvc-release` then `build\windows-msvc\apps\Release\modal-loopback.exe --port "Babyface" --record`; on Linux, with the UM-ONE's, `cmake --build --preset linux-gcc-release` then `build/linux-gcc/apps/Release/modal-loopback --port "UM-ONE" --record` (`modal-ports` lists the names, which `--port` matches a part of). October's results, for comparison (design.md, Measured recording): Windows all 2,000 notes, 1 to 3 ticks late, median 2; Linux all 2,000, 2 to 5 ticks late, median 3. Expect the same, and nothing lost, out of order or unexpected.
+### Results for Windows, 12/11/2026:
+Out: Babyface Midi Port 1 1
+In:  Babyface Midi Port 1 1
+
+Recording 2000 notes, one every 10 ms, spin margin 1.50 ms...
+
+Sent 4000 messages; received 4000 of them. Lost 0, out of order 0, unexpected 0.
+
+  Latency (due to back) min  1.02 ms  median  1.12 ms  p99  1.27 ms  max  2.76 ms
+  Jitter                p99 - median 0.15 ms   standard deviation 0.06 ms
+  After the send call   min  0.92 ms  median  1.02 ms  p99  1.17 ms  max  2.51 ms
+
+  Send lateness         99% within  0.20 ms  max 0.37 ms
+    waking              99% within  0.05 ms  max 0.12 ms
+    sending             99% within  0.20 ms  max 0.36 ms
+
+Recorded 2000 of 2000 notes. Missing 0, extra 0.
+
+  Recorded late by      min  0.52 ms  median  1.04 ms  p99  1.04 ms  max  2.60 ms
+    in ticks            min     1     median     2     p99     2     max     5
+  Recorded longer by    min -1.56 ms  median  0.00 ms  p99  0.52 ms  max  0.52 ms
+  Off arrival time      0 recorded at a tick other than the one they arrived at
+
 2. **A take from a keyboard:** arm a track, `R`, play to the click through the count-in and on, Space; play it back and check it sounds as played, and that `u` undoes it.
 3. **Pre-roll and overdub:** a pre-roll take from bar 5, playing along; then the same bars in overdub, adding to it. In replace mode, check the track goes silent from the record point.
 4. **Sustain pedal** held across the record point and across the stop: the take should start and end with it, nothing left held.
