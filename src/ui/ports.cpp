@@ -379,4 +379,51 @@ PortTable PortTable::read(std::string_view text, std::vector<std::string>* error
     return table;
 }
 
+PortTrouble portTrouble(const PortTable& table, PortDirection direction, std::string_view name)
+{
+    if (direction == PortDirection::Input && name == "*")
+        return table.offered(direction).empty()  ? PortTrouble::NoInputs
+               : table.usable(direction).empty() ? PortTrouble::NoInputsConnected
+                                                 : PortTrouble::None;
+    const auto resolved = table.resolve(direction, name);
+    switch (resolved.problem)
+    {
+    case PortProblem::None:
+        return PortTrouble::None;
+    case PortProblem::Disabled:
+        return name.empty() ? PortTrouble::DefaultDisabled : PortTrouble::Disabled;
+    case PortProblem::Missing:
+        break;
+    }
+    return !name.empty()            ? PortTrouble::Missing
+           : resolved.named.empty() ? PortTrouble::NoDefault
+                                    : PortTrouble::DefaultMissing;
+}
+
+std::string portTroubleText(const PortTable& table, PortDirection direction, std::string_view name,
+                            PortTrouble trouble)
+{
+    const std::string which = direction == PortDirection::Input ? "input" : "output";
+    switch (trouble)
+    {
+    case PortTrouble::None:
+        break;
+    case PortTrouble::Missing:
+        return which + " " + std::string{name} + " not found";
+    case PortTrouble::Disabled:
+        return which + " " + std::string{name} + " disabled";
+    case PortTrouble::NoDefault:
+        return "no default " + which;
+    case PortTrouble::DefaultMissing:
+        return "default " + which + " " + table.defaultPort(direction) + " not found";
+    case PortTrouble::DefaultDisabled:
+        return "default " + which + " disabled";
+    case PortTrouble::NoInputs:
+        return "no inputs enabled";
+    case PortTrouble::NoInputsConnected:
+        return "no inputs connected";
+    }
+    return {};
+}
+
 } // namespace modal::ui

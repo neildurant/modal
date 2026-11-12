@@ -63,21 +63,7 @@ private:
     void nextField(bool forwards);
 
     std::optional<bool> runPortChoice(std::string_view command);
-    // Why a track's output or input can't be used, as the Ports view has the machine's ports:
-    // a port named that isn't found (as a song from elsewhere may name) or is disabled; Default
-    // with no default set, or a default not found or disabled; or All with no input enabled,
-    // or none of those enabled connected.
-    enum class PortTrouble
-    {
-        None,
-        Missing,
-        Disabled,
-        NoDefault,
-        DefaultMissing,
-        DefaultDisabled,
-        NoInputs,
-        NoInputsConnected,
-    };
+    // Why a track's output or input can't be used, if the machine's ports are known.
     PortTrouble portTrouble(const core::Track& track, bool input) const;
     // How the chooser shows a port: the default, every input, or by name.
     static std::string portLabel(const std::string& port);

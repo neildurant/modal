@@ -689,30 +689,13 @@ std::string TracksView::portLabel(const std::string& port)
     return port.empty() ? "Default" : port == core::Track::kAllInputs ? "All" : port;
 }
 
-TracksView::PortTrouble TracksView::portTrouble(const core::Track& track, bool input) const
+PortTrouble TracksView::portTrouble(const core::Track& track, bool input) const
 {
     const auto* table = host_.portTable();
     if (table == nullptr)
         return PortTrouble::None;
-    const auto direction = input ? PortDirection::Input : PortDirection::Output;
-    const auto& name = input ? track.input : track.port;
-    if (input && name == core::Track::kAllInputs)
-        return table->offered(direction).empty()  ? PortTrouble::NoInputs
-               : table->usable(direction).empty() ? PortTrouble::NoInputsConnected
-                                                  : PortTrouble::None;
-    const auto resolved = table->resolve(direction, name);
-    switch (resolved.problem)
-    {
-    case PortProblem::None:
-        return PortTrouble::None;
-    case PortProblem::Disabled:
-        return name.empty() ? PortTrouble::DefaultDisabled : PortTrouble::Disabled;
-    case PortProblem::Missing:
-        break;
-    }
-    return !name.empty()            ? PortTrouble::Missing
-           : resolved.named.empty() ? PortTrouble::NoDefault
-                                    : PortTrouble::DefaultMissing;
+    return ui::portTrouble(*table, input ? PortDirection::Input : PortDirection::Output,
+                           input ? track.input : track.port);
 }
 
 std::optional<bool> TracksView::run(std::string_view command, int count)

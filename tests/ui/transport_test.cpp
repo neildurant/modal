@@ -790,6 +790,124 @@ void playNote(Playing& p, std::uint8_t pitch)
 }
 } // namespace
 
+namespace
+{
+// The machine's ports for recording: one input, Keys, plugged in, enabled and the default.
+PortTable keysTable()
+{
+    PortTable table;
+    table.detected(PortDirection::Input, std::vector<std::string>{"Keys"});
+    table.setEnabled(PortDirection::Input, "Keys", true);
+    table.setDefault(PortDirection::Input, "Keys");
+    return table;
+}
+
+void setTrack(Playing& p, std::size_t index, bool arm, std::string input)
+{
+    const auto id = p.document.song().tracks()[index]->id();
+    p.document.edit("Track", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(id,
+                                         [&](core::Track& track)
+                                         {
+                                             track.arm = arm;
+                                             track.input = input;
+                                         });
+                    });
+}
+} // namespace
+
+TEST_CASE("an armed track whose input can't be used shows ARM in the warning colour, records "
+          "nothing, and R refuses when no armed track can record")
+{
+    auto table = keysTable();
+    Playing p;
+    p.ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
+    const auto& tracks = p.document.song().tracks();
+    const auto first = tracks[0]->name;
+    const auto second = tracks[1]->name;
+
+    setTrack(p, 0, true, "Gone");
+    CHECK(indicator(p, U"ARM 1") == Shown::Warning);
+    p.type(U"R");
+    CHECK_FALSE(p.player.recording());
+    CHECK(p.ws.message() == "Nothing to record from: " + first + ", input Gone not found");
+    CHECK(p.ws.messageKind() == MessageKind::Warning);
+
+    setTrack(p, 1, true, "Elsewhere");
+    p.type(U"R");
+    CHECK_FALSE(p.player.recording());
+    CHECK(p.ws.message() == "No armed track can record: " + first + ", input Gone not found; " +
+                                second + ", input Elsewhere not found");
+
+    // One that can, the other recording nothing and said to.
+    setTrack(p, 0, true, "");
+    CHECK(indicator(p, U"ARM 2") == Shown::Warning);
+    p.type(U"R");
+    CHECK(p.player.recording());
+    CHECK(p.ws.message() == "Recording onto " + first + "; " + second +
+                                " records nothing: input Elsewhere not found");
+    CHECK(p.ws.messageKind() == MessageKind::Warning);
+    p.type(U" ");
+    p.runFor(10ms);
+
+    setTrack(p, 1, false, "Elsewhere");
+    CHECK(indicator(p, U"ARM 1") == Shown::Lit);
+}
+
+TEST_CASE("input lost or an input gone during a take is said as recording stops, and IN is in "
+          "the warning colour from the loss until then")
+{
+    auto table = keysTable();
+    Playing p;
+    p.ws.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
+    setTrack(p, 0, true, "");
+    const auto name = p.document.song().tracks()[0]->name;
+
+    SECTION("lost for want of taking it")
+    {
+        p.type(U"R");
+        p.runFor(2100ms);
+        playNote(p, 99);
+        CHECK(indicator(p, U" IN ") != Shown::Warning);
+        const std::array<std::uint8_t, 3> cc{0xB0, 1, 64};
+        for (std::size_t i = 0; i < core::Engine::kMaxStamped + 100; ++i)
+        {
+            REQUIRE(p.engine.receive(core::InputId{0}, cc, p.clock.time));
+            if (i % core::Engine::kInputBatch == core::Engine::kInputBatch - 1)
+                test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+        }
+        test::runUntil(p.engine, p.clock, p.clock.time + 1ms);
+        const auto lost = p.player.inputLost();
+        REQUIRE(lost > 0);
+        CHECK(indicator(p, U" IN ") == Shown::Warning);
+        p.type(U" ");
+        p.runFor(10ms);
+        REQUIRE_FALSE(p.player.recording());
+        CHECK(p.ws.message() == "Recorded onto " + name + "; " + std::to_string(lost) +
+                                    " MIDI input messages lost during the take, arriving faster "
+                                    "than taken");
+        CHECK(p.ws.messageKind() == MessageKind::Warning);
+        CHECK(indicator(p, U" IN ") != Shown::Warning);
+    }
+    SECTION("an input unplugged")
+    {
+        p.type(U"R");
+        p.runFor(2100ms);
+        playNote(p, 99);
+        table.detected(PortDirection::Input, std::vector<std::string>{});
+        CHECK(indicator(p, U"ARM 1") == Shown::Warning);
+        p.type(U" ");
+        p.runFor(10ms);
+        REQUIRE_FALSE(p.player.recording());
+        CHECK(p.ws.message() == "Recorded onto " + name + "; " + name +
+                                    " lost its input during the take: default input Keys not "
+                                    "found");
+        CHECK(p.ws.messageKind() == MessageKind::Warning);
+    }
+}
+
 TEST_CASE("R records onto the armed track after a count-in, Space stops, and it's one undo step")
 {
     Playing p;

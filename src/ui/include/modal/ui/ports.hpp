@@ -112,4 +112,28 @@ private:
     std::array<std::string, 2> defaults_; // the input's, then the output's
 };
 
+// Why a track's output or input can't be used, as the Ports view has the machine's ports:
+// a port named that isn't found (as a song from elsewhere may name) or is disabled; Default
+// with no default set, or a default not found or disabled; or All with no input enabled,
+// or none of those enabled connected.
+enum class PortTrouble
+{
+    None,
+    Missing,
+    Disabled,
+    NoDefault,
+    DefaultMissing,
+    DefaultDisabled,
+    NoInputs,
+    NoInputsConnected,
+};
+
+// What's wrong with a track's port, by the name it gives (empty for the default, and for an
+// input `*` for all).
+PortTrouble portTrouble(const PortTable& table, PortDirection direction, std::string_view name);
+
+// The trouble in a few words, for a message: `input Keys not found`, `no default input`.
+std::string portTroubleText(const PortTable& table, PortDirection direction, std::string_view name,
+                            PortTrouble trouble);
+
 } // namespace modal::ui

@@ -542,6 +542,9 @@ private:
     // Whether the click has a port to go to: the song's metronome port, or the default output.
     // Without the machine's ports to ask, as in tests, it's taken to have.
     bool clickPort() const;
+    // The armed tracks whose input can't be used, which would record nothing, each with why
+    // (`input Keys not found`), in song order. Without the machine's ports to ask, none.
+    std::vector<std::pair<core::TrackId, std::string>> unrecordable() const;
 
     // :port NAME sets the cursor's track's output port; :port alone says what it is.
     CommandResult port(std::string_view name);
@@ -960,6 +963,10 @@ private:
     std::int64_t lastTime_ = 0;            // of the last key or wake-up
     std::optional<std::int64_t> inputDue_; // when to take MIDI input again, after some arrived
     std::size_t inputLost_ = 0;            // input messages lost, as last reported
+    // While recording, how many had been lost when it started, so the take's losses are known.
+    std::optional<std::size_t> lostAtRecord_;
+    // Whether input has been lost since recording started, for the IN light.
+    bool lostWhileRecording() const;
     bool hintsOn_ = true;
     std::int64_t hintDelay_ = 400;
     std::optional<std::int64_t> waitingSince_; // when keys started longer bindings

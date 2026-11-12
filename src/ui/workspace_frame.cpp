@@ -424,6 +424,7 @@ Bar Workspace::statusBar() const
     const auto& song = document_.song();
     const auto armed =
         std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
+    const bool silentArmed = armed > 0 && !unrecordable().empty();
     const auto indicators = [&](int step)
     {
         std::vector<Segment> segments;
@@ -452,7 +453,13 @@ Bar Workspace::statusBar() const
         const auto lit = [](bool on) { return on ? Lit::On : Lit::Off; };
 
         const auto arm = armed > 0 ? "ARM " + std::to_string(armed) : std::string{"ARM"};
-        indicator(arm, arm, 5, 5, lit(armed > 0), Role::IndicatorArm);
+        // In the warning colour while an armed track's input can't be used, so it would record
+        // nothing (decided 12 November 2026).
+        indicator(arm, arm, 5, 5,
+                  armed == 0    ? Lit::Off
+                  : silentArmed ? Lit::Warning
+                                : Lit::On,
+                  Role::IndicatorArm);
         const bool overdub = song.recordMode == core::RecordMode::Overdub;
         indicator(overdub ? "OVERDUB" : "REPLACE", overdub ? "ODUB" : "REPL", 7, 4, lit(armed > 0),
                   Role::IndicatorRecordMode);
@@ -510,8 +517,11 @@ Bar Workspace::statusBar() const
             // moves (decided November 2026).
             gap();
             segments.push_back(
-                {" IN ", inputLitUntil_ ? Style{Role::IndicatorLitText, Role::IndicatorInput, kBold}
-                                        : Style{Role::IndicatorText, Role::Indicator, kPlain}});
+                {" IN ",
+                 // In the warning colour from input lost while recording until it stops.
+                 lostWhileRecording() ? Style{Role::IndicatorLitText, Role::Warning, kBold}
+                 : inputLitUntil_     ? Style{Role::IndicatorLitText, Role::IndicatorInput, kBold}
+                                      : Style{Role::IndicatorText, Role::Indicator, kPlain}});
             if (step < 2)
             {
                 std::span<const std::uint8_t> last;

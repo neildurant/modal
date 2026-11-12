@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: rearranging the status line is done, its fourth step, how it gives way in narrow windows, accepted and published; the rest of milestone 8 is next. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: recording's handling of inputs that can't be used and input lost is committed locally and waiting to be tried; rearranging the status line is done and published. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -212,6 +212,14 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 **First trial, 11 November 2026, and the rework (a third local commit).** Asked for after trying steps 1 and 2: more space between the groups; each group with its own column headings; **On** and **Default** headings, with a green `✓` / grey `✗` and a radio button (`•` / `◦`; the font's `●` overflows the cell) instead of the E and D letter buttons; a default input as well as output, so a track's input chooses Default (new tracks' choice), All (saved as `*`) or a port; and a `field` theme colour behind free-text fields (aliases, track names, section names, text events) so an empty one shows. The Tracks cells and bar now say `Default` and `All`; the rest of step 3 (dim defaults, warning colour, headings, gap) is still to do. Windows Debug passes 905 tests (903, 2 skipped), WSL linux-clang-debug 906 with no warnings; renders of the view and Tracks in both themes looked at. The second trial, the same day, accepted the layout and behaviour, including the hot-plug watcher, the default input and the field backgrounds. Step 3 (the Tracks cells: dim defaults, warning colour, headings, gap) is next, then the small fixes in schedule.md, before linear recording.
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
+
+## Inputs that can't be used, and input lost, in recording (12 November 2026; waiting to be tried)
+
+Milestone 8's unavailable-input and input-overflow item (design.md, Inputs that can't be used, and input lost). An armed track whose input can't be used puts `ARM` in the warning colour; `R` refuses when no armed track can record, naming each and why, and otherwise names those recording nothing in a warning. Input lost during a take puts `IN` in the warning colour until recording stops, and an input going missing puts `ARM` in it; either is said with `Recorded onto…`, as a warning. The Tracks view's check for a port that can't be used moved to `ports.hpp` (`portTrouble`, with `portTroubleText` for messages), so the indicator, `R` and the Input column agree.
+
+**Validation.** Windows Debug passes 947 tests; WSL linux-clang-debug 948, no warnings; formatting clean. New tests: `ARM` in the warning colour with an armed track's input not found, `R` refused with one and with two such tracks, recording onto the one that can with the other named, and `ARM` lit again once it's disarmed; a flood of input during a take putting `IN` in the warning colour and the count said as it stops, `IN` clear after; and the default input unplugged mid-take putting `ARM` in the warning colour and being said as it stops. The `[.sample]` render has the line with no ports set up (`ARM` and `CLICK` in the warning colour), looked at in both themes.
+
+**To try:** arm a track and set its input (Tracks, Input column) to a port that's unplugged or disabled: `ARM` should turn the warning colour, and `R` should refuse, saying why. Arm a second track whose input works and press `R`: it should record that one and name the other. While recording, unplug the keyboard, then stop: `ARM` should change colour when it goes, and the stop message should say the input was lost. Say whether `ARM`'s warning pink stands apart enough from its red.
 
 ## Narrow windows (12 November 2026; accepted and published)
 

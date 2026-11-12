@@ -2753,15 +2753,38 @@ bool Workspace::record()
         refuse(player_->recording() ? "Already recording: Space stops" : "Stop first to record");
         return true;
     }
+    const auto& song = document_.song();
+    // An armed track whose input can't be used records nothing; if none can, recording is
+    // refused rather than letting a take be played for nothing (decided 12 November 2026).
+    const auto silent = unrecordable();
     std::vector<core::TrackId> armed;
-    for (const auto& track : document_.song().tracks())
+    for (const auto& track : song.tracks())
     {
-        if (track->arm)
+        if (track->arm &&
+            std::ranges::find(silent, track->id(), &std::pair<core::TrackId, std::string>::first) ==
+                silent.end())
             armed.push_back(track->id());
+    }
+    // Why each track that can't record can't: "Lead, input Keys not found"; and, recording
+    // the rest, "Lead records nothing: input Keys not found".
+    std::string why;
+    std::string nothing;
+    for (const auto& [id, trouble] : silent)
+    {
+        const auto name = trackNames(song, std::span{&id, 1});
+        why += (why.empty() ? "" : "; ") + name + ", " + trouble;
+        nothing += "; " + name + " records nothing: " + trouble;
+    }
+    if (armed.empty() && silent.empty())
+    {
+        refuse("No track is armed: , r a arms a track");
+        return true;
     }
     if (armed.empty())
     {
-        refuse("No track is armed: , r a arms a track");
+        refuse((silent.size() == 1 ? "Nothing to record from: " : "No armed track can record: ") +
+                   why,
+               MessageKind::Warning);
         return true;
     }
     if (!player_->record(document_.song()))
@@ -2771,6 +2794,7 @@ bool Workspace::record()
     }
     // The take is shown as it's played, and the tracks it goes onto can't be changed meanwhile,
     // as what's shown would no longer be what's made (decided November 2026).
+    lostAtRecord_ = player_->inputLost();
     document_.setPreview([this](const core::Song& song) { return player_->previewTake(song); });
     document_.setGuard(
         [tracks = player_->recordingTracks()](const core::Song& before,
@@ -2791,11 +2815,13 @@ bool Workspace::record()
     const bool overdub = document_.song().recordMode == core::RecordMode::Overdub;
     auto text =
         (overdub ? "Overdubbing onto " : "Recording onto ") + trackNames(document_.song(), armed);
+    text += nothing;
     if (!player_->clicking())
         text += "; no click, with no metronome port or default output";
     // Several armed is often a mistake, so said as a warning (see Arming in the design).
-    setMessage(text, armed.size() > 1 || !player_->clicking() ? MessageKind::Warning
-                                                              : MessageKind::Information);
+    setMessage(text, armed.size() > 1 || !silent.empty() || !player_->clicking()
+                         ? MessageKind::Warning
+                         : MessageKind::Information);
     showPlayhead();
     return true;
 }
@@ -2806,6 +2832,24 @@ void Workspace::auditionClick(bool downbeat)
     {
         setMessage("No click to hear: no metronome port or default output", MessageKind::Warning);
     }
+}
+
+std::vector<std::pair<core::TrackId, std::string>> Workspace::unrecordable() const
+{
+    std::vector<std::pair<core::TrackId, std::string>> result;
+    const auto* table = portTable();
+    if (table == nullptr)
+        return result;
+    for (const auto& track : document_.song().tracks())
+    {
+        if (!track->arm)
+            continue;
+        if (const auto trouble = portTrouble(*table, PortDirection::Input, track->input);
+            trouble != PortTrouble::None)
+            result.emplace_back(
+                track->id(), portTroubleText(*table, PortDirection::Input, track->input, trouble));
+    }
+    return result;
 }
 
 bool Workspace::clickPort() const
@@ -2828,11 +2872,25 @@ void Workspace::finishRecording()
     }
     document_.setPreview({});
     document_.setGuard({});
+    const auto lost = lostAtRecord_ ? player_->inputLost() - *lostAtRecord_ : 0;
+    lostAtRecord_.reset();
     if (take->song == document_.song())
     {
         setMessage("Nothing recorded: stopped before the record point", MessageKind::Information);
         return;
     }
+    // What went wrong during the take, said with it rather than lost under it (decided
+    // 12 November 2026): an input that went missing, and input that arrived too fast to take.
+    std::string trouble;
+    for (const auto& [id, why] : unrecordable())
+    {
+        if (std::ranges::find(take->tracks, id) != take->tracks.end())
+            trouble += "; " + trackNames(document_.song(), std::span{&id, 1}) +
+                       " lost its input during the take: " + why;
+    }
+    if (lost > 0)
+        trouble += "; " + std::to_string(lost) + " MIDI input message" + (lost == 1 ? "" : "s") +
+                   " lost during the take, arriving faster than taken";
     const auto names = trackNames(document_.song(), take->tracks);
     const auto title = take->tracks.size() == 1
                            ? "Record onto " + names
@@ -2840,7 +2898,13 @@ void Workspace::finishRecording()
     document_.edit(title, view().place(), [&](core::Song& song) { song = std::move(take->song); });
     // Made outside a command, so every view is told, as the song may have grown too.
     refresh();
-    setMessage("Recorded onto " + names, MessageKind::Information);
+    setMessage("Recorded onto " + names + trouble,
+               trouble.empty() ? MessageKind::Information : MessageKind::Warning);
+}
+
+bool Workspace::lostWhileRecording() const
+{
+    return player_ != nullptr && lostAtRecord_ && player_->inputLost() > *lostAtRecord_;
 }
 
 void Workspace::setPlayer(core::Player* player)
