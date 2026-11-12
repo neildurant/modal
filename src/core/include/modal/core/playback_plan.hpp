@@ -179,6 +179,11 @@ struct PlanOptions
     bool recording = false; // whether this playback records, for the metronome's When
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
     bool bypassQuantize = false;                       // play every track as stored, to compare
+    // While recording in replace mode, the tracks being recorded, which play only what comes
+    // before the record point, as replace will leave them: notes cut short there and pedals
+    // let up there (decided November 2026).
+    std::vector<TrackId> replacing = {};
+    Tick replacingFrom = 0;
     // A track's input, the default's being empty; without one, as for a machine without
     // ports, an empty name takes all inputs, as kAllInputs does.
     InputResolver resolveInput = {};

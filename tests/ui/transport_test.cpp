@@ -989,6 +989,54 @@ TEST_CASE("a note and pedal still held when recording stops end there")
     CHECK(p.document.version() == version);
 }
 
+TEST_CASE("replacing, the track being recorded is silent from the record point; overdubbing, and "
+          "after the pass, it's heard")
+{
+    Playing p;
+    // A track with notes in its first two bars, off the click's channel.
+    const auto& song = p.document.song();
+    const auto tracks = song.tracks();
+    const auto busy = std::ranges::find_if(
+        tracks,
+        [&](const auto& candidate)
+        {
+            return candidate->channel != song.metronome.channel &&
+                   std::ranges::any_of(
+                       song.events(candidate->id()).all(), [&](const core::Event& event)
+                       { return event.isNote() && event.tick < 2 * 4 * song.ppqn().quarter(); });
+        });
+    REQUIRE(busy != tracks.end());
+    for (auto i = tracks.begin(); i != busy; ++i)
+        p.press(Key::of(NamedKey::PageDown, kCtrl));
+    p.type(U",ra");
+    const auto* track = armed(p.document);
+    REQUIRE(track != nullptr);
+    REQUIRE(track->channel != p.document.song().metronome.channel);
+    const auto noteOn = static_cast<std::uint8_t>(0x90 | (track->channel - 1));
+    // The note-ons sent on its channel while the song plays for a while.
+    const auto heard = [&](std::u32string_view keys)
+    {
+        p.type(keys);
+        p.runFor(2100ms); // past a count-in, if there is one
+        const auto from = p.sink.sent.size();
+        p.runFor(4s);
+        const auto count = std::ranges::count_if(
+            p.sink.sent.begin() + static_cast<std::ptrdiff_t>(from), p.sink.sent.end(),
+            [&](const auto& sent)
+            { return sent.bytes.size() == 3 && sent.bytes[0] == noteOn && sent.bytes[2] > 0; });
+        p.type(U" ");
+        p.runFor(10ms);
+        return count;
+    };
+    CHECK(heard(U"R") == 0);
+    CHECK(p.ws.message() == "Recorded onto " + track->name); // the old notes gone
+    p.type(U"u");
+    const auto played = heard(U" ");
+    CHECK(played > 0);
+    p.type(U",rm"); // overdub
+    CHECK(heard(U"R") > 0);
+}
+
 TEST_CASE("while recording, edits and undo that would change a track being recorded are refused, "
           "and other tracks can still be edited")
 {

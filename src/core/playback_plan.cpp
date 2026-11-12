@@ -168,6 +168,43 @@ const PlannedTrack* PlaybackPlan::track(TrackId id) const
     return it == tracks.end() ? nullptr : &*it;
 }
 
+namespace
+{
+// What a track being recorded in replace mode plays: what comes before the record point, by
+// where it's stored and where it plays, notes cut short there, and a pedal-up there for each
+// pedal still down.
+std::vector<QuantizedEvent> replacedFrom(const std::vector<QuantizedEvent>& played, Tick from)
+{
+    constexpr std::array<std::uint8_t, 3> kPedals{64, 66, 67}; // sustain, sostenuto, soft
+    std::array<std::uint8_t, kPedals.size()> pedals{};
+    std::vector<QuantizedEvent> kept;
+    for (const auto& item : played)
+    {
+        if (item.stored >= from || item.event.tick >= from)
+        {
+            continue;
+        }
+        kept.push_back(item);
+        auto& event = kept.back().event;
+        if (auto* note = std::get_if<Note>(&event.data))
+        {
+            note->duration = std::min(note->duration, from - event.tick);
+        }
+        else if (const auto* cc = std::get_if<ControlChange>(&event.data))
+        {
+            if (const auto it = std::ranges::find(kPedals, cc->controller); it != kPedals.end())
+                pedals[static_cast<std::size_t>(it - kPedals.begin())] = cc->value;
+        }
+    }
+    for (std::size_t i = 0; i < kPedals.size(); ++i)
+    {
+        if (pedals[i] >= 64)
+            kept.push_back({Event{from, ControlChange{kPedals[i], 0}}, from});
+    }
+    return kept;
+}
+} // namespace
+
 PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDestination,
                          const PlanOptions& options)
 {
@@ -281,6 +318,10 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
             {
                 played.push_back({event, event.tick});
             }
+        }
+        if (std::ranges::find(options.replacing, track.id()) != options.replacing.end())
+        {
+            played = replacedFrom(played, options.replacingFrom);
         }
 
         std::size_t dropped = 0;

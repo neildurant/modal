@@ -114,6 +114,45 @@ TEST_CASE("events become channel messages on the track's channel")
     CHECK_FALSE(plan.events[1].isNoteOn());
 }
 
+TEST_CASE("replacing, a track being recorded plays only what's before the record point, notes "
+          "cut short and pedals let up there")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto recorded = addTrack(song, 1,
+                                   [&](EditTrack& track)
+                                   {
+                                       track.events.insert({0, ControlChange{7, 90}});
+                                       track.events.insert({0, ControlChange{64, 127}});
+                                       track.events.insert({0, Note{60, 100, 6 * q}});
+                                       track.events.insert({q, ControlChange{66, 127}});
+                                       track.events.insert({q, ControlChange{66, 0}});
+                                       track.events.insert({4 * q, Note{62, 100, q}});
+                                       track.events.insert({4 * q, ControlChange{64, 0}});
+                                   });
+    addTrack(song, 2, [&](EditTrack& track) { track.events.insert({4 * q, Note{64, 100, q}}); });
+
+    PlanOptions options;
+    options.replacing = {recorded};
+    options.replacingFrom = 2 * q;
+    const auto plan = compilePlan(song, everythingToPort, options);
+    CHECK(messagesOf(plan.events) == std::vector<ShortMessage>{
+                                         bytes(0xB0, 7, 90),
+                                         bytes(0xB0, 64, 127),
+                                         bytes(0x90, 60, 100),
+                                         bytes(0xB0, 66, 127),
+                                         bytes(0xB0, 66, 0),
+                                         bytes(0xB0, 64, 0), // let up at the record point
+                                         bytes(0x91, 64, 100),
+                                     });
+    CHECK(plan.events[2].endTick == 2 * q); // cut short there
+    CHECK(plan.events[5].tick == 2 * q);
+
+    // Overdubbing, or another track, plays as stored.
+    CHECK(compilePlan(song, everythingToPort).events.size() == 8);
+}
+
 TEST_CASE("event times follow the tempo map")
 {
     const auto ppqn = MODAL_ANY_PPQN();

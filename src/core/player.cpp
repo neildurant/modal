@@ -70,6 +70,13 @@ std::shared_ptr<const PlaybackPlan> Player::compile(const Song& song)
     // While recording, the plan keeps the metronome, as edits replace it.
     options.recording = recorder_.has_value();
     options.metronomeDestination = recorder_ ? click_ : std::nullopt;
+    // Replacing, the tracks being recorded are silent from the record point, as the take will
+    // leave them.
+    if (recorder_ && replacing_)
+    {
+        options.replacing = recorder_->tracks();
+        options.replacingFrom = recordPoint_;
+    }
     auto plan = std::make_shared<const PlaybackPlan>(
         compilePlan(song, [&](const Track& track) { return destination(track.port); }, options));
     quantizeWarnings_ = plan->quantizeWarnings;
@@ -86,6 +93,8 @@ bool Player::record(const Song& song)
     auto start = planRecordStart(song, marker_, click);
     recorder_.emplace(song, 0, marker_, song.recordMode, resolveInput_);
     click_ = click;
+    recordPoint_ = marker_;
+    replacing_ = song.recordMode == RecordMode::Replace;
     auto plan = compile(song);
     const bool countIn = start.countIn.has_value();
     if (!engine_.setPlan(plan) || !engine_.play(start.playFrom, std::move(start.countIn)))
@@ -98,7 +107,6 @@ bool Player::record(const Song& song)
     }
     waiting_.reset();
     play_ = engine_.lastPlay();
-    recordPoint_ = marker_;
     previewAt_ = marker_;
     countIn_ = countIn;
     recorder_.emplace(song, play_, marker_, song.recordMode, resolveInput_);
@@ -172,6 +180,9 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
     Take take{recorder_->finish(song, stoppedAt_), recorder_->tracks()};
     recorder_.reset();
     click_.reset();
+    // Planned again for playing, the tracks recorded heard again and the click as it plays
+    // then, even if nothing was recorded and the song is as it was.
+    update(take.song);
     return take;
 }
 

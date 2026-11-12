@@ -195,6 +195,7 @@ private:
     std::optional<Recorder> recorder_;   // the pass being recorded, until finished
     std::optional<DestinationId> click_; // the metronome's while recording
     Tick recordPoint_ = 0;               // where the pass records from
+    bool replacing_ = false;             // whether it replaces, rather than overdubs
     Tick previewAt_ = 0;                 // where the take was last shown up to
     bool countIn_ = false;               // whether it counts in
 };

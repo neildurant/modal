@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the take shown as it's played is accepted and published; next, silencing recorded tracks in replace mode. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: silencing recorded tracks in replace mode is built locally, to try. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,6 +213,13 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
+## Recorded tracks silent while replacing (12 November 2026; local, to try)
+
+The second of the three steps. `PlanOptions` gains `replacing` and `replacingFrom`: those tracks play only what comes before the record point, by where an event is stored and where it plays, notes cut short there and a pedal-up there for each pedal still down. The player fills them from the recorder's tracks (those armed with a usable input, fixed for the pass) and the record mode at its start, so arming another track or switching the mode partway doesn't change what's silent. Finishing a pass now plans the song again for playing, so the tracks are heard again, and the click goes back to how it plays outside recording, even when nothing was recorded and the song didn't change (before, the recording plan, with its click, stayed until the next edit).
+
+**Validation.** Windows Debug passes 935 tests (933, 2 skipped); WSL linux-clang-debug 936 (933, 3 skipped). New tests: the plan for a replaced track at both PPQNs (controller values and pedals before the record point kept, a note cut there, sustain let up there, later events gone, other tracks and overdub as stored); through the workspace on a fake clock, a track with notes early on sends no note-ons while recording in replace, is heard when played after the pass is undone, and is heard while overdubbing.
+
+**To try:** arm a track with notes in replace mode and record over it: from the record point it should be silent, other tracks playing on; with a pre-roll, it should play until the record point. Stop and play: it should be heard again, even after a pass where nothing was played. In overdub, it should be heard while recording. Arm a track whose input isn't connected: it should play on.
 ## The take shown as it's played (12 November 2026; accepted and published)
 
 The first of three steps agreed on 12 November 2026 (schedule.md, milestone 8): show the take as it's played; then silence recorded tracks in replace mode; then audition notes in the piano roll. Held notes and pedals ending at the stop, and the pass as one undo step, were already built with linear recording, and now have a workspace test too.
