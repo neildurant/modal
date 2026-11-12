@@ -818,8 +818,8 @@ void setTrack(Playing& p, std::size_t index, bool arm, std::string input)
 }
 } // namespace
 
-TEST_CASE("an armed track whose input can't be used shows ARM in the warning colour, records "
-          "nothing, and R refuses when no armed track can record")
+TEST_CASE("an armed track whose input can't be used records nothing and is named when "
+          "recording starts, and R refuses when no armed track can record")
 {
     auto table = keysTable();
     Playing p;
@@ -828,8 +828,9 @@ TEST_CASE("an armed track whose input can't be used shows ARM in the warning col
     const auto first = tracks[0]->name;
     const auto second = tracks[1]->name;
 
+    // ARM stays red: the warning is said when R is pressed (decided after use).
     setTrack(p, 0, true, "Gone");
-    CHECK(indicator(p, U"ARM 1") == Shown::Warning);
+    CHECK(indicator(p, U"ARM 1") == Shown::Lit);
     p.type(U"R");
     CHECK_FALSE(p.player.recording());
     CHECK(p.ws.message() == "Nothing to record from: " + first + ", input Gone not found");
@@ -843,7 +844,7 @@ TEST_CASE("an armed track whose input can't be used shows ARM in the warning col
 
     // One that can, the other recording nothing and said to.
     setTrack(p, 0, true, "");
-    CHECK(indicator(p, U"ARM 2") == Shown::Warning);
+    CHECK(indicator(p, U"ARM 2") == Shown::Lit);
     p.type(U"R");
     CHECK(p.player.recording());
     CHECK(p.ws.message() == "Recording onto " + first + "; " + second +
@@ -897,7 +898,6 @@ TEST_CASE("input lost or an input gone during a take is said as recording stops,
         p.runFor(2100ms);
         playNote(p, 99);
         table.detected(PortDirection::Input, std::vector<std::string>{});
-        CHECK(indicator(p, U"ARM 1") == Shown::Warning);
         p.type(U" ");
         p.runFor(10ms);
         REQUIRE_FALSE(p.player.recording());

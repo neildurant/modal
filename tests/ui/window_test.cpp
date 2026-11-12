@@ -11,7 +11,6 @@
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
-#include <modal/ui/ports.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
@@ -780,11 +779,7 @@ TEST_CASE("a sample of the status line's indicators", "[.sample]")
     view.wake(view.deadline().value_or(0));
     view.show(ViewKind::PianoRoll);
     save("piano");
-    // An armed track whose input can't be used: ARM in the warning colour.
     view.show(ViewKind::EventList);
-    PortTable table;
-    view.setPortControl({.table = [&] { return &table; }, .change = {}, .look = {}});
-    save("unrecordable");
     // Narrower and narrower, as what's least needed gives way, with a section name long enough
     // to be cut short.
     document.edit("Rename section", {},
