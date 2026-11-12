@@ -148,9 +148,10 @@ bool Player::auditionNote(const Song& song, TrackId track, Tick tick, const Note
     }
     const auto& tempo = song.tempo();
     const auto heard = tempo.toTime(tick + std::max(note.duration, Tick{1})) - tempo.toTime(tick);
-    return engine_.audition(*destination, static_cast<std::uint8_t>(found->channel - 1), *pitch,
-                            playbackVelocity(note.velocity, found->velocityOffset),
-                            std::min<std::chrono::nanoseconds>(heard, std::chrono::seconds{1}));
+    return engine_.audition(
+        *destination, static_cast<std::uint8_t>(found->channel - 1), *pitch,
+        playbackVelocity(note.velocity, found->velocityOffset),
+        std::clamp<std::chrono::nanoseconds>(heard, kMinAudition, kMaxAudition));
 }
 
 std::optional<Player::RecordPhase> Player::recordPhase() const

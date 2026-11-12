@@ -227,7 +227,7 @@ On a Visual selection, the moving and length keys act on every note it takes, re
 
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
 
-**Audition:** the cursor landing on a note plays it, by any move but in Visual mode, as does adding one with `o` or `O` (the first, of several) or moving one note to a new pitch, for up to a second, on the track's port and channel; not while playing or recording. `, T a` turns it on and off (the `audition` setting), the status line saying `Audition off` while it is.
+**Audition:** the cursor landing on a note plays it, by any move but in Visual mode, as does adding one with `o` or `O` (the first, of several) or moving one note to a new pitch, for its length but from 150 ms to a second, on the track's port and channel; not while playing or recording. `, T a` turns it on and off (the `audition` setting), the status line saying `Audition off` while it is.
 
 ## Sections
 

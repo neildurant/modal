@@ -402,7 +402,8 @@ TEST_CASE("the player keeps the last channel message in, but a note-off or syste
     CHECK(in({0xE0, 0x7F, 0x7F}) == std::vector<std::uint8_t>{0xE0, 0x7F, 0x7F});
 }
 
-TEST_CASE("a track's note is auditioned on its port and channel, as it plays, for up to a second")
+TEST_CASE(
+    "a track's note is auditioned on its port and channel, as it plays, for 150ms to a second")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = fourNotes(ppqn, "b");
@@ -437,6 +438,13 @@ TEST_CASE("a track's note is auditioned on its port and channel, as it plays, fo
     runUntil(p.engine, p.clock, p.clock.time + 3s);
     REQUIRE(p.sink.sent.size() == 2);
     CHECK(p.sink.sent[1].due - p.sink.sent[0].due == 1s);
+
+    // A very short one for long enough to hear, and for an instrument not to miss its end.
+    p.sink.sent.clear();
+    REQUIRE(p.player.auditionNote(song, id, 0, Note{60, 100, 1}));
+    runUntil(p.engine, p.clock, p.clock.time + 1s);
+    REQUIRE(p.sink.sent.size() == 2);
+    CHECK(p.sink.sent[1].due - p.sink.sent[0].due == 150ms);
 
     // Not on a port that isn't there, nor transposed out of range.
     song.updateTrack(id, [](Track& track) { track.port = "gone"; });

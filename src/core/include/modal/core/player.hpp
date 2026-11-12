@@ -9,6 +9,7 @@
 #include <modal/core/tick.hpp>
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -135,9 +136,13 @@ public:
     [[nodiscard]] bool auditionClick(const Song& song, bool downbeat);
 
     // Plays one of a track's notes, stored at a tick, on the track's port and channel, as
-    // playback would with its transpose and velocity offset, for its length up to a second
-    // (decided 12 November 2026), the next cutting it off. Returns false if the track or its
-    // port isn't there, the note is transposed out of range, or the engine is busy.
+    // playback would with its transpose and velocity offset, for its length, but at least
+    // kMinAudition, so a very short note is heard and an instrument doesn't miss its end, and
+    // at most kMaxAudition (decided 12 November 2026), the next cutting it off. Returns false
+    // if the track or its port isn't there, the note is transposed out of range, or the engine
+    // is busy.
+    static constexpr std::chrono::milliseconds kMinAudition{150};
+    static constexpr std::chrono::milliseconds kMaxAudition{1000};
     [[nodiscard]] bool auditionNote(const Song& song, TrackId track, Tick tick, const Note& note);
 
     // Space: stops if playing, and otherwise plays.

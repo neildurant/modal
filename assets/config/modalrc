@@ -185,7 +185,7 @@ nmap c          section-rename-strip "Rename"
 " velocity as the default note, which o adds; and , T g turns gridadvance on and off. :grid
 " and :len set them by length, such as 1/8 or 1/16t. , T a turns audition on and off: the
 " piano roll playing a note as the cursor lands on it, and as one is added or moved to a new
-" pitch, up to a second of it, on the track's port and channel.
+" pitch, for its length but from 150 ms to a second, on the track's port and channel.
 keysection "The grid and default note"
 nmap zh         grid-finer                "Finer grid"
 nmap z<Left>    grid-finer                "Finer grid"
