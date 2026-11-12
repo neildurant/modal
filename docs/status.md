@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: the take shown as it's played is built locally, to try. See [schedule.md](schedule.md) for work order.*
+*Last updated 12 November 2026: the take shown as it's played is accepted and published; next, silencing recorded tracks in replace mode. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,7 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## The take shown as it's played (12 November 2026; local, to try)
+## The take shown as it's played (12 November 2026; accepted and published)
 
 The first of three steps agreed on 12 November 2026 (schedule.md, milestone 8): show the take as it's played; then silence recorded tracks in replace mode; then audition notes in the piano roll. Held notes and pedals ending at the stop, and the pass as one undo step, were already built with linear recording, and now have a workspace test too.
 
@@ -222,7 +222,9 @@ The first of three steps agreed on 12 November 2026 (schedule.md, milestone 8): 
 
 **Validation.** Windows Debug passes 933 tests (931, 2 skipped). New tests: the document's preview (shown, made again on a change, edits and the listener on the song beneath, cleared) and guard (edit, undo and redo refused with the history kept, other changes made); through the workspace on a fake clock, a held note growing in what's shown while the song is untouched, old events going as the playhead passes in replace mode and the rest kept, a note and pedal held at the stop ending there, and edits and undo refused on the recorded track while the next track's edits are kept, with undo afterwards going back through both.
 
-**To try:** arm a track with notes on it, in replace mode, and record in the piano roll and the arrangement. Notes should appear as they're played, a held one growing; the old notes should go as the playhead passes; recording past the end should grow the song as it goes. While recording, `x` on the recorded track and `u` should be refused, saying it's being recorded; an edit on another track should work. Stop, and `u` should take the whole pass away. Then the same in overdub, the old notes staying.
+**Accepted** on trial, 12 November 2026, in replace and overdub, and published. Next is silencing the recorded tracks in replace mode.
+
+**Tried:** arm a track with notes on it, in replace mode, and record in the piano roll and the arrangement. Notes should appear as they're played, a held one growing; the old notes should go as the playhead passes; recording past the end should grow the song as it goes. While recording, `x` on the recorded track and `u` should be refused, saying it's being recorded; an edit on another track should work. Stop, and `u` should take the whole pass away. Then the same in overdub, the old notes staying.
 
 ## Drop-down lists and the Metronome page after trial (11 November 2026; accepted and published)
 
