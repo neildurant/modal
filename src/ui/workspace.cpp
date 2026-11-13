@@ -3961,7 +3961,7 @@ CommandResult Workspace::meterFollow()
     const auto names = trackNames(song, own);
     const auto from = song.sectionStart(first);
     const auto to = song.sectionStart(last + 1);
-    document_.edit(names + " following the song's meter", view().place(),
+    document_.edit("Rebar " + names + " to follow the song's meter", view().place(),
                    [&](core::Song& s)
                    {
                        for (const auto id : own)

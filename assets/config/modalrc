@@ -439,9 +439,9 @@ nmap <leader>sa section-insert-after "Insert a section after"
 nmap <leader>sj section-join       "Join with the next"
 nmap <leader>ss section-split      "Start a section here"
 nmap <leader>sl label-to-section   "A section from the label"
-nmap <leader>sf meter-follow       "This track following the song's meter here"
+nmap <leader>sf meter-follow       "Rebar and follow the song's meter in this section"
 vgroup <leader>s "Sections"
-vmap <leader>sf meter-follow       "The selected tracks following the song's meter"
+vmap <leader>sf meter-follow       "Rebar and follow the song's meter in these sections"
 
 " Bars on every track, taking time out of the song or putting it in, the conductor's tempo and
 " meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping

@@ -401,9 +401,9 @@ constexpr std::array kSharedCommands{
                 .usage = "[METER]",
                 .choices = {Choices::Meter}},
     CommandInfo{.name = "meter-follow",
-                .description = "Set the cursor's track following the song's meter in its "
-                               "section, or the selected tracks in the sections the selection "
-                               "touches (:meter follow)",
+                .description = "Rebar the cursor's track to follow the song's meter in its "
+                               "section, or the selected tracks over whole sections selected "
+                               "(:meter follow)",
                 .range = true},
     CommandInfo{.name = "rebar",
                 .description = "Rebar the selection in a meter, never moving a note: a range "
