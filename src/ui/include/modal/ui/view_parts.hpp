@@ -9,6 +9,7 @@
 #include <modal/ui/frame.hpp>
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/inspector_edit.hpp>
+#include <modal/ui/track_fields.hpp>
 #include <modal/ui/view.hpp>
 
 #include <algorithm>
@@ -77,6 +78,13 @@ int inspectorHeight(CellSize cell);
 // above and below so fields in rows one under another show apart. Text over it keeps the
 // view's background, which shapes are painted over.
 void addField(Region& region, int x, int y, int columns, CellSize cell);
+
+// A track's button, three cells wide at x, y, the same in every view showing it: filled in its
+// colour when on, its letter grey when off; Thru on a track not armed is its letter in its
+// colour, unfilled, as it does nothing until armed. Boxed when the cursor's on it.
+void addTrackButton(Region& region, int x, int y, CellSize cell, TrackField field,
+                    const core::Track& track, Role background, bool cursor);
+inline constexpr int kTrackButtonColumns = 3;
 
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.
 // Each column is as wide as its longest value can be, so the columns stay put as the cursor

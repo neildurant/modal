@@ -49,8 +49,21 @@ struct TrackColumn
     int gap = 1; // blank cells after it, within its width
 };
 
-// This order drives both drawing and navigation; field identities do not depend on it.
+// Every column, in the Tracks view's order, which drives both drawing and navigation there;
+// field identities do not depend on it.
 std::span<const TrackColumn> trackColumns();
+
+// A column by its field, for a view showing some of them in an order of its own.
+const TrackColumn& trackColumn(TrackField field);
+
+// The columns the arrangement shows beside its track names: Mute, Solo and Arm, which are
+// switched while arranging, and not Thru or Chase, which are set once (decided 13 November
+// 2026). A list, not fixed in the drawing, so a view's columns can later be configured.
+std::span<const TrackField> arrangementColumns();
+
+// Whether a field is a button, switched on and off rather than typed, and whether it's on.
+bool isTrackButton(TrackField field);
+bool trackButtonOn(TrackField field, const core::Track& track);
 std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index);
 
 // A button's letter, shown whether it's on or off, as the buttons have no headings.

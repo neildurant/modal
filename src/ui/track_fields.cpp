@@ -68,6 +68,36 @@ std::span<const TrackColumn> trackColumns()
     return kColumns;
 }
 
+const TrackColumn& trackColumn(TrackField field)
+{
+    const auto column =
+        std::ranges::find_if(kColumns, [&](const TrackColumn& c) { return c.field == field; });
+    return column != kColumns.end() ? *column : kColumns.front();
+}
+
+std::span<const TrackField> arrangementColumns()
+{
+    static constexpr std::array kArrangement{TrackField::Mute, TrackField::Solo, TrackField::Arm};
+    return kArrangement;
+}
+
+bool isTrackButton(TrackField field)
+{
+    return field == TrackField::Mute || field == TrackField::Solo || field == TrackField::Arm ||
+           field == TrackField::Thru || field == TrackField::ChaseNotes ||
+           field == TrackField::Quantize;
+}
+
+bool trackButtonOn(TrackField field, const core::Track& track)
+{
+    return field == TrackField::Mute         ? track.mute
+           : field == TrackField::Solo       ? track.solo
+           : field == TrackField::Arm        ? track.arm
+           : field == TrackField::Thru       ? track.thru
+           : field == TrackField::ChaseNotes ? track.chaseNotes
+                                             : track.quantize.on;
+}
+
 std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index)
 {
     switch (field)

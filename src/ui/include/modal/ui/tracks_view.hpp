@@ -7,6 +7,9 @@
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/view.hpp>
 
+#include <span>
+#include <vector>
+
 namespace modal::ui
 {
 
@@ -48,6 +51,9 @@ private:
     void ensureVisible();
     // A column's width in cells: Name grows with the longest name, up to a limit.
     int columnWidth(const TrackColumn& column) const;
+    // The columns it shows, in order: every one, for now, but its own list so they can later
+    // be configured.
+    std::span<const TrackColumn> columns() const { return columns_; }
     Inspection inspection() const;
     // The table's fields, as the editor works through them.
     Inspection editableFields() const;
@@ -74,6 +80,7 @@ private:
     core::Document& document_;
     ViewHost& host_;
     SongCursor cursor_;
+    std::vector<TrackColumn> columns_{trackColumns().begin(), trackColumns().end()};
     std::size_t column_ = 1;
     std::size_t top_ = 0;
     int left_ = 0;

@@ -19,33 +19,6 @@ namespace modal::ui
 
 namespace
 {
-bool isToggle(TrackField field)
-{
-    return field == TrackField::Mute || field == TrackField::Solo || field == TrackField::Arm ||
-           field == TrackField::Thru || field == TrackField::ChaseNotes ||
-           field == TrackField::Quantize;
-}
-
-bool toggleState(TrackField field, const core::Track& track)
-{
-    return field == TrackField::Mute         ? track.mute
-           : field == TrackField::Solo       ? track.solo
-           : field == TrackField::Arm        ? track.arm
-           : field == TrackField::Thru       ? track.thru
-           : field == TrackField::ChaseNotes ? track.chaseNotes
-                                             : track.quantize.on;
-}
-
-Role toggleColour(TrackField field)
-{
-    return field == TrackField::Mute         ? Role::TrackMute
-           : field == TrackField::Solo       ? Role::TrackSolo
-           : field == TrackField::Arm        ? Role::TrackArm
-           : field == TrackField::Thru       ? Role::TrackThru
-           : field == TrackField::ChaseNotes ? Role::TrackChase
-                                             : Role::TrackQuantize;
-}
-
 // The inspector's fields for playback quantise, and what each sets.
 constexpr std::array<std::pair<std::string_view, TrackField>, 4> kQuantizeFields{{
     {"Grid", TrackField::QuantizeGrid},
@@ -121,7 +94,7 @@ int TracksView::columnWidth(const TrackColumn& column) const
     // Up to 32 characters, scrolling the table sideways if it must, or further if that leaves
     // the table within the window. A character more for the space after it.
     int others = 0;
-    for (const auto& other : trackColumns())
+    for (const auto& other : columns())
     {
         others += other.field == TrackField::Name ? 0 : columnWidth(other);
     }
@@ -141,7 +114,7 @@ void TracksView::ensureVisible()
     if (layout_.fullColumns <= 0)
         return;
     int x = 0;
-    const auto columns = trackColumns();
+    const auto columns = this->columns();
     column_ = std::min(column_, columns.size() - 1);
     for (std::size_t i = 0; i < column_; ++i)
     {
@@ -257,7 +230,7 @@ Inspection TracksView::inspection() const
     }
     const auto& song = document_.song();
     const auto& track = *song.track(*cursor_.track);
-    const auto field = trackColumns()[column_].field;
+    const auto field = columns()[column_].field;
     // What the column under the cursor is, first, much as a tooltip would say (decided November
     // 2026, as the buttons have no headings).
     const InspectorField about{"About", std::string{trackFieldDescription(field)}};
@@ -374,11 +347,11 @@ Inspection TracksView::editableFields() const
         return result;
     }
     const auto& track = *document_.song().track(*cursor_.track);
-    for (const auto& column : trackColumns())
+    for (const auto& column : columns())
     {
         if (column.field != TrackField::Number && column.field != TrackField::Port &&
             column.field != TrackField::Input && column.field != TrackField::QuantizeSummary &&
-            !isToggle(column.field))
+            !isTrackButton(column.field))
         {
             const auto text = trackFieldText(column.field, track, row());
             result.fields.push_back({std::string{column.heading}, text, true, text});
@@ -417,7 +390,7 @@ TrackField TracksView::fieldFor(std::string_view heading) const
             return it->second;
         }
     }
-    for (const auto& column : trackColumns())
+    for (const auto& column : columns())
     {
         if (column.heading == heading)
         {
@@ -564,18 +537,18 @@ std::optional<std::string> TracksView::typingHint() const
 
 bool TracksView::openField()
 {
-    if (trackColumns()[column_].field == TrackField::QuantizeSummary)
+    if (columns()[column_].field == TrackField::QuantizeSummary)
     {
         quantizeEditing_ = editor_.open(quantizeFields());
         return quantizeEditing_;
     }
-    if (trackColumns()[column_].field != TrackField::Port &&
-        trackColumns()[column_].field != TrackField::Input)
+    if (columns()[column_].field != TrackField::Port &&
+        columns()[column_].field != TrackField::Input)
     {
-        return editor_.open(editableFields(), trackColumns()[column_].heading);
+        return editor_.open(editableFields(), columns()[column_].heading);
     }
     const auto& track = *document_.song().track(*cursor_.track);
-    const bool input = trackColumns()[column_].field == TrackField::Input;
+    const bool input = columns()[column_].field == TrackField::Input;
     auto current = input ? track.input : track.port;
     std::vector<std::string> ports{""}; // the default
     if (input)
@@ -616,12 +589,12 @@ bool TracksView::openField()
 
 void TracksView::nextField(bool forwards)
 {
-    const auto columns = trackColumns();
+    const auto columns = this->columns();
     do
     {
         column_ = forwards ? (column_ + 1) % columns.size()
                            : (column_ + columns.size() - 1) % columns.size();
-    } while (columns[column_].field == TrackField::Number || isToggle(columns[column_].field));
+    } while (columns[column_].field == TrackField::Number || isTrackButton(columns[column_].field));
     ensureVisible();
     if (openField())
     {
@@ -716,7 +689,7 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
     }
     else if (command == "cursor-right")
     {
-        column_ = std::min(column_ + n, trackColumns().size() - 1);
+        column_ = std::min(column_ + n, columns().size() - 1);
         ensureVisible();
     }
     else if (command == "go-first")
@@ -734,7 +707,7 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
     }
     else if (command == "cursor-last")
     {
-        column_ = trackColumns().size() - 1;
+        column_ = columns().size() - 1;
         ensureVisible();
     }
     else if (command == "scroll-page-down" || command == "scroll-half-down")
@@ -759,11 +732,11 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
         {
             host_.refuse("No track to edit");
         }
-        else if (const auto field = trackColumns()[column_].field; isToggle(field))
+        else if (const auto field = columns()[column_].field; isTrackButton(field))
         {
             toggle(field);
         }
-        else if (trackColumns()[column_].field == TrackField::Number)
+        else if (columns()[column_].field == TrackField::Number)
         {
             host_.refuse("The track number follows its position");
         }
@@ -802,8 +775,8 @@ std::optional<bool> TracksView::run(std::string_view command, int count)
     {
         const bool up = command.find("increase") != std::string_view::npos;
         if (auto why =
-                edit(trackColumns()[column_].field, {},
-                     up ? static_cast<int>(n) : -static_cast<int>(n), command.ends_with("fine")))
+                edit(columns()[column_].field, {}, up ? static_cast<int>(n) : -static_cast<int>(n),
+                     command.ends_with("fine")))
         {
             host_.refuse(*why);
         }
@@ -831,7 +804,7 @@ void TracksView::toggle(TrackField field)
         return;
     }
     // Selected rows all follow the cursor's row, so they end up the same.
-    const bool on = !toggleState(field, *document_.song().track(*cursor_.track));
+    const bool on = !trackButtonOn(field, *document_.song().track(*cursor_.track));
     const auto ids = selected();
     if (auto why = edit(field, on ? "on" : "off"))
     {
@@ -965,7 +938,7 @@ void TracksView::addRegions(Frame& frame) const
                  .text = {},
                  .under = {},
                  .over = {}};
-    const auto columns = trackColumns();
+    const auto columns = this->columns();
     const auto tracks = document_.song().tracks();
     auto chosen = host_.movingTracks();
     if (chosen.empty() && host_.selection())
@@ -983,8 +956,8 @@ void TracksView::addRegions(Frame& frame) const
             const int room = wide - column.gap; // for its text
             // Buttons have no heading: their letters say what they are.
             auto text = decodeUtf8(track ? trackFieldText(column.field, *track, index)
-                                   : isToggle(column.field) ? std::string{}
-                                                            : std::string{column.heading});
+                                   : isTrackButton(column.field) ? std::string{}
+                                                                 : std::string{column.heading});
             const bool program = track && column.field == TrackField::Program;
             if (program) // a mark for the track's own program changes, keeping the digits in line
             {
@@ -1006,7 +979,7 @@ void TracksView::addRegions(Frame& frame) const
                 text.append(padding, U' ');
             if (listed)
                 text += std::u32string{U' ', ChoiceList::kArrow};
-            const bool toggle = track && isToggle(column.field);
+            const bool toggle = track && isTrackButton(column.field);
             if (toggle)
                 text.assign(static_cast<std::size_t>(room), U' ');
             Style style{track ? Role::Text : Role::Dim, Role::Background, kPlain};
@@ -1078,31 +1051,8 @@ void TracksView::addRegions(Frame& frame) const
             }
             if (toggle)
             {
-                // Filled in its colour when on, its letter grey when off. Thru on a track not
-                // armed is its letter in its colour, unfilled, as it does nothing until armed.
-                const bool on = toggleState(column.field, *track);
-                const bool filled = on && (column.field != TrackField::Thru || track->arm);
-                const auto colour = toggleColour(column.field);
-                const auto badge = U" " + decodeUtf8(toggleLetter(column.field)) + U" ";
-                const auto edge = hairline(cell_);
-                const int w = 3 * cell_.width;
-                // Text backgrounds are painted before shapes; only the badge carries a glyph.
-                table.under.push_back({{x, y + edge, w, std::max(1, cell_.height - 2 * edge)},
-                                       filled ? colour : Role::Panel});
-                table.text.push_back({x,
-                                      y,
-                                      badge,
-                                      {filled ? Role::ToggleText
-                                       : on   ? colour
-                                              : Role::Dim,
-                                       style.background, kBold}});
-                if (index == row() && c == column_)
-                {
-                    table.over.push_back({{x, y, w, edge}, Role::Cursor});
-                    table.over.push_back({{x, y + cell_.height - edge, w, edge}, Role::Cursor});
-                    table.over.push_back({{x, y, edge, cell_.height}, Role::Cursor});
-                    table.over.push_back({{x + w - edge, y, edge, cell_.height}, Role::Cursor});
-                }
+                addTrackButton(table, x, y, cell_, column.field, *track, style.background,
+                               index == row() && c == column_);
             }
             x += wide * cell_.width;
         }

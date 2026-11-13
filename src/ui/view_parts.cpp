@@ -138,6 +138,39 @@ void addField(Region& region, int x, int y, int columns, CellSize cell)
         {{x, y + edge, columns * cell.width, std::max(1, cell.height - 2 * edge)}, Role::Field});
 }
 
+void addTrackButton(Region& region, int x, int y, CellSize cell, TrackField field,
+                    const core::Track& track, Role background, bool cursor)
+{
+    const bool on = trackButtonOn(field, track);
+    const bool filled = on && (field != TrackField::Thru || track.arm);
+    const auto colour = field == TrackField::Mute         ? Role::TrackMute
+                        : field == TrackField::Solo       ? Role::TrackSolo
+                        : field == TrackField::Arm        ? Role::TrackArm
+                        : field == TrackField::Thru       ? Role::TrackThru
+                        : field == TrackField::ChaseNotes ? Role::TrackChase
+                                                          : Role::TrackQuantize;
+    const auto badge = U" " + decodeUtf8(toggleLetter(field)) + U" ";
+    const auto edge = hairline(cell);
+    const int w = kTrackButtonColumns * cell.width;
+    // Text backgrounds are painted before shapes; only the badge carries a glyph.
+    region.under.push_back(
+        {{x, y + edge, w, std::max(1, cell.height - 2 * edge)}, filled ? colour : Role::Panel});
+    region.text.push_back({x,
+                           y,
+                           badge,
+                           {filled ? Role::ToggleText
+                            : on   ? colour
+                                   : Role::Dim,
+                            background, kBold}});
+    if (cursor)
+    {
+        region.over.push_back({{x, y, w, edge}, Role::Cursor});
+        region.over.push_back({{x, y + cell.height - edge, w, edge}, Role::Cursor});
+        region.over.push_back({{x, y, edge, cell.height}, Role::Cursor});
+        region.over.push_back({{x + w - edge, y, edge, cell.height}, Role::Cursor});
+    }
+}
+
 void inspectorValue(Region& region, const InspectorField& field, std::u32string text, int x, int y,
                     int columns, CellSize cell, const InspectorEditor* editor, bool rightAligned,
                     Rect* listAt)
