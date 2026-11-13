@@ -139,7 +139,7 @@ void addField(Region& region, int x, int y, int columns, CellSize cell)
 }
 
 void addTrackButton(Region& region, int x, int y, CellSize cell, TrackField field,
-                    const core::Track& track, Role background, bool cursor)
+                    const core::Track& track, Role background, bool cursor, bool recording)
 {
     const bool on = trackButtonOn(field, track);
     const bool filled = on && (field != TrackField::Thru || track.arm);
@@ -149,7 +149,10 @@ void addTrackButton(Region& region, int x, int y, CellSize cell, TrackField fiel
                         : field == TrackField::Thru       ? Role::TrackThru
                         : field == TrackField::ChaseNotes ? Role::TrackChase
                                                           : Role::TrackQuantize;
-    const auto badge = U" " + decodeUtf8(toggleLetter(field)) + U" ";
+    const auto letter = field == TrackField::Arm && track.arm && recording
+                            ? std::u32string{U"R"}
+                            : decodeUtf8(toggleLetter(field));
+    const auto badge = U" " + letter + U" ";
     const auto edge = hairline(cell);
     const int w = kTrackButtonColumns * cell.width;
     // Text backgrounds are painted before shapes; only the badge carries a glyph.

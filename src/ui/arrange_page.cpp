@@ -341,7 +341,8 @@ void ArrangePage::follow()
 
 void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
-                             const std::vector<core::TrackId>& moving, bool ownMeters) const
+                             const std::vector<core::TrackId>& moving, bool ownMeters,
+                             bool recording) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -401,7 +402,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         for (const auto field : columns_)
         {
             addTrackButton(frame.back(), x, (kRulerRows + line) * cell_.height, cell_, field,
-                           *tracks[index], Role::Background, false);
+                           *tracks[index], Role::Background, false, recording);
             x += trackColumn(field).width * cell_.width;
         }
     }

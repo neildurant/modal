@@ -66,7 +66,8 @@ bool isTrackButton(TrackField field);
 bool trackButtonOn(TrackField field, const core::Track& track);
 std::string trackFieldText(TrackField field, const core::Track& track, std::size_t index);
 
-// A button's letter, shown whether it's on or off, as the buttons have no headings.
+// A button's letter, shown whether it's on or off, as the buttons have no headings: Arm's is A,
+// for the key that arms, or R on a track being recorded (see addTrackButton).
 std::string_view toggleLetter(TrackField field);
 
 // What a field is, in a few words, for the inspector to say about the column under the cursor.

@@ -2840,7 +2840,7 @@ bool Workspace::record()
     }
     if (armed.empty() && silent.empty())
     {
-        refuse("No track is armed: , r a arms a track");
+        refuse("No track is armed: A arms a track");
         return true;
     }
     if (armed.empty())

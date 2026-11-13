@@ -913,7 +913,7 @@ TEST_CASE("R records onto the armed track after a count-in, Space stops, and it'
 {
     Playing p;
     p.type(U"R");
-    CHECK(p.ws.message() == "No track is armed: , r a arms a track");
+    CHECK(p.ws.message() == "No track is armed: A arms a track");
     p.type(U",ra");
     const auto* track = armed(p.document);
     REQUIRE(track != nullptr);
@@ -1879,4 +1879,48 @@ TEST_CASE("the status line's transport, meter, tempo and section are each on a p
     CHECK(meterX() == stopped);
     p.type(U" ");
     p.runFor(10ms);
+}
+
+TEST_CASE("A arms the cursor's track, its button saying A, and R while it's recorded")
+{
+    Playing p;
+    p.type(U"ga");
+    p.ws.resize(132 * kCell.width, 30 * kCell.height, kCell);
+    const auto badge = [&]
+    {
+        const auto frame = p.ws.frame();
+        const auto& page = p.ws.arrangement().page();
+        const int y = (ArrangePage::kRulerRows + static_cast<int>(page.track() - page.topTrack())) *
+                      kCell.height;
+        const int from = (4 + ArrangePage::kNameColumns) * kCell.width;
+        for (const auto& region : frame)
+        {
+            for (const auto& run : region.text)
+            {
+                // The last of the buttons, Arm.
+                if (run.y == y && run.x > from + 2 * 4 * kCell.width &&
+                    run.x < page.headerColumns() * kCell.width && run.text.size() == 3)
+                {
+                    return std::pair{run.text, run.style.foreground};
+                }
+            }
+        }
+        return std::pair{std::u32string{}, Role::Background};
+    };
+    CHECK(badge() == std::pair{std::u32string{U" A "}, Role::Dim});
+    p.type(U"A");
+    const auto* track = armed(p.document);
+    REQUIRE(track != nullptr);
+    CHECK(p.ws.message().starts_with("Armed"));
+    CHECK(badge() == std::pair{std::u32string{U" A "}, Role::ToggleText});
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(badge() == std::pair{std::u32string{U" R "}, Role::ToggleText});
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK_FALSE(p.player.recording());
+    CHECK(badge() == std::pair{std::u32string{U" A "}, Role::ToggleText});
+    p.type(U"A");
+    CHECK(armed(p.document) == nullptr);
+    CHECK(badge() == std::pair{std::u32string{U" A "}, Role::Dim});
 }

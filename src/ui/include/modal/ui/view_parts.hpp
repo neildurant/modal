@@ -81,9 +81,11 @@ void addField(Region& region, int x, int y, int columns, CellSize cell);
 
 // A track's button, three cells wide at x, y, the same in every view showing it: filled in its
 // colour when on, its letter grey when off; Thru on a track not armed is its letter in its
-// colour, unfilled, as it does nothing until armed. Boxed when the cursor's on it.
+// colour, unfilled, as it does nothing until armed. Boxed when the cursor's on it. While
+// recording, an armed track's Arm button says R, as it's being recorded, rather than A, which
+// says what the key does (decided 13 November 2026).
 void addTrackButton(Region& region, int x, int y, CellSize cell, TrackField field,
-                    const core::Track& track, Role background, bool cursor);
+                    const core::Track& track, Role background, bool cursor, bool recording = false);
 inline constexpr int kTrackButtonColumns = 3;
 
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.

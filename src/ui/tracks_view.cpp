@@ -1052,7 +1052,8 @@ void TracksView::addRegions(Frame& frame) const
             if (toggle)
             {
                 addTrackButton(table, x, y, cell_, column.field, *track, style.background,
-                               index == row() && c == column_);
+                               index == row() && c == column_,
+                               host_.player() != nullptr && host_.player()->recording());
             }
             x += wide * cell_.width;
         }

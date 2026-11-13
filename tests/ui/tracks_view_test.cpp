@@ -1698,7 +1698,7 @@ TEST_CASE(
         CHECK(headingX(heading) == -1);
     }
     std::vector<int> badges;
-    for (const auto letter : {U" M ", U" S ", U" R ", U" T ", U" C ", U" Q "})
+    for (const auto letter : {U" M ", U" S ", U" A ", U" T ", U" C ", U" Q "})
     {
         const auto frame = t.ws.frame();
         const auto run =

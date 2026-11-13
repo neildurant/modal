@@ -111,7 +111,7 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
     case TrackField::Solo:
         return track.solo ? "S" : "-";
     case TrackField::Arm:
-        return track.arm ? "R" : "-";
+        return track.arm ? "A" : "-";
     case TrackField::Thru:
         return track.thru ? "T" : "-";
     case TrackField::Port:
@@ -161,7 +161,7 @@ std::string_view toggleLetter(TrackField field)
     case TrackField::Solo:
         return "S";
     case TrackField::Arm:
-        return "R";
+        return "A";
     case TrackField::Thru:
         return "T";
     case TrackField::ChaseNotes:
