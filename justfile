@@ -31,7 +31,7 @@ test config="debug" filter="": (build config)
     ./build/{{preset}}/tests/{{capitalize(config)}}/modal_tests{{exe}} {{ if filter == "" { "" } else { quote(filter) } }}
 
 # Build and start Modal, with its arguments: just run debug --demo
-run config="debug" *args: (build config)
+run config="debug" *args="": (build config)
     ./build/{{preset}}/apps/{{capitalize(config)}}/modal{{exe}} {{args}}
 
 # Format every C++ file
