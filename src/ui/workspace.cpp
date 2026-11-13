@@ -102,146 +102,158 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
     keys_.setTakesCharacter([this](std::string_view command) { return takesCharacter(command); });
     for (const auto& info : commands())
     {
-        registry.add(info,
-                     [this, name = info.name](const CommandCall& call) -> CommandResult
-                     {
-                         if (name == "port")
-                         {
-                             return port(call.arguments);
-                         }
-                         if (name == "countin" || name == "preroll")
-                         {
-                             return countIn(call.arguments, name == "preroll");
-                         }
-                         if (name == "event-insert")
-                         {
-                             return insertEvent(call.arguments);
-                         }
-                         if (name == "track-freeze")
-                         {
-                             return trackFreeze(call.arguments);
-                         }
-                         if (name == "section-insert-before" || name == "section-insert-after" ||
-                             name == "section-join")
-                         {
-                             return sectionHere(name, call.count);
-                         }
-                         if (name == "section-split")
-                         {
-                             return section(call.arguments);
-                         }
-                         if (name == "mark-delete")
-                         {
-                             return deleteMarks(call.arguments);
-                         }
-                         if (name == "label")
-                         {
-                             return label(call.arguments);
-                         }
-                         if (name == "label-delete")
-                         {
-                             return deleteLabels();
-                         }
-                         if (name == "label-to-section")
-                         {
-                             return labelToSection();
-                         }
-                         if (name == "bar-delete")
-                         {
-                             return barDelete(call.count);
-                         }
-                         if (name == "bar-insert")
-                         {
-                             // From keys or the palette, asking how many and in what
-                             // meter (decided November 2026), a count answering the first.
-                             if (call.line.empty())
-                             {
-                                 return askBarInsert(call.count);
-                             }
-                             return barInsert(call.arguments);
-                         }
-                         if (name == "meter-follow")
-                         {
-                             return meterFollow();
-                         }
-                         if (name == "meter-insert" || name == "rebar")
-                         {
-                             // From keys or the palette, asking for the meter, the prompt
-                             // saying what it will change (decided 13 November 2026).
-                             const bool range = name == "rebar";
-                             if (!range && withoutSpaces(call.arguments) == "follow")
-                             {
-                                 return meterFollow();
-                             }
-                             if (call.line.empty())
-                             {
-                                 return askMeter(range);
-                             }
-                             return range ? rebar(call.arguments) : meterInsert(call.arguments);
-                         }
-                         if (name == "section-rename")
-                         {
-                             return renameSection(call.arguments);
-                         }
-                         if (name.starts_with("transform-") && !call.line.empty())
-                         {
-                             return transformLine(name, call.arguments);
-                         }
-                         if (auto result = view().runLine(name, call.arguments))
-                         {
-                             return *result;
-                         }
-                         if (mode_ == Mode::Visual)
-                         {
-                             if (const auto done = runVisual(name, call.count))
-                             {
-                                 return {*done};
-                             }
-                         }
-                         if (name == "mark-go")
-                         {
-                             awaiting_ = Awaiting{std::string{name}, call.count};
-                             return {true};
-                         }
-                         if (name == "find-next" || name == "find-previous")
-                         {
-                             return {startFind(name == "find-next", call.count)};
-                         }
-                         if (name == "find-repeat" || name == "find-repeat-back")
-                         {
-                             return {repeatFind(name == "find-repeat", call.count)};
-                         }
-                         if (name == "search-next" || name == "search-previous")
-                         {
-                             const bool next = name == "search-next";
-                             if (!searching_.query)
-                             {
-                                 operator_.reset();
-                                 mode_ = mode_ == Mode::OperatorPending ? Mode::Normal : mode_;
-                                 refuse("No search yet: " + keysOf("search") + " searches",
-                                        MessageKind::Information);
-                                 return {true};
-                             }
-                             if (mode_ == Mode::OperatorPending)
-                             {
-                                 return {runOperator(next == searching_.forward
-                                                         ? "cursor-match-next"
-                                                         : "cursor-match-previous",
-                                                     call.count)};
-                             }
-                             return {goToMatch(next, call.count)};
-                         }
-                         // After an operator, every command is its motion, or gives it up.
-                         if (mode_ == Mode::OperatorPending)
-                         {
-                             return {runOperator(name, call.count)};
-                         }
-                         if (isShared(name))
-                         {
-                             return {runShared(name, call.count).value_or(false)};
-                         }
-                         return {runViewCommand(name, call.count)};
-                     });
+        registry.add(
+            info,
+            [this, name = info.name](const CommandCall& call) -> CommandResult
+            {
+                if (name == "port")
+                {
+                    return port(call.arguments);
+                }
+                if (name == "countin" || name == "preroll")
+                {
+                    return countIn(call.arguments, name == "preroll");
+                }
+                if (name == "event-insert")
+                {
+                    return insertEvent(call.arguments);
+                }
+                if (name == "track-freeze")
+                {
+                    return trackFreeze(call.arguments);
+                }
+                if (name == "section-insert-before" || name == "section-insert-after" ||
+                    name == "section-join")
+                {
+                    return sectionHere(name, call.count);
+                }
+                if (name == "section-split")
+                {
+                    return section(call.arguments);
+                }
+                if (name == "mark-delete")
+                {
+                    return deleteMarks(call.arguments);
+                }
+                if (name == "label")
+                {
+                    return label(call.arguments);
+                }
+                if (name == "label-delete")
+                {
+                    return deleteLabels();
+                }
+                if (name == "label-to-section")
+                {
+                    return labelToSection();
+                }
+                if (name == "bar-delete")
+                {
+                    return barDelete(call.count);
+                }
+                if (name == "bar-insert")
+                {
+                    // From keys or the palette, asking how many and in what
+                    // meter (decided November 2026), a count answering the first.
+                    if (call.line.empty())
+                    {
+                        return askBarInsert(call.count);
+                    }
+                    return barInsert(call.arguments);
+                }
+                if (name == "meter-follow")
+                {
+                    return meterFollow();
+                }
+                if (name == "meter-insert" || name == "rebar")
+                {
+                    // From keys or the palette, asking for the meter, the prompt
+                    // saying what it will change (decided 13 November 2026).
+                    const bool range = name == "rebar";
+                    if (!range && withoutSpaces(call.arguments) == "follow")
+                    {
+                        return meterFollow();
+                    }
+                    if (call.line.empty())
+                    {
+                        return askMeter(range);
+                    }
+                    return range ? rebar(call.arguments) : meterInsert(call.arguments);
+                }
+                if (name == "section-rename")
+                {
+                    return renameSection(call.arguments);
+                }
+                if (name == "track-add" || name == "track-insert-before")
+                {
+                    return addTracks(name == "track-insert-before", call.count, call.arguments);
+                }
+                if (name == "track-delete")
+                {
+                    return deleteTracks();
+                }
+                if (name == "track-rename")
+                {
+                    return renameTrack(call.arguments);
+                }
+                if (name.starts_with("transform-") && !call.line.empty())
+                {
+                    return transformLine(name, call.arguments);
+                }
+                if (auto result = view().runLine(name, call.arguments))
+                {
+                    return *result;
+                }
+                if (mode_ == Mode::Visual)
+                {
+                    if (const auto done = runVisual(name, call.count))
+                    {
+                        return {*done};
+                    }
+                }
+                if (name == "mark-go")
+                {
+                    awaiting_ = Awaiting{std::string{name}, call.count};
+                    return {true};
+                }
+                if (name == "find-next" || name == "find-previous")
+                {
+                    return {startFind(name == "find-next", call.count)};
+                }
+                if (name == "find-repeat" || name == "find-repeat-back")
+                {
+                    return {repeatFind(name == "find-repeat", call.count)};
+                }
+                if (name == "search-next" || name == "search-previous")
+                {
+                    const bool next = name == "search-next";
+                    if (!searching_.query)
+                    {
+                        operator_.reset();
+                        mode_ = mode_ == Mode::OperatorPending ? Mode::Normal : mode_;
+                        refuse("No search yet: " + keysOf("search") + " searches",
+                               MessageKind::Information);
+                        return {true};
+                    }
+                    if (mode_ == Mode::OperatorPending)
+                    {
+                        return {runOperator(next == searching_.forward ? "cursor-match-next"
+                                                                       : "cursor-match-previous",
+                                            call.count)};
+                    }
+                    return {goToMatch(next, call.count)};
+                }
+                // After an operator, every command is its motion, or gives it up.
+                if (mode_ == Mode::OperatorPending)
+                {
+                    return {runOperator(name, call.count)};
+                }
+                if (isShared(name))
+                {
+                    return {runShared(name, call.count).value_or(false)};
+                }
+                return {runViewCommand(name, call.count)};
+            });
     }
     buildOperatorKeymap();
 }
@@ -4116,6 +4128,189 @@ CommandResult Workspace::renameSection(std::string_view name)
     refresh();
     // As renamed, numbered if another section had the name.
     return {true, "Renamed " + old + " to " + document_.song().sections()[index]->name(), false};
+}
+
+CommandResult Workspace::addTracks(bool before, int count, std::string_view name)
+{
+    // Named Track and the next number, on the lowest channel no track uses (1 when all are),
+    // playing to the cursor's track's port, as a new part usually goes to the same instrument
+    // (decided 13 November 2026).
+    const auto& song = document_.song();
+    const auto tracks = song.tracks();
+    const auto cursor = view().cursor();
+    const core::Track* here = cursor.track ? song.track(*cursor.track) : nullptr;
+    std::size_t at = tracks.size();
+    if (here != nullptr)
+    {
+        at = static_cast<std::size_t>(
+            std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == here->id(); }) -
+            tracks.begin());
+        at += before ? 0 : 1;
+    }
+    const auto n = static_cast<std::size_t>(std::max(count, 1));
+    const auto first = name.find_first_not_of(" \t");
+    const auto given =
+        first == std::string_view::npos
+            ? std::string{}
+            : std::string{name.substr(first, name.find_last_not_of(" \t") - first + 1)};
+    int number = 0;
+    std::array<bool, 17> used{};
+    for (const auto& track : tracks)
+    {
+        if (track->name.starts_with("Track "))
+        {
+            int value = 0;
+            const auto digits = std::string_view{track->name}.substr(6);
+            if (const auto [end, error] =
+                    std::from_chars(digits.data(), digits.data() + digits.size(), value);
+                error == std::errc{} && end == digits.data() + digits.size())
+            {
+                number = std::max(number, value);
+            }
+        }
+        if (track->channel >= 1 && track->channel <= 16)
+        {
+            used[static_cast<std::size_t>(track->channel)] = true;
+        }
+    }
+    std::vector<std::string> names;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        names.push_back(!given.empty() && n == 1 ? given : "Track " + std::to_string(++number));
+    }
+    std::vector<core::TrackId> added;
+    document_.edit(n == 1 ? "Add " + names.front() : "Add " + std::to_string(n) + " tracks",
+                   view().place(),
+                   [&](core::Song& edited)
+                   {
+                       for (std::size_t i = 0; i < n; ++i)
+                       {
+                           const auto id = edited.addTrack(at + i, names[i]);
+                           int channel = 1;
+                           for (int c = 1; c <= 16; ++c)
+                           {
+                               if (!used[static_cast<std::size_t>(c)])
+                               {
+                                   channel = c;
+                                   used[static_cast<std::size_t>(c)] = true;
+                                   break;
+                               }
+                           }
+                           edited.updateTrack(id,
+                                              [&](core::Track& track)
+                                              {
+                                                  track.channel = channel;
+                                                  track.port = here ? here->port : std::string{};
+                                              });
+                           added.push_back(id);
+                       }
+                   });
+    endVisual();
+    refresh();
+    view().setCursor({added.front(), cursor.tick, cursor.pitch});
+    const auto hereId = here == nullptr ? core::TrackId{} : here->id();
+    const auto where = here == nullptr ? std::string{}
+                                       : (before ? " before " : " after ") +
+                                             trackNames(document_.song(), std::span{&hereId, 1});
+    if (n == 1 && given.empty())
+    {
+        // Asking for its name, with this one to keep or type over, as a new section does.
+        openPrompt("track-rename " + names.front());
+        return {true};
+    }
+    return {true, "Added " + (n == 1 ? names.front() : std::to_string(n) + " tracks") + where,
+            false};
+}
+
+CommandResult Workspace::deleteTracks()
+{
+    // The selected tracks, from V or Ctrl-v; a v range, across every track, chooses none.
+    const auto& song = document_.song();
+    const auto cursor = view().cursor();
+    if (!cursor.track)
+    {
+        return CommandResult::error("No track to delete");
+    }
+    std::vector<core::TrackId> ids{*cursor.track};
+    if (selection_)
+    {
+        if (where() == Where::Tracks && selection_->kind == SelectionKind::Range)
+        {
+            return CommandResult::error(
+                "v selects time across every track: V or Ctrl-v selects tracks to delete");
+        }
+        if (const auto block = trackBlock())
+        {
+            ids.clear();
+            for (std::size_t i = 0; i < block->second; ++i)
+            {
+                ids.push_back(song.tracks()[block->first + i]->id());
+            }
+        }
+    }
+    const auto tracks = song.tracks();
+    const auto first = static_cast<std::size_t>(
+        std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == ids.front(); }) -
+        tracks.begin());
+    const auto names = trackNames(song, ids);
+    EventRegister taken;
+    for (const auto id : ids)
+    {
+        taken.wholeTracks.push_back(*song.copyTrack(id));
+    }
+    document_.edit("Delete " + names, view().place(),
+                   [&](core::Song& edited)
+                   {
+                       for (const auto id : ids)
+                       {
+                           edited.removeTrack(id);
+                       }
+                   });
+    register_ = std::move(taken);
+    endVisual();
+    refresh();
+    // The track after them, or the last.
+    const auto left = document_.song().tracks();
+    if (!left.empty())
+    {
+        view().setCursor({left[std::min(first, left.size() - 1)]->id(), cursor.tick, cursor.pitch});
+    }
+    return {true, "Deleted " + names, false};
+}
+
+CommandResult Workspace::renameTrack(std::string_view name)
+{
+    const auto id = view().cursor().track;
+    if (!id)
+    {
+        return CommandResult::error("No track to rename");
+    }
+    const auto old = document_.song().track(*id)->name;
+    const auto first = name.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
+    {
+        // Asking for one, with its name to edit, as :section-rename does.
+        openPrompt("track-rename " + old);
+        return {true};
+    }
+    const std::string text{name.substr(first, name.find_last_not_of(" \t") - first + 1)};
+    if (text == old)
+    {
+        return {true}; // kept, as Enter on a new track's name does, so adding is one undo step
+    }
+    std::optional<std::string> error;
+    auto edited = document_.song();
+    edited.updateTrack(*id, [&](core::Track& track)
+                       { error = setTrackField(track, TrackField::Name, text, edited.ppqn()); });
+    if (error)
+    {
+        return CommandResult::error(*error);
+    }
+    document_.edit("Rename " + old + " to " + text, view().place(),
+                   [&](core::Song& song) { song = edited; });
+    refresh();
+    return {true, "Renamed " + (old.empty() ? std::string{"the track"} : old) + " to " + text,
+            false};
 }
 
 void Workspace::openPrompt(std::string line)

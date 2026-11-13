@@ -1535,3 +1535,73 @@ TEST_CASE("a track's bars are tinted where it has a meter of its own, for whole 
     a.type(U",Tb");
     CHECK(tinted() == std::vector<int>{0, 6, 7});
 }
+
+TEST_CASE("the leader then t and a adds a track after the cursor's, named Track and a number, "
+          "on the lowest channel free and its port, asking for its name")
+{
+    Arranging a;
+    a.ws.setLineHandler([&](const std::string& line) { a.registry.runLine(line); });
+    const auto& song = a.document.song();
+    const auto before = song.tracks().size();
+    a.document.edit(
+        "Port", {}, [&](core::Song& s)
+        { s.updateTrack(s.tracks()[1]->id(), [](core::Track& track) { track.port = "Synth"; }); });
+    a.ws.refresh();
+    a.type(U"j,ta"); // after the Bass
+    CHECK(a.ws.commandLine().text() == U"track-rename Track 1");
+    a.press(Key::of(NamedKey::Enter)); // kept
+    REQUIRE(song.tracks().size() == before + 1);
+    const auto& added = *song.tracks()[2];
+    CHECK(added.name == "Track 1");
+    CHECK(added.channel == 11); // 1 to 10 used
+    CHECK(added.port == "Synth");
+    CHECK(a.ws.arrangement().page().track() == 2);
+    a.type(U"u");
+    CHECK(song.tracks().size() == before);
+
+    // Several before it, counting on; or one named, with no question.
+    CHECK(a.ws.arrangement().page().track() == 1); // back on the Bass
+    a.type(U"3,ti");
+    CHECK(a.ws.message() == "Added 3 tracks before Bass");
+    CHECK(song.tracks()[1]->name == "Track 1");
+    CHECK(song.tracks()[3]->name == "Track 3");
+    CHECK(song.tracks()[3]->channel == 13);
+    CHECK(a.registry.runLine("track-add Keys").message == "Added Keys after Track 1");
+    CHECK(song.tracks()[2]->name == "Keys");
+}
+
+TEST_CASE("the leader then t and d deletes the cursor's track, or those V or Ctrl-v selects, "
+          "and t and r renames it")
+{
+    Arranging a;
+    a.ws.setLineHandler([&](const std::string& line) { a.registry.runLine(line); });
+    const auto& song = a.document.song();
+    const auto before = song.tracks().size();
+    a.type(U"j,td");
+    CHECK(a.ws.message() == "Deleted Bass");
+    CHECK(song.tracks().size() == before - 1);
+    CHECK(song.tracks()[1]->name == "Piano"); // the cursor on the track after it
+    CHECK(a.ws.arrangement().page().track() == 1);
+    REQUIRE(a.ws.registerArea().wholeTracks.size() == 1);
+    CHECK(a.ws.registerArea().wholeTracks[0].settings.name == "Bass");
+    a.type(U"u");
+    CHECK(song.tracks()[1]->name == "Bass");
+
+    // A v range is time across every track, so refused; V rows are tracks.
+    Arranging b;
+    b.type(U"jvj,td");
+    CHECK(b.ws.message().starts_with("v selects time across every track"));
+    CHECK(b.document.song().tracks().size() == before);
+    b.press(Key::of(NamedKey::Escape));
+    b.type(U"kVj,td");
+    CHECK(b.ws.message() == "Deleted Bass, Piano");
+    CHECK(b.document.song().tracks().size() == before - 2);
+
+    Arranging c;
+    c.ws.setLineHandler([&](const std::string& line) { c.registry.runLine(line); });
+    c.type(U"jj,tr");
+    CHECK(c.ws.commandLine().text() == U"track-rename Piano");
+    c.press(Key::of(NamedKey::Escape));
+    CHECK(c.registry.runLine("track-rename Keys").message == "Renamed Piano to Keys");
+    CHECK(c.document.song().tracks()[2]->name == "Keys");
+}

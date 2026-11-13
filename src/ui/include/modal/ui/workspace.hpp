@@ -608,6 +608,12 @@ private:
     // :label-to-section on a selection: every label from one time to another.
     CommandResult labelsToSections(core::Tick from, core::Tick to);
     CommandResult renameSection(std::string_view name);
+    // Empty tracks after the cursor's track, or before it, with the next Track numbers, the
+    // lowest channels no track uses and the cursor's track's port; one asks for its name.
+    CommandResult addTracks(bool before, int count, std::string_view name);
+    // The cursor's track, or the tracks a selection chooses, into the register as whole tracks.
+    CommandResult deleteTracks();
+    CommandResult renameTrack(std::string_view name);
 
     // The two rows along the bottom (decided 12 November 2026): the message row, always there,
     // and the status line under it.

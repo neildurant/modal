@@ -428,6 +428,24 @@ constexpr std::array kSharedCommands{
                                "about those off a bar line, as one undo step",
 
                 .range = true},
+    CommandInfo{.name = "track-add",
+                .description = "Add an empty track after the cursor's, or {count} of them, named "
+                               "Track and the next number unless named, on the lowest channel "
+                               "free and the cursor's track's port",
+                .usage = "[NAME]",
+                .count = true},
+    CommandInfo{.name = "track-insert-before",
+                .description = "Add an empty track before the cursor's, or {count} of them, as "
+                               "track-add does",
+                .usage = "[NAME]",
+                .count = true},
+    CommandInfo{.name = "track-delete",
+                .description = "Delete the cursor's track, or the tracks selected with V or "
+                               "Ctrl-v, keeping them in the register as whole tracks"},
+    CommandInfo{.name = "track-rename",
+                .description = "Rename the cursor's track; with no name, asking for one, with "
+                               "its name to edit",
+                .usage = "[NAME]"},
     CommandInfo{.name = "section-rename",
                 .description = "Rename the section at the cursor; with no name, asking for one, "
                                "with its name to edit",

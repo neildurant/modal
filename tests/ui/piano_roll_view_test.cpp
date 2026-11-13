@@ -2315,3 +2315,15 @@ TEST_CASE("separate Visual move gestures undo separately")
     r.press(Key::typed(U'r', kCtrl));
     CHECK(r.document.song() == second);
 }
+
+TEST_CASE("adding a track in the piano roll shows the new track there")
+{
+    Rolling r;
+    r.ws.setLineHandler([&](const std::string& line) { r.registry.runLine(line); });
+    r.type(U",ta");
+    r.press(Key::of(NamedKey::Enter));
+    const auto& song = r.document.song();
+    REQUIRE(song.tracks().size() == 3);
+    CHECK(song.tracks()[1]->name == "Track 1");
+    CHECK(r.view().cursor().track == song.tracks()[1]->id());
+}
