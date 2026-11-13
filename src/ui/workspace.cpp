@@ -1768,6 +1768,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         showPlayhead();
         return true;
     }
+    if ((command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
+         command == "tracks-arm-toggle") &&
+        where() == Where::Tracks)
+    {
+        return toggleTracks(command == "tracks-mute-toggle"   ? TrackField::Mute
+                            : command == "tracks-solo-toggle" ? TrackField::Solo
+                                                              : TrackField::Arm);
+    }
     if (command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
         command == "tracks-chase-toggle" || command == "tracks-quantize-toggle" ||
         command == "tracks-arm-toggle" || command == "tracks-thru-toggle")
@@ -1791,6 +1799,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                            song.updateTrack(*id, [&](core::Track& changed)
                                             { (arm ? changed.arm : changed.thru) = on; });
                        });
+        refresh(); // for the arrangement's buttons
         if (arm)
         {
             const std::array ids{*id};
@@ -1825,6 +1834,7 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                            song.updateTrack(*id, [&](core::Track& changed)
                                             { (mute ? changed.mute : changed.solo) = on; });
                        });
+        refresh(); // for the arrangement's buttons
         setMessage(std::string{mute ? "Mute " : "Solo "} + (on ? "on: " : "off: ") + name,
                    MessageKind::Information);
         return true;
@@ -4128,6 +4138,61 @@ CommandResult Workspace::renameSection(std::string_view name)
     refresh();
     // As renamed, numbered if another section had the name.
     return {true, "Renamed " + old + " to " + document_.song().sections()[index]->name(), false};
+}
+
+bool Workspace::toggleTracks(TrackField field)
+{
+    if (selection_ && selection_->kind == SelectionKind::Range)
+    {
+        refuse("v selects time across every track: V or Ctrl-v selects tracks");
+        return true;
+    }
+    const auto block = trackBlock();
+    const auto cursor = view().cursor().track;
+    if (!block || !cursor)
+    {
+        refuse("Select a track to change");
+        return true;
+    }
+    const auto& song = document_.song();
+    std::vector<core::TrackId> ids;
+    for (std::size_t i = 0; i < block->second; ++i)
+    {
+        ids.push_back(song.tracks()[block->first + i]->id());
+    }
+    const bool on = !trackButtonOn(field, *song.track(*cursor));
+    const auto names = trackNames(song, ids);
+    const std::string_view what = field == TrackField::Mute   ? "mute"
+                                  : field == TrackField::Solo ? "solo"
+                                                              : "arm";
+    document_.edit("Toggle " + std::string{what}, view().place(),
+                   [&](core::Song& edited)
+                   {
+                       for (const auto id : ids)
+                       {
+                           edited.updateTrack(id,
+                                              [&](core::Track& track)
+                                              {
+                                                  (field == TrackField::Mute   ? track.mute
+                                                   : field == TrackField::Solo ? track.solo
+                                                                               : track.arm) = on;
+                                              });
+                       }
+                   });
+    endVisual();
+    refresh();
+    if (field == TrackField::Arm)
+    {
+        const auto said = armedMessage(document_.song(), ids, on);
+        setMessage(said.text, said.warning ? MessageKind::Warning : MessageKind::Information);
+    }
+    else
+    {
+        setMessage(std::string{field == TrackField::Mute ? "Mute " : "Solo "} +
+                       (on ? "on: " : "off: ") + names,
+                   MessageKind::Information);
+    }
+    return true;
 }
 
 CommandResult Workspace::addTracks(bool before, int count, std::string_view name)

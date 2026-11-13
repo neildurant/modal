@@ -6,12 +6,16 @@
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/ui/frame.hpp>
+#include <modal/ui/track_fields.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace modal::ui
 {
@@ -33,8 +37,13 @@ public:
     static constexpr int kMeterRow = 2;
     static constexpr int kStripRow = 3;
     static constexpr int kNumberRow = 4;
-    static constexpr int kHeaderColumns = 20; // the track's number and name, and a line
-    static constexpr int kNameColumns = 14;
+    // The track column: the track's number, its name, its buttons, then a line, as wide as
+    // they need. The name's width and the buttons are settings rather than fixed, so they can
+    // later be configured.
+    static constexpr int kNameColumns = 14; // the name's width unless set
+    int headerColumns() const;
+    void setNameColumns(int columns) { nameColumns_ = std::max(columns, 1); }
+    void setTrackColumns(std::vector<TrackField> columns) { columns_ = std::move(columns); }
 
     // The length of time in a column of cells at each zoom, from zoomed in to out.
     static constexpr std::array<core::NoteFraction, 7> kZooms{
@@ -156,6 +165,8 @@ private:
     std::size_t topTrack_ = 0;
     core::Tick leftTick_ = 0;
     std::size_t zoom_ = kDefaultZoom;
+    int nameColumns_ = kNameColumns;
+    std::vector<TrackField> columns_{arrangementColumns().begin(), arrangementColumns().end()};
     Rect main_;
     CellSize cell_{1, 1};
 };

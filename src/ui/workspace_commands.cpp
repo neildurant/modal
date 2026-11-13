@@ -635,11 +635,11 @@ std::span<const CommandInfo> Workspace::commands()
         using enum Where;
         const std::array<std::pair<std::string_view, std::uint8_t>, 132> where{{
             {"ports-refresh", onlyIn({PortList})},
-            {"tracks-mute-toggle", onlyIn({TrackList})},
-            {"tracks-solo-toggle", onlyIn({TrackList})},
+            {"tracks-mute-toggle", onlyIn({Tracks, TrackList})},
+            {"tracks-solo-toggle", onlyIn({Tracks, TrackList})},
             {"tracks-chase-toggle", onlyIn({TrackList})},
             {"tracks-quantize-toggle", onlyIn({TrackList})},
-            {"tracks-arm-toggle", onlyIn({TrackList})},
+            {"tracks-arm-toggle", onlyIn({Tracks, TrackList})},
             {"tracks-thru-toggle", onlyIn({TrackList})},
             {"track-arm-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-thru-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},

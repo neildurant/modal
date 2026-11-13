@@ -926,9 +926,10 @@ TEST_CASE("M, S and , t c toggle selected rows in the tracks view, as one undo s
     CHECK(t.document.song() == before);
 }
 
-TEST_CASE("M and S on a selection are for the tracks view")
+TEST_CASE("M and S on a selection are for tracks, not a selection of notes or events")
 {
-    const auto view = GENERATE(as<std::u32string>{}, U"ga", U"gr", U"ge");
+    // The arrangement's V and Ctrl-v choose tracks, so mute and solo them, as its buttons show.
+    const auto view = GENERATE(as<std::u32string>{}, U"gr", U"ge");
     Tracking t;
     t.type(view);
     t.type(U"V");

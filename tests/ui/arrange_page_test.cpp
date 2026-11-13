@@ -23,12 +23,12 @@ namespace
 
 constexpr CellSize kCell{10, 20};
 
-// The demo song's page in a main area of 80 by 22 cells: 60 columns of timeline, and 19
-// tracks' rows below the ruler.
-ArrangePage page80x22()
+// The demo song's page in a main area of 92 by 22 cells: 60 columns of timeline beside the
+// track names and buttons, and 19 tracks' rows below the ruler.
+ArrangePage page92x22()
 {
     ArrangePage page{demoSong()};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1); // to a half note to a column, as these tests measure
     return page;
 }
@@ -114,7 +114,7 @@ TEST_CASE("density goes from sparse to busy by the notes starting to a quarter n
 
 TEST_CASE("the arrangement's cursor moves by each track's bars, and between tracks in time")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     const auto song = demoSong();
     const auto& drums = song.meter(song.tracks()[0]->id());
 
@@ -163,7 +163,7 @@ TEST_CASE("the arrangement's cursor moves by each track's bars, and between trac
 
 TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in view")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     CHECK(page.leftTick() == 0);
     const auto column = ArrangePage::kZooms[page.zoom()].toTicks(core::kPpqn);
 
@@ -180,7 +180,7 @@ TEST_CASE("the arrangement scrolls in whole columns to keep the cursor's bar in 
 TEST_CASE("zooming changes the time in a column, within its limits, and back to a quarter")
 {
     ArrangePage page{demoSong()};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     CHECK(ArrangePage::kZooms[page.zoom()] == core::NoteFraction{1, 4});
     type(page, U"-");
     CHECK(page.zoom() == ArrangePage::kDefaultZoom + 1);
@@ -203,12 +203,12 @@ TEST_CASE("zooming changes the time in a column, within its limits, and back to 
 
 TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     REQUIRE(frame.size() == 2); // the headers, then the timeline
     const auto& timeline = frame[1];
-    CHECK(timeline.bounds == Rect{ArrangePage::kHeaderColumns * kCell.width, kCell.height,
+    CHECK(timeline.bounds == Rect{page.headerColumns() * kCell.width, kCell.height,
                                   60 * kCell.width, 22 * kCell.height});
 
     // Drums: eight bars of 4/4 at density 3, each two columns less a gap of one pixel, then
@@ -253,7 +253,7 @@ TEST_CASE("bars are drawn as blocks as wide as they are long, shaded by density"
 
 TEST_CASE("labels are named in the ruler, with faint lines through it and every track")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     const auto& timeline = frame[1];
@@ -328,7 +328,7 @@ std::vector<std::u32string> rulerText(const Region& timeline, int row)
 
 TEST_CASE("section names are cut short to their sections, or left out if there's no room")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     type(page, U"-", 2); // eight quarter notes to a column
     Frame frame;
     page.addRegions(frame);
@@ -341,7 +341,7 @@ TEST_CASE("section names are cut short to their sections, or left out if there's
 
 TEST_CASE("bars are numbered from bar 1 and each label, every so many bars")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     // The shortest bar, of 2/4, is ten pixels, and "53 " is thirty: every fourth bar, from
@@ -358,7 +358,7 @@ TEST_CASE("bars are numbered from bar 1 and each label, every so many bars")
 
 TEST_CASE("a meter change too short for its name is shown by a tick, not hiding the next")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     // The single bar of 2/4 is ten pixels, too narrow for "2/4", so the bridge's 3/4 shows.
@@ -385,7 +385,7 @@ TEST_CASE("a meter change too short for its name is shown by a tick, not hiding 
 
 TEST_CASE("an empty track's dots are on its bar lines")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     const auto dots = rowShapes(frame[1], 10, Role::Dim);
@@ -396,7 +396,7 @@ TEST_CASE("an empty track's dots are on its bar lines")
 
 TEST_CASE("the cursor boxes its bar on all four sides")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     std::vector<Rect> sides;
@@ -422,7 +422,7 @@ TEST_CASE("a label's line through the ruler breaks only where text sits across i
                       { events.insert({0, core::Note{60, 100, song.ppqn().quarter()}}); });
     song.setLabel(core::NoteFraction{1, 2}.toTicks(song.ppqn()), "Middle");
     ArrangePage page{song};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1); // a half note to a column, so the label is ten pixels in
     Frame frame;
     page.addRegions(frame);
@@ -455,7 +455,7 @@ TEST_CASE("the play-from marker and marks have a row of their own, laid out not 
     song.setMark({'c', 4 * half, id, core::Mark::kNoPitch});
     song.setMark({'d', 4 * half + quarter, id, core::Mark::kNoPitch});
     ArrangePage page{song};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     page.zoomBy(1);
     using Runs = std::vector<std::pair<int, std::u32string>>;
     const auto row = [&](const Frame& frame, int y)
@@ -512,7 +512,7 @@ TEST_CASE("marks at one time are lettered in the order of their rows, from the t
     song.setMark({'b', bar, first, core::Mark::kNoPitch});
     song.setMark({'c', bar, std::nullopt, core::Mark::kNoPitch});
     ArrangePage page{song};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     Frame frame;
     page.addRegions(frame);
     std::u32string letters;
@@ -532,7 +532,7 @@ TEST_CASE("a label at a section's start is named in the labels' row")
     song.addTrack("Piano");
     song.setLabel(0, "Top");
     ArrangePage page{song};
-    page.resize({0, kCell.height, 80 * kCell.width, 22 * kCell.height}, kCell);
+    page.resize({0, kCell.height, 92 * kCell.width, 22 * kCell.height}, kCell);
     Frame frame;
     page.addRegions(frame);
     CHECK(rulerText(frame[1], 0) == std::vector<std::u32string>{U"Top"});
@@ -540,7 +540,7 @@ TEST_CASE("a label at a section's start is named in the labels' row")
 
 TEST_CASE("the view glides under the playhead, which stays a third of the way across")
 {
-    auto page = page80x22(); // a half note to a column
+    auto page = page92x22(); // a half note to a column
     const auto quarter = core::kPpqn.quarter();
     page.showTime(60 * quarter, true);
     const auto left = page.leftTick();
@@ -555,7 +555,7 @@ TEST_CASE("the view glides under the playhead, which stays a third of the way ac
 
 TEST_CASE("narrow bars lose their gaps")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     type(page, U"-", 2); // two whole notes to a column: a bar of 4/4 is five pixels
     Frame frame;
     page.addRegions(frame);
@@ -568,7 +568,7 @@ TEST_CASE("narrow bars lose their gaps")
 
 TEST_CASE("centring puts the cursor's bar and track in the middle of the view")
 {
-    auto page = page80x22(); // 60 columns of two quarter notes, 19 tracks' rows
+    auto page = page92x22(); // 60 columns of two quarter notes, 19 tracks' rows
     type(page, U"G", 30);    // bar 30, from 109 quarter notes, of three
     CHECK(page.leftTick() == 0);
     page.centre();
@@ -584,7 +584,7 @@ TEST_CASE("centring puts the cursor's bar and track in the middle of the view")
 
 TEST_CASE("a page of the arrangement is as many of the cursor's track's bars as are wholly in view")
 {
-    auto page = page80x22(); // 120 quarter notes in view
+    auto page = page92x22(); // 120 quarter notes in view
     const auto song = demoSong();
     const auto right = 120 * core::kPpqn.quarter();
     for (const std::size_t track : {std::size_t{0}, std::size_t{6}}) // 4/4 and 7/8; 3/4
@@ -600,7 +600,7 @@ TEST_CASE("a page of the arrangement is as many of the cursor's track's bars as 
 
 TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     type(page, U"l", 8);
     type(page, U"j", 6);
     CHECK(page.status() == "track 7  bar 12/69  3/4  zoom 1/2");
@@ -608,7 +608,7 @@ TEST_CASE("the arrangement's status shows the track, bar, meter and zoom")
 
 TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
 {
-    auto page = page80x22(); // 60 columns of two quarter notes: 120 quarter notes in view
+    auto page = page92x22(); // 60 columns of two quarter notes: 120 quarter notes in view
     const auto song = demoSong();
     const auto& ostinato = song.meter(song.tracks()[6]->id()); // 3/4, from each section
 
@@ -643,7 +643,7 @@ TEST_CASE("scrolling by bars keeps the cursor exactly where it is on screen")
 
 TEST_CASE("the track column's heading sits directly above the names, the strip above the numbers")
 {
-    auto page = page80x22();
+    auto page = page92x22();
     Frame frame;
     page.addRegions(frame);
     const auto rowOf = [&](std::u32string_view text)
@@ -663,7 +663,7 @@ TEST_CASE("the track column's heading sits directly above the names, the strip a
 
 TEST_CASE("the ruler marks where the tempo changes, not where it starts or stays the same")
 {
-    auto page = page80x22(); // the demo song, to its slower bridge
+    auto page = page92x22(); // the demo song, to its slower bridge
     Frame frame;
     page.addRegions(frame);
     std::vector<std::u32string> signs;

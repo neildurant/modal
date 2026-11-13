@@ -614,6 +614,9 @@ private:
     // The cursor's track, or the tracks a selection chooses, into the register as whole tracks.
     CommandResult deleteTracks();
     CommandResult renameTrack(std::string_view name);
+    // In the arrangement, a button for the tracks a V or Ctrl-v selection takes, as the
+    // Tracks view's rows do, all following the cursor's track.
+    bool toggleTracks(TrackField field);
 
     // The two rows along the bottom (decided 12 November 2026): the message row, always there,
     // and the status line under it.

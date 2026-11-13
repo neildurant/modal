@@ -31,7 +31,8 @@ struct Arranging
         : document{std::move(song)}
     {
         registry.add(windowCommands());
-        ws.resize(120 * kCell.width, 30 * kCell.height, kCell);
+        // The timeline these tests measure, beside the track names and their buttons.
+        ws.resize(132 * kCell.width, 30 * kCell.height, kCell);
         ws.show(ViewKind::Arrangement);
     }
 
@@ -1604,4 +1605,55 @@ TEST_CASE("the leader then t and d deletes the cursor's track, or those V or Ctr
     c.press(Key::of(NamedKey::Escape));
     CHECK(c.registry.runLine("track-rename Keys").message == "Renamed Piano to Keys");
     CHECK(c.document.song().tracks()[2]->name == "Keys");
+}
+
+TEST_CASE("the arrangement shows Mute, Solo and Arm beside the track names")
+{
+    Arranging a;
+    const auto badge = [&](std::u32string_view letter)
+    {
+        const auto frame = a.ws.frame();
+        const auto headers = std::ranges::find_if(
+            frame,
+            [](const Region& region)
+            {
+                return std::ranges::any_of(region.text, [](const TextRun& run)
+                                           { return run.text.starts_with(U"Trk Name"); });
+            });
+        REQUIRE(headers != frame.end());
+        const int y =
+            (ArrangePage::kRulerRows + static_cast<int>(a.page().track() - a.page().topTrack())) *
+            kCell.height;
+        const auto run =
+            std::ranges::find_if(headers->text, [&](const TextRun& candidate)
+                                 { return candidate.y == y && candidate.text == letter; });
+        REQUIRE(run != headers->text.end());
+        // After the name, before the line and the bars.
+        CHECK(run->x >= (4 + ArrangePage::kNameColumns) * kCell.width);
+        CHECK(run->x + 3 * kCell.width < a.page().headerColumns() * kCell.width);
+        return run->style.foreground;
+    };
+    CHECK(badge(U" M ") == Role::Dim);
+    CHECK(badge(U" S ") == Role::Dim);
+    a.type(U"M");
+    CHECK(badge(U" M ") == Role::ToggleText);
+    a.type(U"S");
+    CHECK(badge(U" S ") == Role::ToggleText);
+    a.type(U"MS");
+    CHECK(badge(U" M ") == Role::Dim);
+    CHECK(badge(U" S ") == Role::Dim);
+    // Several, chosen by V, follow the cursor's track; a v range, across every track, chooses
+    // none.
+    a.type(U"Vj");
+    a.type(U"M");
+    CHECK(a.ws.message() == "Mute on: " + a.document.song().tracks()[a.page().track() - 1]->name +
+                                ", " + a.document.song().tracks()[a.page().track()]->name);
+    CHECK(badge(U" M ") == Role::ToggleText);
+    CHECK(a.document.song().tracks()[a.page().track() - 1]->mute);
+    a.type(U"vM");
+    CHECK(a.ws.message().starts_with("v selects time across every track"));
+    a.press(Key::of(NamedKey::Escape));
+
+    // Names keep their width, the column widening for the buttons.
+    CHECK(a.page().headerColumns() == 4 + ArrangePage::kNameColumns + 2 + 3 * 4);
 }

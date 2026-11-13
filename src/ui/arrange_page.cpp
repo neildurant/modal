@@ -174,9 +174,20 @@ int ArrangePage::viewTracks() const
     return std::max(main_.height / cell_.height - kRulerRows, 1);
 }
 
+int ArrangePage::headerColumns() const
+{
+    // The number and a space, the name and a space, then the buttons, each with a space after.
+    int columns = 4 + nameColumns_ + 1 + 1;
+    for (const auto field : columns_)
+    {
+        columns += trackColumn(field).width;
+    }
+    return columns;
+}
+
 int ArrangePage::viewColumns() const
 {
-    return std::max(main_.width / cell_.width - kHeaderColumns, 1);
+    return std::max(main_.width / cell_.width - headerColumns(), 1);
 }
 
 void ArrangePage::goToBar(std::int64_t bar)
@@ -344,7 +355,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                   stripCursor_ ? Style{Role::CursorText, Role::Cursor, kBold} : kDim);
     for (int row = 0; row < rows; ++row)
     {
-        headers.set(kHeaderColumns - 1, row, {U'│', kDim});
+        headers.set(headerColumns() - 1, row, {U'│', kDim});
     }
     for (int line = 0; line < rows - kRulerRows; ++line)
     {
@@ -363,22 +374,40 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         const Style moved{Role::Text, Role::Selection, kPlain};
         if (track.name.empty())
         {
-            headers.write(4, row, std::string(kNameColumns, '-'), isMoving ? moved : kDim);
+            headers.write(4, row, std::string(static_cast<std::size_t>(nameColumns_), '-'),
+                          isMoving ? moved : kDim);
         }
         else
         {
-            auto name = track.name.substr(0, kNameColumns);
+            auto name = track.name.substr(0, static_cast<std::size_t>(nameColumns_));
             if (isMoving) // the whole of its column, as a band
             {
-                name.resize(kNameColumns, ' ');
+                name.resize(static_cast<std::size_t>(nameColumns_), ' ');
             }
             headers.write(4, row, name, isMoving ? moved : Style{});
         }
     }
     frame.push_back(gridRegion(headers, main_, cell_, Role::Background));
+    // The buttons after the names, drawn as the Tracks view draws them, so they look and mean
+    // the same; the cursor stays on the bars, the keys switching them for its track.
+    for (int line = 0; line < rows - kRulerRows; ++line)
+    {
+        const auto index = topTrack_ + static_cast<std::size_t>(line);
+        if (index >= tracks.size())
+        {
+            break;
+        }
+        int x = (4 + nameColumns_ + 1) * cell_.width;
+        for (const auto field : columns_)
+        {
+            addTrackButton(frame.back(), x, (kRulerRows + line) * cell_.height, cell_, field,
+                           *tracks[index], Role::Background, false);
+            x += trackColumn(field).width * cell_.width;
+        }
+    }
 
     // The timeline, in pixels.
-    const int timelineX = kHeaderColumns * cell_.width;
+    const int timelineX = headerColumns() * cell_.width;
     Region timeline{.bounds = {main_.x + timelineX, main_.y, std::max(main_.width - timelineX, 0),
                                main_.height},
                     .background = Role::Background,
