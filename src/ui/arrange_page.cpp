@@ -354,10 +354,11 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     headers.write(0, kNumberRow, "Trk Name", kDim);
     headers.write(0, kStripRow, "Sections",
                   stripCursor_ ? Style{Role::CursorText, Role::Cursor, kBold} : kDim);
-    for (int row = 0; row < rows; ++row)
-    {
-        headers.set(headerColumns() - 1, row, {U'│', kDim});
-    }
+    // The track rows on a shade of their own, across the names, buttons and bars, which ties
+    // each name to its bars, with no line between them, and so no look of a separate pane
+    // (decided 13 November 2026, after use).
+    const Style onRows{Role::Text, Role::TrackRows, kPlain};
+    const Style dimOnRows{Role::Dim, Role::TrackRows, kPlain};
     for (int line = 0; line < rows - kRulerRows; ++line)
     {
         const auto index = topTrack_ + static_cast<std::size_t>(line);
@@ -367,16 +368,17 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         }
         const auto& track = *tracks[index];
         const int row = kRulerRows + line;
+        headers.fill(0, row, headerColumns(), 1, {U' ', onRows});
         auto number = std::to_string(index + 1);
         number.insert(0, 3 - std::min<std::size_t>(number.size(), 3), ' ');
         headers.write(0, row, number,
-                      index == track_ ? Style{Role::CursorText, Role::Cursor, kBold} : Style{});
+                      index == track_ ? Style{Role::CursorText, Role::Cursor, kBold} : onRows);
         const bool isMoving = std::ranges::find(moving, track.id()) != moving.end();
         const Style moved{Role::Text, Role::Selection, kPlain};
         if (track.name.empty())
         {
             headers.write(4, row, std::string(static_cast<std::size_t>(nameColumns_), '-'),
-                          isMoving ? moved : kDim);
+                          isMoving ? moved : dimOnRows);
         }
         else
         {
@@ -385,7 +387,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             {
                 name.resize(static_cast<std::size_t>(nameColumns_), ' ');
             }
-            headers.write(4, row, name, isMoving ? moved : Style{});
+            headers.write(4, row, name, isMoving ? moved : onRows);
         }
     }
     frame.push_back(gridRegion(headers, main_, cell_, Role::Background));
@@ -402,7 +404,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         for (const auto field : columns_)
         {
             addTrackButton(frame.back(), x, (kRulerRows + line) * cell_.height, cell_, field,
-                           *tracks[index], Role::Background, false, recording);
+                           *tracks[index], Role::TrackRows, false, recording);
             x += trackColumn(field).width * cell_.width;
         }
     }
@@ -428,6 +430,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     const int shownTracks = static_cast<int>(std::min<std::size_t>(
         tracks.size() - topTrack_, static_cast<std::size_t>(rows - kRulerRows)));
     const int tracksBottom = tracksTop + shownTracks * cell_.height;
+    timeline.under.push_back(
+        {{0, tracksTop, timeline.bounds.width, tracksBottom - tracksTop}, Role::TrackRows, 255});
     const int lineWidth = hairline(cell_); // also the space beside a line
     const core::Tick whole = core::NoteFraction{1, 1}.toTicks(song_.ppqn());
     // Gaps between bars while a column holds no more than a whole note; past that, bars are

@@ -678,3 +678,33 @@ TEST_CASE("the ruler marks where the tempo changes, not where it starts or stays
     std::ranges::sort(signs, std::greater{}); // the sign and its number
     CHECK(signs == std::vector<std::u32string>{U"▲", U"96"});
 }
+
+TEST_CASE("the track rows are shaded across the names and bars, with no line between them")
+{
+    auto page = page92x22();
+    Frame frame;
+    page.addRegions(frame);
+    REQUIRE(frame.size() == 2);
+    const auto& headers = frame[0];
+    const auto& timeline = frame[1];
+    const int top = ArrangePage::kRulerRows * kCell.height;
+    const auto tracks = static_cast<int>(demoSong().tracks().size());
+    for (const auto& run : headers.text)
+    {
+        CHECK(run.text.find(U'│') == std::u32string::npos);
+        // Within the track column: the grid's cells beyond it are under the timeline.
+        if (run.x < page.headerColumns() * kCell.width && run.y >= top &&
+            run.y < top + tracks * kCell.height && run.style.background != Role::Cursor)
+        {
+            CHECK(run.style.background == Role::TrackRows);
+        }
+        if (run.y < top) // the ruler stays on the background
+        {
+            CHECK(run.style.background != Role::TrackRows);
+        }
+    }
+    // Behind every track's bars, from the first row to the last, under everything else.
+    REQUIRE_FALSE(timeline.under.empty());
+    CHECK(timeline.under.front() ==
+          Shape{{0, top, timeline.bounds.width, tracks * kCell.height}, Role::TrackRows, 255});
+}

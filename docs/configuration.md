@@ -148,6 +148,7 @@ The roles are:
 | `note`, `label` | notes, and labels |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |
 | `own-meter` | laid over a track's bars in the arrangement, partly transparent, where it has a meter of its own |
+| `track-rows` | behind the arrangement's track rows, across the names, buttons and bars |
 | `hint-key`, `hint-group` | a key in the hint menu, and a group of keys that leads to more |
 | `note-selected` | in the piano roll, the note under the cursor and the notes a selection takes |
 

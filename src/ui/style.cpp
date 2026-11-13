@@ -35,6 +35,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "density-3",
     "density-4",
     "own-meter",
+    "track-rows",
     "hint-key",
     "hint-group",
     "note-selected",
