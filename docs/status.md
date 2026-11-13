@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 13 November 2026: the recording hardware checklist passed on Windows and Linux; two fixes found alongside it (the metronome set to always, and the marker on a new song) are committed locally to be tried, after which milestone 8 is done. See [schedule.md](schedule.md) for work order.*
+*Last updated 13 November 2026: milestone 8 is done, the recording hardware checklist passed and its two fixes accepted and published; Mute, Solo and Arm in the arrangement come first next (schedule.md). See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -215,7 +215,7 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 ## Recording: coverage and hardware trials (12 November 2026; checklist passed 13 November 2026)
 
-**Hardware checklist passed** on Windows and Linux, 13 November 2026, run by Neil: every item, including the `modal-loopback --record` re-runs. Found alongside it, and fixed (committed locally to be tried): the metronome set to always clicked only while recording, as the player gave the plan the click's port only then; and a new song from the palette kept the old song's play-from marker, now put back at the start for a new or opened song. Each has a test that failed before the fix. Windows Debug passes 957 tests; WSL linux-clang-debug 958, no warnings.
+**Hardware checklist passed** on Windows and Linux, 13 November 2026, run by Neil: every item, including the `modal-loopback --record` re-runs. Found alongside it, and fixed (accepted on trial and published 13 November 2026): the metronome set to always clicked only while recording, as the player gave the plan the click's port only then; and a new song from the palette kept the old song's play-from marker, now put back at the start for a new or opened song. Each has a test that failed before the fix. Windows Debug passes 957 tests; WSL linux-clang-debug 958, no warnings.
 
 Milestone 8's last item (schedule.md). The audit of recording's tests against the design found the core well covered (the recorder's and count-in's tests all at three resolutions, nearly all the scheduler's, engine's, player's and plan's) and the workspace's end-to-end tests short in places. Added, as workspace tests driving `R` with keys through the engine: a take at 96 PPQN landing on its beat; a take through a tempo change landing where the music is; the marker after a take, back at the record point with rewind and where it stopped without, the next take starting there; two takes in a row, each an undo step, the second replacing the first in replace mode and kept with it in overdub; a pre-roll take, what's played before the record point left out and a note held across it starting there; overdub with a pedal pressed in the count-in, starting at the record point with what was there kept; and two armed tracks recorded at once. All passed as written, finding no fault. Windows Debug passes 955 tests; WSL linux-clang-debug 956, no warnings.
 
