@@ -1047,6 +1047,23 @@ bool Song::setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignat
     return true;
 }
 
+bool Song::followConductor(TrackId id, Tick from, Tick to)
+{
+    if (indexOf(id) == tracks_.size())
+    {
+        return false;
+    }
+    for (std::size_t i = 0; i < sections_.size(); ++i)
+    {
+        if (starts_[i] < to && starts_[i + 1] > from)
+        {
+            updateContent(i, id, [](TrackContent& content) { content.meter.reset(); });
+        }
+    }
+    rebuildMeters();
+    return true;
+}
+
 bool Song::followConductor(TrackId id)
 {
     const auto index = indexOf(id);

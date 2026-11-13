@@ -216,6 +216,37 @@ TEST_CASE("tracks follow the conductor's meter unless they have their own")
     CHECK(song.sections()[0]->content(lead) == nullptr);
 }
 
+TEST_CASE("a track follows the conductor again in the sections a span touches, and no others")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn}; // eight bars of 4/4
+    const auto lead = song.addTrack("Lead");
+    REQUIRE(song.splitSection(8 * q, "Verse"));
+    REQUIRE(song.splitSection(16 * q, "Chorus"));
+    REQUIRE(song.setMeter(lead, 0, song.end(), {7, 8}));
+    const auto own = [&](std::size_t section)
+    {
+        const auto* content = song.sections()[section]->content(lead);
+        return content != nullptr && content->meter.has_value();
+    };
+    for (std::size_t s = 0; s < 3; ++s)
+        REQUIRE(own(s));
+
+    // From inside the Intro to the Verse's start: the Intro only.
+    REQUIRE(song.followConductor(lead, 4 * q, 8 * q));
+    CHECK(!own(0));
+    CHECK(own(1));
+    CHECK(song.meter(lead).signatureAt(0) == TimeSignature{4, 4});
+    CHECK(song.meter(lead).signatureAt(8 * q) == TimeSignature{7, 8});
+    CHECK(song.meter(lead).signatureAt(16 * q) == TimeSignature{7, 8});
+
+    // The Verse and Chorus, the span ending inside the Chorus.
+    REQUIRE(song.followConductor(lead, 8 * q, 17 * q));
+    CHECK(song.meter(lead) == song.meter());
+    CHECK(!song.followConductor(TrackId{lead.value + 1}, 0, song.end()));
+}
+
 TEST_CASE("setting the meter over a span rebars only that span, and nothing moves in time")
 {
     const auto ppqn = MODAL_ANY_PPQN();

@@ -1315,8 +1315,7 @@ TEST_CASE("in Visual mode the leader then b and m rebars a range for the song, t
     CHECK(allEvents(song) == before);
 }
 
-TEST_CASE(":meter and :rebar take the meter at the prompt, and rebarring tracks on their own "
-          "says it isn't built yet")
+TEST_CASE(":meter takes the meter at the prompt")
 {
     Arranging a;
     const auto q = a.document.song().ppqn().quarter();
@@ -1325,8 +1324,165 @@ TEST_CASE(":meter and :rebar take the meter at the prompt, and rebarring tracks 
     CHECK(a.registry.runLine("meter 5/4").message ==
           "5/4 from bar 2 to the end of Intro, for the song");
     CHECK(a.document.song().meter().signatureAt(4 * q) == core::TimeSignature{5, 4});
-    a.type(U"u");
+}
+
+TEST_CASE("a box rebars only its tracks, each then with a meter of its own in the sections it "
+          "touches, and the leader then s and f sets them following again")
+{
+    Arranging a;
+    const auto q = a.document.song().ppqn().quarter();
+    const auto before = allEvents(a.document.song());
+    const auto conductor = a.document.song().meter();
+    a.type(U"l");
     a.press(Key::typed(U'v', kCtrl));
-    a.type(U"j,bm");
-    CHECK(a.ws.message().find("isn't built yet") != std::string::npos);
+    a.type(U"jl,bm"); // the Drums and Bass, bars 2 and 3
+    CHECK(contains(a.status(), U"Rebar bars 2–3, for Drums, Bass, in the meter (4/4): "));
+    a.type(U"7/8");
+    a.press(Key::of(NamedKey::Enter));
+    const auto& song = a.document.song();
+    CHECK(a.meterOf(0).signatureAt(4 * q) == core::TimeSignature{7, 8});
+    CHECK(a.meterOf(1).signatureAt(4 * q) == core::TimeSignature{7, 8});
+    CHECK(a.meterOf(2) == conductor); // the Piano, outside the box
+    CHECK(song.meter() == conductor);
+    CHECK(a.ws.message() == "Rebarred bars 2–3 to 7/8, for Drums, Bass");
+    CHECK(allEvents(song) == before);
+    // Their own in the Intro, which the box touched; the Verse still followed.
+    const auto drums = song.tracks()[0]->id();
+    REQUIRE(song.sections()[0]->content(drums));
+    CHECK(song.sections()[0]->content(drums)->meter);
+    const auto* verse = song.sections()[1]->content(drums);
+    CHECK((verse == nullptr || !verse->meter));
+
+    // The Drums following again in the Intro, and the Piano, which already did, said so.
+    a.type(U"k,sf");
+    CHECK(a.ws.message() == "Drums follows the song's meter in Intro");
+    CHECK(a.meterOf(0) == conductor);
+    CHECK(a.meterOf(1).signatureAt(4 * q) == core::TimeSignature{7, 8});
+    a.type(U"jj,sf");
+    CHECK(a.ws.message() == "Piano already follows the song's meter in Intro");
+    a.type(U"u");
+    CHECK(a.meterOf(0).signatureAt(4 * q) == core::TimeSignature{7, 8});
+}
+
+TEST_CASE("rows rebar their tracks for the whole song, and in the piano roll a selection rebars "
+          "the track shown")
+{
+    Arranging a;
+    const auto conductor = a.document.song().meter();
+    // Counted in the cursor's track's bars, as it was selected: the Clave's 5/8.
+    const auto clave = a.meterOf(7).toBarBeatTick(a.document.song().end() - 1).bar;
+    a.type(U"6jVj,bm"); // the Ostinato and Clave, every bar
+    a.type(U"4/4");
+    a.press(Key::of(NamedKey::Enter));
+    for (const std::size_t track : {6U, 7U})
+        CHECK(a.meterOf(track).changes().size() >= 1);
+    CHECK(a.meterOf(6).signatureAt(0) == core::TimeSignature{4, 4});
+    CHECK(a.meterOf(7).signatureAt(0) == core::TimeSignature{4, 4});
+    CHECK(a.ws.message() ==
+          "Rebarred bars 1–" + std::to_string(clave) + " to 4/4, for Ostinato, Clave");
+    CHECK(a.document.song().meter() == conductor);
+}
+
+TEST_CASE("in the piano roll a Visual rebar is the track shown")
+{
+    Arranging a;
+    const auto q = a.document.song().ppqn().quarter();
+    const auto conductor = a.document.song().meter();
+    a.type(U"jl"); // the Bass, bar 2
+    a.ws.show(ViewKind::PianoRoll);
+    a.type(U"vab"); // the bar
+    a.type(U",bm3/4");
+    a.press(Key::of(NamedKey::Enter));
+    CHECK(a.ws.message() == "Rebarred bar 2 to 3/4, for Bass");
+    CHECK(a.meterOf(1).signatureAt(4 * q) == core::TimeSignature{3, 4});
+    CHECK(a.meterOf(1).signatureAt(7 * q) == core::TimeSignature{1, 4});
+    CHECK(a.meterOf(1).signatureAt(8 * q) == core::TimeSignature{4, 4});
+    CHECK(a.meterOf(0) == conductor);
+    CHECK(a.document.song().meter() == conductor);
+}
+
+TEST_CASE("a box over tracks in different meters cuts remainder bars where it starts and ends "
+          "inside a track's bar, keeping that track's later bar lines")
+{
+    Arranging a;
+    const auto q = a.document.song().ppqn().quarter();
+    const auto barLine = [&](std::size_t track, core::Tick tick)
+    {
+        const auto at = a.meterOf(track).toBarBeatTick(tick);
+        return at.beat == 1 && at.tick == 0;
+    };
+    // The Ostinato's 3/4 bar 2, then down to the Clave, in 5/8: its bar 2 from 5/8 in.
+    a.type(U"6jl");
+    a.press(Key::typed(U'v', kCtrl));
+    a.type(U"j,bm1/4");
+    a.press(Key::of(NamedKey::Enter));
+    // In the Clave's bars, the cursor's: its bar 2, from 5/8 to 5/4 in, two 1/4 bars and
+    // a 1/8 remainder.
+    CHECK(a.ws.message() == "Rebarred bar 2 to 1/4, for Ostinato, Clave");
+    const auto from = q * 5 / 2;
+    const auto to = q * 5;
+    for (const std::size_t track : {6U, 7U})
+    {
+        CHECK(a.meterOf(track).signatureAt(from) == core::TimeSignature{1, 4});
+        CHECK(barLine(track, from));
+        CHECK(barLine(track, from + q));
+        CHECK(barLine(track, from + 2 * q));
+        CHECK(barLine(track, to));
+    }
+    // The Ostinato's 3/4 bar cut short before the box and after it, its bar line at 6/4 kept.
+    CHECK(a.meterOf(6).signatureAt(0) == core::TimeSignature{5, 8});
+    CHECK(a.meterOf(6).signatureAt(to) == core::TimeSignature{1, 4});
+    CHECK(barLine(6, 6 * q));
+    CHECK(a.meterOf(6).signatureAt(6 * q) == core::TimeSignature{3, 4});
+    CHECK(barLine(6, 9 * q));
+    CHECK(a.meterOf(7).signatureAt(to) == core::TimeSignature{5, 8});
+    CHECK(barLine(7, q * 15 / 2));
+}
+
+TEST_CASE("following the song's meter takes a selection only of whole sections, and v across "
+          "them sets every track following")
+{
+    Arranging a;
+    const auto& song = a.document.song();
+    const auto conductor = song.meter();
+    const auto ostinato = song.tracks()[6]->id();
+    const auto clave = song.tracks()[7]->id();
+    const auto own = [&](core::TrackId id, std::size_t section)
+    {
+        const auto* content = a.document.song().sections()[section]->content(id);
+        return content != nullptr && content->meter.has_value();
+    };
+    REQUIRE(own(ostinato, 0));
+    REQUIRE(own(clave, 0));
+
+    // Part of the Intro, in a box or across every track, refused, nothing changed.
+    a.type(U"6j");
+    a.press(Key::typed(U'v', kCtrl));
+    a.type(U"j,sf");
+    CHECK(a.ws.message() == "A track follows the song's meter for whole sections: select "
+                            "whole sections, or none for the cursor's");
+    CHECK(own(ostinato, 0));
+    a.press(Key::of(NamedKey::Escape));
+    a.type(U"vl,sf");
+    CHECK(a.ws.message().starts_with("A track follows the song's meter for whole sections"));
+    CHECK(own(clave, 0));
+    a.press(Key::of(NamedKey::Escape));
+
+    // The Intro whole, in a box over the Clave: only it.
+    a.press(Key::typed(U'v', kCtrl));
+    a.type(U",Ss,sf");
+    CHECK(a.ws.message() == "Clave follows the song's meter in Intro");
+    CHECK(!own(clave, 0));
+    CHECK(own(ostinato, 0));
+    CHECK(a.meterOf(7) != conductor); // its own still in later sections
+
+    // The Intro whole across every track, on the strip: every track with its own there.
+    a.type(U"gsv,sf");
+    CHECK(a.ws.message() == "Ostinato follows the song's meter in Intro");
+    CHECK(!own(ostinato, 0));
+    a.type(U"v,sf");
+    CHECK(a.ws.message() == "Every track already follows the song's meter in Intro");
+    a.type(U"uu");
+    CHECK(own(ostinato, 0));
+    CHECK(own(clave, 0));
 }

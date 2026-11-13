@@ -400,10 +400,15 @@ constexpr std::array kSharedCommands{
                 .aliases = "meter",
                 .usage = "[METER]",
                 .choices = {Choices::Meter}},
+    CommandInfo{.name = "meter-follow",
+                .description = "Set the cursor's track following the song's meter in its "
+                               "section, or the selected tracks in the sections the selection "
+                               "touches (:meter follow)",
+                .range = true},
     CommandInfo{.name = "rebar",
                 .description = "Rebar the selection in a meter, never moving a note: a range "
-                               "across every track, the song's bars there; asking for it, or as "
-                               "given (3/4)",
+                               "across every track, the song's bars there; a box or rows, those "
+                               "tracks'; asking for it, or as given (3/4)",
                 .usage = "[METER]",
                 .range = true,
                 .choices = {Choices::Meter}},
@@ -802,7 +807,8 @@ std::span<const CommandInfo> Workspace::commands()
                 (info.object || info.name == "event-delete" || info.name == "event-delete-line" ||
                  info.name == "visual-delete-time" || info.name == "bar-delete" ||
                  info.name == "bar-insert" || info.name == "meter-insert" || info.name == "rebar" ||
-                 info.name.starts_with("section-") || info.name == "label-to-section"))
+                 info.name == "meter-follow" || info.name.starts_with("section-") ||
+                 info.name == "label-to-section"))
                 info.where = onlyIn({Tracks, Strip, PianoRoll, EventList});
             // x forgets a port that isn't there, in the Ports view.
             if (info.name == "event-delete")

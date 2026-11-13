@@ -424,7 +424,9 @@ cmap <C-.>      panic             "Panic"
 " Sections, from any view, on the cursor's section (decided November 2026): , s r renames it,
 " asking with its name to edit; , s i and , s a insert a new one before or after it; , s j
 " joins it with the next; , s s starts a new section at the cursor's bar line; and , s l
-" starts one at the label at or before the cursor. The strip's own keys do the same there.
+" starts one at the label at or before the cursor. , s f (:meter follow) sets the cursor's
+" track following the song's meter in this section again, or in Visual mode the selected tracks
+" in the sections selected, whole sections only. The strip's own keys do the same there.
 " , e asks for an event to insert at the cursor, of any kind but a note, as :event-insert does;
 " Tab completes the kind, and what it should be followed by is explained if it's wrong.
 nmap <leader>e  event-insert      "Insert an event"
@@ -437,6 +439,9 @@ nmap <leader>sa section-insert-after "Insert a section after"
 nmap <leader>sj section-join       "Join with the next"
 nmap <leader>ss section-split      "Start a section here"
 nmap <leader>sl label-to-section   "A section from the label"
+nmap <leader>sf meter-follow       "This track following the song's meter here"
+vgroup <leader>s "Sections"
+vmap <leader>sf meter-follow       "The selected tracks following the song's meter"
 
 " Bars on every track, taking time out of the song or putting it in, the conductor's tempo and
 " meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping
@@ -444,7 +449,9 @@ nmap <leader>sl label-to-section   "A section from the label"
 " and in what meter, Enter taking one bar in the meter there, as :bar-delete and :bar-insert
 " do. , b m puts in a meter at the cursor, to the next meter change or the section's end, and
 " in Visual mode rebars the selection, asking for the meter, the prompt saying what it will
-" change; neither moves a note (:meter 3/4, :rebar 3/4).
+" change; neither moves a note (:meter 3/4, :rebar 3/4). A v range rebars the song's bars,
+" Ctrl-v and V only the tracks selected, which then have a meter of their own (, s f sets
+" them following the song's meter again).
 keysection "Bars"
 ngroup <leader>b "Bars"
 nmap <leader>bd bar-delete        "Delete bars on every track"

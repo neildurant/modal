@@ -36,6 +36,13 @@ namespace modal::ui
 
 namespace
 {
+std::string_view withoutSpaces(std::string_view text)
+{
+    const auto first = text.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
+        return {};
+    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
+}
 
 // A register's letter, as its lower case.
 char32_t lowerLetter(char32_t letter)
@@ -153,11 +160,19 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                              }
                              return barInsert(call.arguments);
                          }
+                         if (name == "meter-follow")
+                         {
+                             return meterFollow();
+                         }
                          if (name == "meter-insert" || name == "rebar")
                          {
                              // From keys or the palette, asking for the meter, the prompt
                              // saying what it will change (decided 13 November 2026).
                              const bool range = name == "rebar";
+                             if (!range && withoutSpaces(call.arguments) == "follow")
+                             {
+                                 return meterFollow();
+                             }
                              if (call.line.empty())
                              {
                                  return askMeter(range);
@@ -3802,13 +3817,6 @@ CommandResult Workspace::barInsert(std::string_view arguments)
 
 namespace
 {
-std::string_view withoutSpaces(std::string_view text)
-{
-    const auto first = text.find_first_not_of(" \t");
-    if (first == std::string_view::npos)
-        return {};
-    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
-}
 
 std::string signatureText(core::TimeSignature signature)
 {
@@ -3839,7 +3847,8 @@ std::optional<Workspace::MeterPlace> Workspace::meterPlace(std::string* why) con
         return std::nullopt;
     }
     const auto section = song.sectionAt(cursor.tick);
-    MeterPlace place{.track = std::nullopt, .from = cursor.tick, .to = 0, .whose = "the song"};
+    MeterPlace place{
+        .track = std::nullopt, .from = cursor.tick, .to = 0, .whose = "the song", .tracks = {}};
     if (cursor.track)
     {
         const auto* content = song.sections()[section]->content(*cursor.track);
@@ -3870,19 +3879,99 @@ std::optional<Workspace::MeterPlace> Workspace::rebarPlace(std::string* why) con
         *why = "Rebarring takes a selection; , b m without one puts in a meter at the cursor";
         return std::nullopt;
     }
-    // The song's bars over a range across every track; selected tracks on their own come
-    // next (design.md, Inserting a meter and rebarring).
-    if (selection_->kind != SelectionKind::Range ||
-        (selection_->where != Where::Tracks && selection_->where != Where::Strip))
+    const auto& song = document_.song();
+    MeterPlace place{.track = std::nullopt,
+                     .from = span->first,
+                     .to = std::min(span->second, song.end()),
+                     .whose = "the song",
+                     .tracks = {}};
+    // v across every track rebars the song's bars; Ctrl-v and V the tracks they choose; in the
+    // piano roll and event list, the track shown (decided 13 November 2026).
+    if (selection_->where == Where::Strip ||
+        (selection_->where == Where::Tracks && selection_->kind == SelectionKind::Range))
+        return place;
+    if (selection_->where == Where::Tracks)
     {
-        *why = "Rebarring selected tracks on their own isn't built yet: select a range across "
-               "every track with v in the arrangement";
-        return std::nullopt;
+        if (const auto block = trackBlock())
+            for (std::size_t i = 0; i < block->second; ++i)
+                place.tracks.push_back(song.tracks()[block->first + i]->id());
     }
-    return MeterPlace{.track = std::nullopt,
-                      .from = span->first,
-                      .to = std::min(span->second, document_.song().end()),
-                      .whose = "the song"};
+    else if (const auto track = view().cursor().track)
+    {
+        place.tracks.push_back(*track);
+    }
+    if (place.tracks.empty())
+        return place; // the conductor's own list
+    place.whose = trackNames(song, place.tracks);
+    return place;
+}
+
+CommandResult Workspace::meterFollow()
+{
+    // A track follows by whole sections, so a selection must be whole sections, lest its time
+    // read as what follows; v across every track sets them all (decided 13 November 2026).
+    const auto& song = document_.song();
+    std::vector<core::TrackId> tracks;
+    std::size_t first = song.sectionAt(std::min(view().cursor().tick, song.end() - 1));
+    std::size_t last = first;
+    if (const auto span = selection_ ? view().selectionSpan() : std::nullopt)
+    {
+        const auto from = std::min(span->first, song.end() - 1);
+        const auto to = std::min(std::max(span->second, from + 1), song.end());
+        first = song.sectionAt(from);
+        last = song.sectionAt(to - 1);
+        if (song.sectionStart(first) != from || song.sectionStart(last + 1) != to)
+            return CommandResult::error("A track follows the song's meter for whole sections: "
+                                        "select whole sections, or none for the cursor's");
+        std::string why;
+        if (const auto place = rebarPlace(&why))
+            tracks = place->tracks;
+        if (tracks.empty())
+            for (const auto& track : song.tracks())
+                tracks.push_back(track->id());
+    }
+    else if (const auto track = view().cursor().track)
+    {
+        tracks.push_back(*track);
+    }
+    if (tracks.empty())
+        return CommandResult::error("The song's meter is the conductor's: following it is for "
+                                    "tracks with a meter of their own");
+    // Only those with a meter of their own in the sections touched change.
+    std::vector<core::TrackId> own;
+    for (const auto id : tracks)
+        for (auto s = first; s <= last; ++s)
+            if (const auto* content = song.sections()[s]->content(id);
+                content != nullptr && content->meter)
+            {
+                own.push_back(id);
+                break;
+            }
+    const auto sections =
+        first == last ? song.sections()[first]->name()
+                      : song.sections()[first]->name() + " to " + song.sections()[last]->name();
+    const bool every = tracks.size() == song.tracks().size() && tracks.size() > 1;
+    if (own.empty())
+        return {true,
+                (every ? std::string{"Every track already follows"}
+                       : trackNames(song, tracks) +
+                             (tracks.size() == 1 ? " already follows" : " already follow")) +
+                    " the song's meter in " + sections,
+                false};
+    const auto names = trackNames(song, own);
+    const auto from = song.sectionStart(first);
+    const auto to = song.sectionStart(last + 1);
+    document_.edit(names + " following the song's meter", view().place(),
+                   [&](core::Song& s)
+                   {
+                       for (const auto id : own)
+                           s.followConductor(id, from, to);
+                   });
+    endVisual();
+    refresh();
+    return {true,
+            names + (own.size() == 1 ? " follows" : " follow") + " the song's meter in " + sections,
+            false};
 }
 
 CommandResult Workspace::askMeter(bool range)
@@ -3945,6 +4034,23 @@ CommandResult Workspace::rebar(std::string_view arguments)
     if (!place)
         return CommandResult::error(why);
     const auto meterText = signatureText(*signature);
+    if (!place->tracks.empty())
+    {
+        // In the cursor's track's bars, as the selection was made.
+        const auto cursor = view().cursor();
+        const auto bars = barsText(cursor.track ? song.meter(*cursor.track) : song.meter(),
+                                   place->from, place->to);
+        auto edited = song;
+        for (const auto id : place->tracks)
+            if (!edited.setMeter(id, place->from, place->to, *signature))
+                return CommandResult::error("Can't rebar " + bars + " to " + meterText);
+        document_.edit("Rebar " + bars + " to " + meterText + " for " + place->whose,
+                       view().place(), [&](core::Song& s) { s = edited; });
+        endVisual();
+        refresh();
+        chosenMeter(*signature);
+        return {true, "Rebarred " + bars + " to " + meterText + ", for " + place->whose, false};
+    }
     const auto bars = barsText(song.meter(), place->from, place->to);
     // Tracks with a meter of their own there keep it (decided 13 November 2026), and are named.
     std::string kept;

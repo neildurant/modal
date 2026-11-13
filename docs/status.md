@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 13 November 2026: milestone 8 is done. Rebarring step 1, inserting a meter and rebarring the song's meter, is accepted and published; step 2, rebarring selected tracks, is next; then rebarring selected tracks, then adding tracks, then Mute, Solo and Arm in the arrangement (schedule.md). See [schedule.md](schedule.md) for work order.*
+*Last updated 13 November 2026: milestone 8 is done. Rebarring step 1, inserting a meter and rebarring the song's meter, is accepted and published. Step 2, rebarring selected tracks and `:meter follow` (`, s f`), is committed locally and awaiting trial: Windows Debug (972 tests) and WSL Clang Debug pass, and formatting passes; it isn't pushed yet. Then step 3, the tint for bars with a meter of their own, then adding tracks, then Mute, Solo and Arm in the arrangement (schedule.md). See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 

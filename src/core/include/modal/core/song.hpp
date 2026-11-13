@@ -323,8 +323,10 @@ public:
     // song, or a signature whose beat isn't a whole number of ticks.
     bool setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignature signature);
 
-    // Sets the track following the conductor's meter in every section.
+    // Sets the track following the conductor's meter in every section, or in those a span of
+    // time touches. Returns false if there's no such track.
     bool followConductor(TrackId id);
+    bool followConductor(TrackId id, Tick from, Tick to);
 
     // Adds a bookmark, or renames the one at that tick. The name is numbered if another
     // bookmark in the same section has it.

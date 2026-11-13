@@ -829,7 +829,8 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
         const bool songs = command.name == "bar-delete" || command.name == "bar-insert" ||
                            command.name == "section-split" || command.name == "label-to-section" ||
                            command.name == "section-join" || command.name == "track-freeze" ||
-                           command.name == "meter-insert" || command.name == "rebar";
+                           command.name == "meter-insert" || command.name == "rebar" ||
+                           command.name == "meter-follow";
         CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
                !command.keys || songs));
     }

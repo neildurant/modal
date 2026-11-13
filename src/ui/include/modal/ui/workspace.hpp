@@ -584,11 +584,16 @@ private:
         std::optional<core::TrackId> track;
         core::Tick from = 0;
         core::Tick to = 0;
-        std::string whose; // "the song", or the track's name
+        std::string whose;                 // "the song", or the tracks' names
+        std::vector<core::TrackId> tracks; // a rebar's, if not the song's
     };
     std::optional<MeterPlace> meterPlace(std::string* why) const;
-    // The span a rebar takes: the selection's time, for the conductor; or why it can't.
+    // The span a rebar takes: the selection's time, for the conductor (a range across every
+    // track) or the tracks it chooses; or why it can't.
     std::optional<MeterPlace> rebarPlace(std::string* why) const;
+    // The cursor's track following the conductor's meter in its section, or the selected tracks
+    // in the sections the selection touches.
+    CommandResult meterFollow();
     // Labels made section starts, the one at or before the cursor, or all of them.
     CommandResult labelToSection();
     // :label-to-section on a selection: every label from one time to another.
