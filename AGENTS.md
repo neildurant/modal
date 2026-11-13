@@ -101,6 +101,8 @@ ctest --preset windows-msvc-debug
 
 Check formatting: `git ls-files -z '*.cpp' '*.hpp' | xargs -0 clang-format --dry-run --Werror`.
 
+The `justfile` wraps these for both platforms (`just build`, `just test [debug|release] [filter]`, `just run debug --demo`, `just fmt-check`, `just check`, `just clang` for the WSL Clang build from Windows, `just samples`; `just` lists them), as described in the README. It's a convenience: the commands above work without it.
+
 On Linux (Debian or Ubuntu), `tools/setup-linux.sh` installs the packages, clang-format and vcpkg and configures the presets, and `tools/check-linux.sh` builds and tests every preset and checks the formatting, as CI does (`tools/check-linux.sh linux-gcc-debug` for one). Set `CMAKE_BUILD_PARALLEL_LEVEL=4` (or 8) in WSL, or the build can run it out of memory.
 
 The command-line tools (`modal-ports`, `modal-play`, `modal-record`, `modal-loopback`), the hidden `[.timing]` tests and the `MODAL_TEST_ALSA_SEQ` flag for ALSA tests are described in `docs/tools.md`.

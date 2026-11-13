@@ -20,10 +20,11 @@ fi
 
 # The compilers and build tools; what vcpkg needs to fetch and build (autotools for ALSA); the
 # ALSA runtime, which libremidi loads; the X11 and Wayland development files SDL3 builds
-# against; and pipx, for clang-format. CI's list, with what CI's image has already.
+# against; and pipx, for clang-format. CI's list, with what CI's image has already, and just,
+# for the justfile's short commands.
 packages=(build-essential gcc g++ clang cmake ninja-build git curl zip unzip tar pkg-config
           python3 pipx autoconf autoconf-archive automake libtool libasound2t64 libx11-dev
-          libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev)
+          libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev just)
 missing=()
 for package in "${packages[@]}"; do
     dpkg -s "$package" > /dev/null 2>&1 || missing+=("$package")

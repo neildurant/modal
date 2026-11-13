@@ -27,6 +27,20 @@ cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
 ```
 
+Or, with [just](https://just.systems) installed (`winget install Casey.Just` on Windows, `apt install just` on Debian and Ubuntu), the [justfile](justfile)'s short commands do the same on either, Debug unless `release` is given:
+
+```
+just build            configure if need be, and build
+just test             build and run the unit tests; just test debug "*meter*" runs those matching
+just run debug --demo build and start Modal, with its arguments
+just fmt              format the code; just fmt-check checks it, as CI does
+just check            on Linux every preset, as CI builds them; on Windows the build, tests and formatting
+just clang            the Clang Debug build and tests, in WSL on Windows
+just samples          draw the hidden sample renders to build/samples
+```
+
+`just` alone lists them. On Linux they use GCC; `just compiler=clang build` uses Clang.
+
 On Linux, vcpkg also needs Ninja, `pkg-config`, autotools (`autoconf autoconf-archive automake libtool`) and the X11 and Wayland development packages (`libx11-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev`), and MIDI needs the ALSA runtime (`libasound2t64`).
 
 ## Running
