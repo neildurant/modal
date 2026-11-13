@@ -27,6 +27,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -258,17 +259,23 @@ public:
     void setPortControl(PortControl control) { portControl_ = std::move(control); }
 
     // Where completion at the : prompt finds the choices of a kind of argument, from the word
-    // typed so far (the workspace has those of commands, sections, roles, meters, lengths and
-    // ports; the program the settings' and files'), and the choices it shows, while there are
-    // several, with the one chosen.
+    // typed so far (the workspace has those of commands, sections, roles, meters, lengths,
+    // ports and files; the program the settings'), and the choices it shows, while there are
+    // several, with the one chosen, and for a relative file the folder it's in ("In ...").
     using ChoiceSource = std::function<std::vector<std::string>(std::string_view word)>;
     void setChoices(Choices kind, ChoiceSource source);
     std::vector<std::string> choices(Choices kind, std::string_view word) const;
+    // The folders files are completed from: the config directory, for write-config and source,
+    // and the home folder, ~, which a new song's files are in (songs' files being in the
+    // song's folder: see songFolder).
+    void setFolders(std::optional<std::filesystem::path> config,
+                    std::optional<std::filesystem::path> home);
     struct Completions
     {
         std::vector<std::string> matches;
         std::optional<std::size_t> chosen;
         std::size_t scroll = 0;
+        std::string heading;
     };
     std::optional<Completions> completions() const;
 
@@ -1004,6 +1011,10 @@ private:
     static std::vector<Hint> characterHints(std::string_view command);
     std::optional<int> keysPage_; // the list of keys' page, while it shows
     std::array<ChoiceSource, kChoicesCount> sources_;
+    std::optional<std::filesystem::path> configFolder_;
+    std::optional<std::filesystem::path> home_;
+    // The folder a kind of file argument starts from, if it's a file.
+    std::optional<std::filesystem::path> fileFolder(Choices kind) const;
     // Completing at the prompt: the matches, the one chosen as Tab goes round them, where the
     // word they replace starts, and the line as completion left it, to know it's going on.
     struct Completing

@@ -23,6 +23,18 @@ namespace modal::ui
 std::filesystem::path utf8Path(std::string_view text);
 std::string utf8Text(const std::filesystem::path& path);
 
+// Whether a character separates folders in a path typed: / everywhere, and \ on Windows,
+// where it's the system's own.
+bool pathSeparator(char c);
+
+// A path typed (decided November 2026): the text without quotes around it, ~ standing for the
+// home folder, and a relative path in a folder, the one the command's files start from.
+std::filesystem::path typedPath(std::string_view text, const std::filesystem::path& folder,
+                                const std::optional<std::filesystem::path>& home);
+
+// Whether a path typed starts from the folder it's typed in: not absolute, nor from ~.
+bool typedRelative(std::string_view text);
+
 // What command files change.
 struct Config
 {

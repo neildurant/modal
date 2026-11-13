@@ -35,7 +35,7 @@ public:
     }
     void chooseSave(FileKind kind, const std::filesystem::path& suggestion, Chosen done) override
     {
-        asked = kind == FileKind::Song ? "save" : "export";
+        asked = kind == FileKind::Song ? "save" : kind == FileKind::Midi ? "export" : "config";
         suggested = suggestion;
         pending = std::move(done);
     }
@@ -54,10 +54,10 @@ public:
     std::optional<CommandResult> reported;
 };
 
-// The commands on a document, in a fresh directory of their own.
+// The commands on a document, in a fresh directory of their own, which is home too.
 struct Files
 {
-    Files() { addFileCommands(registry, document, host); }
+    Files() { addFileCommands(registry, document, host, directory); }
 
     CommandResult run(const std::string& line) { return registry.runLine(line); }
     std::string path(const std::string& name) const { return utf8Text(directory / name); }
@@ -127,6 +127,31 @@ TEST_CASE(":w saves to the song's file, or asks for one, and :w FILE saves there
     CHECK(f.run("w! " + f.path("first.modal")) == CommandResult{true, "Saved first.modal", false});
     CHECK(f.run("w \"" + f.path("first.modal") + "\"") ==
           CommandResult{true, "Saved first.modal", false}); // its own now
+}
+
+TEST_CASE("a relative file is in the song's folder, or the home folder for a new song")
+{
+    Files f;
+    f.change();
+    CHECK(f.run("w first") == CommandResult{true, "Saved first.modal", false});
+    CHECK(f.document.file() == f.directory / "first.modal");
+    std::filesystem::create_directories(f.directory / "My Songs");
+    CHECK(f.run("w \"My Songs/second\"") == CommandResult{true, "Saved second.modal", false});
+    CHECK(f.document.file() == f.directory / "My Songs" / "second.modal");
+
+    // Beside the song's file now, for :w, :export and :e.
+    CHECK(f.run("w third") == CommandResult{true, "Saved third.modal", false});
+    CHECK(f.document.file() == f.directory / "My Songs" / "third.modal");
+    CHECK(f.run("export third") == CommandResult{false, "Exported third.mid", false});
+    CHECK(std::filesystem::exists(f.directory / "My Songs" / "third.mid"));
+    CHECK(f.run("e second") == CommandResult{true, "Opened second.modal", false});
+    CHECK(f.document.file() == f.directory / "My Songs" / "second.modal");
+
+    // ~ is the home folder.
+    CHECK(f.run("e ~/first") == CommandResult{true, "Opened first.modal", false});
+    CHECK(f.document.file() == f.directory / "first.modal");
+    CHECK(songFolder(f.document, std::nullopt) == f.directory);
+    CHECK(songFolder(core::Document{newSong()}, f.directory) == f.directory);
 }
 
 TEST_CASE(":e opens a song or imports a MIDI file, refusing to lose unsaved changes")

@@ -395,8 +395,9 @@ public:
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
         window_.chooseFile(true,
-                           {kind == FileKind::Song ? ui::sdl::FileFilter{"Songs", "modal"}
-                                                   : ui::sdl::FileFilter{"MIDI files", "mid"}},
+                           {kind == FileKind::Song   ? ui::sdl::FileFilter{"Songs", "modal"}
+                            : kind == FileKind::Midi ? ui::sdl::FileFilter{"MIDI files", "mid"}
+                                                     : ui::sdl::FileFilter{"All files", "*"}},
                            suggested, std::move(done));
     }
 
@@ -777,18 +778,8 @@ int main(int argc, char* argv[])
                         }
                         return ui::settingChoices(settings, word, themes);
                     });
-    view.setChoices(ui::Choices::File,
-                    [](std::string_view word)
-                    {
-                        std::error_code error;
-                        return ui::fileChoices(std::filesystem::current_path(error), word);
-                    });
-    view.setChoices(ui::Choices::ConfigFile,
-                    [&](std::string_view word)
-                    {
-                        return configDirectory ? ui::fileChoices(*configDirectory, word)
-                                               : std::vector<std::string>{};
-                    });
+    const auto home = platform::homeDirectory();
+    view.setFolders(configDirectory, home);
     if (auto error = apply(settings, window, view, document, playback); !error.empty())
     {
         std::fprintf(stderr, "%s\n", error.c_str());
@@ -836,9 +827,9 @@ int main(int argc, char* argv[])
 
     // Lines run at the : prompt, through the registry, after which settings and bindings
     // apply at once.
-    ui::addPromptCommands(commands, reader, config, configDirectory);
     FileHost files{window, view, document, playback};
-    ui::addFileCommands(commands, document, files);
+    ui::addPromptCommands(commands, reader, config, configDirectory, &files, home);
+    ui::addFileCommands(commands, document, files, home);
     view.setLineHandler(
         [&](const std::string& line)
         {

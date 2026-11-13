@@ -11,6 +11,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/settings.hpp>
@@ -218,8 +219,30 @@ void Workspace::setChoices(Choices kind, ChoiceSource source)
     sources_[static_cast<std::size_t>(kind)] = std::move(source);
 }
 
+void Workspace::setFolders(std::optional<std::filesystem::path> config,
+                           std::optional<std::filesystem::path> home)
+{
+    configFolder_ = std::move(config);
+    home_ = std::move(home);
+}
+
+std::optional<std::filesystem::path> Workspace::fileFolder(Choices kind) const
+{
+    // Songs' files from the song's folder, the config's from the config directory (decided
+    // November 2026, as many programs keep a folder for each kind of file).
+    if (kind == Choices::File)
+    {
+        return songFolder(document_, home_);
+    }
+    return kind == Choices::ConfigFile ? configFolder_ : std::nullopt;
+}
+
 std::vector<std::string> Workspace::choices(Choices kind, std::string_view word) const
 {
+    if (const auto folder = fileFolder(kind))
+    {
+        return fileChoices(*folder, word, home_);
+    }
     const auto& song = document_.song();
     std::vector<std::string> found;
     switch (kind)
@@ -452,8 +475,12 @@ std::optional<Workspace::Completions> Workspace::completions() const
     {
         return std::nullopt;
     }
-    return Completions{prompt_.completing->matches, prompt_.completing->chosen,
-                       prompt_.completing->scroll};
+    // Where a relative file is, which can't be seen otherwise.
+    const auto word = completingWord();
+    const auto folder = fileFolder(word.kind);
+    return Completions{
+        prompt_.completing->matches, prompt_.completing->chosen, prompt_.completing->scroll,
+        folder && typedRelative(word.typed) ? "In " + utf8Text(*folder) : std::string{}};
 }
 
 Workspace::CompletingWord Workspace::completingWord() const
@@ -526,7 +553,7 @@ bool Workspace::complete(int by)
         const auto& only = found.front();
         // A setting's name goes on too, with =, ? or !.
         const bool goesOn =
-            only.ends_with('=') || only.ends_with('/') ||
+            only.ends_with('=') || pathSeparator(only.back()) ||
             (word.kind == Choices::Setting && only.find('=') == std::string::npos) ||
             (word.kind == Choices::Query && (only == "vel" || only == "len" || only == "cc"));
         replaceWord(word.start, only + (goesOn ? "" : " "));
@@ -587,7 +614,12 @@ void Workspace::refilter()
     const auto& text = prompt_.line.text();
     const auto at = prompt_.line.cursor();
     const auto word = completingWord();
-    const bool ended = at > 0 && (text[at - 1] == U' ' || text[at - 1] == U'\t');
+    // A space ends the word, unless it's in quotes.
+    const bool ended = at > 0 && (text[at - 1] == U' ' || text[at - 1] == U'\t') &&
+                       std::count(text.begin() + static_cast<std::ptrdiff_t>(word.start),
+                                  text.begin() + static_cast<std::ptrdiff_t>(at), U'"') %
+                               2 ==
+                           0;
     auto found = ended || word.kind == Choices::None
                      ? std::vector<std::string>{}
                      : matching(choices(word.kind, word.typed), word.typed);
@@ -612,9 +644,13 @@ Region Workspace::completionRegion(const Completions& shown) const
     {
         widest = std::max(widest, decodeUtf8(match).size());
     }
+    // The folder of relative files, if any, on a row of its own at the top, dim.
+    const auto heading = decodeUtf8(shown.heading);
+    const int top = heading.empty() ? 0 : cell_.height;
     const bool more = shown.matches.size() > rows;
-    const int width = (static_cast<int>(widest) + (more ? 4 : 2)) * cell_.width;
-    const int height = static_cast<int>(rows) * cell_.height + 2 * pad;
+    const int width =
+        static_cast<int>(std::max(widest + (more ? 4 : 2), heading.size() + 2)) * cell_.width;
+    const int height = static_cast<int>(rows) * cell_.height + 2 * pad + top;
     // Over the word's first character on the line, kept within the window.
     const auto label = promptLabel().size();
     const auto room = static_cast<std::size_t>(
@@ -634,6 +670,10 @@ Region Workspace::completionRegion(const Completions& shown) const
     const Style plain{Role::Text, Role::Panel, kPlain};
     const Style chosen{Role::CursorText, Role::Cursor, kPlain};
     const Style dim{Role::Dim, Role::Panel, kPlain};
+    if (!heading.empty())
+    {
+        region.text.push_back({cell_.width, pad, heading, dim});
+    }
     for (std::size_t r = 0; r < rows; ++r)
     {
         const auto i = shown.scroll + r;
@@ -641,7 +681,7 @@ Region Workspace::completionRegion(const Completions& shown) const
         {
             break;
         }
-        const int y = pad + static_cast<int>(rows - 1 - r) * cell_.height; // the first lowest
+        const int y = pad + top + static_cast<int>(rows - 1 - r) * cell_.height; // first lowest
         if (shown.chosen == i)
         {
             region.under.push_back({{0, y, width, cell_.height}, Role::Cursor, 255});
@@ -654,12 +694,12 @@ Region Workspace::completionRegion(const Completions& shown) const
         const int side = width - 2 * cell_.width;
         if (shown.scroll + rows < shown.matches.size())
         {
-            region.text.push_back({side, pad, U"▲", dim});
+            region.text.push_back({side, pad + top, U"▲", dim});
         }
         if (shown.scroll > 0)
         {
             region.text.push_back(
-                {side, pad + static_cast<int>(rows - 1) * cell_.height, U"▼", dim});
+                {side, pad + top + static_cast<int>(rows - 1) * cell_.height, U"▼", dim});
         }
     }
     return region;

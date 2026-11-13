@@ -4,6 +4,7 @@
 
 #include <modal/ui/commands.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/file_commands.hpp>
 
 #include <filesystem>
 #include <optional>
@@ -22,11 +23,15 @@ std::span<const CommandInfo> promptCommands();
 //   set NAME?...        shows settings' values, as in Vim
 //   source              with no file, runs modalrc in the config directory again
 //   write-config FILE   writes the config (see configText) to a file, relative to the config
-//                       directory; write-config! overwrites it
+//                       directory, ~ being the home folder; write-config! overwrites it;
+//                       with no FILE, the host's save dialog, from modalrc in the config
+//                       directory, writing over a file chosen there, as the dialog asked
 //
 // Errors, including those in files a command runs, come back as a warning: the first, and
-// how many more. The registry, reader and config outlive the commands' use of them.
+// how many more. The registry, reader, config and host outlive the commands' use of them.
 void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Config& config,
-                       std::optional<std::filesystem::path> configDirectory);
+                       std::optional<std::filesystem::path> configDirectory,
+                       FileHost* host = nullptr,
+                       std::optional<std::filesystem::path> home = std::nullopt);
 
 } // namespace modal::ui

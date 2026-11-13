@@ -19,4 +19,8 @@ std::optional<std::filesystem::path> configDirectory();
 // if the system doesn't say where. It may not exist yet.
 std::optional<std::filesystem::path> stateDirectory();
 
+// The user's home directory, which ~ stands for in a path typed: on Linux $HOME; on Windows
+// the user's profile folder. Nothing if the system doesn't say where.
+std::optional<std::filesystem::path> homeDirectory();
+
 } // namespace modal::platform

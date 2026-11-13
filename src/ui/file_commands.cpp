@@ -43,9 +43,11 @@ constexpr std::array<CommandInfo, 6> kFileCommands{{
     {.name = "wq", .description = "Save the song, then quit", .keys = false},
 }};
 
-// The argument as a path: the rest of the line, without quotes around it, given an
-// extension if it has none.
-std::optional<std::filesystem::path> fileArgument(std::string_view text, std::string_view extension)
+// The argument as a path: the rest of the line, without quotes around it, from a folder,
+// given an extension if it has none.
+std::optional<std::filesystem::path> fileArgument(std::string_view text, std::string_view extension,
+                                                  const std::filesystem::path& folder,
+                                                  const std::optional<std::filesystem::path>& home)
 {
     const auto first = text.find_first_not_of(" \t");
     if (first == std::string_view::npos)
@@ -53,11 +55,7 @@ std::optional<std::filesystem::path> fileArgument(std::string_view text, std::st
         return std::nullopt;
     }
     text = text.substr(first, text.find_last_not_of(" \t") - first + 1);
-    if (text.size() >= 2 && text.front() == '"' && text.back() == '"')
-    {
-        text = text.substr(1, text.size() - 2);
-    }
-    auto path = utf8Path(text);
+    auto path = typedPath(text, folder, home);
     if (!path.has_extension())
     {
         path += utf8Path(extension);
@@ -90,9 +88,11 @@ CommandResult unsaved(std::string_view command)
 class FileCommands
 {
 public:
-    FileCommands(core::Document& document, FileHost& host)
+    FileCommands(core::Document& document, FileHost& host,
+                 std::optional<std::filesystem::path> home)
         : document_(document)
         , host_(host)
+        , home_(std::move(home))
     {
     }
 
@@ -102,7 +102,7 @@ public:
         {
             return unsaved("e");
         }
-        if (const auto file = fileArgument(call.arguments, ".modal"))
+        if (const auto file = argument(call, ".modal"))
         {
             return opened(*file);
         }
@@ -119,7 +119,7 @@ public:
 
     CommandResult write(const CommandCall& call, bool thenQuit)
     {
-        if (const auto file = fileArgument(call.arguments, ".modal"))
+        if (const auto file = argument(call, ".modal"))
         {
             if (!call.bang && overwrites(*file, document_.file()))
             {
@@ -148,7 +148,7 @@ public:
 
     CommandResult exportMidi(const CommandCall& call)
     {
-        if (const auto file = fileArgument(call.arguments, ".mid"))
+        if (const auto file = argument(call, ".mid"))
         {
             if (!call.bang && overwrites(*file, std::nullopt))
             {
@@ -193,6 +193,12 @@ public:
     }
 
 private:
+    std::optional<std::filesystem::path> argument(const CommandCall& call,
+                                                  std::string_view extension) const
+    {
+        return fileArgument(call.arguments, extension, songFolder(document_, home_), home_);
+    }
+
     CommandResult opened(const std::filesystem::path& file)
     {
         auto result = openFile(document_, file);
@@ -234,6 +240,7 @@ private:
 
     core::Document& document_;
     FileHost& host_;
+    std::optional<std::filesystem::path> home_;
 };
 
 } // namespace
@@ -243,10 +250,11 @@ std::span<const CommandInfo> fileCommands()
     return kFileCommands;
 }
 
-void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host)
+void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host,
+                     std::optional<std::filesystem::path> home)
 {
     // Kept as long as the registry runs them.
-    auto commands = std::make_shared<FileCommands>(document, host);
+    auto commands = std::make_shared<FileCommands>(document, host, std::move(home));
     registry.add(kFileCommands[0],
                  [commands](const CommandCall& call) { return commands->edit(call); });
     registry.add(kFileCommands[1],
@@ -259,6 +267,21 @@ void addFileCommands(CommandRegistry& registry, core::Document& document, FileHo
                  [commands](const CommandCall& call) { return commands->quit(call); });
     registry.add(kFileCommands[5],
                  [commands](const CommandCall& call) { return commands->write(call, true); });
+}
+
+std::filesystem::path songFolder(const core::Document& document,
+                                 const std::optional<std::filesystem::path>& home)
+{
+    if (const auto& file = document.file() ? document.file() : document.importedFrom())
+    {
+        return file->parent_path();
+    }
+    if (home)
+    {
+        return *home;
+    }
+    std::error_code error;
+    return std::filesystem::current_path(error);
 }
 
 OpenResult openFile(core::Document& document, const std::filesystem::path& file)

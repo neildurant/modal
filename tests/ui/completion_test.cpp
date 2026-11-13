@@ -52,6 +52,19 @@ TEST_CASE("the word under the cursor, and which word of the line it is")
     CHECK(between.index == 2);
     CHECK(wordAt(line, line.size()).index == 2);
     CHECK(wordAt(U"set ", 4).index == 1);
+
+    // Spaces in quotes are in the word, closed or not.
+    const std::u32string path = U"e \"My Songs/ve";
+    CHECK(wordAt(path, path.size()).start == 2);
+    CHECK(wordAt(path, path.size()).index == 1);
+    CHECK(wordAt(U"set font=\"A B\" x", 17).index == 2);
+}
+
+TEST_CASE("a word in quotes matches the choices, quoted or not")
+{
+    const Strings files{"\"My Songs/", "\"notes.modal\""};
+    CHECK(matching(files, "My") == Strings{"\"My Songs/"});
+    CHECK(matching(files, "\"no") == Strings{"\"notes.modal\""});
 }
 
 TEST_CASE("files and folders complete from a folder, the word's folder before them")
@@ -66,6 +79,53 @@ TEST_CASE("files and folders complete from a folder, the word's folder before th
     CHECK(fileChoices(folder, "songs/v") == Strings{"songs/verse.modal"});
     CHECK(fileChoices(folder, ".h") == Strings{".hidden", "song.mid", "songs/"});
     CHECK(fileChoices(folder, "nowhere/x").empty());
+
+    // From anywhere, typed absolute, or from ~.
+    const auto absolute = utf8Text(folder) + "/songs/";
+    CHECK(fileChoices("elsewhere", absolute) == Strings{absolute + "verse.modal"});
+    CHECK(fileChoices("elsewhere", "~/so", folder) == Strings{"~/song.mid", "~/songs/"});
+}
+
+TEST_CASE("files with spaces complete in quotes, a folder left open, and \\ separates on Windows")
+{
+    const modal::test::TempDirectory temporary{"modal-completion-spaces-test"};
+    const auto& folder = temporary.path();
+    std::filesystem::create_directories(folder / "My Songs");
+    std::ofstream{folder / "My Songs" / "verse.modal"};
+    std::ofstream{folder / "notes.modal"};
+    CHECK(fileChoices(folder, "") == Strings{"\"My Songs/", "\"notes.modal\""});
+    CHECK(fileChoices(folder, "\"My Songs/") == Strings{"\"My Songs/verse.modal\""});
+    CHECK(fileChoices(folder, "\"no") == fileChoices(folder, "")); // a quote begun
+    if constexpr (std::filesystem::path::preferred_separator == L'\\')
+    {
+        CHECK(fileChoices(folder, "\"My Songs\\") == Strings{"\"My Songs\\verse.modal\""});
+        std::filesystem::create_directories(folder / "My Songs" / "Old");
+        CHECK(fileChoices(folder, "\"My Songs\\O") ==
+              Strings{"\"My Songs\\Old\\", "\"My Songs\\verse.modal\""});
+    }
+    else
+    {
+        CHECK(fileChoices(folder, "My Songs\\") == fileChoices(folder, "")); // a character
+    }
+}
+
+TEST_CASE("a path typed is in a folder, unless it's absolute or from ~, without its quotes")
+{
+    const std::filesystem::path folder = utf8Path("songs");
+    const std::filesystem::path home = utf8Path("home");
+    CHECK(typedPath("verse.modal", folder, home) == folder / "verse.modal");
+    CHECK(typedPath("\"My Songs/verse.modal\"", folder, home) ==
+          folder / utf8Path("My Songs/verse.modal"));
+    CHECK(typedPath("~/verse.modal", folder, home) == home / "verse.modal");
+    CHECK(typedPath("~", folder, home) == home);
+    CHECK(typedPath("~/x", folder, std::nullopt) == folder / "~/x");
+    const auto absolute = std::filesystem::absolute(folder) / "verse.modal";
+    CHECK(typedPath(utf8Text(absolute), folder, home) == absolute);
+    CHECK(typedRelative("verse.modal"));
+    CHECK(typedRelative("\"My Songs/"));
+    CHECK_FALSE(typedRelative("~/songs"));
+    CHECK_FALSE(typedRelative(utf8Text(absolute)));
+    CHECK_FALSE(typedRelative("/songs"));
 }
 
 TEST_CASE("set completes settings' names, and then their values")

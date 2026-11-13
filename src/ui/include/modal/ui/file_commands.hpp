@@ -24,8 +24,9 @@ public:
 
     enum class FileKind : std::uint8_t
     {
-        Song, // a song to open: .modal, or a MIDI file to import
-        Midi, // a MIDI file to export
+        Song,   // a song to open: .modal, or a MIDI file to import
+        Midi,   // a MIDI file to export
+        Config, // a config file, written by write-config
     };
 
     // Asks for a file to open or to save to, suggesting one (beside the song's file, or the
@@ -58,12 +59,21 @@ public:
 //   quit, q            quits; refused with unsaved changes, unless quit!
 //   wq                 saves, then quits
 //
-// A FILE without an extension is given .modal (or .mid for export).
+// A FILE without an extension is given .modal (or .mid for export). A relative FILE is in the
+// song's folder (see songFolder), and ~ is the home folder.
 std::span<const CommandInfo> fileCommands();
 
 // Gives the registry what runs the file commands, on the document. The registry, document
-// and host outlive the commands' use of them.
-void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host);
+// and host outlive the commands' use of them. home is what ~ stands for.
+void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host,
+                     std::optional<std::filesystem::path> home = std::nullopt);
+
+// Where a song's files typed with a relative path are (decided November 2026, rather than the
+// program's current directory, which means little when it's started from a menu): the folder
+// of the song's file, or of the file it was imported from; or else the home folder; or else
+// the current directory.
+std::filesystem::path songFolder(const core::Document& document,
+                                 const std::optional<std::filesystem::path>& home);
 
 // Opens a song file, or imports a MIDI file, into the document, replacing its song: whether
 // it did, and what went wrong, or else the first warning and how many more, if any.

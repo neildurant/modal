@@ -17,8 +17,9 @@ namespace
 
 constexpr std::array<CommandInfo, 1> kPromptCommands{{
     {.name = "write-config",
-     .description = "Write the config to a file, to start a modalrc from; ! overwrites it",
-     .usage = "FILE",
+     .description = "Write the config to a file, to start a modalrc from; ! overwrites it; "
+                    "with no file, choose one",
+     .usage = "[FILE]",
      .bang = true,
      .keys = false,
      .choices = {Choices::ConfigFile}},
@@ -91,7 +92,8 @@ std::span<const CommandInfo> promptCommands()
 }
 
 void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Config& config,
-                       std::optional<std::filesystem::path> configDirectory)
+                       std::optional<std::filesystem::path> configDirectory, FileHost* host,
+                       std::optional<std::filesystem::path> home)
 {
     const auto directory = configDirectory.value_or(std::filesystem::path{});
 
@@ -133,31 +135,50 @@ void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Co
                      });
     }
 
+    const auto write =
+        [&registry, &config, configDirectory](const std::filesystem::path& file, bool overwrite)
+    {
+        if (auto error =
+                writeConfigFile(file, configText(config, registry, configDirectory), overwrite);
+            !error.empty())
+        {
+            return CommandResult::error(error + (overwrite ? "" : "; write-config! overwrites it"));
+        }
+        return CommandResult{true, "wrote " + utf8Text(file), false};
+    };
     registry.add(kPromptCommands[0],
-                 [&registry, &config, configDirectory, directory](const CommandCall& call)
+                 [write, directory, host, home](const CommandCall& call)
                  {
-                     const auto arguments = words(call.arguments);
-                     if (arguments.size() != 1)
+                     // The rest of the line, so a path in quotes can have spaces.
+                     auto text = std::string_view{call.arguments};
+                     const auto first = text.find_first_not_of(" \t");
+                     text = first == std::string_view::npos
+                                ? std::string_view{}
+                                : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+                     if (text.empty())
                      {
-                         return CommandResult::error("write-config needs FILE");
+                         if (host == nullptr)
+                         {
+                             return CommandResult::error("write-config needs FILE");
+                         }
+                         host->chooseSave(FileHost::FileKind::Config, directory / "modalrc",
+                                          [write, host](std::optional<std::filesystem::path> file)
+                                          {
+                                              if (file)
+                                              {
+                                                  host->report(write(*file, true));
+                                              }
+                                          });
+                         return CommandResult{};
                      }
                      // The ! meant to overwrite, put after the file rather than the command.
-                     if (arguments[0].ends_with('!'))
+                     if (text.ends_with('!'))
                      {
-                         return CommandResult::error(
-                             "! goes after the command: write-config! " +
-                             std::string{arguments[0].substr(0, arguments[0].size() - 1)} +
-                             " overwrites it");
+                         return CommandResult::error("! goes after the command: write-config! " +
+                                                     std::string{text.substr(0, text.size() - 1)} +
+                                                     " overwrites it");
                      }
-                     const auto file = directory / utf8Path(arguments[0]);
-                     if (auto error = writeConfigFile(
-                             file, configText(config, registry, configDirectory), call.bang);
-                         !error.empty())
-                     {
-                         return CommandResult::error(
-                             error + (call.bang ? "" : "; write-config! overwrites it"));
-                     }
-                     return CommandResult{true, "wrote " + utf8Text(file), false};
+                     return write(typedPath(text, directory, home), call.bang);
                  });
 }
 

@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -27,7 +28,7 @@ std::vector<std::string> matching(std::span<const std::string> choices, std::str
 std::string sharedStart(std::span<const std::string> choices);
 
 // The word a cursor is in or just after, in a line: where it starts and ends, and which word of
-// the line it is, the command's name being 0.
+// the line it is, the command's name being 0. Spaces in quotes are in the word.
 struct LineWord
 {
     std::size_t start = 0;
@@ -36,10 +37,14 @@ struct LineWord
 };
 LineWord wordAt(std::u32string_view line, std::size_t cursor);
 
-// The choices for a word that's a file or folder, in a folder: those in the folder the word
-// names (songs/ in songs/ve), each with that folder before it and a / after a folder; files
-// starting with a dot only if the word's name does.
-std::vector<std::string> fileChoices(const std::filesystem::path& folder, std::string_view word);
+// The choices for a word that's a file or folder, from a folder: those in the folder the word
+// names (songs/ in songs/ve), each with that folder before it as typed and a separator after a
+// folder, the one typed last or else /; files starting with a dot only if the word's name does.
+// The word may be absolute, or start from ~, the home folder; \ separates folders on Windows.
+// If the word starts with a quote, or any choice has a space, they're all in quotes, a folder's
+// left open ("My Songs/).
+std::vector<std::string> fileChoices(const std::filesystem::path& folder, std::string_view word,
+                                     const std::optional<std::filesystem::path>& home = {});
 
 // The choices for a word of set: each setting's name, NAME= for those with values, or NAME and
 // noNAME for those on or off; and after NAME=, the setting's values, its themes for theme, on

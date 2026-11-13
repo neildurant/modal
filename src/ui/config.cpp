@@ -120,6 +120,52 @@ std::string utf8Text(const std::filesystem::path& path)
     return {reinterpret_cast<const char*>(text.data()), text.size()};
 }
 
+bool pathSeparator(char c)
+{
+    return c == '/' || (c == '\\' && std::filesystem::path::preferred_separator == L'\\');
+}
+
+namespace
+{
+std::string_view withoutQuotes(std::string_view text)
+{
+    if (text.starts_with('"'))
+    {
+        text.remove_prefix(1);
+        if (text.ends_with('"'))
+        {
+            text.remove_suffix(1);
+        }
+    }
+    return text;
+}
+
+bool fromHome(std::string_view text)
+{
+    return text == "~" || (text.size() > 1 && text[0] == '~' && pathSeparator(text[1]));
+}
+} // namespace
+
+std::filesystem::path typedPath(std::string_view text, const std::filesystem::path& folder,
+                                const std::optional<std::filesystem::path>& home)
+{
+    text = withoutQuotes(text);
+    if (home && fromHome(text))
+    {
+        return text.size() == 1 ? *home : *home / utf8Path(text.substr(2));
+    }
+    const auto path = utf8Path(text);
+    return path.is_absolute() ? path : folder / path;
+}
+
+bool typedRelative(std::string_view text)
+{
+    text = withoutQuotes(text);
+    const auto path = utf8Path(text);
+    return !fromHome(text) && !path.is_absolute() && !path.has_root_name() &&
+           !path.has_root_directory();
+}
+
 std::string ConfigError::text() const
 {
     return source + ":" + std::to_string(line) + ": " + message;

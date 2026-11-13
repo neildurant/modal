@@ -31,14 +31,21 @@ bool separator(char c)
     return c == '-' || c == '_' || c == ' ' || c == '/' || c == '.';
 }
 
+// A choice or a word typed, matched without the quote it may start with.
+std::string_view unquoted(std::string_view text)
+{
+    return text.starts_with('"') ? text.substr(1) : text;
+}
+
 } // namespace
 
 std::vector<std::string> matching(std::span<const std::string> choices, std::string_view typed)
 {
     std::vector<std::string> found;
+    typed = unquoted(typed);
     for (const auto& choice : choices)
     {
-        if (startsWith(choice, typed))
+        if (startsWith(unquoted(choice), typed))
         {
             found.push_back(choice);
         }
@@ -83,8 +90,9 @@ std::string sharedStart(std::span<const std::string> choices)
 
 LineWord wordAt(std::u32string_view line, std::size_t cursor)
 {
-    // The words, as runs of what isn't a space; the cursor in one, or touching its end, or else
-    // an empty word where it is, after those before it.
+    // The words, as runs of what isn't a space, but for spaces in quotes, as in a path with
+    // spaces; the cursor in one, or touching its end, or else an empty word where it is, after
+    // those before it.
     cursor = std::min(cursor, line.size());
     const auto space = [](char32_t c) { return c == U' ' || c == U'\t'; };
     std::size_t index = 0;
@@ -96,8 +104,10 @@ LineWord wordAt(std::u32string_view line, std::size_t cursor)
             continue;
         }
         std::size_t end = at;
-        while (end < line.size() && !space(line[end]))
+        bool quoted = false;
+        while (end < line.size() && (quoted || !space(line[end])))
         {
+            quoted = quoted != (line[end] == U'"');
             ++end;
         }
         if (at <= cursor && cursor <= end)
@@ -114,24 +124,39 @@ LineWord wordAt(std::u32string_view line, std::size_t cursor)
     return {cursor, cursor, index};
 }
 
-std::vector<std::string> fileChoices(const std::filesystem::path& folder, std::string_view word)
+std::vector<std::string> fileChoices(const std::filesystem::path& folder, std::string_view word,
+                                     const std::optional<std::filesystem::path>& home)
 {
-    const auto slash = word.find_last_of('/');
-    const auto in =
-        slash == std::string_view::npos ? std::string{} : std::string{word.substr(0, slash + 1)};
-    const auto name = slash == std::string_view::npos ? word : word.substr(slash + 1);
+    const bool quoted = word.starts_with('"');
+    const auto text = unquoted(word);
+    const auto slash = std::ranges::find_if(text.rbegin(), text.rend(), pathSeparator);
+    const auto in = std::string{text.substr(0, static_cast<std::size_t>(text.rend() - slash))};
+    const auto name = std::string_view{text}.substr(in.size());
+    // Folders end with the separator typed last, or else /, which works everywhere.
+    const char sep = in.empty() ? '/' : in.back();
     std::vector<std::string> found;
     std::error_code error;
-    for (const auto& entry : std::filesystem::directory_iterator{folder / utf8Path(in), error})
+    for (const auto& entry :
+         std::filesystem::directory_iterator{typedPath(in.empty() ? "." : in, folder, home), error})
     {
         auto file = utf8Text(entry.path().filename());
         if (file.starts_with('.') && !name.starts_with('.'))
         {
             continue;
         }
-        found.push_back(in + file + (entry.is_directory(error) ? "/" : ""));
+        found.push_back(in + file + (entry.is_directory(error) ? std::string{sep} : ""));
     }
     std::ranges::sort(found);
+    // In quotes, all of them alike, if the word is or any has a space: a folder's left open
+    // to go on into.
+    if (quoted ||
+        std::ranges::any_of(found, [](const auto& f) { return f.find(' ') != std::string::npos; }))
+    {
+        for (auto& f : found)
+        {
+            f = '"' + f + (pathSeparator(f.back()) ? "" : "\"");
+        }
+    }
     return found;
 }
 

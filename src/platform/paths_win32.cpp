@@ -24,7 +24,7 @@ std::optional<std::filesystem::path> knownFolder(const KNOWNFOLDERID& id)
     std::optional<std::filesystem::path> directory;
     if (SUCCEEDED(found) && folder != nullptr)
     {
-        directory = std::filesystem::path{folder} / "Modal";
+        directory = std::filesystem::path{folder};
     }
     CoTaskMemFree(folder); // even on failure
     return directory;
@@ -34,12 +34,19 @@ std::optional<std::filesystem::path> knownFolder(const KNOWNFOLDERID& id)
 
 std::optional<std::filesystem::path> configDirectory()
 {
-    return knownFolder(FOLDERID_RoamingAppData);
+    auto folder = knownFolder(FOLDERID_RoamingAppData);
+    return folder ? std::optional{*folder / "Modal"} : std::nullopt;
 }
 
 std::optional<std::filesystem::path> stateDirectory()
 {
-    return knownFolder(FOLDERID_LocalAppData);
+    auto folder = knownFolder(FOLDERID_LocalAppData);
+    return folder ? std::optional{*folder / "Modal"} : std::nullopt;
+}
+
+std::optional<std::filesystem::path> homeDirectory()
+{
+    return knownFolder(FOLDERID_Profile);
 }
 
 } // namespace modal::platform

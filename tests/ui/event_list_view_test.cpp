@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/temp_directory.hpp"
+
 #include <modal/core/document.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -11,6 +14,8 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1197,6 +1202,40 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     type(v.ws, U"=l");
     tab();
     CHECK(line() == "set theme=light ");
+}
+
+TEST_CASE("files complete from the song's folder, said above them, and into folders with spaces")
+{
+    const modal::test::TempDirectory temporary{"modal-file-completion-test"};
+    const auto& home = temporary.path();
+    std::filesystem::create_directories(home / "My Songs");
+    std::ofstream{home / "My Songs" / "verse.modal"};
+    std::ofstream{home / "notes.modal"};
+    Viewing v;
+    v.registry.add(fileCommands());
+    v.ws.setFolders(home / "config", home); // a new song's files are at home
+    const auto line = [&] { return encodeUtf8(v.ws.commandLine().text()); };
+    const auto tab = [&] { v.ws.handle(Key::of(NamedKey::Tab), 0); };
+
+    type(v.ws, U":e ");
+    tab();
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->matches ==
+          std::vector<std::string>{"\"My Songs/", "\"notes.modal\""});
+    CHECK(v.ws.completions()->heading == "In " + utf8Text(home));
+    CHECK(line() == "e \""); // as far as they agree
+    type(v.ws, U"M");
+    tab();
+    CHECK(line() == "e \"My Songs/"); // a folder goes on, in its quotes
+    tab();
+    CHECK(line() == "e \"My Songs/verse.modal\" ");
+
+    // An absolute path says no folder.
+    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, decodeUtf8(":e " + utf8Text(home) + "/"));
+    tab();
+    REQUIRE(v.ws.completions());
+    CHECK(v.ws.completions()->heading.empty());
 }
 
 TEST_CASE("the matches of completion follow what's typed, and the arrows and pages go round them")

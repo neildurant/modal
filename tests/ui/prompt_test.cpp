@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 using namespace modal::ui;
 
@@ -24,14 +25,37 @@ constexpr std::array<CommandInfo, 2> kCommands{{
     {.name = "cancel", .description = "Cancel"},
 }};
 
-// A config, its reader, and a registry with the prompt's commands and a few others.
+// A host whose save dialog waits for the test to answer it.
+class Host final : public FileHost
+{
+public:
+    void chooseOpen(Chosen) override {}
+    void chooseSave(FileKind kind, const std::filesystem::path& suggestion, Chosen done) override
+    {
+        config = kind == FileKind::Config;
+        suggested = suggestion;
+        pending = std::move(done);
+    }
+    void quit() override {}
+    void songReplaced() override {}
+    void report(const CommandResult& result) override { reported = result; }
+
+    bool config = false;
+    std::filesystem::path suggested;
+    Chosen pending;
+    std::optional<CommandResult> reported;
+};
+
+// A config, its reader, and a registry with the prompt's commands and a few others; with a
+// host for write-config's dialog, if given one, and a home folder for ~.
 struct Prompt
 {
-    explicit Prompt(std::optional<std::filesystem::path> directory = std::nullopt)
+    explicit Prompt(std::optional<std::filesystem::path> directory = std::nullopt,
+                    Host* host = nullptr, std::optional<std::filesystem::path> home = std::nullopt)
         : reader{config, registry, directory}
     {
         registry.add(kCommands);
-        addPromptCommands(registry, reader, config, directory);
+        addPromptCommands(registry, reader, config, directory, host, std::move(home));
     }
 
     CommandResult run(std::string_view line) { return registry.runLine(line); }
@@ -132,4 +156,32 @@ TEST_CASE("write-config writes the config, relative to the config directory")
           CommandResult::error("! goes after the command: write-config! modalrc overwrites it"));
     CHECK_FALSE(std::filesystem::exists(file.parent_path() / "modalrc!"));
     std::filesystem::remove_all(directory);
+}
+
+TEST_CASE("write-config takes a path with spaces in quotes, or from ~, and with no file asks "
+          "for one in the config directory")
+{
+    const modal::test::TempDirectory temporary{"modal-write-config-paths-test"};
+    const auto directory = temporary / "config";
+    const auto home = temporary / "home";
+    std::filesystem::create_directories(home / "My Config");
+    Host host;
+    Prompt prompt{directory, &host, home};
+
+    const auto spaced = home / "My Config" / "modalrc";
+    CHECK(prompt.run("write-config \"" + utf8Text(spaced) + "\"") ==
+          shows("wrote " + utf8Text(spaced)));
+    CHECK(prompt.run("write-config ~/other") == shows("wrote " + utf8Text(home / "other")));
+
+    // With no file, the dialog, from modalrc in the config directory, writing over the file
+    // chosen, as the dialog asked about that.
+    CHECK(prompt.run("write-config") == CommandResult{});
+    CHECK(host.config);
+    CHECK(host.suggested == directory / "modalrc");
+    std::exchange(host.pending, {})(spaced);
+    CHECK(host.reported == shows("wrote " + utf8Text(spaced)));
+    host.reported.reset();
+    prompt.run("write-config");
+    std::exchange(host.pending, {})(std::nullopt); // cancelled
+    CHECK_FALSE(host.reported);
 }

@@ -34,4 +34,13 @@ std::optional<std::filesystem::path> stateDirectory()
     return std::nullopt;
 }
 
+std::optional<std::filesystem::path> homeDirectory()
+{
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0')
+    {
+        return std::filesystem::path{home};
+    }
+    return std::nullopt;
+}
+
 } // namespace modal::platform
