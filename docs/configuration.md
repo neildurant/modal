@@ -147,7 +147,7 @@ The roles are:
 | `grid-line`, `beat-line`, `bar-line` | lines in timelines |
 | `note`, `label` | notes, and labels |
 | `density-1` to `density-4` | how busy a stretch of a track is in the arrangement, from sparse to dense |
-| `own-meter` | behind a track's bars in the arrangement where it has a meter of its own |
+| `own-meter` | laid over a track's bars in the arrangement, partly transparent, where it has a meter of its own |
 | `hint-key`, `hint-group` | a key in the hint menu, and a group of keys that leads to more |
 | `note-selected` | in the piano roll, the note under the cursor and the notes a selection takes |
 

@@ -24,6 +24,7 @@ namespace
 {
 
 constexpr Style kDim{Role::Dim, Role::Background, kPlain};
+constexpr std::uint8_t kOwnMeterAlpha = 90;
 constexpr std::uint8_t kFaint = 96; // the opacity of label lines
 
 std::string signatureText(core::TimeSignature signature)
@@ -405,9 +406,10 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     const auto spaced = [&](core::Tick ticks)
     { return ticks * cell_.width >= minLineSpacing(cell_) * column; };
 
-    // Where a track has a meter of its own, its whole section tinted, under everything else:
-    // by having one, not by its differing from the song's, since it won't follow the song's
-    // either way (decided 13 November 2026).
+    // Where a track has a meter of its own, its whole section, which is tinted over its bars
+    // below: by having one, not by its differing from the song's, since it won't follow the
+    // song's either way (decided 13 November 2026).
+    std::vector<Rect> ownRects;
     if (ownMeters)
     {
         for (int line = 0; line < shownTracks; ++line)
@@ -422,8 +424,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                 if (from < to && content != nullptr && content->meter)
                 {
                     const int x0 = scale.toX(from);
-                    timeline.under.push_back(
-                        {{x0, y, scale.toX(to) - x0, cell_.height}, Role::OwnMeter, 255});
+                    ownRects.push_back({x0, y, scale.toX(to) - x0, cell_.height});
                 }
             }
         }
@@ -535,6 +536,13 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                     {{x0, y + inset, width, cell_.height - 2 * inset}, role, 255});
             }
         }
+    }
+
+    // Over the bars, so they change colour, which a tint behind them barely showed (decided
+    // 13 November 2026, after use), their density still showing through.
+    for (const auto& rect : ownRects)
+    {
+        timeline.under.push_back({rect, Role::OwnMeter, kOwnMeterAlpha});
     }
 
     // The ruler: labels by name, the conductor's meters, the section strip, and its bars,
