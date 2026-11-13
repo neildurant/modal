@@ -30,9 +30,15 @@ build config="debug": configure
 test config="debug" filter="": (build config)
     ./build/{{preset}}/tests/{{capitalize(config)}}/modal_tests{{exe}} {{ if filter == "" { "" } else { quote(filter) } }}
 
-# Build and start Modal, with its arguments: just run debug --demo
-run config="debug" *args="": (build config)
-    ./build/{{preset}}/apps/{{capitalize(config)}}/modal{{exe}} {{args}}
+# Build and start Modal, with a song or --demo: just run debug "My Songs/song.modal"
+[linux]
+run config="debug" first="" second="": (build config)
+    ./build/{{preset}}/apps/{{capitalize(config)}}/modal {{ if first == "" { "" } else { quote(first) } }} {{ if second == "" { "" } else { quote(second) } }}
+
+# Build and start Modal, with a song or --demo: just run debug "My Songs\song.modal"
+[windows]
+run config="debug" first="" second="": (build config)
+    ./build/{{preset}}/apps/{{capitalize(config)}}/modal.exe {{ if first == "" { "" } else { "'" + replace(first, "'", "''") + "'" } }} {{ if second == "" { "" } else { "'" + replace(second, "'", "''") + "'" } }}
 
 # Format every C++ file
 [linux]
