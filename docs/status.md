@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 13 November 2026: milestone 8 is done. Rebarring step 1, inserting a meter and rebarring the song's meter, is committed locally and waiting to be tried; then rebarring selected tracks, then adding tracks, then Mute, Solo and Arm in the arrangement (schedule.md). See [schedule.md](schedule.md) for work order.*
+*Last updated 13 November 2026: milestone 8 is done. Rebarring step 1, inserting a meter and rebarring the song's meter, is accepted and published; step 2, rebarring selected tracks, is next; then rebarring selected tracks, then adding tracks, then Mute, Solo and Arm in the arrangement (schedule.md). See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Inserting a meter and rebarring, step 1 (13 November 2026; waiting to be tried)
+## Inserting a meter and rebarring, step 1 (13 November 2026; accepted and published)
+
+**Accepted** on trial, 13 November 2026: tried in several places, in Normal and Visual modes and mid-bar, making remainder bars, all as expected.
 
 Designed 13 November 2026 (design.md, Inserting a meter and rebarring; decisions.md). `, b m` (`:meter 3/4`) puts in a meter at the cursor, to the next meter change or the section's end, for what the cursor's track follows, the prompt naming what it will change and the message after where it stops; in Visual mode, `, b m` (`:rebar 3/4`) rebars a `v` range in the arrangement, or sections on the strip, in the song's meter, naming tracks with their own meter, which keep it. Neither moves a note; each is one undo step. Underneath, a new `Song::setMeter` sets the meter over a span for the conductor or one track, section by section: the meter before resumes at the span's end, a remainder bar after it where the span ends inside one of the old bars, so later bars stay where they were. It already serves a track's own meter, for step 2. Rebarring selected tracks on their own (`Ctrl-v`, `V`, the piano roll and event list) says it isn't built yet.
 
