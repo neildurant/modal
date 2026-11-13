@@ -311,6 +311,18 @@ public:
     bool updateMeter(TrackId id, const std::function<void(MeterMap&)>& edit);
     bool updateEvents(TrackId id, const std::function<void(EventList&)>& edit);
 
+    // Sets the meter over a span of time, never moving an event: the conductor's (and so the
+    // tracks following it), or one track's, which then has a meter of its own in each section
+    // the span touches, a copy of the conductor's outside the span. In each such section, the
+    // meter there before resumes at the span's end, and changes inside the span go. A span
+    // starting inside a bar cuts it to a remainder bar first; one ending inside a bar of the
+    // meter before ends with a remainder bar of the new, and if that end isn't on a bar line of
+    // the meter before, a remainder bar after it brings the bars back onto their old lines, so
+    // the bars after the span stay where they were. Sections keep their places and lengths.
+    // Returns false, changing nothing, for no such track, an empty span or one outside the
+    // song, or a signature whose beat isn't a whole number of ticks.
+    bool setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignature signature);
+
     // Sets the track following the conductor's meter in every section.
     bool followConductor(TrackId id);
 

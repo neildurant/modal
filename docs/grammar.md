@@ -207,7 +207,7 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 
 - `dib` deletes and leaves silence; `dab` takes the bar out, the rest of the section closing up, silence gathering at the section's end. `P` puts in, moving the rest of the section later. Ripple stays inside the section, so the rest of the song stays aligned.
 - **Bars on every track,** changing the song's length: `, b d` (`:bar-delete`) deletes the cursor's bar (`2, b d` two), keeping them in the register as a section; `, b i` (`:bar-insert`) inserts empty bars before it, asking how many and in what meter, Enter taking one bar in the meter there.
-
+- **Meters, never moving a note:** `, b m` (`:meter 3/4`) puts in a meter at the cursor, to the next meter change or the end of the section, for what the cursor's track follows: the song's meter, or the track's own where it has one; mid-bar, that bar becomes a remainder bar first. It asks for the meter, the prompt naming what it will change (`Meter from bar 5 of Verse, for the song (4/4):`), Enter taking the meter there. In Visual mode, `, b m` (`:rebar 3/4`) rebars the selection: a `v` range in the arrangement, or sections on the strip, in the song's meter, the meter before resuming at its end and tracks with their own meter keeping it. Rebarring selected tracks on their own (`Ctrl-v`, `V`, and the piano roll and event list) comes next.
 ## Notes in the piano roll
 
 | Keys | Does |

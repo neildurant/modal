@@ -393,6 +393,20 @@ constexpr std::array kSharedCommands{
                 .usage = "[N] [METER]",
                 .count = true,
                 .choices = {Choices::Meter, Choices::Meter, Choices::Meter}},
+    CommandInfo{.name = "meter-insert",
+                .description = "Set the meter from the cursor to the next meter change or the "
+                               "section's end, for what the cursor's track follows, never moving "
+                               "a note; asking for it, or as given (3/4)",
+                .aliases = "meter",
+                .usage = "[METER]",
+                .choices = {Choices::Meter}},
+    CommandInfo{.name = "rebar",
+                .description = "Rebar the selection in a meter, never moving a note: a range "
+                               "across every track, the song's bars there; asking for it, or as "
+                               "given (3/4)",
+                .usage = "[METER]",
+                .range = true,
+                .choices = {Choices::Meter}},
     CommandInfo{.name = "label",
                 .description = "Put a label named NAME at the cursor, or rename the one there; "
                                "with no name, asking for one, with its name to edit",
@@ -787,8 +801,8 @@ std::span<const CommandInfo> Workspace::commands()
             if (info.where == 0 &&
                 (info.object || info.name == "event-delete" || info.name == "event-delete-line" ||
                  info.name == "visual-delete-time" || info.name == "bar-delete" ||
-                 info.name == "bar-insert" || info.name.starts_with("section-") ||
-                 info.name == "label-to-section"))
+                 info.name == "bar-insert" || info.name == "meter-insert" || info.name == "rebar" ||
+                 info.name.starts_with("section-") || info.name == "label-to-section"))
                 info.where = onlyIn({Tracks, Strip, PianoRoll, EventList});
             // x forgets a port that isn't there, in the Ports view.
             if (info.name == "event-delete")

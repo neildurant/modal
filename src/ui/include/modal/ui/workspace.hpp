@@ -572,6 +572,23 @@ private:
     // The conductor's bars from one bar line to another, on every track, closing up.
     CommandResult deleteBars(core::Tick from, core::Tick to);
     CommandResult barInsert(std::string_view arguments);
+    // Inserting a meter at the cursor, and rebarring the selection (design.md, Inserting a
+    // meter and rebarring); asking for the meter, the prompt saying what it will change.
+    CommandResult askMeter(bool range);
+    CommandResult meterInsert(std::string_view arguments);
+    CommandResult rebar(std::string_view arguments);
+    // Where a meter inserted at the cursor would go: what it changes (the conductor, or the
+    // cursor's track's own meter), from where and to where; or why it can't.
+    struct MeterPlace
+    {
+        std::optional<core::TrackId> track;
+        core::Tick from = 0;
+        core::Tick to = 0;
+        std::string whose; // "the song", or the track's name
+    };
+    std::optional<MeterPlace> meterPlace(std::string* why) const;
+    // The span a rebar takes: the selection's time, for the conductor; or why it can't.
+    std::optional<MeterPlace> rebarPlace(std::string* why) const;
     // Labels made section starts, the one at or before the cursor, or all of them.
     CommandResult labelToSection();
     // :label-to-section on a selection: every label from one time to another.

@@ -153,6 +153,17 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                              }
                              return barInsert(call.arguments);
                          }
+                         if (name == "meter-insert" || name == "rebar")
+                         {
+                             // From keys or the palette, asking for the meter, the prompt
+                             // saying what it will change (decided 13 November 2026).
+                             const bool range = name == "rebar";
+                             if (call.line.empty())
+                             {
+                                 return askMeter(range);
+                             }
+                             return range ? rebar(call.arguments) : meterInsert(call.arguments);
+                         }
                          if (name == "section-rename")
                          {
                              return renameSection(call.arguments);
@@ -3787,6 +3798,178 @@ CommandResult Workspace::barInsert(std::string_view arguments)
         chosenMeter(*signature);
     }
     return {true, {}, false};
+}
+
+namespace
+{
+std::string_view withoutSpaces(std::string_view text)
+{
+    const auto first = text.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
+        return {};
+    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
+}
+
+std::string signatureText(core::TimeSignature signature)
+{
+    return std::to_string(signature.numerator) + "/" + std::to_string(signature.denominator);
+}
+
+// A place in a track's bars, "bar 5", or "bar 5 beat 2" inside a bar, or "bar 5 beat 2 and
+// a bit" off a beat.
+std::string placeText(const core::MeterMap& meter, core::Tick tick)
+{
+    const auto at = meter.toBarBeatTick(tick);
+    auto text = "bar " + std::to_string(at.bar);
+    if (at.beat > 1 || at.tick > 0)
+        text += " beat " + std::to_string(at.beat) + (at.tick > 0 ? " and a bit" : "");
+    return text;
+}
+} // namespace
+
+std::optional<Workspace::MeterPlace> Workspace::meterPlace(std::string* why) const
+{
+    // From the cursor, for what its track follows there: the conductor, or the track's own
+    // meter; to the next change of that meter or the section's end.
+    const auto& song = document_.song();
+    const auto cursor = view().cursor();
+    if (cursor.tick >= song.end())
+    {
+        *why = "A meter goes in at a place in the song, before its end";
+        return std::nullopt;
+    }
+    const auto section = song.sectionAt(cursor.tick);
+    MeterPlace place{.track = std::nullopt, .from = cursor.tick, .to = 0, .whose = "the song"};
+    if (cursor.track)
+    {
+        const auto* content = song.sections()[section]->content(*cursor.track);
+        if (content != nullptr && content->meter)
+        {
+            place.track = cursor.track;
+            place.whose = trackNameOf(song, *cursor.track);
+        }
+    }
+    const auto& meter = place.track ? song.meter(*place.track) : song.meter();
+    place.to = song.sectionStart(section + 1);
+    for (const auto& change : meter.changes())
+    {
+        if (change.tick > cursor.tick)
+        {
+            place.to = std::min(place.to, change.tick);
+            break;
+        }
+    }
+    return place;
+}
+
+std::optional<Workspace::MeterPlace> Workspace::rebarPlace(std::string* why) const
+{
+    const auto span = selection_ ? view().selectionSpan() : std::nullopt;
+    if (!selection_ || !span)
+    {
+        *why = "Rebarring takes a selection; , b m without one puts in a meter at the cursor";
+        return std::nullopt;
+    }
+    // The song's bars over a range across every track; selected tracks on their own come
+    // next (design.md, Inserting a meter and rebarring).
+    if (selection_->kind != SelectionKind::Range ||
+        (selection_->where != Where::Tracks && selection_->where != Where::Strip))
+    {
+        *why = "Rebarring selected tracks on their own isn't built yet: select a range across "
+               "every track with v in the arrangement";
+        return std::nullopt;
+    }
+    return MeterPlace{.track = std::nullopt,
+                      .from = span->first,
+                      .to = std::min(span->second, document_.song().end()),
+                      .whose = "the song"};
+}
+
+CommandResult Workspace::askMeter(bool range)
+{
+    std::string why;
+    const auto place = range ? rebarPlace(&why) : meterPlace(&why);
+    if (!place)
+        return CommandResult::error(why);
+    const auto& song = document_.song();
+    const auto& meter = place->track ? song.meter(*place->track) : song.meter();
+    const auto here = signatureText(meter.signatureAt(place->from));
+    const auto section = song.sections()[song.sectionAt(place->from)]->name();
+    const auto question = range ? "Rebar " + barsText(meter, place->from, place->to) + ", for " +
+                                      place->whose + ", in the meter (" + here + "): "
+                                : "Meter from " + placeText(meter, place->from) + " of " + section +
+                                      ", for " + place->whose + " (" + here + "): ";
+    askFor(
+        question, [this, range](const std::string& given)
+        { report(range ? rebar(given) : meterInsert(given)); }, here);
+    return {true};
+}
+
+CommandResult Workspace::meterInsert(std::string_view arguments)
+{
+    const auto& song = document_.song();
+    const auto signature = signatureOf(withoutSpaces(arguments), song.ppqn());
+    if (!signature)
+        return CommandResult::error("meter takes a time signature, such as 3/4");
+    std::string why;
+    const auto place = meterPlace(&why);
+    if (!place)
+        return CommandResult::error(why);
+    const auto meterText = signatureText(*signature);
+    auto edited = song;
+    if (!edited.setMeter(place->track, place->from, place->to, *signature))
+        return CommandResult::error("Can't put " + meterText + " here");
+    // Where it goes, and where it stops, in the bars it makes.
+    const auto& meter = place->track ? edited.meter(*place->track) : edited.meter();
+    const auto from = placeText(meter, place->from);
+    const auto section = edited.sectionAt(place->from);
+    const bool toSectionEnd = place->to == edited.sectionStart(section + 1);
+    const auto until = toSectionEnd ? "the end of " + edited.sections()[section]->name()
+                                    : placeText(meter, place->to) + ", where " +
+                                          signatureText(meter.signatureAt(place->to)) + " starts";
+    document_.edit("Meter " + meterText + " from " + from, view().place(),
+                   [&](core::Song& s) { s = edited; });
+    refresh();
+    chosenMeter(*signature);
+    return {true, meterText + " from " + from + " to " + until + ", for " + place->whose, false};
+}
+
+CommandResult Workspace::rebar(std::string_view arguments)
+{
+    const auto& song = document_.song();
+    const auto signature = signatureOf(withoutSpaces(arguments), song.ppqn());
+    if (!signature)
+        return CommandResult::error("rebar takes a time signature, such as 3/4");
+    std::string why;
+    const auto place = rebarPlace(&why);
+    if (!place)
+        return CommandResult::error(why);
+    const auto meterText = signatureText(*signature);
+    const auto bars = barsText(song.meter(), place->from, place->to);
+    // Tracks with a meter of their own there keep it (decided 13 November 2026), and are named.
+    std::string kept;
+    for (const auto& track : song.tracks())
+    {
+        bool own = false;
+        for (auto s = song.sectionAt(place->from);
+             s < song.sections().size() && song.sectionStart(s) < place->to; ++s)
+        {
+            const auto* content = song.sections()[s]->content(track->id());
+            own = own || (content != nullptr && content->meter);
+        }
+        if (own)
+            kept += "; " + trackNameOf(song, track->id()) + " keeps its own " +
+                    signatureText(song.meter(track->id()).signatureAt(place->from));
+    }
+    auto edited = song;
+    if (!edited.setMeter(std::nullopt, place->from, place->to, *signature))
+        return CommandResult::error("Can't rebar " + bars + " to " + meterText);
+    document_.edit("Rebar " + bars + " to " + meterText, view().place(),
+                   [&](core::Song& s) { s = edited; });
+    endVisual();
+    refresh();
+    chosenMeter(*signature);
+    return {true, "Rebarred " + bars + " to " + meterText + ", for the song" + kept, false};
 }
 
 void Workspace::chosenMeter(core::TimeSignature meter)

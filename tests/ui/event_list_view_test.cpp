@@ -824,10 +824,12 @@ TEST_CASE("the built-in modalrc binds keys only to the event list's and the wind
         // Commands only for the : line, such as port, may want what this view lacks; and the
         // bars' and sections' commands what this song does: a one-bar song at its end, a
         // section starting there and no labels. Freeze also requires a whole track rather
-        // than a partial selection left by an earlier command in this run.
+        // than a partial selection left by an earlier command in this run. A meter goes in
+        // before the song's end, and rebarring takes a selection.
         const bool songs = command.name == "bar-delete" || command.name == "bar-insert" ||
                            command.name == "section-split" || command.name == "label-to-section" ||
-                           command.name == "section-join" || command.name == "track-freeze";
+                           command.name == "section-join" || command.name == "track-freeze" ||
+                           command.name == "meter-insert" || command.name == "rebar";
         CHECK((!result.warning || result.message.find("works only in") != std::string::npos ||
                !command.keys || songs));
     }

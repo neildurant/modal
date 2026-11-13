@@ -216,6 +216,95 @@ TEST_CASE("tracks follow the conductor's meter unless they have their own")
     CHECK(song.sections()[0]->content(lead) == nullptr);
 }
 
+TEST_CASE("setting the meter over a span rebars only that span, and nothing moves in time")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn}; // eight bars of 4/4
+    const auto drums = song.addTrack("Drums");
+    const auto lead = song.addTrack("Lead");
+    song.updateEvents(drums, [&](EventList& events) { events.insert({5 * q, Note{36, 100, q}}); });
+    REQUIRE(
+        song.updateMeter(lead, [](MeterMap& meter) { meter = MeterMap{meter.ppqn(), {7, 8}}; }));
+    const auto leadMeter = song.meter(lead);
+
+    // Ten beats of 3/4 from bar 2 are three bars and a 1/4 bar; the span ends half way through
+    // bar 4 of the 4/4, so a 2/4 bar brings the bars back onto their old lines at bar 5's.
+    REQUIRE(song.setMeter(std::nullopt, 4 * q, 14 * q, {3, 4}));
+    CHECK(changesOf(song.meter()) ==
+          std::vector<MeterChange>{
+              {0, {4, 4}}, {4 * q, {3, 4}}, {13 * q, {1, 4}}, {14 * q, {2, 4}}, {16 * q, {4, 4}}});
+    CHECK(song.meter(drums) == song.meter()); // following it
+    CHECK(song.meter(lead) == leadMeter);     // its own, left alone
+    CHECK(ticksOf(song.events(drums)) == std::vector<Tick>{5 * q});
+    CHECK(song.end() == 32 * q);
+}
+
+TEST_CASE("setting the meter from inside a bar cuts it to a remainder bar first")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn};
+    // From bar 2's second beat to the end: a 1/4 bar, then nine bars of 3/4.
+    REQUIRE(song.setMeter(std::nullopt, 5 * q, song.end(), {3, 4}));
+    CHECK(changesOf(song.meter()) ==
+          std::vector<MeterChange>{{0, {4, 4}}, {4 * q, {1, 4}}, {5 * q, {3, 4}}});
+    CHECK(song.end() == 32 * q);
+}
+
+TEST_CASE("setting the meter over sections changes each apart, their bars starting at their "
+          "starts, and the meter before resuming")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn};
+    song.splitSection(16 * q, "Verse"); // four bars of 4/4 each
+    REQUIRE(song.setMeter(std::nullopt, 8 * q, 24 * q, {3, 4}));
+    CHECK(changesOf(song.sections()[0]->meter()) ==
+          std::vector<MeterChange>{{0, {4, 4}}, {8 * q, {3, 4}}, {14 * q, {2, 4}}});
+    CHECK(changesOf(song.sections()[1]->meter()) ==
+          std::vector<MeterChange>{{0, {3, 4}}, {6 * q, {2, 4}}, {8 * q, {4, 4}}});
+    CHECK(song.sections()[0]->length() == 16 * q);
+    CHECK(song.sections()[1]->length() == 16 * q);
+}
+
+TEST_CASE("setting one track's meter over a span gives it a meter of its own in that section only")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn};
+    song.splitSection(16 * q, "Verse");
+    const auto drums = song.addTrack("Drums");
+    const auto lead = song.addTrack("Lead");
+    const auto conductor = song.meter();
+
+    // Bar 2 of the lead in 7/8: a 7/8 bar and a 1/8 bar, then 4/4 again at bar 3's line.
+    REQUIRE(song.setMeter(lead, 4 * q, 8 * q, {7, 8}));
+    CHECK(song.meter() == conductor);
+    CHECK(song.meter(drums) == conductor);
+    REQUIRE(song.sections()[0]->content(lead));
+    REQUIRE(song.sections()[0]->content(lead)->meter);
+    CHECK(changesOf(*song.sections()[0]->content(lead)->meter) ==
+          std::vector<MeterChange>{
+              {0, {4, 4}}, {4 * q, {7, 8}}, {15 * q / 2, {1, 8}}, {8 * q, {4, 4}}});
+    // The Verse it didn't touch still follows.
+    const auto* verse = song.sections()[1]->content(lead);
+    CHECK((verse == nullptr || !verse->meter));
+}
+
+TEST_CASE("setting the meter refuses what it can't do, changing nothing")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song{ppqn};
+    const auto before = song;
+    CHECK_FALSE(song.setMeter(std::nullopt, 4 * q, 4 * q, {3, 4}));          // empty
+    CHECK_FALSE(song.setMeter(std::nullopt, 4 * q, song.end() + q, {3, 4})); // past the end
+    CHECK_FALSE(song.setMeter(TrackId{99}, 0, 4 * q, {3, 4}));               // no such track
+    CHECK_FALSE(song.setMeter(std::nullopt, 0, 4 * q, {3, 5}));              // not a power of two
+    CHECK(song == before);
+}
+
 TEST_CASE("a section keeps its length when the conductor's meter changes, but the last grows")
 {
     const auto ppqn = MODAL_ANY_PPQN();

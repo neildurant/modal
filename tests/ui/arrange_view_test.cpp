@@ -1235,3 +1235,98 @@ TEST_CASE("tracks can be moved from the arrangement, but not the conductor or th
     a.type(U"j");
     CHECK(a.document.song() == before);
 }
+
+namespace
+{
+// Every event of every track, to check a meter change moved nothing.
+std::vector<std::vector<core::Event>> allEvents(const core::Song& song)
+{
+    std::vector<std::vector<core::Event>> events;
+    for (const auto& track : song.tracks())
+    {
+        const auto all = song.events(track->id()).all();
+        events.emplace_back(all.begin(), all.end());
+    }
+    return events;
+}
+} // namespace
+
+TEST_CASE("the leader then b and m puts in a meter from the cursor to its section's end, for the "
+          "song, the prompt saying so first, and nothing moves")
+{
+    Arranging a;
+    const auto ppqn = a.document.song().ppqn();
+    const auto q = ppqn.quarter();
+    const auto before = allEvents(a.document.song());
+    const auto meter = a.document.song().meter();
+    a.type(U"ll"); // bar 3 of the Intro, on the Drums
+    a.type(U",bm");
+    CHECK(contains(a.status(), U"Meter from bar 3 of Intro, for the song (4/4): "));
+    a.type(U"3/4");
+    a.press(Key::of(NamedKey::Enter));
+    const auto& song = a.document.song();
+    CHECK(song.meter().signatureAt(8 * q) == core::TimeSignature{3, 4});
+    CHECK(song.meter().signatureAt(31 * q) == core::TimeSignature{3, 4});
+    CHECK(song.meter().signatureAt(32 * q) == core::TimeSignature{7, 8}); // the Verse's own
+    CHECK(a.meterOf(0) == song.meter());                                  // the Drums follow it
+    CHECK(a.ws.message() == "3/4 from bar 3 to the end of Intro, for the song");
+    CHECK(allEvents(song) == before);
+    a.type(U"u");
+    CHECK(a.document.song().meter() == meter);
+}
+
+TEST_CASE("on a track with a meter of its own, a meter put in is that track's")
+{
+    Arranging a;
+    const auto conductor = a.document.song().meter();
+    a.type(U"6j"); // the Ostinato, in 3/4 of its own
+    REQUIRE(a.document.song().tracks()[6]->name == "Ostinato");
+    a.type(U"l,bm");
+    CHECK(contains(a.status(), U", for Ostinato (3/4): "));
+    a.type(U"6/8");
+    a.press(Key::of(NamedKey::Enter));
+    const auto tick = a.ws.arrangement().cursor().tick;
+    CHECK(a.meterOf(6).signatureAt(tick) == core::TimeSignature{6, 8});
+    CHECK(a.document.song().meter() == conductor);
+    CHECK(a.ws.message().ends_with(", for Ostinato"));
+}
+
+TEST_CASE("in Visual mode the leader then b and m rebars a range for the song, tracks with their "
+          "own meter keeping it")
+{
+    Arranging a;
+    const auto q = a.document.song().ppqn().quarter();
+    const auto before = allEvents(a.document.song());
+    const auto ostinato = a.meterOf(6);
+    a.type(U"lvl"); // bars 2 and 3
+    a.type(U",bm");
+    CHECK(contains(a.status(), U"Rebar bars 2–3, for the song, in the meter (4/4): "));
+    a.type(U"3/4");
+    a.press(Key::of(NamedKey::Enter));
+    const auto& song = a.document.song();
+    // Eight beats of 3/4: two bars and a 2/4 bar, then 4/4 again at bar 4's old line.
+    CHECK(song.meter().signatureAt(4 * q) == core::TimeSignature{3, 4});
+    CHECK(song.meter().signatureAt(10 * q) == core::TimeSignature{2, 4});
+    CHECK(song.meter().signatureAt(12 * q) == core::TimeSignature{4, 4});
+    CHECK(a.meterOf(6) == ostinato);
+    CHECK(a.ws.message() == "Rebarred bars 2–3 to 3/4, for the song; Ostinato keeps its own "
+                            "3/4; Clave keeps its own 5/8");
+    CHECK(a.ws.mode() == Mode::Normal);
+    CHECK(allEvents(song) == before);
+}
+
+TEST_CASE(":meter and :rebar take the meter at the prompt, and rebarring tracks on their own "
+          "says it isn't built yet")
+{
+    Arranging a;
+    const auto q = a.document.song().ppqn().quarter();
+    a.type(U"l");
+    // As the : prompt runs it.
+    CHECK(a.registry.runLine("meter 5/4").message ==
+          "5/4 from bar 2 to the end of Intro, for the song");
+    CHECK(a.document.song().meter().signatureAt(4 * q) == core::TimeSignature{5, 4});
+    a.type(U"u");
+    a.press(Key::typed(U'v', kCtrl));
+    a.type(U"j,bm");
+    CHECK(a.ws.message().find("isn't built yet") != std::string::npos);
+}

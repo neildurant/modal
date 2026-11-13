@@ -987,6 +987,66 @@ bool Song::updateEvents(TrackId id, const std::function<void(EventList&)>& edit)
     return true;
 }
 
+bool Song::setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignature signature)
+{
+    if ((track && indexOf(*track) == tracks_.size()) || from < 0 || to <= from || to > end() ||
+        !signature.isValid() || !signature.beatLength().isExact(ppqn()))
+    {
+        return false;
+    }
+    for (std::size_t i = 0; i < sections_.size(); ++i)
+    {
+        const Tick start = starts_[i];
+        const Tick length = sections_[i]->length_;
+        if (start + length <= from || start >= to)
+        {
+            continue;
+        }
+        const auto* content = track ? sections_[i]->content(*track) : nullptr;
+        MeterMap meter = content && content->meter ? *content->meter : sections_[i]->meter_;
+        const Tick localFrom = std::max(from, start) - start;
+        const Tick localTo = std::min(to, start + length) - start;
+        // The meter before, where the span ends and the first of its bar lines from there.
+        const auto before = meter;
+        const auto changes = before.changes();
+        for (auto it = changes.rbegin(); it != changes.rend(); ++it)
+        {
+            if (it->tick > localFrom && it->tick < localTo)
+            {
+                meter.remove(it->tick);
+            }
+        }
+        meter.set(localFrom, signature);
+        if (localTo < length)
+        {
+            const auto resumed = before.signatureAt(localTo);
+            const Tick barLine = barLineAtOrAfter(before, localTo);
+            meter.set(localTo, resumed);
+            // Back onto the old bar lines, unless a change there already brings it.
+            if (barLine != localTo && barLine < length &&
+                std::ranges::find(changes, barLine, &MeterChange::tick) == changes.end())
+            {
+                meter.set(barLine, resumed);
+            }
+        }
+        if (track)
+        {
+            cutAt(meter, length);
+            updateContent(i, *track, [&](TrackContent& part) { part.meter = std::move(meter); });
+        }
+        else
+        {
+            auto section = std::make_shared<Section>(*sections_[i]);
+            cutAt(meter, length);
+            section->meter_ = std::move(meter);
+            replaceSection(i, std::move(section));
+        }
+    }
+    rebuildConductor();
+    rebuildMeters();
+    return true;
+}
+
 bool Song::followConductor(TrackId id)
 {
     const auto index = indexOf(id);

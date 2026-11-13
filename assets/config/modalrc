@@ -442,11 +442,16 @@ nmap <leader>sl label-to-section   "A section from the label"
 " meter changes and labels with it: , b d deletes the cursor's bar (3, b d three), keeping
 " them in the register as a section, and , b i inserts empty bars before it, asking how many
 " and in what meter, Enter taking one bar in the meter there, as :bar-delete and :bar-insert
-" do.
+" do. , b m puts in a meter at the cursor, to the next meter change or the section's end, and
+" in Visual mode rebars the selection, asking for the meter, the prompt saying what it will
+" change; neither moves a note (:meter 3/4, :rebar 3/4).
 keysection "Bars"
 ngroup <leader>b "Bars"
 nmap <leader>bd bar-delete        "Delete bars on every track"
 nmap <leader>bi bar-insert        "Insert empty bars on every track"
+nmap <leader>bm meter-insert      "Put in a meter here"
+vgroup <leader>b "Bars"
+vmap <leader>bm rebar             "Rebar the selection"
 
 " Text size: Ctrl with plus, minus or 0, on the keyboard or the keypad. Plus is shifted on
 " most keyboards, so Ctrl-= and Ctrl-Shift-= are bound too. Those without a hint aren't listed
