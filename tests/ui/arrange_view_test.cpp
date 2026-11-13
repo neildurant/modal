@@ -1486,3 +1486,52 @@ TEST_CASE("following the song's meter takes a selection only of whole sections, 
     CHECK(own(ostinato, 0));
     CHECK(own(clave, 0));
 }
+
+TEST_CASE("a track's bars are tinted where it has a meter of its own, for whole sections, and "
+          "the leader then T and b turns it off")
+{
+    Arranging a;
+    const int h = kCell.height;
+    const int tracksTop = ArrangePage::kRulerRows * h;
+    // The rows tinted, by their tops in the timeline.
+    const auto tinted = [&]
+    {
+        std::vector<int> rows;
+        for (const auto& region : a.ws.frame())
+            for (const auto& shape : region.under)
+                if (shape.role == Role::OwnMeter)
+                    rows.push_back((shape.rect.y - tracksTop) / h);
+        std::ranges::sort(rows);
+        rows.erase(std::unique(rows.begin(), rows.end()), rows.end());
+        return rows;
+    };
+    CHECK(tinted() == std::vector<int>{6, 7}); // the Ostinato and the Clave
+
+    // The Drums rebarred for a bar: its whole Intro, as it won't follow the song's there.
+    const auto q = a.document.song().ppqn().quarter();
+    a.document.edit("Rebar", {}, [&](core::Song& song)
+                    { song.setMeter(song.tracks()[0]->id(), 4 * q, 8 * q, {3, 4}); });
+    a.ws.refresh();
+    CHECK(tinted() == std::vector<int>{0, 6, 7});
+    // As wide as the Clave's there, which is its own for the whole song.
+    std::vector<int> widths;
+    for (const auto& region : a.ws.frame())
+        for (const auto& shape : region.under)
+            if (shape.role == Role::OwnMeter && shape.rect.x == 0 &&
+                (shape.rect.y == tracksTop || shape.rect.y == tracksTop + 7 * h))
+                widths.push_back(shape.rect.width);
+    REQUIRE(widths.size() == 2);
+    CHECK(widths[0] == widths[1]);
+
+    // Its view bar says so, and the Bass's doesn't.
+    CHECK(contains(a.barText(), U"Meter: 4/4 own"));
+    a.type(U"j");
+    CHECK(contains(a.barText(), U"Meter: 4/4"));
+    CHECK(!contains(a.barText(), U" own"));
+
+    a.type(U",Tb");
+    CHECK(tinted().empty());
+    CHECK(a.ws.message() == "Bars in a track's own meter not tinted");
+    a.type(U",Tb");
+    CHECK(tinted() == std::vector<int>{0, 6, 7});
+}

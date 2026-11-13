@@ -1916,6 +1916,17 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                    MessageKind::Information);
         return true;
     }
+    if (command == "own-meter-toggle")
+    {
+        if (lineHandler_)
+            lineHandler_("set ownmeter!");
+        else
+            ownMeter_ = !ownMeter_;
+        setMessage(ownMeter_ ? "Bars in a track's own meter tinted"
+                             : "Bars in a track's own meter not tinted",
+                   MessageKind::Information);
+        return true;
+    }
     if (command == "thru-toggle")
     {
         if (lineHandler_)

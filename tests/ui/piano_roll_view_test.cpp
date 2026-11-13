@@ -3,6 +3,7 @@
 #include <modal/core/document.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/key_notation.hpp>
+#include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -505,6 +506,68 @@ TEST_CASE("the piano roll's ruler names the sections and labels and numbers the 
     r.document.edit("Label", {}, [&](core::Song& song) { song.setLabel(t.bar(3), "Fill in"); });
     const auto named = rulerRow(r, 0);
     CHECK(texts(named) == Texts{U"Section 1", U"Verse", U" \u00B7 Fill in", U"Fill"});
+}
+
+TEST_CASE("the piano roll's ruler shows the track's meter at the left and where it changes")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Rolling r{ppqn};
+    const auto& t = r.t;
+    using Texts = std::vector<std::u32string>;
+    // Bars 1-4, all in 4/4: the meter at the left only.
+    CHECK(texts(rulerRow(r, 1)) == Texts{U"4/4"});
+
+    // The Bass in 3/4 of its own from bar 3, two bars and a 2/4 remainder bar, after a mark
+    // there, as the meter is for the whole bar.
+    r.document.edit("Meter", {}, [&](core::Song& song)
+                    { song.setMeter(song.tracks()[0]->id(), t.bar(3), t.bar(5), {3, 4}); });
+    r.type(U"3Gma");
+    const auto row = rulerRow(r, 1);
+    REQUIRE(texts(row).size() >= 3);
+    CHECK(texts(row)[0] == U"4/4");
+    CHECK(texts(row)[1] == U"a");
+    CHECK(texts(row)[2] == U"3/4");
+    CHECK(row[1].first < row[2].first);
+
+    // The view's bar says the meter is the track's own there.
+    std::u32string all;
+    for (const auto& region : r.ws.frame())
+        for (const auto& run : region.text)
+            all += run.text;
+    CHECK(all.find(U"3/4 own") != std::u32string::npos);
+}
+
+TEST_CASE("a text sign goes after the signs at its place and their labels, or is a tick")
+{
+    const int w = kCell.width;
+    const auto runs = [&](const Region& region)
+    {
+        std::vector<std::pair<int, std::u32string>> found;
+        for (const auto& run : region.text)
+            found.emplace_back(run.x, run.text);
+        std::ranges::sort(found);
+        return found;
+    };
+    using Runs = std::vector<std::pair<int, std::u32string>>;
+    Region spaced;
+    addRowSigns(spaced,
+                {{0, 0, U'\0', Role::Dim, {}, true, U"3/4"},
+                 {0, 0, U'\u25B2', Role::EventSign, U"96"},
+                 {10 * w, 0, U'k'}},
+                kCell);
+    CHECK(runs(spaced) ==
+          Runs{{0, U"\u25B2"}, {w, U"96"}, {3 * w + w / 2, U"3/4"}, {10 * w, U"k"}});
+
+    // With no room before the next sign, a tick, and the next where it was.
+    Region crowded;
+    addRowSigns(crowded,
+                {{0, 0, U'\0', Role::Dim, {}, true, U"3/4"},
+                 {0, 0, U'\u25B2', Role::EventSign, U"96"},
+                 {5 * w, 0, U'k'}},
+                kCell);
+    CHECK(runs(crowded) == Runs{{0, U"\u25B2"}, {w, U"96"}, {5 * w, U"k"}});
+    CHECK(std::ranges::any_of(crowded.under,
+                              [](const Shape& shape) { return shape.role == Role::Dim; }));
 }
 
 TEST_CASE("the piano roll keeps its view when it's shown again, but Enter opens whole bars")

@@ -196,6 +196,7 @@ public:
     void setRewind(bool rewind);
     void setThru(bool on);
     void setQuantizeMarks(bool marks) { quantizeMarks_ = marks; }
+    void setOwnMeter(bool tint) { ownMeter_ = tint; }
     // Whether a note in the piano roll is heard as the cursor lands on it, and as one is added
     // or moved to a new pitch (the audition setting, decided 12 November 2026).
     void setAudition(bool on) { audition_ = on; }
@@ -432,6 +433,7 @@ private:
     const core::Player* player() const override { return player_; }
     std::vector<core::TrackId> movingTracks() const override;
     bool quantizeMarks() const override { return quantizeMarks_; }
+    bool ownMeter() const override { return ownMeter_; }
     std::vector<std::string> outputPorts() const override
     {
         return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
@@ -919,6 +921,7 @@ private:
     core::VelocityLimits velocityLimits_;
     QuantizePedal quantizePedal_ = QuantizePedal::Follow;
     bool quantizeMarks_ = true;
+    bool ownMeter_ = true;
     bool refused_ = false; // the last key's command, refused or given up
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;

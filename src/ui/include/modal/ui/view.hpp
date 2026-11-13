@@ -223,6 +223,9 @@ public:
     // Whether to mark where a quantised track's notes will be heard (quantizemarks).
     virtual bool quantizeMarks() const = 0;
 
+    // Whether to tint the bars where a track has a meter of its own (ownmeter).
+    virtual bool ownMeter() const = 0;
+
     // The tracks being moved through the others, to show them.
     virtual std::vector<core::TrackId> movingTracks() const = 0;
 

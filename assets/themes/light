@@ -26,6 +26,7 @@ highlight density-1    #c6d6b1
 highlight density-2    #a3c084
 highlight density-3    #7c9e5a
 highlight density-4    #587539
+highlight own-meter    #d6cfe6
 highlight hint-key     #587539
 highlight hint-group   #9854f1
 highlight match        #007197

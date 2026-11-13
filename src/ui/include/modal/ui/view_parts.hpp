@@ -158,9 +158,12 @@ Region labelledBar(const std::vector<BarPair>& left, const std::vector<BarPair>&
 // playback quantise, program and bank where it has them.
 std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track);
 
-// Where the cursor is: its position, time and meter, fixed in width.
+// Where the cursor is: its position, time and meter, fixed in width; for a track, the meter
+// followed by "own" where the track has a meter of its own, which the song's changes don't
+// reach (decided 13 November 2026).
 std::vector<BarPair> cursorPlacePairs(const core::Song& song, const core::MeterMap& meter,
-                                      core::Tick tick);
+                                      core::Tick tick,
+                                      std::optional<core::TrackId> track = std::nullopt);
 
 // The bar naming a track; and, in a view with a timeline, where the cursor is at the right:
 // its section and the section's bars, then its place.
@@ -176,12 +179,15 @@ struct RowSign
     Role role = Role::Text;
     std::u32string label = {}; // after it, if there's room before the next sign
     bool moves = true;         // false for the play-from marker, whose place matters
+    // Drawn in place of the character, as a meter is, after the other signs at its place, as
+    // it's for a whole bar: whole if there's room before the next sign, or else a tick.
+    std::u32string text = {};
 };
 
 // Signs, each in a box of the background, so a line through the row doesn't run through it.
 // Those in a row that would overlap go one after another from the leftmost, so marks a beat
-// apart read "ab" from the first's place; at the same place, in the order given. One that
-// doesn't move stays at its place, the next going after it.
+// apart read "ab" from the first's place; at the same place, in the order given, a text last.
+// One that doesn't move stays at its place, the next going after it.
 void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell);
 
 // A mark's dot, at its time in a row of bars or notes, its letter being in the ruler's row of

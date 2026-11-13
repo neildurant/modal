@@ -2428,6 +2428,32 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     }
     addTempoSigns(signs, song.tempo(), p.start, p.end, h,
                   [&](core::Tick tick) { return scale.toX(tick) + 2 * lineWidth; });
+    // The track's meters, in whose bars the view counts: each change, and at the left the one
+    // in force there, so every bar's meter shows without counting lines (decided 13 November
+    // 2026); after the other signs at their place, being for the whole bar.
+    const auto meterSign = [&](core::Tick tick, core::TimeSignature signature)
+    {
+        signs.push_back({scale.toX(tick) + 2 * lineWidth,
+                         h,
+                         U'\0',
+                         Role::Dim,
+                         {},
+                         true,
+                         decodeUtf8(std::to_string(signature.numerator) + "/" +
+                                    std::to_string(signature.denominator))});
+    };
+    const auto changes = m.changes();
+    if (std::ranges::find(changes, p.start, &core::MeterChange::tick) == changes.end())
+    {
+        meterSign(p.start, m.signatureAt(p.start));
+    }
+    for (const auto& change : changes)
+    {
+        if (inView(change.tick))
+        {
+            meterSign(change.tick, change.signature);
+        }
+    }
     addRowSigns(ruler, std::move(signs), cell_);
 
     // The third row: the bars, in the track's bars, numbered at their lines, every so many
@@ -2814,7 +2840,7 @@ void PianoRollView::addRegions(Frame& frame) const
                          ? std::to_string(p.firstBar)
                          : std::to_string(p.firstBar) + "–" + std::to_string(p.lastBar),
                      kDropBars});
-    std::ranges::move(cursorPlacePairs(song, meter(), time_), std::back_inserter(right));
+    std::ranges::move(cursorPlacePairs(song, meter(), time_, trackId()), std::back_inserter(right));
     frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
 
     auto inspector =

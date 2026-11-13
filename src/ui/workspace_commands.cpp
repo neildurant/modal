@@ -504,6 +504,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "quantize-marks-toggle",
                 .description = "Mark in the piano roll where a quantised track's notes will be "
                                "heard, or stop"},
+    CommandInfo{.name = "own-meter-toggle",
+                .description = "Tint, or stop tinting, the arrangement's bars where a track has a "
+                               "meter of its own"},
     CommandInfo{.name = "thru-toggle", .description = "Turn MIDI Thru on or off for every track"},
     CommandInfo{.name = "rewind-toggle",
                 .description = "Turn rewind on or off: whether the play-from marker stays put "

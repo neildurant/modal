@@ -9,8 +9,10 @@
 #include <array>
 #include <cmath>
 #include <iterator>
+#include <ranges>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -323,8 +325,9 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
 
 void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
 {
-    std::ranges::stable_sort(signs, [](const RowSign& a, const RowSign& b)
-                             { return a.y != b.y ? a.y < b.y : a.x < b.x; });
+    std::ranges::stable_sort(
+        signs, [](const RowSign& a, const RowSign& b)
+        { return std::tuple{a.y, a.x, !a.text.empty()} < std::tuple{b.y, b.x, !b.text.empty()}; });
     int right = 0; // the last's in the row
     for (std::size_t i = 0; i < signs.size(); ++i)
     {
@@ -333,12 +336,41 @@ void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
         {
             x = std::max(x, right);
         }
+        const bool next = i + 1 < signs.size() && signs[i + 1].y == signs[i].y;
+        if (const auto& text = signs[i].text; !text.empty())
+        {
+            // Half a space after what it follows, so a tempo and a meter don't read as one
+            // number, while a mark a beat on leaves room.
+            if (i > 0 && signs[i - 1].y == signs[i].y && right >= signs[i].x)
+            {
+                x = right + cell.width / 2;
+            }
+            const int end = x + static_cast<int>(text.size()) * cell.width;
+            if (!next || signs[i + 1].x >= end)
+            {
+                region.under.push_back(
+                    {{x, signs[i].y, end - x, cell.height}, Role::Background, 255});
+                region.text.push_back(
+                    {x, signs[i].y, text, {signs[i].role, Role::Background, kPlain}});
+                right = end;
+            }
+            else
+            {
+                // A tick in the lower part of the row, so the next sign can still be read.
+                const int line = std::max(hairline(cell), 1);
+                const int height = cell.height / 3;
+                region.under.push_back(
+                    {{x, signs[i].y + cell.height - height, line, height}, signs[i].role, 255});
+                right = x + 2 * line;
+            }
+            continue;
+        }
         right = x + cell.width;
         if (const auto& label = signs[i].label; !label.empty())
         {
             const int end = right + static_cast<int>(label.size()) * cell.width;
-            const bool room =
-                i + 1 == signs.size() || signs[i + 1].y != signs[i].y || signs[i + 1].x >= end;
+            // A text, a meter, goes after the label rather than hiding it.
+            const bool room = !next || signs[i + 1].x >= end || !signs[i + 1].text.empty();
             if (room)
             {
                 region.text.push_back(
@@ -595,9 +627,23 @@ std::vector<BarPair> trackPairs(const core::Song& song, std::size_t track)
 }
 
 std::vector<BarPair> cursorPlacePairs(const core::Song& song, const core::MeterMap& meter,
-                                      core::Tick tick)
+                                      core::Tick tick, std::optional<core::TrackId> track)
 {
     auto parts = placeParts(song, meter, tick);
+    const auto ownIn = [&](std::size_t section)
+    {
+        const auto* content = song.sections()[section]->content(*track);
+        return content != nullptr && content->meter.has_value();
+    };
+    // Only for a track with a meter of its own somewhere, so other songs lose no room; as wide
+    // in every section, so nothing moves going from one to the next.
+    if (track &&
+        std::ranges::any_of(std::views::iota(std::size_t{0}, song.sections().size()), ownIn))
+    {
+        parts.meter = padText(meterText(meter.signatureAt(tick)) +
+                                  (ownIn(song.sectionAt(tick)) ? " own" : ""),
+                              kMeterWidth + 4, false);
+    }
     return {{"Position:", std::move(parts.position)},
             {"Time:", std::move(parts.time)},
             {"Meter:", std::move(parts.meter)}};
@@ -616,7 +662,10 @@ Region trackBarRegion(const core::Song& song, std::size_t track, std::optional<c
         const auto last = meter.toBarBeatTick(song.sectionStart(section + 1) - 1).bar;
         right.push_back({"Section:", song.sections()[section]->name(), kDropSection});
         right.push_back({"Bars:", std::to_string(first) + "–" + std::to_string(last), kDropBars});
-        std::ranges::move(cursorPlacePairs(song, meter, *tick), std::back_inserter(right));
+        const auto id = track > 0 && track <= song.tracks().size()
+                            ? std::optional{song.tracks()[track - 1]->id()}
+                            : std::nullopt;
+        std::ranges::move(cursorPlacePairs(song, meter, *tick, id), std::back_inserter(right));
     }
     return labelledBar(trackPairs(song, track), right, bounds, width, cell);
 }

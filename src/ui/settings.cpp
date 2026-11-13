@@ -154,6 +154,10 @@ Settings::Settings()
                   "Whether the piano roll marks where a note of a track quantised as it plays "
                   "will be heard, when that's far from where it's stored",
                   true),
+          setting("ownmeter",
+                  "Whether the arrangement tints a track's bars where it has a meter of its own, "
+                  "rather than following the song's",
+                  true),
           setting("rewind",
                   "Whether the play-from marker, which Space plays from, stays put when "
                   "playback stops (on), or moves to where it stopped (off)",

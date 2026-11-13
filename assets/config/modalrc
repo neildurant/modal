@@ -196,6 +196,7 @@ nmap <leader>n  default-note-set          "Default note from this one"
 ngroup <leader>T "Toggles"
 nmap <leader>Tq quantize-bypass-toggle "Bypass playback quantise, to compare"
 nmap <leader>Tm quantize-marks-toggle "Marks of where quantised notes play"
+nmap <leader>Tb own-meter-toggle "Tint bars in a track's own meter"
 nmap <leader>Tg grid-advance-toggle "O by grid step or note length"
 nmap <leader>Ta audition-toggle "Audition notes"
 

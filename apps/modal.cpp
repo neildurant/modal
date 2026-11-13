@@ -490,6 +490,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.setAudition(settings.flag("audition"));
     view.setThru(settings.flag("thru"));
     view.setQuantizeMarks(settings.flag("quantizemarks"));
+    view.setOwnMeter(settings.flag("ownmeter"));
     if (auto own = playback.openOwnPorts(); error.empty())
     {
         error = std::move(own);

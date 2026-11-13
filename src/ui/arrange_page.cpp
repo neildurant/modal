@@ -329,7 +329,7 @@ void ArrangePage::follow()
 
 void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
-                             const std::vector<core::TrackId>& moving) const
+                             const std::vector<core::TrackId>& moving, bool ownMeters) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -404,6 +404,30 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     const int gap = column <= whole ? lineWidth : 0;
     const auto spaced = [&](core::Tick ticks)
     { return ticks * cell_.width >= minLineSpacing(cell_) * column; };
+
+    // Where a track has a meter of its own, its whole section tinted, under everything else:
+    // by having one, not by its differing from the song's, since it won't follow the song's
+    // either way (decided 13 November 2026).
+    if (ownMeters)
+    {
+        for (int line = 0; line < shownTracks; ++line)
+        {
+            const auto id = tracks[topTrack_ + static_cast<std::size_t>(line)]->id();
+            const int y = tracksTop + line * cell_.height;
+            for (std::size_t s = 0; s < song_.sections().size(); ++s)
+            {
+                const auto from = std::max(song_.sectionStart(s), leftTick_);
+                const auto to = std::min(song_.sectionStart(s + 1), shownEnd);
+                const auto* content = song_.sections()[s]->content(id);
+                if (from < to && content != nullptr && content->meter)
+                {
+                    const int x0 = scale.toX(from);
+                    timeline.under.push_back(
+                        {{x0, y, scale.toX(to) - x0, cell_.height}, Role::OwnMeter, 255});
+                }
+            }
+        }
+    }
 
     // The cursor's bar, as a span of time across every track, or a Visual selection in its
     // place, and the cursor's bar boxed on its own track: its sides in the gaps either side of

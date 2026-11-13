@@ -49,6 +49,7 @@ enum class Role : std::uint8_t
     Density2,
     Density3,
     Density4,
+    OwnMeter,     // behind a track's bars where it has a meter of its own (ownmeter)
     HintKey,      // a key in the hint menu
     HintGroup,    // a group in the hint menu, keys that lead to more
     NoteSelected, // the note under the cursor, and the notes a selection takes

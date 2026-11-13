@@ -116,9 +116,10 @@ public:
         core::Tick to;
         bool sections = false; // on the strip, sections, drawn there too
     };
+    // ownMeters tints a track's bars where it has a meter of its own, for whole sections.
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
                     std::optional<Selected> selected = std::nullopt,
-                    const std::vector<core::TrackId>& moving = {}) const;
+                    const std::vector<core::TrackId>& moving = {}, bool ownMeters = true) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.
