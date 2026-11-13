@@ -379,6 +379,10 @@ void Workspace::showSong()
     ports_->showSong();
     metronome_->showSong();
     history_.clear();
+    // A different song plays from its start, not from where the last one's marker was (found
+    // in the hardware trial, 13 November 2026).
+    if (player_ != nullptr)
+        player_->setMarker(0);
     layOut();
 }
 

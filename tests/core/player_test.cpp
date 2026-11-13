@@ -105,6 +105,35 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
     CHECK(p.lookedUp.size() == 4);
 }
 
+TEST_CASE("the metronome set to always clicks in plain playback, and set to while recording "
+          "doesn't")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = fourNotes(ppqn, "a");
+    song.metronome.port = "b"; // destination 2, apart from the track's
+    const auto clicks = [](const Playing& p)
+    {
+        return std::ranges::count_if(p.sink.sent,
+                                     [](const auto& sent)
+                                     {
+                                         return sent.destination == DestinationId{2} &&
+                                                (sent.bytes[0] & 0xF0) == 0x90 && sent.bytes[2] > 0;
+                                     });
+    };
+
+    song.metronome.when = MetronomeSettings::When::Always;
+    Playing always{song};
+    REQUIRE(always.player.play());
+    always.runFor(1100ms); // three beats at 120 BPM
+    CHECK(clicks(always) == 3);
+
+    song.metronome.when = MetronomeSettings::When::Recording;
+    Playing recording{song};
+    REQUIRE(recording.player.play());
+    recording.runFor(1100ms);
+    CHECK(clicks(recording) == 0);
+}
+
 TEST_CASE("playback starts from the marker, which stays put with rewind")
 {
     const auto ppqn = MODAL_ANY_PPQN();

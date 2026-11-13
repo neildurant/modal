@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 12 November 2026: recording's automated coverage is filled in and published; its hardware checklist, below, is waiting for runs on Windows and Linux, the last of milestone 8. See [schedule.md](schedule.md) for work order.*
+*Last updated 13 November 2026: the recording hardware checklist passed on Windows and Linux; two fixes found alongside it (the metronome set to always, and the marker on a new song) are committed locally to be tried, after which milestone 8 is done. See [schedule.md](schedule.md) for work order.*
 
 ## Current handoff
 
@@ -213,7 +213,9 @@ Agreed on 10 November 2026 after the 8.2 hardware trial (design.md, Ports). Step
 
 **To try:** delete the `set inputs=` and `set port=` lines from `modalrc` (now unknown settings). Start Modal: it should say no MIDI ports are enabled. `, v m`: enable the Xkey input and the loopMIDI output (Enter on E), give them aliases, make loopMIDI the default output (Enter on D), and check Thru and playback reach the host. Plug a device in and out: the list should follow, an absent enabled port saying "not connected" in the warning colour. In Tracks, the choosers should offer only enabled ports, by alias. Restart: the choices should be kept, in `%LOCALAPPDATA%\Modal\ports`.
 
-## Recording: coverage and hardware trials (12 November 2026; checklist waiting to be run)
+## Recording: coverage and hardware trials (12 November 2026; checklist passed 13 November 2026)
+
+**Hardware checklist passed** on Windows and Linux, 13 November 2026, run by Neil: every item, including the `modal-loopback --record` re-runs. Found alongside it, and fixed (committed locally to be tried): the metronome set to always clicked only while recording, as the player gave the plan the click's port only then; and a new song from the palette kept the old song's play-from marker, now put back at the start for a new or opened song. Each has a test that failed before the fix. Windows Debug passes 957 tests; WSL linux-clang-debug 958, no warnings.
 
 Milestone 8's last item (schedule.md). The audit of recording's tests against the design found the core well covered (the recorder's and count-in's tests all at three resolutions, nearly all the scheduler's, engine's, player's and plan's) and the workspace's end-to-end tests short in places. Added, as workspace tests driving `R` with keys through the engine: a take at 96 PPQN landing on its beat; a take through a tempo change landing where the music is; the marker after a take, back at the record point with rewind and where it stopped without, the next take starting there; two takes in a row, each an undo step, the second replacing the first in replace mode and kept with it in overdub; a pre-roll take, what's played before the record point left out and a note held across it starting there; overdub with a pedal pressed in the count-in, starting at the record point with what was there kept; and two armed tracks recorded at once. All passed as written, finding no fault. Windows Debug passes 955 tests; WSL linux-clang-debug 956, no warnings.
 
@@ -267,12 +269,19 @@ Recorded 2000 of 2000 notes. Missing 0, extra 0.
   Off arrival time      0 recorded at a tick other than the one they arrived at
 
 2. **A take from a keyboard:** arm a track, `R`, play to the click through the count-in and on, Space; play it back and check it sounds as played, and that `u` undoes it.
+Verified 13/11/2026
 3. **Pre-roll and overdub:** a pre-roll take from bar 5, playing along; then the same bars in overdub, adding to it. In replace mode, check the track goes silent from the record point.
+Verified 13/11/2026
 4. **Sustain pedal** held across the record point and across the stop: the take should start and end with it, nothing left held.
+Verified 13/11/2026
 5. **Two tracks armed** on different channels and sounds: one take onto both, each playing its own sound.
+Verified 13/11/2026
 6. **Unplug the keyboard mid-take,** then stop: the stop message should say the input was lost, and what was played before it kept.
+Verified 13/11/2026
 7. **A flood:** sweep the mod wheel and pitch bend hard, with aftertouch if the keyboard sends it, through a take. Nothing should be lost; if anything is, `IN` should turn the warning colour and the stop message say how many.
+Verified 13/11/2026 - I was unable to get it to the point where anything was detected as lost.
 8. **Thru while recording:** whether it feels immediate through the count-in and the take.
+Verified 13/11/2026
 
 ## Layout tweaks after use (12 November 2026; accepted and published)
 

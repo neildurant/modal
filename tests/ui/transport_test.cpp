@@ -7,6 +7,7 @@
 #include <modal/core/player.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -1187,6 +1188,15 @@ TEST_CASE("recording onto two armed tracks puts the take on each, and says so as
     p.type(U"u");
     CHECK_FALSE(hasPitch(p.document.song(), first, 99));
     CHECK_FALSE(hasPitch(p.document.song(), second, 99));
+}
+
+TEST_CASE("a new or opened song plays from its start, the marker put back there")
+{
+    Playing p;
+    p.player.setMarker(4 * p.document.song().ppqn().whole());
+    p.document.replace(newSong(), std::nullopt);
+    p.ws.showSong();
+    CHECK(p.player.marker() == 0);
 }
 
 TEST_CASE("the leader then r and m switches the song between replace and overdub")

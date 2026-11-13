@@ -69,9 +69,14 @@ std::shared_ptr<const PlaybackPlan> Player::compile(const Song& song)
         options.resolveInput = [&](std::string_view name) { return inputs.find(name)->second; };
     }
     options.bypassQuantize = bypassQuantize_;
-    // While recording, the plan keeps the metronome, as edits replace it.
+    // The click's port: while recording, the one looked up as it began, as edits replace the
+    // plan; otherwise, with the metronome set to always, the one it names now (found missing in
+    // the hardware trial, 13 November 2026, when always clicked only while recording).
     options.recording = recorder_.has_value();
-    options.metronomeDestination = recorder_ ? click_ : std::nullopt;
+    options.metronomeDestination = recorder_ ? click_
+                                   : song.metronome.when == MetronomeSettings::When::Always
+                                       ? lookUp(song.metronome.port)
+                                       : std::nullopt;
     // Replacing, the tracks being recorded are silent from the record point, as the take will
     // leave them.
     if (recorder_ && replacing_)
