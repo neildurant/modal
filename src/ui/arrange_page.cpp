@@ -469,6 +469,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     // the bar's block, its top and bottom above and below it.
     int cursorX0 = 0;
     int cursorX1 = 0;
+    int fillTop = tracksTop;
+    int fillBottom = tracksBottom;
     {
         const auto& meter = meterOf(currentTrack());
         const auto barNumber = meter.toBarBeatTick(time_).bar;
@@ -476,8 +478,6 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         const int x1 = scale.toX(std::min(meter.barStart(barNumber + 1), end_)) + gap;
         cursorX0 = x0;
         cursorX1 = x1;
-        int fillTop = tracksTop;
-        int fillBottom = tracksBottom;
         if (selected)
         {
             cursorX0 = scale.toX(selected->from);
@@ -552,13 +552,14 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             if (level == 0)
             {
                 // Dim where it crosses the cursor's bar, as the empty tracks' dots are, since
-                // beat-line is close to the selection's colour.
+                // beat-line is close to the selection's colour; only on the rows a selection
+                // takes, so it doesn't run above and below a box (found 14 November 2026).
                 const int thickness = std::max(cell_.height / 16, 1);
                 const int lineY = y + (cell_.height - thickness) / 2;
                 timeline.under.push_back({{x0, lineY, width, thickness}, Role::BeatLine, 255});
                 const int from = std::max(x0, cursorX0);
                 const int to = std::min(x0 + width, cursorX1);
-                if (from < to)
+                if (from < to && y >= fillTop && y < fillBottom)
                 {
                     timeline.under.push_back({{from, lineY, to - from, thickness}, Role::Dim, 255});
                 }

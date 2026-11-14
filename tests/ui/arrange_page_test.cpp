@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -707,4 +708,35 @@ TEST_CASE("the track rows are shaded across the names and bars, with no line bet
     REQUIRE_FALSE(timeline.under.empty());
     CHECK(timeline.under.front() ==
           Shape{{0, top, timeline.bounds.width, tracks * kCell.height}, Role::TrackRows, 255});
+}
+
+TEST_CASE("a quiet bar's line is brighter only where the selection or cursor's bar covers it")
+{
+    auto page = page92x22();
+    const int thickness = std::max(kCell.height / 16, 1);
+    const auto brightRows = [&](std::optional<ArrangePage::Selected> selected)
+    {
+        Frame frame;
+        page.addRegions(frame, std::nullopt, selected);
+        std::vector<int> rows;
+        for (const auto& shape : frame[1].under)
+        {
+            if (shape.role == Role::Dim && shape.rect.height == thickness &&
+                shape.rect.width != thickness)
+            {
+                rows.push_back(shape.rect.y / kCell.height - ArrangePage::kRulerRows);
+            }
+        }
+        std::ranges::sort(rows);
+        const auto [first, last] = std::ranges::unique(rows);
+        rows.erase(first, last);
+        return rows;
+    };
+    // The cursor's bar spans every track, so some quiet bars there are brightened.
+    REQUIRE(brightRows(std::nullopt).size() > 1);
+    // A box of one track brightens that track's alone.
+    const auto all = brightRows(std::nullopt);
+    const auto track = static_cast<std::size_t>(all.front());
+    const auto rows = brightRows(ArrangePage::Selected{track, track, 0, page.rightTick()});
+    CHECK(rows == std::vector<int>{all.front()});
 }
