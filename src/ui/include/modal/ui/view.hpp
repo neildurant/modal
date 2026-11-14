@@ -277,8 +277,10 @@ public:
     // moved by the view itself.
     virtual void moveSelection(core::Tick by, int pitches,
                                std::vector<Selection::NotePosition> notes) = 0;
-    // Sets the values a Ctrl-v box in a controller lane takes between.
+    // Sets the values a Ctrl-v box in a controller lane takes between; and keeps the notes it
+    // took as their values change, until the cursor moves or its values do.
     virtual void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) = 0;
+    virtual void keepSelectionNotes(std::vector<Selection::NotePosition> notes) = 0;
 
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.

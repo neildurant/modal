@@ -8,6 +8,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -154,8 +155,10 @@ TEST_CASE("in the lane a number then Enter sets the velocity, and . repeats it")
     l.type(U".");
     CHECK(l.velocity(0, 31) == 100);
 
+    // Enter alone asks, as below.
     l.press(Key::of(NamedKey::Enter));
-    CHECK(l.ws.message().starts_with("Type the velocity first"));
+    CHECK(l.ws.mode() == Mode::CommandLine);
+    l.press(Key::of(NamedKey::Escape));
     l.type(U"200");
     l.press(Key::of(NamedKey::Enter));
     CHECK(l.ws.message() == "A velocity goes from 1 to 127");
@@ -236,17 +239,63 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
     l.press(Key::typed(U'v', kCtrl));
     l.type(U"16l");
     CHECK(l.view().laneTaken().size() == 1);
-    // k and j move the box's other edge, not the velocities.
-    l.type(U"J");
+    // Alt-k and Alt-j move the box's other edge, not the velocities.
+    l.press(Key::typed(U'j', kAlt | kShift));
     CHECK(l.velocity(0, 28) == 96);
     CHECK(l.view().laneTaken().size() == 1);
-    l.type(U"J");
+    l.press(Key::of(NamedKey::Down, kAlt | kShift));
     CHECK(l.view().laneTaken().size() == 2); // and G1's 80
+    // k and j change the velocities it takes, as on v's selection or a note.
+    l.type(U"k");
+    CHECK(l.velocity(0, 28) == 97);
+    CHECK(l.velocity(0, 31) == 81);
     l.type(U"110");
     l.press(Key::of(NamedKey::Enter));
     CHECK(l.velocity(0, 28) == 110);
     CHECK(l.velocity(0, 31) == 110);
     CHECK(l.velocity(l.bar(2), 45) == 50);
+}
+
+TEST_CASE("Alt-k and Alt-j are refused in the lane without a Ctrl-v box")
+{
+    Lane l;
+    l.intoLane();
+    l.press(Key::typed(U'k', kAlt));
+    CHECK(l.ws.message() == "Alt-k and Alt-j move the velocity edge of a Ctrl-v box");
+    CHECK(l.velocity(0, 28) == 96);
+}
+
+TEST_CASE("Enter alone in the lane asks for a velocity, or a change to it")
+{
+    Lane l;
+    const auto answer = [&](std::u32string_view text)
+    {
+        l.press(Key::of(NamedKey::Enter));
+        REQUIRE(l.ws.mode() == Mode::CommandLine);
+        l.type(text);
+        l.press(Key::of(NamedKey::Enter));
+    };
+    l.intoLane();
+    answer(U"+30");
+    CHECK(l.velocity(0, 28) == 126);
+    answer(U"-26");
+    CHECK(l.velocity(0, 28) == 100);
+    answer(U"50%");
+    CHECK(l.velocity(0, 28) == 50);
+    answer(U"90");
+    CHECK(l.velocity(0, 28) == 90);
+    answer(U"+x");
+    CHECK(l.ws.message().starts_with("A velocity is 1 to 127"));
+    CHECK(l.velocity(0, 28) == 90);
+
+    // On a selection, every note it takes, stopping at the ends of the range.
+    l.type(U"v16l");
+    answer(U"+40");
+    CHECK(l.velocity(0, 28) == 127);
+    CHECK(l.velocity(0, 31) == 120);
+    CHECK(l.velocity(l.bar(2), 45) == 90);
+    l.type(U"u");
+    CHECK(l.velocity(0, 31) == 80);
 }
 
 TEST_CASE("the lane refuses what takes notes or pitches, and V")
@@ -275,8 +324,9 @@ TEST_CASE("a chord's velocity bars fan out side by side in the lane, low to high
     Lane l;
     const auto frame = l.ws.frame();
     // The lane: right of its name, vel, under the keyboard.
-    const auto name = std::ranges::find_if(frame, [](const Region& region)
-                                           { return !region.text.empty() && region.text.front().text == U"vel"; });
+    const auto name = std::ranges::find_if(
+        frame, [](const Region& region)
+        { return !region.text.empty() && region.text.front().text == U"vel"; });
     REQUIRE(name != frame.end());
     const Region* lane = nullptr;
     for (const auto& region : frame)
@@ -301,4 +351,46 @@ TEST_CASE("a chord's velocity bars fan out side by side in the lane, low to high
     CHECK(bars[0].x < bars[1].x);
     // E1, the lower, first, and the taller, at 96 to G1's 80.
     CHECK(bars[0].height > bars[1].height);
+}
+
+TEST_CASE("a chord's late note's bar is at its own time in the lane, not with the others")
+{
+    Lane l;
+    // A third note a 32nd after the chord, within a chordwindow of 100 ms, zoomed in to a bar.
+    l.ws.pianoRoll().setChordWindow(std::chrono::milliseconds{100});
+    const auto late = l.ppqn.quarter() / 8;
+    l.document.edit("Late", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(song.tracks()[0]->id(), [&](core::EventList& events)
+                                          { events.insert({late, core::Note{40, 60, 100}}); });
+                    });
+    l.type(U"gg");
+    l.type(U"zizi");
+    const auto frame = l.ws.frame();
+    const auto name = std::ranges::find_if(
+        frame, [](const Region& region)
+        { return !region.text.empty() && region.text.front().text == U"vel"; });
+    REQUIRE(name != frame.end());
+    std::vector<Rect> bars;
+    for (const auto& region : frame)
+    {
+        if (region.bounds.y == name->bounds.y &&
+            region.bounds.x == name->bounds.x + PianoRollView::kKeyColumns * kCell.width)
+        {
+            for (const auto& shape : region.under)
+            {
+                if ((shape.role == Role::Note || shape.role == Role::NoteSelected) &&
+                    shape.rect.x < region.bounds.width / 4)
+                {
+                    bars.push_back(shape.rect);
+                }
+            }
+        }
+    }
+    REQUIRE(bars.size() == 3);
+    std::ranges::sort(bars, {}, &Rect::x);
+    // The two at the start side by side, the late one well after them.
+    CHECK(bars[1].x - bars[0].x < 6);
+    CHECK(bars[2].x - bars[1].x > 6);
 }

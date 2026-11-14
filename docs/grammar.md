@@ -226,17 +226,19 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 On a Visual selection, the moving and length keys act on every note it takes, refused as a whole if a note would overlap another of its pitch, and the selection moves with them; repeated moves of the same kind undo together within that unchanged selection. Ending Visual mode or redefining the selection starts a new undo step for its next moves, including after Escape and `gv`. After the first move, it retains those notes: passing over another note does not collect it, and snapping off-grid notes keeps the bounds around all their new starts. Deleting, yanking and transforms take that same moved set, including after Escape and `gv`. Deliberately extending the selection, changing its Visual kind or choosing another object selects an area again.
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |
 
-**The velocity lane,** below the notes: `gl` goes in, onto the velocity of the note the cursor was in, its name `vel` lit while the cursor's there, and `Escape` goes back to the notes.
+**The velocity lane,** below the notes: `gl` goes in, onto the velocity of the note the cursor was in, its name `vel` lit while the cursor's there and the cursor a line at its time, the current note's bar in the accent colour, and `Escape` goes back to the notes.
 
 | Keys | Does, in the lane |
 | --- | --- |
 | `h` `l` (`Left` `Right`) | Move a grid step, with counts, onto a note starting in the step if there is one (the lowest, if none is at the cursor's pitch) |
-| `Tab` `Shift-Tab` | The next note's velocity, the one before: a chord's notes low to high, as their bars fan out side by side |
+| `Tab` `Shift-Tab` | The next note's velocity, the one before: a chord's notes in time, those starting together low to high, as their bars fan out side by side |
 | `k` `j` (`Up` `Down`) | Velocity up, down by 1, with counts; on a step where no note starts, refused |
 | `K` `J` (`Shift-Up` `Shift-Down`) | Velocity up, down by 10 |
 | a number, `Enter` | Set the velocity: `100 Enter` |
+| `Enter` | Ask for a velocity or a change: `100`, `+30`, `-10`, or `80%` to scale it |
+| `Alt-k` `Alt-j`, `Alt-K` `Alt-J` | Move a `Ctrl-v` box's velocity edge by 1, by 10 (or Alt with the arrows) |
 
-Velocities stop at 1 and 127. Steps one after another on a note undo together, as `Ctrl-a` and `Ctrl-x`'s do, and `.` repeats the last. `v` there selects time and takes the notes starting in it, at every pitch; `k`, `j`, `K` and `J` move every velocity it takes, keeping their differences, and a number and `Enter` sets them all. `Ctrl-v` selects a box of time and velocity, starting at the current note's (64 on an empty step), taking only the notes whose velocities are in it: `h`, `l` and `Tab` widen its time, `k`, `j`, `K` and `J` move its other edge, and a number and `Enter` sets those it takes. The velocity transforms (`, x v`) take what a selection there takes. `V`, the operators and `x` are refused in the lane, a velocity belonging to its note; Escape goes back to the notes for those.
+Velocities stop at 1 and 127. Steps one after another on a note undo together, as `Ctrl-a` and `Ctrl-x`'s do, and `.` repeats the last. `v` there selects time and takes the notes starting in it, at every pitch; `k`, `j`, `K` and `J` move every velocity it takes, keeping their differences, and a number and `Enter` sets them all, or `Enter` alone asks. `Ctrl-v` selects a box of time and velocity, starting at the current note's (64 on an empty step), taking only the notes whose velocities are in it: `h`, `l` and `Tab` widen its time, `Alt-k`, `Alt-j`, `Alt-K` and `Alt-J` move its other edge, and `k`, `j`, `K`, `J`, a number and `Enter` change those it takes, which it keeps as their velocities leave it, until the cursor or its edge moves. The velocity transforms (`, x v`) take what a selection there takes. `V`, the operators and `x` are refused in the lane, a velocity belonging to its note; Escape goes back to the notes for those.
 
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
 

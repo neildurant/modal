@@ -252,6 +252,8 @@ private:
     // After a move in the lane, onto a note starting in the cursor's grid step if none there
     // is at its pitch, the lowest.
     void lanePick();
+    // Asks for a velocity, or a change to it, for the lane's note or selection (Enter alone).
+    bool askVelocity();
     // The lane's own commands: k, j, K, J, Enter and Tab there.
     std::optional<bool> runLane(std::string_view command, int count);
     // Sets each of some notes' velocities to what a change makes of it, as an undo step

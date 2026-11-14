@@ -114,20 +114,30 @@ constexpr std::array kCommands{
                 .description = "Nudge this note earlier, {count} times",
                 .count = true},
     CommandInfo{.name = "lane-go", .description = "Into the velocity lane, below the notes"},
-    CommandInfo{.name = "lane-value-up",
-                .description = "Raise the velocity by {count}; in a Ctrl-v box, its top edge",
-                .count = true},
-    CommandInfo{.name = "lane-value-down",
-                .description = "Lower the velocity by {count}; in a Ctrl-v box, its edge",
-                .count = true},
+    CommandInfo{
+        .name = "lane-value-up", .description = "Raise the velocity by {count}", .count = true},
+    CommandInfo{
+        .name = "lane-value-down", .description = "Lower the velocity by {count}", .count = true},
     CommandInfo{.name = "lane-value-up-coarse",
-                .description = "Raise the velocity by 10, {count} times; or a box's edge",
+                .description = "Raise the velocity by 10, {count} times",
                 .count = true},
     CommandInfo{.name = "lane-value-down-coarse",
-                .description = "Lower the velocity by 10, {count} times; or a box's edge",
+                .description = "Lower the velocity by 10, {count} times",
                 .count = true},
     CommandInfo{.name = "lane-value-set",
-                .description = "Set the velocity to the number typed before it",
+                .description = "Set the velocity to the number typed, or ask for it or a change",
+                .count = true},
+    CommandInfo{.name = "lane-box-up",
+                .description = "Raise a Ctrl-v box's velocity edge by {count}",
+                .count = true},
+    CommandInfo{.name = "lane-box-down",
+                .description = "Lower a Ctrl-v box's velocity edge by {count}",
+                .count = true},
+    CommandInfo{.name = "lane-box-up-coarse",
+                .description = "Raise a Ctrl-v box's velocity edge by 10, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-box-down-coarse",
+                .description = "Lower a Ctrl-v box's velocity edge by 10, {count} times",
                 .count = true},
     CommandInfo{.name = "lane-event-next",
                 .description = "Next note's velocity, a chord's low to high",
@@ -1430,14 +1440,14 @@ void PianoRollView::lanePick()
 
 std::vector<std::pair<core::Tick, std::uint8_t>> PianoRollView::laneOrder() const
 {
-    // Each chord's notes together, low to high, as their bars fan out, though a loosely
-    // played chord's notes start a little apart.
+    // Each chord's notes together, in time and those starting together low to high, as their
+    // bars are drawn.
     const auto id = trackId();
     if (!id)
     {
         return {};
     }
-    std::vector<std::tuple<core::Tick, std::uint8_t, core::Tick>> order;
+    std::vector<std::tuple<core::Tick, core::Tick, std::uint8_t>> order;
     const auto& song = document_.song();
     std::optional<core::Tick> first;
     for (const auto& event : song.events(*id).all())
@@ -1448,13 +1458,13 @@ std::vector<std::pair<core::Tick, std::uint8_t>> PianoRollView::laneOrder() cons
             {
                 first = event.tick;
             }
-            order.emplace_back(*first, note->pitch, event.tick);
+            order.emplace_back(*first, event.tick, note->pitch);
         }
     }
     std::ranges::sort(order);
     std::vector<std::pair<core::Tick, std::uint8_t>> result;
     result.reserve(order.size());
-    for (const auto& [chord, pitch, tick] : order)
+    for (const auto& [chord, tick, pitch] : order)
     {
         result.emplace_back(tick, pitch);
     }
@@ -1519,12 +1529,18 @@ std::vector<std::size_t> PianoRollView::laneTaken() const
         return taken;
     }
     const auto values = laneValues();
-    const auto events = document_.song().events(*trackId()).all();
+    // A box whose notes' velocities have changed keeps those it took, though they've left it.
+    const auto selection = host_.selection();
+    const auto kept = values ? selection->movedNotes : nullptr;
+    const auto id = *trackId();
+    const auto events = document_.song().events(id).all();
     for (std::size_t i = 0; i < events.size() && events[i].tick < span->second; ++i)
     {
         const auto* note = std::get_if<core::Note>(&events[i].data);
         if (note != nullptr && events[i].tick >= span->first &&
-            (!values || (note->velocity >= values->first && note->velocity <= values->second)))
+            (kept ? kept->contains(id, events[i].tick, note->pitch)
+                  : !values ||
+                        (note->velocity >= values->first && note->velocity <= values->second)))
         {
             taken.push_back(i);
         }
@@ -1553,6 +1569,15 @@ bool PianoRollView::setVelocities(const std::vector<std::size_t>& notes,
     {
         return false;
     }
+    if (laneValues())
+    {
+        std::vector<Selection::NotePosition> kept;
+        for (const auto i : notes)
+        {
+            kept.emplace_back(events[i].tick, std::get<core::Note>(events[i].data).pitch);
+        }
+        host_.keepSelectionNotes(std::move(kept));
+    }
     // Taken out by index from the last, so the earlier indices stay put, then put back.
     std::ranges::sort(changed, std::greater{}, &std::pair<std::size_t, core::Event>::first);
     editEvents(
@@ -1569,6 +1594,108 @@ bool PianoRollView::setVelocities(const std::vector<std::size_t>& notes,
             }
         },
         mergeKey);
+    return true;
+}
+
+namespace
+{
+
+// What a typed velocity makes of each one: 100 sets it, +30 and -10 change it by as much, and
+// 80% scales it; or none if it isn't one of those.
+std::optional<std::function<int(int)>> velocityChange(std::string_view text)
+{
+    while (!text.empty() && text.front() == ' ')
+        text.remove_prefix(1);
+    while (!text.empty() && text.back() == ' ')
+        text.remove_suffix(1);
+    const bool percent = text.ends_with('%');
+    if (percent)
+        text.remove_suffix(1);
+    const char sign =
+        !text.empty() && (text.front() == '+' || text.front() == '-') ? text.front() : '\0';
+    if (sign != '\0')
+        text.remove_prefix(1);
+    if (text.empty() || text.size() > 4 ||
+        !std::ranges::all_of(text,
+                             [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+        return std::nullopt;
+    const int number = std::stoi(std::string{text});
+    if (percent && sign == '\0')
+        return [number](int velocity) { return (velocity * number + 50) / 100; };
+    if (percent)
+        return std::nullopt;
+    if (sign == '+')
+        return [number](int velocity) { return velocity + number; };
+    if (sign == '-')
+        return [number](int velocity) { return velocity - number; };
+    if (number < 1 || number > 127)
+        return std::nullopt;
+    return [number](int) { return number; };
+}
+
+} // namespace
+
+bool PianoRollView::askVelocity()
+{
+    // The notes it's for, by their places, found again when it's answered.
+    const auto id = trackId();
+    if (!id)
+    {
+        return false;
+    }
+    std::vector<std::size_t> taken;
+    if (laneSelecting())
+    {
+        taken = laneTaken();
+    }
+    else if (const auto index = laneNote())
+    {
+        taken.push_back(*index);
+    }
+    if (taken.empty())
+    {
+        host_.refuse(laneSelecting() ? "No notes there"
+                                     : "No note starts here: Tab goes to the next",
+                     MessageKind::Information);
+        return true;
+    }
+    std::vector<std::pair<core::Tick, std::uint8_t>> places;
+    const auto& events = document_.song().events(*id);
+    for (const auto i : taken)
+    {
+        places.emplace_back(events[i].tick, std::get<core::Note>(events[i].data).pitch);
+    }
+    const auto what = taken.size() == 1 ? core::pitchName(places.front().second)
+                                        : std::to_string(taken.size()) + " notes";
+    host_.askName(
+        "Velocity for " + what + " (100, +10, -10 or 80%): ", "",
+        [this, id, places, what](const std::string& answer)
+        {
+            const auto change = velocityChange(answer);
+            if (!change)
+            {
+                host_.refuse("A velocity is 1 to 127, a change such as +10 or -10, "
+                             "or a scale such as 80%",
+                             MessageKind::Warning);
+                return;
+            }
+            std::vector<std::size_t> notes;
+            const auto all = document_.song().events(*id).all();
+            for (std::size_t i = 0; i < all.size(); ++i)
+            {
+                const auto* note = std::get_if<core::Note>(&all[i].data);
+                if (note != nullptr &&
+                    std::ranges::find(places, std::pair{all[i].tick, note->pitch}) != places.end())
+                {
+                    notes.push_back(i);
+                }
+            }
+            if (!notes.empty())
+            {
+                setVelocities(notes, *change,
+                              "Velocity " + answer + " for " + what + " in " + trackName(), {});
+            }
+        });
     return true;
 }
 
@@ -1608,20 +1735,20 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         moveToPitch(pitch);
         return true;
     }
-    const bool up = command == "lane-value-up" || command == "lane-value-up-coarse";
+    const bool up = command.starts_with("lane-value-up") || command.starts_with("lane-box-up");
     const bool set = command == "lane-value-set";
     const int by = (command.ends_with("-coarse") ? 10 : 1) * n * (up ? 1 : -1);
-    if (set && (count < 1 || count > 127))
+    if (command.starts_with("lane-box-"))
     {
-        host_.refuse(count == 0 ? "Type the velocity first, then Enter: 100 Enter sets 100"
-                                : "A velocity goes from 1 to 127",
-                     MessageKind::Information);
-        return true;
-    }
-    const auto selection = host_.selection();
-    if (laneSelecting() && selection->kind == SelectionKind::Box && !set)
-    {
-        // k and j move the box's other edge, as moves widen a selection.
+        // Alt-k and Alt-j move a Ctrl-v box's other edge (decided 14 November 2026, after use),
+        // k and j changing the velocities it takes, as they do on a note or v's selection.
+        const auto selection = host_.selection();
+        if (!laneSelecting() || selection->kind != SelectionKind::Box)
+        {
+            host_.refuse("Alt-k and Alt-j move the velocity edge of a Ctrl-v box",
+                         MessageKind::Information);
+            return true;
+        }
         const auto [anchor, edge] =
             selection->values.value_or(std::pair{std::uint8_t{64}, std::uint8_t{64}});
         const auto to = static_cast<std::uint8_t>(std::clamp(edge + by, 1, 127));
@@ -1630,6 +1757,15 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
             return false;
         }
         host_.setSelectionValues({anchor, to});
+        return true;
+    }
+    if (set && count == 0)
+    {
+        return askVelocity();
+    }
+    if (set && count > 127)
+    {
+        host_.refuse("A velocity goes from 1 to 127", MessageKind::Information);
         return true;
     }
     const auto change = [&](int velocity) { return set ? count : velocity + by; };
@@ -3070,19 +3206,29 @@ void PianoRollView::addRegions(Frame& frame) const
     {
         const auto events = song.events(*id).all();
         const int inset = std::max(h / 8, 1);
-        // A chord's bars in the lane fan out side by side from its first note's place, low to
-        // high, so each note's velocity shows and can be reached (decided 14 November 2026).
+        // A chord's bars in the lane fan out side by side, so each note's velocity shows and
+        // can be reached (decided 14 November 2026).
         const int barWidth = std::max(2 * lineWidth, 2);
         std::vector<std::pair<core::Tick, int>> fan(events.size(), {0, 0});
         {
-            std::vector<std::pair<std::uint8_t, std::size_t>> chord; // its pitches, by index
+            // Each at its own time, a bar overlapping the one before in its chord moved just
+            // clear of it (decided 14 November 2026, after use, where a loose chord's late note
+            // was drawn with the others).
+            std::vector<std::tuple<core::Tick, std::uint8_t, std::size_t>> chord;
             core::Tick first = 0;
             const auto spread = [&]
             {
                 std::ranges::sort(chord);
-                for (std::size_t k = 0; k < chord.size(); ++k)
+                std::optional<int> last;
+                for (const auto& [tick, pitch, index] : chord)
                 {
-                    fan[chord[k].second] = {first, static_cast<int>(k)};
+                    int x = scale.toX(tick);
+                    if (last)
+                    {
+                        x = std::max(x, *last + barWidth + lineWidth);
+                    }
+                    fan[index] = {tick, x};
+                    last = x;
                 }
                 chord.clear();
             };
@@ -3101,7 +3247,7 @@ void PianoRollView::addRegions(Frame& frame) const
                 {
                     first = events[i].tick;
                 }
-                chord.emplace_back(note->pitch, i);
+                chord.emplace_back(events[i].tick, note->pitch, i);
             }
             spread();
         }
@@ -3185,10 +3331,9 @@ void PianoRollView::addRegions(Frame& frame) const
                     }
                 }
             }
-            if (const auto [chord, slot] = fan[i]; chord >= p.start)
+            if (const auto [start, x] = fan[i]; start >= p.start)
             {
                 const int y = laneY(note->velocity);
-                const int x = scale.toX(chord) + slot * (barWidth + lineWidth);
                 // A match's velocity in the match's colour, so it reads with the note above
                 // (decided November 2026), unless it's the current note or selected.
                 lane.under.push_back({{x, y, barWidth, laneHeight - y},
@@ -3242,17 +3387,14 @@ void PianoRollView::addRegions(Frame& frame) const
     // the lane.
     if (onPage && inLane_)
     {
-        // In the lane, its grid step boxed there, the row's band above still showing the
-        // pitch of the note whose velocity it's on.
-        // Its left side just before the step, so it doesn't cover the bar starting there.
-        const int side = std::max(lineWidth, 1);
-        const int x0 = std::max(scale.toX(time_) - 2 * side, 0);
-        const int x1 = std::max(scale.toX(std::min(gridAfter(time_), p.end)), x0 + 4 * side);
-        const int edge = std::max(h / 10, 1);
-        lane.over.push_back({{x0, 0, x1 - x0, edge}, Role::Cursor, 255});
-        lane.over.push_back({{x0, laneHeight - edge, x1 - x0, edge}, Role::Cursor, 255});
-        lane.over.push_back({{x0, 0, side, laneHeight}, Role::Cursor, 255});
-        lane.over.push_back({{x1 - side, 0, side, laneHeight}, Role::Cursor, 255});
+        // In the lane, a line at its time (decided 14 November 2026, after use, in place of
+        // its grid step boxed): the note whose velocity it's on is in the accent colour, and
+        // on an empty step the line is where something would go. Under the bars, so it doesn't
+        // hide the one it's on; the band along the pitch row above still shows whose it is.
+        lane.under.insert(lane.under.begin(),
+                          Shape{{scale.toX(time_), 0, std::max(2 * lineWidth, 2), laneHeight},
+                                Role::Cursor,
+                                255});
     }
     else if (onPage && shown(pitch_))
     {

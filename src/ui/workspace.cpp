@@ -2431,6 +2431,17 @@ void Workspace::selectObject(std::string_view command, int count)
     }
 }
 
+void Workspace::keepSelectionNotes(std::vector<Selection::NotePosition> notes)
+{
+    if (!selection_)
+    {
+        return;
+    }
+    std::ranges::sort(notes);
+    selection_->movedNotes = std::make_shared<const Selection::MovedNotes>(
+        Selection::MovedNotes{*view().cursor().track, std::move(notes), view().place()});
+}
+
 void Workspace::moveSelection(core::Tick by, int pitches,
                               std::vector<Selection::NotePosition> notes)
 {

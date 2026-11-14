@@ -427,8 +427,12 @@ private:
     void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) override
     {
         if (selection_)
+        {
             selection_->values = values;
+            selection_->movedNotes.reset();
+        }
     }
+    void keepSelectionNotes(std::vector<Selection::NotePosition> notes) override;
     void chosenMeter(core::TimeSignature meter) override;
     void stopTyping() override
     {

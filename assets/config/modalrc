@@ -266,8 +266,9 @@ nmap e          inspector-edit    "Edit in the inspector"
 
 " The velocity lane, below the piano roll's notes: gl goes in and Escape back. There h and l
 " move a grid step and Tab and Shift-Tab go from note to note, a chord's low to high; k and j
-" raise and lower the velocity by 1, K and J by 10, and a number then Enter sets it. On a
-" selection there they change every note taken; in a Ctrl-v box, k and j move its edge.
+" raise and lower the velocity by 1, K and J by 10, a number then Enter sets it, and Enter
+" alone asks for one, or a change: +10, -10 or 80%. On a selection there they change every
+" note taken; in a Ctrl-v box, Alt-k and Alt-j move its velocity edge, Alt-K and Alt-J by 10.
 keysection "The velocity lane"
 nmap gl         lane-go           "Into the velocity lane"
 nmap k          lane-value-up     "Velocity up"
@@ -281,6 +282,14 @@ nmap <S-Down>   lane-value-down-coarse "Velocity down 10"
 nmap <CR>       lane-value-set    "Set the velocity typed"
 nmap <Tab>      lane-event-next   "Next note"
 nmap <S-Tab>    lane-event-previous "Note before"
+nmap <A-k>      lane-box-up       "Box's edge up"
+nmap <A-Up>     lane-box-up       "Box's edge up"
+nmap <A-j>      lane-box-down     "Box's edge down"
+nmap <A-Down>   lane-box-down     "Box's edge down"
+nmap <A-S-k>    lane-box-up-coarse   "Box's edge up 10"
+nmap <A-S-Up>   lane-box-up-coarse   "Box's edge up 10"
+nmap <A-S-j>    lane-box-down-coarse "Box's edge down 10"
+nmap <A-S-Down> lane-box-down-coarse "Box's edge down 10"
 
 " Deleting, yanking and putting: d and y take a range, up to a boundary its key names (d]b up
 " to the next bar line, d]s the next section, dG the end, dj this event and the next), or an
