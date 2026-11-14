@@ -1473,6 +1473,13 @@ CommandResult Workspace::run(std::string_view command, int count)
 
 bool Workspace::runViewCommand(std::string_view command, int count)
 {
+    // In the lane, only what's offered there, so a key it leaves out (Alt-k, moving a note
+    // in the notes area) doesn't reach the piano roll from it; other views say for themselves
+    // why what isn't theirs is refused.
+    if (where() == Where::Lane && !offered(command))
+    {
+        return sayWhereFor(command);
+    }
     const auto cursor = view().cursor();
     if (const auto changed = view().run(command, count))
     {

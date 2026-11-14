@@ -116,27 +116,25 @@ TEST_CASE("gl goes into the velocity lane, onto the note the cursor is in, and E
     CHECK_FALSE(l.view().inLane());
 }
 
-TEST_CASE("in the lane k and j change the velocity by 1, K and J by 10, with counts")
+TEST_CASE("in the lane Ctrl-a and Ctrl-x change the velocity by 1, with counts")
 {
     Lane l(GENERATE(core::kPpqn, core::Ppqn{96}));
+    const auto ctrl = [&](char32_t key) { l.press(Key::typed(key, kCtrl)); };
     l.intoLane();
     REQUIRE(l.view().pitch() == 28);
-    l.type(U"k");
+    ctrl(U'a');
     CHECK(l.velocity(0, 28) == 97);
-    l.type(U"3j");
+    l.type(U"3");
+    ctrl(U'x');
     CHECK(l.velocity(0, 28) == 94);
-    l.type(U"K");
-    CHECK(l.velocity(0, 28) == 104);
-    l.type(U"2J");
-    CHECK(l.velocity(0, 28) == 84);
-    l.press(Key::of(NamedKey::Up));
-    CHECK(l.velocity(0, 28) == 85);
-    l.press(Key::of(NamedKey::Down, kShift));
-    CHECK(l.velocity(0, 28) == 75);
     // Values stop at the ends of the range.
-    l.type(U"9K");
+    l.type(U"50");
+    ctrl(U'a');
     CHECK(l.velocity(0, 28) == 127);
-    // The pitch hasn't moved: k and j are the velocity's here.
+    // k and j size a box, so on a note they're refused, the pitch staying put.
+    l.type(U"k");
+    CHECK(l.ws.message() == "k and j size a Ctrl-v box: Ctrl-a and Ctrl-x change the velocity");
+    CHECK(l.velocity(0, 28) == 127);
     CHECK(l.view().pitch() == 28);
     // Steps one after another on a note undo together.
     l.type(U"u");
@@ -191,7 +189,7 @@ TEST_CASE("h and l in the lane move a grid step, onto a note starting in it")
     l.type(U"l");
     CHECK(l.view().time() == l.ppqn.quarter() / 4);
     CHECK_FALSE(l.view().laneNote());
-    l.type(U"k");
+    l.press(Key::typed(U'a', kCtrl));
     CHECK(l.ws.message() == "No note starts here: Tab goes to the next");
     l.type(U"h");
     CHECK(l.view().time() == 0);
@@ -204,18 +202,18 @@ TEST_CASE("h and l in the lane move a grid step, onto a note starting in it")
     l.type(U"lh");
     CHECK(l.view().time() == l.bar(5));
     CHECK(l.view().pitch() == 36);
-    l.type(U"k");
+    l.press(Key::typed(U'a', kCtrl));
     CHECK(l.velocity(l.bar(5) + 7, 36) == 101);
 }
 
-TEST_CASE("v in the lane takes the notes starting in its time, k raising them all")
+TEST_CASE("v in the lane takes the notes starting in its time, Ctrl-a raising them all")
 {
     Lane l;
     l.intoLane();
     l.type(U"v16l");
     CHECK(l.ws.mode() == Mode::Visual);
     CHECK(l.view().laneTaken().size() == 3);
-    l.type(U"k");
+    l.press(Key::typed(U'a', kCtrl));
     CHECK(l.velocity(0, 28) == 97);
     CHECK(l.velocity(0, 31) == 81);
     CHECK(l.velocity(l.bar(2), 45) == 51);
@@ -239,16 +237,21 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
     l.press(Key::typed(U'v', kCtrl));
     l.type(U"16l");
     CHECK(l.view().laneTaken().size() == 1);
-    // Alt-k and Alt-j move the box's other edge, not the velocities.
-    l.press(Key::typed(U'j', kAlt | kShift));
+    // j and J move the box's other edge, as moves size any selection, not the velocities.
+    l.type(U"J");
     CHECK(l.velocity(0, 28) == 96);
     CHECK(l.view().laneTaken().size() == 1);
-    l.press(Key::of(NamedKey::Down, kAlt | kShift));
-    CHECK(l.view().laneTaken().size() == 2); // and G1's 80
-    // k and j change the velocities it takes, as on v's selection or a note.
+    l.press(Key::of(NamedKey::Down, kShift));
     l.type(U"k");
+    l.press(Key::of(NamedKey::Down));
+    CHECK(l.view().laneTaken().size() == 2); // and G1's 80
+    // Ctrl-a changes the velocities it takes, which it keeps though E1's leaves it.
+    l.press(Key::typed(U'a', kCtrl));
     CHECK(l.velocity(0, 28) == 97);
     CHECK(l.velocity(0, 31) == 81);
+    l.press(Key::typed(U'a', kCtrl));
+    CHECK(l.velocity(0, 28) == 98);
+    CHECK(l.velocity(0, 31) == 82);
     l.type(U"110");
     l.press(Key::of(NamedKey::Enter));
     CHECK(l.velocity(0, 28) == 110);
@@ -256,13 +259,21 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
     CHECK(l.velocity(l.bar(2), 45) == 50);
 }
 
-TEST_CASE("Alt-k and Alt-j are refused in the lane without a Ctrl-v box")
+TEST_CASE("Alt and the section strip's keys don't reach into the lane")
 {
+    // Alt-h moves a section on the strip; in the lane it isn't a key, and nothing moves.
     Lane l;
     l.intoLane();
-    l.press(Key::typed(U'k', kAlt));
-    CHECK(l.ws.message() == "Alt-k and Alt-j move the velocity edge of a Ctrl-v box");
+    l.press(Key::typed(U'h', kAlt));
     CHECK(l.velocity(0, 28) == 96);
+    l.press(Key::typed(U'k', kAlt));
+    CHECK(l.velocity(0, 28) == 96);
+    l.type(U"=");
+    CHECK(l.velocity(0, 28) == 96);
+    l.type(U"-");
+    CHECK(l.velocity(0, 28) == 96);
+    CHECK(l.document.song().events(l.document.song().tracks()[0]->id())[0].tick == 0);
+    CHECK(l.document.song().sections().size() == 1);
 }
 
 TEST_CASE("Enter alone in the lane asks for a velocity, or a change to it")

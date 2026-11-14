@@ -843,7 +843,8 @@ std::span<const CommandInfo> Workspace::commands()
         }
         // The controller lane (decided 14 November 2026): the piano roll's moves in time,
         // selections and transforms work there too, but not what takes notes or pitches, nor
-        // k, j, K, J, Tab and Enter, which the lane's own commands take there.
+        // the section strip's, whose keys move and resize notes in the notes area; nor k, j,
+        // Ctrl-a, Ctrl-x, Tab and Enter, which the lane's own commands take there.
         constexpr std::array<std::string_view, 21> notInLane{
             "octave-up",        "octave-down",          "velocity-up",        "velocity-down",
             "cursor-note-next", "cursor-note-previous", "note-add",           "note-add-advance",
@@ -859,7 +860,7 @@ std::span<const CommandInfo> Workspace::commands()
             else if (info.name.starts_with("lane-"))
                 info.where = onlyIn({Lane});
             else if ((info.where & whereBit(PianoRoll)) != 0 && !info.name.starts_with("note-") &&
-                     !info.name.starts_with("move-") &&
+                     !info.name.starts_with("move-") && !info.name.starts_with("section-") &&
                      std::ranges::find(notInLane, info.name) == notInLane.end())
                 info.where |= whereBit(Lane);
         }

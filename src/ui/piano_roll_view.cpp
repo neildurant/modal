@@ -118,12 +118,6 @@ constexpr std::array kCommands{
         .name = "lane-value-up", .description = "Raise the velocity by {count}", .count = true},
     CommandInfo{
         .name = "lane-value-down", .description = "Lower the velocity by {count}", .count = true},
-    CommandInfo{.name = "lane-value-up-coarse",
-                .description = "Raise the velocity by 10, {count} times",
-                .count = true},
-    CommandInfo{.name = "lane-value-down-coarse",
-                .description = "Lower the velocity by 10, {count} times",
-                .count = true},
     CommandInfo{.name = "lane-value-set",
                 .description = "Set the velocity to the number typed, or ask for it or a change",
                 .count = true},
@@ -1740,12 +1734,13 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
     const int by = (command.ends_with("-coarse") ? 10 : 1) * n * (up ? 1 : -1);
     if (command.starts_with("lane-box-"))
     {
-        // Alt-k and Alt-j move a Ctrl-v box's other edge (decided 14 November 2026, after use),
-        // k and j changing the velocities it takes, as they do on a note or v's selection.
+        // k and j size a Ctrl-v box, moving its other edge, as moves size any selection; the
+        // velocities change with Ctrl-a and Ctrl-x, as in the notes (decided 14 November 2026,
+        // after use).
         const auto selection = host_.selection();
         if (!laneSelecting() || selection->kind != SelectionKind::Box)
         {
-            host_.refuse("Alt-k and Alt-j move the velocity edge of a Ctrl-v box",
+            host_.refuse("k and j size a Ctrl-v box: Ctrl-a and Ctrl-x change the velocity",
                          MessageKind::Information);
             return true;
         }
@@ -1832,9 +1827,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }
     if (command == "cursor-up" || command == "cursor-down")
     {
-        host_.refuse("Up and down change the velocity in the lane: Escape goes back to the notes",
-                     MessageKind::Information);
-        return true;
+        return runLane(command == "cursor-up" ? "lane-box-up" : "lane-box-down", count);
     }
     // Moves in time, onto a note's velocity where one starts.
     const auto before = time_;
