@@ -424,6 +424,11 @@ private:
     std::optional<Selection> selection() const override { return selection_; }
     void moveSelection(core::Tick by, int pitches,
                        std::vector<Selection::NotePosition> notes) override;
+    void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) override
+    {
+        if (selection_)
+            selection_->values = values;
+    }
     void chosenMeter(core::TimeSignature meter) override;
     void stopTyping() override
     {

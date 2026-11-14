@@ -50,6 +50,21 @@ enum class Choices : std::uint8_t
 };
 inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Query) + 1;
 
+// Where a command does something, for the hint menu and the palette to offer only what works
+// there (decided October 2026): each view, the arrangement's section strip apart from its tracks.
+enum class Where : std::uint8_t
+{
+    Tracks, // the arrangement's tracks
+    Strip,  // its section strip
+    PianoRoll,
+    EventList,
+    TrackList, // the settings table
+    PortList,  // the Ports view
+    MetronomePage,
+    Lane, // the piano roll's controller lane, gl from its notes
+};
+inline constexpr std::size_t kPlacesCount = static_cast<std::size_t>(Where::Lane) + 1;
+
 struct CommandInfo
 {
     std::string_view name = {};        // lower case with hyphens, by what it acts on: cursor-left
@@ -74,20 +89,7 @@ struct CommandInfo
     // What it does in each place, by Where, where that reads differently from description
     // (decided October 2026, built November 2026): the palette says what it does where the
     // cursor is, rather than one sentence covering every view.
-    std::array<std::string_view, 7> here = {};
-};
-
-// Where a command does something, for the hint menu and the palette to offer only what works
-// there (decided October 2026): each view, the arrangement's section strip apart from its tracks.
-enum class Where : std::uint8_t
-{
-    Tracks, // the arrangement's tracks
-    Strip,  // its section strip
-    PianoRoll,
-    EventList,
-    TrackList, // the settings table
-    PortList,  // the Ports view
-    MetronomePage,
+    std::array<std::string_view, kPlacesCount> here = {};
 };
 
 // What a command does in a place: its description there, or its description.

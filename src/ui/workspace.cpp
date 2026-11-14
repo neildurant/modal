@@ -1207,7 +1207,7 @@ Where Workspace::where() const
     case ViewKind::Arrangement:
         return arrange_->onStrip() ? Where::Strip : Where::Tracks;
     case ViewKind::PianoRoll:
-        return Where::PianoRoll;
+        return pianoRoll_->inLane() ? Where::Lane : Where::PianoRoll;
     case ViewKind::Tracks:
         return Where::TrackList;
     case ViewKind::Ports:
@@ -1544,7 +1544,7 @@ bool Workspace::sayWhereFor(std::string_view command)
         }
     }
     std::vector<std::string> places;
-    constexpr std::array<std::pair<Where, std::string_view>, 7> kPlaces{{
+    constexpr std::array<std::pair<Where, std::string_view>, kPlacesCount> kPlaces{{
         {Where::Tracks, "the arrangement's tracks"},
         {Where::Strip, "the section strip"},
         {Where::PianoRoll, "the piano roll"},
@@ -1552,10 +1552,13 @@ bool Workspace::sayWhereFor(std::string_view command)
         {Where::TrackList, "the tracks view"},
         {Where::PortList, "the ports view"},
         {Where::MetronomePage, "the metronome page"},
+        {Where::Lane, "the controller lane"},
     }};
     for (const auto& [place, name] : kPlaces)
     {
-        if ((where & whereBit(place)) != 0)
+        // The lane is part of the piano roll, so named only for what's for the lane alone.
+        if ((where & whereBit(place)) != 0 &&
+            (place != Where::Lane || (where & whereBit(Where::PianoRoll)) == 0))
         {
             places.emplace_back(name);
         }
@@ -1633,7 +1636,8 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                       .where = where(),
                       .index = view().selectionIndex(),
                       .span = kind == SelectionKind::Rows ? view().rowsSpan() : std::nullopt,
-                      .cut = false};
+                      .cut = false,
+                      .values = kind == SelectionKind::Box ? view().boxValues() : std::nullopt};
         mode_ = Mode::Visual;
         sayWholeRows();
         return true;
@@ -1648,10 +1652,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         const auto saved = *lastSelection_;
         document_.breakMerge();
         const auto here = saved.selection.where;
-        show(here == Where::TrackList   ? ViewKind::Tracks
-             : here == Where::EventList ? ViewKind::EventList
-             : here == Where::PianoRoll ? ViewKind::PianoRoll
-                                        : ViewKind::Arrangement);
+        show(here == Where::TrackList                          ? ViewKind::Tracks
+             : here == Where::EventList                        ? ViewKind::EventList
+             : here == Where::PianoRoll || here == Where::Lane ? ViewKind::PianoRoll
+                                                               : ViewKind::Arrangement);
+        if (here == Where::Lane)
+        {
+            pianoRoll_->enterLane();
+        }
         selection_ = saved.selection;
         beforeObject_ = saved.beforeObject;
         view().setCursor(saved.cursor);
@@ -1705,6 +1713,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     }
     if (command == "cancel")
     {
+        // Escape from the controller lane goes back to the notes.
+        if (where() == Where::Lane)
+        {
+            pianoRoll_->leaveLane();
+            return true;
+        }
         return false;
     }
     if (command == "play-toggle" || command == "play-stop-back" || command == "play-cursor" ||
@@ -2309,6 +2323,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
             selection_->starts.reset();
             selection_->object.reset();
             selection_->movedNotes.reset();
+            selection_->values = kind == SelectionKind::Box ? view().boxValues() : std::nullopt;
             sayWholeRows();
         }
         return true;

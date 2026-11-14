@@ -264,6 +264,24 @@ nmap <C-a>      velocity-up       "Velocity up"
 nmap <C-x>      velocity-down     "Velocity down"
 nmap e          inspector-edit    "Edit in the inspector"
 
+" The velocity lane, below the piano roll's notes: gl goes in and Escape back. There h and l
+" move a grid step and Tab and Shift-Tab go from note to note, a chord's low to high; k and j
+" raise and lower the velocity by 1, K and J by 10, and a number then Enter sets it. On a
+" selection there they change every note taken; in a Ctrl-v box, k and j move its edge.
+keysection "The velocity lane"
+nmap gl         lane-go           "Into the velocity lane"
+nmap k          lane-value-up     "Velocity up"
+nmap <Up>       lane-value-up     "Velocity up"
+nmap j          lane-value-down   "Velocity down"
+nmap <Down>     lane-value-down   "Velocity down"
+nmap K          lane-value-up-coarse   "Velocity up 10"
+nmap <S-Up>     lane-value-up-coarse   "Velocity up 10"
+nmap J          lane-value-down-coarse "Velocity down 10"
+nmap <S-Down>   lane-value-down-coarse "Velocity down 10"
+nmap <CR>       lane-value-set    "Set the velocity typed"
+nmap <Tab>      lane-event-next   "Next note"
+nmap <S-Tab>    lane-event-previous "Note before"
+
 " Deleting, yanking and putting: d and y take a range, up to a boundary its key names (d]b up
 " to the next bar line, d]s the next section, dG the end, dj this event and the next), or an
 " object: ib this bar's events, ab this bar as time, which d takes out, closing the gap up to

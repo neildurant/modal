@@ -155,6 +155,9 @@ struct Selection
         }
     };
     std::shared_ptr<const MovedNotes> movedNotes = nullptr;
+    // A Ctrl-v box in a controller lane: the values it takes between, where it started and its
+    // other edge, which k and j move (decided 14 November 2026).
+    std::optional<std::pair<std::uint8_t, std::uint8_t>> values = std::nullopt;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -274,6 +277,8 @@ public:
     // moved by the view itself.
     virtual void moveSelection(core::Tick by, int pitches,
                                std::vector<Selection::NotePosition> notes) = 0;
+    // Sets the values a Ctrl-v box in a controller lane takes between.
+    virtual void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) = 0;
 
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.
@@ -375,6 +380,11 @@ public:
         return std::nullopt;
     }
     virtual std::optional<std::size_t> selectionIndex() const { return std::nullopt; }
+    // The values a Ctrl-v box starts between, in a controller lane, or none elsewhere.
+    virtual std::optional<std::pair<std::uint8_t, std::uint8_t>> boxValues() const
+    {
+        return std::nullopt;
+    }
     // The time whole rows (V) take when they're first selected, if not the whole song's.
     virtual std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const
     {

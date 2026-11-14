@@ -1475,8 +1475,9 @@ TEST_CASE("the hint menu offers only the commands that do something where the cu
 {
     // Every binding offered in each place, run there afresh, does something there rather than
     // saying it's for somewhere else; and gs, say, isn't offered in the piano roll.
-    const std::array<std::pair<std::u32string_view, Where>, 5> places{{
+    const std::array<std::pair<std::u32string_view, Where>, 6> places{{
         {U"", Where::PianoRoll},
+        {U"gl", Where::Lane},
         {U"ga", Where::Tracks},
         {U"gags", Where::Strip},
         {U"ge", Where::EventList},
@@ -1532,7 +1533,7 @@ TEST_CASE("the hint menu shows after an operator once it has waited, its keys ig
     {
         keys.push_back(hint.keys);
     }
-    CHECK(keys == std::vector<std::string>{"a", "c", "e", "g", "m", "n", "r", "t", "v"});
+    CHECK(keys == std::vector<std::string>{"a", "c", "e", "g", "l", "m", "n", "r", "t", "v"});
 }
 
 TEST_CASE("keys bound to one command show together in the hint menu, arrows as arrows")

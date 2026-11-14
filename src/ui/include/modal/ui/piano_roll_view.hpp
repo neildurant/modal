@@ -61,6 +61,7 @@ public:
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const override;
+    std::optional<std::pair<std::uint8_t, std::uint8_t>> boxValues() const override;
     std::optional<CutRange> cutRange(std::string_view motion, int count) override;
     void selectObject(std::string_view object, int count, Selection& selection) override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
@@ -138,6 +139,18 @@ public:
     // Where h and l go from a time: a grid step, or off a note there in one.
     core::Tick stepLeft(core::Tick tick) const;
     core::Tick stepRight(core::Tick tick) const;
+
+    // Whether the cursor is in the controller lane below the notes (gl), where it moves in time
+    // and changes values (see Editing in the lane in the design); and going in and out.
+    bool inLane() const { return inLane_; }
+    void enterLane();
+    void leaveLane() { inLane_ = false; }
+    // The note whose velocity the lane's cursor is on: at the cursor's pitch, starting in its
+    // grid step; or none.
+    std::optional<std::size_t> laneNote() const;
+    // The notes a Visual selection in the lane takes: those starting in its time, and in a
+    // Ctrl-v box only those whose velocities are between its values.
+    std::vector<std::size_t> laneTaken() const;
 
     // The time the cursor covers, from its start to its end (decided October 2026): the
     // current note's, or on an empty spot the default note's from the cursor, the note o would
@@ -228,6 +241,26 @@ private:
     bool acrossPitches(std::string_view motion) const;
     // Deletes or yanks the cursor's bar and those after it, its notes or as time (ab).
     bool operateOnBars(std::string_view op, int count, bool time);
+    // The lane's Visual selection: its time, and with Ctrl-v the values it takes between,
+    // lowest and highest; or none if it isn't in the lane.
+    bool laneSelecting() const;
+    std::optional<std::pair<core::Tick, core::Tick>> laneSpan() const;
+    std::optional<std::pair<std::uint8_t, std::uint8_t>> laneValues() const;
+    // The track's notes in the order Tab takes them in the lane: by chord, then low to high,
+    // as their bars fan out, each with its own start and pitch.
+    std::vector<std::pair<core::Tick, std::uint8_t>> laneOrder() const;
+    // After a move in the lane, onto a note starting in the cursor's grid step if none there
+    // is at its pitch, the lowest.
+    void lanePick();
+    // The lane's own commands: k, j, K, J, Enter and Tab there.
+    std::optional<bool> runLane(std::string_view command, int count);
+    // Sets each of some notes' velocities to what a change makes of it, as an undo step
+    // merged with the next if it has the same merge key, saying if none changed.
+    bool setVelocities(const std::vector<std::size_t>& notes, const std::function<int(int)>& change,
+                       std::string title, std::string_view mergeKey);
+    // The commands run in the notes area, and in the lane, moves in time.
+    std::optional<bool> runNotes(std::string_view command, int count);
+
     // Changes the current note, the cursor going with it, unless it would go before the song's
     // start or past its last tick, or run into another note of its pitch. The change says
     // whether it can be made, giving its own message if not.
@@ -259,6 +292,7 @@ private:
     std::chrono::milliseconds chordWindow_{30};
     std::chrono::milliseconds nudge_{5};
     bool gridAdvance_ = false;
+    bool inLane_ = false;
     InspectorEditor editor_;
     int width_ = 0;
     CellSize cell_{1, 1};

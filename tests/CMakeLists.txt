@@ -76,6 +76,7 @@ add_executable(modal_tests
     ui/view_state_test.cpp
     ui/visual_test.cpp
     ui/piano_roll_view_test.cpp
+    ui/velocity_lane_test.cpp
     ui/tracks_view_test.cpp
     ui/transport_test.cpp
     ui/metronome_view_test.cpp

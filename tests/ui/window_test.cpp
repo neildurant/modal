@@ -939,3 +939,67 @@ TEST_CASE("a sample of search matches", "[.sample]")
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-search-events.bmp"));
 }
+
+TEST_CASE("a sample of the velocity lane", "[.sample]")
+{
+    // The piano roll's velocity lane with the cursor in it, chords fanned out, then a Ctrl-v
+    // box taking the louder notes.
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            view.handle(Key::typed(key), 0);
+        }
+    };
+    // Chords on the piano: its notes from bar 2 with a third and fifth above, softer, and the
+    // fifth a little late, as played.
+    document.edit(
+        "Chords", {},
+        [](modal::core::Song& song)
+        {
+            const auto id = song.tracks()[2]->id();
+            std::vector<modal::core::Event> added;
+            for (const auto& event : song.events(id).all())
+            {
+                if (const auto* note = std::get_if<modal::core::Note>(&event.data))
+                {
+                    added.push_back(
+                        {event.tick, modal::core::Note{static_cast<std::uint8_t>(note->pitch + 4),
+                                                       70, note->duration}});
+                    added.push_back({event.tick + 5,
+                                     modal::core::Note{static_cast<std::uint8_t>(note->pitch + 7),
+                                                       85, note->duration}});
+                }
+            }
+            song.updateEvents(id,
+                              [&](modal::core::EventList& events)
+                              {
+                                  for (const auto& event : added)
+                                      events.insert(event);
+                              });
+        });
+    type(U"gr");
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0); // the piano
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    type(U"gl");
+    view.handle(Key::of(NamedKey::Tab), 0);
+    view.handle(Key::of(NamedKey::Tab), 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-lane.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-lane-light.bmp"));
+    view.handle(Key::typed(U'v', kCtrl), 0);
+    type(U"8lJ");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-lane-box.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-lane-box-light.bmp"));
+}
