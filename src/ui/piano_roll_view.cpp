@@ -132,11 +132,11 @@ constexpr std::array kCommands{
     CommandInfo{.name = "lane-controller-previous",
                 .description = "Show the track's controller before in the lane",
                 .count = true},
-    CommandInfo{.name = "lane-fine-left",
-                .description = "A nudge earlier, in a controller's lane, {count} times",
+    CommandInfo{.name = "cursor-nudge-left",
+                .description = "A nudge earlier, off the grid, {count} times",
                 .count = true},
-    CommandInfo{.name = "lane-fine-right",
-                .description = "A nudge later, in a controller's lane, {count} times",
+    CommandInfo{.name = "cursor-nudge-right",
+                .description = "A nudge later, off the grid, {count} times",
                 .count = true},
     CommandInfo{.name = "lane",
                 .description = "Show velocity, a controller (cc74), bend or pressure in the "
@@ -2368,25 +2368,6 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         }
         return true;
     }
-    if (command == "lane-fine-left" || command == "lane-fine-right")
-    {
-        // A nudge at a time, so the cursor can stand between a controller's events.
-        if (notes)
-        {
-            host_.refuse("H and L move by a nudge in a controller's lane; here h and l go note "
-                         "to note",
-                         MessageKind::Information);
-            return true;
-        }
-        const auto to =
-            std::max<core::Tick>(nudged(time_, command == "lane-fine-left" ? -n : n), 0);
-        if (to == time_ || to > lastTick())
-        {
-            return false;
-        }
-        moveTo(to);
-        return true;
-    }
     const bool up = command.starts_with("lane-value-up") || command.starts_with("lane-box-up");
     const bool set = command == "lane-value-set";
     const int by = (command.ends_with("-coarse") ? 10 : 1) * n * (up ? 1 : -1);
@@ -2508,6 +2489,13 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         if (command == "cursor-up" || command == "cursor-down")
         {
             return runLane(command == "cursor-up" ? "lane-box-up" : "lane-box-down", count);
+        }
+        if (notes && command.starts_with("cursor-nudge-"))
+        {
+            host_.refuse("H and L move by a nudge in the notes and a controller's lane; here h "
+                         "and l go note to note",
+                         MessageKind::Information);
+            return true;
         }
         // In the lane, h and l go event to event, as Tab does: the time between notes means
         // nothing there, and a selection grows an event at a time rather than overshooting
@@ -2782,6 +2770,18 @@ std::optional<bool> PianoRollView::runNotes(std::string_view command, int count)
         const auto& [tick, notePitch] = starts[static_cast<std::size_t>(at)];
         moveTo(tick);
         moveToPitch(notePitch);
+    }
+    else if (command == "cursor-nudge-left" || command == "cursor-nudge-right")
+    {
+        // A nudge at a time, off the grid, to place a note or a controller's event exactly
+        // (decided 15 November 2026, after use); h and l go back to the grid's steps.
+        const auto to =
+            std::max<core::Tick>(nudged(time_, command == "cursor-nudge-left" ? -n : n), 0);
+        if (to == time_ || to > lastTick())
+        {
+            return false;
+        }
+        moveTo(to);
     }
     else if (command == "cursor-chord-up" || command == "cursor-chord-down")
     {

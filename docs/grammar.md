@@ -244,6 +244,8 @@ Velocities stop at 1 and 127. Steps one after another on a note undo together, a
 
 **A controller's lane** works as the velocity lane does, on its events: `Tab` / `Shift-Tab` and `h` / `l` go event to event, `H` / `L` (`Shift-Left` / `Shift-Right`) move a nudge at a time between them, a thin bright line showing where, `Ctrl-a` / `Ctrl-x` change the value, a number and `Enter` set it and `Enter` alone asks (`100`, `+10`, `-500` for pitch bend, `80%`), and `v` and `Ctrl-v` select its events. Its events are bars, pitch bend's up and down from the middle, joined by a faint line at the value each holds. Adding, deleting and moving its events come next.
 
+**Off the grid:** `H` / `L` (`Shift-Left` / `Shift-Right`) move the cursor a nudge at a time (the `nudge` setting), in the notes and a controller's lane, so `o` adds a note exactly there; `h` / `l` go back to the grid's steps (asked for 15 November 2026).
+
 **The grid and default note,** each track's own: `zh` `zl` finer and coarser, `Ctrl-t` triplets on and off, `:grid 1/16`, `:len 1/8`; `, n` takes the current note's length and velocity as the default note.
 
 **Audition:** the cursor landing on a note plays it, by any move but in Visual mode, as does adding one with `o` or `O` (the first, of several) or moving one note to a new pitch, for its length but from 150 ms to a second, on the track's port and channel; not while playing or recording. `, T a` turns it on and off (the `audition` setting), the status line saying `Audition off` while it is.

@@ -266,3 +266,23 @@ TEST_CASE("a Ctrl-v box in a controller's lane takes the events with values insi
     CHECK(l.view().laneTaken().size() == 2);
     CHECK(l.view().selectionStatus()->starts_with("2 events, values 10–70"));
 }
+
+TEST_CASE("H and L nudge the cursor off the grid in the notes, and o adds a note there")
+{
+    Lanes l;
+    l.type(U"ggL");
+    const auto at = l.view().time();
+    CHECK(at > 0);
+    CHECK(at < l.q() / 4); // short of the first grid step
+    l.type(U"o");
+    const auto& events = l.document.song().events(l.track().id()).all();
+    CHECK(std::ranges::any_of(events,
+                              [&](const core::Event& e) { return e.isNote() && e.tick == at; }));
+    // h goes back to the grid.
+    l.type(U"h");
+    CHECK(l.view().time() == 0);
+    // In the velocity lane, h and l go note to note, and H and L are refused.
+    l.type(U"gl");
+    l.type(U"H");
+    CHECK(l.ws.message().starts_with("H and L move by a nudge in the notes"));
+}

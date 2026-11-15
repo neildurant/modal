@@ -292,16 +292,17 @@ nmap <S-Down>   lane-box-down-coarse "Box's edge down 10"
 
 " The controllers, , c: , c c chooses what the lane shows, velocity, a controller, pitch bend
 " or aftertouch, from a list with the latest used first; ]c and [c in the lane step through
-" the track's own. In a controller's lane, H and L move a nudge at a time, between its events.
+" the track's own. In the piano roll's notes and a controller's lane, H and L move a nudge at a
+" time, off the grid, to place a note or event exactly.
 " The pedalling tools are here as well as under , x P.
 ngroup <leader>c "Controllers"
 nmap <leader>cc  lane-choose       "Choose the lane"
 nmap ]c         lane-controller-next     "Next controller in the lane"
 nmap [c         lane-controller-previous "Controller before in the lane"
-nmap H          lane-fine-left    "A nudge earlier"
-nmap <S-Left>   lane-fine-left    "A nudge earlier"
-nmap L          lane-fine-right   "A nudge later"
-nmap <S-Right>  lane-fine-right   "A nudge later"
+nmap H          cursor-nudge-left  "A nudge earlier"
+nmap <S-Left>   cursor-nudge-left  "A nudge earlier"
+nmap L          cursor-nudge-right "A nudge later"
+nmap <S-Right>  cursor-nudge-right "A nudge later"
 ngroup <leader>cP "Pedalling"
 nmap <leader>cPr transform-pedal-repedal "Re-pedal at chord changes"
 nmap <leader>cPt transform-pedal-retime  "Re-time the pedalling to the chords"
