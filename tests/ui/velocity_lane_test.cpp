@@ -460,3 +460,101 @@ TEST_CASE("a lane selection by an object or to a boundary stays inside it")
     l.type(U"]b");
     CHECK((l.view().time() == l.bar(2) && l.view().pitch() == 45));
 }
+
+namespace
+{
+
+// The inspector's text, its runs in order down and across, a space between.
+std::u32string inspectorText(const Lane& l)
+{
+    const auto frame = l.ws.frame();
+    std::vector<TextRun> runs;
+    for (const auto& region : frame)
+    {
+        if (region.background == Role::Panel)
+        {
+            runs.insert(runs.end(), region.text.begin(), region.text.end());
+        }
+    }
+    std::ranges::sort(runs, [](const TextRun& a, const TextRun& b)
+                      { return a.y != b.y ? a.y < b.y : a.x < b.x; });
+    std::u32string text;
+    for (const auto& run : runs)
+    {
+        text += run.text + U" ";
+    }
+    return text;
+}
+
+} // namespace
+
+TEST_CASE("gk and gj go up and down a chord's notes in the notes, Ctrl-a changing each")
+{
+    Lane l;
+    l.intoLane();
+    l.press(Key::of(NamedKey::Escape)); // on E1, in the notes
+    REQUIRE(l.ws.where() == Where::PianoRoll);
+    l.type(U"gk");
+    CHECK((l.view().time() == 0 && l.view().pitch() == 31));
+    l.press(Key::typed(U'a', kCtrl));
+    CHECK(l.velocity(0, 31) == 81);
+    l.type(U"gk"); // the top: nothing further
+    CHECK(l.view().pitch() == 31);
+    l.type(U"gj");
+    CHECK(l.view().pitch() == 28);
+    // A note on its own isn't a chord.
+    l.type(U"]b");
+    l.press(Key::of(NamedKey::Tab));
+    REQUIRE(l.view().pitch() == 45);
+    l.type(U"gk");
+    CHECK(l.ws.message() == "gk and gj go through a chord's notes: no chord here");
+    // In the lane, h and l do it, so gk isn't offered there.
+    l.type(U"gl");
+    CHECK_FALSE(l.ws.offered("cursor-chord-up"));
+}
+
+TEST_CASE("the inspector names the chord a note is in, its notes and velocities")
+{
+    Lane l;
+    l.intoLane();
+    // E1 and G1 alone aren't a chord to name.
+    auto text = inspectorText(l);
+    CHECK(text.find(U"Chord") != std::u32string::npos);
+    CHECK(text.find(U"Name: -") != std::u32string::npos);
+    CHECK(text.find(U"Notes: 2") != std::u32string::npos);
+    CHECK(text.find(U"Vel: 80–96") != std::u32string::npos);
+    // With C2 too, a C over E, a little late as played.
+    l.document.edit("C", {},
+                    [](core::Song& song)
+                    {
+                        song.updateEvents(song.tracks()[0]->id(), [](core::EventList& events)
+                                          { events.insert({4, core::Note{36, 70, 100}}); });
+                    });
+    text = inspectorText(l);
+    CHECK(text.find(U"Name: C/E") != std::u32string::npos);
+    CHECK(text.find(U"Vel: 70–96") != std::u32string::npos);
+    // On a note on its own, no Chord.
+    l.type(U"3l");
+    REQUIRE(l.view().pitch() == 45);
+    CHECK(inspectorText(l).find(U"Chord") == std::u32string::npos);
+}
+
+TEST_CASE("^ic sets or changes a whole chord's velocities, keeping their balance")
+{
+    Lane l;
+    l.intoLane();
+    l.press(Key::of(NamedKey::Escape));
+    const auto velocity = [&](std::u32string_view answer)
+    {
+        l.type(U"^ic");
+        l.type(answer);
+        l.press(Key::of(NamedKey::Enter));
+    };
+    velocity(U"+10");
+    CHECK(l.velocity(0, 28) == 106);
+    CHECK(l.velocity(0, 31) == 90);
+    CHECK(l.velocity(l.bar(2), 45) == 50);
+    velocity(U"80");
+    CHECK(l.velocity(0, 28) == 80);
+    CHECK(l.velocity(0, 31) == 80);
+}

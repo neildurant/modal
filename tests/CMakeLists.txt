@@ -16,6 +16,7 @@ add_executable(modal_tests
     core/meter_map_test.cpp
     core/note_fraction_test.cpp
     core/pedalling_test.cpp
+    core/chords_test.cpp
     core/pitch_test.cpp
     core/playback_plan_test.cpp
     core/player_test.cpp

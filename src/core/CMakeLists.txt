@@ -13,6 +13,7 @@ add_library(modal_core STATIC
     controllers.cpp
     count_in.cpp
     document.cpp
+    chords.cpp
     pitch.cpp
     playback_plan.cpp
     playback_transform.cpp

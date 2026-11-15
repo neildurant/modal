@@ -633,7 +633,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 132> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 134> where{{
             {"ports-refresh", onlyIn({PortList})},
             {"tracks-mute-toggle", onlyIn({Tracks, TrackList})},
             {"tracks-solo-toggle", onlyIn({Tracks, TrackList})},
@@ -708,6 +708,9 @@ std::span<const CommandInfo> Workspace::commands()
             {"number-decrease", onlyIn({EventList, TrackList})},
             {"note-add", onlyIn({PianoRoll, EventList})},
             {"cursor-chord-next", onlyIn({PianoRoll, EventList})},
+            // In the notes alone: the lane's h and l already go through a chord's notes.
+            {"cursor-chord-up", onlyIn({PianoRoll})},
+            {"cursor-chord-down", onlyIn({PianoRoll})},
             {"cursor-chord-previous", onlyIn({PianoRoll, EventList})},
             {"cursor-bar-next-scroll", onlyIn({Tracks, PianoRoll})},
             {"cursor-bar-previous-scroll", onlyIn({Tracks, PianoRoll})},
@@ -845,13 +848,13 @@ std::span<const CommandInfo> Workspace::commands()
         // selections and transforms work there too, but not what takes notes or pitches, nor
         // the section strip's, whose keys move and resize notes in the notes area; nor k, j,
         // Ctrl-a, Ctrl-x, Tab and Enter, which the lane's own commands take there.
-        constexpr std::array<std::string_view, 21> notInLane{
+        constexpr std::array<std::string_view, 23> notInLane{
             "octave-up",        "octave-down",          "velocity-up",        "velocity-down",
             "cursor-note-next", "cursor-note-previous", "note-add",           "note-add-advance",
             "default-note-set", "visual-rows",          "cut-at-edges",       "search-here",
             "search-here-back", "cursor-up-scroll",     "cursor-down-scroll", "put-merge",
             "put-insert",       "put-ending",           "put-merge-at-pitch", "put-insert-at-pitch",
-            "event-delete",
+            "event-delete",     "cursor-chord-up",      "cursor-chord-down",
         };
         for (auto& info : result)
         {

@@ -222,6 +222,7 @@ A value stays in place as editing starts. `e` opens the inspector on Pitch at fi
 | `=` `-` | Move its end to the grid step after, before |
 | `+` `_` | Lengthen, shorten it by a nudge |
 | `Ctrl-a` `Ctrl-x` | Velocity up, down |
+| `gk` `gj` | Up, down the chord's notes, each from its start, with counts; the inspector's Chord block shows the chord's name, notes and velocities |
 
 On a Visual selection, the moving and length keys act on every note it takes, refused as a whole if a note would overlap another of its pitch, and the selection moves with them; repeated moves of the same kind undo together within that unchanged selection. Ending Visual mode or redefining the selection starts a new undo step for its next moves, including after Escape and `gv`. After the first move, it retains those notes: passing over another note does not collect it, and snapping off-grid notes keeps the bounds around all their new starts. Deleting, yanking and transforms take that same moved set, including after Escape and `gv`. Deliberately extending the selection, changing its Visual kind or choosing another object selects an area again.
 | `e` | Edit its fields in the inspector: Tab and Shift-Tab go round, Enter sets, Escape leaves |

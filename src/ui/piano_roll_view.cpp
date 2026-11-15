@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/chords.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
@@ -112,6 +113,12 @@ constexpr std::array kCommands{
                 .count = true},
     CommandInfo{.name = "move-left-fine",
                 .description = "Nudge this note earlier, {count} times",
+                .count = true},
+    CommandInfo{.name = "cursor-chord-up",
+                .description = "Up to the chord's next note, {count} times",
+                .count = true},
+    CommandInfo{.name = "cursor-chord-down",
+                .description = "Down to the chord's next note, {count} times",
                 .count = true},
     CommandInfo{.name = "lane-go", .description = "Into the velocity lane, below the notes"},
     CommandInfo{
@@ -668,6 +675,73 @@ void PianoRollView::selectObject(std::string_view object, int count, Selection& 
     selection.span = std::pair{first, end};
     selection.starts = std::pair{first, last + 1};
     setCursor(SongCursor{*id, first, high});
+}
+
+std::vector<std::size_t> PianoRollView::chordOfCurrent() const
+{
+    const auto index = currentNote();
+    if (!index)
+    {
+        return {};
+    }
+    const auto& song = document_.song();
+    return chordNotes(song, song.events(*trackId()), *index, 1, chordWindow_);
+}
+
+void PianoRollView::addChord(Region& inspector) const
+{
+    // On a note of a chord, its name, how many notes, and their velocities' range, so their
+    // balance shows while each is changed (decided 15 November 2026): after the fields, its
+    // headings dim and values in the text colour, as the note's are; left out where there's no
+    // room.
+    const auto chord = chordOfCurrent();
+    if (chord.size() < 2)
+    {
+        return;
+    }
+    const auto& events = document_.song().events(*trackId());
+    std::vector<std::uint8_t> pitches;
+    int low = 127;
+    int high = 1;
+    for (const auto i : chord)
+    {
+        const auto& note = std::get<core::Note>(events[i].data);
+        pitches.push_back(note.pitch);
+        low = std::min<int>(low, note.velocity);
+        high = std::max<int>(high, note.velocity);
+    }
+    const auto name = core::chordName(pitches);
+    const std::array<std::pair<std::u32string, std::u32string>, 3> rows{{
+        {U"Name:", decodeUtf8(name.value_or("-"))},
+        {U"Notes:", decodeUtf8(std::to_string(chord.size()))},
+        {U"Vel:", decodeUtf8(low == high ? std::to_string(low)
+                                         : std::to_string(low) + "–" + std::to_string(high))},
+    }};
+    const Style label{Role::Dim, Role::Panel, kPlain};
+    const Style value{Role::Text, Role::Panel, kPlain};
+    constexpr int kLabels = 6;
+    constexpr int kWide = kLabels + 1 + 9; // as wide as a long name, Bbmmaj7, or 127–127
+    const int margin = BarSpacing::forCell(cell_).margin;
+    int used = 0;
+    for (const auto& run : inspector.text)
+    {
+        used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+    }
+    const int x = used + 3 * cell_.width;
+    if (x + kWide * cell_.width > inspector.bounds.width - margin ||
+        cell_.height * 4 > inspector.bounds.height)
+    {
+        return;
+    }
+    const int top = cell_.height / 4;
+    inspector.text.push_back({x, top, U"Chord", label});
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        const int y = top + static_cast<int>(i + 1) * cell_.height;
+        inspector.text.push_back({x, y, rows[i].first, label});
+        inspector.text.push_back(
+            {x + (kLabels + 1) * cell_.width, y, rows[i].second, i == 0 && !name ? label : value});
+    }
 }
 
 std::vector<std::size_t> PianoRollView::chordHere(int count) const
@@ -2268,6 +2342,36 @@ std::optional<bool> PianoRollView::runNotes(std::string_view command, int count)
         moveTo(tick);
         moveToPitch(notePitch);
     }
+    else if (command == "cursor-chord-up" || command == "cursor-chord-down")
+    {
+        // Through the chord's notes, low to high, each from its start, so its velocity can be
+        // changed on its own (decided 15 November 2026); stopping at the top and bottom.
+        const auto chord = chordOfCurrent();
+        if (chord.size() < 2)
+        {
+            host_.refuse("gk and gj go through a chord's notes: no chord here",
+                         MessageKind::Information);
+            return true;
+        }
+        const auto& events = song.events(*trackId());
+        std::vector<std::pair<std::uint8_t, core::Tick>> notes;
+        for (const auto i : chord)
+        {
+            notes.emplace_back(std::get<core::Note>(events[i].data).pitch, events[i].tick);
+        }
+        std::ranges::sort(notes);
+        const auto here =
+            std::ranges::find(notes, pitch_, &std::pair<std::uint8_t, core::Tick>::first);
+        const auto at = here - notes.begin();
+        const auto to = std::clamp<std::ptrdiff_t>(at + (command == "cursor-chord-up" ? n : -n), 0,
+                                                   std::ssize(notes) - 1);
+        if (to == at)
+        {
+            return false;
+        }
+        moveTo(notes[static_cast<std::size_t>(to)].second);
+        moveToPitch(notes[static_cast<std::size_t>(to)].first);
+    }
     else if (command == "cursor-chord-next" || command == "cursor-chord-previous")
     {
         // The start of a chord, on its lowest note.
@@ -3660,6 +3764,7 @@ void PianoRollView::addRegions(Frame& frame) const
                         static_cast<int>(positionText(meter(), lastTick()).size()), &editor_);
     if (trackId())
     {
+        addChord(inspector);
         addNewNote(inspector, *song.tracks()[track_]);
     }
     frame.push_back(std::move(inspector));

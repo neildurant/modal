@@ -214,6 +214,10 @@ private:
     // The notes of the chord holding the note under the cursor and as many chords after it as
     // the count says less one (ic), or none, saying so, if there's no note there.
     std::vector<std::size_t> chordHere(int count) const;
+    // The notes of the chord holding the current note, by index, or none; and the inspector's
+    // Chord block on one, its name, size and velocities.
+    std::vector<std::size_t> chordOfCurrent() const;
+    void addChord(Region& inspector) const;
 
     // Adds the default note at the cursor, or with advancing (O) as many as the count says one
     // after another, the cursor moving on past each; deletes or yanks notes, as indices into
