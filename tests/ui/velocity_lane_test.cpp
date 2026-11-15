@@ -558,3 +558,16 @@ TEST_CASE("^ic sets or changes a whole chord's velocities, keeping their balance
     CHECK(l.velocity(0, 28) == 80);
     CHECK(l.velocity(0, 31) == 80);
 }
+
+TEST_CASE("g with Up and Down go up and down a chord's notes, as gk and gj do")
+{
+    Lane l;
+    l.intoLane();
+    l.press(Key::of(NamedKey::Escape));
+    l.press(Key::typed(U'g'));
+    l.press(Key::of(NamedKey::Up));
+    CHECK(l.view().pitch() == 31);
+    l.press(Key::typed(U'g'));
+    l.press(Key::of(NamedKey::Down));
+    CHECK(l.view().pitch() == 28);
+}

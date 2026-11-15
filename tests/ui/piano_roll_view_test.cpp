@@ -1534,7 +1534,7 @@ TEST_CASE("the hint menu shows after an operator once it has waited, its keys ig
         keys.push_back(hint.keys);
     }
     CHECK(keys ==
-          std::vector<std::string>{"a", "c", "e", "g", "j", "k", "l", "m", "n", "r", "t", "v"});
+          std::vector<std::string>{"a", "c", "e", "g", "j/↓", "k/↑", "l", "m", "n", "r", "t", "v"});
 }
 
 TEST_CASE("keys bound to one command show together in the hint menu, arrows as arrows")

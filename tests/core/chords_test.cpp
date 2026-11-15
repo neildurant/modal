@@ -39,12 +39,15 @@ TEST_CASE("chords are named as lead sheets name them")
     CHECK(name("B3 D4 F4") == "Bdim");
     CHECK(name("C4 E4 G#4") == "Caug");
     CHECK(name("D4 G4 A4") == "Dsus4");
-    CHECK(name("F3 A3 C4 E4") == "Fmaj7");
+    CHECK(name("F3 A3 C4 E4") == "FMaj7");
     CHECK(name("G3 B3 D4 F4") == "G7");
     CHECK(name("A3 C4 E4 G4") == "Am7");
     CHECK(name("B3 D4 F4 A4") == "Bm7b5");
     CHECK(name("C4 D4 E4 G4") == "Cadd9");
     CHECK(name("C4 E4 G4 Bb4 D5") == "C9");
+    // Major sevenths with a capital M, as in FmMaj7 (decided 15 November 2026, after use).
+    CHECK(name("F3 Ab3 C4 E4") == "FmMaj7");
+    CHECK(name("C4 E4 G4 B4 D5") == "CMaj9");
     // Spelled as lead sheets usually are.
     CHECK(name("Bb3 D4 F4") == "Bb");
     CHECK(name("F#3 A#3 C#4") == "F#");
