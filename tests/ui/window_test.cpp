@@ -997,7 +997,7 @@ TEST_CASE("a sample of the velocity lane", "[.sample]")
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-lane-light.bmp"));
     view.handle(Key::typed(U'v', kCtrl), 0);
-    type(U"8lJ");
+    type(U"4lJ");
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-lane-box.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));

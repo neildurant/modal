@@ -182,35 +182,49 @@ TEST_CASE("Tab in the lane goes through a chord's notes low to high, then on")
     CHECK((l.view().time() == 0 && l.view().pitch() == 28));
 }
 
-TEST_CASE("h and l in the lane move a grid step, onto a note starting in it")
+TEST_CASE("h and l in the velocity lane go note to note, as Tab does")
 {
     Lane l;
     l.intoLane();
     l.type(U"l");
-    CHECK(l.view().time() == l.ppqn.quarter() / 4);
-    CHECK_FALSE(l.view().laneNote());
-    l.press(Key::typed(U'a', kCtrl));
-    CHECK(l.ws.message() == "No note starts here: Tab goes to the next");
-    l.type(U"h");
-    CHECK(l.view().time() == 0);
-    CHECK(l.view().laneNote());
-
-    // A note a little off the grid is in the grid step it starts in.
-    l.type(U"3");
-    l.press(Key::of(NamedKey::Tab));
-    REQUIRE(l.view().time() == l.bar(5) + 7);
-    l.type(U"lh");
-    CHECK(l.view().time() == l.bar(5));
-    CHECK(l.view().pitch() == 36);
+    CHECK((l.view().time() == 0 && l.view().pitch() == 31));
+    l.press(Key::of(NamedKey::Right));
+    CHECK((l.view().time() == l.bar(2) && l.view().pitch() == 45));
+    // A note a little off the grid is reached as any other.
+    l.type(U"l");
+    CHECK((l.view().time() == l.bar(5) + 7 && l.view().pitch() == 36));
     l.press(Key::typed(U'a', kCtrl));
     CHECK(l.velocity(l.bar(5) + 7, 36) == 101);
+    l.type(U"3h");
+    CHECK((l.view().time() == 0 && l.view().pitch() == 28));
+    // Past the first, nothing moves.
+    l.press(Key::of(NamedKey::Left));
+    CHECK((l.view().time() == 0 && l.view().pitch() == 28));
+}
+
+TEST_CASE("o in a Ctrl-v box in the lane goes to its other corner, its values too")
+{
+    Lane l;
+    l.intoLane();
+    // From E1's 96 to A2, down to 50: E1, G1 and A2 taken.
+    l.press(Key::typed(U'v', kCtrl));
+    l.type(U"2l5J");
+    REQUIRE(l.view().laneTaken().size() == 3);
+    l.type(U"o");
+    CHECK((l.view().time() == 0 && l.view().pitch() == 28));
+    // k now moves the edge that was the anchor's, 96, so lowering it drops E1 and G1.
+    l.type(U"k");
+    CHECK(l.view().laneTaken().size() == 3);
+    l.type(U"2J");
+    CHECK(l.view().laneTaken().size() == 1);
+    CHECK(l.view().selectionStatus()->starts_with("1 note, velocities 46–77"));
 }
 
 TEST_CASE("v in the lane takes the notes starting in its time, Ctrl-a raising them all")
 {
     Lane l;
     l.intoLane();
-    l.type(U"v16l");
+    l.type(U"v2l");
     CHECK(l.ws.mode() == Mode::Visual);
     CHECK(l.view().laneTaken().size() == 3);
     l.press(Key::typed(U'a', kCtrl));
@@ -235,7 +249,7 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
     l.intoLane();
     // From E1's 96, over the chord and A2.
     l.press(Key::typed(U'v', kCtrl));
-    l.type(U"16l");
+    l.type(U"2l");
     CHECK(l.view().laneTaken().size() == 1);
     // j and J move the box's other edge, as moves size any selection, not the velocities.
     l.type(U"J");
@@ -300,7 +314,7 @@ TEST_CASE("Enter alone in the lane asks for a velocity, or a change to it")
     CHECK(l.velocity(0, 28) == 90);
 
     // On a selection, every note it takes, stopping at the ends of the range.
-    l.type(U"v16l");
+    l.type(U"v2l");
     answer(U"+40");
     CHECK(l.velocity(0, 28) == 127);
     CHECK(l.velocity(0, 31) == 120);

@@ -2363,6 +2363,11 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         selection_->anchor = view().cursor();
         selection_->index = view().selectionIndex();
         view().setCursor(other);
+        // A box in the lane goes to its other corner, its values' edges swapping too.
+        if (auto& values = selection_->values)
+        {
+            std::swap(values->first, values->second);
+        }
         if (selection_->movedNotes)
         {
             auto notes = std::make_shared<Selection::MovedNotes>(*selection_->movedNotes);

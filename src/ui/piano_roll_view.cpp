@@ -1829,6 +1829,13 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return runLane(command == "cursor-up" ? "lane-box-up" : "lane-box-down", count);
     }
+    // In the velocity lane, h and l go note to note, as Tab does: the time between notes
+    // means nothing there, and a selection grows a note at a time rather than overshooting
+    // (decided 14 November 2026, after use).
+    if (command == "cursor-left" || command == "cursor-right")
+    {
+        return runLane(command == "cursor-left" ? "lane-event-previous" : "lane-event-next", count);
+    }
     // Moves in time, onto a note's velocity where one starts.
     const auto before = time_;
     const auto done = runNotes(command, count);
@@ -3103,7 +3110,10 @@ void PianoRollView::addRegions(Frame& frame) const
     if (onPage)
     {
         notes.under.push_back({{cursorX, 0, cursorWidth, notesHeight}, Role::Selection, kBand});
-        lane.under.push_back({{cursorX, 0, cursorWidth, laneHeight}, Role::Selection, kBand});
+        if (!inLane_) // the lane's own tint shows where the cursor is there
+        {
+            lane.under.push_back({{cursorX, 0, cursorWidth, laneHeight}, Role::Selection, kBand});
+        }
     }
     // A Visual selection: its time at every pitch, tinted through the notes and the lane; or
     // with V its rows, through the notes alone.
@@ -3328,10 +3338,18 @@ void PianoRollView::addRegions(Frame& frame) const
             {
                 const int y = laneY(note->velocity);
                 // A match's velocity in the match's colour, so it reads with the note above
-                // (decided November 2026), unless it's the current note or selected.
+                // (decided November 2026), unless it's the current note or selected. With the
+                // cursor in the lane, the note it's on in the brightest colour, not a selection's
+                // (decided 14 November 2026, after use).
+                const bool here = inLane_ && current == i;
+                // The others as strong as the notes' bodies above, so the current one stands
+                // out (decided 14 November 2026, after use).
+                const bool bright = here && !laneSelecting();
                 lane.under.push_back({{x, y, barWidth, laneHeight - y},
-                                      matched && !picked ? Role::Match : role,
-                                      255});
+                                      bright               ? Role::Text
+                                      : matched && !picked ? Role::Match
+                                                           : role,
+                                      bright ? std::uint8_t{255} : bodyAlpha(note->velocity)});
             }
         }
     }
@@ -3378,16 +3396,13 @@ void PianoRollView::addRegions(Frame& frame) const
 
     // The cursor's cell boxed, over the notes, and the playhead, a line through the notes and
     // the lane.
-    if (onPage && inLane_)
+    if (inLane_)
     {
-        // In the lane, a line at its time (decided 14 November 2026, after use, in place of
-        // its grid step boxed): the note whose velocity it's on is in the accent colour, and
-        // on an empty step the line is where something would go. Under the bars, so it doesn't
-        // hide the one it's on; the band along the pitch row above still shows whose it is.
+        // The lane tinted along its length while the cursor's in it, as the cursor's pitch row
+        // is in the notes, the bar it's on in the brightest colour; no other mark, which in a
+        // Ctrl-v box looked untidy (decided 14 November 2026, after use).
         lane.under.insert(lane.under.begin(),
-                          Shape{{scale.toX(time_), 0, std::max(2 * lineWidth, 2), laneHeight},
-                                Role::Cursor,
-                                255});
+                          Shape{{0, 0, width, laneHeight}, Role::Selection, kBand});
     }
     else if (onPage && shown(pitch_))
     {
