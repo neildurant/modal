@@ -435,3 +435,28 @@ TEST_CASE("a chord's late note's bar is at its own time in the lane, not with th
     CHECK(bars[1].x - bars[0].x < 6);
     CHECK(bars[2].x - bars[1].x > 6);
 }
+
+TEST_CASE("a lane selection by an object or to a boundary stays inside it")
+{
+    // vib, v]b and Ctrl-v ib in bar 1 take its chord, not bar 2's A2.
+    for (const auto* keys : {U"vib", U"v]b"})
+    {
+        Lane l;
+        l.intoLane();
+        l.type(keys);
+        CHECK(l.view().laneTaken().size() == 2);
+        CHECK((l.view().time() == 0 && l.view().pitch() == 31));
+    }
+    Lane box;
+    box.intoLane();
+    box.press(Key::typed(U'v', kCtrl));
+    box.type(U"ib");
+    CHECK(box.view().laneTaken().size() == 2);
+    CHECK(box.view().selectionStatus()->starts_with("2 notes, velocities 80–96"));
+
+    // Not selecting, ]b goes on to the next bar's first note.
+    Lane l;
+    l.intoLane();
+    l.type(U"]b");
+    CHECK((l.view().time() == l.bar(2) && l.view().pitch() == 45));
+}

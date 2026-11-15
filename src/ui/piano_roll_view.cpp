@@ -583,7 +583,42 @@ void PianoRollView::selectObject(std::string_view object, int count, Selection& 
     // objects their time, on every pitch, as their operators take it.
     if (object != "object-note" && object != "object-chord")
     {
+        const auto span = objectSpan(object, count);
         View::selectObject(object, count, selection);
+        if (inLane_ && span)
+        {
+            // In the lane, from the first note in its time to the last, so it stays inside
+            // it, rather than the cursor at its last tick going on to the next note (decided
+            // 14 November 2026, after use, where vib ran into the next bar); a box takes
+            // every velocity they have.
+            const auto& events = document_.song().events(*trackId());
+            std::vector<LaneEntry> inside;
+            for (const auto& entry : laneEntries())
+            {
+                if (entry.tick >= span->first && entry.tick < span->second)
+                {
+                    inside.push_back(entry);
+                }
+            }
+            if (!inside.empty())
+            {
+                selection.anchor = SongCursor{trackId(), inside.front().tick, inside.front().pitch};
+                setCursor(SongCursor{trackId(), inside.back().tick, inside.back().pitch});
+                if (selection.kind == SelectionKind::Box)
+                {
+                    auto low = std::uint8_t{127};
+                    auto high = std::uint8_t{1};
+                    for (const auto& entry : inside)
+                    {
+                        const auto velocity =
+                            std::get<core::Note>(events[entry.index].data).velocity;
+                        low = std::min(low, velocity);
+                        high = std::max(high, velocity);
+                    }
+                    selection.values = std::pair{low, high};
+                }
+            }
+        }
         return;
     }
     if (inLane_)
@@ -1969,9 +2004,33 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
             return runLane(command == "cursor-left" ? "lane-event-previous" : "lane-event-next",
                            count);
         }
-        // Moves in time, onto a note's velocity where one starts.
+        // Moves in time, onto a note's velocity where one starts; selecting, a move forward
+        // onto the last note before where it ends, as a selection to a boundary stops short
+        // of it, so v]b stays in the bar (decided 14 November 2026, after use).
         const auto from = time_;
+        const auto current = laneNote();
         const auto result = runNotes(command, count);
+        if (time_ > from && laneSelecting())
+        {
+            const auto entries = laneEntries();
+            const auto at =
+                current ? std::ranges::find(entries, *current, &LaneEntry::index) : entries.end();
+            std::optional<LaneEntry> last;
+            for (auto it = at == entries.end() ? entries.begin() : std::next(at);
+                 it != entries.end() && it->tick < time_; ++it)
+            {
+                if (it->tick >= from)
+                {
+                    last = *it;
+                }
+            }
+            if (last)
+            {
+                moveTo(last->tick);
+                moveToPitch(last->pitch);
+                return result;
+            }
+        }
         if (time_ != from)
         {
             lanePick();
