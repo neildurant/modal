@@ -164,9 +164,6 @@ constexpr std::array kCommands{
         .name = "lane-value-up", .description = "Raise the velocity by {count}", .count = true},
     CommandInfo{
         .name = "lane-value-down", .description = "Lower the velocity by {count}", .count = true},
-    CommandInfo{.name = "lane-value-zero",
-                .description =
-                    "Set the value to 0, as 0 and Enter, where 0 alone goes to the start"},
     CommandInfo{.name = "lane-value-set",
                 .description = "Set the velocity to the number typed, or ask for it or a change",
                 .count = true},
@@ -2794,11 +2791,6 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         }
         return moveLaneEvents(command, n);
     }
-    if (command == "lane-value-zero")
-    {
-        // 0 and Enter, as a count can't start with 0, which moves to the start.
-        return runLane("lane-value-set-zero", 0);
-    }
     const bool up = command.starts_with("lane-value-up") || command.starts_with("lane-box-up");
     const bool zero = command == "lane-value-set-zero";
     const bool set = command == "lane-value-set" || zero;
@@ -2827,6 +2819,11 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         }
         host_.setSelectionValues({anchor, to}, true);
         return true;
+    }
+    if (set && count == 0 && !zero && std::exchange(zeroTyped_, false) && !velocityLane())
+    {
+        // 0 and Enter: 0 began no count, as it's the motion to the start, so it waited.
+        return runLane("lane-value-set-zero", 0);
     }
     if (set && count == 0 && !zero)
     {
@@ -2934,6 +2931,19 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     if (!inLane_)
     {
         return runNotes(command, count);
+    }
+    // 0 with no count, in a controller's lane, waits for Enter to set 0 rather than going to
+    // the start, a number and Enter setting a value there (decided 15 November 2026, after use).
+    const bool zero = std::exchange(zeroTyped_, false);
+    if (command == "cursor-first" && count == 0 && !velocityLane() && !isSwitchLane())
+    {
+        zeroTyped_ = true;
+        host_.setMessage("0: Enter sets the value to 0", MessageKind::Information);
+        return true;
+    }
+    if (command == "lane-value-set" && zero)
+    {
+        zeroTyped_ = true; // for runLane to take
     }
     const auto before = std::pair{time_, pitch_};
     const bool notes = velocityLane();

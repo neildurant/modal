@@ -192,13 +192,14 @@ TEST_CASE("in a controller's lane, Tab and h and l go event to event, and H and 
     const auto lit = [&]
     {
         const auto frame = l.ws.frame();
-        return std::ranges::count_if(frame,
-                                     [](const Region& region)
-                                     {
-                                         return std::ranges::any_of(
-                                             region.over, [](const Shape& shape)
-                                             { return shape.role == Role::Text; });
-                                     });
+        return std::ranges::count_if(
+            frame,
+            [](const Region& region)
+            {
+                return std::ranges::any_of(
+                    region.over, [](const Shape& shape)
+                    { return shape.role == Role::Text && shape.rect.height >= kCell.height; });
+            });
     };
     CHECK(lit() == 1);
     l.press(Key::typed(U'a', kCtrl));

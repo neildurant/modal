@@ -367,6 +367,7 @@ private:
     bool gridAdvance_ = false;
     bool inLane_ = false;
     bool pedalValues_ = false; // a pedal's lane showing its values, not its regions (, c v)
+    bool zeroTyped_ = false;   // 0 typed in a controller's lane, for Enter to set 0
     std::optional<ChoiceList> laneChooser_;
     std::vector<core::Lane> laneChoices_; // what laneChooser_'s choices are
     InspectorEditor editor_;
