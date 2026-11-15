@@ -1434,6 +1434,16 @@ void PianoRollView::lanePick()
 
 std::vector<std::pair<core::Tick, std::uint8_t>> PianoRollView::laneOrder() const
 {
+    std::vector<std::pair<core::Tick, std::uint8_t>> result;
+    for (const auto& entry : laneEntries())
+    {
+        result.emplace_back(entry.tick, entry.pitch);
+    }
+    return result;
+}
+
+std::vector<PianoRollView::LaneEntry> PianoRollView::laneEntries() const
+{
     // Each chord's notes together, in time and those starting together low to high, as their
     // bars are drawn.
     const auto id = trackId();
@@ -1441,28 +1451,119 @@ std::vector<std::pair<core::Tick, std::uint8_t>> PianoRollView::laneOrder() cons
     {
         return {};
     }
-    std::vector<std::tuple<core::Tick, core::Tick, std::uint8_t>> order;
+    std::vector<std::tuple<core::Tick, core::Tick, std::uint8_t, std::size_t>> order;
     const auto& song = document_.song();
     std::optional<core::Tick> first;
-    for (const auto& event : song.events(*id).all())
+    const auto events = song.events(*id).all();
+    for (std::size_t i = 0; i < events.size(); ++i)
     {
-        if (const auto* note = std::get_if<core::Note>(&event.data))
+        if (const auto* note = std::get_if<core::Note>(&events[i].data))
         {
-            if (!first || !together(song, *first, event.tick, chordWindow_))
+            if (!first || !together(song, *first, events[i].tick, chordWindow_))
             {
-                first = event.tick;
+                first = events[i].tick;
             }
-            order.emplace_back(*first, event.tick, note->pitch);
+            order.emplace_back(*first, events[i].tick, note->pitch, i);
         }
     }
     std::ranges::sort(order);
-    std::vector<std::pair<core::Tick, std::uint8_t>> result;
+    std::vector<LaneEntry> result;
     result.reserve(order.size());
-    for (const auto& [chord, tick, pitch] : order)
+    for (const auto& [chord, tick, pitch, index] : order)
     {
-        result.emplace_back(tick, pitch);
+        result.push_back({tick, pitch, index});
     }
     return result;
+}
+
+std::vector<int> PianoRollView::laneBarXs(const TimeScale& scale) const
+{
+    // Each at its own time, a bar overlapping the one before in its chord moved just clear of
+    // it (decided 14 November 2026, after use, where a loose chord's late note was drawn with
+    // the others).
+    const auto id = trackId();
+    if (!id)
+    {
+        return {};
+    }
+    const auto& song = document_.song();
+    const auto events = song.events(*id).all();
+    const int lineWidth = hairline(cell_);
+    const int barWidth = std::max(2 * lineWidth, 2);
+    std::vector<int> xs(events.size(), 0);
+    std::vector<std::tuple<core::Tick, std::uint8_t, std::size_t>> chord;
+    core::Tick first = 0;
+    const auto spread = [&]
+    {
+        std::ranges::sort(chord);
+        std::optional<int> last;
+        for (const auto& [tick, pitch, index] : chord)
+        {
+            int x = scale.toX(tick);
+            if (last)
+            {
+                x = std::max(x, *last + barWidth + lineWidth);
+            }
+            xs[index] = x;
+            last = x;
+        }
+        chord.clear();
+    };
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto* note = std::get_if<core::Note>(&events[i].data);
+        if (note == nullptr)
+        {
+            continue;
+        }
+        if (!chord.empty() && !together(song, first, events[i].tick, chordWindow_))
+        {
+            spread();
+        }
+        if (chord.empty())
+        {
+            first = events[i].tick;
+        }
+        chord.emplace_back(events[i].tick, note->pitch, i);
+    }
+    spread();
+    return xs;
+}
+
+std::optional<std::pair<std::size_t, std::size_t>> PianoRollView::laneRange() const
+{
+    // From the note the selection started on to the one the cursor's on, as Tab takes them,
+    // both in (decided 14 November 2026, after use, rather than their times, which took the
+    // rest of a chord and ran on to the next grid step).
+    if (!laneSelecting())
+    {
+        return std::nullopt;
+    }
+    const auto selection = *host_.selection();
+    if (selection.span)
+    {
+        return std::nullopt;
+    }
+    const auto entries = laneEntries();
+    if (entries.empty())
+    {
+        return std::nullopt;
+    }
+    const auto at = [&](core::Tick tick, std::uint8_t pitch)
+    {
+        const auto exact = std::ranges::find_if(entries, [&](const LaneEntry& e)
+                                                { return e.tick == tick && e.pitch == pitch; });
+        if (exact != entries.end())
+        {
+            return static_cast<std::size_t>(exact - entries.begin());
+        }
+        const auto later =
+            std::ranges::find_if(entries, [&](const LaneEntry& e) { return e.tick >= tick; });
+        return static_cast<std::size_t>(std::min(later - entries.begin(), std::ssize(entries) - 1));
+    };
+    const auto anchor = at(selection.anchor.tick, selection.anchor.pitch.value_or(pitch_));
+    const auto cursor = at(time_, pitch_);
+    return std::pair{std::min(anchor, cursor), std::max(anchor, cursor)};
 }
 
 bool PianoRollView::laneSelecting() const
@@ -1482,9 +1583,20 @@ std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::laneSpan() const
     {
         return selection.span;
     }
-    const auto from = std::min(selection.anchor.tick, time_);
-    const auto last = std::max(selection.anchor.tick, time_);
-    return std::pair{from, std::max(gridAfter(last), last + 1)};
+    const auto range = laneRange();
+    if (!range)
+    {
+        return std::pair{time_, time_ + 1};
+    }
+    const auto entries = laneEntries();
+    core::Tick from = entries[range->first].tick;
+    core::Tick last = from;
+    for (auto i = range->first; i <= range->second; ++i)
+    {
+        from = std::min(from, entries[i].tick);
+        last = std::max(last, entries[i].tick);
+    }
+    return std::pair{from, last + 1};
 }
 
 std::optional<std::pair<std::uint8_t, std::uint8_t>> PianoRollView::laneValues() const
@@ -1528,13 +1640,30 @@ std::vector<std::size_t> PianoRollView::laneTaken() const
     const auto kept = values ? selection->movedNotes : nullptr;
     const auto id = *trackId();
     const auto events = document_.song().events(id).all();
+    const auto takes = [&](std::size_t i)
+    {
+        const auto& note = std::get<core::Note>(events[i].data);
+        return kept
+                   ? kept->contains(id, events[i].tick, note.pitch)
+                   : !values || (note.velocity >= values->first && note.velocity <= values->second);
+    };
+    if (const auto range = laneRange())
+    {
+        const auto entries = laneEntries();
+        for (auto i = range->first; i <= range->second; ++i)
+        {
+            if (takes(entries[i].index))
+            {
+                taken.push_back(entries[i].index);
+            }
+        }
+        std::ranges::sort(taken);
+        return taken;
+    }
+    // An object's time, every note starting in it.
     for (std::size_t i = 0; i < events.size() && events[i].tick < span->second; ++i)
     {
-        const auto* note = std::get_if<core::Note>(&events[i].data);
-        if (note != nullptr && events[i].tick >= span->first &&
-            (kept ? kept->contains(id, events[i].tick, note->pitch)
-                  : !values ||
-                        (note->velocity >= values->first && note->velocity <= values->second)))
+        if (events[i].isNote() && events[i].tick >= span->first && takes(i))
         {
             taken.push_back(i);
         }
@@ -1821,27 +1950,48 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return runNotes(command, count);
     }
-    if (command.starts_with("lane-"))
+    const auto before = std::pair{time_, pitch_};
+    const auto done = [&]() -> std::optional<bool>
     {
-        return runLane(command, count);
-    }
-    if (command == "cursor-up" || command == "cursor-down")
+        if (command.starts_with("lane-"))
+        {
+            return runLane(command, count);
+        }
+        if (command == "cursor-up" || command == "cursor-down")
+        {
+            return runLane(command == "cursor-up" ? "lane-box-up" : "lane-box-down", count);
+        }
+        // In the velocity lane, h and l go note to note, as Tab does: the time between notes
+        // means nothing there, and a selection grows a note at a time rather than overshooting
+        // (decided 14 November 2026, after use).
+        if (command == "cursor-left" || command == "cursor-right")
+        {
+            return runLane(command == "cursor-left" ? "lane-event-previous" : "lane-event-next",
+                           count);
+        }
+        // Moves in time, onto a note's velocity where one starts.
+        const auto from = time_;
+        const auto result = runNotes(command, count);
+        if (time_ != from)
+        {
+            lanePick();
+        }
+        return result;
+    }();
+    // A Ctrl-v box's moving corner goes to the velocity of the note the cursor moves to, so
+    // the box runs from note to note, k and j adjusting it from there (decided 14 November
+    // 2026, after use, where it stayed at the velocity the box started at).
+    const auto selection = host_.selection();
+    if (std::pair{time_, pitch_} != before && laneSelecting() &&
+        selection->kind == SelectionKind::Box)
     {
-        return runLane(command == "cursor-up" ? "lane-box-up" : "lane-box-down", count);
-    }
-    // In the velocity lane, h and l go note to note, as Tab does: the time between notes
-    // means nothing there, and a selection grows a note at a time rather than overshooting
-    // (decided 14 November 2026, after use).
-    if (command == "cursor-left" || command == "cursor-right")
-    {
-        return runLane(command == "cursor-left" ? "lane-event-previous" : "lane-event-next", count);
-    }
-    // Moves in time, onto a note's velocity where one starts.
-    const auto before = time_;
-    const auto done = runNotes(command, count);
-    if (time_ != before)
-    {
-        lanePick();
+        if (const auto index = laneNote())
+        {
+            const auto velocity =
+                std::get<core::Note>(document_.song().events(*trackId())[*index].data).velocity;
+            const auto anchor = selection->values ? selection->values->first : velocity;
+            host_.setSelectionValues({anchor, velocity});
+        }
     }
     return done;
 }
@@ -3140,19 +3290,6 @@ void PianoRollView::addRegions(Frame& frame) const
     const int laneTop = laneInset + lineWidth;
     const auto laneY = [&](int velocity)
     { return laneHeight - (laneHeight - laneTop) * velocity / 127; };
-    if (const auto span = laneSpan(); span && span->first < p.end && span->second > p.start)
-    {
-        const int x0 = scale.toX(std::max(span->first, p.start));
-        const int x1 = scale.toX(std::min(span->second, p.end));
-        int top = 0;
-        int bottom = laneHeight;
-        if (const auto values = laneValues())
-        {
-            top = std::max(laneY(values->second + 1), 0);
-            bottom = laneY(values->first - 1);
-        }
-        lane.under.push_back({{x0, top, x1 - x0, bottom - top}, Role::Selection, 255});
-    }
     for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid(), cell_))
     {
         notes.under.push_back(line);
@@ -3212,48 +3349,7 @@ void PianoRollView::addRegions(Frame& frame) const
         // A chord's bars in the lane fan out side by side, so each note's velocity shows and
         // can be reached (decided 14 November 2026).
         const int barWidth = std::max(2 * lineWidth, 2);
-        std::vector<std::pair<core::Tick, int>> fan(events.size(), {0, 0});
-        {
-            // Each at its own time, a bar overlapping the one before in its chord moved just
-            // clear of it (decided 14 November 2026, after use, where a loose chord's late note
-            // was drawn with the others).
-            std::vector<std::tuple<core::Tick, std::uint8_t, std::size_t>> chord;
-            core::Tick first = 0;
-            const auto spread = [&]
-            {
-                std::ranges::sort(chord);
-                std::optional<int> last;
-                for (const auto& [tick, pitch, index] : chord)
-                {
-                    int x = scale.toX(tick);
-                    if (last)
-                    {
-                        x = std::max(x, *last + barWidth + lineWidth);
-                    }
-                    fan[index] = {tick, x};
-                    last = x;
-                }
-                chord.clear();
-            };
-            for (std::size_t i = 0; i < events.size(); ++i)
-            {
-                const auto* note = std::get_if<core::Note>(&events[i].data);
-                if (note == nullptr)
-                {
-                    continue;
-                }
-                if (!chord.empty() && !together(song, first, events[i].tick, chordWindow_))
-                {
-                    spread();
-                }
-                if (chord.empty())
-                {
-                    first = events[i].tick;
-                }
-                chord.emplace_back(events[i].tick, note->pitch, i);
-            }
-            spread();
-        }
+        const auto barXs = laneBarXs(scale);
         for (std::size_t i = 0; i < events.size() && events[i].tick < p.end; ++i)
         {
             const auto& event = events[i];
@@ -3334,8 +3430,9 @@ void PianoRollView::addRegions(Frame& frame) const
                     }
                 }
             }
-            if (const auto [start, x] = fan[i]; start >= p.start)
+            if (event.tick >= p.start)
             {
+                const int x = barXs[i];
                 const int y = laneY(note->velocity);
                 // A match's velocity in the match's colour, so it reads with the note above
                 // (decided November 2026), unless it's the current note or selected. With the
@@ -3344,13 +3441,50 @@ void PianoRollView::addRegions(Frame& frame) const
                 const bool here = inLane_ && current == i;
                 // The others as strong as the notes' bodies above, so the current one stands
                 // out (decided 14 November 2026, after use).
-                const bool bright = here && !laneSelecting();
+                const bool bright = here;
                 lane.under.push_back({{x, y, barWidth, laneHeight - y},
                                       bright               ? Role::Text
                                       : matched && !picked ? Role::Match
                                                            : role,
                                       bright ? std::uint8_t{255} : bodyAlpha(note->velocity)});
             }
+        }
+    }
+
+    // The lane's selection, from its first note's bar to its last's, and in a Ctrl-v box between
+    // its values, so a box just started shows nothing, as a Visual box at one cell doesn't
+    // (decided 14 November 2026, after use); under the bars.
+    if (const auto laneTime = laneSpan();
+        laneTime && laneTime->first < p.end && laneTime->second > p.start)
+    {
+        int x0 = scale.toX(std::max(laneTime->first, p.start));
+        int x1 = scale.toX(std::min(laneTime->second, p.end));
+        if (const auto range = laneRange())
+        {
+            const int barWidth = std::max(2 * lineWidth, 2);
+            const auto entries = laneEntries();
+            const auto xs = laneBarXs(scale);
+            x0 = xs[entries[range->first].index];
+            x1 = x0 + barWidth;
+            for (auto i = range->first; i <= range->second; ++i)
+            {
+                x0 = std::min(x0, xs[entries[i].index]);
+                x1 = std::max(x1, xs[entries[i].index] + barWidth);
+            }
+            x0 = std::max(x0 - lineWidth, 0);
+            x1 += lineWidth;
+        }
+        int top = 0;
+        int bottom = laneHeight;
+        if (const auto values = laneValues())
+        {
+            top = laneY(values->second);
+            bottom = laneY(values->first);
+        }
+        if (bottom > top)
+        {
+            lane.under.insert(lane.under.begin(),
+                              Shape{{x0, top, x1 - x0, bottom - top}, Role::Selection, 255});
         }
     }
 

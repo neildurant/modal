@@ -206,9 +206,9 @@ TEST_CASE("o in a Ctrl-v box in the lane goes to its other corner, its values to
 {
     Lane l;
     l.intoLane();
-    // From E1's 96 to A2, down to 50: E1, G1 and A2 taken.
+    // From E1's 96 to A2's 50: E1, G1 and A2 taken.
     l.press(Key::typed(U'v', kCtrl));
-    l.type(U"2l5J");
+    l.type(U"2l");
     REQUIRE(l.view().laneTaken().size() == 3);
     l.type(U"o");
     CHECK((l.view().time() == 0 && l.view().pitch() == 28));
@@ -217,7 +217,7 @@ TEST_CASE("o in a Ctrl-v box in the lane goes to its other corner, its values to
     CHECK(l.view().laneTaken().size() == 3);
     l.type(U"2J");
     CHECK(l.view().laneTaken().size() == 1);
-    CHECK(l.view().selectionStatus()->starts_with("1 note, velocities 46–77"));
+    CHECK(l.view().selectionStatus()->starts_with("1 note, velocities 50–77"));
 }
 
 TEST_CASE("v in the lane takes the notes starting in its time, Ctrl-a raising them all")
@@ -247,18 +247,22 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
 {
     Lane l;
     l.intoLane();
-    // From E1's 96, over the chord and A2.
+    // From E1's 96, its corners on the notes it's started and ended on.
     l.press(Key::typed(U'v', kCtrl));
-    l.type(U"2l");
     CHECK(l.view().laneTaken().size() == 1);
-    // j and J move the box's other edge, as moves size any selection, not the velocities.
-    l.type(U"J");
-    CHECK(l.velocity(0, 28) == 96);
-    CHECK(l.view().laneTaken().size() == 1);
-    l.press(Key::of(NamedKey::Down, kShift));
-    l.type(U"k");
+    l.type(U"l"); // G1's 80
+    CHECK(l.view().laneTaken().size() == 2);
+    l.type(U"l"); // A2's 50
+    CHECK(l.view().laneTaken().size() == 3);
+    // k and K move its moving edge from there, as moves size any selection, not the
+    // velocities: up to 80 leaves A2 out.
+    l.type(U"3K");
+    CHECK(l.velocity(l.bar(2), 45) == 50);
+    CHECK(l.view().laneTaken().size() == 2);
+    l.press(Key::of(NamedKey::Up));
+    CHECK(l.view().laneTaken().size() == 1); // 81 leaves G1's 80 out
     l.press(Key::of(NamedKey::Down));
-    CHECK(l.view().laneTaken().size() == 2); // and G1's 80
+    CHECK(l.view().laneTaken().size() == 2);
     // Ctrl-a changes the velocities it takes, which it keeps though E1's leaves it.
     l.press(Key::typed(U'a', kCtrl));
     CHECK(l.velocity(0, 28) == 97);
@@ -271,6 +275,18 @@ TEST_CASE("Ctrl-v in the lane takes only the notes with velocities inside its va
     CHECK(l.velocity(0, 28) == 110);
     CHECK(l.velocity(0, 31) == 110);
     CHECK(l.velocity(l.bar(2), 45) == 50);
+}
+
+TEST_CASE("a lane selection runs from note to note, not on to the next grid step")
+{
+    // v on E1 takes E1 alone, though G1 starts with it, and l takes G1 too, but not A2.
+    Lane l;
+    l.intoLane();
+    l.type(U"v");
+    CHECK(l.view().laneTaken().size() == 1);
+    l.type(U"l");
+    CHECK(l.view().laneTaken().size() == 2);
+    CHECK(l.view().selectionStatus()->starts_with("2 notes"));
 }
 
 TEST_CASE("Alt and the section strip's keys don't reach into the lane")

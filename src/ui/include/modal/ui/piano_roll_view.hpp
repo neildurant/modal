@@ -249,6 +249,20 @@ private:
     // The track's notes in the order Tab takes them in the lane: by chord, then low to high,
     // as their bars fan out, each with its own start and pitch.
     std::vector<std::pair<core::Tick, std::uint8_t>> laneOrder() const;
+    // The same, each with its index into the track's events.
+    struct LaneEntry
+    {
+        core::Tick tick = 0;
+        std::uint8_t pitch = 0;
+        std::size_t index = 0;
+    };
+    std::vector<LaneEntry> laneEntries() const;
+    // The lane's v or Ctrl-v selection, as places in that order, from the first note it takes
+    // to the last; or none, for no selection or one an object made, which takes time.
+    std::optional<std::pair<std::size_t, std::size_t>> laneRange() const;
+    // Where each note's bar is across the lane, by its index into the track's events, a
+    // chord's fanned out side by side.
+    std::vector<int> laneBarXs(const TimeScale& scale) const;
     // After a move in the lane, onto a note starting in the cursor's grid step if none there
     // is at its pitch, the lowest.
     void lanePick();
