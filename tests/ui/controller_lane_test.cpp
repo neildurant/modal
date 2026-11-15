@@ -487,3 +487,34 @@ TEST_CASE("once a Ctrl-v box's edge is set with k or j, it no longer follows the
     l.type(U"h");
     CHECK(l.view().selectionStatus()->find("values 40–80") != std::string::npos);
 }
+
+TEST_CASE("a search's matching controller events are in the match colour, and n goes to them")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    // The mod wheel above 30: the 40 and the 80.
+    l.type(U"/");
+    l.type(U"cc1>30");
+    l.enter();
+    const auto matched = [&]
+    {
+        const auto frame = l.ws.frame();
+        int count = 0;
+        for (const auto& region : frame)
+        {
+            for (const auto& shape : region.under)
+            {
+                count += shape.role == Role::Match ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    // The cursor's bar is lit, the other match in the match colour.
+    CHECK(l.view().time() == l.q());
+    CHECK(matched() == 1);
+    l.type(U"n");
+    CHECK(l.view().time() == 2 * l.q());
+    CHECK(l.view().laneNote());
+    CHECK(matched() == 1);
+}
