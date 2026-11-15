@@ -51,7 +51,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
 
 - [ ] **Doing** — Step 1 accepted on its fifth trial and published 15 November 2026; step 1b, with the inspector naming the chord (asked for 15 November 2026), accepted on trial and published 15 November 2026; step 2a (choosing the lane with `, c c`, `:lane` and `]c`, drawing a controller's, pitch bend's and aftertouch's events, moving through them with `H` / `L` between, changing values and selecting) accepted on trial and published 15 November 2026, with a line showing the cursor between events and `H` / `L` nudging the cursor in the notes too; 2b (adding, deleting and moving events) built 15 November 2026, changed after its first trial, awaiting a second. Designed 14 November 2026 (design.md, Editing in the lane), in steps each tried before the next: (1) editing the velocity lane: `gl` in, `Tab` between notes, `h` / `l` by grid steps, `k` / `j` and `K` / `J`, digits, chords fanned out, `v` and a value box with `Ctrl-v`; (1b) chords as a whole: `gk` / `gj`, the inspector's range and `^ic`; (2) CC, pitch bend and aftertouch lanes, chosen with `, c c` (agreed 15 November 2026), adding and deleting events; (3) search highlighting in the lane. Editable lanes for CCs, pitch bend and aftertouch, with selections, transforms and search highlighting.
 - [ ] **To do** — A taller controller lane for precise work (asked for 14 November 2026): a key toggling it between its three rows and half the view's height, or cycling through a few heights; to design.
-- [ ] **To do** — Switch-controller regions for sustain, sostenuto, soft pedal and similar controllers; preserve imported half-pedal values.
+- [ ] **To do** — Switch-controller regions for sustain, sostenuto, soft pedal and similar controllers; preserve imported half-pedal values. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 - [x] **Done** — Program-change event markers in the piano-roll ruler, delivered with bank/program setup; validation and the accepted trial are recorded in status.md.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
@@ -144,7 +144,7 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 
 ## 16. Takes, alternatives and reusable material
 
-- [ ] **To do** — Take lanes and comping.
+- [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 - [ ] **To do** — Section alternatives, auditionable in place.
 - [ ] **To do** — Persistent musical notebook: named/tagged fragments with source date, song, section, key, tempo and meter.
 - [ ] **To do** — Yank or record into the notebook; search by name, tag or source, audition and put fragments into songs.
