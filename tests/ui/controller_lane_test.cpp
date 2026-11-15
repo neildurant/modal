@@ -286,3 +286,77 @@ TEST_CASE("H and L nudge the cursor off the grid in the notes, and o adds a note
     l.type(U"H");
     CHECK(l.ws.message().starts_with("H and L move by a nudge in the notes"));
 }
+
+TEST_CASE("o adds a controller's event at the cursor, at the value before it")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    // Half a beat on, between 10 and 40: o takes 10.
+    l.type(U"l");
+    REQUIRE(l.view().time() == l.q());
+    l.type(U"h");
+    l.type(U"LLLL");
+    const auto at = l.view().time();
+    REQUIRE_FALSE(l.view().laneNote());
+    l.type(U"o");
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 10, 40, 80});
+    CHECK(l.view().laneNote());
+    // Again there is refused: there's one already.
+    l.type(U"o");
+    CHECK(l.ws.message().starts_with("There's an event here already"));
+    // A number and Enter on an empty spot adds one at that value; Enter alone asks.
+    l.type(U"L");
+    l.type(U"30");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 10, 30, 40, 80});
+    l.type(U"L");
+    l.enter();
+    l.type(U"+5");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 10, 30, 35, 40, 80});
+    CHECK(at > 0);
+    // In the velocity lane, there's nothing to add.
+    l.line(U"lane velocity");
+    l.type(U"o");
+    CHECK(l.ws.message().starts_with("A velocity belongs to its note"));
+}
+
+TEST_CASE("x deletes a controller's event, and d a selection's, into the register")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.type(U"x");
+    CHECK(l.values(kModWheel) == std::vector<int>{40, 80});
+    l.type(U"u");
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 80});
+    l.type(U"vld");
+    CHECK(l.values(kModWheel) == std::vector<int>{80});
+    // The notes, the volume and the bend are untouched.
+    CHECK(l.values({.kind = core::Lane::Kind::Controller, .controller = 7}) ==
+          std::vector<int>{100});
+    CHECK(l.values(kBend) == std::vector<int>{1000, 0});
+}
+
+TEST_CASE("Alt-h and Alt-l move a controller's event a grid step, Alt-H and Alt-L a nudge")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.press(Key::of(NamedKey::Tab)); // the 40, on beat 2
+    l.press(Key::typed(U'l', kAlt));
+    // A sixteenth later, the cursor going with it.
+    CHECK(l.view().time() == l.q() + l.q() / 4);
+    REQUIRE(l.view().laneNote());
+    l.press(Key::typed(U'l', kAlt | kShift));
+    CHECK(l.view().time() > l.q() + l.q() / 4);
+    // Back a grid step at a time to the start, where the 10 is, is refused there.
+    for (int i = 0; i < 6; ++i)
+    {
+        l.press(Key::typed(U'h', kAlt));
+    }
+    CHECK(l.view().time() == l.q() / 4);
+    CHECK(l.ws.message() == "Another event is there already");
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 80});
+}

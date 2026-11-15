@@ -293,12 +293,24 @@ nmap <S-Down>   lane-box-down-coarse "Box's edge down 10"
 " The controllers, , c: , c c chooses what the lane shows, velocity, a controller, pitch bend
 " or aftertouch, from a list with the latest used first; ]c and [c in the lane step through
 " the track's own. In the piano roll's notes and a controller's lane, H and L move a nudge at a
-" time, off the grid, to place a note or event exactly.
+" time, off the grid, to place a note or event exactly. There o adds an event at the cursor,
+" at the value before it, a number and Enter one at that value, x deletes the event and d a
+" selection's, and Alt-h and Alt-l move it a grid step, Alt-H and Alt-L a nudge, as for notes.
 " The pedalling tools are here as well as under , x P.
 ngroup <leader>c "Controllers"
 nmap <leader>cc  lane-choose       "Choose the lane"
 nmap ]c         lane-controller-next     "Next controller in the lane"
 nmap [c         lane-controller-previous "Controller before in the lane"
+nmap o          lane-event-add    "Add an event"
+nmap x          lane-event-delete "Delete this event"
+nmap <A-h>      lane-event-earlier "Move onto the grid step before"
+nmap <A-Left>   lane-event-earlier "Move onto the grid step before"
+nmap <A-l>      lane-event-later  "Move onto the next grid step"
+nmap <A-Right>  lane-event-later  "Move onto the next grid step"
+nmap <A-S-h>    lane-event-earlier-fine "Nudge earlier"
+nmap <A-S-Left> lane-event-earlier-fine "Nudge earlier"
+nmap <A-S-l>    lane-event-later-fine "Nudge later"
+nmap <A-S-Right> lane-event-later-fine "Nudge later"
 nmap H          cursor-nudge-left  "A nudge earlier"
 nmap <S-Left>   cursor-nudge-left  "A nudge earlier"
 nmap L          cursor-nudge-right "A nudge later"

@@ -132,6 +132,21 @@ constexpr std::array kCommands{
     CommandInfo{.name = "lane-controller-previous",
                 .description = "Show the track's controller before in the lane",
                 .count = true},
+    CommandInfo{.name = "lane-event-add",
+                .description = "Add an event at the cursor, at the value before it"},
+    CommandInfo{.name = "lane-event-delete", .description = "Delete this event"},
+    CommandInfo{.name = "lane-event-earlier",
+                .description = "Move this event onto the grid step before, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-event-later",
+                .description = "Move this event onto the next grid step, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-event-earlier-fine",
+                .description = "Nudge this event earlier, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-event-later-fine",
+                .description = "Nudge this event later, {count} times",
+                .count = true},
     CommandInfo{.name = "cursor-nudge-left",
                 .description = "A nudge earlier, off the grid, {count} times",
                 .count = true},
@@ -2273,6 +2288,32 @@ bool PianoRollView::askValue()
     {
         taken.push_back(*index);
     }
+    if (taken.empty() && !laneSelecting() && !velocityLane())
+    {
+        // On an empty spot in a controller's lane, a new event's value, or a change to the
+        // value before it.
+        const auto shown = lane();
+        const auto tick = time_;
+        const auto held = heldValue(tick);
+        host_.askName(
+            "Value for a new " + laneLabel() + " event (the value before is " +
+                std::to_string(held) + "): ",
+            "",
+            [this, shown, tick, held](const std::string& answer)
+            {
+                const auto change = valueChange(answer, shown.lowest(), shown.highest());
+                if (!change)
+                {
+                    host_.refuse("A value is " + std::to_string(std::max(shown.lowest(), 0)) +
+                                     " to " + std::to_string(shown.highest()) +
+                                     ", or a change such as +10 or -10",
+                                 MessageKind::Warning);
+                    return;
+                }
+                addLaneEvent(tick, std::clamp((*change)(held), shown.lowest(), shown.highest()));
+            });
+        return true;
+    }
     if (taken.empty())
     {
         host_.refuse(
@@ -2329,6 +2370,235 @@ bool PianoRollView::askValue()
     return true;
 }
 
+int PianoRollView::heldValue(core::Tick tick) const
+{
+    // The value of the lane's last event at or before a time, as it sounds there; or, before
+    // any, the middle of a controller's range, and pitch bend's and pressure's rest.
+    const auto shown = lane();
+    std::optional<int> value;
+    for (const auto& event : document_.song().events(*trackId()).all())
+    {
+        if (event.tick > tick)
+        {
+            break;
+        }
+        if (shown.shows(event.data))
+        {
+            value = shown.value(event.data);
+        }
+    }
+    return value.value_or(shown.kind == core::Lane::Kind::Controller ? 64 : 0);
+}
+
+bool PianoRollView::addLaneEvent(core::Tick tick, int value)
+{
+    const auto shown = lane();
+    const auto id = *trackId();
+    for (const auto& event : document_.song().events(id).all())
+    {
+        if (event.tick == tick && shown.shows(event.data))
+        {
+            host_.refuse("There's an event here already: Ctrl-a, Ctrl-x or Enter change it",
+                         MessageKind::Information);
+            return true;
+        }
+    }
+    core::EventData data = core::ChannelPressure{0};
+    if (shown.kind == core::Lane::Kind::Controller)
+    {
+        data = core::ControlChange{shown.controller, 0};
+    }
+    else if (shown.kind == core::Lane::Kind::PitchBend)
+    {
+        data = core::PitchBend{0};
+    }
+    shown.setValue(data, value);
+    editEvents("Add " + laneLabel() + " " + std::to_string(shown.value(data)) + " in " +
+                   trackName(),
+               [&](core::EventList& events) { events.insert({tick, data}); });
+    return true;
+}
+
+bool PianoRollView::moveLaneEvents(std::string_view command, int n)
+{
+    // The current event, or a selection's, moved together, each by as much as the first
+    // moves, keeping their spacing; refused where one would land on another of the lane's or
+    // go past the song's ends.
+    const auto id = *trackId();
+    const auto& events = document_.song().events(id);
+    std::vector<std::size_t> moving;
+    if (laneSelecting())
+    {
+        moving = laneTaken();
+    }
+    else if (const auto index = laneNote())
+    {
+        moving.push_back(*index);
+    }
+    if (moving.empty())
+    {
+        host_.refuse(laneSelecting() ? "No events there" : laneNothing(), MessageKind::Information);
+        return true;
+    }
+    const auto first = events[moving.front()].tick;
+    const bool earlier = command.starts_with("lane-event-earlier");
+    core::Tick to = first;
+    if (command.ends_with("-fine"))
+    {
+        to = nudged(first, earlier ? -n : n);
+    }
+    else
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            to = earlier ? gridBefore(to) : gridAfter(to);
+        }
+    }
+    const auto by = to - first;
+    if (by == 0)
+    {
+        return false;
+    }
+    const auto shown = lane();
+    std::vector<core::Event> moved;
+    for (const auto i : moving)
+    {
+        auto event = events[i];
+        event.tick += by;
+        if (event.tick < 0 || event.tick > lastTick())
+        {
+            host_.refuse("That would go past the song's start or end", MessageKind::Information);
+            return true;
+        }
+        moved.push_back(event);
+    }
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (shown.shows(events[i].data) && std::ranges::find(moving, i) == moving.end() &&
+            std::ranges::any_of(moved,
+                                [&](const core::Event& e) { return e.tick == events[i].tick; }))
+        {
+            host_.refuse("Another event is there already", MessageKind::Information);
+            return true;
+        }
+    }
+    std::vector<Selection::NotePosition> positions;
+    for (const auto& event : moved)
+    {
+        positions.emplace_back(event.tick, lanePitch(event));
+    }
+    const auto key = "lane move " + std::to_string(id.value);
+    editEvents(
+        "Move " + laneTaking(moving.size()) + " " + (earlier ? "earlier" : "later") + " in " +
+            trackName(),
+        [&](core::EventList& list)
+        {
+            for (auto it = moving.rbegin(); it != moving.rend(); ++it)
+            {
+                list.erase(*it);
+            }
+            for (const auto& event : moved)
+            {
+                list.insert(event);
+            }
+        },
+        key);
+    if (laneSelecting())
+    {
+        host_.moveSelection(by, 0, std::move(positions));
+    }
+    moveTo(time_ + by);
+    return true;
+}
+
+bool PianoRollView::laneOperate(std::string_view op, std::string_view motion, int count)
+{
+    // d and y in a controller's lane take its events: a selection's, or those a motion or
+    // object covers; into the register as notes go, so p puts them back.
+    if (op != "operator-delete" && op != "operator-yank")
+    {
+        host_.refuse("In a controller's lane, d and y take its events; the transforms work on "
+                     "a selection",
+                     MessageKind::Information);
+        return true;
+    }
+    const auto shown = lane();
+    const auto& events = document_.song().events(*trackId());
+    std::vector<std::size_t> taken;
+    std::pair<core::Tick, core::Tick> span{time_, time_ + 1};
+    if (motion == "visual")
+    {
+        taken = laneTaken();
+        if (const auto s = laneSpan())
+        {
+            span = *s;
+        }
+    }
+    else
+    {
+        std::optional<std::pair<core::Tick, core::Tick>> range;
+        if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")
+        {
+            const auto& m = meter();
+            const auto bar = m.toBarBeatTick(time_).bar;
+            range = std::pair{m.barStart(bar), std::min(m.barStart(bar + std::max(count, 1)),
+                                                        document_.song().end())};
+        }
+        else if (const auto object = objectSpan(motion, count);
+                 object && motion.starts_with("object-"))
+        {
+            range = object;
+        }
+        else
+        {
+            range = timeSpan(motion, count);
+        }
+        if (!range)
+        {
+            return true;
+        }
+        span = *range;
+        for (std::size_t i = 0; i < events.size(); ++i)
+        {
+            if (shown.shows(events[i].data) && events[i].tick >= span.first &&
+                events[i].tick < span.second)
+            {
+                taken.push_back(i);
+            }
+        }
+    }
+    auto& reg = host_.eventRegister();
+    reg = EventRegister{};
+    auto& kept = reg.tracks.emplace_back();
+    for (const auto i : taken)
+    {
+        auto event = events[i];
+        event.tick -= span.first;
+        kept.push_back(std::move(event));
+    }
+    reg.span = span.second - span.first;
+    const auto what = laneTaking(taken.size());
+    if (op == "operator-yank")
+    {
+        host_.setMessage(what + " yanked", MessageKind::Information);
+        return true;
+    }
+    if (taken.empty())
+    {
+        host_.refuse("No events there to delete", MessageKind::Information);
+        return true;
+    }
+    editEvents("Delete " + what + " in " + trackName(),
+               [&](core::EventList& list)
+               {
+                   for (auto it = taken.rbegin(); it != taken.rend(); ++it)
+                   {
+                       list.erase(*it);
+                   }
+               });
+    return true;
+}
+
 std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
 {
     const int n = std::max(count, 1);
@@ -2367,6 +2637,40 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
             moveToPitch(entry.pitch);
         }
         return true;
+    }
+    if (command == "lane-event-add" || command == "lane-event-delete" ||
+        command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later"))
+    {
+        if (notes)
+        {
+            host_.refuse("A velocity belongs to its note: Escape goes back to the notes to add, "
+                         "delete or move notes",
+                         MessageKind::Information);
+            return true;
+        }
+        if (command == "lane-event-add")
+        {
+            return addLaneEvent(time_, heldValue(time_));
+        }
+        if (command == "lane-event-delete")
+        {
+            const auto index = laneNote();
+            if (!index)
+            {
+                host_.refuse(laneNothing(), MessageKind::Information);
+                return true;
+            }
+            const auto event = song.events(*id)[*index];
+            auto& reg = host_.eventRegister();
+            reg = EventRegister{};
+            reg.tracks.emplace_back().push_back({0, event.data});
+            reg.span = 1;
+            editEvents("Delete " + laneLabel() + " " + std::to_string(shown.value(event.data)) +
+                           " in " + trackName(),
+                       [&](core::EventList& list) { list.erase(*index); });
+            return true;
+        }
+        return moveLaneEvents(command, n);
     }
     const bool up = command.starts_with("lane-value-up") || command.starts_with("lane-box-up");
     const bool set = command == "lane-value-set";
@@ -2429,6 +2733,11 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
                              set ? std::string_view{} : std::string_view{key});
     }
     const auto index = laneNote();
+    if (!index && set && !notes)
+    {
+        // A number and Enter on an empty spot in a controller's lane adds an event there.
+        return addLaneEvent(time_, count);
+    }
     if (!index)
     {
         host_.refuse(laneNothing(), MessageKind::Information);
@@ -3188,16 +3497,16 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
     {
         return false;
     }
+    if (inLane_ && !velocityLane())
+    {
+        return laneOperate(op, motion, count);
+    }
     if (inLane_)
     {
-        // A velocity belongs to its note, so there's nothing in its lane to delete or yank; a
-        // controller's events can't yet be deleted there either.
-        host_.refuse(
-            velocityLane()
-                ? "Velocities change in the lane rather than going: Escape goes back to "
-                  "the notes"
-                : "Deleting a controller's events comes next: Escape goes back to the notes",
-            MessageKind::Information);
+        // A velocity belongs to its note, so there's nothing in its lane to delete or yank.
+        host_.refuse("Velocities change in the lane rather than going: Escape goes back to the "
+                     "notes",
+                     MessageKind::Information);
         return true;
     }
     if (motion == "operator-line" || motion == "object-bar-contents" || motion == "object-bar")

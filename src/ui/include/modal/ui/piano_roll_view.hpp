@@ -298,6 +298,13 @@ private:
     std::string laneValueName() const;
     std::string laneTaking(std::size_t count) const;
     std::string laneNothing() const;
+    // The value the lane holds at a time, from its last event there; adding an event with a
+    // value; moving the current event or a selection's (Alt-h, Alt-l, Alt-H, Alt-L); and d
+    // and y on a controller's events.
+    int heldValue(core::Tick tick) const;
+    bool addLaneEvent(core::Tick tick, int value);
+    bool moveLaneEvents(std::string_view command, int n);
+    bool laneOperate(std::string_view op, std::string_view motion, int count);
     // , c c: opens the list of lanes to choose from; ]c and [c: the track's next or previous.
     bool chooseLane();
     bool stepLane(int by);
