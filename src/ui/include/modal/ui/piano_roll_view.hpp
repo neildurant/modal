@@ -302,6 +302,7 @@ private:
     // value; moving the current event or a selection's (Alt-h, Alt-l, Alt-H, Alt-L); and d
     // and y on a controller's events.
     int heldValue(core::Tick tick) const;
+    std::optional<int> priorValue(core::Tick tick) const;
     bool addLaneEvent(core::Tick tick, int value);
     bool moveLaneEvents(std::string_view command, int n);
     bool laneOperate(std::string_view op, std::string_view motion, int count);

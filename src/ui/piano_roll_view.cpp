@@ -1889,6 +1889,10 @@ std::optional<std::pair<int, int>> PianoRollView::boxValues() const
     {
         value = shown.value(document_.song().events(*trackId())[*index].data);
     }
+    else if (!velocityLane())
+    {
+        value = heldValue(time_); // between events, the value they hold there
+    }
     return std::pair{value, value};
 }
 
@@ -2012,6 +2016,26 @@ std::optional<std::function<int(int)>> valueChange(std::string_view text, int lo
     const bool percent = text.ends_with('%');
     if (percent)
         text.remove_suffix(1);
+    // A value and a change after it, as typed after the value the prompt starts with (64+10):
+    // the two together, a value.
+    if (const auto at = text.find_first_of("+-", 1); at != std::string_view::npos && !percent)
+    {
+        const auto base = text.substr(0, at);
+        const auto by = text.substr(at + 1);
+        const auto digits = [](std::string_view s)
+        {
+            return !s.empty() && s.size() <= 5 &&
+                   std::ranges::all_of(s, [](char c)
+                                       { return std::isdigit(static_cast<unsigned char>(c)); });
+        };
+        const bool negative = base.starts_with('-');
+        const auto number = negative ? base.substr(1) : base;
+        if (!digits(number) || !digits(by))
+            return std::nullopt;
+        const int sum = (negative ? -1 : 1) * std::stoi(std::string{number}) +
+                        (text[at] == '+' ? 1 : -1) * std::stoi(std::string{by});
+        return [sum, lowest, highest](int) { return std::clamp(sum, lowest, highest); };
+    }
     const char sign =
         !text.empty() && (text.front() == '+' || text.front() == '-') ? text.front() : '\0';
     if (sign != '\0')
@@ -2295,10 +2319,8 @@ bool PianoRollView::askValue()
         const auto shown = lane();
         const auto tick = time_;
         const auto held = heldValue(tick);
-        host_.askName(
-            "Value for a new " + laneLabel() + " event (the value before is " +
-                std::to_string(held) + "): ",
-            "",
+        host_.askValue(
+            "Value for a new " + laneLabel() + " event (100, +10, -10): ", std::to_string(held),
             [this, shown, tick, held](const std::string& answer)
             {
                 const auto change = valueChange(answer, shown.lowest(), shown.highest());
@@ -2336,8 +2358,16 @@ bool PianoRollView::askValue()
     name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
     const auto example = shown.kind == core::Lane::Kind::PitchBend ? "(0, +500, -500 or 80%)"
                                                                    : "(100, +10, -10 or 80%)";
-    host_.askName(
-        name + " for " + what + " " + example + ": ", "",
+    // Filled with the value, as a reference to change or type over, where they're all the same.
+    std::string now;
+    if (std::ranges::all_of(
+            taken, [&](std::size_t i)
+            { return shown.value(events[i].data) == shown.value(events[taken.front()].data); }))
+    {
+        now = std::to_string(shown.value(events[taken.front()].data));
+    }
+    host_.askValue(
+        name + " for " + what + " " + example + ": ", now,
         [this, id, places, what, shown, name](const std::string& answer)
         {
             const auto lowest = shown.kind == core::Lane::Kind::Velocity ? 1 : shown.lowest();
@@ -2370,10 +2400,9 @@ bool PianoRollView::askValue()
     return true;
 }
 
-int PianoRollView::heldValue(core::Tick tick) const
+std::optional<int> PianoRollView::priorValue(core::Tick tick) const
 {
-    // The value of the lane's last event at or before a time, as it sounds there; or, before
-    // any, the middle of a controller's range, and pitch bend's and pressure's rest.
+    // The value of the lane's last event at or before a time, as it sounds there.
     const auto shown = lane();
     std::optional<int> value;
     for (const auto& event : document_.song().events(*trackId()).all())
@@ -2387,7 +2416,13 @@ int PianoRollView::heldValue(core::Tick tick) const
             value = shown.value(event.data);
         }
     }
-    return value.value_or(shown.kind == core::Lane::Kind::Controller ? 64 : 0);
+    return value;
+}
+
+int PianoRollView::heldValue(core::Tick tick) const
+{
+    // Or, before any, the middle of a controller's range, and pitch bend's and pressure's rest.
+    return priorValue(tick).value_or(lane().kind == core::Lane::Kind::Controller ? 64 : 0);
 }
 
 bool PianoRollView::addLaneEvent(core::Tick tick, int value)
@@ -3908,11 +3943,15 @@ Inspection PianoRollView::inspection() const
                       : shown.kind == core::Lane::Kind::PitchBend  ? "Bend"
                                                                    : "Pressure";
         result.fields.push_back({"Position", positionText(m, time_)});
-        if (!index)
+        // Between events, the value held there from the last before, as it sounds (decided
+        // 15 November 2026, after use).
+        const auto held = index ? std::optional{shown.value(song.events(*trackId())[*index].data)}
+                                : priorValue(time_);
+        if (!held)
         {
             return result;
         }
-        const auto value = std::to_string(shown.value(song.events(*trackId())[*index].data));
+        const auto value = std::to_string(*held);
         if (shown.kind == core::Lane::Kind::Controller)
         {
             result.fields.push_back({"Controller", laneTitle(shown)});
@@ -4511,6 +4550,18 @@ void PianoRollView::addRegions(Frame& frame) const
             }
             x0 = std::max(x0 - lineWidth, 0);
             x1 += lineWidth;
+        }
+        // In a controller's lane an end can be between events, where the cursor or the
+        // selection's start is; it reaches there, staying with the cursor (decided 15 November
+        // 2026, after use).
+        if (!velocityLane() && selection && !selection->span)
+        {
+            for (const auto tick : {selection->anchor.tick, time_})
+            {
+                const int x = scale.toX(std::clamp(tick, p.start, p.end));
+                x0 = std::min(x0, x);
+                x1 = std::max(x1, x + lineWidth);
+            }
         }
         int top = 0;
         int bottom = laneHeight;

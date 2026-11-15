@@ -11,6 +11,7 @@ namespace modal::ui
 
 void CommandLine::open()
 {
+    replaceable_ = false;
     text_.clear();
     cursor_ = 0;
     recalled_ = history_.size();
@@ -24,13 +25,25 @@ void CommandLine::open(std::u32string text)
     cursor_ = text_.size();
 }
 
+void CommandLine::openValue(std::u32string text)
+{
+    open(std::move(text));
+    replaceable_ = true;
+}
+
 void CommandLine::insert(char32_t character)
 {
+    if (std::exchange(replaceable_, false) && character >= U'0' && character <= U'9')
+    {
+        text_.clear();
+        cursor_ = 0;
+    }
     text_.insert(cursor_++, 1, character);
 }
 
 bool CommandLine::backspace()
 {
+    replaceable_ = false;
     if (cursor_ == 0)
     {
         return false;
@@ -41,6 +54,7 @@ bool CommandLine::backspace()
 
 bool CommandLine::erase()
 {
+    replaceable_ = false;
     if (cursor_ == text_.size())
     {
         return false;
@@ -51,26 +65,31 @@ bool CommandLine::erase()
 
 void CommandLine::left()
 {
+    replaceable_ = false;
     cursor_ -= cursor_ > 0 ? 1 : 0;
 }
 
 void CommandLine::right()
 {
+    replaceable_ = false;
     cursor_ += cursor_ < text_.size() ? 1 : 0;
 }
 
 void CommandLine::start()
 {
+    replaceable_ = false;
     cursor_ = 0;
 }
 
 void CommandLine::end()
 {
+    replaceable_ = false;
     cursor_ = text_.size();
 }
 
 void CommandLine::clear()
 {
+    replaceable_ = false;
     text_.clear();
     cursor_ = 0;
 }

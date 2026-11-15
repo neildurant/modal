@@ -258,6 +258,13 @@ public:
     // what's given (Enter), and Escape runs nothing.
     virtual void askName(std::string label, std::string name,
                          std::function<void(const std::string&)> answer) = 0;
+    // Asks for a value, with the one there now as a reference that a number typed replaces and
+    // a change typed after it (+10) builds on.
+    virtual void askValue(std::string label, std::string value,
+                          std::function<void(const std::string&)> answer)
+    {
+        askName(std::move(label), std::move(value), std::move(answer));
+    }
 
     // Asks a question in the status line, running yes if the next key is y and no for any
     // other, or for Escape stop, if there's one, which stops a run of questions; with nothing

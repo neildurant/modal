@@ -418,6 +418,8 @@ private:
     void openPrompt(std::string line) override;
     void askName(std::string label, std::string name,
                  std::function<void(const std::string&)> answer) override;
+    void askValue(std::string label, std::string value,
+                  std::function<void(const std::string&)> answer) override;
     void ask(std::string question, std::function<void()> yes, std::function<void()> no = {},
              std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;

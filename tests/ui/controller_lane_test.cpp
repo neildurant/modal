@@ -360,3 +360,110 @@ TEST_CASE("Alt-h and Alt-l move a controller's event a grid step, Alt-H and Alt-
     CHECK(l.ws.message() == "Another event is there already");
     CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 80});
 }
+
+namespace
+{
+
+// The inspector's text, its runs in order down and across, a space between.
+std::u32string inspectorText(const Lanes& l)
+{
+    const auto frame = l.ws.frame();
+    std::vector<TextRun> runs;
+    for (const auto& region : frame)
+    {
+        if (region.background == Role::Panel)
+        {
+            runs.insert(runs.end(), region.text.begin(), region.text.end());
+        }
+    }
+    std::ranges::sort(runs, [](const TextRun& a, const TextRun& b)
+                      { return a.y != b.y ? a.y < b.y : a.x < b.x; });
+    std::u32string text;
+    for (const auto& run : runs)
+    {
+        text += run.text + U" ";
+    }
+    return text;
+}
+
+// The width of the lane's selection as drawn, or 0.
+int selectionWidth(const Lanes& l)
+{
+    const auto frame = l.ws.frame();
+    const auto name = std::ranges::find_if(
+        frame, [](const Region& region)
+        { return !region.text.empty() && region.text.front().text == U"cc1"; });
+    for (const auto& region : frame)
+    {
+        if (name != frame.end() && region.bounds.y == name->bounds.y &&
+            region.bounds.x > name->bounds.x)
+        {
+            for (const auto& shape : region.under)
+            {
+                if (shape.role == Role::Selection && shape.alpha == 255)
+                {
+                    return shape.rect.width;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+} // namespace
+
+TEST_CASE("the value prompt starts with the value, a number replacing it and +10 building on it")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.enter();
+    CHECK(l.ws.commandLine().text() == U"10");
+    l.type(U"+5");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{15, 40, 80});
+    l.enter();
+    CHECK(l.ws.commandLine().text() == U"15");
+    l.type(U"100");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{100, 40, 80});
+}
+
+TEST_CASE("between a controller's events, the inspector shows the value held there")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggllL"); // a nudge past the 40
+    REQUIRE_FALSE(l.view().laneNote());
+    const auto text = inspectorText(l);
+    CHECK(text.find(U"No event") != std::u32string::npos);
+    CHECK(text.find(U"1 Modulation") != std::u32string::npos);
+    CHECK(text.find(U" 40 ") != std::u32string::npos);
+}
+
+TEST_CASE("a selection in a controller's lane reaches the cursor between events")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.type(U"vl");
+    const auto to = selectionWidth(l);
+    CHECK(to > 0);
+    l.type(U"20L"); // on past the 40, towards the 80
+    CHECK(selectionWidth(l) > to);
+    CHECK(l.view().laneTaken().size() == 2);
+    // From between events, too.
+    l.press(Key::of(NamedKey::Escape));
+    l.type(U"Lv");
+    l.type(U"l");
+    CHECK(selectionWidth(l) > 0);
+}
+
+TEST_CASE("a Ctrl-v box started between a controller's events starts at the value held there")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggllL"); // a nudge past the 40
+    l.press(Key::typed(U'v', kCtrl));
+    CHECK(l.view().selectionStatus()->find("values 40") != std::string::npos);
+}

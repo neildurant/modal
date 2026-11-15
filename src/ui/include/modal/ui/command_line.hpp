@@ -22,6 +22,10 @@ public:
     // Starts a new, empty line, or one with text in it and the cursor at its end.
     void open();
     void open(std::u32string text);
+    // Starts with a value in it, as a reference: a digit typed first takes its place, and
+    // anything else, as +10 after it, goes on after it (decided 15 November 2026, after use).
+    void openValue(std::u32string text);
+    bool replaceable() const { return replaceable_; }
 
     void insert(char32_t character);
     // Deletes the character before the cursor, or after it; false if there's none.
@@ -52,6 +56,7 @@ private:
     std::vector<std::u32string> history_;
     std::size_t recalled_ = 0; // the history line shown, or history_.size() if none
     std::u32string draft_;     // the line being typed, kept while recalling others
+    bool replaceable_ = false; // the value it was opened with, until something's typed
 };
 
 } // namespace modal::ui

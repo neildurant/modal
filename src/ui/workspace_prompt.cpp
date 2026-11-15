@@ -724,6 +724,13 @@ void Workspace::askName(std::string label, std::string name,
     prompt_.line.open(decodeUtf8(name));
 }
 
+void Workspace::askValue(std::string label, std::string value,
+                         std::function<void(const std::string&)> answer)
+{
+    askFor(std::move(label), std::move(answer));
+    prompt_.line.openValue(decodeUtf8(value));
+}
+
 std::vector<PaletteItem> Workspace::paletteItems() const
 {
     // The commands that can be run from Normal mode, the palette apart, with their keys.
@@ -1166,7 +1173,10 @@ Region Workspace::promptRegion() const
     { return margin + static_cast<int>(column) * cell_.width; };
     const auto lead = label.size();
     region.text.push_back({x(0), 0, label, plain});
-    region.text.push_back({x(lead), 0, text.substr(first, cursor - first), plain});
+    // A value it was opened with, highlighted while a number typed would replace it.
+    region.text.push_back(
+        {x(lead), 0, text.substr(first, cursor - first),
+         prompt_.line.replaceable() ? Style{Role::Text, Role::Selection, kPlain} : plain});
     const char32_t under = cursor < text.size() ? text[cursor] : U' ';
     region.text.push_back({x(lead + cursor - first), 0, std::u32string(1, under), kCursor});
     if (cursor + 1 < text.size())
