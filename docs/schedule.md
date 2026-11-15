@@ -53,7 +53,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
 - [ ] **To do** — A taller controller lane for precise work (asked for 14 November 2026): a key toggling it between its three rows and half the view's height, or cycling through a few heights; to design.
 - [ ] **Doing** — Designed 15 November 2026 after renders (design.md, Pedals in the lane and the notes): the first part (regions drawn, `, c v` for values, region to region, the inspector, sustain tails and tint, with dots on a controller's values, a held 0 shown and `0 Enter` setting 0) accepted on trial and published 15 November 2026; editing regions next. Switch-controller regions for sustain, sostenuto, soft pedal and similar controllers; preserve imported half-pedal values. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 - [x] **Done** — Program-change event markers in the piano-roll ruler, delivered with bank/program setup; validation and the accepted trial are recorded in status.md.
-- [ ] **To do** — Controller ramps and shaping (asked for 15 November 2026): `, c r` writes a ramp of a controller's events across a selection, from one value to another, at the grid step or a chosen density, for fades and swells, in shapes to choose from: linear, curved by an amount either way (slow then fast, or fast then slow, as a DAW's tension), an S-curve easing in and out, and equal-power for crossfades; and shaping a controller's existing values: scaling, limiting and smoothing. To design, curves to try by ear while looping.
+- [ ] **To do** — Controller ramps and shaping (asked for 15 November 2026): `, c r` writes a ramp of a controller's events across a selection, from one value to another, at the grid step or a chosen density, for fades and swells, in shapes to choose from: linear, curved by an amount either way (slow then fast, or fast then slow, as a DAW's tension), an S-curve easing in and out, and equal-power for crossfades; and shaping a controller's existing values: scaling, limiting and smoothing. With them, from Sequencer Plus Gold's MIDI transforms (compared 15 November 2026): inverting a controller's values (127 less each), remapping program changes (one patch number to another, for another synth), removing repeated identical values, and retrograde, offset and compress or expand in time for controllers, pitch bend and aftertouch as well as notes. To design, curves to try by ear while looping.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
@@ -74,6 +74,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [ ] **To do** — Paste history, including cycling the material just put.
 - [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
 - [ ] **To do** — Song-format compatibility policy between versions.
+- [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
 
 Resolve the related [design questions](design.md#to-decide) before implementation. Large-song measurements support this milestone; see Engineering work as needed.
 
@@ -138,7 +139,10 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 - [x] **Done** — Existing time-stretch transform with ratio/percentage input, delivered with the full grammar.
 - [ ] **To do** — Extend time stretching/compression with a target length in beats or bars; settle range and ripple semantics before implementation.
 - [ ] **To do** — Half-speed recording, independently usable before free-time tempo fitting.
-- [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines.
+- [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines. One way to fit it, Sequencer Plus Gold's Tap-Tempo: play the track back and tap a note on each beat, the tempo map following the taps; it also locks onto music recorded without a click.
+- [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
+- [ ] **To do** — Release velocity tools: setting and adjusting note-off velocities over a range, as `^` does note-on velocities (Sequencer Plus Gold's Set-NoteOff and Adjust-NoteOff).
+- [ ] **To do** — Splitting by more than pitch: by velocity, duration, whether on or off the grid, and every nth note (Sequencer Plus Gold's Modulus); and a pitch map, remapping many pitches at once as a table, beside remap's one note.
 - [ ] **To do** — Chord/key track, including changes over time.
 - [ ] **To do** — Scale lock and a semitone motion that ignores it, after the chord/key track.
 - [ ] **To do** — Track-wide ripple editing.
