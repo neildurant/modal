@@ -158,6 +158,19 @@ public:
     // whether it's the notes' velocities, and its name on the left: vel, cc1, bend or pres.
     core::Lane lane() const;
     bool velocityLane() const;
+    // Whether the lane is a pedal's, sustain and the like; and drawn as its regions, not its
+    // values (, c v).
+    bool isPedalLane() const;
+    bool isSwitchLane() const;
+    // Where a pedal is down on the track, each from its press to its lift, with the press's
+    // index into the track's events.
+    struct PedalRegion
+    {
+        core::Tick start = 0;
+        core::Tick end = 0;
+        std::size_t index = 0;
+    };
+    std::vector<PedalRegion> pedalRegions(std::uint8_t controller) const;
     std::string laneLabel() const;
     // Shows a lane on the track, as , c c's list and :lane choose it, remembering it as used
     // when chosen, and not when ]c and [c step to it.
@@ -353,6 +366,7 @@ private:
     std::chrono::milliseconds nudge_{5};
     bool gridAdvance_ = false;
     bool inLane_ = false;
+    bool pedalValues_ = false; // a pedal's lane showing its values, not its regions (, c v)
     std::optional<ChoiceList> laneChooser_;
     std::vector<core::Lane> laneChoices_; // what laneChooser_'s choices are
     InspectorEditor editor_;

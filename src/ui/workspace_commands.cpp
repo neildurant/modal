@@ -522,6 +522,12 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "quantize-marks-toggle",
                 .description = "Mark in the piano roll where a quantised track's notes will be "
                                "heard, or stop"},
+    CommandInfo{.name = "sustain-tails-toggle",
+                .description = "Show, or stop showing, tails after notes the sustain pedal holds, "
+                               "to where it lifts"},
+    CommandInfo{.name = "sustain-tint-toggle",
+                .description = "Tint, or stop tinting, the piano roll where the sustain pedal is "
+                               "down"},
     CommandInfo{.name = "own-meter-toggle",
                 .description = "Tint, or stop tinting, the arrangement's bars where a track has a "
                                "meter of its own"},
@@ -861,6 +867,7 @@ std::span<const CommandInfo> Workspace::commands()
             if (info.name == "lane-go")
                 info.where = onlyIn({PianoRoll});
             else if (info.name == "lane-choose" || info.name == "lane" ||
+                     info.name == "lane-values-toggle" ||
                      info.name.starts_with("lane-controller-") ||
                      info.name.starts_with("cursor-nudge-"))
                 info.where = onlyIn({PianoRoll, Lane});

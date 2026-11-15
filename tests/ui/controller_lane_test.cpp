@@ -518,3 +518,86 @@ TEST_CASE("a search's matching controller events are in the match colour, and n 
     CHECK(l.view().laneNote());
     CHECK(matched() == 1);
 }
+
+namespace
+{
+
+// The synth with sustain: down at beat 1 and lifted half a beat after the C4 ends, so it holds
+// it; then down at beat 3, eased to 90 and held to beat 5.
+void pedal(Lanes& l)
+{
+    const auto q = l.q();
+    l.document.edit("Pedal", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            song.tracks()[0]->id(),
+                            [&](core::EventList& events)
+                            {
+                                events.insert({0, core::ControlChange{64, 127}});
+                                events.insert({q + q / 2, core::ControlChange{64, 0}});
+                                events.insert({2 * q, core::ControlChange{64, 127}});
+                                events.insert({2 * q + q / 2, core::ControlChange{64, 90}});
+                                events.insert({4 * q, core::ControlChange{64, 0}});
+                            });
+                    });
+}
+
+const core::Lane kSustain{.kind = core::Lane::Kind::Controller, .controller = 64};
+
+} // namespace
+
+TEST_CASE("a pedal's lane goes region to region, the inspector showing where it's down")
+{
+    Lanes l;
+    pedal(l);
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    REQUIRE(l.view().laneNote());
+    CHECK(inspectorText(l).find(U"Pedal") != std::u32string::npos);
+    l.press(Key::of(NamedKey::Tab));
+    CHECK(l.view().time() == 2 * l.q());
+    // Half-pedalled within it, still one region: no further.
+    l.press(Key::of(NamedKey::Tab));
+    CHECK(l.view().time() == 2 * l.q());
+    l.type(U"h");
+    CHECK(l.view().time() == 0);
+    // Between them, pedal up.
+    l.type(U"l20H"); // back from the second region, past the first's lift
+    CHECK_FALSE(l.view().laneNote());
+    CHECK(inspectorText(l).find(U"Pedal up") != std::u32string::npos);
+    // Editing regions comes next; , c v shows the values, as a controller's.
+    l.press(Key::typed(U'a', kCtrl));
+    CHECK(l.ws.message().starts_with("Editing a pedal's regions comes next"));
+    l.type(U",cv");
+    CHECK_FALSE(l.view().isSwitchLane());
+    l.type(U"gg");
+    l.press(Key::typed(U'x', kCtrl));
+    CHECK(l.values(kSustain) == std::vector<int>{126, 0, 127, 90, 0});
+    l.type(U",cv");
+    CHECK(l.view().isSwitchLane());
+}
+
+TEST_CASE("the toggles , T s and , T S turn the sustain tails and tint on and off")
+{
+    Lanes l;
+    pedal(l);
+    // Shapes in the notes' colour beyond the notes: the tails, and with the tint, more.
+    const auto count = [&]
+    {
+        const auto frame = l.ws.frame();
+        std::size_t shapes = 0;
+        for (const auto& region : frame)
+        {
+            shapes += region.under.size();
+        }
+        return shapes;
+    };
+    const auto tails = count();
+    l.type(U",Ts");
+    CHECK(l.ws.message() == "Sustain tails hidden");
+    CHECK(count() < tails);
+    l.type(U",TS");
+    CHECK(l.ws.message() == "Notes tinted where the sustain pedal is down");
+    CHECK(count() > tails - 2);
+}

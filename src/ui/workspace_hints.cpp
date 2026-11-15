@@ -179,6 +179,14 @@ std::optional<std::string> Workspace::toggleTitle(std::string_view command) cons
     {
         return std::string{"Quantise marks: "} + (quantizeMarks_ ? "shown" : "hidden");
     }
+    if (command == "sustain-tails-toggle")
+    {
+        return std::string{"Sustain tails: "} + (sustainTails_ ? "on" : "off");
+    }
+    if (command == "sustain-tint-toggle")
+    {
+        return std::string{"Sustain tint: "} + (sustainTint_ ? "on" : "off");
+    }
     if (command == "own-meter-toggle")
     {
         return std::string{"Own meter tint: "} + (ownMeter_ ? "on" : "off");

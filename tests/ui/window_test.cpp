@@ -1075,3 +1075,86 @@ TEST_CASE("a sample of controller lanes", "[.sample]")
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-choose.bmp"));
 }
+
+TEST_CASE("a sample of the sustain lane", "[.sample]")
+{
+    // The piano's sustain as regions: plain pedalling in bar 2, half-pedalling within a region
+    // in bar 3, and a continuous pedal's stream of values in bar 4.
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    registry.add(windowCommands());
+    view.setLineHandler([&](const std::string& line) { registry.runLine(line); });
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    document.edit("Pedalling", {},
+                  [](modal::core::Song& song)
+                  {
+                      const auto id = song.tracks()[2]->id();
+                      const auto q = song.ppqn().quarter();
+                      const auto bar = [&](int n) { return 4 * q * (n - 1); };
+                      song.updateEvents(
+                          id,
+                          [&](modal::core::EventList& events)
+                          {
+                              // Clear what the demo has.
+                              std::vector<std::size_t> pedals;
+                              for (std::size_t i = 0; i < events.size(); ++i)
+                                  if (const auto* c =
+                                          std::get_if<modal::core::ControlChange>(&events[i].data);
+                                      c && c->controller == 64)
+                                      pedals.push_back(i);
+                              for (auto it = pedals.rbegin(); it != pedals.rend(); ++it)
+                                  events.erase(*it);
+                              const auto pedal = [&](modal::core::Tick t, int v)
+                              {
+                                  events.insert({t, modal::core::ControlChange{
+                                                        64, static_cast<std::uint8_t>(v)}});
+                              };
+                              // Bar 2: down on each beat's change, as a pianist pedals.
+                              for (int beat = 0; beat < 4; ++beat)
+                              {
+                                  pedal(bar(2) + beat * q + q / 8, 127);
+                                  pedal(bar(2) + (beat + 1) * q - q / 16, 0);
+                              }
+                              // Bar 3: down, eased to half, back down, then up.
+                              pedal(bar(3) + q / 8, 127);
+                              pedal(bar(3) + q, 90);
+                              pedal(bar(3) + 2 * q, 72);
+                              pedal(bar(3) + 3 * q, 127);
+                              pedal(bar(4) - q / 16, 0);
+                              // Bar 4: a continuous pedal, a stream rising and falling.
+                              for (int i = 0; i <= 32; ++i)
+                              {
+                                  const int v = i <= 16 ? i * 8 : (32 - i) * 8;
+                                  pedal(bar(4) + i * q / 8, std::min(v, 127));
+                              }
+                          });
+                  });
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            view.handle(Key::typed(key), 0);
+        }
+    };
+    type(U"gr");
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    type(U":lane cc64");
+    view.handle(Key::of(NamedKey::Enter), 0);
+    type(U"gl");
+    // The regions, with tails after the notes they hold.
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-sustain.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-sustain-light.bmp"));
+    // The tint too, and the values.
+    view.setSustainShown(true, true);
+    type(U",cv");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-sustain-values.bmp"));
+}

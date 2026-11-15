@@ -126,6 +126,8 @@ constexpr std::array kCommands{
     CommandInfo{.name = "lane-choose",
                 .description = "Choose what the lane shows: velocity, a controller, pitch bend "
                                "or aftertouch"},
+    CommandInfo{.name = "lane-values-toggle",
+                .description = "Show a pedal's values in the lane, or its regions again"},
     CommandInfo{.name = "lane-controller-next",
                 .description = "Show the track's next controller in the lane",
                 .count = true},
@@ -1569,6 +1571,58 @@ bool PianoRollView::velocityLane() const
     return lane().kind == core::Lane::Kind::Velocity;
 }
 
+bool PianoRollView::isPedalLane() const
+{
+    // Sustain, portamento, sostenuto, soft, legato and hold 2: on or off.
+    const auto shown = lane();
+    return shown.kind == core::Lane::Kind::Controller && shown.controller >= 64 &&
+           shown.controller <= 69;
+}
+
+bool PianoRollView::isSwitchLane() const
+{
+    // A pedal's lane shows regions, unless , c v has it show its values (decided 15 November
+    // 2026, after renders), where half-pedalling and what's below 64 can be seen and edited.
+    return isPedalLane() && !pedalValues_;
+}
+
+std::vector<PianoRollView::PedalRegion> PianoRollView::pedalRegions(std::uint8_t controller) const
+{
+    // Where a pedal is down, 64 and above, from each press to its lift, by the press's index.
+    std::vector<PedalRegion> regions;
+    const auto id = trackId();
+    if (!id)
+    {
+        return regions;
+    }
+    const auto events = document_.song().events(*id).all();
+    std::optional<PedalRegion> down;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto* change = std::get_if<core::ControlChange>(&events[i].data);
+        if (change == nullptr || change->controller != controller)
+        {
+            continue;
+        }
+        if (change->value >= 64 && !down)
+        {
+            down = PedalRegion{events[i].tick, events[i].tick, i};
+        }
+        else if (change->value < 64 && down)
+        {
+            down->end = events[i].tick;
+            regions.push_back(*down);
+            down.reset();
+        }
+    }
+    if (down)
+    {
+        down->end = std::max(document_.song().end(), down->start + 1);
+        regions.push_back(*down);
+    }
+    return regions;
+}
+
 void PianoRollView::enterLane()
 {
     // Onto the velocity of the note the cursor was on, from wherever in it the cursor was; in
@@ -1590,6 +1644,18 @@ std::optional<std::size_t> PianoRollView::laneNote() const
     }
     const auto shown = lane();
     const bool notes = velocityLane();
+    // A pedal's region the cursor is in, by its press.
+    if (isSwitchLane())
+    {
+        for (const auto& region : pedalRegions(shown.controller))
+        {
+            if (time_ >= region.start && time_ < region.end)
+            {
+                return region.index;
+            }
+        }
+        return std::nullopt;
+    }
     // A note at the cursor's pitch starting in its grid step; or a controller's event at its
     // time.
     const auto end = notes ? std::max(gridAfter(time_), time_ + 1) : time_ + 1;
@@ -1657,6 +1723,14 @@ std::vector<PianoRollView::LaneEntry> PianoRollView::laneEntries() const
     const auto& song = document_.song();
     const auto events = song.events(*id).all();
     std::vector<LaneEntry> result;
+    if (isSwitchLane())
+    {
+        for (const auto& region : pedalRegions(lane().controller))
+        {
+            result.push_back({region.start, 0, region.index});
+        }
+        return result;
+    }
     if (!velocityLane())
     {
         const auto shown = lane();
@@ -2673,6 +2747,16 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         }
         return true;
     }
+    if (isSwitchLane() &&
+        (command.starts_with("lane-value-") || command == "lane-event-add" ||
+         command == "lane-event-delete" || command.starts_with("lane-event-earlier") ||
+         command.starts_with("lane-event-later")))
+    {
+        host_.refuse("Editing a pedal's regions comes next: , c v shows its values, to edit "
+                     "them as a controller's",
+                     MessageKind::Information);
+        return true;
+    }
     if (command == "lane-event-add" || command == "lane-event-delete" ||
         command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later"))
     {
@@ -2812,6 +2896,21 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     if (command == "lane-choose")
     {
         return chooseLane();
+    }
+    if (command == "lane-values-toggle")
+    {
+        if (!isPedalLane())
+        {
+            host_.refuse(", c v switches a pedal's lane between its regions and its values: "
+                         ", c c chooses sustain or another pedal",
+                         MessageKind::Information);
+            return true;
+        }
+        pedalValues_ = !pedalValues_;
+        host_.setMessage(pedalValues_ ? "The pedal's values, each event"
+                                      : "The pedal's regions, where it's down",
+                         MessageKind::Information);
+        return true;
     }
     if (command == "lane-controller-next" || command == "lane-controller-previous")
     {
@@ -3934,6 +4033,28 @@ Inspection PianoRollView::inspection() const
     // controller's lane, its event there, or the position.
     const auto& song = document_.song();
     const auto& m = meter();
+    if (inLane_ && isSwitchLane())
+    {
+        // A pedal's region: where it's pressed and lifted, and how long it's down.
+        Inspection result;
+        const auto shown = lane();
+        result.kind = "Pedal";
+        const auto regions = pedalRegions(shown.controller);
+        const auto index = laneNote();
+        const auto region = std::ranges::find(regions, index, [](const PedalRegion& r)
+                                              { return std::optional{r.index}; });
+        if (!index || region == regions.end())
+        {
+            result.kind = "Pedal up";
+            result.fields.push_back({"Position", positionText(m, time_)});
+            result.fields.push_back({"Controller", laneTitle(shown)});
+            return result;
+        }
+        result.fields.push_back({"Position", positionText(m, region->start)});
+        result.fields.push_back({"Ends", positionText(m, region->end)});
+        result.fields.push_back({"Controller", laneTitle(shown)});
+        return result;
+    }
     if (inLane_ && !velocityLane())
     {
         Inspection result;
@@ -4352,6 +4473,26 @@ void PianoRollView::addRegions(Frame& frame) const
     const bool cutting = span && selection && selection->cut;
     const auto search = host_.searchQuery();
     const auto laneTakes = laneTaken();
+    // Where the sustain pedal holds notes: a faint tint where it's down (sustaintint), and a
+    // tail after each note it holds past its end, to where it lifts, seen through the notes it
+    // crosses (sustaintails; decided 15 November 2026, after renders).
+    std::vector<std::pair<core::Tick, core::Tick>> sustained;
+    for (const auto& region : pedalRegions(64))
+    {
+        sustained.emplace_back(region.start, region.end);
+    }
+    if (host_.sustainTint())
+    {
+        for (const auto& [down, up] : sustained)
+        {
+            if (down < p.end && up > p.start)
+            {
+                const int a = scale.toX(std::max(down, p.start));
+                const int b = scale.toX(std::min(up, p.end));
+                notes.under.push_back({{a, 0, b - a, notesHeight}, Role::Note, 22});
+            }
+        }
+    }
     if (const auto id = trackId())
     {
         const auto events = song.events(*id).all();
@@ -4396,6 +4537,23 @@ void PianoRollView::addRegions(Frame& frame) const
                 notes.under.push_back({{x0 + start, y, noteWidth - start, h - 2 * inset},
                                        role,
                                        bodyAlpha(note->velocity)});
+                if (host_.sustainTails())
+                {
+                    for (const auto& [down, up] : sustained)
+                    {
+                        if (end >= down && end < up)
+                        {
+                            const int a = scale.toX(std::min(end, p.end));
+                            const int b = scale.toX(std::min(up, p.end));
+                            if (b > a)
+                            {
+                                const int third = (h - 2 * inset) / 3;
+                                notes.under.push_back(
+                                    {{a, y + third, b - a, h - 2 * inset - 2 * third}, role, 90});
+                            }
+                        }
+                    }
+                }
                 // A search's match, outlined, so it shows over the current note and a
                 // selection's colour alike.
                 if (matched)
@@ -4461,10 +4619,77 @@ void PianoRollView::addRegions(Frame& frame) const
         }
     }
 
+    // A switch controller's lane, sustain and the other pedals: each time it's down (64 and
+    // above) a bar along the lane, like a note, with a solid start, lighter where a recorded
+    // value below 127 holds it partly down, as half-pedalling does (proposed 15 November
+    // 2026).
+    if (const auto pedals = trackId(); pedals && isSwitchLane())
+    {
+        const auto events = song.events(*pedals).all();
+        const int inset = std::max(laneHeight / 5, 1);
+        const int startWidth = std::max(cell_.width / 2, 2);
+        std::optional<int> held;
+        core::Tick from = p.start;
+        bool regionStart = false;
+        const auto onRegion = inLane_ ? laneNote() : std::nullopt;
+        std::optional<std::size_t> press; // the region being drawn, by its press
+        const auto segment = [&](core::Tick to)
+        {
+            if (!held || *held < 64 || to <= p.start || from >= p.end)
+            {
+                return;
+            }
+            const int x0 = scale.toX(std::max(from, p.start));
+            const int x1 = scale.toX(std::min(to, p.end));
+            if (x1 <= x0)
+            {
+                return;
+            }
+            // Fully down as a note's start is bright; partly down lighter, by how far.
+            const auto alpha = static_cast<std::uint8_t>(60 + (*held - 64) * 100 / 63);
+            // The region the cursor's in, in the brightest colour, as a current event is.
+            const auto role = press && press == onRegion ? Role::Text : Role::Note;
+            lane.under.push_back({{x0, inset, x1 - x0, laneHeight - 2 * inset}, role, alpha});
+            if (regionStart && from >= p.start)
+            {
+                lane.under.push_back(
+                    {{x0, inset, std::min(startWidth, x1 - x0), laneHeight - 2 * inset},
+                     role,
+                     255});
+            }
+        };
+        for (std::size_t i = 0; i < events.size(); ++i)
+        {
+            const auto& event = events[i];
+            if (event.tick >= p.end)
+            {
+                break;
+            }
+            if (!shownLane.shows(event.data))
+            {
+                continue;
+            }
+            const int value = shownLane.value(event.data);
+            segment(event.tick);
+            regionStart = (!held || *held < 64) && value >= 64;
+            if (regionStart)
+            {
+                press = i;
+            }
+            held = value;
+            from = event.tick;
+        }
+        segment(p.end);
+        // Between regions, a thin line where the cursor is, as between a controller's events.
+        if (inLane_ && !onRegion && time_ >= p.start && time_ < p.end)
+        {
+            lane.over.push_back({{scale.toX(time_), 0, lineWidth, laneHeight}, Role::Text, 255});
+        }
+    }
     // A controller's lane: a bar for each event, up from the bottom, or for pitch bend up or
     // down from the middle, as bright as velocity's, and a faint line joining them at the value
     // each holds until the next, as it sounds (decided 15 November 2026).
-    if (const auto id = trackId(); id && !velocityLane())
+    else if (const auto id = trackId(); id && !velocityLane())
     {
         const auto events = song.events(*id).all();
         const int barWidth = std::max(2 * lineWidth, 2);
@@ -4516,6 +4741,11 @@ void PianoRollView::addRegions(Frame& frame) const
                                   here ? std::uint8_t{255} : kControllerBar});
         }
         hold(width);
+        if (isPedalLane())
+        {
+            // The line between up and down, in a pedal's values.
+            lane.under.push_back({{0, laneY(64), width, lineWidth}, Role::BarLine, 255});
+        }
         if (shownLane.kind == core::Lane::Kind::PitchBend)
         {
             lane.under.push_back({{0, base, width, lineWidth}, Role::BarLine, 255});

@@ -197,6 +197,11 @@ public:
     void setThru(bool on);
     void setQuantizeMarks(bool marks) { quantizeMarks_ = marks; }
     void setOwnMeter(bool tint) { ownMeter_ = tint; }
+    void setSustainShown(bool tails, bool tint)
+    {
+        sustainTails_ = tails;
+        sustainTint_ = tint;
+    }
     // Whether a note in the piano roll is heard as the cursor lands on it, and as one is added
     // or moved to a new pitch (the audition setting, decided 12 November 2026).
     void setAudition(bool on) { audition_ = on; }
@@ -448,6 +453,8 @@ private:
     std::vector<core::TrackId> movingTracks() const override;
     bool quantizeMarks() const override { return quantizeMarks_; }
     bool ownMeter() const override { return ownMeter_; }
+    bool sustainTails() const override { return sustainTails_; }
+    bool sustainTint() const override { return sustainTint_; }
     std::vector<std::string> outputPorts() const override
     {
         return portFinder_ ? portFinder_("").ports : std::vector<std::string>{};
@@ -945,7 +952,9 @@ private:
     QuantizePedal quantizePedal_ = QuantizePedal::Follow;
     bool quantizeMarks_ = true;
     bool ownMeter_ = true;
-    bool refused_ = false; // the last key's command, refused or given up
+    bool sustainTails_ = true; // sustaintails
+    bool sustainTint_ = false; // sustaintint
+    bool refused_ = false;     // the last key's command, refused or given up
     std::chrono::milliseconds humanizeTime_{10};
     int humanizeVelocity_ = 8;
     std::mt19937_64 random_{std::random_device{}()};

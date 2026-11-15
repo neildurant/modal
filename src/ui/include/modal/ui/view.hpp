@@ -231,6 +231,10 @@ public:
 
     // Whether to tint the bars where a track has a meter of its own (ownmeter).
     virtual bool ownMeter() const = 0;
+    // Whether the piano roll shows where the sustain pedal holds notes: tails after them to
+    // where it lifts (sustaintails), and a faint tint where it's down (sustaintint).
+    virtual bool sustainTails() const { return true; }
+    virtual bool sustainTint() const { return false; }
 
     // The tracks being moved through the others, to show them.
     virtual std::vector<core::TrackId> movingTracks() const = 0;

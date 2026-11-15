@@ -491,6 +491,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     view.setThru(settings.flag("thru"));
     view.setQuantizeMarks(settings.flag("quantizemarks"));
     view.setOwnMeter(settings.flag("ownmeter"));
+    view.setSustainShown(settings.flag("sustaintails"), settings.flag("sustaintint"));
     if (auto own = playback.openOwnPorts(); error.empty())
     {
         error = std::move(own);

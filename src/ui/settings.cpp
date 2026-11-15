@@ -154,6 +154,14 @@ Settings::Settings()
                   "Whether the piano roll marks where a note of a track quantised as it plays "
                   "will be heard, when that's far from where it's stored",
                   true),
+          setting("sustaintails",
+                  "Whether the piano roll draws a tail after each note the sustain pedal holds "
+                  "past its end, to where the pedal lifts",
+                  true),
+          setting("sustaintint",
+                  "Whether the piano roll tints its notes faintly wherever the sustain pedal is "
+                  "down",
+                  false),
           setting("ownmeter",
                   "Whether the arrangement tints a track's bars where it has a meter of its own, "
                   "rather than following the song's",

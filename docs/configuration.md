@@ -117,6 +117,8 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 | `ownportname` | `Modal` | The name of Modal's own ports: one is `Modal`, several are `Modal 1`, `Modal 2` and so on |
 | `thru`       | `on` | Send MIDI input through to armed tracks whose own Thru is on; `, T t` switches it. Held notes and pedals still finish when switched off. This is a machine setting, independent of the song |
 | `quantizemarks` | `on` | Whether the piano roll marks where a note of a track quantised as it plays will be heard, when that's far from where it's stored; `, T m` turns it on or off |
+| `sustaintails` | `on` | Whether the piano roll draws a thin tail after each note the sustain pedal holds past its end, to where the pedal lifts; `, T s` turns it on or off |
+| `sustaintint` | `off` | Whether the piano roll tints its notes faintly wherever the sustain pedal is down; `, T S` turns it on or off |
 | `ownmeter` | `on` | Whether the arrangement tints a track's bars where it has a meter of its own, rather than following the song's; `, T b` turns it on or off |
 | `rewind`     | `on`    | Whether the play-from marker, which Space plays from, stays put when playback stops (`on`), or moves to where it stopped (`off`) |
 

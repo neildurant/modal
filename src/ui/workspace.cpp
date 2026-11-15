@@ -1959,6 +1959,21 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                    MessageKind::Information);
         return true;
     }
+    if (command == "sustain-tails-toggle" || command == "sustain-tint-toggle")
+    {
+        const bool tails = command == "sustain-tails-toggle";
+        auto& shown = tails ? sustainTails_ : sustainTint_;
+        shown = !shown;
+        if (lineHandler_)
+            lineHandler_(std::string{"set "} + (tails ? "sustaintails=" : "sustaintint=") +
+                         (shown ? "on" : "off"));
+        setMessage(tails ? (sustainTails_ ? "Sustain tails shown after held notes"
+                                          : "Sustain tails hidden")
+                         : (sustainTint_ ? "Notes tinted where the sustain pedal is down"
+                                         : "Sustain tint hidden"),
+                   MessageKind::Information);
+        return true;
+    }
     if (command == "own-meter-toggle")
     {
         if (lineHandler_)
