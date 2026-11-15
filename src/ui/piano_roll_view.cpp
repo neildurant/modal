@@ -2732,7 +2732,7 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         {
             return false;
         }
-        host_.setSelectionValues({anchor, to});
+        host_.setSelectionValues({anchor, to}, true);
         return true;
     }
     if (set && count == 0)
@@ -2887,10 +2887,11 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     }();
     // A Ctrl-v box's moving corner goes to the value of the event the cursor moves to, so
     // the box runs from event to event, k and j adjusting it from there (decided 14 November
-    // 2026, after use, where it stayed at the value the box started at).
+    // 2026, after use, where it stayed at the value the box started at); once k or j have set
+    // it, it stays as set (decided 15 November 2026, after use).
     const auto selection = host_.selection();
     if (std::pair{time_, pitch_} != before && laneSelecting() &&
-        selection->kind == SelectionKind::Box)
+        selection->kind == SelectionKind::Box && !selection->valuesSet)
     {
         if (const auto index = laneNote())
         {

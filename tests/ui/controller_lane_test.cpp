@@ -467,3 +467,23 @@ TEST_CASE("a Ctrl-v box started between a controller's events starts at the valu
     l.press(Key::typed(U'v', kCtrl));
     CHECK(l.view().selectionStatus()->find("values 40") != std::string::npos);
 }
+
+TEST_CASE("once a Ctrl-v box's edge is set with k or j, it no longer follows the events")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.press(Key::typed(U'v', kCtrl));
+    // Onto the 40: the corner takes it.
+    l.type(U"l");
+    CHECK(l.view().selectionStatus()->find("values 10–40") != std::string::npos);
+    // Set to 50 by hand, it stays there as the cursor goes on to the 80.
+    l.type(U"10k");
+    l.type(U"l");
+    CHECK(l.view().selectionStatus()->find("values 10–50") != std::string::npos);
+    // A box started afresh follows again.
+    l.press(Key::of(NamedKey::Escape));
+    l.press(Key::typed(U'v', kCtrl));
+    l.type(U"h");
+    CHECK(l.view().selectionStatus()->find("values 40–80") != std::string::npos);
+}

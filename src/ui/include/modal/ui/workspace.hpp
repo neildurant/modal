@@ -428,11 +428,12 @@ private:
                        std::vector<Selection::NotePosition> notes) override;
     std::vector<std::string> recentLanes() const override;
     void usedLane(const std::string& lane) override;
-    void setSelectionValues(std::pair<int, int> values) override
+    void setSelectionValues(std::pair<int, int> values, bool set = false) override
     {
         if (selection_)
         {
             selection_->values = values;
+            selection_->valuesSet = selection_->valuesSet || set;
             selection_->movedNotes.reset();
         }
     }

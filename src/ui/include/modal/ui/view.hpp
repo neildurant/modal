@@ -158,6 +158,9 @@ struct Selection
     // A Ctrl-v box in a controller lane: the values it takes between, where it started and its
     // other edge, which k and j move (decided 14 November 2026).
     std::optional<std::pair<int, int>> values = std::nullopt;
+    // Whether its moving edge has been set with k or j, after which it no longer takes the
+    // value of the events the cursor goes to (decided 15 November 2026, after use).
+    bool valuesSet = false;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -286,7 +289,7 @@ public:
                                std::vector<Selection::NotePosition> notes) = 0;
     // Sets the values a Ctrl-v box in a controller lane takes between; and keeps the notes it
     // took as their values change, until the cursor moves or its values do.
-    virtual void setSelectionValues(std::pair<int, int> values) = 0;
+    virtual void setSelectionValues(std::pair<int, int> values, bool set = false) = 0;
     virtual void keepSelectionNotes(std::vector<Selection::NotePosition> notes) = 0;
 
     // The lanes used most lately in the piano roll, the latest first, as their names (cc74), and
