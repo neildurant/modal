@@ -236,7 +236,7 @@ On a Visual selection, the moving and length keys act on every note it takes, re
 | `h` `l` (`Left` `Right`) | The note before, the next, as `Shift-Tab` and `Tab`, with counts |
 | `Tab` `Shift-Tab` | The next note's velocity, the one before: a chord's notes in time, those starting together low to high, as their bars fan out side by side |
 | `Ctrl-a` `Ctrl-x` | Velocity up, down by 1, with counts (`10 Ctrl-a`), as in the notes; on a step where no note starts, refused |
-| a number, `Enter` | Set the velocity: `100 Enter` |
+| a number, `Enter` | Set the velocity: `100 Enter`; in a controller's lane `0 Enter` sets 0, `0` alone going to the start |
 | `Enter` | Ask for a velocity or a change: `100`, `+30`, `-10`, or `80%` to scale it |
 | `k` `j`, `K` `J` (the arrows, `Shift` with them) | Move a `Ctrl-v` box's velocity edge by 1, by 10; refused outside a box |
 

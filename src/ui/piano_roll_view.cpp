@@ -164,6 +164,9 @@ constexpr std::array kCommands{
         .name = "lane-value-up", .description = "Raise the velocity by {count}", .count = true},
     CommandInfo{
         .name = "lane-value-down", .description = "Lower the velocity by {count}", .count = true},
+    CommandInfo{.name = "lane-value-zero",
+                .description =
+                    "Set the value to 0, as 0 and Enter, where 0 alone goes to the start"},
     CommandInfo{.name = "lane-value-set",
                 .description = "Set the velocity to the number typed, or ask for it or a change",
                 .count = true},
@@ -2791,8 +2794,14 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         }
         return moveLaneEvents(command, n);
     }
+    if (command == "lane-value-zero")
+    {
+        // 0 and Enter, as a count can't start with 0, which moves to the start.
+        return runLane("lane-value-set-zero", 0);
+    }
     const bool up = command.starts_with("lane-value-up") || command.starts_with("lane-box-up");
-    const bool set = command == "lane-value-set";
+    const bool zero = command == "lane-value-set-zero";
+    const bool set = command == "lane-value-set" || zero;
     const int by = (command.ends_with("-coarse") ? 10 : 1) * n * (up ? 1 : -1);
     const int lowest = notes ? 1 : shown.lowest();
     const int highest = shown.highest();
@@ -2819,9 +2828,14 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         host_.setSelectionValues({anchor, to}, true);
         return true;
     }
-    if (set && count == 0)
+    if (set && count == 0 && !zero)
     {
         return askValue();
+    }
+    if (zero && velocityLane())
+    {
+        host_.refuse("A velocity goes from 1 to 127", MessageKind::Information);
+        return true;
     }
     if (set && count > highest)
     {
@@ -4419,8 +4433,11 @@ void PianoRollView::addRegions(Frame& frame) const
     const auto shownLane = this->lane();
     const int laneLow = velocityLane() ? 0 : shownLane.lowest();
     const int laneHigh = shownLane.highest();
+    // The lowest a little above the lane's bottom, so a line holding 0 shows, apart from no
+    // value at all (decided 15 November 2026, after use).
+    const int laneFloor = laneHeight - std::max(2 * lineWidth, 2);
     const auto laneY = [&](int value)
-    { return laneHeight - (laneHeight - laneTop) * (value - laneLow) / (laneHigh - laneLow); };
+    { return laneFloor - (laneFloor - laneTop) * (value - laneLow) / (laneHigh - laneLow); };
     for (const auto& line : meterLines(meter(), scale, 0, notesHeight, grid(), cell_))
     {
         notes.under.push_back(line);
@@ -4733,12 +4750,17 @@ void PianoRollView::addRegions(Frame& frame) const
             const bool here = inLane_ && onEvent == i;
             const bool picked = std::ranges::binary_search(laneTakes, i);
             const bool matched = search && core::matches(*search, events[i].data, song.ppqn());
+            const auto role = here      ? Role::Text
+                              : picked  ? Role::NoteSelected
+                              : matched ? Role::Match
+                                        : Role::Note;
             lane.under.push_back({{x, std::min(y, base), barWidth, std::max(std::abs(base - y), 1)},
-                                  here      ? Role::Text
-                                  : picked  ? Role::NoteSelected
-                                  : matched ? Role::Match
-                                            : Role::Note,
+                                  role,
                                   here ? std::uint8_t{255} : kControllerBar});
+            // A dot at its value, in the bar's colour at full strength, so even a small value's
+            // event shows, and which is current (decided 15 November 2026, after use).
+            const int dot = std::max(3 * lineWidth, 4);
+            lane.over.push_back({{x + barWidth / 2 - dot / 2, y - dot / 2, dot, dot}, role, 255});
         }
         hold(width);
         if (isPedalLane())

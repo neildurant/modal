@@ -601,3 +601,17 @@ TEST_CASE("the toggles , T s and , T S turn the sustain tails and tint on and of
     CHECK(l.ws.message() == "Notes tinted where the sustain pedal is down");
     CHECK(count() > tails - 2);
 }
+
+TEST_CASE("0 and Enter set a controller's value to 0, though 0 alone goes to the start")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"ggglll"); // the 80
+    l.type(U"0");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 0});
+    // Other numbers as before.
+    l.type(U"20");
+    l.enter();
+    CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 20});
+}
