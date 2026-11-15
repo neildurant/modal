@@ -1003,3 +1003,69 @@ TEST_CASE("a sample of the velocity lane", "[.sample]")
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-lane-box-light.bmp"));
 }
+
+TEST_CASE("a sample of controller lanes", "[.sample]")
+{
+    // The piano's lane showing a mod-wheel swell, then pitch bend, in the cursor's lane.
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    registry.add(windowCommands());
+    view.setLineHandler([&](const std::string& line) { registry.runLine(line); });
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    document.edit(
+        "Controllers", {},
+        [](modal::core::Song& song)
+        {
+            const auto id = song.tracks()[2]->id();
+            const auto q = song.ppqn().quarter();
+            song.updateEvents(
+                id,
+                [&](modal::core::EventList& events)
+                {
+                    for (int i = 0; i < 32; ++i)
+                    {
+                        const auto value =
+                            static_cast<std::uint8_t>(i < 16 ? i * 8 : (32 - i) * 8 - 1);
+                        events.insert({4 * q + i * q / 4, modal::core::ControlChange{1, value}});
+                    }
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        events.insert({8 * q + i * q / 2,
+                                       modal::core::PitchBend{
+                                           static_cast<std::int16_t>((i % 4 - 2) * 2000)}});
+                    }
+                });
+        });
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            view.handle(Key::typed(key), 0);
+        }
+    };
+    type(U"gr");
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    type(U":lane cc1");
+    view.handle(Key::of(NamedKey::Enter), 0);
+    type(U"gl]b");
+    for (int i = 0; i < 6; ++i)
+    {
+        view.handle(Key::of(NamedKey::Tab), 0);
+    }
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-cc.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-cc-light.bmp"));
+    type(U"]c");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-bend.bmp"));
+    type(U",cc");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-choose.bmp"));
+}

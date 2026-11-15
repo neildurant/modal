@@ -796,6 +796,16 @@ bool Reader::readTrack(std::span<const Token> tokens)
                 track.noteLength = *fraction;
             }
         }
+        else if (value && name == "lane")
+        {
+            const auto lane = parseLane(*value);
+            if (!lane)
+            {
+                return fail("lane should be velocity, a controller such as cc74, bend or "
+                            "pressure");
+            }
+            track.lane = *lane;
+        }
         else if (value && name == "vel")
         {
             const auto velocity = parseInteger(*value, 1, 127);
@@ -1696,6 +1706,10 @@ std::string writeSong(const Song& song)
         if (track->noteVelocity != Track::kDefaultVelocity)
         {
             text += " vel=" + std::to_string(track->noteVelocity);
+        }
+        if (track->lane != Lane{})
+        {
+            text += " lane=" + toString(track->lane);
         }
         line(0, text);
     }

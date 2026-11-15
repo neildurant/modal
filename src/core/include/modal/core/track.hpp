@@ -112,6 +112,36 @@ struct PlaybackQuantize
 std::optional<QuantizeMove> quantizeMove(std::string_view name);
 std::string_view quantizeMoveName(QuantizeMove move);
 
+// What the piano roll's lane below the notes shows (decided 15 November 2026): the notes'
+// velocities, a controller's values, pitch bend or channel pressure (aftertouch).
+struct Lane
+{
+    enum class Kind : std::uint8_t
+    {
+        Velocity,
+        Controller,
+        PitchBend,
+        Pressure,
+    };
+    Kind kind = Kind::Velocity;
+    std::uint8_t controller = 0; // for a controller
+
+    // Whether an event is one the lane shows, its value there, and that value set, for a
+    // controller, pitch bend or pressure lane; and the values it can have.
+    bool shows(const EventData& data) const;
+    int value(const EventData& data) const;
+    void setValue(EventData& data, int value) const;
+    int lowest() const { return kind == Kind::PitchBend ? PitchBend::kMin : 0; }
+    int highest() const { return kind == Kind::PitchBend ? PitchBend::kMax : 127; }
+
+    friend bool operator==(const Lane&, const Lane&) = default;
+};
+
+// A lane as a song file and the prompt write it, velocity, cc74, bend or pressure; and read
+// back, taking vel, a controller's number alone, pitchbend and aftertouch too, in any case.
+std::string toString(const Lane& lane);
+std::optional<Lane> parseLane(std::string_view text);
+
 // A track's settings. Its meter and events are held by the song's sections.
 class Track
 {
@@ -159,6 +189,8 @@ public:
     NoteFraction grid = kDefaultGrid;
     std::optional<NoteFraction> noteLength;
     std::uint8_t noteVelocity = kDefaultVelocity;
+    // What its lane in the piano roll shows, kept with it as its grid is.
+    Lane lane;
 
     NoteFraction defaultLength() const { return noteLength.value_or(grid); }
 

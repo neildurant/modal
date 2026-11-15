@@ -65,8 +65,14 @@ Song everything(Ppqn ppqn)
                          track.grid = NoteFraction{1, 8}.triplet();
                          track.noteLength = NoteFraction{437, 3840}; // not a common length
                          track.noteVelocity = 90;
+                         track.lane = Lane{.kind = Lane::Kind::Controller, .controller = 74};
                      });
-    song.updateTrack(lead, [](Track& track) { track.noteLength = NoteFraction{1, 4}; });
+    song.updateTrack(lead,
+                     [](Track& track)
+                     {
+                         track.noteLength = NoteFraction{1, 4};
+                         track.lane = Lane{.kind = Lane::Kind::PitchBend};
+                     });
 
     song.updateMeter([&](MeterMap& meter) { meter.set(8 * q, {3, 4}); });
     song.updateMeter(lead, [](MeterMap& meter) { meter = MeterMap{meter.ppqn(), {7, 8}}; });
@@ -285,6 +291,7 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
         {header + "track 2 \"T\" grid=1/0\n", "line 4", "grid should be a note length"},
         {header + "track 2 \"T\" len=long\n", "line 4", "len should be a note length"},
         {header + "track 2 \"T\" vel=0\n", "line 4", "vel should be a velocity"},
+        {header + "track 2 \"T\" lane=cc128\n", "line 4", "lane should be velocity"},
         {header + "track 2 \"T\" program=128\n", "line 4", "program should be from 0 to 127"},
         {header + "track 2 \"T\" quantize=yes\n", "line 4", "quantize should be on or off"},
         {header + "track 2 \"T\" qgrid=1/0\n", "line 4", "qgrid should be a note length"},

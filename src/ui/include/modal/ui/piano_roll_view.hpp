@@ -6,6 +6,7 @@
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/track.hpp>
 #include <modal/ui/bar_lines.hpp>
+#include <modal/ui/choice_list.hpp>
 #include <modal/ui/commands.hpp>
 #include <modal/ui/inspector.hpp>
 #include <modal/ui/inspector_edit.hpp>
@@ -61,7 +62,7 @@ public:
     std::optional<std::string> selectionStatus() const override;
     std::optional<std::pair<core::Tick, core::Tick>> selectionSpan() const override;
     std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const override;
-    std::optional<std::pair<std::uint8_t, std::uint8_t>> boxValues() const override;
+    std::optional<std::pair<int, int>> boxValues() const override;
     std::optional<CutRange> cutRange(std::string_view motion, int count) override;
     void selectObject(std::string_view object, int count, Selection& selection) override;
     std::optional<std::pair<core::Tick, core::Tick>> objectSpan(std::string_view object,
@@ -90,16 +91,24 @@ public:
     void showSong() override;
     void showPlayhead(core::Tick playhead, Follow follow) override;
     void stopPlayhead(std::optional<core::Tick> cursorTo) override;
-    // Editing the inspector's fields, with e.
-    bool typing() const override { return editor_.active(); }
+    // Editing the inspector's fields, with e; or choosing the lane's controller from its list.
+    bool typing() const override { return editor_.active() || laneChooser_.has_value(); }
     std::optional<std::string> typingHint() const override
     {
+        if (laneChooser_)
+            return "Enter chooses, Escape leaves it; a number or a name narrows the list";
         if (!typing())
             return std::nullopt;
         return "Enter sets it, Tab goes on, Escape leaves it; Up and Down step it";
     }
     const InspectorEditor& inspectorEditor() const { return editor_; }
-    void type(char32_t character) override { editor_.type(character); }
+    void type(char32_t character) override
+    {
+        if (laneChooser_)
+            laneChooser_->type(character);
+        else
+            editor_.type(character);
+    }
     std::optional<bool> runTyping(std::string_view command) override;
 
     // What's in view (see Piano roll pages in the design): where it starts and ends in time,
@@ -145,6 +154,16 @@ public:
     bool inLane() const { return inLane_; }
     void enterLane();
     void leaveLane() { inLane_ = false; }
+    // What the lane shows, the track's own (velocity, a controller, pitch bend or pressure),
+    // whether it's the notes' velocities, and its name on the left: vel, cc1, bend or pres.
+    core::Lane lane() const;
+    bool velocityLane() const;
+    std::string laneLabel() const;
+    // Shows a lane on the track, as , c c's list and :lane choose it, remembering it as used
+    // when chosen, and not when ]c and [c step to it.
+    void showLane(const core::Lane& lane, bool chosen = true);
+    // The list , c c opens, while it's open: the choices as shown, and the lanes they are.
+    const ChoiceList* laneChooser() const { return laneChooser_ ? &*laneChooser_ : nullptr; }
     // The note whose velocity the lane's cursor is on: at the cursor's pitch, starting in its
     // grid step; or none.
     std::optional<std::size_t> laneNote() const;
@@ -249,7 +268,7 @@ private:
     // lowest and highest; or none if it isn't in the lane.
     bool laneSelecting() const;
     std::optional<std::pair<core::Tick, core::Tick>> laneSpan() const;
-    std::optional<std::pair<std::uint8_t, std::uint8_t>> laneValues() const;
+    std::optional<std::pair<int, int>> laneValues() const;
     // The track's notes in the order Tab takes them in the lane: by chord, then low to high,
     // as their bars fan out, each with its own start and pitch.
     std::vector<std::pair<core::Tick, std::uint8_t>> laneOrder() const;
@@ -270,14 +289,27 @@ private:
     // After a move in the lane, onto a note starting in the cursor's grid step if none there
     // is at its pitch, the lowest.
     void lanePick();
-    // Asks for a velocity, or a change to it, for the lane's note or selection (Enter alone).
-    bool askVelocity();
+    // Asks for a value, or a change to it, for the lane's event or selection (Enter alone).
+    bool askValue();
+    // Where a selection keeps what it took: a note at its pitch, a controller's event at 0.
+    std::uint8_t lanePitch(const core::Event& event) const;
+    // For messages: what the lane's values are (velocity, value, bend, pressure), so many of
+    // what it takes (3 notes, 1 event), and that the cursor's on none.
+    std::string laneValueName() const;
+    std::string laneTaking(std::size_t count) const;
+    std::string laneNothing() const;
+    // , c c: opens the list of lanes to choose from; ]c and [c: the track's next or previous.
+    bool chooseLane();
+    bool stepLane(int by);
+    // The lanes offered, in the list's order, with how each is shown.
+    std::vector<std::pair<core::Lane, std::string>> laneChoices() const;
     // The lane's own commands: k, j, K, J, Enter and Tab there.
     std::optional<bool> runLane(std::string_view command, int count);
-    // Sets each of some notes' velocities to what a change makes of it, as an undo step
-    // merged with the next if it has the same merge key, saying if none changed.
-    bool setVelocities(const std::vector<std::size_t>& notes, const std::function<int(int)>& change,
-                       std::string title, std::string_view mergeKey);
+    // Sets each of some events' values in the lane to what a change makes of it, as an undo
+    // step merged with the next if it has the same merge key, saying if none changed.
+    bool setLaneValues(const std::vector<std::size_t>& indices,
+                       const std::function<int(int)>& change, std::string title,
+                       std::string_view mergeKey);
     // The commands run in the notes area, and in the lane, moves in time.
     std::optional<bool> runNotes(std::string_view command, int count);
 
@@ -313,6 +345,8 @@ private:
     std::chrono::milliseconds nudge_{5};
     bool gridAdvance_ = false;
     bool inLane_ = false;
+    std::optional<ChoiceList> laneChooser_;
+    std::vector<core::Lane> laneChoices_; // what laneChooser_'s choices are
     InspectorEditor editor_;
     int width_ = 0;
     CellSize cell_{1, 1};

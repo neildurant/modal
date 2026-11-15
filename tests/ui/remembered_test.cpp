@@ -64,7 +64,12 @@ TEST_CASE("what's remembered is kept as plain text, and read back the same")
     remembered.ran("zoom-in", kNow + 5);
     remembered.ran("section-split", kNow - kDay);
     remembered.typedMeter({7, 8});
+    remembered.usedLane("bend");
+    remembered.usedLane("cc1");
     const auto text = remembered.text();
+    // The latest used first.
+    CHECK(remembered.lanes().front() == "cc1");
+    CHECK(text.find("lane cc1\nlane bend\n") != std::string::npos);
     CHECK(text.starts_with("# "));
     CHECK(text.find("ran zoom-in 2 1800000005\n") != std::string::npos);
     CHECK(text.find("meter 7/8\n") != std::string::npos);

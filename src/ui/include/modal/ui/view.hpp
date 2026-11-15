@@ -157,7 +157,7 @@ struct Selection
     std::shared_ptr<const MovedNotes> movedNotes = nullptr;
     // A Ctrl-v box in a controller lane: the values it takes between, where it started and its
     // other edge, which k and j move (decided 14 November 2026).
-    std::optional<std::pair<std::uint8_t, std::uint8_t>> values = std::nullopt;
+    std::optional<std::pair<int, int>> values = std::nullopt;
 };
 
 // What an operator other than d and y takes over a range or object (decided for milestone 6):
@@ -279,8 +279,13 @@ public:
                                std::vector<Selection::NotePosition> notes) = 0;
     // Sets the values a Ctrl-v box in a controller lane takes between; and keeps the notes it
     // took as their values change, until the cursor moves or its values do.
-    virtual void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) = 0;
+    virtual void setSelectionValues(std::pair<int, int> values) = 0;
     virtual void keepSelectionNotes(std::vector<Selection::NotePosition> notes) = 0;
+
+    // The lanes used most lately in the piano roll, the latest first, as their names (cc74), and
+    // one used, remembered on the machine across songs (decided 15 November 2026).
+    virtual std::vector<std::string> recentLanes() const { return {}; }
+    virtual void usedLane(const std::string& /*lane*/) {}
 
     // A meter the user chose, typed in a field or at the prompt, offered from now on if it
     // isn't among the built-in ones.
@@ -383,10 +388,7 @@ public:
     }
     virtual std::optional<std::size_t> selectionIndex() const { return std::nullopt; }
     // The values a Ctrl-v box starts between, in a controller lane, or none elsewhere.
-    virtual std::optional<std::pair<std::uint8_t, std::uint8_t>> boxValues() const
-    {
-        return std::nullopt;
-    }
+    virtual std::optional<std::pair<int, int>> boxValues() const { return std::nullopt; }
     // The time whole rows (V) take when they're first selected, if not the whole song's.
     virtual std::optional<std::pair<core::Tick, core::Tick>> rowsSpan() const
     {

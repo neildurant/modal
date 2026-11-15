@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cctype>
 #include <cstdlib>
 #include <iterator>
 #include <map>
@@ -14,6 +15,91 @@
 
 namespace modal::core
 {
+
+bool Lane::shows(const EventData& data) const
+{
+    switch (kind)
+    {
+    case Kind::Controller:
+    {
+        const auto* change = std::get_if<ControlChange>(&data);
+        return change != nullptr && change->controller == controller;
+    }
+    case Kind::PitchBend:
+        return std::holds_alternative<PitchBend>(data);
+    case Kind::Pressure:
+        return std::holds_alternative<ChannelPressure>(data);
+    case Kind::Velocity:
+        return std::holds_alternative<Note>(data);
+    }
+    return false;
+}
+
+int Lane::value(const EventData& data) const
+{
+    if (const auto* change = std::get_if<ControlChange>(&data))
+        return change->value;
+    if (const auto* bend = std::get_if<PitchBend>(&data))
+        return bend->value;
+    if (const auto* pressure = std::get_if<ChannelPressure>(&data))
+        return pressure->value;
+    if (const auto* note = std::get_if<Note>(&data))
+        return note->velocity;
+    return 0;
+}
+
+void Lane::setValue(EventData& data, int value) const
+{
+    if (auto* change = std::get_if<ControlChange>(&data))
+        change->value = static_cast<std::uint8_t>(std::clamp(value, 0, 127));
+    else if (auto* bend = std::get_if<PitchBend>(&data))
+        bend->value =
+            static_cast<std::int16_t>(std::clamp<int>(value, PitchBend::kMin, PitchBend::kMax));
+    else if (auto* pressure = std::get_if<ChannelPressure>(&data))
+        pressure->value = static_cast<std::uint8_t>(std::clamp(value, 0, 127));
+    else if (auto* note = std::get_if<Note>(&data))
+        note->velocity = static_cast<std::uint8_t>(std::clamp(value, 1, 127));
+}
+
+std::string toString(const Lane& lane)
+{
+    switch (lane.kind)
+    {
+    case Lane::Kind::Controller:
+        return "cc" + std::to_string(lane.controller);
+    case Lane::Kind::PitchBend:
+        return "bend";
+    case Lane::Kind::Pressure:
+        return "pressure";
+    case Lane::Kind::Velocity:
+        break;
+    }
+    return "velocity";
+}
+
+std::optional<Lane> parseLane(std::string_view text)
+{
+    std::string lower;
+    for (const char c : text)
+        lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (lower == "velocity" || lower == "vel")
+        return Lane{};
+    if (lower == "bend" || lower == "pitchbend")
+        return Lane{.kind = Lane::Kind::PitchBend};
+    if (lower == "pressure" || lower == "aftertouch" || lower == "pres")
+        return Lane{.kind = Lane::Kind::Pressure};
+    std::string_view number = lower;
+    if (number.starts_with("cc"))
+        number.remove_prefix(2);
+    if (number.empty() || number.size() > 3 ||
+        !std::ranges::all_of(number, [](char c) { return c >= '0' && c <= '9'; }))
+        return std::nullopt;
+    const int controller = std::stoi(std::string{number});
+    if (controller > 127)
+        return std::nullopt;
+    return Lane{.kind = Lane::Kind::Controller,
+                .controller = static_cast<std::uint8_t>(controller)};
+}
 
 namespace
 {

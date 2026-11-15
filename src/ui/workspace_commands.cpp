@@ -860,6 +860,9 @@ std::span<const CommandInfo> Workspace::commands()
         {
             if (info.name == "lane-go")
                 info.where = onlyIn({PianoRoll});
+            else if (info.name == "lane-choose" || info.name == "lane" ||
+                     info.name.starts_with("lane-controller-"))
+                info.where = onlyIn({PianoRoll, Lane});
             else if (info.name.starts_with("lane-"))
                 info.where = onlyIn({Lane});
             else if ((info.where & whereBit(PianoRoll)) != 0 && !info.name.starts_with("note-") &&

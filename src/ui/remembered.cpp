@@ -96,6 +96,16 @@ void Remembered::typedMeter(core::TimeSignature meter)
     }
 }
 
+void Remembered::usedLane(std::string lane)
+{
+    std::erase(lanes_, lane);
+    lanes_.insert(lanes_.begin(), std::move(lane));
+    if (lanes_.size() > kMaxLanes)
+    {
+        lanes_.resize(kMaxLanes);
+    }
+}
+
 void Remembered::setMacro(char32_t name, std::vector<Key> keys)
 {
     if (keys.empty())
@@ -127,6 +137,10 @@ std::string Remembered::text() const
     {
         text += "meter " + std::to_string(meter.numerator) + "/" +
                 std::to_string(meter.denominator) + "\n";
+    }
+    for (const auto& lane : lanes_)
+    {
+        text += "lane " + lane + "\n";
     }
     // In key notation, which has no spaces: "macro a 3>>j".
     for (const auto& [name, keys] : macros_)
@@ -166,6 +180,14 @@ Remembered Remembered::read(std::string_view text)
             {
                 remembered.setMacro(static_cast<char32_t>(parts[1][0]),
                                     std::move(std::get<std::vector<Key>>(keys)));
+            }
+        }
+        else if (parts.size() == 2 && parts[0] == "lane")
+        {
+            if (remembered.lanes_.size() < kMaxLanes &&
+                std::ranges::find(remembered.lanes_, parts[1]) == remembered.lanes_.end())
+            {
+                remembered.lanes_.emplace_back(parts[1]);
             }
         }
         else if (parts.size() == 2 && parts[0] == "meter")

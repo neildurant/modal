@@ -326,24 +326,47 @@ std::string Workspace::optionsCommand() const
 std::vector<Key> Workspace::transformKeys() const
 {
     // The keys the transforms' bindings start with, the menu's (<leader>x at first), so a
-    // user's own bindings make the menu theirs.
-    std::optional<std::vector<Key>> common;
+    // user's own bindings make the menu theirs: the longest that every transform can be
+    // reached from, as some are bound elsewhere too, the pedalling tools under , c P.
+    std::vector<std::pair<std::vector<Key>, std::string>> bound;
+    std::vector<std::string> commands;
     for (const auto& [keys, binding] : keymap_.bindings(Mode::Normal))
     {
-        if (!binding.command.starts_with("transform-") || keys.size() < 2)
+        if (binding.command.starts_with("transform-") && keys.size() >= 2)
         {
-            continue;
+            bound.emplace_back(keys, binding.command);
+            if (std::ranges::find(commands, binding.command) == commands.end())
+            {
+                commands.push_back(binding.command);
+            }
         }
-        const std::vector<Key> before(keys.begin(), keys.end() - 1);
-        if (!common)
-        {
-            common = before;
-            continue;
-        }
-        const auto [mine, theirs] = std::ranges::mismatch(*common, before);
-        common->erase(mine, common->end());
     }
-    return common.value_or(std::vector<Key>{});
+    std::vector<Key> best;
+    for (const auto& [keys, command] : bound)
+    {
+        for (std::size_t length = keys.size() - 1; length > best.size(); --length)
+        {
+            const std::span<const Key> prefix{keys.data(), length};
+            const bool all = std::ranges::all_of(
+                commands,
+                [&](const std::string& each)
+                {
+                    return std::ranges::any_of(
+                        bound,
+                        [&](const auto& other)
+                        {
+                            return other.second == each && other.first.size() > length &&
+                                   std::ranges::equal(prefix, std::span{other.first}.first(length));
+                        });
+                });
+            if (all)
+            {
+                best.assign(prefix.begin(), prefix.end());
+                break;
+            }
+        }
+    }
+    return best;
 }
 
 bool Workspace::openTransformMenu(OperatorTarget target)

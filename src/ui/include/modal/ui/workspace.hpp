@@ -424,7 +424,9 @@ private:
     std::optional<Selection> selection() const override { return selection_; }
     void moveSelection(core::Tick by, int pitches,
                        std::vector<Selection::NotePosition> notes) override;
-    void setSelectionValues(std::pair<std::uint8_t, std::uint8_t> values) override
+    std::vector<std::string> recentLanes() const override;
+    void usedLane(const std::string& lane) override;
+    void setSelectionValues(std::pair<int, int> values) override
     {
         if (selection_)
         {

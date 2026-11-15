@@ -2443,6 +2443,17 @@ void Workspace::selectObject(std::string_view command, int count)
     }
 }
 
+std::vector<std::string> Workspace::recentLanes() const
+{
+    return {remembered_.lanes().begin(), remembered_.lanes().end()};
+}
+
+void Workspace::usedLane(const std::string& lane)
+{
+    remembered_.usedLane(lane);
+    rememberedChanged();
+}
+
 void Workspace::keepSelectionNotes(std::vector<Selection::NotePosition> notes)
 {
     if (!selection_)

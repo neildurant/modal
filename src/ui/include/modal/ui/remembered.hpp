@@ -40,6 +40,11 @@ public:
     void typedMeter(core::TimeSignature meter);
     std::span<const core::TimeSignature> meters() const { return meters_; }
 
+    // The piano roll's lanes used, as their names (cc74), the latest first.
+    static constexpr std::size_t kMaxLanes = 16;
+    void usedLane(std::string lane);
+    std::span<const std::string> lanes() const { return lanes_; }
+
     // The macros, a to z, as their keys; setting one to no keys forgets it.
     void setMacro(char32_t name, std::vector<Key> keys);
     const std::vector<Key>* macro(char32_t name) const;
@@ -63,6 +68,7 @@ private:
 
     std::vector<Use> uses_;
     std::vector<core::TimeSignature> meters_;
+    std::vector<std::string> lanes_;
     std::map<char32_t, std::vector<Key>> macros_;
 };
 

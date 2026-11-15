@@ -326,7 +326,7 @@ TEST_CASE("Enter alone in the lane asks for a velocity, or a change to it")
     answer(U"90");
     CHECK(l.velocity(0, 28) == 90);
     answer(U"+x");
-    CHECK(l.ws.message().starts_with("A velocity is 1 to 127"));
+    CHECK(l.ws.message().starts_with("Velocity is 1 to 127"));
     CHECK(l.velocity(0, 28) == 90);
 
     // On a selection, every note it takes, stopping at the ends of the range.
