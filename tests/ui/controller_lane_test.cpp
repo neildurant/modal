@@ -188,10 +188,24 @@ TEST_CASE("in a controller's lane, Tab and h and l go event to event, and H and 
     l.type(U"L");
     CHECK(l.view().time() > l.q());
     CHECK_FALSE(l.view().laneNote());
+    // Where nothing's lit, a line in the brightest colour shows where the cursor is.
+    const auto lit = [&]
+    {
+        const auto frame = l.ws.frame();
+        return std::ranges::count_if(frame,
+                                     [](const Region& region)
+                                     {
+                                         return std::ranges::any_of(
+                                             region.over, [](const Shape& shape)
+                                             { return shape.role == Role::Text; });
+                                     });
+    };
+    CHECK(lit() == 1);
     l.press(Key::typed(U'a', kCtrl));
     CHECK(l.ws.message() == "No event here: Tab goes to the next");
     l.press(Key::of(NamedKey::Tab));
     CHECK(l.view().time() == 2 * l.q());
+    CHECK(lit() == 0);
 }
 
 TEST_CASE("a controller's values change as velocities do, and the inspector shows the event")

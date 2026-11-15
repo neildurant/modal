@@ -4171,6 +4171,13 @@ void PianoRollView::addRegions(Frame& frame) const
         {
             lane.under.push_back({{0, base, width, lineWidth}, Role::BarLine, 255});
         }
+        // Between events, where nothing's lit, a thin line in the brightest colour at the
+        // cursor's time, where an event would go (decided 15 November 2026, after use, as H and
+        // L moved nothing to be seen in the lane).
+        if (inLane_ && !onEvent && time_ >= p.start && time_ < p.end)
+        {
+            lane.over.push_back({{scale.toX(time_), 0, lineWidth, laneHeight}, Role::Text, 255});
+        }
     }
 
     // The lane's selection, from its first note's bar to its last's, and in a Ctrl-v box between

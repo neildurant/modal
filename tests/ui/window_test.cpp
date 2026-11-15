@@ -1062,6 +1062,12 @@ TEST_CASE("a sample of controller lanes", "[.sample]")
     CHECK(window->saveFrame(base + "-cc.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-cc-light.bmp"));
+    // A nudge or two on, between events.
+    type(U"LLL");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-between.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-between-light.bmp"));
     type(U"]c");
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-bend.bmp"));
