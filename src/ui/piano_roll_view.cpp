@@ -1603,30 +1603,9 @@ namespace
 std::string laneTitle(const core::Lane& lane); // further down, with the lane's list
 } // namespace
 
-std::vector<std::size_t> PianoRollView::regionEvents(const PedalRegion& region) const
+std::vector<std::size_t> PianoRollView::regionEvents(const core::PedalRegion& region) const
 {
-    std::vector<std::size_t> indices;
-    const auto controller = lane().controller;
-    const auto events = document_.song().events(*trackId()).all();
-    for (std::size_t i = region.index; i < events.size(); ++i)
-    {
-        const auto* change = std::get_if<core::ControlChange>(&events[i].data);
-        if (change == nullptr || change->controller != controller)
-        {
-            continue;
-        }
-        if (i == region.lift)
-        {
-            indices.push_back(i);
-            break;
-        }
-        if (events[i].tick >= region.end)
-        {
-            break;
-        }
-        indices.push_back(i);
-    }
-    return indices;
+    return core::pedalRegionEvents(document_.song().events(*trackId()), lane().controller, region);
 }
 
 std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
@@ -1641,7 +1620,7 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
     const auto& events = document_.song().events(id);
     const auto regions = pedalRegions(controller);
     const auto here = laneNote();
-    const auto current = std::ranges::find_if(regions, [&](const PedalRegion& r)
+    const auto current = std::ranges::find_if(regions, [&](const core::PedalRegion& r)
                                               { return here && r.index == *here; });
     const auto name = laneTitle(lane());
     if (command == "lane-event-add")
@@ -1658,7 +1637,7 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
         const auto length =
             std::max<core::Tick>(song.tracks()[track_]->defaultLength().toTicks(song.ppqn()), 1);
         auto end = time_ + length;
-        if (const auto next = std::ranges::find_if(regions, [&](const PedalRegion& r)
+        if (const auto next = std::ranges::find_if(regions, [&](const core::PedalRegion& r)
                                                    { return r.start > time_; });
             next != regions.end())
         {
@@ -1678,7 +1657,7 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
         return true;
     }
     // The regions it's for: a selection's, or the cursor's.
-    std::vector<PedalRegion> targets;
+    std::vector<core::PedalRegion> targets;
     if (laneSelecting())
     {
         const auto taken = laneTaken();
@@ -1700,10 +1679,10 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
                      MessageKind::Information);
         return true;
     }
-    const auto others = [&](const PedalRegion& region)
+    const auto others = [&](const core::PedalRegion& region)
     {
-        return std::ranges::none_of(targets,
-                                    [&](const PedalRegion& t) { return t.index == region.index; });
+        return std::ranges::none_of(targets, [&](const core::PedalRegion& t)
+                                    { return t.index == region.index; });
     };
     const auto what =
         targets.size() == 1 ? std::string{"a region"} : std::to_string(targets.size()) + " regions";
@@ -1879,42 +1858,11 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
     return true;
 }
 
-std::vector<PianoRollView::PedalRegion> PianoRollView::pedalRegions(std::uint8_t controller) const
+std::vector<core::PedalRegion> PianoRollView::pedalRegions(std::uint8_t controller) const
 {
-    // Where a pedal is down, 64 and above, from each press to its lift, by the press's index.
-    std::vector<PedalRegion> regions;
     const auto id = trackId();
-    if (!id)
-    {
-        return regions;
-    }
-    const auto events = document_.song().events(*id).all();
-    std::optional<PedalRegion> down;
-    for (std::size_t i = 0; i < events.size(); ++i)
-    {
-        const auto* change = std::get_if<core::ControlChange>(&events[i].data);
-        if (change == nullptr || change->controller != controller)
-        {
-            continue;
-        }
-        if (change->value >= 64 && !down)
-        {
-            down = PedalRegion{events[i].tick, events[i].tick, i, std::nullopt};
-        }
-        else if (change->value < 64 && down)
-        {
-            down->end = events[i].tick;
-            down->lift = i;
-            regions.push_back(*down);
-            down.reset();
-        }
-    }
-    if (down)
-    {
-        down->end = std::max(document_.song().end(), down->start + 1);
-        regions.push_back(*down);
-    }
-    return regions;
+    return id ? core::pedalRegions(document_.song().events(*id), controller, document_.song().end())
+              : std::vector<core::PedalRegion>{};
 }
 
 void PianoRollView::enterLane()
@@ -4387,7 +4335,7 @@ Inspection PianoRollView::inspection() const
         result.kind = "Pedal";
         const auto regions = pedalRegions(shown.controller);
         const auto index = laneNote();
-        const auto region = std::ranges::find(regions, index, [](const PedalRegion& r)
+        const auto region = std::ranges::find(regions, index, [](const core::PedalRegion& r)
                                               { return std::optional{r.index}; });
         if (!index || region == regions.end())
         {

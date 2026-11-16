@@ -56,6 +56,63 @@ using Changes = std::vector<std::pair<Tick, bool>>;
 
 } // namespace
 
+TEST_CASE("pedal-region queries retain half-pedalling and isolate one controller")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    const auto controller = GENERATE(64, 65, 66, 67, 68, 69);
+    const auto cc = [&](Tick tick, int value)
+    {
+        return Event{tick, ControlChange{static_cast<std::uint8_t>(controller),
+                                         static_cast<std::uint8_t>(value)}};
+    };
+    const auto events = listOf({{0, ControlChange{1, 10}},
+                                cc(0, 20),
+                                note(0, 60, q),
+                                cc(q, 64),
+                                {q + q / 4, ControlChange{1, 90}},
+                                cc(q + q / 2, 90),
+                                cc(q + 3 * q / 4, 127),
+                                cc(2 * q, 63),
+                                cc(2 * q, 30),
+                                cc(3 * q, 127),
+                                cc(3 * q, 100),
+                                note(3 * q, 62, q)});
+    const auto before = events;
+    const auto regions = pedalRegions(events, controller, 4 * q);
+    REQUIRE(regions.size() == 2);
+    CHECK(regions[0] == PedalRegion{q, 2 * q, 3, 7});
+    CHECK(regions[1] == PedalRegion{3 * q, 4 * q, 9, std::nullopt});
+    CHECK(pedalRegionEvents(events, controller, regions[0]) ==
+          std::vector<std::size_t>{3, 5, 6, 7});
+    CHECK(pedalRegionEvents(events, controller, regions[1]) == std::vector<std::size_t>{9, 10});
+    CHECK(events == before);
+    CHECK(pedalRegions(events, 7, 4 * q).empty());
+}
+
+TEST_CASE("pedal-region discovery preserves same-tick controller ordering")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto events =
+        listOf({sustain(0, true), sustain(q, false), sustain(q, true), sustain(2 * q, false),
+                sustain(2 * q, true), sustain(2 * q, false)});
+    CHECK(pedalRegions(events, kSustain, 4 * q) ==
+          std::vector<PedalRegion>{{0, q, 0, 1}, {q, 2 * q, 2, 3}, {2 * q, 2 * q, 4, 5}});
+}
+
+TEST_CASE("an unlifted pedal region has an effective end without inventing a lift")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto events = listOf({sustain(q, true)});
+    CHECK(pedalRegions(events, kSustain, 4 * q) ==
+          std::vector<PedalRegion>{{q, 4 * q, 0, std::nullopt}});
+    CHECK(pedalRegions(events, kSustain, q) ==
+          std::vector<PedalRegion>{{q, q + 1, 0, std::nullopt}});
+    CHECK(pedalRegions(EventList{}, kSustain, 4 * q).empty());
+}
+
 TEST_CASE("re-pedalling replaces the sustain, lifting and pressing around each change")
 {
     const auto ppqn = MODAL_ANY_PPQN();

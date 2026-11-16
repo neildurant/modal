@@ -91,6 +91,62 @@ std::vector<Event> withoutPedal(const EventList& events, Tick from, Tick to, int
 
 } // namespace
 
+std::vector<PedalRegion> pedalRegions(const EventList& events, int controller, Tick songEnd)
+{
+    std::vector<PedalRegion> regions;
+    std::optional<PedalRegion> down;
+    const auto all = events.all();
+    for (std::size_t i = 0; i < all.size(); ++i)
+    {
+        const auto* change = pedalOf(all[i], controller);
+        if (change == nullptr)
+        {
+            continue;
+        }
+        if (change->value >= 64 && !down)
+        {
+            down = PedalRegion{all[i].tick, all[i].tick, i, std::nullopt};
+        }
+        else if (change->value < 64 && down)
+        {
+            down->end = all[i].tick;
+            down->lift = i;
+            regions.push_back(*down);
+            down.reset();
+        }
+    }
+    if (down)
+    {
+        down->end = std::max(songEnd, down->start + 1);
+        regions.push_back(*down);
+    }
+    return regions;
+}
+
+std::vector<std::size_t> pedalRegionEvents(const EventList& events, int controller,
+                                           const PedalRegion& region)
+{
+    std::vector<std::size_t> indices;
+    for (std::size_t i = region.index; i < events.size(); ++i)
+    {
+        if (pedalOf(events[i], controller) == nullptr)
+        {
+            continue;
+        }
+        if (i == region.lift)
+        {
+            indices.push_back(i);
+            break;
+        }
+        if (events[i].tick >= region.end)
+        {
+            break;
+        }
+        indices.push_back(i);
+    }
+    return indices;
+}
+
 bool pedalDown(const EventList& events, int controller, Tick tick)
 {
     std::optional<int> value;

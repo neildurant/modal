@@ -6,8 +6,11 @@
 #include <modal/core/track.hpp>
 #include <modal/core/transforms.hpp>
 
+#include <cstddef>
 #include <functional>
+#include <optional>
 #include <span>
+#include <vector>
 
 namespace modal::core
 {
@@ -17,6 +20,24 @@ namespace modal::core
 // CC 64, sostenuto 66 and soft 67; a pedal is down at 64 or more. Times in milliseconds are
 // turned into ticks by the caller, at the tempo where they fall.
 inline constexpr int kSustain = 64;
+
+// A switch controller's down span, derived from its stored CC events. The indices belong
+// only to the queried event list; no lift means it holds to the effective song end.
+struct PedalRegion
+{
+    Tick start = 0;
+    Tick end = 0;
+    std::size_t index = 0;
+    std::optional<std::size_t> lift;
+
+    friend bool operator==(const PedalRegion&, const PedalRegion&) = default;
+};
+
+std::vector<PedalRegion> pedalRegions(const EventList& events, int controller, Tick songEnd);
+
+// The press, its later values and its lift, excluding other controllers and notes.
+std::vector<std::size_t> pedalRegionEvents(const EventList& events, int controller,
+                                           const PedalRegion& region);
 
 // Whether a pedal is down just before a tick, by its last event before it.
 bool pedalDown(const EventList& events, int controller, Tick tick);

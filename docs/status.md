@@ -8,6 +8,8 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 Read [schedule.md](schedule.md) for the current milestone, item states and next work. Read [design.md](design.md) for behaviour and unresolved choices. The sections below preserve validation evidence and accepted trials; their historical feature summaries do not define the current specification.
 
+The pedal-region extraction is approved and in progress: first shared region queries in core, then musical editing operations, preserving current behaviour. The query step is implemented and passes GCC Debug and Clang Debug (1,046 registered tests per preset, three platform/MIDI skips and no failures), whole-tree formatting and `git diff --check`. Direct core tests cover all six switch controllers at the three test PPQNs, half-pedal values, unrelated events, same-tick ordering and absent lifts; existing Workspace tests pass. The editing step, full Linux validation and the required UI trial remain pending. The preceding review fixes are published through `99d70a7`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43855649871).
+
 ## Pending
 
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
