@@ -120,7 +120,8 @@ reason to discard those original values.
 In the region view, Tab visits presses, ordinary left and right move through
 time, and `o` adds a press at the cursor. `=` and `-` move the release later
 or earlier by the grid, while `+` and `_` use a nudge. Alt-left and Alt-right
-move the region, and `x`, `d` and `y` act on whole regions. A new region or
+move the region, and `x`, `d` and `y` act on whole regions. Regions a
+selection takes turn the selection's colour, as notes do. A new region or
 lengthening cannot run into a later press; a selected batch is checked as a
 whole. Nor can a press share the tick where another region lifts: a lift and
 a press at the same instant would be ambiguous, and a pianist's pedal change

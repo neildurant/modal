@@ -85,6 +85,10 @@ nmap <leader>ta track-add         "Add a track after this one"
 nmap <leader>ti track-insert-before "Add a track before this one"
 nmap <leader>td track-delete      "Delete this track"
 nmap <leader>tr track-rename      "Rename this track"
+nmap <leader>ty track-yank        "Yank this whole track"
+nmap <leader>tp track-put-after   "Put whole tracks after this one"
+nmap <leader>tP track-put-before  "Put whole tracks before this one"
+nmap <leader>tD track-duplicate   "Duplicate this track"
 nmap <A-Up>     track-move-up     "Move the track up"
 nmap <A-Down>   track-move-down   "Move the track down"
 nmap <A-k>      track-move-up     "Move the track up"
@@ -99,6 +103,8 @@ vmap <leader>tc tracks-chase-toggle "Chase notes on the selected tracks, or stop
 vmap <leader>tq tracks-quantize-toggle "Quantise the selected tracks, or stop"
 vmap <leader>tf track-freeze      "Freeze the selected whole tracks"
 vmap <leader>td track-delete      "Delete the selected tracks"
+vmap <leader>ty track-yank        "Yank the selected whole tracks"
+vmap <leader>tD track-duplicate   "Duplicate the selected tracks"
 
 " Recording: arming tracks and sending MIDI input through to them
 keysection "Recording"
@@ -106,6 +112,7 @@ ngroup <leader>r "Recording"
 nmap <leader>ra track-arm-toggle  "Arm this track, or disarm it"
 nmap <leader>rt track-thru-toggle "Thru to this track, or stop"
 nmap <leader>rm record-mode-toggle "Replace or overdub"
+nmap <leader>rA tracks-disarm     "Disarm every armed track"
 ngroup <leader>m "Metronome"
 nmap <leader>mm metronome-cycle "Metronome: off, recording or always"
 nmap <leader>mc countin-cycle   "Count-in, pre-roll or neither"
@@ -179,6 +186,8 @@ keysection "The section strip"
 nmap gs         go-section-strip  "Section strip"
 nmap <A-h>      section-move-earlier "Move a place earlier"
 nmap <A-l>      section-move-later "Move a place later"
+nmap <A-Left>   section-move-earlier "Move a place earlier"
+nmap <A-Right>  section-move-later "Move a place later"
 nmap J          section-join-strip "Join with the next"
 nmap +          section-lengthen  "A bar longer"
 nmap =          section-lengthen  "A bar longer"
@@ -505,6 +514,20 @@ cmap <C-.>      panic             "Panic"
 " , e asks for an event to insert at the cursor, of any kind but a note, as :event-insert does;
 " Tab completes the kind, and what it should be followed by is explained if it's wrong.
 nmap <leader>e  event-insert      "Insert an event"
+
+" Labels and marks, from any view: , l l puts a label at the cursor, asking its name (or renames
+" the one there), , l d deletes it, or in Visual mode every label selected, and , l s starts a
+" section there, as , s l does; , l m says where the marks are, and , l x deletes marks, asking
+" which letters (a, abc, or a-d), as :label, :label-delete, :marks and :mark-delete do.
+keysection "Labels and marks"
+ngroup <leader>l "Labels and marks"
+nmap <leader>ll label             "A label here"
+nmap <leader>ld label-delete      "Delete the label here"
+nmap <leader>ls label-to-section  "A section from the label"
+nmap <leader>lm marks             "Where the marks are"
+nmap <leader>lx mark-delete       "Delete marks"
+vgroup <leader>l "Labels and marks"
+vmap <leader>ld label-delete      "Delete the labels selected"
 
 keysection "Sections"
 ngroup <leader>s "Sections"

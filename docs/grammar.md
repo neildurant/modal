@@ -79,7 +79,7 @@ A find or search counts (`3fE`, `3n`). After an operator, `f` takes the range th
 
 ### Marks
 
-`ma` marks the cursor's place with a letter, saved with the song; `'a` (or `` `a ``) goes there, and after an operator is the range to it (`d'a`). `''` goes back to before the last jump. `:marks` lists them, `:mark-delete a` deletes one.
+`ma` marks the cursor's place with a letter, saved with the song; `'a` (or `` `a ``) goes there, and after an operator is the range to it (`d'a`). `''` goes back to before the last jump. `:marks` lists them, `:mark-delete a` deletes one. The leader group `, l`, labels and marks, has `, l l` a label at the cursor (asking its name, or renaming the one there, `:label`), `, l d` delete it, or in Visual mode every label selected (`:label-delete`), `, l s` start a section at it (as `, s l`), `, l m` list the marks and `, l x` delete marks, asking which letters.
 
 ### Views and scrolling
 
@@ -182,6 +182,7 @@ In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$
 - `=` / `-` and Ctrl-A / Ctrl-X step numeric fields. For musical offsets these add the track's editing grid to the note fraction, keeping the fine ticks, while `+` / `_` step the fine ticks alone. An offset given in plain ticks stays in ticks. Millisecond offsets step by 1 ms. In the button columns, an upward step sets on and a downward step sets off.
 - Time offsets accept `-40ms`, `+120t`, `+1/16` and composites such as `+1/16-22t`. These are absolute settings, including their sign; the last example is +218 ticks at 960 PPQN. Limits are ±1000 ms or ±64 whole notes. Musical and millisecond units retain their meaning through save/load. A musical value stays as it was typed, on screen and in the song file: `+1/16-33t` is not rewritten around a nearer fraction. A change of PPQN keeps the fraction and scales the fine ticks.
 - `V` selects complete rows. Enter assigns the field to all selected tracks; steps change each track relative to its own value. The entire edit is refused if any row would be invalid. Each batch is one undo step; names are edited individually.
+- From any view with tracks, `, t y` yanks the current whole track (or those `V` or `Ctrl-v` selected), `, t p` / `, t P` put the register's whole tracks after / before the current one as new tracks, and `, t D` duplicates the current track just after it, the register left as it was. `, r A` disarms every armed track.
 - `Vy` copies one whole track, `Vjy` two; `yy` or `Y` also copies the current track. Settings, editing defaults, all section events and per-section meter ownership are included. `Vd` deletes explicitly selected tracks; `dd` and event-deletion keys do not delete whole tracks.
 - Normal `p` / `P` insert copies after/before the current row, with new IDs and unique numbered names. Visual `p` / `P` replace selected rows as one undo step. Routing and mute/solo are preserved. Named registers work (`V"ay`, `"ap`); appending adds rows. Event contents and sections remain separate payloads, and cannot be pasted as whole tracks.
 - The first implementation requires matching PPQN, section names, order and lengths when pasting. An incompatible paste leaves the song and register unchanged. `yit` in the editing views still takes only event contents.
@@ -254,7 +255,7 @@ Velocities stop at 1 and 127. Steps one after another on a note undo together, a
 
 ## Sections
 
-- **On the strip:** `h` `l` go between sections; `x` and `Y` delete and yank one; `p` and `P` put after and before; `Alt-h` `Alt-l` move one a place; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert one before and after; `c` renames it; `e` edits its name and length in the inspector; Enter plays from it.
+- **On the strip:** `h` `l` go between sections; `x` and `Y` delete and yank one; `p` and `P` put after and before; `Alt-h` `Alt-l` (or `Alt-Left` `Alt-Right`) move one a place; `J` joins it with the next; `+` `-` lengthen and shorten it by a bar; `i` `a` insert one before and after; `c` renames it; `e` edits its name and length in the inspector; Enter plays from it.
 - **From any view, on the cursor's section,** `, s`: `r` rename, `i` and `a` insert one before and after, `j` join with the next, `s` start one at the cursor's bar line, `l` start one at the label before.
 - A new section's name is asked first, with "Section N" to edit; Enter puts it in named, as one change, and Escape puts none.
 

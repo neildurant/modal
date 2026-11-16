@@ -133,6 +133,14 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                 }
                 if (name == "mark-delete")
                 {
+                    // From keys or the palette, asking which (, l x).
+                    if (call.line.empty())
+                    {
+                        askName("Delete the marks (a, abc, or a-d): ", "",
+                                [this](const std::string& letters)
+                                { report(deleteMarks(letters)); });
+                        return {true};
+                    }
                     return deleteMarks(call.arguments);
                 }
                 if (name == "label")
@@ -191,6 +199,18 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                 if (name == "track-delete")
                 {
                     return deleteTracks();
+                }
+                if (name == "track-yank" || name == "track-duplicate")
+                {
+                    return yankTracks(name == "track-duplicate", call.count);
+                }
+                if (name == "track-put-after" || name == "track-put-before")
+                {
+                    return putTracks(register_.wholeTracks, name == "track-put-before", call.count);
+                }
+                if (name == "tracks-disarm")
+                {
+                    return disarmTracks();
                 }
                 if (name == "track-rename")
                 {
@@ -1422,14 +1442,15 @@ CommandResult Workspace::run(std::string_view command, int count)
         unnamed = std::exchange(register_, from);
     }
     const bool taking =
-        command == "event-yank" || command == "event-delete" || command == "operator-yank" ||
-        command == "operator-delete" || command == "visual-delete-time" ||
-        command == "bar-delete" ||
+        command == "track-yank" || command == "event-yank" || command == "event-delete" ||
+        command == "operator-yank" || command == "operator-delete" ||
+        command == "visual-delete-time" || command == "bar-delete" ||
         (operator_ && (operator_->name == "operator-yank" || operator_->name == "operator-delete"));
     if (taking && named != 0 && named != letter)
     {
         const auto& into = registers_[letter];
-        if (!into.empty() && (where() == Where::TrackList) != !into.wholeTracks.empty())
+        const bool whole = where() == Where::TrackList || command == "track-yank";
+        if (!into.empty() && whole != !into.wholeTracks.empty())
         {
             // Refuse before a delete changes the song, or a yank changes either register.
             refuse("Cannot append whole tracks and other material to the same register");
@@ -4402,6 +4423,150 @@ CommandResult Workspace::deleteTracks()
         view().setCursor({left[std::min(first, left.size() - 1)]->id(), cursor.tick, cursor.pitch});
     }
     return {true, "Deleted " + names, false};
+}
+
+std::optional<std::vector<core::TrackId>> Workspace::chosenTracks(std::string_view verb)
+{
+    // The cursor's track, or those V or Ctrl-v selected; a v range, across every track,
+    // chooses none.
+    const auto& song = document_.song();
+    const auto cursor = view().cursor();
+    if (!cursor.track)
+    {
+        refuse("No track to " + std::string{verb});
+        return std::nullopt;
+    }
+    std::vector<core::TrackId> ids{*cursor.track};
+    if (selection_)
+    {
+        if (where() == Where::Tracks && selection_->kind == SelectionKind::Range)
+        {
+            refuse("v selects time across every track: V or Ctrl-v selects tracks to " +
+                   std::string{verb});
+            return std::nullopt;
+        }
+        if (const auto block = trackBlock())
+        {
+            ids.clear();
+            for (std::size_t i = 0; i < block->second; ++i)
+            {
+                ids.push_back(song.tracks()[block->first + i]->id());
+            }
+        }
+    }
+    return ids;
+}
+
+CommandResult Workspace::yankTracks(bool duplicate, int count)
+{
+    // Whole tracks, settings and all, into the register to put as new tracks, from any view
+    // with tracks (decided 16 November 2026), as V and y do in the Tracks view; or duplicated
+    // just after, the register left as it was.
+    const auto ids = chosenTracks(duplicate ? "duplicate" : "yank");
+    if (!ids)
+    {
+        return {true};
+    }
+    const auto& song = document_.song();
+    std::vector<core::TrackCopy> copies;
+    for (const auto id : *ids)
+    {
+        copies.push_back(*song.copyTrack(id));
+    }
+    const auto names = trackNames(song, *ids);
+    endVisual();
+    if (duplicate)
+    {
+        // After the last of them, the cursor on the first copy.
+        view().setCursor({ids->back(), view().cursor().tick, view().cursor().pitch});
+        return putTracks(copies, false, count);
+    }
+    EventRegister taken;
+    taken.wholeTracks = std::move(copies);
+    register_ = std::move(taken);
+    return {false, "Yanked " + names + (ids->size() == 1 ? ", the whole track" : ", whole tracks"),
+            false};
+}
+
+CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool before, int count)
+{
+    if (copies.empty())
+    {
+        return CommandResult::error("No whole tracks yanked: , t y yanks this one");
+    }
+    auto& song = document_.song();
+    for (const auto& copy : copies)
+    {
+        if (!song.canInsertTrack(copy))
+        {
+            return CommandResult::error(
+                "The copied tracks need the same PPQN, section names and lengths");
+        }
+    }
+    const auto cursor = view().cursor();
+    const auto tracks = song.tracks();
+    std::size_t at = 0;
+    if (cursor.track)
+    {
+        at = static_cast<std::size_t>(
+            std::ranges::find_if(tracks, [&](const auto& t) { return t->id() == *cursor.track; }) -
+            tracks.begin());
+        at = before ? at : std::min(at + 1, tracks.size());
+    }
+    endVisual();
+    std::optional<core::TrackId> first;
+    std::size_t made = 0;
+    document_.edit(copies.size() == 1 ? "Put a whole track" : "Put whole tracks", view().place(),
+                   [&](core::Song& edited)
+                   {
+                       for (int n = 0; n < std::max(count, 1); ++n)
+                       {
+                           for (const auto& copy : copies)
+                           {
+                               const auto id = edited.insertTrack(at++, copy);
+                               if (!first)
+                               {
+                                   first = id;
+                               }
+                               ++made;
+                           }
+                       }
+                   });
+    refresh();
+    if (first)
+    {
+        view().setCursor({*first, cursor.tick, cursor.pitch});
+    }
+    return {true, "Put " + std::to_string(made) + (made == 1 ? " whole track" : " whole tracks"),
+            false};
+}
+
+CommandResult Workspace::disarmTracks()
+{
+    // Every armed track at once, from wherever the cursor is (decided 16 November 2026).
+    std::vector<core::TrackId> armed;
+    for (const auto& track : document_.song().tracks())
+    {
+        if (track->arm)
+        {
+            armed.push_back(track->id());
+        }
+    }
+    if (armed.empty())
+    {
+        return {false, "No track is armed", false};
+    }
+    const auto names = trackNames(document_.song(), armed);
+    document_.edit("Disarm " + names, view().place(),
+                   [&](core::Song& song)
+                   {
+                       for (const auto id : armed)
+                       {
+                           song.updateTrack(id, [](core::Track& track) { track.arm = false; });
+                       }
+                   });
+    refresh();
+    return {true, "Disarmed " + names, false};
 }
 
 CommandResult Workspace::renameTrack(std::string_view name)

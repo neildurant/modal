@@ -25,9 +25,13 @@ These actions are undoable. The conductor is separate and stays first.
 
 In Tracks, `V` selects complete rows, including settings. `Vy` copies a track;
 normal `p` and `P` insert copies after or before the current row, and Visual
-put replaces selected rows. By contrast, `yit` in a musical view takes a
-track's event contents. Copying a whole instrument part and copying its
-music for another instrument are different operations.
+put replaces selected rows. From any other view with a current track, the
+Tracks group does the same: `, t y` yanks the whole track (or the tracks
+selected with `V` or Ctrl-V), `, t p` and `, t P` put the yanked tracks as new
+ones after or before the current track, and `, t D` duplicates the current
+track just after it, leaving the register as it was. By contrast, `yit` in a
+musical view takes a track's event contents. Copying a whole instrument part
+and copying its music for another instrument are different operations.
 
 `, t o` enters track-reordering mode. The rows can move up or down before
 Enter accepts their order as one change, or Escape restores it. While this
@@ -73,7 +77,8 @@ track is soloed, a soloed track plays even when its Mute button is also on.
 `M`, `S` and `A` work from musical views with a current track as well as
 from Tracks. Arming is independent for each track, so several may be armed
 at once. Modal names already-armed parts when another is armed to help make
-that choice visible.
+that choice visible. `, r A` disarms every armed track at once, wherever the
+cursor is, without going to each track.
 
 `, r t` changes the current track's Thru. `, T t` is the machine-wide Thru
 switch: both the machine switch and the track's own choice must permit it.

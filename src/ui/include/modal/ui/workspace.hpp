@@ -642,6 +642,12 @@ private:
     CommandResult addTracks(bool before, int count, std::string_view name);
     // The cursor's track, or the tracks a selection chooses, into the register as whole tracks.
     CommandResult deleteTracks();
+    // , t y, , t p, , t P, , t D and , r A: whole tracks yanked, put, duplicated; and every
+    // track disarmed. The tracks chosen are the cursor's, or those V or Ctrl-v selected.
+    std::optional<std::vector<core::TrackId>> chosenTracks(std::string_view verb);
+    CommandResult yankTracks(bool duplicate, int count);
+    CommandResult putTracks(std::vector<core::TrackCopy> copies, bool before, int count);
+    CommandResult disarmTracks();
     CommandResult renameTrack(std::string_view name);
     // In the arrangement, a button for the tracks a V or Ctrl-v selection takes, as the
     // Tracks view's rows do, all following the cursor's track.

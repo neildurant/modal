@@ -86,8 +86,9 @@ registers and macros have separate sets of names: mark a, register a and
 macro a can all exist independently. Setting one does not overwrite either
 of the others.
 
-`''` returns to the place before the last jump. `:marks` lists marks and
-`:mark-delete a` removes one. A mark can also end an operator range, as in
+`''` returns to the place before the last jump. `, l m` (`:marks`) lists
+marks and `, l x` deletes them, asking which letters (`:mark-delete a`, or
+`a-d` for several). A mark can also end an operator range, as in
 `d'a`. The same navigation destination can therefore describe music to
 act on.
 

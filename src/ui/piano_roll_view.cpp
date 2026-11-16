@@ -4859,7 +4859,11 @@ void PianoRollView::addRegions(Frame& frame) const
             // Fully down as a note's start is bright; partly down lighter, by how far.
             const auto alpha = static_cast<std::uint8_t>(60 + (*held - 64) * 100 / 63);
             // The region the cursor's in, in the brightest colour, as a current event is.
-            const auto role = press && press == onRegion ? Role::Text : Role::Note;
+            // And those a selection takes in its colour, as notes are (decided 16 November 2026).
+            const auto role = press && press == onRegion ? Role::Text
+                              : press && std::ranges::binary_search(laneTakes, *press)
+                                  ? Role::NoteSelected
+                                  : Role::Note;
             lane.under.push_back({{x0, inset, x1 - x0, laneHeight - 2 * inset}, role, alpha});
             if (regionStart && from >= p.start)
             {

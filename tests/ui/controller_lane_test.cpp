@@ -824,3 +824,85 @@ TEST_CASE("o won't press the pedal on the tick another region lifts")
     l.type(U"Lo");
     CHECK(pedalling(l).size() == 7);
 }
+
+TEST_CASE("pedal regions a selection takes are in the selection's colour")
+{
+    Lanes l;
+    pedal(l);
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    const auto selected = [&]
+    {
+        std::size_t count = 0;
+        for (const auto& region : l.ws.frame())
+        {
+            for (const auto& shape : region.under)
+            {
+                count += shape.role == Role::NoteSelected ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    const auto before = selected();
+    l.type(U"v\t");
+    CHECK(selected() > before);
+}
+
+TEST_CASE("the leader keys t y and t p yank and put whole tracks from the piano roll, and , t D "
+          "duplicates")
+{
+    Lanes l;
+    l.type(U",ty");
+    CHECK(l.ws.message() == "Yanked Synth, the whole track");
+    l.type(U",tp");
+    REQUIRE(l.document.song().tracks().size() == 2);
+    // A copy with all its events, the cursor on it.
+    const auto& song = l.document.song();
+    CHECK(song.events(song.tracks()[1]->id()).size() == song.events(song.tracks()[0]->id()).size());
+    CHECK(l.view().track() == 1);
+    l.type(U",tD");
+    CHECK(l.document.song().tracks().size() == 3);
+    CHECK(l.view().track() == 2);
+    // The register still holds the first yank: one more.
+    l.type(U",tP");
+    CHECK(l.document.song().tracks().size() == 4);
+    l.type(U"u");
+    CHECK(l.document.song().tracks().size() == 3);
+}
+
+TEST_CASE("the leader keys r A disarm every armed track, from wherever the cursor is")
+{
+    Lanes l;
+    l.type(U",tp"); // nothing yanked yet
+    CHECK(l.ws.message() == "No whole tracks yanked: , t y yanks this one");
+    l.type(U"A");
+    REQUIRE(l.track().arm);
+    l.type(U",rA");
+    CHECK_FALSE(l.track().arm);
+    CHECK(l.ws.message() == "Disarmed Synth");
+    l.type(U",rA");
+    CHECK(l.ws.message() == "No track is armed");
+}
+
+TEST_CASE(
+    "the leader keys l l and l d put and delete a label, and , l x asks which marks to delete")
+{
+    Lanes l;
+    l.type(U",ll");
+    l.type(U"Verse");
+    l.enter();
+    REQUIRE(l.document.song().labels().size() == 1);
+    CHECK(l.document.song().labels().front().name == "Verse");
+    l.type(U",ld");
+    CHECK(l.document.song().labels().empty());
+    l.type(U"ma");
+    REQUIRE(l.document.song().mark('a') != nullptr);
+    l.type(U",lm");
+    REQUIRE(l.ws.listing().size() == 1);
+    CHECK(l.ws.listing().front().first == "a");
+    l.press(Key::of(NamedKey::Escape)); // the list closes
+    l.type(U",lx");
+    l.type(U"a");
+    l.enter();
+    CHECK(l.document.song().mark('a') == nullptr);
+}

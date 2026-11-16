@@ -137,17 +137,17 @@ new kind of piano roll. The named command can also be found in the palette.
 A command's context still applies: binding a note operation to another key
 does not make it meaningful in the Ports view.
 
-A personal binding is also useful when a command has no default arrow-key
-alternative. For example, these add Alt-arrow section reordering on the
-section strip, alongside its default `Alt-h` and `Alt-l` bindings:
+A personal binding is also useful when a command has no default key, or
+another key suits the hand better. For example, this binds `:put-ending`, which
+has none, in the piano roll and the arrangement:
 
 ```text
-nmap <A-Left> section-move-earlier "Move a section earlier"
-nmap <A-Right> section-move-later "Move a section later"
+nmap <leader>pe put-ending "Put, ending at the cursor"
 ```
 
-The commands apply only on the strip, so the existing Alt-arrow note movements
-in the piano roll retain their own context.
+Keys bound to several commands mean the one that does something where the
+cursor is: Alt-Left moves a section on the section strip and a note in the
+piano roll, each binding applying in its own place.
 
 Keys in configuration use angle-bracket notation for named or modified
 keys: `<Esc>`, `<Tab>`, `<CR>` for Enter, `<Space>`, `<C-p>` for Ctrl-P and

@@ -70,10 +70,8 @@ with motions can take several sections. `p` puts whole sections after the
 cursor's section; `P` puts them before. Their lengths and the material on
 all tracks go together.
 
-`Alt-h` and `Alt-l` move a section earlier or later through its neighbours.
-These section-reordering commands currently have no default Alt-arrow
-binding; they can also be found by name in the palette or given a personal
-binding, as described in @sec-customisation. Reordering changes
+`Alt-h` and `Alt-l` (or Alt-Left and Alt-Right) move a section earlier or
+later through its neighbours. Reordering changes
 its position in the piece, while preserving the relative timing inside it.
 A section's labels and its local tempo and meter information travel with it.
 Enter on the strip plays from that section, allowing its musical role to
@@ -133,12 +131,13 @@ placed before an operator, it applies to that edit, as in `|d]b`.
 
 A **label** is a named position. Unlike a section boundary, it need not divide
 the arrangement: “bass entry” or “check this transition” can simply identify
-a place. `:label NAME` creates or renames one at the cursor; `:label-delete`
-removes one there, or all labels in a Visual range. `[l` and `]l` navigate
-between labels.
+a place. `, l l` (`:label NAME`) creates or renames one at the cursor, asking
+for its name; `, l d` (`:label-delete`) removes one there, or all labels in a
+Visual range. `[l` and `]l` navigate between labels. The `, l` group,
+**labels and marks**, gathers these with the marks' commands.
 
 An imported MIDI file may contain labels that already describe its form.
-`:label-to-section` (`, s l`) converts the label at or before the cursor into
+`:label-to-section` (`, s l`, or `, l s`) converts the label at or before the cursor into
 a section boundary at its bar line. On a selection, it converts the labels in that
 range. Off-bar labels ask for confirmation because the structural boundary
 will be at the bar line rather than the label's exact time.

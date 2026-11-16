@@ -580,6 +580,11 @@ TEST_CASE("Alt-h and Alt-l move a section, J joins, and + and - resize")
     CHECK(s.strip() == 1u); // with it
     s.press(Key::typed(U'h', kAlt));
     CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
+    // Alt with the arrows too, as tracks move with Alt-Up and Alt-Down.
+    s.press(Key::of(NamedKey::Right, kAlt));
+    CHECK(s.names() == std::vector<std::string>{"B", "A", "C"});
+    s.press(Key::of(NamedKey::Left, kAlt));
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
 
     s.type(U"J");
     CHECK(s.names() == std::vector<std::string>{"A", "C"});

@@ -120,11 +120,11 @@ constexpr std::array kSharedCommands{
                 .description = "Go to the place a letter after it marks ('a), or with ' back to "
                                "before the last jump; after an operator, the range to it (d'a)",
                 .motion = true},
-    CommandInfo{.name = "marks", .description = "Say where the marks are", .keys = false},
+    CommandInfo{.name = "marks", .description = "Say where the marks are"},
     CommandInfo{.name = "mark-delete",
-                .description = "Delete marks by their letters: a, abc, or a-d (a-z for all)",
-                .usage = "LETTERS",
-                .keys = false},
+                .description = "Delete marks by their letters: a, abc, or a-d (a-z for all); "
+                               "from keys, asking which",
+                .usage = "LETTERS"},
     CommandInfo{.name = "cursor-mark",
                 .description = "To the mark ('a), as the range an operator takes",
                 .keys = false,
@@ -415,11 +415,9 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "label",
                 .description = "Put a label named NAME at the cursor, or rename the one there; "
                                "with no name, asking for one, with its name to edit",
-                .usage = "[NAME]",
-                .keys = false},
+                .usage = "[NAME]"},
     CommandInfo{.name = "label-delete",
                 .description = "Delete the label at the cursor, or every label in a selection",
-                .keys = false,
                 .range = true},
     CommandInfo{.name = "label-to-section",
                 .description = "Start a section at the label at or before the cursor, named "
@@ -442,6 +440,32 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "track-delete",
                 .description = "Delete the cursor's track, or the tracks selected with V or "
                                "Ctrl-v, keeping them in the register as whole tracks"},
+    CommandInfo{.name = "track-yank",
+                .description = "Yank the cursor's whole track, or those selected with V or "
+                               "Ctrl-v, settings and all, to put as new tracks",
+                .where =
+                    onlyIn({Where::Tracks, Where::PianoRoll, Where::EventList, Where::TrackList})},
+    CommandInfo{.name = "track-put-after",
+                .description = "Put the yanked whole tracks after the cursor's, as new tracks, "
+                               "{count} times",
+                .count = true,
+                .where =
+                    onlyIn({Where::Tracks, Where::PianoRoll, Where::EventList, Where::TrackList})},
+    CommandInfo{.name = "track-put-before",
+                .description = "Put the yanked whole tracks before the cursor's, as new tracks, "
+                               "{count} times",
+                .count = true,
+                .where =
+                    onlyIn({Where::Tracks, Where::PianoRoll, Where::EventList, Where::TrackList})},
+    CommandInfo{.name = "track-duplicate",
+                .description = "Copy the cursor's track, or those selected, just after it, the "
+                               "register left as it was",
+                .where =
+                    onlyIn({Where::Tracks, Where::PianoRoll, Where::EventList, Where::TrackList})},
+    CommandInfo{.name = "tracks-disarm",
+                .description = "Disarm every armed track",
+                .where =
+                    onlyIn({Where::Tracks, Where::PianoRoll, Where::EventList, Where::TrackList})},
     CommandInfo{.name = "track-rename",
                 .description = "Rename the cursor's track; with no name, asking for one, with "
                                "its name to edit",
