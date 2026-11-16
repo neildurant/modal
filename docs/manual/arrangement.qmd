@@ -1,0 +1,189 @@
+# Building an arrangement {#sec-arrangement}
+
+Tracks describe simultaneous parts; sections describe successive parts of
+the piece. A section spans every track, so moving a chorus means moving its
+bass, melody, controllers and tempo changes together. Working within a track
+instead changes one part while the surrounding arrangement stays aligned.
+
+This distinction gives Modal two scales of structural editing: music within
+a section and sections within the song.
+
+## Bars, tracks and sections
+
+In the arrangement, the cursor's bar belongs to its track. The section strip
+above the tracks belongs to the whole song. `gs`, “go to section strip”,
+changes the focus to that structure. Down (or `j`) moves back down from the
+strip to the track rows. This is ordinary downward movement, not a separate
+shortcut to memorise. Up (or `k`) from the first track moves back onto the strip.
+On the strip, left and right move between sections rather than bars.
+
+`is`, **in section**, follows this context. On a track it means that track's
+events in the section; on the strip it means the section's events on every
+track. `as`, **around section**, is available on the strip for the section
+itself. Consequently `dis` on the strip clears its music but leaves its
+time, while `das` removes the section and shortens the song.
+
+A section copy is independent after it is put. It is a convenient way to
+start a second verse from the first, without linking their subsequent edits.
+Sections are not reusable patterns with shared content.
+
+## Giving the song structure
+
+A new song begins with one track and a section. Naming sections for their
+musical roles makes navigation and copying easier. The section commands
+live under `, s`; their actions apply to the cursor's section from other
+views too.
+
+| Intention | On the section strip | From anywhere in the song |
+| --- | --- | --- |
+| Rename the section | `c` | `, s r` |
+| Insert a section before / after | `i` / `a` | `, s i` / `, s a` |
+| Join with the next section | `J` | `, s j` |
+| Start a section at the current bar | — | `, s s` |
+| Edit name and length | `e` | — |
+| Add / remove a bar of section length | `+` / `-` | — |
+
+The leader commands also work while the strip has focus. “Anywhere in the
+song” means the arrangement, its strip, the piano roll or the event list;
+the Ports and other settings pages do not provide that section context.
+
+The last two controls are specific to a section focused on the strip:
+`e` edits that section's fields, and `+` / `-` change its length. They have
+no default leader binding. `ga` opens the arrangement and `gs` focuses its
+strip, where those controls have their section-editing meaning.
+
+The distinction between inserting **before** and adding **after** is also
+a useful mnemonic for `i` and `a` here. These are section commands in this
+context, not the prefixes of an object awaiting an operator.
+
+Splitting an existing section at a bar line gives the later material a new
+section without moving its notes in time. `:section-split NAME` names that
+new part; `, s s` invokes the same command and asks for the name.
+Joining performs the complementary structural operation. Section
+names are unique; copies gain a numbered suffix so a named destination
+remains unambiguous.
+
+## Copying and rearranging whole sections
+
+On the strip, `Y` yanks the current section and `x` deletes it. Operators
+with motions can take several sections. `p` puts whole sections after the
+cursor's section; `P` puts them before. Their lengths and the material on
+all tracks go together.
+
+`Alt-h` and `Alt-l` move a section earlier or later through its neighbours.
+These section-reordering commands currently have no default Alt-arrow
+binding; they can also be found by name in the palette or given a personal
+binding, as described in @sec-customisation. Reordering changes
+its position in the piece, while preserving the relative timing inside it.
+A section's labels and its local tempo and meter information travel with it.
+Enter on the strip plays from that section, allowing its musical role to
+be heard in context.
+
+The strip's `ie` object means the entire song's events on every track.
+Its breadth is intentional: a whole-song edit is made from the place that
+represents the whole structure, rather than accidentally reaching every
+track from a single part.
+
+## Copying music without changing the structure
+
+On arrangement tracks and in the piano roll, `p` merges copied events over
+what is there. `P` inserts the copied time, moving later material **within
+the section**; it asks before growing a section when necessary. On a Visual
+selection, either key replaces the selection as one change.
+
+Copied bars go to the start of the destination bar. Other event material
+goes to the cursor's time. The message after a put states what was put,
+where, and whether it merged, inserted or replaced material.
+
+In the piano roll, Alt-P and Alt-p add pitch placement to the corresponding
+put. Intervals are preserved relative to the pitch at which the material
+was taken, so a melodic shape can start on another note. `:put-ending`
+anchors the copy's end at the cursor instead of its start: useful for a
+lead-in that must arrive at a downbeat. It has no default key binding;
+the command line, palette or a personal binding provides access to it.
+
+A register can hold events, whole tracks or sections. These are different
+kinds of material, not interchangeable clipboard formats. A section copy
+belongs on the strip; a whole-track copy belongs in Tracks. Named registers
+for keeping several copies are covered in @sec-efficient-work.
+
+## Removing contents, removing time
+
+Clearing a bar and closing a gap are different musical decisions. `dib`
+removes the events starting in the bar and leaves silence. `dab` removes
+that bar as time on the chosen track, closing up the remainder of its
+section. Later sections remain aligned.
+
+A Visual `D` removes the selection's time, also closing up within each
+section. In the piano roll it requires time at every pitch: a pitch box
+would leave unclear what should happen to unselected notes crossing it.
+The event list refuses this time-removal operation.
+
+To change the song's length across every track, `:bar-delete` (`, b d`) and
+`:bar-insert` (`, b i`) are explicit alternatives. They use the conductor's bars.
+For example, `:bar-insert 2 3/4` adds two empty bars of 3/4 before the cursor's
+bar. A deleted run is kept as section material that can be put on the strip.
+
+Events are normally taken by their starts. A note beginning before a selected
+range can therefore cross into it without becoming a target. The `|` command
+cuts notes at selection boundaries so only the pieces inside are taken;
+placed before an operator, it applies to that edit, as in `|d]b`.
+
+## Labels describe places without dividing the song
+
+A **label** is a named position. Unlike a section boundary, it need not divide
+the arrangement: “bass entry” or “check this transition” can simply identify
+a place. `:label NAME` creates or renames one at the cursor; `:label-delete`
+removes one there, or all labels in a Visual range. `[l` and `]l` navigate
+between labels.
+
+An imported MIDI file may contain labels that already describe its form.
+`:label-to-section` (`, s l`) converts the label at or before the cursor into
+a section boundary at its bar line. On a selection, it converts the labels in that
+range. Off-bar labels ask for confirmation because the structural boundary
+will be at the bar line rather than the label's exact time.
+
+This allows labels to serve first as observations, and later as structure
+when the intended divisions are settled.
+
+## Meter counts time; rebarring does not move notes
+
+The **conductor** supplies the song's tempo and reference meter. A track
+normally follows that meter, but can have a meter of its own in a section.
+The same elapsed musical time might therefore be three bars on one track
+and four on another. Arrangement columns represent time, not a promise
+that every track's bar numbers line up.
+
+The ruler uses the conductor's bars; the cursor and its position display use
+the current track's. Bars with an independent meter have a tint, and the track
+bar shows `own` after its meter. `, T b` toggles the tint. The piano roll
+shows the current track's meters along its own ruler.
+
+Without a selection, `:meter 3/4`, or `, b m` followed by the meter, inserts
+a meter from the cursor to the next meter change or the section's end.
+It affects the meter the current track follows: the conductor's
+or its own. It never shifts notes. A change inside a bar first makes a short
+remainder bar where necessary.
+
+**Rebarring** applies a meter to a selected span and restores the earlier
+meter afterwards. `:rebar 3/4`, also reached with `, b m` in Visual mode,
+counts that time in threes without stretching the music. Ten quarter-note
+beats become three 3/4 bars and one 1/4 remainder bar.
+
+The selection determines whose bars change:
+
+- A `v` range in the arrangement, or sections on the strip, changes the
+  conductor and tracks following it. Tracks with their own meter keep it.
+- A track box or `V` rows changes only those tracks, giving them a meter
+  of their own. In the piano roll or event list the selected rebar affects
+  the displayed track.
+
+Meter ownership is per whole section. Rebarring part of one track's section
+therefore gives it its own meter throughout that section, copying the
+conductor's meter outside the changed span. Subsequent conductor changes
+will no longer reach it there.
+
+`:meter follow` (`, s f`) returns the current track to following the conductor
+in the current section. On a selection, it requires exact whole sections. That
+requirement reflects what is being changed: ownership of the section's
+meter, rather than just the appearance of a few bar lines.

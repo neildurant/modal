@@ -69,3 +69,7 @@ Testing/
 
 # Sample images the [.sample] tests draw
 /sample-*.bmp
+
+# User manual output and Quarto's working files
+docs/manual/_book/
+docs/manual/.quarto/

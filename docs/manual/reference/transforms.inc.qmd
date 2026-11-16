@@ -1,0 +1,350 @@
+<!-- Generated from transformSpecs and the default keymap; see tools/manual-references.cmake. -->
+
+## :transpose {#ref-transform-transpose}
+
+Transpose the notes a range or object takes by a number of semitones, asking how many (+12, -3); :transpose N those of the selection, or else of the cursor's bar.
+
+**Syntax:** `` :transpose [SEMITONES] ``.
+
+**Choose before a target:** `` , x t ``.
+
+**Default:** no fixed default. **Examples of answers:** `` +12, -3 ``.
+
+## :transpose-key {#ref-transform-transpose-key}
+
+Transpose the notes a range or object takes by degrees of a key's scale, asking for the key (the last used, at Enter) and how many (+2, -3); notes outside the scale keep their distance above its note below.
+
+**Syntax:** `` :transpose-key [DEGREES] [key=KEY] ``.
+
+**Choose before a target:** `` , x T ``.
+
+**Default:** no fixed default.
+
+## :invert {#ref-transform-invert}
+
+Invert the notes a range or object takes, mirroring their pitches about a pivot, chromatically, asking which (the first note, at Enter).
+
+**Syntax:** `` :invert [PIVOT] ``.
+
+**Choose before a target:** `` , x i ``.
+
+**Default:** the first note.
+
+## :invert-key {#ref-transform-invert-key}
+
+Invert the notes a range or object takes within a key's scale, mirroring them by its degrees about a pivot, asking for the key and the pivot.
+
+**Syntax:** `` :invert-key [PIVOT] [key=KEY] ``.
+
+**Choose before a target:** `` , x I ``.
+
+**Default:** no fixed default.
+
+## :retrograde {#ref-transform-retrograde}
+
+Reverse the order in time of the notes a range or object takes, mirroring their rhythm.
+
+**Syntax:** `` :retrograde ``.
+
+**Choose before a target:** `` , x R ``.
+
+## :vel-lift {#ref-transform-velocity-lift}
+
+Lift the velocities of the notes a range or object takes a percentage of the way towards 127, keeping their order and proportions, asking how far (25%); :vel-lift N% those of the selection, or else of the cursor's bar.
+
+**Syntax:** `` :vel-lift [PERCENT] ``.
+
+**Choose before a target:** `` , x l ``.
+
+**Default:** `` 25% ``.
+
+## :vel-lower {#ref-transform-velocity-lower}
+
+Lower the velocities of the notes a range or object takes a percentage of the way towards the floor (velfloor), keeping their order and proportions, asking how far (25%).
+
+**Syntax:** `` :vel-lower [PERCENT] ``.
+
+**Choose before a target:** `` , x L ``.
+
+**Default:** `` 25% ``.
+
+## :vel-limit {#ref-transform-velocity-limit}
+
+Keep the velocities of the notes a range or object takes between two values, asking which (20-110).
+
+**Syntax:** `` :vel-limit [LOW-HIGH] ``.
+
+**Choose before a target:** `` , x M ``.
+
+**Default:** no fixed default. **Examples of answers:** `` 20-110 ``.
+
+## :vel-ramp {#ref-transform-velocity-ramp}
+
+A crescendo or diminuendo over the notes a range or object takes, by time: velocities set from one value to another (60-100), or their own scaled from one percentage to another (80%-120%).
+
+**Syntax:** `` :vel-ramp [FROM-TO] ``.
+
+**Choose before a target:** `` , x r ``.
+
+**Default:** no fixed default. **Examples of answers:** `` 60-100, 80%-120% ``.
+
+## :vel-compress {#ref-transform-velocity-compress}
+
+Compress the velocities of the notes a range or object takes, pulling each a percentage of the way towards the average of those around it (50%): evens out the playing, keeping its swells; window= how far around (1bar, 2bars, 1/2), centre= local, average or a velocity, threshold= only those above (\>90) or below (\<30).
+
+**Syntax:** `` :vel-compress [PERCENT] [window=1bar] [centre=local] [threshold=>N] ``.
+
+**Choose before a target:** `` , x c ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` 50% `` | as prompted |
+| `` window `` | `` 1bar `` | `` 1bar / 2bars / 1/2 `` |
+| `` centre `` | `` local `` | `` local / average / N `` |
+| `` threshold `` | `` all `` | `` all / >N / <N `` |
+
+## :vel-expand {#ref-transform-velocity-expand}
+
+Expand the velocities of the notes a range or object takes, pushing each a percentage further from the average of those around it (50%): sharpens accents; takes compress's options.
+
+**Syntax:** `` :vel-expand [PERCENT] [window=1bar] [centre=local] [threshold=>N] ``.
+
+**Choose before a target:** `` , x e ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` 50% `` | as prompted |
+| `` window `` | `` 1bar `` | `` 1bar / 2bars / 1/2 `` |
+| `` centre `` | `` local `` | `` local / average / N `` |
+| `` threshold `` | `` all `` | `` all / >N / <N `` |
+
+## :vel-phrase {#ref-transform-velocity-phrase}
+
+Scale the phrase dynamics of the notes a range or object takes: the contour of their velocities' averages over a window (130% bigger swells, 70% flatter), each note keeping its place on it; asking how much and the window.
+
+**Syntax:** `` :vel-phrase [PERCENT] [window=1bar] ``.
+
+**Choose before a target:** `` , x p ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` 130% `` | as prompted |
+| `` window `` | `` 1bar `` | `` 1bar / 2bars / 1/2 `` |
+
+## :chord-accent {#ref-transform-chord-accent}
+
+Accent the top note of each chord a range or object takes, up by an amount and the others down by it (10), to bring out a melody.
+
+**Syntax:** `` :chord-accent [AMOUNT] ``.
+
+**Choose before a target:** `` , x a ``.
+
+**Default:** `` 10 ``.
+
+## :chord-balance {#ref-transform-chord-balance}
+
+Balance each chord a range or object takes by pitch: a straight slope of velocities from its lowest note to its highest (70-95), or reversed to bring out the bass (95-70).
+
+**Syntax:** `` :chord-balance [BOTTOM-TOP] ``.
+
+**Choose before a target:** `` , x b ``.
+
+**Default:** `` 70-95 ``.
+
+## :chord-compress {#ref-transform-chord-compress}
+
+Compress each chord a range or object takes, pulling its velocities a percentage of the way together about their average (50%).
+
+**Syntax:** `` :chord-compress [PERCENT] ``.
+
+**Choose before a target:** `` , x C ``.
+
+**Default:** `` 50% ``.
+
+## :chord-expand {#ref-transform-chord-expand}
+
+Expand each chord a range or object takes, pushing its velocities a percentage further apart about their average (50%).
+
+**Syntax:** `` :chord-expand [PERCENT] ``.
+
+**Choose before a target:** `` , x E ``.
+
+**Default:** `` 50% ``.
+
+## :quantize {#ref-transform-quantize}
+
+Quantise the notes a range or object takes, asking in turn for the grid (the track's, at Enter), how far onto it, the swing and what to move (starts, ends, both or lengths); Enter throughout does what q does.
+
+**Syntax:** `` :quantize [GRID] [strength=100%] [swing=50%] [move=starts] ``.
+
+**Choose before a target:** `` , x q ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the track's grid | `` 1/16 / 1/8t / grid `` |
+| `` strength `` | `` 100% `` | `` 0%-100% `` |
+| `` swing `` | `` 50% `` | `` 25%-75%, 50% straight `` |
+| `` move `` | `` starts `` | `` starts / ends / both / lengths `` |
+
+## :stretch {#ref-transform-stretch}
+
+Stretch the time of the events a range or object takes about the first, asking by how much: 2 for half time, 1/2 for double time, or a percentage (150%); the notes alone in the piano roll.
+
+**Syntax:** `` :stretch [RATIO] ``.
+
+**Choose before a target:** `` , x s ``.
+
+**Default:** no fixed default. **Examples of answers:** `` 2 half time, 1/2 double time, 150% ``.
+
+## :length {#ref-transform-length}
+
+Set the lengths of the notes a range or object takes, asking how: legato, each held until the next but for the last, a length (1/8) or a percentage of their own (80%).
+
+**Syntax:** `` :length [LENGTH] ``.
+
+**Choose before a target:** `` , x n ``.
+
+**Default:** no fixed default. **Examples of answers:** `` legato, 1/8, 80% ``.
+
+## :legato {#ref-transform-legato}
+
+Make the notes a range or object takes legato, each note or chord held until the next starts, but for the last, which keeps its length.
+
+**Syntax:** `` :legato ``.
+
+## :thin {#ref-transform-thin}
+
+Thin out dense controller, pitch bend and aftertouch data in a range or object, asking which, the most to keep a quarter note (16) and the smallest change kept (2); each gesture's first and last kept, and never the pedals or other switches.
+
+**Syntax:** `` :thin [all|ccN|bend|aftertouch] [per=16] [step=2] ``.
+
+**Choose before a target:** `` , x d ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` all `` | `` all / cc1 / bend / aftertouch `` |
+| `` per `` | `` 16 `` | `` 1-96 `` |
+| `` step `` | `` 2 `` | `` 0-64, in value `` |
+
+## :filter {#ref-transform-filter}
+
+Delete the events a range or object takes that match a query, as / writes them (vel\<20, cc7), asking which, the search's at Enter.
+
+**Syntax:** `` :filter [QUERY] ``.
+
+**Choose before a target:** `` , x f ``.
+
+**Default:** the current search. **Examples of answers:** `` vel<20, cc7 ``.
+
+## :split {#ref-transform-split}
+
+Split the notes a range or object takes at a note, moving it and those above, or those below, to another track, asking at which note, which side and which track; a new name makes a new track.
+
+**Syntax:** `` :split [NOTE] [side=above] [to=TRACK] ``.
+
+**Choose before a target:** `` , x y ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` C4 `` | `` a note `` |
+| `` side `` | `` above `` | `` above / below `` |
+| `` to `` | a suggested destination track | `` a track, or a new one's name `` |
+
+## :remap {#ref-transform-remap}
+
+Remap a controller (cc1 to cc11) or a note (C1 to D1) in a range or object, asking which and to what.
+
+**Syntax:** `` :remap [ccN|NOTE] [to=ccN|NOTE] ``.
+
+**Choose before a target:** `` , x m ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | no fixed default | `` cc1 / C1 `` |
+| `` to `` | no fixed default | `` cc11 / D1 `` |
+
+## :repedal {#ref-transform-pedal-repedal}
+
+Re-pedal the range: its sustain replaced by a pedal down just after its first chord, lifted and pressed again around each chord change, and lifted as its last notes end; asking how long before and after.
+
+**Syntax:** `` :repedal [lift=10ms] [down=60ms] ``.
+
+**Choose before a target:** `` , c P r ``, `` , x P r ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| `` lift `` | the pedallift setting | `` ms `` |
+| `` down `` | the pedaldown setting | `` ms `` |
+
+## :pedal-each {#ref-transform-pedal-each}
+
+Pedal the range afresh on each bar or beat, its sustain replaced; asking which, and how long before and after each line.
+
+**Syntax:** `` :pedal-each [bar|beat] [lift=10ms] [down=60ms] ``.
+
+**Choose before a target:** `` , c P b ``, `` , x P b ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` bar `` | `` bar / beat `` |
+| `` lift `` | the pedallift setting | `` ms `` |
+| `` down `` | the pedaldown setting | `` ms `` |
+
+## :retime {#ref-transform-pedal-retime}
+
+Re-time the range's performed sustain: each lift and press near a chord change moved to just before and after it, the rest left as played.
+
+**Syntax:** `` :retime [lift=10ms] [down=60ms] [near=200ms] ``.
+
+**Choose before a target:** `` , c P t ``, `` , x P t ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| `` lift `` | the pedallift setting | `` ms `` |
+| `` down `` | the pedaldown setting | `` ms `` |
+| `` near `` | `` 200ms `` | `` ms of a change `` |
+
+## :pedal-clean {#ref-transform-pedal-clean}
+
+Clean up the range's pedalling: exact repeats removed and flicker, a lift and a press again within a few milliseconds, merged; the first and last events kept.
+
+**Syntax:** `` :pedal-clean [flicker=30ms] ``.
+
+**Choose before a target:** `` , c P c ``, `` , x P c ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| `` flicker `` | `` 30ms `` | `` ms between a lift and a press `` |
+
+## :pedal-clear {#ref-transform-pedal-clear}
+
+Clear a pedal from the range, lifting it at the start if it's down there and pressing it again at the end if it was down there.
+
+**Syntax:** `` :pedal-clear [sustain|sostenuto|soft|all] ``.
+
+**Choose before a target:** `` , c P x ``, `` , x P x ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` sustain `` | `` sustain / sostenuto / soft / all `` |
+
+## :pedal-offset {#ref-transform-pedal-offset}
+
+Move every pedal change in the range later by some milliseconds, or earlier (-20ms).
+
+**Syntax:** `` :pedal-offset [MS] ``.
+
+**Choose before a target:** `` , c P o ``, `` , x P o ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | `` 20ms `` | `` ms, -20ms earlier `` |
+
+## :pedal-bake {#ref-transform-pedal-bake}
+
+Bake the range's sustain into its notes: each note held by the pedal lengthened to where it lifts, and the sustain then cleared.
+
+**Syntax:** `` :pedal-bake ``.
+
+**Choose before a target:** `` , c P k ``, `` , x P k ``.
+

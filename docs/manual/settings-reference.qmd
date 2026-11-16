@@ -1,0 +1,13 @@
+# Application settings {#sec-settings-reference}
+
+These are `set` variables, with defaults taken directly from the application.
+The table describes startup defaults, not the values of a customised running
+session. `:set NAME?` reports the current value. Boolean values accept `on`
+or `off`, and the enabling, disabling and toggling forms described in
+@sec-customisation.
+
+The track's Grid, Length, input/output routing and playback transforms are
+track properties. Recording mode, metronome and count-in belong to the song.
+They are deliberately absent from this application-settings table.
+
+{{< include reference/settings.inc.qmd >}}

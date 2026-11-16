@@ -1,0 +1,214 @@
+# Shaping a performance {#sec-performance}
+
+Once a part has the right notes, its character depends on timing, articulation
+and dynamics. Modal offers two places to shape them: edits to the stored events
+and settings applied while a track plays. Choosing between them keeps the
+relationship between what is seen, heard and exported understandable.
+
+## Stored edits and playback settings
+
+A transform changes the selected music and is an undoable edit. For example,
+transposing a phrase changes its stored pitches. The piano roll and event
+list then show those new pitches.
+
+A playback setting instead leaves the events intact. A track's transpose,
+velocity offset, time offset and playback quantise can alter what is heard
+without rewriting the performance. This suits comparison or compensation
+for a particular instrument. The track settings make these changes visible;
+the event list continues to show the original events.
+
+MIDI export writes stored events, not the result of all playback settings.
+To make a playback change part of the exported performance, freeze it first,
+as described at the end of this chapter.
+
+## Three routes to a transform
+
+Transforms use the editing language's targets. There are three useful routes:
+
+- `!` takes a range or object first, then offers a transform. For example,
+  `!ib` chooses this bar before choosing how to change it.
+- `, x` chooses the transform first, then its target. It is useful when the
+  desired operation is already clear.
+- A named `:` command takes the Visual selection, or otherwise the current
+  bar. It can specify exact arguments and be found through the palette.
+
+A transform that needs several parameters asks for them in turn. Enter takes
+the displayed default; Tab offers choices where available. Parameters already
+supplied at the command line need not be entered again. This makes a named
+command such as `:quantize 1/8 swing=60` an entry into the same operation,
+not a separate system to learn.
+
+The reference in @sec-transform-reference lists command syntax and parameter
+defaults. The following sections explain the musical distinctions behind them.
+
+## Quantising timing
+
+**Quantising** moves notes towards a rhythmic grid. The simple `q` operator
+quantises starts to the track's editing grid. The extended quantise transform
+also offers a grid, strength, swing and the choice of starts, ends, both or
+lengths.
+
+Strength controls how far a note moves towards its target. At 100% it reaches
+the target; a smaller percentage retains some of the played deviation.
+Swing changes the spacing of alternating subdivisions: 50% is straight,
+while a later second subdivision creates a long-short pair. Modal accepts
+25% to 75%, allowing the opposite feel too.
+
+The choice of what moves matters. Quantising starts places attacks;
+quantising ends controls release points; quantising lengths changes durations.
+These decisions can produce different articulation even when the same grid
+is used. A passage of detached notes should not acquire an unintended legato
+merely because its starts were corrected.
+
+Pedalling can follow the moved notes, retain its original timing or ask each
+time, according to `quantizepedal`. The default is `follow`. The extended
+quantise dialogue asks about the pedalling explicitly. Notes that cannot
+move safely because of a collision can remain in place and be reported;
+read the result rather than assuming every requested target was reached.
+
+### Playback quantise
+
+The track's Q setting applies quantise while it plays. Its grid can follow
+the editing grid or remain fixed; strength, swing and the kind of movement
+are track settings too. `, t q` toggles it. The inspector edits the parameters
+when the Quantise column is selected.
+
+`, T q` bypasses playback quantise across tracks for comparison. The piano
+roll can mark the positions where notes will actually be heard, using
+`quantizemarks` (`, T m`). Stored and heard positions remain distinct until
+the transform is frozen.
+
+## Velocity and musical dynamics
+
+**Velocity** is the note-on value sent to the instrument, usually affecting
+loudness, attack or timbre. The `^` operator accepts three kinds of change:
+`80` sets a value, `+10` adds an amount and `80%` scales the existing values.
+Their musical purposes differ: setting makes a uniform passage; adding
+brightens it while keeping differences; scaling changes its dynamic range.
+
+The velocity transforms provide more specific shapes:
+
+| Transform | Musical purpose |
+| --- | --- |
+| Lift / lower | Move a percentage of the way towards the upper limit or the velocity floor |
+| Limit | Keep values within a low-high range |
+| Ramp | Create a rise or fall across the phrase, using absolute values or percentages |
+| Compress / expand | Reduce or increase differences about a chosen centre over a moving window |
+| Phrase | Change the size of the phrase's dynamic shape over time |
+| Chord accent / balance | Bring out top notes or shape the balance from low to high |
+| Chord compress / expand | Change the spread of velocities within each chord |
+
+For example, a `60-100` velocity ramp specifies endpoints, while `80%-120%`
+changes each note relative to its own velocity as the ramp progresses.
+The second retains more of the original differences between simultaneous notes.
+
+`velclip` controls relative changes near the limits. Its default, `soft`,
+eases them towards the boundary rather than flattening every high note at
+the ceiling; `hard` clips. `velfloor` sets the lower bound, initially 1.
+A MIDI note-on velocity of zero is not used as an ordinary quiet note.
+
+The velocity lane offers direct local editing alongside these phrase-level
+operations; see @sec-controllers.
+
+## Pitch and harmony
+
+Chromatic transposition changes every pitch by a number of semitones. It
+preserves intervals but can change how a phrase relates to its harmony.
+Key-aware transposition instead moves by scale degrees in a chosen key.
+A phrase can move within D dorian while retaining the scale's unequal steps.
+Notes outside the scale retain their distance above the scale note below.
+
+The key is explicit for the operation, rather than a global promise that
+all later editing follows a key. Names include forms such as `Eb`, `F#m`
+and `D dorian`. Modal offers a fitting key from the target notes; Tab and
+the offered alternatives help choose another interpretation. The musical
+judgement remains yours, particularly for short or chromatic passages.
+
+**Inversion** reflects pitches about a pivot. Chromatic inversion measures
+semitones; key-aware inversion measures scale degrees. **Retrograde** reflects
+the order of notes in time, reversing the rhythmic pattern. These are useful
+ways to derive related material while keeping the source available through
+copying and undo.
+
+## Time, length and humanisation
+
+**Stretch** changes timing about the target's first event. A ratio of `2`
+doubles the time distances, giving half speed; `1/2` halves them, giving double
+speed; `150%` multiplies them by one and a half. This is a performance edit,
+not a change of the song's tempo map.
+
+**Length** can set a note fraction or scale durations by a percentage.
+**Legato** extends each note or chord towards the next, leaving the last
+without a following target. It is useful for connected phrasing, whereas a
+percentage length change suits shortening a part while retaining its rhythm.
+
+**Humanise**, also available as `~`, adds bounded random changes in start time
+and velocity. `humanizetime` and `humanizevel` set the limits, initially
+10 ms and 8 velocity units. Random variation is a tool for creating variation;
+it does not infer musical emphasis or replace a played performance's intention.
+
+## Separating and redirecting material
+
+A **split** sends notes above or below a chosen pitch to another track. This
+can separate a keyboard part into registers with different sounds. The
+transform asks for the split note, side and destination; a new destination
+name creates a track.
+
+**Remap** changes a note pitch or controller number, for example redirecting
+modulation data from `cc1` to expression on `cc11`. Controller numbers are
+addresses; their effect depends on the receiver. Changing the address is
+not the same as scaling its values.
+
+**Filter** deletes events matching a search query. Its name means filtering
+material out, not merely hiding it from view. The current search can supply
+the query, allowing matches to be inspected before deletion.
+
+**Thin** reduces the density of continuous controller, bend and aftertouch
+data. Its density and value-step controls are useful for simplifying a dense
+recorded gesture. It excludes pedals. In this edition it should not be
+assumed to preserve every intermediate return to zero; inspect important
+reset events after thinning.
+
+## Playback offsets and instrument setup
+
+A playback **transpose** or **velocity offset** changes what a track sends
+without rewriting its notes. Notes transposed beyond MIDI's pitch range are
+not sent and are reported. Velocity offsets stay within valid note-on values.
+
+A **time offset** changes when all the track's events are sent. Negative
+milliseconds can compensate for a slow attack; a musical fraction instead
+expresses a rhythmic displacement. The Tracks field accepts milliseconds,
+ticks and musical fractions, including composites such as `+1/16-22t`.
+The chosen units retain their meaning through saving and loading.
+
+Bank MSB, Bank LSB and Program supply an instrument setup at playback start.
+An unset field is shown as `-`; clearing it removes that request. Program
+and bank values use MIDI numbers from 0 to 127. Some instruments label their
+patches from 1 to 128, so consult the instrument's numbering when choosing a
+sound. Program changes stored among events can change the sound later in the song. A dot
+after Program identifies such changes; conflicting setups on a shared port
+and channel are warned about because the instrument receives one stream of
+messages, not isolated virtual instruments for each Modal track.
+
+## Freezing a playback decision
+
+**Freeze**, `, t f` or `:track-freeze`, commits playback changes to stored
+events and resets the chosen settings. It is useful when a comparison has
+become a decision, or when another MIDI program must hear the same result.
+The choices are All, Transpose, Velocity, Quantise and Time offset.
+
+Playback must be stopped. Freeze takes the current whole track, or selected
+whole rows in Tracks, as one undoable edit. Other Visual selections must
+be left first. The choice list explains unavailable operations rather than
+silently dropping part of the request.
+
+All freezes quantise before the time offset. Time offset alone requires
+quantise to be off; freeze quantise first or choose All. Quantise cannot be
+committed while the relevant playback quantise is bypassed. A zero offset
+or a retained but disabled quantise setting is not an active change to freeze.
+
+The complete proposed edit is validated before it is applied. Out-of-range
+pitches, invalid times and new collisions can refuse it. Millisecond offsets
+use the current tempo map when converted into stored musical positions.
+Undo restores both the events and the settings, keeping the two accounts of
+the performance consistent.

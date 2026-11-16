@@ -1,0 +1,72 @@
+project:
+  type: book
+  output-dir: _book
+  resources:
+    - examples/first-phrase.modal
+    - styles/fonts/
+
+quarto-required: "=1.11.9"
+lang: en-GB
+date: "16 November 2026"
+language:
+  title-block-published: "Edition"
+
+book:
+  title: "Modal"
+  subtitle: "User manual · initial draft"
+  author: "The Modal project"
+  output-file: modal-user-manual
+  downloads: [pdf]
+  chapters:
+    - index.qmd
+    - first-session.qmd
+    - editing-language.qmd
+    - notes.qmd
+    - arrangement.qmd
+    - tracks-recording.qmd
+    - performance.qmd
+    - controllers.qmd
+    - efficient-work.qmd
+    - customisation.qmd
+    - files.qmd
+  appendices:
+    - key-reference.qmd
+    - transform-reference.qmd
+    - settings-reference.qmd
+  sidebar:
+    style: docked
+    search: true
+  page-footer:
+    left: "Modal · MIDI sequencing from the keyboard"
+    right: "Initial draft · November 2026"
+
+format:
+  html:
+    grid:
+      body-width: 760px
+    theme:
+      light: [cosmo, styles/light.scss]
+      dark: [cosmo, styles/dark.scss]
+    css: styles/manual.css
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    smooth-scroll: false
+    anchor-sections: true
+    link-external-newwindow: false
+  typst:
+    papersize: a4
+    fontsize: 11pt
+    mainfont: Libertinus Serif
+    codefont: JetBrains Mono NL
+    font-paths: [styles/fonts]
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    section-numbering: "1.1"
+    include-in-header: styles/manual.typ
+    template-partials: [styles/typst-show.typ]
+    keep-typ: true
+
+execute:
+  enabled: false

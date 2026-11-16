@@ -1,0 +1,126 @@
+# Keeping and exchanging a song {#sec-files}
+
+A native song and a MIDI file serve different purposes. The native file keeps
+Modal's working structure and settings. A Standard MIDI File exchanges events
+with other software. Choosing the right one avoids mistaking a useful
+interchange copy for a complete working document.
+
+## Native files keep the arrangement
+
+The `.modal` format stores sections, track settings, local meters and the
+musical events in plain text. Positions within the file belong to sections,
+so moving a section need not rewrite every event's position in the document.
+The file can be inspected or kept in version control, but editing it by hand
+is not required for normal work.
+
+`:w` saves the current native song. A new song opens a save chooser; `:w FILE`
+saves to a named file. With no extension Modal adds `.modal`. `:wq` saves
+and quits. Native saves use a temporary file and replacement to avoid leaving
+a partially written song if writing fails.
+
+Unsaved changes are a property of the current song. Opening another song,
+starting a new one or quitting refuses to discard them unless the corresponding
+forced command is used. Closing the window offers the save decision. During
+recording, the take must be stopped and finalised first, even for forced
+commands.
+
+Modal currently edits one song at a time: opening or creating another song
+replaces the current one, subject to the unsaved-change checks above. There
+are no song tabs or multiple open-song buffers in this version.
+
+The native `.modal` file format is still under development. Compatibility
+between files written by different development versions is not yet guaranteed.
+Keep separate copies of important work before trying a newer build.
+Undo history is a working-session facility, not a substitute for saved copies.
+
+## Importing MIDI
+
+`:e FILE.mid` imports a Standard MIDI File, as does passing it to Modal at
+startup. Import produces a Modal song that can then be saved natively.
+A subsequent MIDI export is an interchange operation, not an instruction
+to replace the native working copy.
+
+A Modal track uses one output channel. MIDI material with multiple channels
+is separated as needed on import, so its parts can have independent settings.
+The conductor holds tempo and meter, while imported labels can describe
+places in the song. `:label-to-section` (`, s l`) can turn those places into an
+editable section structure once their meaning is understood.
+
+Imported data is retained honestly, including unusual timing and overlapping
+notes. An edit may refuse a new collision even though imported overlaps
+already exist: preserving supplied data and creating more of it are separate
+responsibilities.
+
+## Exporting MIDI
+
+`:export FILE.mid` writes a Standard MIDI File; with no filename it opens a
+chooser. Export uses the stored events and their channels. Playback-only
+transpose, velocity, timing and quantise settings are not all baked into it,
+and mute or solo does not select a subset for export. Freeze a chosen
+playback result first when the destination should receive those changes.
+
+Track bank and program setup is an exception: it is written at the start
+so that the receiving program can choose the requested sound. Reimporting
+that file reads those setup messages as events, because MIDI does not mark
+them as Modal-specific track settings.
+
+The conductor's meter becomes the MIDI file's shared time signature. Independent
+track meters, section editing structure, machine routing and Modal's working
+state cannot all be represented by that shared interchange model. A `.mid`
+export should therefore accompany, rather than replace, the native song
+when those distinctions matter.
+
+An existing named output file is protected from accidental overwrite.
+The bang follows the command, as in `:export! FILE.mid` or `:w! FILE`.
+It does not go at the end of the path. A chooser may supply its own overwrite
+confirmation.
+
+## File-command summary
+
+| Command | Purpose |
+| --- | --- |
+| `:e` / `:e FILE` | Choose or name a song or MIDI file to open |
+| `:new` | Start a new song |
+| `:w` / `:w FILE` | Save the native song, or save to a chosen path |
+| `:export` / `:export FILE.mid` | Write a MIDI interchange copy |
+| `:q` | Quit, protecting unsaved changes |
+| `:wq` | Save and quit |
+| `:source` | Re-read application configuration; it does not open a song |
+| `:write-config` | Write application preferences; it does not save the song |
+
+Relative song paths start in the song's folder, or the home folder for an
+unsaved song. Configuration commands use the configuration directory instead.
+Completion shows the base directory when offering filenames. A path beginning
+with `~` starts at the home directory.
+
+## When the result is unexpected
+
+The most useful first evidence is the message row. A refused operation leaves
+a reason there: an overlap, an unavailable port, an invalid value or a recording
+track that cannot be edited yet. Repeating the same keys without considering
+the reason will usually repeat the same refusal.
+
+If notes appear in the right place but sound different, inspect track playback
+settings and the receiving instrument's program and controllers. If a MIDI
+export sounds different in another program, check which playback transforms
+still need freezing and how that program chooses its instruments. If input
+activity is visible but silent, distinguish input reception, arming, Thru,
+output routing and the receiver's audio path.
+
+For a reproducible problem, keep a small song that demonstrates it, the exact
+commands or keys, the operating system and the relevant MIDI route. The
+state directory's `crash.log`, if present, records unexpected application
+errors with a version and time. This is more useful than assuming that every
+silence or warning is a timing problem.
+
+## Companion command-line tools
+
+`modal-ports` lists visible inputs and outputs. `modal-play` and `modal-record`
+provide terminal-based MIDI playback and recording with their own `--help`.
+They are separate programs, not commands for Modal's colon prompt.
+
+`modal-loopback` measures timing through a real MIDI route. Its results depend
+on the interface, driver and test setup. Software tests and offscreen figures
+do not measure those hardware properties. The repository's `docs/tools.md`
+contains the detailed diagnostic options; most musical work should begin
+with the GUI's port and track information instead.

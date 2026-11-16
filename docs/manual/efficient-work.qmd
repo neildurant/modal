@@ -1,0 +1,158 @@
+# Finding material and reusing actions {#sec-efficient-work}
+
+A keyboard language becomes most useful when it can describe musical
+relationships rather than only screen positions. Search locates notes by
+properties; marks remember places; registers retain material; repeat and
+macros retain actions. Each reduces a different kind of repetition.
+
+## Finding a pitch class
+
+A **find** seeks the next or previous note of a pitch class in any octave.
+`fE` finds the next E, while `FE` finds the previous one. A following `#`
+or `b` specifies a sharp or flat. `;` repeats the last find in its original
+direction, and Alt-; repeats it in the opposite direction.
+
+This suits a musical landmark such as the next bass root, without needing
+to know its bar or octave. A count chooses a later occurrence. After an
+operator, a find can describe the range through that landmark, so `dfE`
+takes the events through the next E.
+
+The accidental can complete a find after its letter. After an operator,
+Modal revises the edit to the sharpened or flattened target as one change;
+Escape at that point undoes it. The message and highlights show the target
+being used, which is particularly helpful for ambiguous letter sequences.
+
+## Searching by musical properties
+
+`/` opens a search query. Its terms are conditions on events, not ordinary
+text to find in the song title. Combined terms must all match.
+
+| Query | Meaning |
+| --- | --- |
+| `/C4` | The exact pitch C4 |
+| `/C` | C in any octave |
+| `/A3-A5` | Pitches in that range |
+| `/vel<60` | Notes with attack velocity below 60 |
+| `/C4 vel<60` | Quiet C4 notes |
+| `/len<1/16` | Notes shorter than a sixteenth |
+| `/cc64>63` | Sustain-controller values above 63 |
+| `/bend` | Pitch-bend events |
+| `/outside D dorian` | Notes outside that key and scale |
+| `/inside D dorian` | Notes inside it |
+
+Enter accepts the query. Matches are highlighted, with the match count in
+the feedback. `n` and `N` visit the next and previous matches, wrapping at
+the ends.
+
+`*` and `#` start a search for the exact pitch under the cursor,
+forwards or backwards, without typing a `/` query.
+
+`/` followed by Enter with an empty query, `:noh`, or `, S c` clears the search.
+
+The search concerns the current track in this edition. It does not silently
+turn into a search across every arrangement track.
+
+## Search and selection are different
+
+Highlighting identifies matches; it does not automatically make them the
+target of every edit. This distinction allows a passage to be inspected
+without turning a later ordinary edit into a global replacement.
+
+The `, S` selection group connects the two when desired. Lower-case `b`,
+`s`, `t` and `v` select a bar, section, track or the visible material.
+Their upper-case equivalents select only the search matches within that
+scope. For example, `, S T` selects the matches on the track. In Visual
+mode, `, S m` keeps only matching events in the existing selection.
+
+The `gn` object means the match at the cursor, or the next one. An operator
+with it changes that match and advances to the next. This creates a
+controlled review pattern: `.` applies the same change to the next match,
+while `n` skips it. The decision remains local at each occurrence, rather
+than requiring one all-or-nothing change across every match.
+
+A filter transform deletes matches. Searching, selecting matches and deleting
+matches are therefore three separate intentions, with increasingly broad
+consequences.
+
+## Marks and labels
+
+A **mark** is a place named by a letter: `ma` records mark a and `'a`
+returns to it. The letter is chosen for the task, such as a place being
+compared with the current passage. Marks are saved with the song and move
+with their sections.
+
+Every lower-case letter from `a` to `z` can name a mark. Marks, named
+registers and macros have separate sets of names: mark a, register a and
+macro a can all exist independently. Setting one does not overwrite either
+of the others.
+
+`''` returns to the place before the last jump. `:marks` lists marks and
+`:mark-delete a` removes one. A mark can also end an operator range, as in
+`d'a`. The same navigation destination can therefore describe music to
+act on.
+
+A label has a full name and can describe the piece to a reader; a mark is
+a compact working bookmark. Neither has to create a new section. The
+palette's apostrophe prefix finds labels and marks by name.
+
+## Registers keep material
+
+The unnamed register holds recently yanked or deleted material. A **named
+register** keeps a copy deliberately: `"a` before a yank, delete or put
+chooses register a. An upper-case name appends to it, so `"A` adds material
+to register a instead of replacing it. `:registers` shows the stored contents.
+
+The full set `a` to `z` is available for named registers, separate from
+marks and macros. Upper-case letters append to the corresponding lower-case
+register; they do not name another set of 26 registers.
+
+For example, `"ayib` yanks the current bar into a; `"ap` later puts from a.
+Another delete can use the unnamed register without losing that named copy.
+Registers can retain different kinds of material, including events, sections
+and whole tracks, but a put must still use a context appropriate to its kind.
+
+These registers are internal to Modal. System clipboard exchange and
+multiple open songs are not part of this edition. Named copies should not
+be treated as substitutes for saving a song.
+
+## Repeating an edit
+
+`.` repeats the last change, including its target and answers. The target
+is reinterpreted at the new cursor location: a change to a bar can be applied
+to another bar without specifying its parameters again. A count before the
+repeat substitutes for the recorded count.
+
+Undo (`u`) and redo (Ctrl-R) restore the edit and its editing location. Some
+continuous gestures, such as repeated moves of the same selected notes,
+are grouped into one step. This makes undo reflect the musical gesture
+rather than every key repeat.
+
+Repeat is most useful when the intended edit is already correct. A Visual
+selection or a search-match workflow can be preferable when the target still
+needs to be inspected before each change.
+
+## Macros keep sequences of actions
+
+A **macro** records keys rather than musical events. `Qa` starts recording
+into macro a, and `Q` ends it. `@a` plays it; `@@` repeats the last macro,
+and a count such as `3@a` plays it three times. Upper-case `QA` appends to a.
+`:macros` lists the recordings.
+
+Macro names also run from `a` to `z`, independently of marks and registers.
+`Qz` records macro z and `@z` plays it. The upper-case recording form appends
+to its lower-case macro, rather than selecting a separate macro name.
+
+A macro is suited to a repeated editing procedure with several actions,
+where `.` would remember only the most recent change. Because it records
+keys, its effect depends on the starting view, cursor, settings and musical
+context. A sequence intended for a piano-roll note is not made independent
+of context by recording it.
+
+Modal stops a macro when a command is refused, rather than carrying on from
+an unexpected state. A warning that accompanies a successful operation does
+not itself mean refusal. Macros are remembered between sessions in the
+machine's state files; they are not embedded in every song.
+
+The useful progression is from a clear edit, to repeat, to a deliberate
+sequence. A macro is easier to trust when its component actions and targets
+are understood first.

@@ -1,0 +1,22 @@
+# Transform commands {#sec-transform-reference}
+
+The following entries are generated from the application's transform
+definitions and default bindings. Arguments in square brackets are optional:
+omitting one usually asks for it. Do not type the brackets. Fixed-choice
+defaults are shown where the definition supplies them; musical context,
+such as the current track's grid or the selected notes, can supply others.
+
+At the `:` prompt, a transform takes the Visual target if one exists,
+otherwise the cursor's bar. The leader bindings choose a transform before
+its target. Spaces between its keys separate strokes; they are not typed.
+In parameter tables, slashes separate alternative forms, not literal slashes
+to enter (note fractions such as `1/8` still contain a literal slash).
+Ordinary operators also provide `q` for simple
+quantise, `^` for velocity and `~` for humanisation. Their settings and musical
+purposes are explained in @sec-performance.
+
+Key-aware transforms ask for a key as well as their other parameters; Tab
+offers choices. Generated defaults describe the initial prompt, not a
+guarantee that every later invocation ignores previous answers.
+
+{{< include reference/transforms.inc.qmd >}}

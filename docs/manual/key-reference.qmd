@@ -1,0 +1,152 @@
+# Keys and editing targets {#sec-key-reference}
+
+This is a compact reference to the default bindings. It complements the
+explanations in the chapters. `, ?` is the complete live list for the current
+view, focus and custom bindings; prefixes and operators also offer contextual
+hint menus. A sequence written without spaces is typed one key at a time.
+
+## Views and discovery
+
+| Keys | Meaning |
+| --- | --- |
+| `ga`, `gr`, `ge`, `gc` | Arrangement, piano roll, event list, conductor |
+| `gt`, `gm`; `gs` in the arrangement | Tracks, Ports; section strip |
+| `gl` / Escape | Enter the piano roll's lane / return to notes |
+| Backspace | Previous view |
+| Ctrl-PageDown / Ctrl-PageUp | Next / previous track |
+| Ctrl-P, `, :` | Command palette |
+| `, ?` | Keys available here |
+| `:` | Named command line |
+| Escape | Cancel waiting keys, a prompt or a selection |
+
+## Movement and screen scale
+
+| Keys | Meaning |
+| --- | --- |
+| `h` `j` `k` `l`, arrows | Left, down, up, right in the current view |
+| `gg` / `G` | Start / end; a count chooses a bar or strip section |
+| `0` / `$` | First / last position appropriate to the view |
+| `[b` / `]b` | Previous / next bar line |
+| `{` / `}` | Same position a bar earlier / later |
+| `[s` / `]s`, `[l` / `]l` | Previous / next section, label |
+| Tab / Shift-Tab | Next / previous note, event in a lane, or occupied arrangement bar |
+| `(` / `)` | Previous / next chord |
+| Up / Down (or `k` / `j`); `K` / `J` | Piano-roll semitone movement; octave movement |
+| `g` then Up / Down, or `gk` / `gj` | Move up / down within the chord |
+| `zi`, `zo`, `z0` | Zoom in, out, reset |
+| `z` then Left / Right (or `zh` / `zl`), Ctrl-T | Finer / coarser editing grid, triplets |
+| `zz`, `zf` | Centre cursor, resume following playback |
+| Ctrl-D / Ctrl-U | Half a page down / up |
+| Ctrl-F / Ctrl-B | A page down / up |
+| Ctrl with directions | Move and scroll together |
+| Ctrl-Shift-Left / Ctrl-Shift-Right, or Ctrl-Shift-H / Ctrl-Shift-L | A horizontal page |
+
+`0` and `$` are bar start/last step in the piano roll, song first/last bar
+in the arrangement, and first/last field in an event-list row. They are not
+interchangeable with `gg` and `G` in every view.
+
+## Operators and objects
+
+The general form is `[count] operator [count] target`. A target is a range
+or an object. In Visual mode the selection already supplies it.
+
+| Operator | Purpose |
+| --- | --- |
+| `d`, `y` | Delete, yank |
+| `>`, `<` | Transpose up, down |
+| `t`, `T` | Shift later, earlier |
+| `q`, `^`, `~` | Quantise, velocity, humanise |
+| `!` | Choose a transform after the target |
+
+| Object | On a track | On the section strip |
+| --- | --- | --- |
+| `in` | Note or event under the cursor | — |
+| `ic` | Chord, in piano roll/event list | — |
+| `ib` | This bar's event contents | — |
+| `ab` | This bar as time; not in event list | — |
+| `is` | This section's events on this track | Section's events on every track |
+| `as` | — | Section itself |
+| `it` | Track's events | — |
+| `ie` | — | Entire song's events |
+| `gn` | Current or next search match | — |
+
+Doubling an operator normally supplies the track's current bar: `dd`, `>>`,
+`qq`. An amount before transposition or shifting describes how far; after
+it, a count describes the target's extent. For other operators, before and
+after counts multiply.
+
+## Selections, copies and history
+
+| Keys | Purpose |
+| --- | --- |
+| `v`, `V`, Ctrl-V | Time band, whole rows, box in timeline views |
+| `o` in Visual mode | Swap active end/corner |
+| `gv` | Restore last selection |
+| `D` on suitable Visual time | Remove time within sections |
+| `|` | Cut crossing notes at target edges |
+| `p`, `P` | Merge/insert events; replace a Visual target; after/before on strip |
+| Alt-p / Alt-P | Piano-roll put at cursor pitch too |
+| `"a`, `"A` | Use register a, append to a |
+| `u`, Ctrl-R, `.` | Undo, redo, repeat last change |
+| `Qa` … `Q`, `@a`, `@@` | Record macro a, play it, replay last macro |
+
+## Notes, lanes and fields
+
+| Keys | Purpose |
+| --- | --- |
+| `o`, `O` in notes | Add a note, add and advance |
+| `, n` | Default note from the current note |
+| `x`, `Y` | Delete / yank current note or event |
+| Alt with directions | Move a note or suitable lane event |
+| Alt-Shift-Left / Alt-Shift-Right, or `Alt-H` / `Alt-L` | Nudge an event in time |
+| `=` / `-`, `+` / `_` in notes | Grid end adjustment, fine length adjustment |
+| Ctrl-A / Ctrl-X | Step velocity or a numeric field |
+| `e`, Enter | Inspector editor, or current field as appropriate |
+| `, c c`, `[c`, `]c` | Choose lane, previous/next controller |
+| `, c v` | Pedal regions / values |
+| Number then Enter in a lane | Set or insert a value |
+
+## Tracks, sections and transport
+
+| Keys | Purpose |
+| --- | --- |
+| `, t a`, `, t i`, `, t d`, `, t r` | Add, insert, delete, rename tracks |
+| `, t o`, Alt-Up / Alt-Down | Reorder tracks, move immediately |
+| `M`, `S`, `A` | Mute, solo, arm the current track |
+| `, t c`, `, t q`, `, t f` | Chase notes, playback quantise, freeze |
+| `, s r`, `, s i`, `, s a`, `, s j` | Rename, insert before/after, join sections |
+| `, s s`, `, s l`, `, s f` | Split at bar, label to section, follow meter |
+| `, b i`, `, b d`, `, b m` | Song-bar insert/delete, meter or Visual rebar |
+| Space, Shift-Space | Play/stop, stop and return |
+| `m` then Space, Ctrl-Space | Set play-from marker, set it and play |
+| `R`, `, r m`, `, r t` | Record, replace/overdub, track Thru |
+| `, m m`, `, m c`, `, m s` | Click mode, lead-in mode, Metronome page |
+| Ctrl-. | Panic |
+
+The section strip's single keys differ from the track commands: `i` and
+`a` insert sections, `c` renames, `J` joins, and `+`/`-` change length.
+Down (or `j`) moves back down to the tracks. Section reordering uses
+`Alt-h` / `Alt-l`, with no default Alt-arrow binding; @sec-customisation
+shows how to add one. The text chapters explain these contextual meanings.
+
+## Search and memory
+
+| Keys or command | Purpose |
+| --- | --- |
+| `f` / `F` and a pitch class | Find forwards / backwards |
+| `;`, Alt-; | Repeat find, reverse its direction |
+| `/`, `n`, `N`, `*`, `#` | Query, next/previous match, search current pitch |
+| `gn` after an operator | Act on a match and advance |
+| `, S b/s/t/v` | Select bar/section/track/visible material |
+| `, S B/S/T/V` | Select only matches in that scope |
+| `, S m`, `, S c` | Keep matches in selection, clear search |
+| `ma`, `'a`, `''` | Set mark a, visit it, return before last jump |
+| `:marks`, `:registers`, `:macros` | Inspect remembered places/material/actions |
+
+Slashes between letters in this table describe alternatives, not literal
+slashes to type. For example, `, S b/s/t/v` means choose one of those four
+letters after `, S`.
+
+Marks, named registers and macros each have their own independent `a`–`z`
+names. Upper-case register and macro recording names append to the
+corresponding lower-case name; marks use lower-case names.

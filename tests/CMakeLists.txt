@@ -68,6 +68,8 @@ add_executable(modal_tests
     ui/key_notation_test.cpp
     ui/keymap_test.cpp
     ui/layout_test.cpp
+    ui/manual_test.cpp
+    ui/manual_reference_test.cpp
     ui/prompt_test.cpp
     ui/settings_test.cpp
     ui/time_motions_test.cpp
@@ -84,6 +86,9 @@ add_executable(modal_tests
     ui/metronome_view_test.cpp
     ui/window_test.cpp
 )
+
+set_source_files_properties(ui/manual_test.cpp ui/manual_reference_test.cpp PROPERTIES
+    COMPILE_DEFINITIONS "MODAL_MANUAL_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}/docs/manual\"")
 
 target_link_libraries(modal_tests PRIVATE
     modal::core modal::platform modal::ui modal::ui_sdl modal::warnings Catch2::Catch2WithMain Threads::Threads

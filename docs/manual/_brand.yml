@@ -1,0 +1,10 @@
+color:
+  palette:
+    modal-blue: "#2e7de9"
+    modal-green: "#46652b"
+    modal-amber: "#8c6c3e"
+    modal-violet: "#7847bd"
+  primary: modal-blue
+  success: modal-green
+  warning: modal-amber
+  info: modal-violet

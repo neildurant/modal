@@ -1,0 +1,36 @@
+<!-- Generated from Settings; see tools/manual-references.cmake. -->
+
+| Setting | Default | Meaning |
+| :--- | :--- | :--- |
+| `` theme `` | `` dark `` | The colour theme: themes/NAME in the config directory, or a built-in theme, dark or light |
+| `` font `` | (empty) | A TrueType or OpenType font file for the grid, or empty for the built-in JetBrains Mono |
+| `` fontsize `` | `` 12 `` | The font's size in points, before the display's scaling. Range: 4 to 72 |
+| `` minsize `` | `` 120x30 `` | The smallest the window can be made, in cells. Range: 20 to 1000 |
+| `` timeoutlen `` | `` 500 `` | How long to wait, in milliseconds, after keys that are a binding and also start a longer one, before running the shorter. Range: 0 to 10000 |
+| `` leader `` | `` , `` | The leader key, which \<leader\> stands for in key bindings: one key, such as , or \<Space\> |
+| `` hints `` | `` on `` | Whether the hint menu shows, after a pause, the keys that can follow those typed |
+| `` palettelines `` | `` 10 `` | How many matches the command palette (Ctrl-p) shows below what's typed. Range: 3 to 40 |
+| `` hintdelay `` | `` 400 `` | How long to wait, in milliseconds, after keys that start longer bindings, before the hint menu shows what can follow. Range: 0 to 10000 |
+| `` timingunit `` | `` grid `` | The note inspector's coarse timing unit: grid, or a note fraction such as 1/16 |
+| `` chordwindow `` | `` 30 `` | How far apart, in milliseconds, events can start and still be one chord, as a chord's notes played a little apart are. Range: 0 to 1000 |
+| `` gridadvance `` | `` off `` | Whether O in the piano roll moves the cursor on by the grid step (on) or by the note's length (off) |
+| `` audition `` | `` on `` | Whether the piano roll plays a note as the cursor lands on it, and as one is added or moved to a new pitch |
+| `` nudge `` | `` 5 `` | How far, in milliseconds, a nudge moves a note in the piano roll, or lengthens or shortens it. Range: 1 to 1000 |
+| `` humanizetime `` | `` 10 `` | How far, in milliseconds, ~ moves a note in time at most, either way. Range: 0 to 1000 |
+| `` humanizevel `` | `` 8 `` | How far ~ changes a note's velocity at most, either way. Range: 0 to 127 |
+| `` velclip `` | `` soft `` | How velocity changes keep within their limits: soft, easing off near them, or hard, clipping |
+| `` quantizepedal `` | `` follow `` | What q does with the pedalling of the notes it quantises: follow, moving it with them; keep, leaving it where it is; or ask |
+| `` velfloor `` | `` 1 `` | The lowest velocity a change makes a note. Range: 1 to 127 |
+| `` pedallift `` | `` 10 `` | How long, in milliseconds, the pedalling tools lift the sustain pedal before a change. Range: 0 to 1000 |
+| `` pedaldown `` | `` 60 `` | How long, in milliseconds, the pedalling tools press the sustain pedal again after a change. Range: 0 to 1000 |
+| `` undolevels `` | `` 1000 `` | How many changes can be undone. Range: 0 to 100000 |
+| `` ownports `` | `` 1 `` | How many MIDI output ports of its own Modal makes, for other programs to connect to (where the system lets it: Linux, not Windows). Range: 0 to 16 |
+| `` ownportname `` | `` Modal `` | The name of Modal's own ports; several are numbered after it |
+| `` thru `` | `` on `` | Send MIDI input through to armed tracks with Thru enabled |
+| `` quantizemarks `` | `` on `` | Whether the piano roll marks where a note of a track quantised as it plays will be heard, when that's far from where it's stored |
+| `` sustaintails `` | `` on `` | Whether the piano roll draws a tail after each note the sustain pedal holds past its end, to where the pedal lifts |
+| `` sustaintint `` | `` off `` | Whether the piano roll tints its notes faintly wherever the sustain pedal is down |
+| `` ownmeter `` | `` on `` | Whether the arrangement tints a track's bars where it has a meter of its own, rather than following the song's |
+| `` rewind `` | `` on `` | Whether the play-from marker, which Space plays from, stays put when playback stops (on), or moves to where it stopped (off) |
+
+: Application settings and startup defaults. {#tbl-settings tbl-colwidths="[26,12,62]"}

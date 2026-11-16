@@ -18,6 +18,10 @@ wsl_distro := "Ubuntu-24.04"
 default:
     @{{just_executable()}} --list --unsorted
 
+# Publish the user manual as HTML and PDF, without building the application
+manual:
+    cmake -P tools/build-manual.cmake
+
 # Configure the preset, if it isn't already
 configure:
     {{ if path_exists(justfile_directory() / "build" / preset / "CMakeCache.txt") == "true" { "" } else { "cmake --preset " + preset } }}

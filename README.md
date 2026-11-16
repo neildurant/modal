@@ -19,6 +19,11 @@ The ongoing milestone plan, progress checkboxes and unscheduled ideas are in [do
 
 ## Building
 
+The [user manual](docs/manual/README.md) has ten explanatory chapters, reference
+appendices and an example song, built as both a website and a PDF with `just manual` or
+`cmake -P tools/build-manual.cmake`. It requires Quarto 1.11.9; the application
+build does not.
+
 Modal is C++20, built with CMake 3.25 or later, with its libraries from [vcpkg](https://vcpkg.io) in manifest mode. Set `VCPKG_ROOT` to a vcpkg clone, then use a preset: `windows-msvc` on Windows; `linux-gcc` or `linux-clang` on Linux.
 
 ```

@@ -1,0 +1,178 @@
+# Making Modal your own {#sec-customisation}
+
+Customisation is another use of the command language. A setting can be tried
+live, then kept as a startup command when it proves useful. The built-in
+bindings and themes remain available underneath the personal choices.
+
+There are three homes for information: the song holds musical decisions,
+the configuration file holds deliberate application preferences, and the
+machine's state files hold things Modal remembers for itself.
+
+## Trying a setting and keeping it
+
+At the `:` prompt, `set NAME=VALUE` changes a setting immediately. A question
+mark asks for its current value: `:set fontsize?`. Several settings can appear
+on one line, such as `:set fontsize=14 hintdelay=200`.
+
+Boolean settings also have short forms: `:set audition` enables audition,
+`:set noaudition` disables it and `:set audition!` toggles it. The `!` here
+belongs to the setting word. It is different from the bang after a file
+command, such as `:w! FILE`.
+
+The `modalrc` file contains startup commands, one per line. Modal runs its
+built-in defaults first, then this file. A few chosen lines are usually
+better than copying every default: settings left unspecified continue to
+follow future defaults.
+
+```text
+" Comments begin with a double quote
+set fontsize=14
+set hintdelay=200
+set theme=light
+```
+
+`:write-config` opens a save dialogue in the configuration directory. With
+a filename, `:write-config modalrc` writes there directly, refusing an
+existing file unless `:write-config! modalrc` is used. The generated file
+writes changed choices as commands and leaves unchanged defaults commented,
+with descriptions. It is a useful starting point rather than a file that
+must be maintained in full.
+
+`:source` with no filename runs `modalrc` again. It applies those commands
+over the current state; deleting a line from the file does not reverse a
+change already made in the running application. Restarting begins again
+from the defaults before applying the remaining lines.
+
+## File locations
+
+| Kind | Linux | Windows |
+| --- | --- | --- |
+| Configuration | `$XDG_CONFIG_HOME/modal`, normally `~/.config/modal` | `%APPDATA%\Modal` |
+| State | `$XDG_STATE_HOME/modal`, normally `~/.local/state/modal` | `%LOCALAPPDATA%\Modal` |
+
+Personal themes live in `themes/` inside the configuration directory.
+The state directory's `ports` file remembers this machine's enabled ports,
+aliases and defaults. Those choices belong to the Ports view, not to `modalrc`.
+Its `remembered` file retains palette ranking, macros and other remembered
+choices. It is not the song file.
+
+A startup-command error names its file and line on the message row. Later
+lines still run, so one spelling mistake does not suppress the whole
+configuration. On Linux, errors also appear on standard error.
+
+Application preferences and the machine's port choices are separate from
+song edits: `u` is not a general undo for every configuration change. Ports
+are remembered as they are changed in the Ports view. `:palette-forget`
+clears the palette's learned ranking without changing the song.
+
+## Naming a custom scale
+
+Key-aware transforms can use a scale defined in the configuration. The
+`scale` command gives it a name and ascending degrees, for example:
+
+```text
+scale Hijaz 1 b2 3 4 5 b6 b7
+```
+
+The degrees describe a scale relative to its tonic, so the same definition
+can be used in different keys. This extends the available musical vocabulary
+without changing the semitone movement keys or creating a global scale lock.
+The definition belongs in `modalrc` when it should be available at startup.
+
+## Choosing a readable view
+
+Ctrl-plus and Ctrl-minus change text size, and Ctrl-0 returns to the configured
+size. The window keeps its pixel size, showing more or fewer character cells.
+A larger font therefore trades the amount visible for easier reading.
+
+`font` chooses a local TrueType or OpenType file; an empty value uses the
+built-in JetBrains Mono. The window's character grid remains fixed-width
+in its layout. `minsize` sets the smallest permitted size in cells, rather
+than prescribing one physical display size.
+
+Settings that influence feedback include `hints`, `hintdelay`, `timeoutlen`
+and `palettelines`. Hint delay controls when a menu appears. Timeout length
+is a different matter: when one bound sequence is also the start of a longer
+one, it limits how long Modal waits before running the shorter. Making hints
+quicker need not make the keyboard timeout shorter.
+
+The complete settings table, with actual defaults, is in
+@sec-settings-reference. Musical properties such as the track's grid or
+recording lead-in have their own fields or commands and are not all `set`
+variables.
+
+## Themes describe roles
+
+A theme assigns colours to **roles**, such as note, cursor, selection and
+warning. It does not paint individual notes by arbitrary colour commands.
+This keeps the same meaning recognisable across views.
+
+`:set theme=dark` and `:set theme=light` choose the built-in themes. A personal
+theme is a command file in `themes/NAME`, containing only the roles it changes.
+It starts from the dark theme before applying its overrides. For example:
+
+```text
+highlight cursor #e0af68
+highlight note #9ece6a
+highlight selection #2e3c64
+```
+
+`highlight` commands after `set theme` override that theme in turn. `:write-config`
+lists the colours of all the roles in the chosen theme, providing names and
+values to start from. Keep enough contrast to distinguish the cursor,
+selected material, search matches and playback; their different purposes
+are more useful than a colour scheme that makes them look alike.
+
+## Key bindings attach names to actions
+
+A key binding names a command. `nmap` binds Normal-mode keys; an optional
+hint supplies the label shown in the key menus. `nunmap` removes a binding.
+
+```text
+nmap <F6> view-piano-roll "Piano roll"
+```
+
+This binds another route to the existing view command; it does not create a
+new kind of piano roll. The named command can also be found in the palette.
+A command's context still applies: binding a note operation to another key
+does not make it meaningful in the Ports view.
+
+A personal binding is also useful when a command has no default arrow-key
+alternative. For example, these add Alt-arrow section reordering on the
+section strip, alongside its default `Alt-h` and `Alt-l` bindings:
+
+```text
+nmap <A-Left> section-move-earlier "Move a section earlier"
+nmap <A-Right> section-move-later "Move a section later"
+```
+
+The commands apply only on the strip, so the existing Alt-arrow note movements
+in the piano roll retain their own context.
+
+Keys in configuration use angle-bracket notation for named or modified
+keys: `<Esc>`, `<Tab>`, `<CR>` for Enter, `<Space>`, `<C-p>` for Ctrl-P and
+`<A-Left>` for Alt-Left (`<A-h>` for the letter alternative). Ordinary sequences
+run together: `gg`, or `<C-w>` followed by Down (or `j`).
+A literal less-than sign is `<lt>`. `<leader>` means the current leader,
+so bindings written with it follow a change to the `leader` setting.
+
+For example, `set leader=<Space>` moves the leader groups to Space. That
+choice changes a prominent existing binding, so it is worth considering
+how playback will then be reached. The live key list shows what the resolved
+bindings actually do in the current context.
+
+Bindings may share a key when their commands apply in different places,
+as `J` already does for octave movement and section joining. A later
+applicable binding overrides an earlier one. `ngroup` gives a prefix a hint
+menu title; `keysection` groups subsequent bindings in the list of keys.
+Advanced map forms exist for other modes, but not every proposed editing
+mode is implemented; the current grammar remains the guide to actual use.
+
+Arguments with spaces are quoted. Within a command file, `\"` represents a
+quote and `\\` a backslash. This is command-file quoting, distinct from the
+rules of a terminal such as PowerShell. Using the file chooser or completion
+avoids manually escaping many file paths.
+
+Customisation works best when it supports already-understood operations.
+The standard bindings in this book remain a common vocabulary; the live
+menus and palette provide the corresponding vocabulary for a customised setup.

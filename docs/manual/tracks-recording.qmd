@@ -1,0 +1,191 @@
+# Tracks, playback and recording {#sec-recording}
+
+A track holds a part's musical identity: its events, routing, editing defaults
+and playback settings. Recording adds an incoming performance to that part.
+The important distinction is between the instrument being heard, the track
+being recorded, and the stored events that will be saved afterwards.
+
+The port directions and operating-system connections introduced in
+@sec-midi-ports are the foundation. This chapter describes how a song uses
+those connections.
+
+## Organising tracks
+
+The **Tracks view** (`gt`) puts one track on each row, with settings in
+columns. It suits comparison: two parts' channels, inputs or transpose
+settings can be seen together. In the arrangement, the same parts appear
+as bars through time.
+
+![The Tracks view compares routing, channels and playback settings across parts.](images/tracks.png){#fig-tracks fig-alt="The two tracks Melody and Bass in the Tracks table, with mute, solo, arm, Thru, chase and quantise buttons, input and output choices, channel and instrument settings."}
+
+`, t a` adds a track after the current one, `, t i` before it, and `, t r`
+renames it. A single addition asks for its name. `, t d` deletes the current
+track or selected track rows, keeping the whole-track material in a register.
+These actions are undoable. The conductor is separate and stays first.
+
+In Tracks, `V` selects complete rows, including settings. `Vy` copies a track;
+normal `p` and `P` insert copies after or before the current row, and Visual
+put replaces selected rows. By contrast, `yit` in a musical view takes a
+track's event contents. Copying a whole instrument part and copying its
+music for another instrument are different operations.
+
+`, t o` enters track-reordering mode. The rows can move up or down before
+Enter accepts their order as one change, or Escape restores it. While this
+mode is active other commands, including transport, are ignored. Alt-Up
+and Alt-Down move tracks immediately instead.
+
+## Editing settings in a table
+
+Enter or `e` edits the selected cell. A fully highlighted value is replaced
+by typing; a cursor movement retains it for editing. Enter accepts,
+Escape cancels, and Tab commits and moves to the next editable column.
+Up and Down step numeric values. A field marked with a down arrow has a
+fixed-choice list; typing can help find the choice.
+
+Whole-row selections support batch changes. Assigning a value sets it on
+all selected tracks; stepping changes each relative to its own value. A
+batch that would make any row invalid is refused as a whole. Names remain
+individual, since giving every part the same name would obscure its identity.
+
+Output chooses a destination, Input chooses what the track listens to, and
+Channel is the MIDI channel the part uses. `Default` follows the machine's
+chosen port; `All` on Input receives from all enabled inputs. An unavailable
+saved choice remains visible with a warning, rather than silently falling
+back to another device.
+
+## Mute, Solo, Arm and Thru
+
+The coloured letter buttons are related but answer different questions.
+
+| Button | Question | Consequence |
+| --- | --- | --- |
+| Mute (`M`) | Should the stored part be silent? | Suppresses ordinary playback when no solo overrides it |
+| Solo (`S`) | Which parts should be heard alone? | If any track is soloed, only soloed tracks play |
+| Arm (`A`, `R` while recording) | Should this track receive the take? | Makes it a recording destination |
+| Thru (`T`) | Should live input be heard through this track? | Sends matching input to its output while armed |
+| Chase (`C`) | Should notes held at the playback start be started? | Recreates their remaining sound when enabled |
+| Quantise (`Q`) | Should timing be adjusted during playback? | Applies the track's playback quantise settings |
+
+Mute and Solo concern stored playback; Thru is how a live performance is
+heard. An armed, muted track can therefore still pass live input. If any
+track is soloed, a soloed track plays even when its Mute button is also on.
+
+`M`, `S` and `A` work from musical views with a current track as well as
+from Tracks. Arming is independent for each track, so several may be armed
+at once. Modal names already-armed parts when another is armed to help make
+that choice visible.
+
+`, r t` changes the current track's Thru. `, T t` is the machine-wide Thru
+switch: both the machine switch and the track's own choice must permit it.
+An unarmed track does not receive Thru merely because its T is enabled.
+
+## Hearing and diagnosing input
+
+The status line's input indicator flashes as MIDI arrives and displays the
+last non-note-off channel message. This establishes that input reached
+Modal; it does not establish that a track is armed, correctly routed or
+audible at its instrument.
+
+Live input is sent to every matching armed track with Thru enabled. Incoming
+channels are mapped to each destination track's channel, and playback
+transpose and velocity offset also affect the monitored notes. Time offsets
+are not applied to live Thru, since deliberately delaying the player's
+monitoring would make playing harder.
+
+The engine remembers the destinations of held notes and pedals. Their
+releases still go to the original destinations if a setting changes while
+they are held. Space stops playback without cutting off live held notes
+whose releases are still expected; panic, Ctrl-., ends them too.
+
+## Playback positions and rewind
+
+The play-from marker gives Space a stable starting point independent of
+the editing cursor. `m` then Space sets that marker, and Ctrl-Space sets it
+and plays immediately. Space toggles playback and stop; Shift-Space stops
+and returns to where the cursor was.
+
+With **rewind** on, the marker stays where it was when playback stops.
+This suits repeatedly checking the same passage. With rewind off, the marker
+moves to the stopped position, which suits continuing through a piece.
+`, T Space` changes the setting. The status line shows the marker while
+stopped and the playhead while playing; the top bar still describes the cursor.
+
+Chasing makes a mid-song start meaningful. Modal restores preceding program
+and controller state, then, when note chasing is on, starts notes already
+held for their remaining lengths. Note chase is useful for sustained parts;
+it may be undesirable for drums whose attack should only occur at the
+original note start. The C setting controls notes, not all state restoration.
+
+## Preparing a recording
+
+Recording has three song-level choices: where it starts, what precedes it,
+and whether it replaces or overdubs existing music. The armed tracks supply
+the input and output destinations. This separation allows the same performance
+to be recorded onto several parts deliberately.
+
+`R` starts a take from the play-from marker, after the selected count-in or
+pre-roll. It requires at least one armed track with usable input. Space
+stops the take. Starting recording during existing playback is not supported
+in this edition; that would be a punch-in operation.
+
+**Replace** removes existing material in the recorded range. From the record
+point, a track actually being recorded is silent so that the replaced part
+is not heard underneath the performance. **Overdub** merges the take with
+what is there, and the existing part remains audible. `, r m` switches the
+song between them; the status line shows REPLACE or OVERDUB.
+
+Recording continues beyond the current end of the song until stopped. The
+last section grows to contain it. A track whose input is unavailable receives
+nothing, and its existing music is not cleared merely because it was armed.
+Warnings identify tracks that cannot participate.
+
+## The metronome is another MIDI instrument
+
+The metronome sends MIDI notes to an output and channel. It therefore needs
+a receiving sound just as a musical track does. Its port can be explicit,
+or follow the default output. A missing click route is shown as No click.
+A General MIDI percussion receiver on channel 10 is one possible destination;
+a different instrument may need different click pitches or a different channel.
+
+The **Metronome page**, `, m s` or `:metronome`, groups its destination,
+downbeat and beat sounds, velocities, note length and recording lead-in.
+Its Test buttons audition the click through the selected route. Fields are
+edited in place like track settings.
+
+![The Metronome page separates the click's sound and destination from what precedes recording.](images/metronome.png){#fig-metronome fig-alt="Modal's Metronome page with playback mode, MIDI port and channel, downbeat and beat notes with velocities and Test buttons, then count-in and pre-roll settings."}
+
+`, m m` cycles the click between off, during recording and always. A click
+uses the conductor's meter; in 6/8 that currently means six eighth-note beats,
+not two dotted-quarter beats. It is not muted or soloed with the tracks.
+
+A **count-in** gives a metronome-only lead-in with the song silent. A
+**pre-roll** plays existing music before the recording point to supply
+musical context. `, m c` cycles none, count-in and pre-roll. Exact lengths
+can be set with `:countin 2`, `:countin 3 beats`, `:preroll 2` or
+`:preroll 3 beats`; `:countin off` selects no lead-in.
+
+A count-in always clicks when a click destination is available. Without a
+usable metronome destination, recording can proceed without the click and
+count-in. Stopping during the count-in creates no recorded edit.
+
+## Completing and keeping a take
+
+During recording, the views preview what the song would contain if the take
+ended now. Held notes grow with the playhead. Replace mode removes the old
+preview material as recording advances. The completed take becomes one
+undoable edit after stopping and finalisation.
+
+Until then, save, export, open, new and quit are refused with Stop recording
+first, including forced commands and the window's close button. This prevents
+a save from omitting a take still in progress. Once the take is finalised,
+normal saving applies.
+
+Edits that would alter the events of a recording track are also refused
+while the take is active; other tracks remain editable. If input is lost,
+Modal reports it, and an overflow stops safely rather than presenting an
+incomplete performance as an ordinary successful take. Check warnings before
+accepting the result.
+
+This edition supports linear recording and overdubbing. Loop recording,
+punch ranges and a library of alternate takes are not available yet. Here
+“take” means the performance made between a recording start and stop.

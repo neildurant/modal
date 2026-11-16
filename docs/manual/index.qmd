@@ -1,0 +1,68 @@
+# Welcome {.unnumbered}
+
+Modal is a MIDI sequencer for Linux and Windows, designed to let you write,
+arrange and shape music from the keyboard. Its window uses a fixed character
+grid, but it is a graphical application: the piano roll, arrangement and event
+list are different views of the same song.
+
+This book assumes you know what MIDI tracks, notes, channels and controllers
+are. It assumes **no knowledge of Vim**, the keyboard-driven text editor
+whose command language inspired Modal's editing model. Vim combines actions
+with descriptions of text; Modal applies that idea to musical things such
+as notes, bars and sections. This book explains the model in musical terms.
+
+## About this edition {.unnumbered}
+
+This is the initial draft of Modal's user manual. It documents the implemented behaviour of Modal
+0.1.0, based on application revision `99d70a7`
+(16 November 2026). This draft was accepted on 16 November 2026;
+the manual is maintained alongside application development on `main`.
+
+The chapters progress from orientation and editing grammar to note entry,
+arrangement, recording, performance shaping, controllers and efficient work.
+Configuration and file exchange follow, with compact key tables and generated
+transform and settings references at the back. Planned features such as
+Insert-mode step entry and loop recording are not presented as available.
+
+## Reading this book {.unnumbered}
+
+Start with @sec-first-session. The chapters build up the ideas behind the
+interface and the editing language, with examples whose results are explained
+in the text. They can be read away from a computer. Having Modal open is
+optional: it lets you explore those ideas as you encounter them.
+
+The emphasis is on what an action means and when it is useful. Key mnemonics
+are explained where they help, so the keyboard becomes a language you can
+understand and recall.
+
+The examples use the default key bindings. If you already have a customised
+`modalrc`, your bindings may differ. The hint menus and the list of keys show
+the bindings active in your session.
+
+The illustrations and examples use [First phrase](examples/first-phrase.modal),
+an example song you can also download. With the PDF, use
+`docs/manual/examples/first-phrase.modal` in the source checkout,
+or the `examples` folder beside the generated online manual. The song has
+two tracks, Melody and Bass, and two four-bar sections, Phrase and Answer,
+in 4/4 at 100 BPM. It contains no device-specific
+port names or program changes.
+
+## How keys are written {.unnumbered}
+
+`h` means press the letter h. `G` means a capital G. `gg` means press g twice,
+one key after the other. `Ctrl-P` means hold Ctrl while pressing p. `Shift-Tab`
+means hold Shift while pressing Tab.
+
+Spaces between key names in an explanation separate steps; do not type spaces
+unless the book says **Space**. Thus `,` then `?` opens the list of keys, and
+`>` then `i` then `b` is written `>ib` once you know the sequence.
+
+A command written `:grid 1/8` means press `:`, type `grid 1/8`, then press Enter.
+You do type the space between the command and its argument. The leading colon
+opens Modal's own command line; it is not a command for your operating system's
+terminal.
+
+> **Cancellation and undo serve different purposes.** Escape cancels a waiting
+> key sequence or leaves a prompt. `u` undoes an accepted musical edit while
+> the keys are acting as commands. Cancelling a prompt does not undo an edit
+> that has already been accepted.

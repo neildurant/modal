@@ -1,0 +1,168 @@
+# Writing and shaping notes {#sec-notes}
+
+A musical note has several independent qualities: where it starts, how long
+it lasts, its pitch and its velocities. The piano roll brings these together
+visually. The editing grid supplies a musical ruler, while the inspector
+provides exact values when a performance needs finer attention.
+
+This chapter explains the difference between placing a cursor, creating a
+note and changing a note. Keeping those actions separate makes it possible
+to navigate through music without accidentally moving it.
+
+Pitch names use C4 for MIDI note 60. Octave labels differ between sequencers;
+the numeric pitch in the inspector gives an unambiguous comparison.
+
+## The grid is a ruler
+
+The **editing grid** is a track's time step. With an eighth-note grid, the
+ordinary left and right movements visit eighth-note positions. `:grid 1/8`
+sets that grid directly; `z` then Left (or `zh`) makes it finer, and `z`
+then Right (or `zl`) coarser. Ctrl-T toggles
+triplets. The `z` family also contains zoom commands, but grid and zoom are
+different: the grid changes the musical step, while zoom changes how much
+music fits on screen.
+
+Changing the grid does not quantise existing notes. A note recorded slightly
+late remains late, even if the new grid is coarse. This preserves the
+performance while giving later edits a useful ruler. Tab visits existing
+notes independently of that ruler, so off-grid material remains accessible.
+
+Note fractions describe durations: `1/4` is a quarter note, `1/8` an eighth,
+`1/8.` a dotted eighth and `1/8t` an eighth-note triplet. They describe musical
+length, not elapsed seconds. The tempo determines how long they take to play.
+
+## A default note belongs to the track
+
+A new note needs a length and velocity before it exists. Each track therefore
+has a **default note**, separate from the note under the cursor. The default
+is a set of values for subsequent note entry; changing it leaves existing
+notes alone.
+
+`:len 1/8` fixes the default length at an eighth note. `:len grid` makes it
+follow the editing grid instead. The Tracks view also exposes the track's
+Grid, Length and Vel fields. `, n` takes the length and velocity of the
+current note as the new defaults: an existing phrase can supply the values
+for the next one.
+
+In the piano roll, `o` adds the default note at the cursor's time and pitch.
+`O` adds it and advances the cursor. By default that advance is the note's
+length, which suits writing one note after another. With `gridadvance` on
+(`, T g`), it is a grid step instead, useful for separated attacks or notes
+whose lengths overlap in time at different pitches. A count repeats entry:
+`8O` writes eight notes in succession.
+
+The editor refuses to create an overlap with another note of the same pitch.
+An imported performance may already contain such overlaps; Modal retains
+that data, but ordinary entry and movement do not introduce new ones.
+
+## Cursor movement and note movement
+
+The ordinary arrow keys move the cursor, as do `h`, `j`, `k` and `l`.
+Holding Alt with an arrow changes the intention to moving the note under
+the cursor; the corresponding Alt-letter bindings are alternatives.
+Adding Shift gives the finer time nudge or the larger pitch step shown below.
+Pitch changes can be heard through **audition**:
+a short playback of the current note as the cursor lands on it, a note is
+added, or one note is moved to another pitch. Audition uses the track's output
+and channel. It does not run while the song is playing or recording, or while
+a Visual selection grows. `, T a` switches it on or off.
+
+| Keys in the piano roll | Change |
+| --- | --- |
+| Alt-Left / Alt-Right, or `Alt-h` / `Alt-l` | Move the note to the previous / next grid line |
+| Alt-Shift-Left / Alt-Shift-Right, or `Alt-H` / `Alt-L` | Nudge its start earlier / later in real time |
+| `Alt-{` / `Alt-}` | Move it a bar earlier / later |
+| Alt-Up / Alt-Down, or `Alt-k` / `Alt-j` | Move it up / down a semitone |
+| Alt-Shift-Up / Alt-Shift-Down, or `Alt-K` / `Alt-J` | Move it up / down an octave |
+| `=` / `-` | Move its end to the next / previous grid step |
+| `+` / `_` | Lengthen / shorten it by a nudge |
+| Ctrl-A / Ctrl-X | Increase / decrease its velocity |
+| `x` / `Y` | Delete / yank the current note |
+
+A **nudge** is a small time adjustment measured in milliseconds, initially
+5 ms, controlled by `:set nudge=5`. It suits a performance adjustment whose
+size should be independent of the tempo. Grid movement instead suits a
+change in rhythmic position. Shift-Left and Shift-Right (or `H` and `L`),
+without Alt, nudge the cursor;
+this allows a new note to be placed between grid lines.
+
+There is also a useful distinction between snapping and shifting. Alt-left
+and Alt-right move notes onto neighbouring grid lines. The `t` and `T`
+operators shift a target by a grid step while retaining each event's existing
+offset from the grid. A phrase can therefore move by an eighth note without
+losing its internal timing. In the piano roll those operators take notes;
+in event-oriented views they can also move the other MIDI events with them.
+
+## A selection remains the same music while it moves
+
+The movement and length keys work on a Visual selection too. After movement,
+the selection follows the notes it took: passing over an unselected note does
+not collect it. This matters when moving a phrase through a busy passage.
+The target remains the chosen phrase, rather than becoming whatever happens
+to occupy its new rectangle.
+
+A deliberate extension or a new object selects an area again. Escape ends
+the selection, and `gv` recalls it. Repeated moves of the same kind within
+an unchanged selection undo together; redefining or ending the selection
+starts a separate gesture for subsequent moves.
+
+A selected edit is refused as a whole if one of its notes would become
+invalid, for example by moving before the song or overlapping another note
+of its pitch. The message identifies the problem. This preserves the shape
+of a phrase instead of moving only the notes that happen to fit.
+
+## Timing in the inspector
+
+The note inspector separates **Start**, **Length** and **Ends**. Start and
+Ends are positions, counted from bar 1 and beat 1; Length is a duration.
+Changing Ends changes the duration without moving the start.
+
+Each timing row offers a coarse musical value, a signed fine adjustment in
+**ticks**, and an exact value. Ticks are the song's small integer time units;
+their musical size depends on its resolution. The coarse value gives an
+accessible musical position while Fine preserves expressive timing near it.
+A coarse edit keeps that fine remainder, rather than snapping the note.
+
+The coarse unit normally follows the editing grid. `:set timingunit=1/16`
+fixes the inspector's unit at a sixteenth note; `:set timingunit=grid`
+restores grid-following. This is a display choice and does not move notes.
+
+`e` opens the inspector's field editor. Tab and Shift-Tab commit a field and
+move between fields; Up and Down step values. Enter accepts an edit, and
+Escape abandons the current field. The next visit remembers the last field,
+which is useful when making the same kind of adjustment to several notes.
+
+The note's release velocity, shown as Off Vel, is distinct from its attack
+velocity. Instruments vary in how they respond to it; it can be inspected
+and edited without changing the note's attack.
+
+## Chords and the event list
+
+For chord operations, Modal groups nearby note starts using `chordwindow`,
+initially 30 ms. This recognises a played chord even when the fingers did not
+land at exactly the same tick. The chord inspector identifies its notes and
+velocities. `g` then Up or Down (or `gk` and `gj`) moves through its notes,
+while `(` and `)` navigate
+between chords. The `ic` object gives an operator the chord as a target.
+
+The **event list** (`ge`) is useful when the grid conceals a distinction,
+such as two events very close in time or a controller beside a note. Each
+event is a row and its fields are columns. Enter edits the current field;
+`e` opens the inspector. Numeric steps and relative entries such as `+10`
+allow an adjustment without retyping the full value.
+
+The conductor's dim rows provide landmarks among a track's events. Tempo
+and meter are edited in the conductor's own list (`gc`), rather than by
+altering those contextual rows on a note track. The list and piano roll
+are complementary views of the same stored performance.
+
+## Seeing the right amount of music
+
+`zi`, `zo` and `z0` zoom in, out and back to the normal scale. `zz` centres
+the cursor. The piano roll shows pages of whole bars, keeping bar structure
+legible as the scale changes. Page and half-page movements cover larger
+distances; the compact key reference collects them in @sec-key-reference.
+
+During playback, moving away from the playhead allows another passage to be
+inspected. `zf` resumes following. Editing position and listening position
+can remain separate for as long as the task needs them to be.
