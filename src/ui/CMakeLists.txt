@@ -32,6 +32,7 @@ add_library(modal_ui STATIC
     transform_specs.cpp
     prompt.cpp
     settings.cpp
+    status_bar.cpp
     style.cpp
     event_edit.cpp
     event_list_view.cpp

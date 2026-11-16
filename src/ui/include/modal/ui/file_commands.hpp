@@ -3,6 +3,7 @@
 #pragma once
 
 #include <modal/core/document.hpp>
+#include <modal/core/recording_session.hpp>
 #include <modal/core/song.hpp>
 #include <modal/ui/commands.hpp>
 
@@ -63,9 +64,9 @@ public:
 // song's folder (see songFolder), and ~ is the home folder.
 std::span<const CommandInfo> fileCommands();
 
-// Gives the registry what runs the file commands, on the document. The registry, document
-// and host outlive the commands' use of them. home is what ~ stands for.
-void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host,
+// Gives the registry file commands for the session's document. The session, its document
+// and the host outlive the commands' use of them. home is what ~ stands for.
+void addFileCommands(CommandRegistry& registry, core::RecordingSession& recording, FileHost& host,
                      std::optional<std::filesystem::path> home = std::nullopt);
 
 // Where a song's files typed with a relative path are (decided November 2026, rather than the

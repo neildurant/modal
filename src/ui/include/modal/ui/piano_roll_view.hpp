@@ -4,6 +4,7 @@
 
 #include <modal/core/document.hpp>
 #include <modal/core/note_fraction.hpp>
+#include <modal/core/pedalling.hpp>
 #include <modal/core/track.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/choice_list.hpp>
@@ -164,16 +165,9 @@ public:
     bool isSwitchLane() const;
     // Where a pedal is down on the track, each from its press to its lift, with the press's
     // index into the track's events.
-    struct PedalRegion
-    {
-        core::Tick start = 0;
-        core::Tick end = 0;
-        std::size_t index = 0;
-        std::optional<std::size_t> lift; // none where it's held to the song's end
-    };
-    std::vector<PedalRegion> pedalRegions(std::uint8_t controller) const;
+    std::vector<core::PedalRegion> pedalRegions(std::uint8_t controller) const;
     // A region's events, by index: its press, any values within it, and its lift.
-    std::vector<std::size_t> regionEvents(const PedalRegion& region) const;
+    std::vector<std::size_t> regionEvents(const core::PedalRegion& region) const;
     // Adding, deleting, moving, lengthening and shortening a pedal's regions, as notes are.
     std::optional<bool> editPedal(std::string_view command, int n);
     std::string laneLabel() const;

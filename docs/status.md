@@ -22,12 +22,49 @@ Review `build/manual/index.html` and `build/manual/modal-user-manual.pdf`; the w
 
 Read [schedule.md](schedule.md) for the current milestone, item states and next work. Read [design.md](design.md) for behaviour and unresolved choices. The sections below preserve validation evidence and accepted trials; their historical feature summaries do not define the current specification.
 
+Status-bar presentation extraction is implemented in `442aa1d`; publication before the visual trial was explicitly requested 16 November 2026, with the trial deferred until later. Workspace gathers a `StatusBarState` value snapshot once per frame; the independent UI component produces the Bar with all existing indicator rules and the same nine width compromises, now named. Musical formatting helpers, input timers, the message row, shared Bar layout and SDL rendering retain their responsibilities. Direct component tests pass (9 cases, 22,172 assertions); focused component/Workspace checks pass (24 cases, 23,204 assertions). All 58 offscreen status samples are byte-identical before and after the extraction. Final validation on 16 November 2026: `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,077 registered tests and no failures. Whole-tree formatting and `git diff --check` pass. The GCC Debug executable is newer than every tracked application build input. The visual trial remains pending and has not been accepted. Publication is authorised before that trial; Linux/Windows CI confirmation follows the push.
+
+Status-bar visual trial still required:
+
+- Resize a window from wide to narrow and back, checking that fields shorten/disappear in the familiar order and indicators keep their positions when toggled.
+- Check transport and recording phases, arm and Replace/Overdub/count-in indicators, click state and routing warnings, and the settings indicators in both themes.
+- Play MIDI input and let the IN light expire; the last message should stay visible. Open prompts and show messages/Visual selections: the row above should remain separate from the permanent bar.
+
+No real desktop or MIDI hardware has been driven by the agent. This is a presentation extraction with no intended appearance or behaviour change.
+
+Recording-session lifecycle extraction is implemented in `50d2224` and its practical UI trial was accepted 16 November 2026. Core now owns the pending take, preview/guard, loss baseline and single undo commit; Workspace, file commands, delayed dialog answers and window closing use that session. It remains pending through stop acknowledgement and commit callbacks. Direct fake-clock and Workspace recording coverage passes: 136 cases, 11,095 assertions, including count-in/pre-roll, overdubbing, failed starts, final input, undo, panic, input loss, hook cleanup and file safety. A new regression first reproduced a crash when deleting a live-preview-only note on an empty recorded track: both event views now consult the session before indexed edits, as do shared transforms. Restarting or changing Player while a take finishes is protected too. Validation on 16 November 2026 passes all six Linux configurations: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 1,068 registered tests and no failures. The combined check completed the four ordinary configurations before its process was terminated during the sanitizer build; separate sanitizer checks then both passed. Whole-tree formatting and `git diff --check` pass, and the GCC Debug application is newer than every tracked build input. Published through `9d84f9c`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43898352563). The pedal extraction is published through `e4b8329`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43862998587).
+
+Recording-session practical trial checklist, accepted 16 November 2026:
+
+- Record on an empty armed track, hold a note and pedal, and watch the live preview in both event views. Try deleting a preview-only note and transposing its bar during the take: both should refuse with the recorded-track message and keep the take.
+- Try editing another track and the conductor tempo during a take. Those edits should remain available and survive stopping; one undo should remove just the take, then redo should restore it.
+- Stop during count-in, then record normally. Try Replace and Overdub, two consecutive takes, and panic during a held note/pedal. Each completed take should be a separate undo step with no stuck notes. Check count-in/pre-roll and Shift-Space return with the normal settings.
+- During recording try save, export, new, open, quit (including forced commands), window close and section playback. Files/closing should say `Stop recording first`, and section playback should say `Recording: Space stops it first`. Stop and immediately press Space again: it should not restart over a take awaiting completion. Save after stopping and reopen the file to check the completed take.
+- If convenient, open a file dialog before starting a take, then answer it during recording: the answer should refuse safely. Once stopped, normal open should still warn about the unsaved take; forced open may discard it.
+
+The practical trial was reported as working. No real desktop or MIDI hardware was driven by the agent, and no hardware timing measurements are claimed.
+
+The pedal-region extraction is implemented and was accepted on trial 16 November 2026: first shared region queries in core, then musical editing operations, preserving current behaviour. The query step is committed as `a4baf8e` and passes GCC Debug and Clang Debug (1,046 registered tests per preset, three platform/MIDI skips and no failures), whole-tree formatting and `git diff --check`. Direct core tests cover all six switch controllers at the three test PPQNs, half-pedal values, unrelated events, same-tick ordering and absent lifts; existing Workspace tests pass.
+
+The editing step is committed as `29dbbaf`: core inserts, deletes, moves and resizes regions, validates the complete batch before producing edited events, and returns typed refusals. The view retains keys, grid/nudge destination calculations, messages, cursor/selection updates and undo grouping. Direct tests cover raw value retention, insertion bounds and normal song growth, selected/unselected collisions, touching imported regions, song limits, shortening through interior values, deletion and missing lifts. Focused GCC Debug pedal checks pass (49 test cases, 1,597 assertions), including Workspace checks for the existing refusal messages, saved state and undo.
+
+Final validation, 16 November 2026: `tools/check-linux.sh` passes all six Linux configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,054 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop was driven by the agent and no hardware timing was measured. The UI trial was accepted 16 November 2026. Publication and Linux/Windows CI confirmation follow that acceptance. The preceding review fixes are published through `99d70a7`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43855649871).
+
 ## Pending
 
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
 ## Review findings
+
+### Pedal-region extraction: accepted UI trial, 16 November 2026
+
+Using a disposable song or the demo, choose the sustain lane (`:lane cc64`) in the piano roll and enter it with `gl`:
+
+- Add two separated regions with `o`. Tab and Shift-Tab should move between them; the inspector, sustain tails and region highlighting should look as before. `, c v` should still switch to the raw values and back.
+- Move a region with Alt-h/Alt-l and Alt-H/Alt-L, and lift it later/earlier with `=`/`-` and `+`/`_`. Its intermediate values and lift value should be retained. Delete with `x`, and undo.
+- Select both regions with `v` and Tab; move and resize them together. A lengthening that would reach the next press should refuse the whole edit, with the same message and selection. Valid repeated edits should still undo together.
+- Try another switch controller, such as sostenuto (`:lane cc66`). Its editing should work as before, including refusing to resize a region with no lift. Existing core and Workspace tests cover this case without requiring hardware.
 
 ### Fixes for the 16 November 2026 review
 

@@ -21,6 +21,7 @@ add_executable(modal_tests
     core/playback_plan_test.cpp
     core/player_test.cpp
     core/recorder_test.cpp
+    core/recording_session_test.cpp
     core/scale_test.cpp
     core/scheduler_test.cpp
     core/smf_export_test.cpp
@@ -47,6 +48,7 @@ add_executable(modal_tests
     ui/arrange_view_test.cpp
     ui/bar_lines_test.cpp
     ui/bar_test.cpp
+    ui/status_bar_test.cpp
     ui/block_glyphs_test.cpp
     ui/cell_grid_test.cpp
     ui/command_line_test.cpp

@@ -72,7 +72,7 @@ public:
     void setPreview(Preview preview);
     void refreshPreview();
 
-    // A pending recording take is shown but has not yet become a saved or undoable edit.
+    // Whether the song shown is a preview, independently of recording-session liveness.
     bool hasPreview() const { return static_cast<bool>(preview_); }
 
     // While set, an edit, undo or redo whose result the guard objects to isn't made: the song

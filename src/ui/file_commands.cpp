@@ -88,9 +88,10 @@ CommandResult unsaved(std::string_view command)
 class FileCommands
 {
 public:
-    FileCommands(core::Document& document, FileHost& host,
+    FileCommands(core::RecordingSession& recording, FileHost& host,
                  std::optional<std::filesystem::path> home)
-        : document_(document)
+        : recording_(recording)
+        , document_(recording.document())
         , host_(host)
         , home_(std::move(home))
     {
@@ -201,9 +202,9 @@ private:
 
     CommandResult opened(const std::filesystem::path& file, bool force)
     {
-        if (document_.hasPreview())
+        if (auto refusal = recording_.fileOperationRefusal())
         {
-            return CommandResult::error("Stop recording first");
+            return CommandResult::error(std::move(*refusal));
         }
         if (document_.modified() && !force)
         {
@@ -224,9 +225,9 @@ private:
 
     CommandResult saved(const std::filesystem::path& file, bool thenQuit)
     {
-        if (document_.hasPreview())
+        if (auto refusal = recording_.fileOperationRefusal())
         {
-            return CommandResult::error("Stop recording first");
+            return CommandResult::error(std::move(*refusal));
         }
         if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
@@ -242,9 +243,9 @@ private:
 
     CommandResult exported(const std::filesystem::path& file)
     {
-        if (document_.hasPreview())
+        if (auto refusal = recording_.fileOperationRefusal())
         {
-            return CommandResult::error("Stop recording first");
+            return CommandResult::error(std::move(*refusal));
         }
         const auto result = core::exportSmfFile(document_.underlying(), file);
         if (!result.error.empty())
@@ -254,6 +255,7 @@ private:
         return {false, "Exported " + named(file), false};
     }
 
+    core::RecordingSession& recording_;
     core::Document& document_;
     FileHost& host_;
     std::optional<std::filesystem::path> home_;
@@ -266,20 +268,23 @@ std::span<const CommandInfo> fileCommands()
     return kFileCommands;
 }
 
-void addFileCommands(CommandRegistry& registry, core::Document& document, FileHost& host,
+void addFileCommands(CommandRegistry& registry, core::RecordingSession& recording, FileHost& host,
                      std::optional<std::filesystem::path> home)
 {
     // Kept as long as the registry runs them.
-    auto commands = std::make_shared<FileCommands>(document, host, std::move(home));
+    auto commands = std::make_shared<FileCommands>(recording, host, std::move(home));
     // Check before opening a dialog too; the callbacks above check again, as recording can
     // start while a dialog is waiting for its answer.
     const auto add = [&](const CommandInfo& info, auto run)
     {
         registry.add(info,
-                     [&document, run](const CommandCall& call)
+                     [&recording, run](const CommandCall& call)
                      {
-                         return document.hasPreview() ? CommandResult::error("Stop recording first")
-                                                      : run(call);
+                         if (auto refusal = recording.fileOperationRefusal())
+                         {
+                             return CommandResult::error(std::move(*refusal));
+                         }
+                         return run(call);
                      });
     };
     add(kFileCommands[0], [commands](const CommandCall& call) { return commands->edit(call); });

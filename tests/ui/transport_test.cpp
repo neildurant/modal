@@ -817,7 +817,7 @@ TEST_CASE("file operations refuse a pending recording take, even after stop and 
     Playing p;
     RecordingFiles files;
     test::TempDirectory directory{"modal-recording-files-test"};
-    addFileCommands(p.registry, p.document, files, directory.path());
+    addFileCommands(p.registry, p.ws.recordingSession(), files, directory.path());
     p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
     p.type(U",ra");
     const auto id = armed(p.document)->id();
@@ -862,7 +862,7 @@ TEST_CASE("a file dialog answered during recording cannot change or save the son
     Playing p;
     RecordingFiles files;
     test::TempDirectory directory{"modal-recording-dialog-test"};
-    addFileCommands(p.registry, p.document, files, directory.path());
+    addFileCommands(p.registry, p.ws.recordingSession(), files, directory.path());
     p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
     p.type(U",ra");
     p.document.markSaved();
@@ -895,7 +895,7 @@ TEST_CASE("an open dialog rechecks unsaved changes after a take is finalised")
     Playing p;
     RecordingFiles files;
     test::TempDirectory directory{"modal-recorded-open-dialog-test"};
-    addFileCommands(p.registry, p.document, files, directory.path());
+    addFileCommands(p.registry, p.ws.recordingSession(), files, directory.path());
     p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
     p.type(U",ra");
     p.document.markSaved();
@@ -928,6 +928,76 @@ TEST_CASE("an open dialog rechecks unsaved changes after a take is finalised")
         CHECK_FALSE(files.replaced);
         CHECK(p.document.underlying() == before);
     }
+}
+
+TEST_CASE("a recording session remains bound and protected while its stop is pending")
+{
+    Playing p;
+    p.type(U",raR");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    const auto id = armed(p.document)->id();
+    p.type(U" ");
+    REQUIRE(p.ws.recordingSession().pending());
+    REQUIRE_FALSE(p.player.playing());
+    // A second Space before acknowledgement must not start another play over the take.
+    p.type(U" ");
+    CHECK_FALSE(p.player.playing());
+    p.ws.setPlayer(nullptr);
+    CHECK(p.ws.message() == "Stop recording first");
+    p.runFor(10ms);
+    CHECK_FALSE(p.ws.recordingSession().pending());
+    CHECK(hasPitch(p.document.underlying(), id, 99));
+    p.ws.setPlayer(nullptr);
+    p.type(U" ");
+    CHECK(p.ws.message() == "Nothing to play to");
+}
+
+TEST_CASE("playing a section during a take respects the recording session")
+{
+    Playing p;
+    p.type(U",raR");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    const auto id = armed(p.document)->id();
+    const auto marker = p.player.marker();
+    p.ws.show(ViewKind::Arrangement);
+    p.type(U"k"); // the section strip
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "Recording: Space stops it first");
+    CHECK(p.player.marker() == marker);
+    CHECK(p.player.recording());
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(hasPitch(p.document.underlying(), id, 99));
+}
+
+TEST_CASE("an event existing only in the live take is protected before a view edits its indices")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    p.document.edit("Empty recorded track", {}, [&](core::Song& song)
+                    { song.updateEvents(id, [](core::EventList& events) { events = {}; }); });
+    p.ws.refresh();
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    REQUIRE(p.document.underlying().events(id).empty());
+    REQUIRE(hasPitch(p.document.song(), id, 99));
+    const auto tick = p.document.song().events(id)[0].tick;
+    p.view.setCursor({id, tick, std::uint8_t{99}});
+    const auto kind = GENERATE(ViewKind::EventList, ViewKind::PianoRoll);
+    p.ws.show(kind);
+    const auto command = GENERATE(U"x", U">ib");
+    p.type(command);
+    CHECK(p.ws.message() ==
+          armed(p.document)->name + " is being recorded: change it once recording stops");
+    CHECK(p.document.underlying().events(id).empty());
+    CHECK(hasPitch(p.document.song(), id, 99));
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(hasPitch(p.document.underlying(), id, 99));
 }
 
 namespace

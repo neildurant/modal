@@ -215,6 +215,12 @@ public:
     // command that did what was asked doesn't stop one.
     virtual void refuse(std::string message, MessageKind kind = MessageKind::Warning) = 0;
 
+    // Refuses event mutation before a view uses indices from a live preview.
+    virtual std::optional<std::string> eventEditRefusal(core::TrackId) const
+    {
+        return std::nullopt;
+    }
+
     // A view starts or stops taking typed keys itself, as the event list does when a field is
     // edited in place: the mode is the command line's while it does.
     virtual void startTyping() = 0;
