@@ -6,6 +6,8 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+The status-bar extraction is pushed through `c6e790f` with its visual trial explicitly deferred. Its CI passed every Linux job before being cancelled by the subsequent manual publication. Combined-tree CI then passed all Linux jobs but found two Windows compilation errors in manual-image tests: `Window::saveFrame` takes a UTF-8 string, while those calls relied on a filesystem path's platform-dependent implicit string conversion. Both now use the existing explicit `utf8Text` helper. Native GCC Debug and Clang Debug builds and all 1,080 registered tests pass; the corrected offscreen manual-image test passes all 60 assertions. Whole-tree formatting and `git diff --check` pass. Replacement CI remains pending. The deferred status-bar visual trial remains outstanding.
+
 ### User manual publication (16 November 2026)
 
 Publication approved 16 November 2026. The manual and upkeep procedures are committed in `e611cee` and `84635e4`; merge `a73aa41` incorporates `origin/main` through `c6e790f` and is now on local `main`. All upstream refactoring and its deferred status-bar visual trial are preserved. The combined tree builds and passes native GCC Debug and Clang Debug: 1,080 registered tests each, three expected platform/MIDI skips, no failures. Whole-tree clang-format 22.1.8 and `git diff --check` pass. Both manual formats rebuild successfully, with a 57-page A4 PDF. Logs are `/tmp/modal-manual-merge-{gcc-build,clang-build,gcc-tests,clang-tests,publish}.log`. Push and hosted CI verification follow this handoff update; further manual work takes place on `main` alongside application development.

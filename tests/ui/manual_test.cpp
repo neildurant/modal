@@ -7,6 +7,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/themes.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -207,7 +208,7 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
     const auto save = [&](std::string_view name)
     {
         window->draw(m.ws.frame(), theme);
-        CHECK(window->saveFrame(directory / (std::string{name} + ".bmp")));
+        CHECK(window->saveFrame(utf8Text(directory / (std::string{name} + ".bmp"))));
     };
     save("arrangement");
     m.piano();
@@ -259,7 +260,7 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
                  .over = {}});
         }
         window->draw(frame, theme);
-        CHECK(window->saveFrame(directory / (std::string{name} + ".bmp")));
+        CHECK(window->saveFrame(utf8Text(directory / (std::string{name} + ".bmp"))));
         m.ws.resize(width, height, cell);
     };
     m.press(NamedKey::Escape);
