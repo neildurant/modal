@@ -806,3 +806,21 @@ TEST_CASE("a Ctrl-v box is refused among a pedal's regions, but not in its value
     l.press(Key::typed(U'v', kCtrl));
     CHECK(l.ws.mode() == Mode::Visual);
 }
+
+TEST_CASE("o won't press the pedal on the tick another region lifts")
+{
+    Lanes l;
+    pedal(l);
+    const auto q = l.q();
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    // The first region lifts at a beat and a half; the cursor there.
+    l.type(U"6l");
+    REQUIRE(l.view().time() == q + q / 2);
+    l.type(U"o");
+    CHECK(l.ws.message() == "The pedal lifts here: press it after the lift (L nudges on)");
+    CHECK(pedalling(l).size() == 5);
+    // A nudge on, it's a pedal change.
+    l.type(U"Lo");
+    CHECK(pedalling(l).size() == 7);
+}

@@ -56,6 +56,7 @@ Final validation, 16 November 2026: `tools/check-linux.sh` passes all six Linux 
 
 ## Pending
 
+- **Manual build after the pedal change (16 November 2026):** `docs/manual/controllers.qmd` gained a sentence on not pressing the pedal on a lift's tick. The registry and manual tests pass, but Quarto isn't installed on the Windows machine, so `tools/build-manual.cmake` (HTML and PDF) is still to be run where Quarto 1.11.9 is.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 

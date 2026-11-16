@@ -122,7 +122,10 @@ time, and `o` adds a press at the cursor. `=` and `-` move the release later
 or earlier by the grid, while `+` and `_` use a nudge. Alt-left and Alt-right
 move the region, and `x`, `d` and `y` act on whole regions. A new region or
 lengthening cannot run into a later press; a selected batch is checked as a
-whole. Ctrl-V boxes are not offered in this region view.
+whole. Nor can a press share the tick where another region lifts: a lift and
+a press at the same instant would be ambiguous, and a pianist's pedal change
+takes time anyway, so press a nudge after the lift (`L`). Ctrl-V boxes are
+not offered in this region view.
 
 ## Sustain changes the sounding end of a note
 

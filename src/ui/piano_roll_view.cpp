@@ -1637,6 +1637,9 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
                 message = "The pedal's down here already: = and - lift it later or earlier, x "
                           "deletes it";
                 break;
+            case Refusal::LiftsHere:
+                message = "The pedal lifts here: press it after the lift (L nudges on)";
+                break;
             case Refusal::NoRoom:
                 message = "There's no room before the next region";
                 break;

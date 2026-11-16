@@ -180,6 +180,10 @@ PedalRegionResult insertPedalRegion(const EventList& events, int controller, Tic
         {
             return PedalRegionRefusal::AlreadyDown;
         }
+        if (region.lift && start == region.end)
+        {
+            return PedalRegionRefusal::LiftsHere;
+        }
         if (region.start > start)
         {
             end = std::min(end, region.start - 1);

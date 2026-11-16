@@ -139,6 +139,13 @@ TEST_CASE("inserting a pedal region preserves existing events and stops before t
                 cc(2 * q, controller, 100), cc(3 * q, controller, 20)}));
     CHECK(insertPedalRegion(events, controller, 2 * q + q / 2, 4 * q, 8 * q) ==
           PedalRegionResult{PedalRegionRefusal::AlreadyDown});
+    // Not on the tick it lifts, which would be ambiguous; a tick after is a change.
+    CHECK(insertPedalRegion(events, controller, 3 * q, 4 * q, 8 * q) ==
+          PedalRegionResult{PedalRegionRefusal::LiftsHere});
+    CHECK(
+        regionEdit(insertPedalRegion(events, controller, 3 * q + 1, 4 * q, 8 * q)) ==
+        listOf({cc(0, 1, 10), note(0, 60, q), cc(2 * q, controller, 100), cc(3 * q, controller, 20),
+                cc(3 * q + 1, controller, 127), cc(4 * q, controller, 0)}));
     CHECK(insertPedalRegion(events, controller, 2 * q - 1, 4 * q, 8 * q) ==
           PedalRegionResult{PedalRegionRefusal::NoRoom});
     CHECK(insertPedalRegion(events, controller, q, q, 8 * q) ==

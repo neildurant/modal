@@ -44,6 +44,7 @@ std::vector<std::size_t> pedalRegionEvents(const EventList& events, int controll
 enum class PedalRegionRefusal
 {
     AlreadyDown,
+    LiftsHere, // a press on the tick another region lifts, which would be ambiguous
     NoRoom,
     BeforeStart,
     PastEnd,
@@ -54,8 +55,10 @@ enum class PedalRegionRefusal
 
 using PedalRegionResult = std::variant<EventList, PedalRegionRefusal>;
 
-// Insert a press and lift, ending no later than one tick before the next press. Insertion
-// may extend the song, as ordinary event insertion does; songEnd bounds an existing hold.
+// Insert a press and lift, ending no later than one tick before the next press, and starting
+// after any lift, never on its tick: a lift and a press together would be ambiguous, in
+// another program if not here, and a pianist's change takes time (decided 16 November 2026).
+// Insertion may extend the song, as ordinary event insertion does; songEnd bounds an existing hold.
 PedalRegionResult insertPedalRegion(const EventList& events, int controller, Tick start, Tick end,
                                     Tick songEnd);
 
