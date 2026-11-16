@@ -10,6 +10,7 @@ Read [schedule.md](schedule.md) for the current milestone, item states and next 
 
 ## Pending
 
+- **UI trial of the 16 November review fixes**, before pushing the local commits: pending-take file safety, live tempo edits while recording, selected pedal-region lengths and restarting after the song ends. All six Linux configurations pass; trial steps are below.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
@@ -19,13 +20,22 @@ Read [schedule.md](schedule.md) for the current milestone, item states and next 
 
 The four-fix plan is approved; broader architectural changes are deferred. Pending-take file safety is implemented: file commands, forced commands, delayed dialog answers and window closing refuse with `Stop recording first` until the take has been finalised. Workspace regressions first reproduced the failures, then passed for active recording, the interval before stop acknowledgement, and saving the completed take; the GCC Debug file-command checks pass (10 test cases, 245 assertions).
 
-Recording across live tempo edits is also fixed: captured input is drained against the old mapping before a plan swap, and stamps carry the immutable tempo map needed to invert the track offset. Maps are allocated on the control side and their final reference is released there; input does not retain entire playback plans. A regression first failed, then passed at all three core-test PPQNs with zero, positive/negative musical and positive/negative millisecond offsets, input queued before the edit, a note spanning it, and delayed collection after plan reclamation. The focused timing and ownership checks pass (228 assertions). GCC Debug passes all 1,040 registered tests before the final spanning-note extension; that extended regression also passes.
+Recording across live tempo edits is also fixed: captured input is drained against the old mapping before a plan swap, and stamps carry the immutable tempo map needed to invert the track offset. Maps are allocated on the control side and their final reference is released there; input does not retain entire playback plans. A regression first failed, then passed at all three core-test PPQNs with zero, positive/negative musical and positive/negative millisecond offsets, input queued before the edit, a note spanning it, and delayed collection after plan reclamation. The focused timing and ownership checks pass (228 assertions).
 
 Selected pedal-region lengthening now checks every later press, including those selected, since their starts do not move. The Workspace regression first reproduced the overlap, then passed at both PPQNs for grid and fine steps that touch or cross the next press, retaining the song, cursor, selection and saved state on refusal, and checking a subsequent valid edit and undo. Focused pedal checks pass (3 test cases, 98 assertions).
 
 Playback completion now publishes its play-request ID in one atomic value, with the public finished flag derived from it. Player ignores completion belonging to an earlier request. A regression first reproduced an immediately cancelled restart, then passed at all three core-test PPQNs, also checking that the replacement plays its first note and later finishes normally. Focused restart checks pass (3 test cases, 90 assertions).
 
-A final file-safety check found that an open dialog started before recording could discard the take after it was finalised. Its answer now rechecks unsaved changes and retains the original command's bang: normal `:e` refuses, while `:e!` may discard the completed take. The Workspace regression first reproduced this failure, then passed; focused dialog/file checks pass (4 test cases, 199 assertions). All four fixes are implemented; full Linux validation of the final dialog fix and the UI trial remain pending. Whole-tree formatting and `git diff --check` pass.
+A final file-safety check found that an open dialog started before recording could discard the take after it was finalised. Its answer now rechecks unsaved changes and retains the original command's bang: normal `:e` refuses, while `:e!` may discard the completed take. The Workspace regression first reproduced this failure, then passed; focused dialog/file checks pass (4 test cases, 199 assertions).
+
+Final validation, 16 November 2026: `tools/check-linux.sh` passes on the final code in all six configurations: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each registers 1,043 tests, with three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. This complete rerun supersedes an earlier combined run that overlapped the final dialog edit and tested an older object file under ASan; rebuilding that object also passed the focused regression. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop was driven and no hardware timing results were measured. Local implementation commits are `875ec05`, `0a44d05`, `b4a38f8`, `6c0fe3f` and `01be611`. The UI trial remains pending, so nothing has been pushed; Windows CI will run after publication.
+
+Trial, using a disposable song and the normal MIDI setup:
+
+- Start recording on an armed track, play a few notes, then try `:w`, `:export`, `:e`, `:new`, `:q` (including forced commands) and the window's close button. Each should say `Stop recording first` and keep the take. Stop with Space, then save: the recorded notes should be included.
+- During a take, change the conductor's tempo from 120 to 60 BPM and record more notes, including one held across the change. After stopping, their starts and ends should follow where they were played in the music. This is a functional trial, not a measured hardware timing result.
+- In the sustain lane, select two separate nearby regions with `v` and Tab. Lengthen until the first lift would reach the second press: refuse the whole edit, keeping the selection. A smaller lengthening should still work and undo together.
+- Play to the song's end and restart with Space: playback should restart and continue normally.
 
 ### Review of `d0017ae` (16 November 2026)
 
