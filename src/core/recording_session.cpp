@@ -92,7 +92,18 @@ std::optional<RecordingSession::Completion> RecordingSession::finish(const EditP
 
 std::optional<std::string> RecordingSession::fileOperationRefusal() const
 {
-    return pending() ? std::optional<std::string>{"Stop recording first"} : std::nullopt;
+    // Once stopped, the take is committed within a frame or two; saying so rather than asking
+    // to stop what has stopped (decided 16 November 2026, after a review).
+    switch (state())
+    {
+    case State::Recording:
+        return "Stop recording first";
+    case State::Finishing:
+        return "Finishing the take: try again in a moment";
+    case State::Idle:
+        break;
+    }
+    return std::nullopt;
 }
 
 std::optional<std::string> RecordingSession::eventEditRefusal(TrackId id) const

@@ -828,7 +828,7 @@ TEST_CASE("file operations refuse a pending recording take, even after stop and 
     REQUIRE(hasPitch(p.document.song(), id, 99));
     REQUIRE_FALSE(p.document.modified());
 
-    const auto check = [&]
+    const auto check = [&](std::string_view refusal)
     {
         const auto before = p.document.underlying();
         for (const auto command :
@@ -837,16 +837,16 @@ TEST_CASE("file operations refuse a pending recording take, even after stop and 
             p.type(U":");
             p.type(command);
             p.press(Key::of(NamedKey::Enter));
-            CHECK(p.ws.message() == "Stop recording first");
+            CHECK(p.ws.message() == refusal);
             CHECK(p.document.underlying() == before);
             CHECK_FALSE(files.quitted);
             CHECK_FALSE(files.replaced);
             CHECK_FALSE(files.pending);
         }
     };
-    check();
+    check("Stop recording first");
     p.type(U" "); // the engine has not acknowledged the stop yet
-    check();
+    check("Finishing the take: try again in a moment");
     p.runFor(10ms);
     REQUIRE(hasPitch(p.document.underlying(), id, 99));
     p.type(U":w take");
@@ -944,7 +944,7 @@ TEST_CASE("a recording session remains bound and protected while its stop is pen
     p.type(U" ");
     CHECK_FALSE(p.player.playing());
     p.ws.setPlayer(nullptr);
-    CHECK(p.ws.message() == "Stop recording first");
+    CHECK(p.ws.message() == "Finishing the take: try again in a moment");
     p.runFor(10ms);
     CHECK_FALSE(p.ws.recordingSession().pending());
     CHECK(hasPitch(p.document.underlying(), id, 99));
@@ -2132,4 +2132,17 @@ TEST_CASE("A arms the cursor's track, its button saying A, and R while it's reco
     p.type(U"A");
     CHECK(armed(p.document) == nullptr);
     CHECK(badge() == std::pair{std::u32string{U" A "}, Role::Dim});
+}
+
+TEST_CASE("R while a stopped take is being finished says so, rather than asking to stop")
+{
+    Playing p;
+    p.type(U",ra");
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    p.type(U" "); // stopped, the engine not yet acknowledging it
+    REQUIRE(p.ws.recordingSession().state() == core::RecordingSession::State::Finishing);
+    p.type(U"R");
+    CHECK(p.ws.message() == "Finishing the take: try again in a moment");
 }

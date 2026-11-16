@@ -2890,7 +2890,10 @@ bool Workspace::record()
     }
     if (recording_.pending() || player_->playing() || player_->stopping())
     {
-        refuse(player_->recording() ? "Already recording: Space stops" : "Stop first to record");
+        refuse(player_->recording() ? "Already recording: Space stops"
+               : recording_.state() == core::RecordingSession::State::Finishing
+                   ? "Finishing the take: try again in a moment"
+                   : "Stop first to record");
         return true;
     }
     const auto& song = document_.song();

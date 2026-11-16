@@ -91,7 +91,7 @@ TEST_CASE("a recording session keeps its take pending until one acknowledged und
     CHECK_FALSE(r.document.modified());
     REQUIRE(r.session.stop());
     CHECK(r.session.state() == RecordingSession::State::Finishing);
-    CHECK(r.session.fileOperationRefusal() == "Stop recording first");
+    CHECK(r.session.fileOperationRefusal() == "Finishing the take: try again in a moment");
     CHECK_FALSE(r.session.finish({}, "Record Lead"));
     CHECK_FALSE(r.session.start(r.player));
     CHECK_FALSE(r.document.edit("Still recorded", {},

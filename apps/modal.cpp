@@ -679,6 +679,9 @@ int main(int argc, char* argv[])
 
     ui::Workspace view{commands, document, config.keymap};
     view.setScales(config.scales);
+    // Set once, for the program's life. The workspace refuses to change players while a take is
+    // pending, its recording session holding this one; a later change of player (reconnecting
+    // devices, say) must honour that refusal, or the session would keep a player that's gone.
     view.setPlayer(&playback.player());
     // What's remembered between sessions, read from the state directory and written back there
     // after each change: a file that may be missing, or deleted, at any time.
