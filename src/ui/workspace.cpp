@@ -1258,7 +1258,7 @@ std::optional<std::int64_t> Workspace::deadline() const
         const auto shown = *waitingSince_ + hintDelay_;
         deadline = deadline ? std::min(*deadline, shown) : shown;
     }
-    if (wasPlaying_ || (player_ != nullptr && player_->planWaiting()))
+    if (wasPlaying_ || recording_.pending() || (player_ != nullptr && player_->planWaiting()))
     {
         const auto frame = lastTime_ + kFrameInterval;
         deadline = deadline ? std::min(*deadline, frame) : frame;
@@ -1323,7 +1323,7 @@ bool Workspace::wake(std::int64_t now)
         waitingSince_.reset();
         hintsShown_ = false;
     }
-    if (wasPlaying_)
+    if (wasPlaying_ || recording_.pending())
     {
         player_->poll();
         showPlayhead();
@@ -1347,10 +1347,9 @@ bool Workspace::wake(std::int64_t now)
     {
         changed = takeInput() || changed; // each frame, as recording will
     }
-    if (player_ != nullptr && player_->recordPhase() == core::Player::RecordPhase::Recording)
+    if (recording_.refreshPreview())
     {
         // The take as it's played, and what it replaces going as the playhead passes.
-        document_.refreshPreview();
         view().refresh();
         showPlayhead(); // as refreshing may have moved the view from it
         changed = true;
@@ -2828,15 +2827,15 @@ bool Workspace::transport(std::string_view command)
     bool taken = true;
     if (command == "play-toggle")
     {
-        taken = player_->toggle();
+        taken = recording_.pending() ? recording_.stop() : player_->toggle();
     }
     else if (command == "play-stop-back")
     {
         const bool was = player_->playing();
-        taken = player_->toggle();
+        taken = recording_.pending() ? recording_.stop() : player_->toggle();
         returning_ = taken ? was : returning_;
     }
-    else if (command == "play-cursor" && player_->recording())
+    else if (command == "play-cursor" && recording_.pending())
     {
         // Playing from elsewhere would end the pass without saying so.
         refuse("Recording: Space stops it first");
@@ -2889,7 +2888,7 @@ bool Workspace::record()
         refuse("Nothing to record from", MessageKind::Warning);
         return true;
     }
-    if (player_->playing() || player_->stopping())
+    if (recording_.pending() || player_->playing() || player_->stopping())
     {
         refuse(player_->recording() ? "Already recording: Space stops" : "Stop first to record");
         return true;
@@ -2928,31 +2927,11 @@ bool Workspace::record()
                MessageKind::Warning);
         return true;
     }
-    if (!player_->record(document_.song()))
+    if (!recording_.start(*player_))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return true;
     }
-    // The take is shown as it's played, and the tracks it goes onto can't be changed meanwhile,
-    // as what's shown would no longer be what's made (decided November 2026).
-    lostAtRecord_ = player_->inputLost();
-    document_.setPreview([this](const core::Song& song) { return player_->previewTake(song); });
-    document_.setGuard(
-        [tracks = player_->recordingTracks()](const core::Song& before,
-                                              const core::Song& after) -> std::optional<std::string>
-        {
-            for (const auto id : tracks)
-            {
-                if (before.track(id) == nullptr)
-                    continue;
-                if (after.track(id) == nullptr || !(after.events(id) == before.events(id)))
-                {
-                    const auto name = trackNames(before, std::span{&id, 1});
-                    return name + " is being recorded: change it once recording stops";
-                }
-            }
-            return std::nullopt;
-        });
     const bool overdub = document_.song().recordMode == core::RecordMode::Overdub;
     auto text =
         (overdub ? "Overdubbing onto " : "Recording onto ") + trackNames(document_.song(), armed);
@@ -3002,42 +2981,38 @@ bool Workspace::clickPort() const
 
 void Workspace::finishRecording()
 {
-    if (player_ == nullptr || !player_->recordingStopped())
+    if (recording_.state() != core::RecordingSession::State::Finishing)
     {
         return;
     }
-    auto take = player_->finishRecording(document_.underlying());
-    if (!take)
+    const auto tracks = recording_.tracks();
+    const auto names = trackNames(document_.underlying(), tracks);
+    const auto title = tracks.size() == 1
+                           ? "Record onto " + names
+                           : "Record onto " + std::to_string(tracks.size()) + " tracks";
+    auto completed = recording_.finish(view().place(), title);
+    if (!completed)
     {
         return;
     }
-    document_.setPreview({});
-    document_.setGuard({});
-    const auto lost = lostAtRecord_ ? player_->inputLost() - *lostAtRecord_ : 0;
-    lostAtRecord_.reset();
-    if (take->song == document_.song())
+    if (!completed->changed)
     {
         setMessage("Nothing recorded: stopped before the record point", MessageKind::Information);
         return;
     }
-    // What went wrong during the take, said with it rather than lost under it (decided
-    // 12 November 2026): an input that went missing, and input that arrived too fast to take.
+    // Input availability and status wording belong to the UI; the session has committed
+    // the take and released its preview and guard before reporting completion.
     std::string trouble;
     for (const auto& [id, why] : unrecordable())
     {
-        if (std::ranges::find(take->tracks, id) != take->tracks.end())
+        if (std::ranges::find(completed->tracks, id) != completed->tracks.end())
             trouble += "; " + trackNames(document_.song(), std::span{&id, 1}) +
                        " lost its input during the take: " + why;
     }
-    if (lost > 0)
-        trouble += "; " + std::to_string(lost) + " MIDI input message" + (lost == 1 ? "" : "s") +
+    if (completed->inputLost > 0)
+        trouble += "; " + std::to_string(completed->inputLost) + " MIDI input message" +
+                   (completed->inputLost == 1 ? "" : "s") +
                    " lost during the take, arriving faster than taken";
-    const auto names = trackNames(document_.song(), take->tracks);
-    const auto title = take->tracks.size() == 1
-                           ? "Record onto " + names
-                           : "Record onto " + std::to_string(take->tracks.size()) + " tracks";
-    document_.edit(title, view().place(), [&](core::Song& song) { song = std::move(take->song); });
-    // Made outside a command, so every view is told, as the song may have grown too.
     refresh();
     setMessage("Recorded onto " + names + trouble,
                trouble.empty() ? MessageKind::Information : MessageKind::Warning);
@@ -3045,13 +3020,18 @@ void Workspace::finishRecording()
 
 bool Workspace::lostWhileRecording() const
 {
-    return player_ != nullptr && lostAtRecord_ && player_->inputLost() > *lostAtRecord_;
+    return recording_.inputLost();
 }
 
 void Workspace::setPlayer(core::Player* player)
 {
     if (player_ != player)
     {
+        if (auto refusal = recording_.fileOperationRefusal())
+        {
+            refuse(*refusal);
+            return;
+        }
         view().stopPlayhead(std::nullopt);
         wasPlaying_ = false;
         returning_ = false;
@@ -4476,6 +4456,11 @@ void Workspace::playFrom(core::Tick tick)
     if (player_ == nullptr)
     {
         refuse("Nothing to play to", MessageKind::Warning);
+        return;
+    }
+    if (recording_.pending())
+    {
+        refuse("Recording: Space stops it first");
         return;
     }
     player_->setMarker(tick);

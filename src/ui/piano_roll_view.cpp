@@ -424,6 +424,11 @@ void PianoRollView::editEvents(std::string title,
     {
         return;
     }
+    if (const auto refusal = host_.eventEditRefusal(*id))
+    {
+        host_.refuse(*refusal);
+        return;
+    }
     document_.edit(
         std::move(title), place(), [&](core::Song& song) { song.updateEvents(*id, change); },
         mergeKey);

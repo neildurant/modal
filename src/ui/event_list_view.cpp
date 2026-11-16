@@ -1574,6 +1574,14 @@ void EventListView::restore(const core::EditPlace& place)
 
 bool EventListView::edit(std::string title, const std::function<void(core::Song&)>& change)
 {
+    if (const auto id = list_.track())
+    {
+        if (const auto refusal = host_.eventEditRefusal(*id))
+        {
+            host_.refuse(*refusal);
+            return false;
+        }
+    }
     const bool changed = document_.edit(std::move(title), place(), change);
     refresh();
     return changed;

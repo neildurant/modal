@@ -1780,6 +1780,14 @@ bool Workspace::quantizeAsked(std::string_view /*name*/, const OperatorTarget& t
 bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
                              const EventsChange& change)
 {
+    for (const auto& part : target.parts)
+    {
+        if (const auto refusal = recording_.eventEditRefusal(part.track))
+        {
+            refuse(*refusal);
+            return true;
+        }
+    }
     // Each track's events as changed, or the first refusal; then all of them as one change.
     const auto& song = document_.song();
     std::vector<core::EventList> changed;

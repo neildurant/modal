@@ -5,6 +5,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/freeze.hpp>
 #include <modal/core/player.hpp>
+#include <modal/core/recording_session.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/arrange_view.hpp>
 #include <modal/ui/bar.hpp>
@@ -137,6 +138,9 @@ public:
     const ArrangeView& arrangement() const { return *arrange_; }
     PianoRollView& pianoRoll() { return *pianoRoll_; }
     const PianoRollView& pianoRoll() const { return *pianoRoll_; }
+
+    core::RecordingSession& recordingSession() { return recording_; }
+    const core::RecordingSession& recordingSession() const { return recording_; }
 
     TracksView& tracks() { return *tracks_; }
     const TracksView& tracks() const { return *tracks_; }
@@ -392,6 +396,10 @@ public:
         setMessage(std::move(message), kind);
         refused_ = true;
         macros_.failed = macros_.failed || macros_.depth > 0;
+    }
+    std::optional<std::string> eventEditRefusal(core::TrackId track) const override
+    {
+        return recording_.eventEditRefusal(track);
     }
     // Whether the last key's command was refused or given up, rather than done.
     bool refused() const { return refused_; }
@@ -669,6 +677,7 @@ private:
 
     CommandRegistry& commands_;
     core::Document& document_;
+    core::RecordingSession recording_{document_};
     std::unique_ptr<EventListView> eventList_;
     std::unique_ptr<ArrangeView> arrange_;
     std::unique_ptr<PianoRollView> pianoRoll_;
@@ -1027,8 +1036,6 @@ private:
     std::int64_t lastTime_ = 0;            // of the last key or wake-up
     std::optional<std::int64_t> inputDue_; // when to take MIDI input again, after some arrived
     std::size_t inputLost_ = 0;            // input messages lost, as last reported
-    // While recording, how many had been lost when it started, so the take's losses are known.
-    std::optional<std::size_t> lostAtRecord_;
     // Whether input has been lost since recording started, for the IN light.
     bool lostWhileRecording() const;
     bool hintsOn_ = true;

@@ -831,7 +831,7 @@ int main(int argc, char* argv[])
     // apply at once.
     FileHost files{window, view, document, playback};
     ui::addPromptCommands(commands, reader, config, configDirectory, &files, home);
-    ui::addFileCommands(commands, document, files, home);
+    ui::addFileCommands(commands, view.recordingSession(), files, home);
     view.setLineHandler(
         [&](const std::string& line)
         {
@@ -856,9 +856,9 @@ int main(int argc, char* argv[])
     // :wq, which closes the window once it has saved, after the save dialog if it needs one.
     const auto closing = [&]
     {
-        if (document.hasPreview())
+        if (auto refusal = view.recordingSession().fileOperationRefusal())
         {
-            view.report(ui::CommandResult::error("Stop recording first"));
+            view.report(ui::CommandResult::error(std::move(*refusal)));
             return false;
         }
         if (!document.modified())

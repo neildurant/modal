@@ -57,7 +57,7 @@ public:
 // The commands on a document, in a fresh directory of their own, which is home too.
 struct Files
 {
-    Files() { addFileCommands(registry, document, host, directory); }
+    Files() { addFileCommands(registry, recording, host, directory); }
 
     CommandResult run(const std::string& line) { return registry.runLine(line); }
     std::string path(const std::string& name) const { return utf8Text(directory / name); }
@@ -71,6 +71,7 @@ struct Files
     test::TempDirectory temporary{"modal-file-commands-test"};
     std::filesystem::path directory = temporary.path();
     core::Document document{newSong()};
+    core::RecordingSession recording{document};
     Host host;
     CommandRegistry registry;
 };
@@ -86,6 +87,16 @@ TEST_CASE("a new song has one empty track on channel 1, and isn't modified")
     CHECK(song.events(song.tracks()[0]->id()).size() == 0);
     CHECK(song.sections().size() == 1);
     CHECK_FALSE(core::Document{newSong()}.modified());
+}
+
+TEST_CASE("file commands consult the recording session independently of the preview")
+{
+    Files f;
+    f.document.setPreview([](const core::Song& song) { return song; });
+    REQUIRE(f.document.hasPreview());
+    CHECK_FALSE(f.recording.pending());
+    CHECK(f.run("w idle-preview").message == "Saved idle-preview.modal");
+    CHECK(std::filesystem::exists(f.directory / "idle-preview.modal"));
 }
 
 TEST_CASE(":w saves to the song's file, or asks for one, and :w FILE saves there")

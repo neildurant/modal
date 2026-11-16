@@ -19,6 +19,7 @@ add_library(modal_core STATIC
     playback_transform.cpp
     player.cpp
     recorder.cpp
+    recording_session.cpp
     scale.cpp
     scheduler.cpp
     smf.cpp
