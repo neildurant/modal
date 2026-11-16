@@ -890,6 +890,46 @@ TEST_CASE("a file dialog answered during recording cannot change or save the son
     CHECK(saved.song->title == "Existing file");
 }
 
+TEST_CASE("an open dialog rechecks unsaved changes after a take is finalised")
+{
+    Playing p;
+    RecordingFiles files;
+    test::TempDirectory directory{"modal-recorded-open-dialog-test"};
+    addFileCommands(p.registry, p.document, files, directory.path());
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    p.type(U",ra");
+    p.document.markSaved();
+    const bool force = GENERATE(false, true);
+    p.type(force ? U":e!" : U":e");
+    p.press(Key::of(NamedKey::Enter));
+    REQUIRE(files.pending);
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE(p.document.modified());
+    const auto before = p.document.underlying();
+    const auto path = directory.path() / "other.modal";
+    REQUIRE(core::writeSongFile(newSong(), path).empty());
+    const auto callback = std::move(files.pending);
+    callback(path);
+    REQUIRE(files.reported);
+    if (force)
+    {
+        CHECK_FALSE(files.reported->refused);
+        CHECK(files.replaced);
+        CHECK_FALSE(p.document.modified());
+    }
+    else
+    {
+        CHECK(*files.reported ==
+              CommandResult::error("Unsaved changes: :w saves them, or :e! discards them"));
+        CHECK_FALSE(files.replaced);
+        CHECK(p.document.underlying() == before);
+    }
+}
+
 namespace
 {
 // The machine's ports for recording: one input, Keys, plugged in, enabled and the default.

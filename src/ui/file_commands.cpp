@@ -104,14 +104,14 @@ public:
         }
         if (const auto file = argument(call, ".modal"))
         {
-            return opened(*file);
+            return opened(*file, call.bang);
         }
         host_.chooseOpen(
-            [this](std::optional<std::filesystem::path> file)
+            [this, force = call.bang](std::optional<std::filesystem::path> file)
             {
                 if (file)
                 {
-                    host_.report(opened(*file));
+                    host_.report(opened(*file, force));
                 }
             });
         return {};
@@ -199,11 +199,15 @@ private:
         return fileArgument(call.arguments, extension, songFolder(document_, home_), home_);
     }
 
-    CommandResult opened(const std::filesystem::path& file)
+    CommandResult opened(const std::filesystem::path& file, bool force)
     {
         if (document_.hasPreview())
         {
             return CommandResult::error("Stop recording first");
+        }
+        if (document_.modified() && !force)
+        {
+            return unsaved("e");
         }
         auto result = openFile(document_, file);
         if (!result.opened)
