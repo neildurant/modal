@@ -567,9 +567,9 @@ TEST_CASE("a pedal's lane goes region to region, the inspector showing where it'
     l.type(U"l20H"); // back from the second region, past the first's lift
     CHECK_FALSE(l.view().laneNote());
     CHECK(inspectorText(l).find(U"Pedal up") != std::u32string::npos);
-    // Editing regions comes next; , c v shows the values, as a controller's.
+    // Its values change in the values view, , c v, as a controller's.
     l.press(Key::typed(U'a', kCtrl));
-    CHECK(l.ws.message().starts_with("Editing a pedal's regions comes next"));
+    CHECK(l.ws.message().starts_with("A pedal's regions are down or up"));
     l.type(U",cv");
     CHECK_FALSE(l.view().isSwitchLane());
     l.type(U"gg");
@@ -615,4 +615,93 @@ TEST_CASE("0 and Enter set a controller's value to 0, though 0 alone goes to the
     l.type(U"20");
     l.enter();
     CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 20});
+}
+
+namespace
+{
+
+// The sustain's events, as their times and values.
+std::vector<std::pair<core::Tick, int>> pedalling(const Lanes& l)
+{
+    std::vector<std::pair<core::Tick, int>> result;
+    for (const auto& event : l.document.song().events(l.track().id()).all())
+    {
+        if (kSustain.shows(event.data))
+        {
+            result.emplace_back(event.tick, kSustain.value(event.data));
+        }
+    }
+    return result;
+}
+
+} // namespace
+
+TEST_CASE("o presses the pedal at the cursor, up to just before the next region")
+{
+    Lanes l;
+    pedal(l);
+    const auto q = l.q();
+    l.line(U"lane cc64");
+    l.type(U"gggll"); // the second region, at beat 3
+    l.type(U"H");     // a nudge before it, between the regions
+    const auto at = l.view().time();
+    REQUIRE_FALSE(l.view().laneNote());
+    l.type(U"o");
+    CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{{0, 127},
+                                                                  {q + q / 2, 0},
+                                                                  {at, 127},
+                                                                  {2 * q - 1, 0},
+                                                                  {2 * q, 127},
+                                                                  {2 * q + q / 2, 90},
+                                                                  {4 * q, 0}});
+    // In a region, it's down already.
+    l.type(U"o");
+    CHECK(l.ws.message().starts_with("The pedal's down here already"));
+}
+
+TEST_CASE("= and - lift a pedal's region later or earlier, never into the next")
+{
+    Lanes l;
+    pedal(l);
+    const auto q = l.q();
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    l.type(U"=");
+    CHECK(pedalling(l).at(1) == std::pair<core::Tick, int>{q + q / 2 + q / 4, 0});
+    l.type(U"-");
+    CHECK(pedalling(l).at(1) == std::pair<core::Tick, int>{q + q / 2, 0});
+    // Into the next region is refused.
+    l.type(U"3=");
+    CHECK(l.ws.message() == "That would run into the next region");
+    // Lifted before its half-pedalled value, that value goes, as it would press it again.
+    l.type(U"l6-");
+    CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{
+                              {0, 127}, {q + q / 2, 0}, {2 * q, 127}, {2 * q + q / 2, 0}});
+}
+
+TEST_CASE("Alt-h and Alt-l move a pedal's region with its values, and x deletes it")
+{
+    Lanes l;
+    pedal(l);
+    const auto q = l.q();
+    l.line(U"lane cc64");
+    l.type(U"ggglll");
+    REQUIRE(l.view().time() == 2 * q);
+    l.press(Key::typed(U'l', kAlt));
+    CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{{0, 127},
+                                                                  {q + q / 2, 0},
+                                                                  {2 * q + q / 4, 127},
+                                                                  {2 * q + q / 2 + q / 4, 90},
+                                                                  {4 * q + q / 4, 0}});
+    CHECK(l.view().time() == 2 * q + q / 4);
+    // Back into the first is refused.
+    l.type(U"3");
+    l.press(Key::typed(U'h', kAlt));
+    CHECK(l.ws.message() == "That would run into another region");
+    l.type(U"x");
+    CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{{0, 127}, {q + q / 2, 0}});
+    // d on a selection takes whole regions.
+    l.type(U"u");
+    l.type(U"ggvld");
+    CHECK(pedalling(l).empty());
 }

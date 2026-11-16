@@ -137,6 +137,18 @@ constexpr std::array kCommands{
     CommandInfo{.name = "lane-event-add",
                 .description = "Add an event at the cursor, at the value before it"},
     CommandInfo{.name = "lane-event-delete", .description = "Delete this event"},
+    CommandInfo{.name = "lane-region-longer",
+                .description = "Lift a pedal's region at the grid step after, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-region-shorter",
+                .description = "Lift a pedal's region at the grid step before, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-region-longer-fine",
+                .description = "Lift a pedal's region a nudge later, {count} times",
+                .count = true},
+    CommandInfo{.name = "lane-region-shorter-fine",
+                .description = "Lift a pedal's region a nudge earlier, {count} times",
+                .count = true},
     CommandInfo{.name = "lane-event-earlier",
                 .description = "Move this event onto the grid step before, {count} times",
                 .count = true},
@@ -1586,6 +1598,286 @@ bool PianoRollView::isSwitchLane() const
     return isPedalLane() && !pedalValues_;
 }
 
+namespace
+{
+std::string laneTitle(const core::Lane& lane); // further down, with the lane's list
+} // namespace
+
+std::vector<std::size_t> PianoRollView::regionEvents(const PedalRegion& region) const
+{
+    std::vector<std::size_t> indices;
+    const auto controller = lane().controller;
+    const auto events = document_.song().events(*trackId()).all();
+    for (std::size_t i = region.index; i < events.size(); ++i)
+    {
+        const auto* change = std::get_if<core::ControlChange>(&events[i].data);
+        if (change == nullptr || change->controller != controller)
+        {
+            continue;
+        }
+        if (i == region.lift)
+        {
+            indices.push_back(i);
+            break;
+        }
+        if (events[i].tick >= region.end)
+        {
+            break;
+        }
+        indices.push_back(i);
+    }
+    return indices;
+}
+
+std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
+{
+    // A pedal's regions edited as notes are (decided 15 November 2026): pressed at the cursor
+    // with o, lifted later or earlier with = and - (+ and _ a nudge), moved with Alt-h and
+    // Alt-l (Alt-H and Alt-L a nudge), and deleted with x; a selection's together. Refused
+    // where a region would run into another, as two notes of one pitch can't. The values
+    // within a region, half-pedalling, are kept and move with it.
+    const auto controller = lane().controller;
+    const auto id = *trackId();
+    const auto& events = document_.song().events(id);
+    const auto regions = pedalRegions(controller);
+    const auto here = laneNote();
+    const auto current = std::ranges::find_if(regions, [&](const PedalRegion& r)
+                                              { return here && r.index == *here; });
+    const auto name = laneTitle(lane());
+    if (command == "lane-event-add")
+    {
+        if (current != regions.end())
+        {
+            host_.refuse("The pedal's down here already: = and - lift it later or earlier, x "
+                         "deletes it",
+                         MessageKind::Information);
+            return true;
+        }
+        // For the default note's length, or up to just before the next region.
+        const auto& song = document_.song();
+        const auto length =
+            std::max<core::Tick>(song.tracks()[track_]->defaultLength().toTicks(song.ppqn()), 1);
+        auto end = time_ + length;
+        if (const auto next = std::ranges::find_if(regions, [&](const PedalRegion& r)
+                                                   { return r.start > time_; });
+            next != regions.end())
+        {
+            end = std::min(end, next->start - 1);
+        }
+        if (end <= time_)
+        {
+            host_.refuse("There's no room before the next region", MessageKind::Information);
+            return true;
+        }
+        editEvents("Pedal down for " + name + " in " + trackName(),
+                   [&](core::EventList& list)
+                   {
+                       list.insert({time_, core::ControlChange{controller, 127}});
+                       list.insert({end, core::ControlChange{controller, 0}});
+                   });
+        return true;
+    }
+    // The regions it's for: a selection's, or the cursor's.
+    std::vector<PedalRegion> targets;
+    if (laneSelecting())
+    {
+        const auto taken = laneTaken();
+        for (const auto& region : regions)
+        {
+            if (std::ranges::find(taken, region.index) != taken.end())
+            {
+                targets.push_back(region);
+            }
+        }
+    }
+    else if (current != regions.end())
+    {
+        targets.push_back(*current);
+    }
+    if (targets.empty())
+    {
+        host_.refuse(laneSelecting() ? "No regions there" : "No region here: Tab goes to the next",
+                     MessageKind::Information);
+        return true;
+    }
+    const auto others = [&](const PedalRegion& region)
+    {
+        return std::ranges::none_of(targets,
+                                    [&](const PedalRegion& t) { return t.index == region.index; });
+    };
+    const auto what =
+        targets.size() == 1 ? std::string{"a region"} : std::to_string(targets.size()) + " regions";
+    if (command == "lane-event-delete")
+    {
+        std::vector<std::size_t> gone;
+        for (const auto& region : targets)
+        {
+            std::ranges::copy(regionEvents(region), std::back_inserter(gone));
+        }
+        std::ranges::sort(gone, std::greater{});
+        editEvents("Delete " + what + " of " + name + " in " + trackName(),
+                   [&](core::EventList& list)
+                   {
+                       for (const auto i : gone)
+                       {
+                           list.erase(i);
+                       }
+                   });
+        return true;
+    }
+    const bool fine = command.ends_with("-fine");
+    // The new events, and those they replace.
+    std::vector<std::size_t> gone;
+    std::vector<core::Event> added;
+    if (command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later"))
+    {
+        const bool earlier = command.starts_with("lane-event-earlier");
+        const auto first = targets.front().start;
+        auto to = first;
+        if (fine)
+        {
+            to = nudged(first, earlier ? -n : n);
+        }
+        else
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                to = earlier ? gridBefore(to) : gridAfter(to);
+            }
+        }
+        const auto by = to - first;
+        if (by == 0)
+        {
+            return false;
+        }
+        for (const auto& target : targets)
+        {
+            const auto start = target.start + by;
+            const auto end = target.end + by;
+            if (start < 0 || (target.lift && end > lastTick()))
+            {
+                host_.refuse("That would go past the song's start or end",
+                             MessageKind::Information);
+                return true;
+            }
+            for (const auto& other : regions)
+            {
+                if (others(other) && start <= other.end && other.start <= end)
+                {
+                    host_.refuse("That would run into another region", MessageKind::Information);
+                    return true;
+                }
+            }
+            for (const auto i : regionEvents(target))
+            {
+                gone.push_back(i);
+                auto event = events[i];
+                event.tick += by;
+                added.push_back(event);
+            }
+        }
+        std::ranges::sort(gone, std::greater{});
+        editEvents(
+            "Move " + what + " of " + name + " " + (earlier ? "earlier" : "later") + " in " +
+                trackName(),
+            [&](core::EventList& list)
+            {
+                for (const auto i : gone)
+                {
+                    list.erase(i);
+                }
+                for (const auto& event : added)
+                {
+                    list.insert(event);
+                }
+            },
+            "pedal move " + std::to_string(id.value));
+        if (laneSelecting())
+        {
+            std::vector<Selection::NotePosition> positions;
+            for (const auto& target : targets)
+            {
+                positions.emplace_back(target.start + by, std::uint8_t{0});
+            }
+            host_.moveSelection(by, 0, std::move(positions));
+        }
+        moveTo(std::max<core::Tick>(time_ + by, 0));
+        return true;
+    }
+    // Lifted later or earlier: each region's lift moved, the values within it after its new
+    // lift dropped, as they'd press it again.
+    const bool longer = command.starts_with("lane-region-longer");
+    for (const auto& target : targets)
+    {
+        if (!target.lift)
+        {
+            host_.refuse("That region holds to the song's end, with no lift to move",
+                         MessageKind::Information);
+            return true;
+        }
+        auto end = target.end;
+        if (fine)
+        {
+            end = nudged(end, longer ? n : -n);
+        }
+        else
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                end = longer ? gridAfter(end) : gridBefore(end);
+            }
+        }
+        if (end <= target.start)
+        {
+            host_.refuse("That would leave nothing of the region: x deletes it",
+                         MessageKind::Information);
+            return true;
+        }
+        if (end > lastTick())
+        {
+            host_.refuse("That would go past the song's end", MessageKind::Information);
+            return true;
+        }
+        for (const auto& other : regions)
+        {
+            if (others(other) && other.start > target.start && end >= other.start)
+            {
+                host_.refuse("That would run into the next region", MessageKind::Information);
+                return true;
+            }
+        }
+        for (const auto i : regionEvents(target))
+        {
+            if (i == *target.lift)
+            {
+                gone.push_back(i);
+                auto lift = events[i];
+                lift.tick = end;
+                added.push_back(lift);
+            }
+            else if (events[i].tick >= end)
+            {
+                gone.push_back(i);
+            }
+        }
+    }
+    std::ranges::sort(gone, std::greater{});
+    editEvents((longer ? "Lengthen " : "Shorten ") + what + " of " + name + " in " + trackName(),
+               [&](core::EventList& list)
+               {
+                   for (const auto i : gone)
+                   {
+                       list.erase(i);
+                   }
+                   for (const auto& event : added)
+                   {
+                       list.insert(event);
+                   }
+               },
+               "pedal length " + std::to_string(id.value));
+    return true;
+}
+
 std::vector<PianoRollView::PedalRegion> PianoRollView::pedalRegions(std::uint8_t controller) const
 {
     // Where a pedal is down, 64 and above, from each press to its lift, by the press's index.
@@ -1606,11 +1898,12 @@ std::vector<PianoRollView::PedalRegion> PianoRollView::pedalRegions(std::uint8_t
         }
         if (change->value >= 64 && !down)
         {
-            down = PedalRegion{events[i].tick, events[i].tick, i};
+            down = PedalRegion{events[i].tick, events[i].tick, i, std::nullopt};
         }
         else if (change->value < 64 && down)
         {
             down->end = events[i].tick;
+            down->lift = i;
             regions.push_back(*down);
             down.reset();
         }
@@ -2676,6 +2969,23 @@ bool PianoRollView::laneOperate(std::string_view op, std::string_view motion, in
             }
         }
     }
+    if (isSwitchLane())
+    {
+        // A pedal's whole regions: a selection's, or those starting in the range.
+        std::vector<std::size_t> whole;
+        for (const auto& region : pedalRegions(shown.controller))
+        {
+            const bool in = motion == "visual"
+                                ? std::ranges::find(taken, region.index) != taken.end()
+                                : region.start >= span.first && region.start < span.second;
+            if (in)
+            {
+                std::ranges::copy(regionEvents(region), std::back_inserter(whole));
+            }
+        }
+        std::ranges::sort(whole);
+        taken = std::move(whole);
+    }
     auto& reg = host_.eventRegister();
     reg = EventRegister{};
     auto& kept = reg.tracks.emplace_back();
@@ -2748,12 +3058,21 @@ std::optional<bool> PianoRollView::runLane(std::string_view command, int count)
         return true;
     }
     if (isSwitchLane() &&
-        (command.starts_with("lane-value-") || command == "lane-event-add" ||
-         command == "lane-event-delete" || command.starts_with("lane-event-earlier") ||
-         command.starts_with("lane-event-later")))
+        (command == "lane-event-add" || command == "lane-event-delete" ||
+         command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later") ||
+         command.starts_with("lane-region-")))
     {
-        host_.refuse("Editing a pedal's regions comes next: , c v shows its values, to edit "
-                     "them as a controller's",
+        return editPedal(command, n);
+    }
+    if (command.starts_with("lane-region-"))
+    {
+        host_.refuse("= and - lift a pedal's region later or earlier: , c c chooses sustain",
+                     MessageKind::Information);
+        return true;
+    }
+    if (isSwitchLane() && command.starts_with("lane-value-"))
+    {
+        host_.refuse("A pedal's regions are down or up: , c v shows its values, to change them",
                      MessageKind::Information);
         return true;
     }

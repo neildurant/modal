@@ -169,8 +169,13 @@ public:
         core::Tick start = 0;
         core::Tick end = 0;
         std::size_t index = 0;
+        std::optional<std::size_t> lift; // none where it's held to the song's end
     };
     std::vector<PedalRegion> pedalRegions(std::uint8_t controller) const;
+    // A region's events, by index: its press, any values within it, and its lift.
+    std::vector<std::size_t> regionEvents(const PedalRegion& region) const;
+    // Adding, deleting, moving, lengthening and shortening a pedal's regions, as notes are.
+    std::optional<bool> editPedal(std::string_view command, int n);
     std::string laneLabel() const;
     // Shows a lane on the track, as , c c's list and :lane choose it, remembering it as used
     // when chosen, and not when ]c and [c step to it.
