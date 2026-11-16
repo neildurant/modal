@@ -856,6 +856,11 @@ int main(int argc, char* argv[])
     // :wq, which closes the window once it has saved, after the save dialog if it needs one.
     const auto closing = [&]
     {
+        if (document.hasPreview())
+        {
+            view.report(ui::CommandResult::error("Stop recording first"));
+            return false;
+        }
         if (!document.modified())
         {
             return true;

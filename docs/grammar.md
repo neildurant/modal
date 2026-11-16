@@ -298,6 +298,8 @@ The leader is `,` (the `leader` setting). Its groups:
 
 ## Playing
 
+While recording or waiting for its take to finish after stopping, save, export, open, new and quit (including `!` and the window's close button) are refused with `Stop recording first`.
+
 `Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it. `:countin 2`, `:countin 3 beats`, `:countin off`, `:preroll 2` and `:preroll 3 beats` set what comes before recording.
 
 ## The Metronome page

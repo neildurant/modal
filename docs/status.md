@@ -15,6 +15,25 @@ Read [schedule.md](schedule.md) for the current milestone, item states and next 
 
 ## Review findings
 
+### Fixes for the 16 November 2026 review
+
+The four-fix plan is approved; broader architectural changes are deferred. Pending-take file safety is implemented: file commands, forced commands, delayed dialog answers and window closing refuse with `Stop recording first` until the take has been finalised. Workspace regressions first reproduced the failures, then passed for active recording, the interval before stop acknowledgement, and saving the completed take; the GCC Debug file-command checks pass (10 test cases, 245 assertions). Whole-tree formatting and `git diff --check` pass. Full Linux validation and the UI trial remain pending, along with the other three fixes.
+
+### Review of `d0017ae` (16 November 2026)
+
+Reviewed the design, grammar, handoff and schedule against the core, platform, application and UI code, concentrating on recording, playback state, file commands and controller editing. Four findings remain open; no implementation changes were made:
+
+1. **Closing during recording can discard the take without warning.** The take lives in the document's preview until stopping finishes it. The underlying document can therefore remain unmodified while notes are visible. File commands and the window's close handler check only `Document::modified()`; `:q` accepts the close, and saving writes the underlying song without the pending take. Coordinate save, close and replacement with recording's stop acknowledgement and take finalisation.
+2. **Editing tempo during recording misplaces later input.** The engine stamps input against its current plan, but `Recorder::receiveMessage()` converts song time using the tempo map captured when the recorder was created. In a fake-clock run changing 120 BPM to 60 BPM during the take, a note stamped at tick 1440 was stored at 2880 (144 became 288 at 96 PPQN). Stopping earlier can discard the note because its incorrectly converted start is beyond the stop tick. Offset inversion needs the mapping effective for that input.
+3. **Lengthening selected pedal regions can make them overlap.** `PianoRollView::editPedal()` excludes all selected regions from collision checks, although lengthening moves only their lifts. With regions `[0, 1.5q)` and `[2q, 4q)`, `ggglv<Tab>3=` in the sustain lane moves the first lift to `2.25q`, after the second press. The first lift then releases the second region early. Validate selected regions against each other's proposed spans as well as untouched regions.
+4. **A stale finished flag can cancel a restarted play.** After the song ends, a new `Player::play()` followed by `poll()` before the engine steps sees the previous play's `finished` flag and queues Stop behind the new Play. Completion needs attribution to the play request, as stop acknowledgements already have.
+
+Standalone C++ harnesses in `/tmp/modal_review.cpp` and `/tmp/modal_review_lifecycle.cpp` reproduce these findings with fake clocks, a recording MIDI sink and Workspace keys where applicable. Findings 2–4 reproduce at both 960 and 96 PPQN; finding 1 uses the normal PPQN and confirms one preview note, an unmodified document, an accepted quit and zero notes in the saved file. No desktop automation or MIDI hardware was used. The harnesses are not committed regression tests.
+
+Architectural opportunities: recording/session lifecycle is spread between Workspace, Player, Document and application/file callbacks, allowing file operations to bypass pending-take safety; pedal-region extraction and editing rules live inside the piano-roll view, making whole-batch validation harder to reuse for later editing routes. Prefer narrow extractions around those responsibilities rather than a general rewrite. The existing core/platform/UI split and deterministic test interfaces are useful foundations.
+
+Validation: `tools/check-linux.sh linux-gcc-debug linux-clang-debug` passes, with 1,036 registered tests per preset and no failures; whole-tree formatting passes. The first sandboxed build attempt could not acquire vcpkg's lock outside the workspace; the approved retry completed both configurations. Release, sanitizers, Windows and hardware checks were not rerun for this review.
+
 ### Review of `415b665..5e2885b` (10 November 2026)
 
 Pulled and reviewed all nine commits since the schedule publication: GUI MIDI input/arming/Thru, port filtering, bar and prompt layout changes, completion navigation, and step 8.2's design choices. One actionable finding was identified; its approved fix and accepted trial are recorded below:

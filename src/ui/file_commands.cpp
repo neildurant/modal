@@ -201,6 +201,10 @@ private:
 
     CommandResult opened(const std::filesystem::path& file)
     {
+        if (document_.hasPreview())
+        {
+            return CommandResult::error("Stop recording first");
+        }
         auto result = openFile(document_, file);
         if (!result.opened)
         {
@@ -216,6 +220,10 @@ private:
 
     CommandResult saved(const std::filesystem::path& file, bool thenQuit)
     {
+        if (document_.hasPreview())
+        {
+            return CommandResult::error("Stop recording first");
+        }
         if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
@@ -230,6 +238,10 @@ private:
 
     CommandResult exported(const std::filesystem::path& file)
     {
+        if (document_.hasPreview())
+        {
+            return CommandResult::error("Stop recording first");
+        }
         const auto result = core::exportSmfFile(document_.underlying(), file);
         if (!result.error.empty())
         {
@@ -255,18 +267,26 @@ void addFileCommands(CommandRegistry& registry, core::Document& document, FileHo
 {
     // Kept as long as the registry runs them.
     auto commands = std::make_shared<FileCommands>(document, host, std::move(home));
-    registry.add(kFileCommands[0],
-                 [commands](const CommandCall& call) { return commands->edit(call); });
-    registry.add(kFileCommands[1],
-                 [commands](const CommandCall& call) { return commands->write(call, false); });
-    registry.add(kFileCommands[2],
-                 [commands](const CommandCall& call) { return commands->exportMidi(call); });
-    registry.add(kFileCommands[3],
-                 [commands](const CommandCall& call) { return commands->newSong(call); });
-    registry.add(kFileCommands[4],
-                 [commands](const CommandCall& call) { return commands->quit(call); });
-    registry.add(kFileCommands[5],
-                 [commands](const CommandCall& call) { return commands->write(call, true); });
+    // Check before opening a dialog too; the callbacks above check again, as recording can
+    // start while a dialog is waiting for its answer.
+    const auto add = [&](const CommandInfo& info, auto run)
+    {
+        registry.add(info,
+                     [&document, run](const CommandCall& call)
+                     {
+                         return document.hasPreview() ? CommandResult::error("Stop recording first")
+                                                      : run(call);
+                     });
+    };
+    add(kFileCommands[0], [commands](const CommandCall& call) { return commands->edit(call); });
+    add(kFileCommands[1],
+        [commands](const CommandCall& call) { return commands->write(call, false); });
+    add(kFileCommands[2],
+        [commands](const CommandCall& call) { return commands->exportMidi(call); });
+    add(kFileCommands[3], [commands](const CommandCall& call) { return commands->newSong(call); });
+    add(kFileCommands[4], [commands](const CommandCall& call) { return commands->quit(call); });
+    add(kFileCommands[5],
+        [commands](const CommandCall& call) { return commands->write(call, true); });
 }
 
 std::filesystem::path songFolder(const core::Document& document,

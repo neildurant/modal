@@ -179,6 +179,7 @@ Each is a substantial, separately reviewed step:
 
 These support the milestones rather than forming a separate feature milestone. Start them when the related feature or a measurement justifies the work.
 
+- [ ] **Doing** — Fix the four findings from the 16 November 2026 review: pending-take file safety, recording across live tempo edits, selected pedal-region collisions and playback completion attribution. Plan approved; regressions and validation in progress. See status.md.
 - [ ] **To do** — Resolve blocking Windows SysEx delivery if needed for input/recording.
 - [ ] **To do** — Measure large-song edits and playback-plan rebuilds with milestone 10; optimise only where warranted.
 - [ ] **To do** — Improve note-off scheduling if density measurements justify it.

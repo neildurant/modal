@@ -72,6 +72,9 @@ public:
     void setPreview(Preview preview);
     void refreshPreview();
 
+    // A pending recording take is shown but has not yet become a saved or undoable edit.
+    bool hasPreview() const { return static_cast<bool>(preview_); }
+
     // While set, an edit, undo or redo whose result the guard objects to isn't made: the song
     // and its history stay as they were, and the guard's reason is kept for takeRefusal(), as
     // edits to the tracks being recorded are refused (decided November 2026). The guard is

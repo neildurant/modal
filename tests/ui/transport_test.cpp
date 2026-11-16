@@ -2,9 +2,11 @@
 
 #include "support/fake_clock.hpp"
 #include "support/playback.hpp"
+#include "support/temp_directory.hpp"
 
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
+#include <modal/core/song_file.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/file_commands.hpp>
@@ -13,6 +15,7 @@
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <array>
@@ -789,7 +792,103 @@ void playNote(Playing& p, std::uint8_t pitch)
                              p.clock.time));
     p.runFor(100ms);
 }
+
+class RecordingFiles final : public FileHost
+{
+public:
+    void chooseOpen(Chosen done) override { pending = std::move(done); }
+    void chooseSave(FileKind, const std::filesystem::path&, Chosen done) override
+    {
+        pending = std::move(done);
+    }
+    void quit() override { quitted = true; }
+    void songReplaced() override { replaced = true; }
+    void report(const CommandResult& result) override { reported = result; }
+
+    Chosen pending;
+    bool quitted = false;
+    bool replaced = false;
+    std::optional<CommandResult> reported;
+};
 } // namespace
+
+TEST_CASE("file operations refuse a pending recording take, even after stop and with bang")
+{
+    Playing p;
+    RecordingFiles files;
+    test::TempDirectory directory{"modal-recording-files-test"};
+    addFileCommands(p.registry, p.document, files, directory.path());
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    p.document.markSaved();
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    REQUIRE(hasPitch(p.document.song(), id, 99));
+    REQUIRE_FALSE(p.document.modified());
+
+    const auto check = [&]
+    {
+        const auto before = p.document.underlying();
+        for (const auto command :
+             {U"q", U"q!", U"w", U"w!", U"wq", U"export", U"export!", U"e", U"e!", U"new", U"new!"})
+        {
+            p.type(U":");
+            p.type(command);
+            p.press(Key::of(NamedKey::Enter));
+            CHECK(p.ws.message() == "Stop recording first");
+            CHECK(p.document.underlying() == before);
+            CHECK_FALSE(files.quitted);
+            CHECK_FALSE(files.replaced);
+            CHECK_FALSE(files.pending);
+        }
+    };
+    check();
+    p.type(U" "); // the engine has not acknowledged the stop yet
+    check();
+    p.runFor(10ms);
+    REQUIRE(hasPitch(p.document.underlying(), id, 99));
+    p.type(U":w take");
+    p.press(Key::of(NamedKey::Enter));
+    const auto saved = core::readSongFile(directory.path() / "take.modal");
+    REQUIRE(saved.song);
+    CHECK(hasPitch(*saved.song, id, 99));
+    CHECK_FALSE(p.document.modified());
+}
+
+TEST_CASE("a file dialog answered during recording cannot change or save the song")
+{
+    Playing p;
+    RecordingFiles files;
+    test::TempDirectory directory{"modal-recording-dialog-test"};
+    addFileCommands(p.registry, p.document, files, directory.path());
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    p.type(U",ra");
+    p.document.markSaved();
+    p.type(U":");
+    p.type(GENERATE(U"e", U"w", U"wq", U"export"));
+    p.press(Key::of(NamedKey::Enter));
+    REQUIRE(files.pending);
+    p.type(U"R");
+    p.runFor(2100ms);
+    playNote(p, 99);
+    const auto before = p.document.underlying();
+    const auto path = directory.path() / "dialog.modal";
+    auto existing = newSong();
+    existing.title = "Existing file";
+    REQUIRE(core::writeSongFile(existing, path).empty());
+    const auto callback = std::move(files.pending);
+    callback(path);
+    REQUIRE(files.reported);
+    CHECK(*files.reported == CommandResult::error("Stop recording first"));
+    CHECK(p.document.underlying() == before);
+    CHECK_FALSE(files.quitted);
+    CHECK_FALSE(files.replaced);
+    const auto saved = core::readSongFile(path);
+    REQUIRE(saved.song);
+    CHECK(saved.song->title == "Existing file");
+}
 
 namespace
 {
