@@ -10,7 +10,6 @@ Read [schedule.md](schedule.md) for the current milestone, item states and next 
 
 ## Pending
 
-- **UI trial of the 16 November review fixes**, before pushing the local commits: pending-take file safety, live tempo edits while recording, selected pedal-region lengths and restarting after the song ends. All six Linux configurations pass; trial steps are below.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
@@ -28,9 +27,9 @@ Playback completion now publishes its play-request ID in one atomic value, with 
 
 A final file-safety check found that an open dialog started before recording could discard the take after it was finalised. Its answer now rechecks unsaved changes and retains the original command's bang: normal `:e` refuses, while `:e!` may discard the completed take. The Workspace regression first reproduced this failure, then passed; focused dialog/file checks pass (4 test cases, 199 assertions).
 
-Final validation, 16 November 2026: `tools/check-linux.sh` passes on the final code in all six configurations: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each registers 1,043 tests, with three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. This complete rerun supersedes an earlier combined run that overlapped the final dialog edit and tested an older object file under ASan; rebuilding that object also passed the focused regression. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop was driven and no hardware timing results were measured. Local implementation commits are `875ec05`, `0a44d05`, `b4a38f8`, `6c0fe3f` and `01be611`. The UI trial remains pending, so nothing has been pushed; Windows CI will run after publication.
+Final validation, 16 November 2026: `tools/check-linux.sh` passes on the final code in all six configurations: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer. Each registers 1,043 tests, with three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. This complete rerun supersedes an earlier combined run that overlapped the final dialog edit and tested an older object file under ASan; rebuilding that object also passed the focused regression. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop was driven by the agent and no hardware timing results were measured. Implementation commits are `875ec05`, `0a44d05`, `b4a38f8`, `6c0fe3f` and `01be611`. The UI trial was accepted 16 November 2026. Publication and Windows/Linux CI confirmation follow that acceptance.
 
-Trial, using a disposable song and the normal MIDI setup:
+Accepted trial, 16 November 2026, using a disposable song and the normal MIDI setup:
 
 - Start recording on an armed track, play a few notes, then try `:w`, `:export`, `:e`, `:new`, `:q` (including forced commands) and the window's close button. Each should say `Stop recording first` and keep the take. Stop with Space, then save: the recorded notes should be included.
 - During a take, change the conductor's tempo from 120 to 60 BPM and record more notes, including one held across the change. After stopping, their starts and ends should follow where they were played in the music. This is a functional trial, not a measured hardware timing result.
