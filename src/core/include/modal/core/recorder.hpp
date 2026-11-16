@@ -84,11 +84,12 @@ private:
     {
         InputId input;
         std::chrono::nanoseconds songTime;
+        std::shared_ptr<const TempoMap> tempo;
         std::vector<std::uint8_t> bytes;
     };
 
     void receiveMessage(InputId input, std::span<const std::uint8_t> message,
-                        std::chrono::nanoseconds songTime);
+                        std::chrono::nanoseconds songTime, const TempoMap& tempo);
     void noteOn(TrackTake& take, InputId input, std::uint8_t inChannel, std::uint8_t pitch,
                 std::uint8_t velocity, Tick tick);
     void noteOff(TrackTake& take, InputId input, std::uint8_t inChannel, std::uint8_t pitch,

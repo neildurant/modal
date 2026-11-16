@@ -91,6 +91,7 @@ namespace detail
 struct EngineSnapshot
 {
     std::shared_ptr<const PlaybackPlan> plan;
+    std::shared_ptr<const TempoMap> inputTempo;
     std::uint64_t playRequest = 0;
     Tick start = 0;
     std::shared_ptr<const std::vector<PlannedEvent>> chased;
@@ -251,7 +252,8 @@ private:
     bool carryOut(const Command& command, std::chrono::nanoseconds now) noexcept;
     using InputBatch = std::array<std::size_t, kMaxInputs>;
     InputBatch queuedInput() const noexcept;
-    void takeInput(InputBatch& queued, std::size_t most = kInputBatch) noexcept;
+    void takeInput(InputBatch& queued, const Snapshot* snapshot,
+                   std::size_t most = kInputBatch) noexcept;
     void publishStatus(std::chrono::nanoseconds now) noexcept;
     void noteStop(std::chrono::nanoseconds now) noexcept;
 

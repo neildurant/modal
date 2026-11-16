@@ -105,6 +105,68 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
     CHECK(p.lookedUp.size() == 4);
 }
 
+TEST_CASE("recording retains each input's tempo mapping across live edits and delayed collection")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto offsetKind = GENERATE(0, 1, 2, 3, 4);
+    const auto offset = offsetKind == 1   ? TimeOffset::ticks(q / 4)
+                        : offsetKind == 2 ? TimeOffset::ticks(-q / 4)
+                        : offsetKind == 3 ? TimeOffset{125ms}
+                        : offsetKind == 4 ? TimeOffset{-125ms}
+                                          : TimeOffset{};
+    auto song = songAt(ppqn);
+    const auto id = song.addTrack("Recorded");
+    song.updateTrack(id,
+                     [&](Track& track)
+                     {
+                         track.arm = true;
+                         track.timeOffset = offset;
+                     });
+    song.countIn.mode = CountInSettings::Mode::None;
+    Playing p{song};
+    REQUIRE(p.player.record(song));
+    p.engine.step();
+    const auto leadIn = compilePlan(song, byPortName).leadIn;
+    p.clock.time += 1s;
+    // Queued before the edit: it must be stamped against the old mapping.
+    const auto oldTick = offset.undo(song.tempo(), p.clock.time - kStart - leadIn);
+    REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0xB0, 11, 80}, p.clock.time));
+    REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0x90, 88, 90}, p.clock.time));
+    song.updateTempo([](TempoMap& tempo) { tempo.set(0, Tempo{1'000'000}); });
+    p.player.update(song);
+    p.engine.step();
+
+    p.clock.time += 500ms;
+    p.engine.step();
+    REQUIRE(p.engine.status().position);
+    const auto heard = song.tempo().toTime(*p.engine.status().position);
+    const auto start = offset.undo(song.tempo(), heard);
+    REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0x80, 88, 64}, p.clock.time));
+    REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0x90, 99, 100}, p.clock.time));
+    p.engine.step();
+    p.clock.time += 500ms;
+    REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0x80, 99, 70}, p.clock.time));
+    p.engine.step();
+    // Replace and reclaim the plans before collecting any input. Its mapping must survive.
+    for (int i = 0; i < 4; ++i)
+    {
+        p.player.update(song);
+        p.engine.step();
+    }
+    p.clock.time += 500ms;
+    REQUIRE(p.player.stop());
+    p.engine.step();
+    p.player.poll();
+    const auto take = p.player.finishRecording(song);
+    REQUIRE(take);
+    const auto events = take->song.events(id).all();
+    REQUIRE(events.size() == 3);
+    CHECK(events[0] == Event{oldTick, ControlChange{11, 80}});
+    CHECK(events[1] == Event{oldTick, Note{88, 90, start - oldTick, 64}});
+    CHECK(events[2] == Event{start, Note{99, 100, q / 2, 70}});
+}
+
 TEST_CASE("the metronome set to always clicks in plain playback, and set to while recording "
           "doesn't")
 {

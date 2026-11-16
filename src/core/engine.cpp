@@ -29,6 +29,7 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
 {
     assert(plan);
     Snapshot next = latest_ ? *latest_ : Snapshot{};
+    next.inputTempo = std::make_shared<const TempoMap>(plan->tempo);
     next.plan = std::move(plan);
     return publish(std::move(next)) && woken(true);
 }
@@ -192,17 +193,24 @@ void Engine::run() noexcept
 EngineWake Engine::step() noexcept
 {
     const auto now = clock_.now();
+    // Capture a finite backlog: producers can only append behind it. Whole messages stay
+    // together and ports take turns, so a flood cannot trap playback in the input loop.
+    auto input = queuedInput();
+    const auto* before = snapshots_.current();
     if (snapshots_.update())
     {
+        // The replaced snapshot stays alive until the next update. Finish the captured
+        // input against its old mapping before changing tempo or Thru targets.
+        if (before != nullptr)
+        {
+            takeInput(input, before, kMaxInputs * InputQueue::kCapacity);
+        }
         const auto& plan = *snapshots_.current()->plan;
         scheduler_.setPlan(plan, now);
         thru_.setTargets(plan.thru);
     }
 
-    // Capture a finite backlog: producers can only append behind it. Whole messages stay
-    // together and ports take turns, so a flood cannot trap playback in the input loop.
-    auto input = queuedInput();
-    takeInput(input);
+    takeInput(input, snapshots_.current());
 
     // Commands are carried out in order; a Play whose snapshot hasn't arrived yet waits, and
     // so do the commands after it.
@@ -215,7 +223,7 @@ EngineWake Engine::step() noexcept
         }
         // Finish input captured before this transport boundary while its play/mapping is
         // still current. This is bounded by queue capacities, not by ongoing input traffic.
-        takeInput(input, kMaxInputs * InputQueue::kCapacity);
+        takeInput(input, snapshots_.current(), kMaxInputs * InputQueue::kCapacity);
         if (!carryOut(*command, now))
         {
             pending_ = command;
@@ -283,7 +291,7 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         // Producers are closed. Capture any final callback after the step's initial snapshot
         // and finish its messages before releasing state and allowing IDs to be reused.
         auto input = queuedInput();
-        takeInput(input, kMaxInputs * InputQueue::kCapacity);
+        takeInput(input, snapshots_.current(), kMaxInputs * InputQueue::kCapacity);
         thru_.endAll(clock_.now());
         inputsReset_.store(command.request, std::memory_order_release);
         return true;
@@ -310,7 +318,7 @@ Engine::InputBatch Engine::queuedInput() const noexcept
     return result;
 }
 
-void Engine::takeInput(InputBatch& queued, std::size_t most) noexcept
+void Engine::takeInput(InputBatch& queued, const Snapshot* snapshot, std::size_t most) noexcept
 {
     thru_.setEnabled(thruOn_.load(std::memory_order_relaxed));
     std::size_t received = 0;
@@ -346,6 +354,8 @@ void Engine::takeInput(InputBatch& queued, std::size_t most) noexcept
                                          currentPlay_};
                     if (currentPlay_ != 0)
                     {
+                        assert(snapshot != nullptr);
+                        stamped.tempo = snapshot->inputTempo;
                         stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
                         stamped.songTime =
                             scheduler_.songTimeAt(chunk->time).value_or(nanoseconds{0});

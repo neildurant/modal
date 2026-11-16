@@ -295,6 +295,31 @@ TEST_CASE("input the engine hasn't kept up with is dropped, for that input only"
     CHECK(engine.receive(InputId{0}, note, kStart)); // room again
 }
 
+TEST_CASE("stamped input retains only its tempo map until the control side releases it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    REQUIRE(engine.setPlan(fourNotes(ppqn)));
+    REQUIRE(engine.play(0));
+    engine.step();
+    REQUIRE(engine.receive(InputId{0}, std::array<std::uint8_t, 3>{0xB0, 1, 90}, clock.time));
+    engine.step();
+    auto input = engine.nextReceived();
+    REQUIRE(input);
+    REQUIRE(input->tempo);
+    std::weak_ptr<const TempoMap> mapping = input->tempo;
+    for (int i = 0; i < 4; ++i)
+    {
+        REQUIRE(engine.setPlan(fourNotes(ppqn)));
+        engine.step();
+    }
+    CHECK(mapping.use_count() == 1); // snapshots reclaimed, only the received input owns it
+    input.reset();                   // final release on the control side
+    CHECK(mapping.expired());
+}
+
 // Input from a thread of its own, while the engine runs on another.
 TEST_CASE("the engine takes in input from another thread while it runs")
 {

@@ -10,11 +10,14 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 
 namespace modal::core
 {
+
+class TempoMap;
 
 // Which input port a message came from.
 struct InputId
@@ -53,6 +56,11 @@ struct StampedInput
     // While playing, how far into the song it arrived, on the song's tempo map; before 0 in a
     // lead-in. The recorder takes a track's time offset off this.
     std::chrono::nanoseconds songTime{};
+
+    // The immutable mapping used for this stamp. Made on the control side and moved back
+    // through the queue, so delayed collection never uses a later edit's tempo. A failed
+    // push leaves its snapshot owning the map; the engine never frees the last reference.
+    std::shared_ptr<const TempoMap> tempo = nullptr;
 };
 
 // Messages from one input port on their way to the engine, timestamped as they arrived. One

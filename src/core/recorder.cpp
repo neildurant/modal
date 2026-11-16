@@ -112,10 +112,12 @@ void Recorder::receive(const StampedInput& input)
         }
         if (input.chunk.more)
         {
-            partial_.push_back({input.input, input.songTime, {bytes.begin(), bytes.end()}});
+            partial_.push_back(
+                {input.input, input.songTime, input.tempo, {bytes.begin(), bytes.end()}});
             return;
         }
-        receiveMessage(input.input, bytes, input.songTime);
+        receiveMessage(input.input, bytes, input.songTime,
+                       input.tempo ? *input.tempo : song_.tempo());
         return;
     }
 
@@ -128,12 +130,13 @@ void Recorder::receive(const StampedInput& input)
     {
         const auto whole = std::move(*partial);
         partial_.erase(partial);
-        receiveMessage(whole.input, whole.bytes, whole.songTime);
+        receiveMessage(whole.input, whole.bytes, whole.songTime,
+                       whole.tempo ? *whole.tempo : song_.tempo());
     }
 }
 
 void Recorder::receiveMessage(InputId input, std::span<const std::uint8_t> message,
-                              nanoseconds songTime)
+                              nanoseconds songTime, const TempoMap& tempo)
 {
     if (message.empty())
     {
@@ -182,7 +185,7 @@ void Recorder::receiveMessage(InputId input, std::span<const std::uint8_t> messa
     {
         if (take.input && *take.input != input)
             continue;
-        const Tick tick = take.timeOffset.undo(song_.tempo(), songTime);
+        const Tick tick = take.timeOffset.undo(tempo, songTime);
         if (status == 0x90 && b > 0)
         {
             noteOn(take, input, inChannel, a, b, tick);
