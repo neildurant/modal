@@ -60,11 +60,15 @@ struct Lanes
         type(U"gr");
     }
 
+    // Keys typed, \t for Tab and \v for Shift-Tab.
     void type(std::u32string_view keys)
     {
         for (const char32_t key : keys)
         {
-            ws.handle(Key::typed(key), 0);
+            ws.handle(key == U'\t'   ? Key::of(NamedKey::Tab)
+                      : key == U'\v' ? Key::of(NamedKey::Tab, kShift)
+                                     : Key::typed(key),
+                      0);
         }
     }
     void press(const Key& key) { ws.handle(key, 0); }
@@ -171,18 +175,18 @@ TEST_CASE("the lane's list, , c c, has Velocity first, then the latest used, the
     CHECK(l.track().lane == kModWheel);
 }
 
-TEST_CASE("in a controller's lane, Tab and h and l go event to event, and H and L between")
+TEST_CASE("in a controller's lane, Tab goes event to event, h and l a grid step, H and L a nudge")
 {
     Lanes l(GENERATE(core::kPpqn, core::Ppqn{96}));
     l.line(U"lane cc1");
     l.type(U"gggl");
     REQUIRE(l.view().laneNote());
     CHECK(l.view().time() == 0);
-    l.type(U"l");
+    l.type(U"\t");
     CHECK(l.view().time() == l.q());
     l.press(Key::of(NamedKey::Tab));
     CHECK(l.view().time() == 2 * l.q());
-    l.type(U"h");
+    l.type(U"\v");
     CHECK(l.view().time() == l.q());
     // A nudge on, there's no event; Tab goes on to the next.
     l.type(U"L");
@@ -220,7 +224,7 @@ TEST_CASE("a controller's values change as velocities do, and the inspector show
     l.enter();
     CHECK(l.values(kModWheel) == std::vector<int>{50, 40, 80});
     // Enter alone asks: +5 on the next.
-    l.type(U"l");
+    l.type(U"\t");
     l.enter();
     l.type(U"+5");
     l.enter();
@@ -228,7 +232,7 @@ TEST_CASE("a controller's values change as velocities do, and the inspector show
     // A v selection over all three, raised by 10, the highest stopping at 127.
     l.type(U"0");
     l.type(U"gg");
-    l.type(U"v2l");
+    l.type(U"v2\t");
     l.type(U"10");
     l.press(Key::typed(U'a', kCtrl));
     CHECK(l.values(kModWheel) == std::vector<int>{60, 55, 90});
@@ -261,7 +265,7 @@ TEST_CASE("a Ctrl-v box in a controller's lane takes the events with values insi
     l.type(U"gggl");
     // From 10 to 80 takes all three; lowering the top edge to 70 leaves 80 out.
     l.press(Key::typed(U'v', kCtrl));
-    l.type(U"2l");
+    l.type(U"2\t");
     CHECK(l.view().laneTaken().size() == 3);
     l.type(U"J");
     CHECK(l.view().laneTaken().size() == 2);
@@ -294,9 +298,9 @@ TEST_CASE("o adds a controller's event at the cursor, at the value before it")
     l.line(U"lane cc1");
     l.type(U"gggl");
     // Half a beat on, between 10 and 40: o takes 10.
-    l.type(U"l");
+    l.type(U"\t");
     REQUIRE(l.view().time() == l.q());
-    l.type(U"h");
+    l.type(U"\v");
     l.type(U"LLLL");
     const auto at = l.view().time();
     REQUIRE_FALSE(l.view().laneNote());
@@ -332,7 +336,7 @@ TEST_CASE("x deletes a controller's event, and d a selection's, into the registe
     CHECK(l.values(kModWheel) == std::vector<int>{40, 80});
     l.type(U"u");
     CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 80});
-    l.type(U"vld");
+    l.type(U"v\td");
     CHECK(l.values(kModWheel) == std::vector<int>{80});
     // The notes, the volume and the bend are untouched.
     CHECK(l.values({.kind = core::Lane::Kind::Controller, .controller = 7}) ==
@@ -434,7 +438,7 @@ TEST_CASE("between a controller's events, the inspector shows the value held the
 {
     Lanes l;
     l.line(U"lane cc1");
-    l.type(U"gggllL"); // a nudge past the 40
+    l.type(U"gggl\tL"); // a nudge past the 40
     REQUIRE_FALSE(l.view().laneNote());
     const auto text = inspectorText(l);
     CHECK(text.find(U"No event") != std::u32string::npos);
@@ -447,7 +451,7 @@ TEST_CASE("a selection in a controller's lane reaches the cursor between events"
     Lanes l;
     l.line(U"lane cc1");
     l.type(U"gggl");
-    l.type(U"vl");
+    l.type(U"v\t");
     const auto to = selectionWidth(l);
     CHECK(to > 0);
     l.type(U"20L"); // on past the 40, towards the 80
@@ -464,7 +468,7 @@ TEST_CASE("a Ctrl-v box started between a controller's events starts at the valu
 {
     Lanes l;
     l.line(U"lane cc1");
-    l.type(U"gggllL"); // a nudge past the 40
+    l.type(U"gggl\tL"); // a nudge past the 40
     l.press(Key::typed(U'v', kCtrl));
     CHECK(l.view().selectionStatus()->find("values 40") != std::string::npos);
 }
@@ -476,16 +480,16 @@ TEST_CASE("once a Ctrl-v box's edge is set with k or j, it no longer follows the
     l.type(U"gggl");
     l.press(Key::typed(U'v', kCtrl));
     // Onto the 40: the corner takes it.
-    l.type(U"l");
+    l.type(U"\t");
     CHECK(l.view().selectionStatus()->find("values 10–40") != std::string::npos);
     // Set to 50 by hand, it stays there as the cursor goes on to the 80.
     l.type(U"10k");
-    l.type(U"l");
+    l.type(U"\t");
     CHECK(l.view().selectionStatus()->find("values 10–50") != std::string::npos);
     // A box started afresh follows again.
     l.press(Key::of(NamedKey::Escape));
     l.press(Key::typed(U'v', kCtrl));
-    l.type(U"h");
+    l.type(U"\v");
     CHECK(l.view().selectionStatus()->find("values 40–80") != std::string::npos);
 }
 
@@ -561,10 +565,10 @@ TEST_CASE("a pedal's lane goes region to region, the inspector showing where it'
     // Half-pedalled within it, still one region: no further.
     l.press(Key::of(NamedKey::Tab));
     CHECK(l.view().time() == 2 * l.q());
-    l.type(U"h");
+    l.type(U"\v");
     CHECK(l.view().time() == 0);
     // Between them, pedal up.
-    l.type(U"l20H"); // back from the second region, past the first's lift
+    l.type(U"\t20H"); // back from the second region, past the first's lift
     CHECK_FALSE(l.view().laneNote());
     CHECK(inspectorText(l).find(U"Pedal up") != std::u32string::npos);
     // Its values change in the values view, , c v, as a controller's.
@@ -607,7 +611,7 @@ TEST_CASE("0 and Enter set a controller's value to 0, though 0 alone goes to the
 {
     Lanes l;
     l.line(U"lane cc1");
-    l.type(U"ggglll"); // the 80
+    l.type(U"gggl\t\t"); // the 80
     l.type(U"0");
     l.enter();
     CHECK(l.values(kModWheel) == std::vector<int>{10, 40, 0});
@@ -642,8 +646,8 @@ TEST_CASE("o presses the pedal at the cursor, up to just before the next region"
     pedal(l);
     const auto q = l.q();
     l.line(U"lane cc64");
-    l.type(U"gggll"); // the second region, at beat 3
-    l.type(U"H");     // a nudge before it, between the regions
+    l.type(U"gggl\t"); // the second region, at beat 3
+    l.type(U"H");      // a nudge before it, between the regions
     const auto at = l.view().time();
     REQUIRE_FALSE(l.view().laneNote());
     l.type(U"o");
@@ -674,7 +678,7 @@ TEST_CASE("= and - lift a pedal's region later or earlier, never into the next")
     l.type(U"3=");
     CHECK(l.ws.message() == "That would run into the next region");
     // Lifted before its half-pedalled value, that value goes, as it would press it again.
-    l.type(U"l6-");
+    l.type(U"\t6-");
     CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{
                               {0, 127}, {q + q / 2, 0}, {2 * q, 127}, {2 * q + q / 2, 0}});
 }
@@ -685,7 +689,7 @@ TEST_CASE("Alt-h and Alt-l move a pedal's region with its values, and x deletes 
     pedal(l);
     const auto q = l.q();
     l.line(U"lane cc64");
-    l.type(U"ggglll");
+    l.type(U"gggl\t\t");
     REQUIRE(l.view().time() == 2 * q);
     l.press(Key::typed(U'l', kAlt));
     CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{{0, 127},
@@ -702,6 +706,43 @@ TEST_CASE("Alt-h and Alt-l move a pedal's region with its values, and x deletes 
     CHECK(pedalling(l) == std::vector<std::pair<core::Tick, int>>{{0, 127}, {q + q / 2, 0}});
     // d on a selection takes whole regions.
     l.type(U"u");
-    l.type(U"ggvld");
+    l.type(U"ggv\td");
     CHECK(pedalling(l).empty());
+}
+
+TEST_CASE("h and l move a grid step in a controller's or pedal's lane, note to note in velocity's")
+{
+    Lanes l;
+    l.line(U"lane cc1");
+    l.type(U"gggl");
+    l.type(U"l");
+    CHECK(l.view().time() == l.q() / 4);
+    l.type(U"3l");
+    CHECK(l.view().time() == l.q());
+    REQUIRE(l.view().laneNote()); // the 40
+    l.type(U"h");
+    CHECK(l.view().time() == 3 * l.q() / 4);
+    l.line(U"lane cc64");
+    l.type(U"l");
+    CHECK(l.view().time() == l.q());
+}
+
+TEST_CASE("a Ctrl-v box is refused among a pedal's regions, but not in its values")
+{
+    Lanes l;
+    pedal(l);
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    l.press(Key::typed(U'v', kCtrl));
+    CHECK(l.ws.message().starts_with("A pedal's regions are down or up"));
+    CHECK(l.ws.mode() == Mode::Normal);
+    // Nor from v.
+    l.type(U"v");
+    l.press(Key::typed(U'v', kCtrl));
+    CHECK(l.ws.message().starts_with("A pedal's regions are down or up"));
+    l.press(Key::of(NamedKey::Escape));
+    l.press(Key::of(NamedKey::Escape));
+    l.type(U",cv");
+    l.press(Key::typed(U'v', kCtrl));
+    CHECK(l.ws.mode() == Mode::Visual);
 }

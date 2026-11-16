@@ -3283,10 +3283,12 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                          MessageKind::Information);
             return true;
         }
-        // In the lane, h and l go event to event, as Tab does: the time between notes means
-        // nothing there, and a selection grows an event at a time rather than overshooting
-        // (decided 14 November 2026, after use); H and L move between a controller's events.
-        if (command == "cursor-left" || command == "cursor-right")
+        // In the velocity lane, h and l go note to note, as Tab does: the time between notes
+        // means nothing there, and a selection grows a note at a time rather than overshooting
+        // (decided 14 November 2026, after use). In a controller's or pedal's lane they move a
+        // grid step, to get about quickly where events are to be added, Tab going event to
+        // event and H and L a nudge (decided 16 November 2026, after use).
+        if (notes && (command == "cursor-left" || command == "cursor-right"))
         {
             return runLane(command == "cursor-left" ? "lane-event-previous" : "lane-event-next",
                            count);

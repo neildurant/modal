@@ -1636,6 +1636,14 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
     if (command == "visual" || command == "visual-rows" || command == "visual-box")
     {
         const auto kind = selectionKind(command);
+        if (kind == SelectionKind::Box && where() == Where::Lane && pianoRoll_->isSwitchLane())
+        {
+            // A box of values means nothing among a pedal's regions, which are down or up.
+            refuse("A pedal's regions are down or up, so there's no box of values: v selects "
+                   "them, and , c v shows its values",
+                   MessageKind::Information);
+            return true;
+        }
         document_.breakMerge();
         selection_ =
             Selection{.anchor = view().cursor(),
@@ -2336,6 +2344,12 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
         if (selection_->kind == kind)
         {
             endVisual();
+        }
+        else if (kind == SelectionKind::Box && where() == Where::Lane && pianoRoll_->isSwitchLane())
+        {
+            refuse("A pedal's regions are down or up, so there's no box of values: v selects "
+                   "them, and , c v shows its values",
+                   MessageKind::Information);
         }
         else
         {
