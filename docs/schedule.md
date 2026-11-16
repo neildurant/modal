@@ -142,7 +142,7 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 - [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines. One way to fit it, Sequencer Plus Gold's Tap-Tempo: play the track back and tap a note on each beat, the tempo map following the taps; it also locks onto music recorded without a click.
 - [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
 - [ ] **To do** — Release velocity tools: setting and adjusting note-off velocities over a range, as `^` does note-on velocities (Sequencer Plus Gold's Set-NoteOff and Adjust-NoteOff).
-- [ ] **To do** — Splitting by more than pitch: by velocity, duration, whether on or off the grid, and every nth note (Sequencer Plus Gold's Modulus); and a pitch map, remapping many pitches at once as a table, beside remap's one note.
+- [ ] **To do** — Splitting by more than pitch: by velocity, duration, whether on or off the grid, and every nth note (Sequencer Plus Gold's Modulus); and, going beyond it (its Pitch Map does one note at a time, as remap does), a pitch map remapping many pitches at once as a table. How it does these is in design.md, Feature notes.
 - [ ] **To do** — Chord/key track, including changes over time.
 - [ ] **To do** — Scale lock and a semitone motion that ignores it, after the chord/key track.
 - [ ] **To do** — Track-wide ripple editing.
