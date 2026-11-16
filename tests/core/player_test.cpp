@@ -548,3 +548,25 @@ TEST_CASE(
                      });
     CHECK_FALSE(p.player.auditionNote(song, id, 0, Note{60, 100, ppqn.quarter()}));
 }
+
+TEST_CASE("a finished play cannot cancel its replacement before the engine starts it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Playing p{fourNotes(ppqn)};
+    REQUIRE(p.player.play());
+    REQUIRE(p.runFor(3s));
+    REQUIRE_FALSE(p.player.playing());
+    REQUIRE(p.engine.status().finished);
+    const auto sent = p.sink.sent.size();
+    REQUIRE(p.player.play());
+    // The UI can poll before the engine has taken the replacement request.
+    CHECK_FALSE(p.player.poll());
+    CHECK(p.player.playing());
+    p.runFor(1ms);
+    CHECK(p.player.playing());
+    CHECK(p.engine.status().playing);
+    REQUIRE(p.sink.sent.size() > sent);
+    CHECK(p.sink.sent[sent].bytes == std::vector<std::uint8_t>{0x90, 60, 100});
+    CHECK(p.runFor(3s));
+    CHECK_FALSE(p.player.playing());
+}

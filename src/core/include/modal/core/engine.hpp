@@ -59,10 +59,11 @@ struct EngineWake
 struct EngineStatus
 {
     bool playing = false;
-    bool finished = false;        // every event sent and every note ended
-    bool countingIn = false;      // in a count-in, before the record point
-    std::optional<Tick> position; // while playing
-    std::size_t droppedNotes = 0; // see Scheduler::droppedNotes
+    bool finished = false;          // every event sent and every note ended
+    std::uint64_t finishedPlay = 0; // the completed play request, or 0 while unfinished
+    bool countingIn = false;        // in a count-in, before the record point
+    std::optional<Tick> position;   // while playing
+    std::size_t droppedNotes = 0;   // see Scheduler::droppedNotes
 
     // How late messages were sent: from each one's due time to just after it was handed to
     // the MIDI layer. That is the sum of how late the engine got to it (waking, and any
@@ -295,7 +296,7 @@ private:
     // Status, written by the engine thread only.
     std::atomic<std::uint64_t> inputsReset_{0}; // acknowledgement, after releasing held input
     std::atomic<bool> playing_{false};
-    std::atomic<bool> finished_{false};
+    std::atomic<std::uint64_t> finishedPlay_{0};
     std::atomic<bool> countingIn_{false};
     static constexpr Tick kNoPosition = -1;
     std::atomic<Tick> position_{kNoPosition};

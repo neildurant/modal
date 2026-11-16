@@ -330,7 +330,7 @@ bool Player::poll()
         }
     }
     // Recording carries on past the song's end until stopped.
-    if (playing_ && !recorder_ && engine_.status().finished)
+    if (playing_ && !recorder_ && play_ != 0 && engine_.status().finishedPlay == play_)
     {
         // Resuming from the end would play nothing, so without rewind, back to the start. The
         // engine has finished, so if it can't take the stop now, nothing more sounds anyway.

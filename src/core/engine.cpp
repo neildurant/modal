@@ -29,6 +29,7 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
 {
     assert(plan);
     Snapshot next = latest_ ? *latest_ : Snapshot{};
+    // Input retains the mapping alone, so delayed collection cannot pin whole old plans.
     next.inputTempo = std::make_shared<const TempoMap>(plan->tempo);
     next.plan = std::move(plan);
     return publish(std::move(next)) && woken(true);
@@ -113,7 +114,8 @@ EngineStatus Engine::status() const
 {
     EngineStatus status;
     status.playing = playing_.load(std::memory_order_relaxed);
-    status.finished = finished_.load(std::memory_order_relaxed);
+    status.finishedPlay = finishedPlay_.load(std::memory_order_relaxed);
+    status.finished = status.finishedPlay != 0;
     status.countingIn = countingIn_.load(std::memory_order_relaxed);
     if (const Tick position = position_.load(std::memory_order_relaxed); position != kNoPosition)
     {
@@ -405,7 +407,7 @@ std::optional<Tick> Engine::stoppedAt(std::uint64_t play) const noexcept
 void Engine::publishStatus(nanoseconds now) noexcept
 {
     playing_.store(scheduler_.isPlaying(), std::memory_order_relaxed);
-    finished_.store(scheduler_.finished(), std::memory_order_relaxed);
+    finishedPlay_.store(scheduler_.finished() ? currentPlay_ : 0, std::memory_order_relaxed);
     countingIn_.store(scheduler_.countingIn(now), std::memory_order_relaxed);
     position_.store(scheduler_.position(now).value_or(kNoPosition), std::memory_order_relaxed);
     droppedNotes_.store(scheduler_.droppedNotes(), std::memory_order_relaxed);
