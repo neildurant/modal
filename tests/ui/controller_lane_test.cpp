@@ -710,6 +710,37 @@ TEST_CASE("Alt-h and Alt-l move a pedal's region with its values, and x deletes 
     CHECK(pedalling(l).empty());
 }
 
+TEST_CASE("selected pedal regions cannot be lengthened into one another")
+{
+    Lanes l(GENERATE(core::kPpqn, core::Ppqn{96}));
+    pedal(l);
+    const auto original = pedalling(l);
+    l.line(U"lane cc64");
+    l.type(U"ggglv\t");
+    const auto before = l.document.song();
+    const auto time = l.view().time();
+    const auto selection = l.view().selectionSpan();
+    const auto taken = l.view().laneTaken();
+    l.document.markSaved();
+    // The first lift would touch or pass the second press, by grid steps or 5 ms nudges.
+    l.type(GENERATE(U"2=", U"3=", U"50+", U"51+"));
+    CHECK(l.ws.message() == "That would run into the next region");
+    CHECK(l.document.song() == before);
+    CHECK_FALSE(l.document.modified());
+    CHECK(l.view().time() == time);
+    CHECK(l.ws.mode() == Mode::Visual);
+    CHECK(l.view().selectionSpan() == selection);
+    CHECK(l.view().laneTaken() == taken);
+    // A smaller lengthening still works for both, and undoes as one step.
+    l.type(U"=");
+    CHECK(pedalling(l).at(1).first == l.q() + l.q() / 2 + l.q() / 4);
+    CHECK(pedalling(l).back().first == 4 * l.q() + l.q() / 4);
+    l.press(Key::of(NamedKey::Escape));
+    l.type(U"u");
+    CHECK(pedalling(l) == original);
+    CHECK_FALSE(l.document.modified());
+}
+
 TEST_CASE("h and l move a grid step in a controller's or pedal's lane, note to note in velocity's")
 {
     Lanes l;

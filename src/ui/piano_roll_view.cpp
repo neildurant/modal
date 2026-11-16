@@ -1840,7 +1840,8 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
         }
         for (const auto& other : regions)
         {
-            if (others(other) && other.start > target.start && end >= other.start)
+            // Lengthening leaves every press in place, including a selected region's.
+            if (other.start > target.start && end >= other.start)
             {
                 host_.refuse("That would run into the next region", MessageKind::Information);
                 return true;
