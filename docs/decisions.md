@@ -4,6 +4,8 @@ How Modal's design was decided: each decision with when it was made and why, in 
 
 ## Views
 
+**Pedal-region queries and edits in core (decided 16 November 2026).** Extract the region description and queries first, then musical editing operations, keeping the existing behaviour. Shared event-list operations give the musical rules one home and make full-batch validation directly testable. Regions stay derived from raw CC events, preserving half-pedal values, stored ordering and absent lifts; their indices are valid only for the queried list. The view retains keys, destination calculations, cursor/selection updates, undo grouping, rendering and message wording. Core reports typed refusal reasons. Session-lifecycle ownership remains separate work.
+
 **The Tracks view (decided November 2026, for milestone 7; first step built November 2026).** Add a dedicated table of track settings before the outline view. Comparing routing and playback settings across tracks is useful when setting up a song or making an imported MIDI file productive; putting every setting beside the arrangement would consume timeline space and give horizontal movement two different jobs. The arrangement stays focused on time, the outline on sections, and the Tracks view on the song's parts and how they play. Views share the same track settings and remember the musical position when switching.
 
 - Expose what the engine already supports first: number, name, mute, solo, output port, channel, transpose, velocity offset and time offset. Mute and solo go beside the name for easy visual reference. Bank/program setup and playback quantise follow as separate steps. Leave out a whole-track loop toggle, since sections and cycles need a richer looping model.

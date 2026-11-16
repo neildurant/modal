@@ -6,6 +6,7 @@
 #include <array>
 #include <numeric>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace modal::core
@@ -42,6 +43,24 @@ EventList listOf(const std::vector<Event>& events)
         list.insert(event);
     }
     return list;
+}
+
+EventList replacePedalEvents(const EventList& events, std::vector<std::size_t> gone,
+                             std::span<const Event> added = {})
+{
+    std::ranges::sort(gone, std::greater{});
+    const auto duplicates = std::ranges::unique(gone);
+    gone.erase(duplicates.begin(), duplicates.end());
+    auto result = events;
+    for (const auto index : gone)
+    {
+        result.erase(index);
+    }
+    for (const auto& event : added)
+    {
+        result.insert(event);
+    }
+    return result;
 }
 
 // A pedal's value just before a tick, by its last event before it.
@@ -145,6 +164,140 @@ std::vector<std::size_t> pedalRegionEvents(const EventList& events, int controll
         indices.push_back(i);
     }
     return indices;
+}
+
+PedalRegionResult insertPedalRegion(const EventList& events, int controller, Tick start, Tick end,
+                                    Tick songEnd)
+{
+    if (start < 0)
+    {
+        return PedalRegionRefusal::BeforeStart;
+    }
+    const auto regions = pedalRegions(events, controller, songEnd);
+    for (const auto& region : regions)
+    {
+        if (start >= region.start && start < region.end)
+        {
+            return PedalRegionRefusal::AlreadyDown;
+        }
+        if (region.start > start)
+        {
+            end = std::min(end, region.start - 1);
+            break;
+        }
+    }
+    if (end <= start)
+    {
+        return PedalRegionRefusal::NoRoom;
+    }
+    auto result = events;
+    result.insert(pedal(start, controller, true));
+    result.insert(pedal(end, controller, false));
+    return result;
+}
+
+EventList erasePedalRegions(const EventList& events, int controller,
+                            std::span<const PedalRegion> targets)
+{
+    std::vector<std::size_t> gone;
+    for (const auto& target : targets)
+    {
+        const auto indices = pedalRegionEvents(events, controller, target);
+        gone.insert(gone.end(), indices.begin(), indices.end());
+    }
+    return replacePedalEvents(events, std::move(gone));
+}
+
+PedalRegionResult movePedalRegions(const EventList& events, int controller,
+                                   std::span<const PedalRegion> targets, Tick by, Tick songEnd)
+{
+    if (by == 0)
+    {
+        return events;
+    }
+    const auto regions = pedalRegions(events, controller, songEnd);
+    std::vector<std::size_t> gone;
+    std::vector<Event> added;
+    for (const auto& target : targets)
+    {
+        const auto start = target.start + by;
+        const auto end = target.end + by;
+        if (start < 0)
+        {
+            return PedalRegionRefusal::BeforeStart;
+        }
+        if (target.lift && end > std::max<Tick>(songEnd - 1, 0))
+        {
+            return PedalRegionRefusal::PastEnd;
+        }
+        // Selected regions share one translation, preserving their relative positions,
+        // including touching regions in imported data. Only other regions can collide.
+        for (const auto& other : regions)
+        {
+            const bool selected = std::ranges::any_of(targets, [&](const PedalRegion& t)
+                                                      { return t.index == other.index; });
+            if (!selected && start <= other.end && other.start <= end)
+            {
+                return PedalRegionRefusal::Collision;
+            }
+        }
+        for (const auto index : pedalRegionEvents(events, controller, target))
+        {
+            gone.push_back(index);
+            auto event = events[index];
+            event.tick += by;
+            added.push_back(std::move(event));
+        }
+    }
+    return replacePedalEvents(events, std::move(gone), added);
+}
+
+PedalRegionResult resizePedalRegions(const EventList& events, int controller,
+                                     std::span<const PedalRegion> targets,
+                                     const std::function<Tick(Tick)>& endAt, Tick songEnd)
+{
+    const auto regions = pedalRegions(events, controller, songEnd);
+    std::vector<std::size_t> gone;
+    std::vector<Event> added;
+    for (const auto& target : targets)
+    {
+        if (!target.lift)
+        {
+            return PedalRegionRefusal::NoLift;
+        }
+        const auto end = endAt(target.end);
+        if (end <= target.start)
+        {
+            return PedalRegionRefusal::EmptyRegion;
+        }
+        if (end > std::max<Tick>(songEnd - 1, 0))
+        {
+            return PedalRegionRefusal::PastEnd;
+        }
+        for (const auto& other : regions)
+        {
+            // Resizing leaves every press in place, including selected regions' presses.
+            if (other.start > target.start && end >= other.start)
+            {
+                return PedalRegionRefusal::Collision;
+            }
+        }
+        for (const auto index : pedalRegionEvents(events, controller, target))
+        {
+            if (index == *target.lift)
+            {
+                gone.push_back(index);
+                auto lift = events[index];
+                lift.tick = end;
+                added.push_back(std::move(lift));
+            }
+            else if (events[index].tick >= end)
+            {
+                gone.push_back(index);
+            }
+        }
+    }
+    return replacePedalEvents(events, std::move(gone), added);
 }
 
 bool pedalDown(const EventList& events, int controller, Tick tick)

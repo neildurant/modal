@@ -741,6 +741,35 @@ TEST_CASE("selected pedal regions cannot be lengthened into one another")
     CHECK_FALSE(l.document.modified());
 }
 
+TEST_CASE("pedal-region editing keeps the view's messages for musical refusals")
+{
+    Lanes l(GENERATE(core::kPpqn, core::Ppqn{96}));
+    pedal(l);
+    l.line(U"lane cc64");
+    l.type(U"gggl");
+    const auto before = l.document.song();
+    l.document.markSaved();
+    SECTION("a region cannot be shortened to nothing")
+    {
+        l.type(U"6-");
+        CHECK(l.ws.message() == "That would leave nothing of the region: x deletes it");
+    }
+    SECTION("a lift cannot go past the song's end")
+    {
+        l.type(U"\t1000=");
+        CHECK(l.ws.message() == "That would go past the song's end");
+    }
+    SECTION("a held region has no lift to move")
+    {
+        l.type(U",cv\t\t\t\tx,cv"); // delete the final lift in the values view
+        l.type(U"gg\t=");
+        CHECK(l.ws.message() == "That region holds to the song's end, with no lift to move");
+        l.type(U"u"); // only the earlier deletion should have made an undo step
+    }
+    CHECK(l.document.song() == before);
+    CHECK_FALSE(l.document.modified());
+}
+
 TEST_CASE("h and l move a grid step in a controller's or pedal's lane, note to note in velocity's")
 {
     Lanes l;

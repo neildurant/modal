@@ -1610,53 +1610,66 @@ std::vector<std::size_t> PianoRollView::regionEvents(const core::PedalRegion& re
 
 std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
 {
-    // A pedal's regions edited as notes are (decided 15 November 2026): pressed at the cursor
-    // with o, lifted later or earlier with = and - (+ and _ a nudge), moved with Alt-h and
-    // Alt-l (Alt-H and Alt-L a nudge), and deleted with x; a selection's together. Refused
-    // where a region would run into another, as two notes of one pitch can't. The values
-    // within a region, half-pedalling, are kept and move with it.
+    const auto& song = document_.song();
     const auto controller = lane().controller;
     const auto id = *trackId();
-    const auto& events = document_.song().events(id);
-    const auto regions = pedalRegions(controller);
-    const auto here = laneNote();
-    const auto current = std::ranges::find_if(regions, [&](const core::PedalRegion& r)
-                                              { return here && r.index == *here; });
+    const auto& events = song.events(id);
     const auto name = laneTitle(lane());
+    const bool moving =
+        command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later");
+    // The core owns the musical edit and its refusals. Keys, destinations, messages, undo
+    // grouping and the cursor/selection remain the view's responsibility.
+    const auto apply =
+        [&](core::PedalRegionResult result, std::string title, std::string_view mergeKey = {})
+    {
+        if (const auto* refused = std::get_if<core::PedalRegionRefusal>(&result))
+        {
+            using Refusal = core::PedalRegionRefusal;
+            const char* message = "";
+            switch (*refused)
+            {
+            case Refusal::AlreadyDown:
+                message = "The pedal's down here already: = and - lift it later or earlier, x "
+                          "deletes it";
+                break;
+            case Refusal::NoRoom:
+                message = "There's no room before the next region";
+                break;
+            case Refusal::BeforeStart:
+                message = "That would go past the song's start or end";
+                break;
+            case Refusal::PastEnd:
+                message = moving ? "That would go past the song's start or end"
+                                 : "That would go past the song's end";
+                break;
+            case Refusal::Collision:
+                message = moving ? "That would run into another region"
+                                 : "That would run into the next region";
+                break;
+            case Refusal::NoLift:
+                message = "That region holds to the song's end, with no lift to move";
+                break;
+            case Refusal::EmptyRegion:
+                message = "That would leave nothing of the region: x deletes it";
+                break;
+            }
+            host_.refuse(message, MessageKind::Information);
+            return false;
+        }
+        editEvents(
+            std::move(title), [&](core::EventList& list)
+            { list = std::get<core::EventList>(std::move(result)); }, mergeKey);
+        return true;
+    };
     if (command == "lane-event-add")
     {
-        if (current != regions.end())
-        {
-            host_.refuse("The pedal's down here already: = and - lift it later or earlier, x "
-                         "deletes it",
-                         MessageKind::Information);
-            return true;
-        }
-        // For the default note's length, or up to just before the next region.
-        const auto& song = document_.song();
         const auto length =
             std::max<core::Tick>(song.tracks()[track_]->defaultLength().toTicks(song.ppqn()), 1);
-        auto end = time_ + length;
-        if (const auto next = std::ranges::find_if(regions, [&](const core::PedalRegion& r)
-                                                   { return r.start > time_; });
-            next != regions.end())
-        {
-            end = std::min(end, next->start - 1);
-        }
-        if (end <= time_)
-        {
-            host_.refuse("There's no room before the next region", MessageKind::Information);
-            return true;
-        }
-        editEvents("Pedal down for " + name + " in " + trackName(),
-                   [&](core::EventList& list)
-                   {
-                       list.insert({time_, core::ControlChange{controller, 127}});
-                       list.insert({end, core::ControlChange{controller, 0}});
-                   });
+        apply(core::insertPedalRegion(events, controller, time_, time_ + length, song.end()),
+              "Pedal down for " + name + " in " + trackName());
         return true;
     }
-    // The regions it's for: a selection's, or the cursor's.
+    const auto regions = pedalRegions(controller);
     std::vector<core::PedalRegion> targets;
     if (laneSelecting())
     {
@@ -1669,9 +1682,13 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
             }
         }
     }
-    else if (current != regions.end())
+    else if (const auto here = laneNote())
     {
-        targets.push_back(*current);
+        const auto current = std::ranges::find(regions, *here, &core::PedalRegion::index);
+        if (current != regions.end())
+        {
+            targets.push_back(*current);
+        }
     }
     if (targets.empty())
     {
@@ -1679,36 +1696,16 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
                      MessageKind::Information);
         return true;
     }
-    const auto others = [&](const core::PedalRegion& region)
-    {
-        return std::ranges::none_of(targets, [&](const core::PedalRegion& t)
-                                    { return t.index == region.index; });
-    };
     const auto what =
         targets.size() == 1 ? std::string{"a region"} : std::to_string(targets.size()) + " regions";
     if (command == "lane-event-delete")
     {
-        std::vector<std::size_t> gone;
-        for (const auto& region : targets)
-        {
-            std::ranges::copy(regionEvents(region), std::back_inserter(gone));
-        }
-        std::ranges::sort(gone, std::greater{});
-        editEvents("Delete " + what + " of " + name + " in " + trackName(),
-                   [&](core::EventList& list)
-                   {
-                       for (const auto i : gone)
-                       {
-                           list.erase(i);
-                       }
-                   });
+        apply(core::erasePedalRegions(events, controller, targets),
+              "Delete " + what + " of " + name + " in " + trackName());
         return true;
     }
     const bool fine = command.ends_with("-fine");
-    // The new events, and those they replace.
-    std::vector<std::size_t> gone;
-    std::vector<core::Event> added;
-    if (command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later"))
+    if (moving)
     {
         const bool earlier = command.starts_with("lane-event-earlier");
         const auto first = targets.front().start;
@@ -1729,48 +1726,13 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
         {
             return false;
         }
-        for (const auto& target : targets)
+        if (!apply(core::movePedalRegions(events, controller, targets, by, song.end()),
+                   "Move " + what + " of " + name + " " + (earlier ? "earlier" : "later") + " in " +
+                       trackName(),
+                   "pedal move " + std::to_string(id.value)))
         {
-            const auto start = target.start + by;
-            const auto end = target.end + by;
-            if (start < 0 || (target.lift && end > lastTick()))
-            {
-                host_.refuse("That would go past the song's start or end",
-                             MessageKind::Information);
-                return true;
-            }
-            for (const auto& other : regions)
-            {
-                if (others(other) && start <= other.end && other.start <= end)
-                {
-                    host_.refuse("That would run into another region", MessageKind::Information);
-                    return true;
-                }
-            }
-            for (const auto i : regionEvents(target))
-            {
-                gone.push_back(i);
-                auto event = events[i];
-                event.tick += by;
-                added.push_back(event);
-            }
+            return true;
         }
-        std::ranges::sort(gone, std::greater{});
-        editEvents(
-            "Move " + what + " of " + name + " " + (earlier ? "earlier" : "later") + " in " +
-                trackName(),
-            [&](core::EventList& list)
-            {
-                for (const auto i : gone)
-                {
-                    list.erase(i);
-                }
-                for (const auto& event : added)
-                {
-                    list.insert(event);
-                }
-            },
-            "pedal move " + std::to_string(id.value));
         if (laneSelecting())
         {
             std::vector<Selection::NotePosition> positions;
@@ -1783,78 +1745,22 @@ std::optional<bool> PianoRollView::editPedal(std::string_view command, int n)
         moveTo(std::max<core::Tick>(time_ + by, 0));
         return true;
     }
-    // Lifted later or earlier: each region's lift moved, the values within it after its new
-    // lift dropped, as they'd press it again.
     const bool longer = command.starts_with("lane-region-longer");
-    for (const auto& target : targets)
+    const auto endAt = [&](core::Tick end)
     {
-        if (!target.lift)
-        {
-            host_.refuse("That region holds to the song's end, with no lift to move",
-                         MessageKind::Information);
-            return true;
-        }
-        auto end = target.end;
         if (fine)
         {
-            end = nudged(end, longer ? n : -n);
+            return nudged(end, longer ? n : -n);
         }
-        else
+        for (int i = 0; i < n; ++i)
         {
-            for (int i = 0; i < n; ++i)
-            {
-                end = longer ? gridAfter(end) : gridBefore(end);
-            }
+            end = longer ? gridAfter(end) : gridBefore(end);
         }
-        if (end <= target.start)
-        {
-            host_.refuse("That would leave nothing of the region: x deletes it",
-                         MessageKind::Information);
-            return true;
-        }
-        if (end > lastTick())
-        {
-            host_.refuse("That would go past the song's end", MessageKind::Information);
-            return true;
-        }
-        for (const auto& other : regions)
-        {
-            // Lengthening leaves every press in place, including a selected region's.
-            if (other.start > target.start && end >= other.start)
-            {
-                host_.refuse("That would run into the next region", MessageKind::Information);
-                return true;
-            }
-        }
-        for (const auto i : regionEvents(target))
-        {
-            if (i == *target.lift)
-            {
-                gone.push_back(i);
-                auto lift = events[i];
-                lift.tick = end;
-                added.push_back(lift);
-            }
-            else if (events[i].tick >= end)
-            {
-                gone.push_back(i);
-            }
-        }
-    }
-    std::ranges::sort(gone, std::greater{});
-    editEvents((longer ? "Lengthen " : "Shorten ") + what + " of " + name + " in " + trackName(),
-               [&](core::EventList& list)
-               {
-                   for (const auto i : gone)
-                   {
-                       list.erase(i);
-                   }
-                   for (const auto& event : added)
-                   {
-                       list.insert(event);
-                   }
-               },
-               "pedal length " + std::to_string(id.value));
+        return end;
+    };
+    apply(core::resizePedalRegions(events, controller, targets, endAt, song.end()),
+          (longer ? "Lengthen " : "Shorten ") + what + " of " + name + " in " + trackName(),
+          "pedal length " + std::to_string(id.value));
     return true;
 }
 

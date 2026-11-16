@@ -10,6 +10,7 @@
 #include <functional>
 #include <optional>
 #include <span>
+#include <variant>
 #include <vector>
 
 namespace modal::core
@@ -38,6 +39,39 @@ std::vector<PedalRegion> pedalRegions(const EventList& events, int controller, T
 // The press, its later values and its lift, excluding other controllers and notes.
 std::vector<std::size_t> pedalRegionEvents(const EventList& events, int controller,
                                            const PedalRegion& region);
+
+// Musical refusals; the caller supplies the message appropriate to its editing command.
+enum class PedalRegionRefusal
+{
+    AlreadyDown,
+    NoRoom,
+    BeforeStart,
+    PastEnd,
+    Collision,
+    NoLift,
+    EmptyRegion,
+};
+
+using PedalRegionResult = std::variant<EventList, PedalRegionRefusal>;
+
+// Insert a press and lift, ending no later than one tick before the next press. Insertion
+// may extend the song, as ordinary event insertion does; songEnd bounds an existing hold.
+PedalRegionResult insertPedalRegion(const EventList& events, int controller, Tick start, Tick end,
+                                    Tick songEnd);
+
+// Targets come from pedalRegions() on this event list. Every edit preserves unrelated
+// events and stored CC values. Nothing is changed if any target would be refused.
+EventList erasePedalRegions(const EventList& events, int controller,
+                            std::span<const PedalRegion> targets);
+PedalRegionResult movePedalRegions(const EventList& events, int controller,
+                                   std::span<const PedalRegion> targets, Tick by, Tick songEnd);
+
+// The caller maps each lift to its proposed tick, as grid or elapsed-time steps require.
+// A missing lift is refused before asking for its destination. Values cut off by an earlier
+// lift are removed; all other values, including the lift's own, are kept.
+PedalRegionResult resizePedalRegions(const EventList& events, int controller,
+                                     std::span<const PedalRegion> targets,
+                                     const std::function<Tick(Tick)>& endAt, Tick songEnd);
 
 // Whether a pedal is down just before a tick, by its last event before it.
 bool pedalDown(const EventList& events, int controller, Tick tick);
