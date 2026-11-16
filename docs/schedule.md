@@ -179,7 +179,7 @@ Each is a substantial, separately reviewed step:
 
 These support the milestones rather than forming a separate feature milestone. Start them when the related feature or a measurement justifies the work.
 
-- [ ] **Doing** — Extract pedal-region queries and editing rules into core, preserving the current behaviour. Approved 16 November 2026 in two steps: shared region descriptions and queries, then editing operations with whole-batch validation and typed refusals. The view retains keys, grid/nudge destinations, selection, undo and rendering. See status.md.
+- [ ] **Doing** — Extract pedal-region queries and editing rules into core, preserving the current behaviour. Both approved steps are committed locally: shared region descriptions and queries, then editing operations with whole-batch validation and typed refusals. The view retains keys, grid/nudge destinations, selection, undo and rendering. All six Linux configurations pass; awaiting the required UI trial before pushing. See status.md.
 - [x] **Done** — Fix the four findings from the 16 November 2026 review: pending-take file safety, recording across live tempo edits, selected pedal-region collisions and playback completion attribution. Implemented with regressions, including delayed open-dialog safety; all six Linux configurations pass and the UI trial was accepted 16 November 2026. See status.md.
 - [ ] **To do** — Resolve blocking Windows SysEx delivery if needed for input/recording.
 - [ ] **To do** — Measure large-song edits and playback-plan rebuilds with milestone 10; optimise only where warranted.

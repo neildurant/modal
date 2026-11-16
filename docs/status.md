@@ -10,14 +10,26 @@ Read [schedule.md](schedule.md) for the current milestone, item states and next 
 
 The pedal-region extraction is approved and in progress: first shared region queries in core, then musical editing operations, preserving current behaviour. The query step is committed as `a4baf8e` and passes GCC Debug and Clang Debug (1,046 registered tests per preset, three platform/MIDI skips and no failures), whole-tree formatting and `git diff --check`. Direct core tests cover all six switch controllers at the three test PPQNs, half-pedal values, unrelated events, same-tick ordering and absent lifts; existing Workspace tests pass.
 
-The editing step is implemented: core inserts, deletes, moves and resizes regions, validates the complete batch before producing edited events, and returns typed refusals. The view retains keys, grid/nudge destination calculations, messages, cursor/selection updates and undo grouping. Direct tests cover raw value retention, insertion bounds and normal song growth, selected/unselected collisions, touching imported regions, song limits, shortening through interior values, deletion and missing lifts. Focused GCC Debug pedal checks pass (49 test cases, 1,597 assertions), including Workspace checks for the existing refusal messages, saved state and undo. Full Linux validation and the required UI trial remain pending. The preceding review fixes are published through `99d70a7`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43855649871).
+The editing step is committed as `29dbbaf`: core inserts, deletes, moves and resizes regions, validates the complete batch before producing edited events, and returns typed refusals. The view retains keys, grid/nudge destination calculations, messages, cursor/selection updates and undo grouping. Direct tests cover raw value retention, insertion bounds and normal song growth, selected/unselected collisions, touching imported regions, song limits, shortening through interior values, deletion and missing lifts. Focused GCC Debug pedal checks pass (49 test cases, 1,597 assertions), including Workspace checks for the existing refusal messages, saved state and undo.
+
+Final validation, 16 November 2026: `tools/check-linux.sh` passes all six Linux configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,054 registered tests, three platform/MIDI skips and no failures. Whole-tree formatting and `git diff --check` pass. `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No real desktop was driven and no hardware timing was measured. The UI trial remains pending, so the extraction has not been pushed. The preceding review fixes are published through `99d70a7`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/43855649871).
 
 ## Pending
 
+- **UI trial of the pedal-region extraction**, before pushing: region navigation and inspection, switching to values, sustain tails, adding/deleting/moving/resizing regions, selection collisions and undo. All six Linux configurations pass; trial steps are below.
 - **The Linux checks** for milestones 3 to 6, on Neil's laptop, under X11 and Wayland: the window and its resizing, display scaling, text input (dead keys, AltGr), Ctrl and keypad keys, the configuration directory, the offscreen renders' appearance, and the views. These need a manual native-desktop check.
 - **A two-display check on Windows**: dragging the window between displays with different scaling.
 
 ## Review findings
+
+### Pedal-region extraction: UI trial
+
+Using a disposable song or the demo, choose the sustain lane (`:lane cc64`) in the piano roll and enter it with `gl`:
+
+- Add two separated regions with `o`. Tab and Shift-Tab should move between them; the inspector, sustain tails and region highlighting should look as before. `, c v` should still switch to the raw values and back.
+- Move a region with Alt-h/Alt-l and Alt-H/Alt-L, and lift it later/earlier with `=`/`-` and `+`/`_`. Its intermediate values and lift value should be retained. Delete with `x`, and undo.
+- Select both regions with `v` and Tab; move and resize them together. A lengthening that would reach the next press should refuse the whole edit, with the same message and selection. Valid repeated edits should still undo together.
+- Try another switch controller, such as sostenuto (`:lane cc66`). Its editing should work as before, including refusing to resize a region with no lift. Existing core and Workspace tests cover this case without requiring hardware.
 
 ### Fixes for the 16 November 2026 review
 
