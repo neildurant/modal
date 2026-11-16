@@ -12,6 +12,14 @@ Use standard Markdown checkboxes with an explicit state:
 
 Change an item's state when work starts or finishes, and update status.md in the same change. Split large items into reviewable steps before implementation. Keep completed items here as history. Work on one milestone at a time; agree changes to scope or order before recording them here. A milestone is complete when its items are Done and required checks are complete; state outstanding manual checks explicitly. Future items remain To do until work actually starts. Someday maybe items are deliberately unscheduled, not the next tasks in a queue.
 
+## User manual
+
+The user manual is being brought forward from milestone 14, agreed 16 November 2026, initially on the `user-manual` branch. The full draft was accepted 16 November 2026; further manual work takes place on `main` alongside application development.
+
+- [x] **Done** — Publication prototype and revised samples accepted 16 November 2026. One Quarto source builds offline HTML and PDF with the agreed visual style, explanatory tone, example song and labelled offscreen illustrations. Validation evidence is in status.md.
+- [x] **Done** — Initial full draft written and validated 16 November 2026: ten explanatory chapters and three appendices, with generated settings/transform references and ten reproducible figures. Full-draft review feedback on arrows/directions, section scope, commands/bindings, search paragraphs, independent letter names and native-file wording is applied and validated. Revised PDF/HTML accepted 16 November 2026; see status.md.
+- [x] **Done** — Working procedures and regular upkeep added 16 November 2026: update the manual by user-visible feature completion, permit explicit related-commit follow-ups, review at milestone boundaries, check registry reference drift in normal tests, and build both formats in a dedicated CI workflow. Local builds/checks pass; the first hosted CI run is pending publication on `main`, recorded in status.md.
+
 ## Completed foundations
 
 - [x] **Done** — 1. Engine and MIDI layer; timing measured on Linux and Windows.

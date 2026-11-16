@@ -742,6 +742,12 @@ macOS isn't planned, but nothing should rule it out. SDL3, libremidi (CoreMIDI) 
 
 [Schedule](schedule.md) is the only maintained list of milestones, progress and unscheduled ideas. Each implementation step remains runnable and testable on both platforms. Historical milestone sequencing and settled checklist entries are preserved in [decisions.md](decisions.md#earlier-design-record).
 
+## User documentation
+
+The user manual is an explanatory book for readers who know MIDI sequencing but need no Vim knowledge. It can be studied away from a computer: describe what a facility does, why it is useful and how it fits the editing model. Examples explain their results without requiring a sequence of edits to be followed; procedural tutorials can be developed separately. Introduce concepts before using their terminology, explain useful key mnemonics, and identify screen regions visually before referring readers to them. One Quarto source produces a static HTML manual and an A4 PDF, with local assets and fonts so publication works offline after installing the publishing tools. Styling follows Modal's themes while using book typography for sustained reading.
+
+The source, publishing instructions and illustration workflow are in [manual/README.md](manual/README.md). Illustrations come from SDL offscreen renders, and worked editing examples are checked against the supplied example song through Workspace tests. The settings and transform appendices are generated from the application's definitions and default bindings, with normal tests detecting stale copies. User-visible features update the manual by feature completion, related small commits may share an explicit documentation follow-up, and milestone boundaries include a review of affected chapters and illustrations. A separate CI workflow builds HTML and PDF artifacts for review without deploying hosting. Work states belong in [schedule.md](schedule.md#user-manual); the engineering documents retain their existing roles.
+
 ## Feature notes
 
 - **A menu bar, for those who don't know Vim.** A conventional way in beside the keys: File, Edit, View and Play menus, File holding Open, Save, Export and Exit. SDL3 has no native menus, so it would be drawn on the grid like SPG's own menus or Turbo Vision's, the same on Windows and Linux: opened with a key (F10, say) or the mouse, every item a command from the registry with its keys shown beside it, so the menus can't drift from the keymap. Hideable (`set menubar`) for those who'd rather have the row.

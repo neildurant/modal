@@ -1,0 +1,34 @@
+name: Manual
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: manual-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  manual:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up the pinned publisher
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.11.9'
+          tinytex: false
+      - name: Build HTML and PDF
+        run: cmake -P tools/build-manual.cmake
+      - name: Keep the reviewable manual
+        uses: actions/upload-artifact@v4
+        with:
+          name: modal-user-manual
+          path: build/manual/
+          if-no-files-found: error
+          retention-days: 14

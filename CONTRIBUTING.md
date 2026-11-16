@@ -30,6 +30,27 @@ ctest --preset linux-gcc-debug
 or the `windows-msvc` presets on Windows. CI runs GCC and Clang (Debug and Release), the
 AddressSanitizer and ThreadSanitizer builds, and MSVC on every pull request.
 
+## Keeping the user manual current
+
+User-visible changes include a manual update before the feature is complete or
+published. Related implementation commits can share a documentation follow-up;
+keep that pending work in `docs/status.md` until it is done. Internal refactoring
+does not require an unrelated prose edit. Review affected chapters and figures
+again at milestone boundaries.
+
+The manual in [`docs/manual`](docs/manual/README.md) explains ideas, purposes and
+musical consequences before key sequences. Examples must make sense without
+Modal open. Introduce terminology before using it and preserve the distinction
+between user explanation and the engineering specification.
+
+Settings and transform reference tables are generated from application definitions;
+normal tests reject stale copies. After changing them, refresh with
+`tools/manual-references.cmake` using the built test executable. Run
+`cmake -P tools/build-manual.cmake` after changing the manual and review the HTML
+and PDF. The manual CI workflow builds both and retains the output as an artifact;
+it does not deploy a public website. The authoring guide lists exact commands,
+the pinned publishing tool and the offscreen illustration workflow.
+
 ## How the code is written
 
 - **C++20, CMake and vcpkg.** No other languages, and dependencies come through vcpkg rather
