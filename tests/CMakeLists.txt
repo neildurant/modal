@@ -48,6 +48,7 @@ add_executable(modal_tests
     ui/arrange_view_test.cpp
     ui/bar_lines_test.cpp
     ui/bar_test.cpp
+    ui/status_bar_test.cpp
     ui/block_glyphs_test.cpp
     ui/cell_grid_test.cpp
     ui/command_line_test.cpp
