@@ -160,6 +160,8 @@ public:
 
     // Hands the player the song, looking the ports up the first time, for a new song, and
     // whenever the ports have changed. Then says which tracks' ports can't be used, and why.
+    // Given the song beneath any take being recorded, as the document's listener is, not the
+    // one shown, whose take so far would be played again.
     std::string update(const core::Song& song)
     {
         const bool lookUp = !lookedUp_;
@@ -408,7 +410,7 @@ public:
     {
         view_.showSong();
         playback_.songReplaced();
-        if (auto missing = playback_.update(document_.song()); !missing.empty())
+        if (auto missing = playback_.update(document_.underlying()); !missing.empty())
         {
             missing_ = std::move(missing);
         }
@@ -501,7 +503,7 @@ std::string apply(ui::Settings& settings, ui::sdl::Window& window, ui::Workspace
     {
         error = std::move(inputs);
     }
-    if (auto missing = playback.update(document.song()); error.empty())
+    if (auto missing = playback.update(document.underlying()); error.empty())
     {
         error = std::move(missing);
     }
@@ -708,7 +710,7 @@ int main(int argc, char* argv[])
     const auto portsChanged = [&]
     {
         auto problem = playback.openInputs();
-        auto missing = playback.update(document.song());
+        auto missing = playback.update(document.underlying());
         if (problem.empty())
             problem = std::move(missing);
         if (!problem.empty())
@@ -928,7 +930,7 @@ int main(int argc, char* argv[])
                         auto error = playback.pollInputs(now);
                         if (!playback.inputDeadline())
                         {
-                            auto missing = playback.update(document.song());
+                            auto missing = playback.update(document.underlying());
                             if (error.empty())
                                 error = std::move(missing);
                             changed = true;

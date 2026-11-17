@@ -1635,6 +1635,53 @@ TEST_CASE("replacing, the track being recorded is silent from the record point; 
     CHECK(heard(U"R") > 0);
 }
 
+TEST_CASE("a plan made during a take is of the song beneath, not of the take so far")
+{
+    Playing p;
+    p.type(U",ra");
+    const auto id = armed(p.document)->id();
+    const auto channel = armed(p.document)->channel;
+    // Quantised as it plays to whole bars, so a note played late in a bar plays at the next.
+    p.document.edit("Quantise", {},
+                    [&](core::Song& song)
+                    {
+                        song.recordMode = core::RecordMode::Overdub;
+                        song.updateTrack(id,
+                                         [](core::Track& track)
+                                         {
+                                             track.quantize.on = true;
+                                             track.quantize.grid = core::NoteFraction{1, 1};
+                                         });
+                    });
+    p.player.update(p.document.song());
+    p.type(U"R");
+    p.runFor(2100ms); // the count-in
+    REQUIRE(p.player.recordPhase() == core::Player::RecordPhase::Recording);
+    p.runFor(1300ms); // well into the second half of the bar
+    const auto on = static_cast<std::uint8_t>(0x90 | (channel - 1));
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x90, 99, 100},
+                             p.clock.time));
+    p.runFor(50ms);
+    REQUIRE(p.engine.receive(core::InputId{0}, std::array<std::uint8_t, 3>{0x80, 99, 64},
+                             p.clock.time));
+    p.runFor(50ms);
+    REQUIRE(noteOn(p.document.song(), id, 99).has_value()); // in the take as shown
+    const auto heard = [&]
+    {
+        return std::ranges::count_if(
+            p.sink.sent, [&](const auto& sent)
+            { return sent.bytes.size() == 3 && sent.bytes[0] == on && sent.bytes[1] == 99; });
+    };
+    const auto before = heard(); // through thru, if at all
+
+    p.type(U",Tq"); // bypassed, and back: each plans the song again
+    p.type(U",Tq");
+    p.runFor(1500ms); // past the next bar line
+    CHECK(heard() == before);
+    p.type(U" ");
+    p.runFor(10ms);
+}
+
 TEST_CASE("while recording, edits and undo that would change a track being recorded are refused, "
           "and other tracks can still be edited")
 {

@@ -1978,7 +1978,9 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
             return true;
         }
         player_->setBypassQuantize(!player_->bypassQuantize());
-        player_->update(document_.song());
+        // The song beneath: during a take the one shown has the take so far, which would be
+        // played again (found in a code review, November 2026).
+        player_->update(document_.underlying());
         setMessage(player_->bypassQuantize() ? "Quantise bypassed: every track plays as stored"
                                              : "Quantise back on, for the tracks that have it",
                    MessageKind::Information);
