@@ -540,7 +540,7 @@ TEST_CASE("thinning preserves every reset inside a dense gesture")
           std::vector<Event>{point(0, 5), point(2, 0), point(3, 0), point(5, 6)});
 }
 
-TEST_CASE("thinning resets respects selected events and independently filtered streams")
+TEST_CASE("thinning keeps the selected resets of the stream it thins")
 {
     const auto q = MODAL_ANY_PPQN().quarter();
     const auto unit = q / 16;
