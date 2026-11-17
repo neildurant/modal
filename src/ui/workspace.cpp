@@ -1493,6 +1493,19 @@ CommandResult Workspace::run(std::string_view command, int count)
 
 bool Workspace::runViewCommand(std::string_view command, int count)
 {
+    // p and P with whole tracks in the register put them as new tracks after or before the
+    // cursor's, in any view with tracks, as , t p and , t P do (decided 17 November 2026,
+    // after use); the Tracks view puts them as rows itself.
+    if (!register_.wholeTracks.empty() && mode_ != Mode::Visual &&
+        (where() == Where::Tracks || where() == Where::PianoRoll || where() == Where::Lane ||
+         where() == Where::EventList) &&
+        (command == "put-merge" || command == "put-insert" || command == "put-ending" ||
+         command == "put-merge-at-pitch" || command == "put-insert-at-pitch"))
+    {
+        report(putTracks(register_.wholeTracks,
+                         command == "put-insert" || command == "put-insert-at-pitch", count));
+        return true;
+    }
     // In the lane, only what's offered there, so a key it leaves out (Alt-k, moving a note
     // in the notes area) doesn't reach the piano roll from it; other views say for themselves
     // why what isn't theirs is refused.

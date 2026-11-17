@@ -178,13 +178,17 @@ TEST_CASE("whole-track material cannot replace event selections or sections")
     Tracking t;
     t.type(U"Vy");
     const auto before = t.document.song();
-    for (auto keys : {U"gap", U"grvp", U"gevp", U"gagsvp"})
+    for (auto keys : {U"grvp", U"gevp", U"gagsvp"})
     {
         t.type(keys);
         CHECK(t.document.song() == before);
         CHECK(t.ws.message().find("tracks view") != std::string::npos);
         t.press(NamedKey::Escape);
     }
+    // Outside Visual mode, p puts them as new tracks in the arrangement (decided 17 November
+    // 2026, after use).
+    t.type(U"gajp"); // from the strip, where the loop left it, back to the tracks
+    CHECK(t.document.song().tracks().size() == before.tracks().size() + 1);
 }
 
 TEST_CASE("the leader then v and r shows the piano roll, as gr does")

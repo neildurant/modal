@@ -102,7 +102,8 @@ the command line, palette or a personal binding provides access to it.
 
 A register can hold events, whole tracks or sections. These are different
 kinds of material, not interchangeable clipboard formats. A section copy
-belongs on the strip; a whole-track copy belongs in Tracks. Named registers
+belongs on the strip. A whole-track copy becomes new tracks: `p` and `P` put
+it after or before the current track, here as in the Tracks view. Named registers
 for keeping several copies are covered in @sec-efficient-work.
 
 ## Removing contents, removing time

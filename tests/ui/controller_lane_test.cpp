@@ -906,3 +906,19 @@ TEST_CASE(
     l.enter();
     CHECK(l.document.song().mark('a') == nullptr);
 }
+
+TEST_CASE("p and P put whole tracks as new tracks in the piano roll and arrangement")
+{
+    Lanes l;
+    l.type(U",ty");
+    l.type(U"p");
+    REQUIRE(l.document.song().tracks().size() == 2);
+    CHECK(l.view().track() == 1);
+    l.type(U"P");
+    CHECK(l.document.song().tracks().size() == 3);
+    CHECK(l.view().track() == 1);
+    // In the arrangement too.
+    l.type(U"ga");
+    l.type(U"p");
+    CHECK(l.document.song().tracks().size() == 4);
+}
