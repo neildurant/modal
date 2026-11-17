@@ -4916,153 +4916,17 @@ void PianoRollView::addRegions(Frame& frame) const
         }
     }
 
-    // A switch controller's lane, sustain and the other pedals: each time it's down (64 and
-    // above) a bar along the lane, like a note, with a solid start, lighter where a recorded
-    // value below 127 holds it partly down, as half-pedalling does (proposed 15 November
-    // 2026).
+    // The lane's own contents, a pedal's regions or a controller's values; velocity's bars
+    // were drawn with the notes.
+    const LaneDrawing laneDrawing{lane,      p,       scale,    width,   laneHeight, lineWidth,
+                                  shownLane, laneLow, laneHigh, laneTop, laneFloor,  laneTakes};
     if (const auto pedals = trackId(); pedals && isSwitchLane())
     {
-        const auto events = song.events(*pedals).all();
-        const int inset = std::max(laneHeight / 5, 1);
-        const int startWidth = std::max(cell_.width / 2, 2);
-        std::optional<int> held;
-        core::Tick from = p.start;
-        bool regionStart = false;
-        const auto onRegion = inLane_ ? laneNote() : std::nullopt;
-        std::optional<std::size_t> press; // the region being drawn, by its press
-        const auto segment = [&](core::Tick to)
-        {
-            if (!held || *held < 64 || to <= p.start || from >= p.end)
-            {
-                return;
-            }
-            const int x0 = scale.toX(std::max(from, p.start));
-            const int x1 = scale.toX(std::min(to, p.end));
-            if (x1 <= x0)
-            {
-                return;
-            }
-            // Fully down as a note's start is bright; partly down lighter, by how far.
-            const auto alpha = static_cast<std::uint8_t>(60 + (*held - 64) * 100 / 63);
-            // The region the cursor's in, in the brightest colour, as a current event is.
-            // And those a selection takes in its colour, as notes are (decided 16 November 2026).
-            const auto role = press && press == onRegion ? Role::Text
-                              : press && std::ranges::binary_search(laneTakes, *press)
-                                  ? Role::NoteSelected
-                                  : Role::Note;
-            lane.under.push_back({{x0, inset, x1 - x0, laneHeight - 2 * inset}, role, alpha});
-            if (regionStart && from >= p.start)
-            {
-                lane.under.push_back(
-                    {{x0, inset, std::min(startWidth, x1 - x0), laneHeight - 2 * inset},
-                     role,
-                     255});
-            }
-        };
-        for (std::size_t i = 0; i < events.size(); ++i)
-        {
-            const auto& event = events[i];
-            if (event.tick >= p.end)
-            {
-                break;
-            }
-            if (!shownLane.shows(event.data))
-            {
-                continue;
-            }
-            const int value = shownLane.value(event.data);
-            segment(event.tick);
-            regionStart = (!held || *held < 64) && value >= 64;
-            if (regionStart)
-            {
-                press = i;
-            }
-            held = value;
-            from = event.tick;
-        }
-        segment(p.end);
-        // Between regions, a thin line where the cursor is, as between a controller's events.
-        if (inLane_ && !onRegion && time_ >= p.start && time_ < p.end)
-        {
-            lane.over.push_back({{scale.toX(time_), 0, lineWidth, laneHeight}, Role::Text, 255});
-        }
+        addPedalRegions(laneDrawing, *pedals);
     }
-    // A controller's lane: a bar for each event, up from the bottom, or for pitch bend up or
-    // down from the middle, as bright as velocity's, and a faint line joining them at the value
-    // each holds until the next, as it sounds (decided 15 November 2026).
     else if (const auto id = trackId(); id && !velocityLane())
     {
-        const auto events = song.events(*id).all();
-        const int barWidth = std::max(2 * lineWidth, 2);
-        const int base = shownLane.kind == core::Lane::Kind::PitchBend ? laneY(0) : laneHeight;
-        const auto onEvent = laneNote();
-        std::optional<int> held; // the value before, and where it was set
-        int heldX = 0;
-        const auto hold = [&](int to)
-        {
-            if (held && to > heldX)
-            {
-                lane.under.push_back(
-                    {{heldX, laneY(*held), to - heldX, lineWidth}, Role::Note, kHeldLine});
-            }
-        };
-        for (std::size_t i = 0; i < events.size() && events[i].tick < p.end; ++i)
-        {
-            if (!shownLane.shows(events[i].data))
-            {
-                continue;
-            }
-            const int value = shownLane.value(events[i].data);
-            if (events[i].tick < p.start)
-            {
-                held = value;
-                continue;
-            }
-            const int x = scale.toX(events[i].tick);
-            hold(x);
-            if (held)
-            {
-                const int a = laneY(*held);
-                const int b = laneY(value);
-                lane.under.push_back({{x, std::min(a, b), lineWidth, std::abs(a - b) + lineWidth},
-                                      Role::Note,
-                                      kHeldLine});
-            }
-            held = value;
-            heldX = x;
-            const int y = laneY(value);
-            const bool here = inLane_ && onEvent == i;
-            const bool picked = std::ranges::binary_search(laneTakes, i);
-            const bool matched = search && core::matches(*search, events[i].data, song.ppqn());
-            const auto role = here      ? Role::Text
-                              : picked  ? Role::NoteSelected
-                              : matched ? Role::Match
-                                        : Role::Note;
-            lane.under.push_back({{x, std::min(y, base), barWidth, std::max(std::abs(base - y), 1)},
-                                  role,
-                                  here ? std::uint8_t{255} : kControllerBar});
-            // A dot at its value, in the bar's colour at full strength, so even a small value's
-            // event shows, and which is current (decided 15 November 2026, after use).
-            const int dot = std::max(3 * lineWidth, 4);
-            lane.over.push_back({{x + barWidth / 2 - dot / 2, y - dot / 2, dot, dot}, role, 255});
-        }
-        hold(width);
-        if (isPedalLane())
-        {
-            // The line between up and down, in a pedal's values.
-            lane.under.push_back({{0, laneY(64), width, lineWidth}, Role::BarLine, 255});
-        }
-        if (shownLane.kind == core::Lane::Kind::PitchBend)
-        {
-            lane.under.push_back({{0, base, width, lineWidth}, Role::BarLine, 255});
-        }
-        // Between events, where nothing's lit, a thin line in the brightest colour at the
-        // cursor's time, where an event would go (decided 15 November 2026, after use, as H and
-        // L moved nothing to be seen in the lane).
-        if (inLane_ && !onEvent && time_ >= p.start && time_ < p.end)
-        {
-            lane.over.push_back({{scale.toX(time_), 0, lineWidth, laneHeight}, Role::Text, 255});
-        }
+        addControllerValues(laneDrawing, *id);
     }
 
     // The lane's selection, from its first note's bar to its last's, and in a Ctrl-v box between
@@ -5196,10 +5060,172 @@ void PianoRollView::addRegions(Frame& frame) const
                            .over = {}});
     frame.push_back(std::move(ruler));
 
-    // The view's bar: the track and its grid, then the page, its section and bars, and where
-    // the cursor is. The grid is here as the track's own, not in the status line with what's
-    // the same in every view (decided 12 November 2026), padded so what follows stays put; the
-    // note a new one would be is in the inspector, being the cursor's (decided November 2026).
+    addBars(frame, p);
+    if (laneChooser_)
+    {
+        frame.push_back(
+            laneChooser_->region({main.x, notesTop + notesHeight, keyWidth, h}, main, cell_));
+    }
+}
+
+// A switch controller's lane, sustain and the other pedals: each time it's down (64 and
+// above) a bar along the lane, like a note, with a solid start, lighter where a recorded
+// value below 127 holds it partly down, as half-pedalling does (proposed 15 November
+// 2026).
+void PianoRollView::addPedalRegions(const LaneDrawing& d, core::TrackId track) const
+{
+    const auto& song = document_.song();
+    const auto events = song.events(track).all();
+    const int inset = std::max(d.height / 5, 1);
+    const int startWidth = std::max(cell_.width / 2, 2);
+    std::optional<int> held;
+    core::Tick from = d.page.start;
+    bool regionStart = false;
+    const auto onRegion = inLane_ ? laneNote() : std::nullopt;
+    std::optional<std::size_t> press; // the region being drawn, by its press
+    const auto segment = [&](core::Tick to)
+    {
+        if (!held || *held < 64 || to <= d.page.start || from >= d.page.end)
+        {
+            return;
+        }
+        const int x0 = d.scale.toX(std::max(from, d.page.start));
+        const int x1 = d.scale.toX(std::min(to, d.page.end));
+        if (x1 <= x0)
+        {
+            return;
+        }
+        // Fully down as a note's start is bright; partly down lighter, by how far.
+        const auto alpha = static_cast<std::uint8_t>(60 + (*held - 64) * 100 / 63);
+        // The region the cursor's in, in the brightest colour, as a current event is.
+        // And those a selection takes in its colour, as notes are (decided 16 November 2026).
+        const auto role = press && press == onRegion ? Role::Text
+                          : press && std::ranges::binary_search(d.taken, *press)
+                              ? Role::NoteSelected
+                              : Role::Note;
+        d.lane.under.push_back({{x0, inset, x1 - x0, d.height - 2 * inset}, role, alpha});
+        if (regionStart && from >= d.page.start)
+        {
+            d.lane.under.push_back(
+                {{x0, inset, std::min(startWidth, x1 - x0), d.height - 2 * inset}, role, 255});
+        }
+    };
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto& event = events[i];
+        if (event.tick >= d.page.end)
+        {
+            break;
+        }
+        if (!d.shown.shows(event.data))
+        {
+            continue;
+        }
+        const int value = d.shown.value(event.data);
+        segment(event.tick);
+        regionStart = (!held || *held < 64) && value >= 64;
+        if (regionStart)
+        {
+            press = i;
+        }
+        held = value;
+        from = event.tick;
+    }
+    segment(d.page.end);
+    // Between regions, a thin line where the cursor is, as between a controller's events.
+    if (inLane_ && !onRegion && time_ >= d.page.start && time_ < d.page.end)
+    {
+        d.lane.over.push_back({{d.scale.toX(time_), 0, d.lineWidth, d.height}, Role::Text, 255});
+    }
+}
+
+// A controller's lane: a bar for each event, up from the bottom, or for pitch bend up or
+// down from the middle, as bright as velocity's, and a faint line joining them at the value
+// each holds until the next, as it sounds (decided 15 November 2026).
+void PianoRollView::addControllerValues(const LaneDrawing& d, core::TrackId track) const
+{
+    const auto& song = document_.song();
+    const auto search = host_.searchQuery();
+    const auto events = song.events(track).all();
+    const int barWidth = std::max(2 * d.lineWidth, 2);
+    const int base = d.shown.kind == core::Lane::Kind::PitchBend ? d.y(0) : d.height;
+    const auto onEvent = laneNote();
+    std::optional<int> held; // the value before, and where it was set
+    int heldX = 0;
+    const auto hold = [&](int to)
+    {
+        if (held && to > heldX)
+        {
+            d.lane.under.push_back(
+                {{heldX, d.y(*held), to - heldX, d.lineWidth}, Role::Note, kHeldLine});
+        }
+    };
+    for (std::size_t i = 0; i < events.size() && events[i].tick < d.page.end; ++i)
+    {
+        if (!d.shown.shows(events[i].data))
+        {
+            continue;
+        }
+        const int value = d.shown.value(events[i].data);
+        if (events[i].tick < d.page.start)
+        {
+            held = value;
+            continue;
+        }
+        const int x = d.scale.toX(events[i].tick);
+        hold(x);
+        if (held)
+        {
+            const int a = d.y(*held);
+            const int b = d.y(value);
+            d.lane.under.push_back({{x, std::min(a, b), d.lineWidth, std::abs(a - b) + d.lineWidth},
+                                    Role::Note,
+                                    kHeldLine});
+        }
+        held = value;
+        heldX = x;
+        const int y = d.y(value);
+        const bool here = inLane_ && onEvent == i;
+        const bool picked = std::ranges::binary_search(d.taken, i);
+        const bool matched = search && core::matches(*search, events[i].data, song.ppqn());
+        const auto role = here      ? Role::Text
+                          : picked  ? Role::NoteSelected
+                          : matched ? Role::Match
+                                    : Role::Note;
+        d.lane.under.push_back({{x, std::min(y, base), barWidth, std::max(std::abs(base - y), 1)},
+                                role,
+                                here ? std::uint8_t{255} : kControllerBar});
+        // A dot at its value, in the bar's colour at full strength, so even a small value's
+        // event shows, and which is current (decided 15 November 2026, after use).
+        const int dot = std::max(3 * d.lineWidth, 4);
+        d.lane.over.push_back({{x + barWidth / 2 - dot / 2, y - dot / 2, dot, dot}, role, 255});
+    }
+    hold(d.width);
+    if (isPedalLane())
+    {
+        // The line between up and down, in a pedal's values.
+        d.lane.under.push_back({{0, d.y(64), d.width, d.lineWidth}, Role::BarLine, 255});
+    }
+    if (d.shown.kind == core::Lane::Kind::PitchBend)
+    {
+        d.lane.under.push_back({{0, base, d.width, d.lineWidth}, Role::BarLine, 255});
+    }
+    // Between events, where nothing's lit, a thin line in the brightest colour at the
+    // cursor's time, where an event would go (decided 15 November 2026, after use, as H and
+    // L moved nothing to be seen in the lane).
+    if (inLane_ && !onEvent && time_ >= d.page.start && time_ < d.page.end)
+    {
+        d.lane.over.push_back({{d.scale.toX(time_), 0, d.lineWidth, d.height}, Role::Text, 255});
+    }
+}
+
+// The view's bar: the track and its grid, then the page, its section and bars, and where
+// the cursor is. The grid is here as the track's own, not in the status line with what's
+// the same in every view (decided 12 November 2026), padded so what follows stays put; the
+// note a new one would be is in the inspector, being the cursor's (decided November 2026).
+void PianoRollView::addBars(Frame& frame, const Page& p) const
+{
+    const auto& song = document_.song();
     std::vector<BarPair> left;
     std::vector<BarPair> right;
     if (trackId())
@@ -5231,11 +5257,6 @@ void PianoRollView::addRegions(Frame& frame) const
         addNewNote(inspector, *song.tracks()[track_]);
     }
     frame.push_back(std::move(inspector));
-    if (laneChooser_)
-    {
-        frame.push_back(
-            laneChooser_->region({main.x, notesTop + notesHeight, keyWidth, h}, main, cell_));
-    }
 }
 
 void PianoRollView::addNewNote(Region& inspector, const core::Track& track) const

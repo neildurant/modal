@@ -232,6 +232,30 @@ private:
     Inspection inspection() const;
     // The ruler above the notes: the sections, labels and play-from marker, then the bars.
     void addRuler(Region& ruler, const TimeScale& scale, const Page& page) const;
+    // What drawing a lane's contents shares: the lane's region and size, the page across it,
+    // its scale of values, from the lowest a little above its bottom to the highest at its
+    // top, and the events a selection takes.
+    struct LaneDrawing
+    {
+        Region& lane;
+        const Page& page;
+        const TimeScale& scale;
+        int width;
+        int height;
+        int lineWidth;
+        const core::Lane& shown;
+        int low;
+        int high;
+        int top;
+        int floor;
+        const std::vector<std::size_t>& taken;
+
+        int y(int value) const { return floor - (floor - top) * (value - low) / (high - low); }
+    };
+    void addPedalRegions(const LaneDrawing& d, core::TrackId track) const;
+    void addControllerValues(const LaneDrawing& d, core::TrackId track) const;
+    // The view's bar and the inspector, above the ruler.
+    void addBars(Frame& frame, const Page& page) const;
 
     // The track's name, or its number if it has none, for messages.
     std::string trackName() const;
