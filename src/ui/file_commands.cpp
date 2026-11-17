@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/files.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/ui/config.hpp>
@@ -7,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <fstream>
+#include <iterator>
 #include <string_view>
 #include <system_error>
 #include <utility>
@@ -395,6 +398,62 @@ core::Song newSong()
     core::Song song;
     song.addTrack("Track 1");
     return song;
+}
+
+namespace
+{
+constexpr std::string_view kRecoveryNote = "recovered";
+} // namespace
+
+std::optional<std::filesystem::path> writeRecovery(const core::Document& document,
+                                                   const std::filesystem::path& stateDirectory,
+                                                   std::string_view stamp) noexcept
+{
+    try
+    {
+        if (!document.modified())
+        {
+            return std::nullopt;
+        }
+        std::error_code ignored;
+        std::filesystem::create_directories(stateDirectory, ignored);
+        const auto file = stateDirectory / utf8Path("recovered-" + std::string{stamp} + ".modal");
+        if (!core::writeSongFile(document.underlying(), file).empty())
+        {
+            return std::nullopt;
+        }
+        const auto name = utf8Text(file);
+        static_cast<void>(core::writeFileAtomically(
+            stateDirectory / kRecoveryNote,
+            {reinterpret_cast<const std::uint8_t*>(name.data()), name.size()}));
+        return file;
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+}
+
+std::optional<std::string> takeRecoveryNotice(const std::filesystem::path& stateDirectory)
+{
+    const auto note = stateDirectory / kRecoveryNote;
+    std::string name;
+    {
+        std::ifstream in{note, std::ios::binary};
+        if (!in)
+        {
+            return std::nullopt;
+        }
+        name.assign(std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{});
+    }
+    std::error_code ignored;
+    std::filesystem::remove(note, ignored);
+    if (name.empty())
+    {
+        return std::nullopt;
+    }
+    return "Modal ended unexpectedly last time: the song's unsaved changes are in " + name +
+           " (:e opens it)";
 }
 
 } // namespace modal::ui

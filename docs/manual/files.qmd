@@ -117,6 +117,12 @@ state directory's `crash.log`, if present, records unexpected application
 errors with a version and time. This is more useful than assuming that every
 silence or warning is a timing problem.
 
+If Modal ever does stop on such an error while a song has unsaved changes, it
+saves the song as it was into the state directory, named `recovered-` and the
+time, and says where when it next starts. Open that file with `:e`, save it
+under the name it should have with `:w FILE`, then delete the recovered copy.
+It is a last resort rather than a substitute for saving.
+
 ## Companion command-line tools
 
 `modal-ports` lists visible inputs and outputs. `modal-play` and `modal-record`

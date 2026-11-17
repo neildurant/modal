@@ -59,6 +59,9 @@ namespace
 // Where a crash is written down, if there's a config directory.
 std::optional<std::filesystem::path> crashLog;
 
+// The song being edited, while there is one, for a crash to save its unsaved changes from.
+const modal::core::Document* crashDocument = nullptr;
+
 std::string twoDigits(unsigned value)
 {
     return (value < 10 ? "0" : "") + std::to_string(value);
@@ -100,7 +103,29 @@ std::string utcNow()
             what = "uncaught exception of an unknown type";
         }
     }
-    const auto line = utcNow() + " UTC  modal " + std::string{modal::core::version()} + ": " + what;
+    auto line = utcNow() + " UTC  modal " + std::string{modal::core::version()} + ": " + what;
+    if (crashDocument != nullptr && crashLog)
+    {
+        // The song's unsaved changes, kept beside the log for the next start to say of. The
+        // stamp is the time as a file's name can have it: 20261023-094107.
+        std::string stamp;
+        for (const char c : utcNow())
+        {
+            if (c == ' ')
+            {
+                stamp += '-';
+            }
+            else if (c != '-' && c != ':')
+            {
+                stamp += c;
+            }
+        }
+        if (const auto saved =
+                modal::ui::writeRecovery(*crashDocument, crashLog->parent_path(), stamp))
+        {
+            line += "; unsaved changes kept in " + modal::ui::utf8Text(*saved);
+        }
+    }
     std::fprintf(stderr, "%s\n", line.c_str());
     if (crashLog)
     {
@@ -678,6 +703,15 @@ int main(int argc, char* argv[])
     // arrangement sketch.
     core::Document document{demo ? ui::demoSong() : ui::newSong()};
     document.setListener([&](const core::Song& song) { playback.player().update(song); });
+    crashDocument = &document;
+    if (const auto stateDirectory = platform::stateDirectory())
+    {
+        if (auto recovered = ui::takeRecoveryNotice(*stateDirectory))
+        {
+            std::fprintf(stderr, "%s\n", recovered->c_str());
+            message = message.empty() ? *recovered : *recovered + "; " + message;
+        }
+    }
     if (songFile)
     {
         if (auto loaded = ui::openFile(document, *songFile); !loaded.message.empty())
@@ -945,5 +979,6 @@ int main(int argc, char* argv[])
                 },
                 .closing = closing,
                 .woken = [&](std::int64_t now) { return view.inputWoken(now); }});
+    crashDocument = nullptr; // the document goes as main() returns
     return 0;
 }

@@ -302,3 +302,26 @@ TEST_CASE(":wq saves and quits, once the song has a file")
     CHECK(f.host.quitted);
     CHECK_FALSE(f.document.modified());
 }
+
+TEST_CASE("an unexpected end saves a song with unsaved changes, and the next start says where")
+{
+    Files files;
+    CHECK_FALSE(writeRecovery(files.document, files.directory, "20261117-094107"));
+    CHECK_FALSE(takeRecoveryNotice(files.directory)); // nothing unsaved, so nothing kept
+
+    files.change();
+    const auto file = writeRecovery(files.document, files.directory / "state", "20261117-094107");
+    REQUIRE(file);
+    CHECK(*file == files.directory / "state" / "recovered-20261117-094107.modal");
+    const auto back = core::readSongFile(*file);
+    REQUIRE(back.song);
+    CHECK(back.song->title == "Changed");
+    CHECK(files.document.modified()); // still unsaved, as far as the document goes
+
+    const auto notice = takeRecoveryNotice(files.directory / "state");
+    REQUIRE(notice);
+    CHECK(*notice == "Modal ended unexpectedly last time: the song's unsaved changes are in " +
+                         utf8Text(*file) + " (:e opens it)");
+    CHECK_FALSE(takeRecoveryNotice(files.directory / "state")); // said once
+    CHECK(std::filesystem::exists(*file));                      // the song stays
+}

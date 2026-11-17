@@ -89,4 +89,17 @@ OpenResult openFile(core::Document& document, const std::filesystem::path& file)
 // one section at 120 BPM in 4/4.
 core::Song newSong();
 
+// When Modal is ending unexpectedly, as for an exception nothing caught: saves a song with
+// unsaved changes as recovered-STAMP.modal in the state directory, and leaves a note of it
+// there for the next start (decided 17 November 2026, after a code review, so that such an
+// end doesn't lose the work). The stamp tells one recovery from another, and must do in a
+// file's name. Returns the file, or nothing if the song had no changes or couldn't be saved.
+// Never throws.
+std::optional<std::filesystem::path> writeRecovery(const core::Document& document,
+                                                   const std::filesystem::path& stateDirectory,
+                                                   std::string_view stamp) noexcept;
+
+// At the start: what to say of a song recovered at the last end, once, or nothing.
+std::optional<std::string> takeRecoveryNotice(const std::filesystem::path& stateDirectory);
+
 } // namespace modal::ui
