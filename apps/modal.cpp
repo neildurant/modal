@@ -8,6 +8,7 @@
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/core/version.hpp>
+#include <modal/platform/arguments.hpp>
 #include <modal/platform/clock.hpp>
 #include <modal/platform/midi_input_session.hpp>
 #include <modal/platform/midi_output.hpp>
@@ -534,12 +535,13 @@ int main(int argc, char* argv[])
     std::optional<std::filesystem::path> songFile;
     bool force = false;
     bool demo = false;
-    for (int i = 1; i < argc; ++i)
+    const auto arguments = platform::arguments(argc, argv); // UTF-8, on Windows too
+    for (std::size_t i = 0; i < arguments.size(); ++i)
     {
-        const std::string_view argument = argv[i];
-        if (argument == "--write-config" && i + 1 < argc)
+        const std::string_view argument = arguments[i];
+        if (argument == "--write-config" && i + 1 < arguments.size())
         {
-            configFile = argv[++i];
+            configFile = ui::utf8Path(arguments[++i]);
         }
         else if (argument == "--force")
         {

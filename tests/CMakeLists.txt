@@ -38,6 +38,7 @@ add_executable(modal_tests
     core/track_test.cpp
     core/transforms_test.cpp
     core/version_test.cpp
+    platform/arguments_test.cpp
     platform/clock_test.cpp
     platform/midi_io_test.cpp
     platform/midi_input_session_test.cpp
