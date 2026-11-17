@@ -504,6 +504,12 @@ private:
     // Runs a command the workspace has itself, returning whether what's shown changed, or
     // nothing if it isn't one; or a view's command, through the view shown.
     std::optional<bool> runShared(std::string_view command, int count);
+    // Its parts, each returning nothing for a command that isn't its own.
+    std::optional<bool> runEditCommand(std::string_view command, int count);
+    std::optional<bool> runTransportCommand(std::string_view command);
+    std::optional<bool> runTrackCommand(std::string_view command, int count);
+    std::optional<bool> runToggleCommand(std::string_view command);
+    std::optional<bool> runShowCommand(std::string_view command, int count);
     bool runViewCommand(std::string_view command, int count);
     // Says where a command does something, for one run where it does nothing.
     bool sayWhereFor(std::string_view command);

@@ -1639,6 +1639,35 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         mode_ = Mode::OperatorPending;
         return true;
     }
+    if (const auto done = runEditCommand(command, count))
+    {
+        return done;
+    }
+    if (const auto done = runTransportCommand(command))
+    {
+        return done;
+    }
+    if (const auto done = runTrackCommand(command, count))
+    {
+        return done;
+    }
+    if (const auto done = runToggleCommand(command))
+    {
+        return done;
+    }
+    if (const auto done = runShowCommand(command, count))
+    {
+        return done;
+    }
+    return std::nullopt;
+}
+
+// The workspace's own commands, in parts (split after a code review, November 2026), each
+// returning nothing for a command that isn't its own. First those of editing itself: the
+// palette, Visual mode, repeating, registers, macros, marks, undo and cancelling.
+std::optional<bool> Workspace::runEditCommand(std::string_view command, int count)
+{
+    const int n = std::max(count, 1);
     if (command == "cut-at-edges")
     {
         cutNext_ = true; // for the next operator
@@ -1769,6 +1798,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         }
         return false;
     }
+    return std::nullopt;
+}
+
+// Playing and recording, and the song's settings for them.
+std::optional<bool> Workspace::runTransportCommand(std::string_view command)
+{
     if (command == "play-toggle" || command == "play-stop-back" || command == "play-cursor" ||
         command == "play-from-set" || command == "panic")
     {
@@ -1830,6 +1865,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
         showPlayhead();
         return true;
     }
+    return std::nullopt;
+}
+
+// The tracks' buttons and order, from whichever view.
+std::optional<bool> Workspace::runTrackCommand(std::string_view command, int count)
+{
     if ((command == "tracks-mute-toggle" || command == "tracks-solo-toggle" ||
          command == "tracks-arm-toggle") &&
         where() == Where::Tracks)
@@ -1970,6 +2011,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                    MessageKind::Information);
         return true;
     }
+    return std::nullopt;
+}
+
+// The session's switches, most of them settings set through the command line.
+std::optional<bool> Workspace::runToggleCommand(std::string_view command)
+{
     if (command == "quantize-bypass-toggle")
     {
         if (player_ == nullptr)
@@ -2084,6 +2131,12 @@ std::optional<bool> Workspace::runShared(std::string_view command, int count)
                    MessageKind::Information);
         return true;
     }
+    return std::nullopt;
+}
+
+// The command line, searching and selecting, and going from view to view.
+std::optional<bool> Workspace::runShowCommand(std::string_view command, int count)
+{
     if (command == "command-line")
     {
         mode_ = Mode::CommandLine;
