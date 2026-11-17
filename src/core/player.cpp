@@ -106,10 +106,13 @@ bool Player::record(const Song& song)
     const bool countIn = start.countIn.has_value();
     if (!engine_.setPlan(plan) || !engine_.play(start.playFrom, std::move(start.countIn)))
     {
-        // The plan, if taken, records nothing without a play; the next update replaces it.
+        // The pass's plan, if taken, records nothing without a play, but plays as the pass
+        // would: the tracks replaced silent, the click carrying on. So the song is planned
+        // again for playing, to wait for the engine if it must (found in a code review,
+        // November 2026).
         recorder_.reset();
         click_.reset();
-        waiting_ = std::move(plan);
+        update(song);
         return false;
     }
     waiting_.reset();

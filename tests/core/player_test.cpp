@@ -345,6 +345,37 @@ TEST_CASE("a plan the engine can't take yet is kept and handed over later, the n
     CHECK(heard);
 }
 
+TEST_CASE("a record the engine can't take leaves the song planned for playing")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = fourNotes(ppqn);
+    song.countIn.mode = CountInSettings::Mode::None;
+    song.updateTrack(song.tracks()[0]->id(), [](Track& track) { track.arm = true; });
+    Playing p{song};
+    // With the engine not running, its queue fills.
+    for (int i = 0; i < 1000 && !p.player.planWaiting(); ++i)
+    {
+        p.player.update(song);
+    }
+    REQUIRE(p.player.planWaiting());
+    CHECK_FALSE(p.player.record(song));
+    CHECK_FALSE(p.player.recording());
+    CHECK(p.player.recordingTracks().empty());
+
+    // What waits for the engine isn't the pass's plan, the armed track silent as replacing
+    // leaves it, but the song as it plays.
+    p.runFor(1ms);
+    CHECK_FALSE(p.player.planWaiting());
+    CHECK(p.player.play());
+    p.runFor(100ms);
+    bool heard = false;
+    for (const auto& sent : p.sink.sent)
+    {
+        heard = heard || (sent.bytes.size() == 3 && sent.bytes[1] == 60);
+    }
+    CHECK(heard);
+}
+
 TEST_CASE("a play or stop the engine can't take changes nothing")
 {
     const auto ppqn = MODAL_ANY_PPQN();
