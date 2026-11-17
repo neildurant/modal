@@ -15,6 +15,7 @@ add_library(modal_core STATIC
     document.cpp
     chords.cpp
     pitch.cpp
+    ramp.cpp
     playback_plan.cpp
     playback_transform.cpp
     player.cpp

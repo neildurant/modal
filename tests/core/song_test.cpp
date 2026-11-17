@@ -541,10 +541,10 @@ TEST_CASE("a song made from its parts")
     Section intro{"Intro", 2 * bar, MeterMap{ppqn}, kDefaultTempo};
     intro.addTempo({bar, Tempo{400'000}});
     intro.addLabel({bar, "fill"});
-    intro.setContent(TrackId{3}, {std::nullopt, events});
+    intro.setContent(TrackId{3}, {std::nullopt, events, {}});
     Section verse{"Verse", 6 * q, MeterMap{ppqn, {3, 4}}, Tempo{400'000}};
     verse.setColour("blue");
-    verse.setContent(TrackId{3}, {std::nullopt, events});
+    verse.setContent(TrackId{3}, {std::nullopt, events, {}});
 
     const Song song{ppqn, {bass}, {intro, verse}};
     REQUIRE(song.tracks().size() == 1);

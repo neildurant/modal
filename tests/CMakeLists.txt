@@ -36,6 +36,7 @@ add_executable(modal_tests
     core/time_offset_test.cpp
     core/timing_stats_test.cpp
     core/track_test.cpp
+    core/ramp_test.cpp
     core/transforms_test.cpp
     core/version_test.cpp
     platform/arguments_test.cpp

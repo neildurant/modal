@@ -3,6 +3,7 @@
 #include <modal/core/files.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
+#include <modal/core/ramp.hpp>
 #include <modal/core/song_file.hpp>
 
 #include <algorithm>
@@ -354,6 +355,7 @@ private:
     bool readMark(std::span<const Token> tokens);
     bool readBlock(std::span<const Token> tokens);
     bool readEvent(std::span<const Token> tokens);
+    bool readRamp(std::span<const Token> tokens);
     std::optional<EventData> eventData(std::span<const Token> tokens);
 
     // Ends the conductor's part of the section, ready for the tracks.
@@ -402,6 +404,7 @@ private:
         TrackId id;
         std::optional<MeterMap> meter;
         EventList events;
+        std::vector<ControllerRamp> ramps;
     };
 
     int line_ = 0;
@@ -490,6 +493,10 @@ bool Reader::readLine(std::span<const Token> tokens)
     if (word == "section")
     {
         return readSection(tokens);
+    }
+    if (word == "ramp")
+    {
+        return readRamp(tokens);
     }
     if (word == "track")
     {
@@ -940,7 +947,7 @@ bool Reader::readMeter(std::span<const Token> tokens)
     }
 
     auto& meter = block_ ? block_->meter : section_->meter;
-    if (block_ ? !block_->events.empty() : section_->meterClosed)
+    if (block_ ? !block_->events.empty() || !block_->ramps.empty() : section_->meterClosed)
     {
         return fail("meter lines come first");
     }
@@ -1107,7 +1114,7 @@ bool Reader::readBlock(std::span<const Token> tokens)
     {
         return fail("track " + tokens[1].text + " comes twice in this section");
     }
-    block_.emplace(OpenBlock{it->id(), std::nullopt, {}});
+    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}});
     return true;
 }
 
@@ -1142,6 +1149,111 @@ bool Reader::readEvent(std::span<const Token> tokens)
         return fail("the event has a value out of range");
     }
     block_->events.insert(std::move(event));
+    return true;
+}
+
+bool Reader::readRamp(std::span<const Token> tokens)
+{
+    if (!block_)
+    {
+        return fail("a ramp belongs in a track, in a section");
+    }
+    if (tokens.size() < 3)
+    {
+        return fail("a ramp is a position, a lane and settings, as ramp 1:1:0 cc1 len=1/1 from=0 "
+                    "to=127");
+    }
+    const auto& meter = block_->meter ? *block_->meter : section_->section->meter();
+    const auto tick = tickAt(meter, tokens[1].text);
+    if (!tick)
+    {
+        return false;
+    }
+    const auto lane = parseLane(tokens[2].text);
+    if (!lane || !rampable(*lane))
+    {
+        return fail("a ramp is of a continuous controller, such as cc1, or of bend or pressure");
+    }
+    ControllerRamp ramp{.lane = *lane, .start = *tick};
+    std::optional<Tick> rampLength;
+    std::optional<std::int64_t> from;
+    std::optional<std::int64_t> to;
+    for (const auto& token : tokens.subspan(3))
+    {
+        const auto [name, value] = settingOf(token);
+        if (value && name == "len")
+        {
+            rampLength = length(*value);
+            if (!rampLength)
+            {
+                return false;
+            }
+        }
+        else if (value && (name == "from" || name == "to"))
+        {
+            const auto number = parseInteger(*value, lane->lowest(), lane->highest());
+            if (!number)
+            {
+                return fail("a ramp's values should be from " + std::to_string(lane->lowest()) +
+                            " to " + std::to_string(lane->highest()));
+            }
+            (name == "from" ? from : to) = number;
+        }
+        else if (value && name == "shape")
+        {
+            const auto shape = parseRampShape(*value);
+            if (!shape)
+            {
+                return fail("a ramp's shape is linear, curve, scurve or equalpower");
+            }
+            ramp.shape = *shape;
+        }
+        else if (value && name == "amount")
+        {
+            const auto amount =
+                parseInteger(*value, -ControllerRamp::kMaxAmount, ControllerRamp::kMaxAmount);
+            if (!amount)
+            {
+                return fail("a ramp's amount should be from -100 to 100");
+            }
+            ramp.amount = static_cast<int>(*amount);
+        }
+        else if (value && name == "density")
+        {
+            const auto density = parseInteger(*value, 1, ControllerRamp::kMaxDensity);
+            if (!density)
+            {
+                return fail("a ramp's density should be from 1 to " +
+                            std::to_string(ControllerRamp::kMaxDensity));
+            }
+            ramp.density = static_cast<int>(*density);
+        }
+        else
+        {
+            return fail("unknown ramp setting \"" + token.text + "\"");
+        }
+    }
+    if (!rampLength || !from || !to)
+    {
+        return fail("a ramp needs its length and values, as len=1/1 from=0 to=127");
+    }
+    ramp.length = *rampLength;
+    ramp.from = static_cast<int>(*from);
+    ramp.to = static_cast<int>(*to);
+    if (!ramp.valid())
+    {
+        return fail("a ramp needs a length");
+    }
+    if (ramp.end() >= section_->section->length())
+    {
+        return fail("the ramp runs past the end of the section");
+    }
+    if (std::ranges::any_of(block_->ramps,
+                            [&](const ControllerRamp& other) { return other.collides(ramp); }))
+    {
+        return fail("the ramp touches or overlaps another of its lane");
+    }
+    block_->ramps.push_back(ramp);
     return true;
 }
 
@@ -1393,8 +1505,10 @@ bool Reader::closeBlock()
 {
     if (block_)
     {
-        section_->section->setContent(block_->id,
-                                      {std::move(block_->meter), std::move(block_->events)});
+        std::ranges::stable_sort(block_->ramps, {}, &ControllerRamp::start);
+        section_->section->setContent(
+            block_->id,
+            {std::move(block_->meter), std::move(block_->events), std::move(block_->ramps)});
         block_.reset();
     }
     return true;
@@ -1587,6 +1701,22 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
                     note->duration = scale(start + note->duration) - scale(start);
                 }
                 scaled.events.insert(std::move(event));
+            }
+            for (auto ramp : content->ramps)
+            {
+                const Tick start = ramp.start;
+                ramp.start = scale(start);
+                ramp.length = std::max(scale(start + ramp.length) - ramp.start, Tick{1});
+                const bool collides =
+                    std::ranges::any_of(scaled.ramps, [&](const ControllerRamp& other)
+                                        { return other.collides(ramp); });
+                if (ramp.end() >= length || collides)
+                {
+                    error = "two ramps meet, or one meets its section's end, at " +
+                            std::to_string(to.value) + " PPQN";
+                    return std::nullopt;
+                }
+                scaled.ramps.push_back(ramp);
             }
             section.setContent(track->id(), std::move(scaled));
         }
@@ -1782,6 +1912,26 @@ std::string writeSong(const Song& song)
                     line(2, "meter " + positionText(trackMeter, change.tick) + " " +
                                 signatureText(change.signature));
                 }
+            }
+            for (const auto& ramp : content->ramps)
+            {
+                std::string rampText =
+                    "ramp " + positionText(trackMeter, ramp.start) + " " + toString(ramp.lane) +
+                    " len=" + lengthText(ramp.length, ppqn) + " from=" + std::to_string(ramp.from) +
+                    " to=" + std::to_string(ramp.to);
+                if (ramp.shape != ControllerRamp::Shape::Linear)
+                {
+                    rampText += " shape=" + std::string{toString(ramp.shape)};
+                }
+                if (ramp.amount != 0)
+                {
+                    rampText += " amount=" + std::to_string(ramp.amount);
+                }
+                if (ramp.density != ControllerRamp::kDefaultDensity)
+                {
+                    rampText += " density=" + std::to_string(ramp.density);
+                }
+                line(2, rampText);
             }
             for (const auto& event : content->events.all())
             {

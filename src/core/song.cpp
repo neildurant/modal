@@ -73,6 +73,28 @@ EventList eventsBetween(const EventList& events, Tick from, Tick to)
     return part;
 }
 
+// The ramps starting from one tick until another, positioned from the first.
+std::vector<ControllerRamp> rampsBetween(std::span<const ControllerRamp> ramps, Tick from, Tick to)
+{
+    std::vector<ControllerRamp> part;
+    for (auto ramp : ramps)
+    {
+        if (ramp.start >= from && ramp.start < to)
+        {
+            ramp.start -= from;
+            part.push_back(ramp);
+        }
+    }
+    return part;
+}
+
+// A part of a track's content from one tick until another, positioned from the first.
+TrackContent contentBetween(const TrackContent& content, Tick from, Tick to)
+{
+    return {std::nullopt, eventsBetween(content.events, from, to),
+            rampsBetween(content.ramps, from, to)};
+}
+
 // Where an event ends: a note's end, or just after any other event.
 Tick endOf(const Event& event)
 {
@@ -139,7 +161,7 @@ void Section::addMark(Mark mark)
 
 void Section::setContent(TrackId id, TrackContent content)
 {
-    if (!content.meter && content.events.empty())
+    if (content.empty())
     {
         content_.erase(id);
         return;
@@ -240,8 +262,8 @@ TrackId Song::addTrack(std::size_t position, std::string name)
     track->name = std::move(name);
     const auto offset = static_cast<std::ptrdiff_t>(position);
     tracks_.insert(tracks_.begin() + offset, std::move(track));
-    flattened_.insert(flattened_.begin() + offset,
-                      Flattened{meter_, std::make_shared<const EventList>()});
+    const auto none = std::make_shared<const EventList>();
+    flattened_.insert(flattened_.begin() + offset, Flattened{meter_, none, none, {}});
     return id;
 }
 
@@ -380,7 +402,7 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
     }
     const auto index = sectionAt(tick);
     const Tick at = tick - starts_[index];
-    if (at == 0)
+    if (at == 0 || rampAcross(tick))
     {
         return std::nullopt;
     }
@@ -436,8 +458,8 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
     first->content_.clear();
     for (const auto& [id, content] : old.content_)
     {
-        TrackContent before{std::nullopt, eventsBetween(content->events, 0, at)};
-        TrackContent after{std::nullopt, eventsBetween(content->events, at, kForever)};
+        auto before = contentBetween(*content, 0, at);
+        auto after = contentBetween(*content, at, kForever);
         if (content->meter)
         {
             before.meter = meterBetween(*content->meter, 0, at);
@@ -447,11 +469,11 @@ std::optional<Song::Split> Song::splitSection(Tick tick, std::string name)
             }
             after.meter = meterBetween(*content->meter, at, kForever);
         }
-        if (before.meter || !before.events.empty())
+        if (!before.empty())
         {
             first->content_.emplace(id, std::make_shared<const TrackContent>(std::move(before)));
         }
-        if (after.meter || !after.events.empty())
+        if (!after.empty())
         {
             second->content_.emplace(id, std::make_shared<const TrackContent>(std::move(after)));
         }
@@ -599,6 +621,10 @@ bool Song::resizeSection(std::size_t index, std::int64_t bars)
             return false;
         }
         const Tick end = old.meter_.barStart(last + bars + 1);
+        if (rampAcross(starts_[index] + end))
+        {
+            return false;
+        }
         section->length_ = end;
         section->meter_ = meterBetween(old.meter_, 0, end);
         std::erase_if(section->tempo_, [end](const auto& change) { return change.tick >= end; });
@@ -606,13 +632,13 @@ bool Song::resizeSection(std::size_t index, std::int64_t bars)
         std::erase_if(section->marks_, [end](const Mark& mark) { return mark.tick >= end; });
         for (auto it = section->content_.begin(); it != section->content_.end();)
         {
-            TrackContent shorter{std::nullopt, eventsBetween(it->second->events, 0, end)};
+            auto shorter = contentBetween(*it->second, 0, end);
             if (it->second->meter)
             {
                 shorter.meter = meterBetween(*it->second->meter, 0, end);
                 cutAt(*shorter.meter, end);
             }
-            if (!shorter.meter && shorter.events.empty())
+            if (shorter.empty())
             {
                 it = section->content_.erase(it);
                 continue;
@@ -690,13 +716,19 @@ bool Song::joinSections(std::size_t index)
     {
         const auto* before = first.content(id);
         const auto* after = second.content(id);
-        TrackContent content{std::nullopt, before ? before->events : EventList{}};
+        TrackContent content{std::nullopt, before ? before->events : EventList{},
+                             before ? before->ramps : std::vector<ControllerRamp>{}};
         if (after)
         {
             for (auto event : after->events.all())
             {
                 event.tick += at;
                 content.events.insert(std::move(event));
+            }
+            for (auto ramp : after->ramps)
+            {
+                ramp.start += at;
+                content.ramps.push_back(ramp);
             }
         }
         if ((before && before->meter) || (after && after->meter))
@@ -724,6 +756,14 @@ Song::BarsEdit Song::removeBars(Tick from, std::int64_t count)
     if (from == 0 && to == end())
     {
         return result; // a song keeps a bar
+    }
+    for (const Tick tick : {from, to})
+    {
+        if (const auto ramp = rampAcross(tick))
+        {
+            result.ramp = ramp->track;
+            return result;
+        }
     }
     // The bars cut out as sections of their own, then removed, and the section they were cut
     // from joined up again.
@@ -777,6 +817,11 @@ Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeS
     {
         return result;
     }
+    if (const auto ramp = rampAcross(at))
+    {
+        result.ramp = ramp->track;
+        return result;
+    }
     const auto index = sectionAt(at);
     const Section& old = *sections_[index];
     const Tick offset = at - starts_[index];
@@ -794,7 +839,7 @@ Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeS
                 return result;
             }
             added->content_.emplace(
-                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}}));
+                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}, {}}));
         }
     }
     Song edited = *this;
@@ -850,6 +895,10 @@ void Song::fitToContent()
         {
             extent = std::max(extent, endOf(event));
         }
+        for (const auto& ramp : content->ramps)
+        {
+            extent = std::max(extent, ramp.end() + 1);
+        }
     }
     for (const auto& label : section->labels_)
     {
@@ -893,6 +942,147 @@ const EventList& Song::events(TrackId id) const
     const auto index = indexOf(id);
     assert(index < tracks_.size());
     return index < tracks_.size() ? *flattened_[index].events : kNone;
+}
+
+const EventList& Song::sourceEvents(TrackId id) const
+{
+    static const EventList kNone;
+    const auto index = indexOf(id);
+    assert(index < tracks_.size());
+    return index < tracks_.size() ? *flattened_[index].source : kNone;
+}
+
+std::span<const ControllerRamp> Song::ramps(TrackId id) const
+{
+    const auto index = indexOf(id);
+    return index < tracks_.size() ? std::span<const ControllerRamp>{flattened_[index].ramps}
+                                  : std::span<const ControllerRamp>{};
+}
+
+std::optional<Song::RampAt> Song::rampAcross(Tick tick) const
+{
+    for (std::size_t i = 0; i < tracks_.size(); ++i)
+    {
+        const auto& ramps = flattened_[i].ramps;
+        for (std::size_t r = 0; r < ramps.size(); ++r)
+        {
+            if (ramps[r].start < tick && ramps[r].end() >= tick)
+            {
+                return RampAt{tracks_[i]->id(), r};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+Song::RampEdit Song::checkRamp(std::size_t trackIndex, const ControllerRamp& ramp,
+                               std::optional<std::size_t> except) const
+{
+    if (!ramp.valid())
+    {
+        return {RampRefusal::Invalid};
+    }
+    if (ramp.end() >= end())
+    {
+        return {RampRefusal::PastEnd};
+    }
+    if (ramp.end() >= starts_[sectionAt(ramp.start) + 1])
+    {
+        return {RampRefusal::CrossesSection};
+    }
+    const auto& ramps = flattened_[trackIndex].ramps;
+    for (std::size_t r = 0; r < ramps.size(); ++r)
+    {
+        if (r != except && ramps[r].collides(ramp))
+        {
+            return {RampRefusal::Collides, r};
+        }
+    }
+    return {};
+}
+
+Song::RampEdit Song::addRamp(TrackId id, ControllerRamp ramp)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size())
+    {
+        return {RampRefusal::NoTrack};
+    }
+    if (const auto refused = checkRamp(index, ramp, std::nullopt); !refused.done())
+    {
+        return refused;
+    }
+    auto ramps = flattened_[index].ramps;
+    const auto at = std::ranges::upper_bound(ramps, ramp.start, {}, &ControllerRamp::start);
+    const auto position = static_cast<std::size_t>(at - ramps.begin());
+    ramps.insert(at, ramp);
+    setRamps(index, std::move(ramps));
+    return {RampRefusal::None, position};
+}
+
+Song::RampEdit Song::replaceRamp(TrackId id, std::size_t which, ControllerRamp ramp)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size())
+    {
+        return {RampRefusal::NoTrack};
+    }
+    if (which >= flattened_[index].ramps.size())
+    {
+        return {RampRefusal::NoRamp};
+    }
+    if (const auto refused = checkRamp(index, ramp, which); !refused.done())
+    {
+        return refused;
+    }
+    auto ramps = flattened_[index].ramps;
+    ramps.erase(ramps.begin() + static_cast<std::ptrdiff_t>(which));
+    const auto at = std::ranges::upper_bound(ramps, ramp.start, {}, &ControllerRamp::start);
+    const auto position = static_cast<std::size_t>(at - ramps.begin());
+    ramps.insert(at, ramp);
+    setRamps(index, std::move(ramps));
+    return {RampRefusal::None, position};
+}
+
+bool Song::removeRamp(TrackId id, std::size_t which)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size() || which >= flattened_[index].ramps.size())
+    {
+        return false;
+    }
+    auto ramps = flattened_[index].ramps;
+    ramps.erase(ramps.begin() + static_cast<std::ptrdiff_t>(which));
+    setRamps(index, std::move(ramps));
+    return true;
+}
+
+bool Song::convertRamp(TrackId id, std::size_t which)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size() || which >= flattened_[index].ramps.size())
+    {
+        return false;
+    }
+    auto ramps = flattened_[index].ramps;
+    const auto ramp = ramps[which];
+    EventList source;
+    for (const auto& event : flattened_[index].source->all())
+    {
+        if (!ramp.owns(event))
+        {
+            source.insert(event);
+        }
+    }
+    for (auto& event : rampEvents(ramp, ppqn()))
+    {
+        source.insert(std::move(event));
+    }
+    ramps.erase(ramps.begin() + static_cast<std::ptrdiff_t>(which));
+    flattened_[index].ramps = ramps;
+    setSource(index, std::move(source));
+    setRamps(index, std::move(ramps));
+    return true;
 }
 
 void Song::updateTempo(const std::function<void(TempoMap&)>& edit)
@@ -972,8 +1162,37 @@ bool Song::updateEvents(TrackId id, const std::function<void(EventList&)>& edit)
     }
     EventList events = *flattened_[index].events;
     edit(events);
-    Tick extent = 0;
+    const auto& ramps = flattened_[index].ramps;
+    if (ramps.empty())
+    {
+        setSource(index, std::move(events));
+        return true;
+    }
+    // What the edit left outside the ramps, and what they hid before.
+    EventList source;
     for (const auto& event : events.all())
+    {
+        if (!ownedByRamp(event, ramps))
+        {
+            source.insert(event);
+        }
+    }
+    for (const auto& event : flattened_[index].source->all())
+    {
+        if (ownedByRamp(event, ramps))
+        {
+            source.insert(event);
+        }
+    }
+    setSource(index, std::move(source));
+    return true;
+}
+
+void Song::setSource(std::size_t trackIndex, EventList source)
+{
+    const auto id = tracks_[trackIndex]->id();
+    Tick extent = 0;
+    for (const auto& event : source.all())
     {
         extent = std::max(extent, endOf(event));
     }
@@ -981,10 +1200,30 @@ bool Song::updateEvents(TrackId id, const std::function<void(EventList&)>& edit)
     for (std::size_t i = 0; i < sections_.size(); ++i)
     {
         updateContent(i, id, [&](TrackContent& content)
-                      { content.events = eventsBetween(events, starts_[i], starts_[i + 1]); });
+                      { content.events = eventsBetween(source, starts_[i], starts_[i + 1]); });
     }
-    flattened_[index].events = std::make_shared<const EventList>(std::move(events));
-    return true;
+    auto& flat = flattened_[trackIndex];
+    flat.source = std::make_shared<const EventList>(std::move(source));
+    flat.events =
+        flat.ramps.empty()
+            ? flat.source
+            : std::make_shared<const EventList>(withRamps(*flat.source, flat.ramps, ppqn()));
+}
+
+void Song::setRamps(std::size_t trackIndex, std::vector<ControllerRamp> ramps)
+{
+    const auto id = tracks_[trackIndex]->id();
+    for (std::size_t i = 0; i < sections_.size(); ++i)
+    {
+        updateContent(i, id, [&](TrackContent& content)
+                      { content.ramps = rampsBetween(ramps, starts_[i], starts_[i + 1]); });
+    }
+    auto& flat = flattened_[trackIndex];
+    flat.ramps = std::move(ramps);
+    flat.events =
+        flat.ramps.empty()
+            ? flat.source
+            : std::make_shared<const EventList>(withRamps(*flat.source, flat.ramps, ppqn()));
 }
 
 bool Song::setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignature signature)
@@ -1198,7 +1437,7 @@ void Song::updateContent(std::size_t index, TrackId id,
     const auto* old = sections_[index]->content(id);
     TrackContent content = old ? *old : TrackContent{};
     edit(content);
-    const bool empty = !content.meter && content.events.empty();
+    const bool empty = content.empty();
     if (old ? content == *old : empty)
     {
         return;
@@ -1256,7 +1495,8 @@ void Song::rebuildConductor()
 void Song::rebuildEvents(std::size_t trackIndex)
 {
     const auto id = tracks_[trackIndex]->id();
-    auto events = std::make_shared<EventList>();
+    auto source = std::make_shared<EventList>();
+    std::vector<ControllerRamp> ramps;
     for (std::size_t s = 0; s < sections_.size(); ++s)
     {
         if (const auto* content = sections_[s]->content(id))
@@ -1264,11 +1504,22 @@ void Song::rebuildEvents(std::size_t trackIndex)
             for (auto event : content->events.all())
             {
                 event.tick += starts_[s];
-                events->insert(std::move(event));
+                source->insert(std::move(event));
+            }
+            for (auto ramp : content->ramps)
+            {
+                ramp.start += starts_[s];
+                ramps.push_back(ramp);
             }
         }
     }
-    flattened_[trackIndex].events = std::move(events);
+    auto& flat = flattened_[trackIndex];
+    flat.source = std::move(source);
+    flat.ramps = std::move(ramps);
+    flat.events =
+        flat.ramps.empty()
+            ? flat.source
+            : std::make_shared<const EventList>(withRamps(*flat.source, flat.ramps, ppqn()));
 }
 
 void Song::rebuildAll()
@@ -1277,7 +1528,7 @@ void Song::rebuildAll()
     flattened_.clear();
     for (std::size_t i = 0; i < tracks_.size(); ++i)
     {
-        flattened_.push_back({meter_, nullptr});
+        flattened_.push_back({meter_, nullptr, nullptr, {}});
         rebuildEvents(i);
     }
     rebuildMeters();

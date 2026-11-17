@@ -4,6 +4,7 @@
 
 #include <modal/core/meter_map.hpp>
 #include <modal/core/metronome.hpp>
+#include <modal/core/ramp.hpp>
 #include <modal/core/tempo_map.hpp>
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
@@ -59,7 +60,12 @@ struct TrackContent
     // The track's own meter here, or none to follow the conductor's. The section's end cuts
     // its last bar short if the bar would run past it.
     std::optional<MeterMap> meter;
+    // Its own events, including any its ramps hide.
     EventList events;
+    // Its controller ramps, in order of start, each ending before the section does.
+    std::vector<ControllerRamp> ramps;
+
+    bool empty() const { return !meter && events.empty() && ramps.empty(); }
 
     friend bool operator==(const TrackContent&, const TrackContent&) = default;
 };
@@ -268,6 +274,7 @@ public:
     {
         bool done = false;
         std::optional<TrackId> misaligned; // a track with a meter of its own whose bars it cuts
+        std::optional<TrackId> ramp;       // a track with a ramp it would cut
         std::vector<std::shared_ptr<const Section>> removed; // what removeBars took out
     };
 
@@ -284,6 +291,15 @@ public:
     BarsEdit insertBars(Tick at, std::int64_t count,
                         std::optional<TimeSignature> signature = std::nullopt);
 
+    // A ramp a tick would cut, if a section started there: one starting before it and ending
+    // at it or after. As a track and the ramp's index in ramps(track).
+    struct RampAt
+    {
+        TrackId track;
+        std::size_t index;
+    };
+    std::optional<RampAt> rampAcross(Tick tick) const;
+
     // Sets the last section to the fewest whole bars, at least one, that hold everything in
     // it, including the ends of notes.
     void fitToContent();
@@ -299,10 +315,46 @@ public:
     // A track's meter (its own where it has one, the conductor's elsewhere) and events. Not
     // to be asked of a track the song doesn't have.
     const MeterMap& meter(TrackId id) const;
+    // What plays: the track's events with its ramps' in place of those they hide.
     const EventList& events(TrackId id) const;
+    // The track's own events, including those its ramps hide.
+    const EventList& sourceEvents(TrackId id) const;
+    // Its ramps, at ticks from the song's start, in order of start.
+    std::span<const ControllerRamp> ramps(TrackId id) const;
+
+    // Controller ramps (designed 17 November 2026). An edit is refused, changing nothing, for
+    // no such track or ramp, settings that don't make sense, a ramp reaching the song's end or
+    // the next section, or one touching or overlapping another of its controller on the track.
+    enum class RampRefusal : std::uint8_t
+    {
+        None,
+        NoTrack,
+        NoRamp,
+        Invalid,
+        PastEnd,
+        CrossesSection,
+        Collides,
+    };
+    struct RampEdit
+    {
+        RampRefusal refusal = RampRefusal::None;
+        std::size_t index = 0; // the ramp's index afterwards, or the one it collides with
+
+        bool done() const { return refusal == RampRefusal::None; }
+    };
+    RampEdit addRamp(TrackId id, ControllerRamp ramp);
+    // Replaces a ramp, by its index in ramps(id), as moving, resizing or reshaping it does.
+    RampEdit replaceRamp(TrackId id, std::size_t index, ControllerRamp ramp);
+    // Removes a ramp, showing the events it hid again.
+    bool removeRamp(TrackId id, std::size_t index);
+    // Makes a ramp's events ordinary ones, in place of those it hid, and removes it.
+    bool convertRamp(TrackId id, std::size_t index);
 
     // Edits the tempo, the conductor's meter, a track's meter or a track's events in ticks
-    // from the song's start, then shares the result out to the sections. A section keeps its
+    // from the song's start, then shares the result out to the sections. A track's events are
+    // edited as they play; its ramps' events can't be changed this way, being made from the
+    // ramps, so whatever the edit leaves of a ramp's controller in its span is set aside and
+    // the events the ramp hid kept. A section keeps its
     // length when the conductor's meter changes, ending in a remainder bar if need be, except
     // the last, which grows to the next bar line instead. Editing a track's meter gives it a
     // meter of its own in every section. Return false if there's no such track.
@@ -370,10 +422,19 @@ private:
     struct Flattened
     {
         MeterMap meter;
-        std::shared_ptr<const EventList> events; // shared, so copying a song is cheap
+        std::shared_ptr<const EventList> events; // what plays; shared, so copying is cheap
+        std::shared_ptr<const EventList> source; // the same list when there are no ramps
+        std::vector<ControllerRamp> ramps;
     };
 
     std::size_t indexOf(TrackId id) const;
+
+    // Shares a track's own events out to the sections, and rebuilds what plays.
+    void setSource(std::size_t trackIndex, EventList source);
+    // Shares a track's ramps out to the sections, and rebuilds what plays.
+    void setRamps(std::size_t trackIndex, std::vector<ControllerRamp> ramps);
+    RampEdit checkRamp(std::size_t trackIndex, const ControllerRamp& ramp,
+                       std::optional<std::size_t> except) const;
 
     // Grows the last section to the bar line at or after the tick.
     void growTo(Tick end);
