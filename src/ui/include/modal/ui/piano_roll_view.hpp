@@ -335,6 +335,10 @@ private:
                        std::string_view mergeKey);
     // The commands run in the notes area, and in the lane, moves in time.
     std::optional<bool> runNotes(std::string_view command, int count);
+    // Its parts, each returning nothing for a command that isn't its own.
+    std::optional<bool> runNoteMove(std::string_view command, int count, bool keepsBarOffset);
+    std::optional<bool> runNoteJump(std::string_view command, int count);
+    std::optional<bool> runNoteEdit(std::string_view command, int count);
 
     // Changes the current note, the cursor going with it, unless it would go before the song's
     // start or past its last tick, or run into another note of its pitch. The change says

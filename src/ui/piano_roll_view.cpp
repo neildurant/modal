@@ -3263,6 +3263,22 @@ std::optional<bool> PianoRollView::runNotes(std::string_view command, int count)
     {
         barOffset_.reset();
     }
+    if (const auto done = runNoteMove(command, count, keepsBarOffset))
+    {
+        return done;
+    }
+    if (const auto done = runNoteJump(command, count))
+    {
+        return done;
+    }
+    return runNoteEdit(command, count);
+}
+
+// The notes' commands, in parts (split after a code review, November 2026), each returning
+// nothing for a command that isn't its own. First the cursor's steps and the view's scrolling.
+std::optional<bool> PianoRollView::runNoteMove(std::string_view command, int count,
+                                               bool keepsBarOffset)
+{
     const int n = std::max(count, 1);
     const auto& song = document_.song();
     const auto& m = meter();
@@ -3411,7 +3427,20 @@ std::optional<bool> PianoRollView::runNotes(std::string_view command, int count)
         turn(time_);
         centre();
     }
-    else if (command.starts_with("cursor-find-") || command.starts_with("cursor-match-"))
+    else
+    {
+        return std::nullopt;
+    }
+    return true;
+}
+
+// The cursor's jumps: to what was found, a note, a chord, a mark, a section, a label or
+// another track.
+std::optional<bool> PianoRollView::runNoteJump(std::string_view command, int count)
+{
+    const int n = std::max(count, 1);
+    const auto& song = document_.song();
+    if (command.starts_with("cursor-find-") || command.starts_with("cursor-match-"))
     {
         // The next or previous match of a find (fE) or a search (/C1), in time and then low to
         // high, a search going round past the ends.
@@ -3580,7 +3609,20 @@ std::optional<bool> PianoRollView::runNotes(std::string_view command, int count)
         showTrack(to, std::nullopt);
         align();
     }
-    else if (command == "zoom-in" || command == "zoom-out")
+    else
+    {
+        return std::nullopt;
+    }
+    return true;
+}
+
+// The zoom and the grid, and what changes the notes.
+std::optional<bool> PianoRollView::runNoteEdit(std::string_view command, int count)
+{
+    const int n = std::max(count, 1);
+    const auto& song = document_.song();
+    const auto& m = meter();
+    if (command == "zoom-in" || command == "zoom-out")
     {
         // Fewer bars in view, or more.
         const auto last = static_cast<int>(kPageSizes.size()) - 1;
