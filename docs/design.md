@@ -836,6 +836,10 @@ These notes preserve feature descriptions. Their scheduled or someday maybe stat
 
 Only unresolved design choices belong here, grouped by feature rather than implementation order. [schedule.md](schedule.md) says when each feature is worked on and records its progress. Resolve questions before implementing the behaviour they affect, put the agreed specification in the relevant section above, record the reason in decisions.md, and remove the resolved question here. An agreed design is not an implementation completion.
 
+**Playback**
+
+- SysEx in a song is sent on the engine's thread, which WinMM blocks for as long as a long message takes, holding back every note due meanwhile (raised by a review, 17 November 2026; thru already leaves SysEx out for this reason). Whether to send it from a thread of its own, and so in what order with the channel messages around it, or to leave it and say so.
+
 **Recording**
 
 
