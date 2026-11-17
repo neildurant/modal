@@ -2870,6 +2870,26 @@ bool PianoRollView::laneOperate(std::string_view op, std::string_view motion, in
                      MessageKind::Information);
         return true;
     }
+    // dd and yy on a ramp take it, as x does, without needing a selection (asked for 17
+    // November 2026, after use).
+    if (const auto ramp =
+            motion == "operator-line" && !laneSelecting() ? currentRamp() : std::nullopt)
+    {
+        if (op == "operator-delete")
+        {
+            return deleteRamp(*ramp);
+        }
+        auto taken = document_.song().ramps(*trackId())[*ramp];
+        auto& reg = host_.eventRegister();
+        reg = EventRegister{};
+        reg.tracks.emplace_back();
+        reg.span = taken.length + 1;
+        taken.start = 0;
+        reg.ramps.push_back({taken});
+        host_.setMessage("Yanked the " + core::toString(taken.lane) + " ramp",
+                         MessageKind::Information);
+        return true;
+    }
     const auto shown = lane();
     const auto& events = document_.song().events(*trackId());
     std::vector<std::size_t> taken;

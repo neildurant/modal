@@ -603,3 +603,28 @@ TEST_CASE("taking time out and putting it back carries ramps with the events the
               .value_or("") == "A ramp would touch or overlap another of its controller there");
     CHECK(song == before);
 }
+
+TEST_CASE("dd and yy on a ramp take it, without a selection")
+{
+    Ramps r;
+    const auto before = r.values();
+    r.type(U",cr\t127");
+    r.keep();
+    const auto made = r.ramps()[0];
+    r.type(U"yy");
+    CHECK(r.ws.message() == "Yanked the cc1 ramp");
+    CHECK(r.ramps().size() == 1);
+    r.type(U"]bp");
+    REQUIRE(r.ramps().size() == 2);
+    CHECK(r.ramps()[1].start == 4 * r.q());
+    CHECK(r.ramps()[1].to == made.to);
+    r.type(U"dd"); // the one at the cursor, as x
+    REQUIRE(r.ramps().size() == 1);
+    CHECK(r.ramps()[0] == made);
+    CHECK(r.ws.message() == "Deleted the ramp: what it hid plays again");
+    // Off a ramp, dd takes the bar's events, as before: there are none in bar 2.
+    r.type(U"dd");
+    CHECK(r.ws.message() == "No events there to delete");
+    CHECK(r.ramps().size() == 1);
+    CHECK(r.values().size() > before.size()); // bar 1's ramp still playing
+}
