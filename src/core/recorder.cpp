@@ -263,6 +263,22 @@ Song Recorder::finish(Song song, Tick stop) const
     }
     for (const auto& take : takes_)
     {
+        // A take writing a ramp's controller inside its span removes the ramp, so what was
+        // played is what's heard; undoing the take brings it back (decided 17 November 2026).
+        const auto ramps = song.ramps(take.track);
+        for (auto r = ramps.size(); r-- > 0;)
+        {
+            const auto& ramp = ramps[r];
+            if (std::ranges::any_of(take.events,
+                                    [&](const auto& taken)
+                                    {
+                                        return !taken.removed && taken.event.tick >= start_ &&
+                                               taken.event.tick < stop && ramp.owns(taken.event);
+                                    }))
+            {
+                song.removeRamp(take.track, r);
+            }
+        }
         song.updateEvents(take.track,
                           [&](EventList& events) { events = applied(events, take, stop); });
     }

@@ -227,6 +227,11 @@ struct Put
 {
     std::size_t events = 0;
     std::size_t tracks = 0;
+    std::size_t ramps = 0;
+    // A ramp that couldn't go where it would, and the track it was for, the song left as it
+    // was on that track; puts are tried on a copy first, to refuse the whole.
+    std::optional<core::Song::RampEdit> refused = std::nullopt;
+    core::TrackId refusedTrack{0};
 };
 Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at);
 
@@ -280,6 +285,34 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
 // register holds them, their ticks from its start, with its length.
 EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t last,
                          core::Tick from, core::Tick to);
+
+// A ramp on tracks (counting from 0, first to last) that a cut at a time, or either end of a
+// span, would go through, as taking time out, inserting it or taking a span does: one starting
+// before the time and ending at it or after. And a refusal naming it, saying what would cut it.
+struct RampCut
+{
+    core::TrackId track{0};
+    std::size_t index = 0;
+};
+std::optional<RampCut> rampCut(const core::Song& song, std::size_t first, std::size_t last,
+                               core::Tick at);
+std::optional<RampCut> rampCut(const core::Song& song, std::size_t first, std::size_t last,
+                               core::Tick from, core::Tick to);
+std::string rampCutText(const core::Song& song, const RampCut& cut);
+// Why shortening a section by some bars (a negative count) would be refused for a ramp it
+// would cut, if one would.
+std::optional<std::string> shorteningCuts(const core::Song& song, std::size_t section,
+                                          std::int64_t bars);
+// Why a ramp couldn't go where it would, in words.
+std::string rampRefusalText(const core::Song::RampEdit& edit);
+// Why putting a register at a time, or inserting it there (the section growing by some bars
+// first), would be refused for the ramps, tried on a copy of the song: an insertion inside a
+// ramp, or a ramp that wouldn't be allowed where it would go.
+std::optional<std::string> rampPutRefusal(const core::Song& song, const EventRegister& reg,
+                                          std::size_t firstTrack, core::Tick at, bool insert,
+                                          std::int64_t bars);
+// How many ramps a register holds.
+std::size_t rampCount(const EventRegister& reg);
 
 // The bars a span of time covers, as words in a meter: "bar 3", "bars 3–5".
 std::string barsText(const core::MeterMap& meter, core::Tick from, core::Tick to);

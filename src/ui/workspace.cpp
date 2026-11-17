@@ -3580,6 +3580,11 @@ CommandResult Workspace::section(std::string_view name)
     refresh();
     if (!split)
     {
+        if (const auto ramp = document_.song().rampAcross(tick))
+        {
+            return CommandResult::error(
+                rampCutText(document_.song(), RampCut{ramp->track, ramp->index}));
+        }
         return CommandResult::error("Can't start a section at " + at);
     }
     // The name it got, numbered if another section had it.
@@ -3705,6 +3710,10 @@ CommandResult Workspace::labelToSection()
         return CommandResult::error(label.name + " is at the start of " +
                                     song.sections()[section]->name() +
                                     ", so there's no section to start");
+    }
+    if (const auto ramp = song.rampAcross(start))
+    {
+        return CommandResult::error(rampCutText(song, RampCut{ramp->track, ramp->index}));
     }
     const auto at = positionText(meter, start);
     const auto make = [this, label, start, at]
@@ -3834,6 +3843,16 @@ void Workspace::finishLabels(const LabelRun& run)
         setMessage("No labels turned into sections" + left, MessageKind::Information);
         return;
     }
+    // A section can't start inside a ramp; none are made if one would (decided 17 November
+    // 2026).
+    for (const auto& [start, name] : run.starts)
+    {
+        if (const auto ramp = document_.song().rampAcross(start))
+        {
+            refuse(rampCutText(document_.song(), RampCut{ramp->track, ramp->index}));
+            return;
+        }
+    }
     const auto turned = run.starts.size();
     document_.edit("Turn " + std::to_string(turned) + (turned == 1 ? " label" : " labels") +
                        " into sections",
@@ -3901,6 +3920,12 @@ CommandResult Workspace::deleteBars(core::Tick from, core::Tick to)
             return CommandResult::error(trackNameOf(song, *edit.misaligned) +
                                         "'s bars don't line up with " + bars +
                                         "; delete them on each track instead");
+        }
+        if (edit.ramp)
+        {
+            return CommandResult::error("That would cut a ramp in " +
+                                        trackNameOf(song, *edit.ramp) +
+                                        ": move it, or , c R makes it events");
         }
         return CommandResult::error("A song keeps at least one bar");
     }
@@ -3998,6 +4023,12 @@ CommandResult Workspace::barInsert(std::string_view arguments)
             return CommandResult::error(trackNameOf(song, *edit.misaligned) +
                                         "'s bars don't line up with " + what +
                                         "; put them in on each track instead");
+        }
+        if (edit.ramp)
+        {
+            return CommandResult::error("That would cut a ramp in " +
+                                        trackNameOf(song, *edit.ramp) +
+                                        ": move it, or , c R makes it events");
         }
         return CommandResult::error("Can't insert " + what + " here");
     }

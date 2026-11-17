@@ -976,6 +976,29 @@ bool PianoRollView::put(bool insert, bool ending, bool atPitch)
             }
         }
     }
+    // Ramps put in a ramp's lane become its controller's, keeping their values; between a
+    // 0 to 127 controller and pitch bend that's refused, as either mapping would be a guess
+    // (decided 17 November 2026).
+    if (inLane_ && !velocityLane() && !isSwitchLane() && core::rampable(lane()))
+    {
+        const auto shown = lane();
+        for (auto& ramps : moved.ramps)
+        {
+            for (auto& ramp : ramps)
+            {
+                const bool bend = shown.kind == core::Lane::Kind::PitchBend;
+                if (bend != (ramp.lane.kind == core::Lane::Kind::PitchBend))
+                {
+                    host_.refuse("A " + core::toString(ramp.lane) + " ramp can't go into the " +
+                                     laneLabel() +
+                                     " lane: pitch bend's values and a controller's differ",
+                                 MessageKind::Warning);
+                    return true;
+                }
+                ramp.lane = shown;
+            }
+        }
+    }
     const auto& reg = moved;
     if (reg.empty())
     {
@@ -1025,9 +1048,20 @@ bool PianoRollView::put(bool insert, bool ending, bool atPitch)
             ++total;
         }
     }
+    if (const auto why = rampPutRefusal(song, reg, track_, at, insert,
+                                        insert ? barsToInsert(song, reg, track_, at) : 0))
+    {
+        host_.refuse(*why, MessageKind::Warning);
+        return true;
+    }
+    const auto ramps = rampCount(reg);
     const auto where =
         reg.tracks.size() > 1 ? trackName() + " and the tracks after it" : trackName();
-    const auto said = "Put " + eventCount(total) + " in " + where +
+    const auto said = "Put " + eventCount(total) +
+                      (ramps == 0   ? std::string{}
+                       : ramps == 1 ? std::string{" and a ramp"}
+                                    : " and " + std::to_string(ramps) + " ramps") +
+                      " in " + where +
                       (ending ? ", ending at " + putPlace(m, bar, reg.bars)
                               : " at " + putPlace(m, at, reg.bars)) +
                       (atPitch && here ? ", from " + core::pitchName(*here) : std::string{});
@@ -2881,6 +2915,53 @@ bool PianoRollView::laneOperate(std::string_view op, std::string_view motion, in
             }
         }
     }
+    // A ramp of the lane's controller wholly in the span goes with it, without the events it
+    // hides, which stay where they are; a span cutting through one is refused (decided 17
+    // November 2026). Its points aren't taken as events, being made from it.
+    std::vector<std::size_t> rampsTaken;
+    const auto ramps = document_.song().ramps(*trackId());
+    if (!isSwitchLane() && !velocityLane() && !ramps.empty())
+    {
+        auto times = span;
+        if (motion == "visual")
+        {
+            const auto selection = *host_.selection();
+            times = selection.span ? *selection.span
+                                   : std::pair{std::min(selection.anchor.tick, time_),
+                                               std::max(selection.anchor.tick, time_) + 1};
+        }
+        const auto mine = [&](const core::Lane& other)
+        {
+            return other.kind == shown.kind && (other.kind != core::Lane::Kind::Controller ||
+                                                other.controller == shown.controller);
+        };
+        for (std::size_t r = 0; r < ramps.size(); ++r)
+        {
+            if (!mine(ramps[r].lane))
+            {
+                continue;
+            }
+            const bool inside = ramps[r].start >= times.first && ramps[r].end() < times.second;
+            const bool touches = ramps[r].start < times.second && ramps[r].end() >= times.first;
+            if (inside)
+            {
+                rampsTaken.push_back(r);
+            }
+            else if (touches)
+            {
+                host_.refuse("That would cut the " + core::toString(ramps[r].lane) + " ramp at " +
+                                 positionText(meter(), ramps[r].start) +
+                                 ": take all of it, or , c R makes it events",
+                             MessageKind::Warning);
+                return true;
+            }
+        }
+        std::erase_if(taken, [&](std::size_t i) { return core::ownedByRamp(events[i], ramps); });
+        if (!rampsTaken.empty())
+        {
+            span = {std::min(span.first, times.first), std::max(span.second, times.second)};
+        }
+    }
     if (isSwitchLane())
     {
         // A pedal's whole regions: a selection's, or those starting in the range.
@@ -2908,25 +2989,84 @@ bool PianoRollView::laneOperate(std::string_view op, std::string_view motion, in
         kept.push_back(std::move(event));
     }
     reg.span = span.second - span.first;
-    const auto what = laneTaking(taken.size());
+    auto& keptRamps = reg.ramps.emplace_back();
+    for (const auto r : rampsTaken)
+    {
+        auto ramp = ramps[r];
+        ramp.start -= span.first;
+        keptRamps.push_back(ramp);
+    }
+    const auto what =
+        laneTaking(taken.size()) + (rampsTaken.empty() ? std::string{}
+                                    : rampsTaken.size() == 1
+                                        ? std::string{" and a ramp"}
+                                        : " and " + std::to_string(rampsTaken.size()) + " ramps");
     if (op == "operator-yank")
     {
         host_.setMessage(what + " yanked", MessageKind::Information);
         return true;
     }
-    if (taken.empty())
+    if (taken.empty() && rampsTaken.empty())
     {
         host_.refuse("No events there to delete", MessageKind::Information);
         return true;
     }
-    editEvents("Delete " + what + " in " + trackName(),
-               [&](core::EventList& list)
-               {
-                   for (auto it = taken.rbegin(); it != taken.rend(); ++it)
+    if (rampsTaken.empty())
+    {
+        editEvents("Delete " + what + " in " + trackName(),
+                   [&](core::EventList& list)
                    {
-                       list.erase(*it);
-                   }
-               });
+                       for (auto it = taken.rbegin(); it != taken.rend(); ++it)
+                       {
+                           list.erase(*it);
+                       }
+                   });
+        return true;
+    }
+    // The ramps and the events they hid go with the events taken.
+    const auto id = *trackId();
+    if (const auto refusal = host_.eventEditRefusal(id))
+    {
+        host_.refuse(*refusal);
+        return true;
+    }
+    std::vector<core::Event> gone;
+    for (const auto i : taken)
+    {
+        gone.push_back(events[i]);
+    }
+    document_.edit("Delete " + what + " in " + trackName(), place(),
+                   [&](core::Song& s)
+                   {
+                       s.updateTrackContent(
+                           id,
+                           [&](core::EventList& source, std::vector<core::ControllerRamp>& kept)
+                           {
+                               std::vector<core::ControllerRamp> removed;
+                               for (auto it = rampsTaken.rbegin(); it != rampsTaken.rend(); ++it)
+                               {
+                                   removed.push_back(kept[*it]);
+                                   kept.erase(kept.begin() + static_cast<std::ptrdiff_t>(*it));
+                               }
+                               core::EventList left;
+                               for (const auto& event : source.all())
+                               {
+                                   if (core::ownedByRamp(event, removed))
+                                   {
+                                       continue;
+                                   }
+                                   if (const auto it = std::ranges::find(gone, event);
+                                       it != gone.end())
+                                   {
+                                       gone.erase(it);
+                                       continue;
+                                   }
+                                   left.insert(event);
+                               }
+                               source = std::move(left);
+                           });
+                   });
+    refresh();
     return true;
 }
 
@@ -3200,6 +3340,16 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
                      (command == "lane-value-set" && count == 0 && !zeroTyped_)))
         {
             return openRamp(*ramp, false);
+        }
+        if (ramp && !laneSelecting() && command == "lane-event-delete")
+        {
+            return deleteRamp(*ramp);
+        }
+        if (ramp && !laneSelecting() &&
+            (command.starts_with("lane-event-earlier") || command.starts_with("lane-event-later") ||
+             command.starts_with("lane-region-")))
+        {
+            return retimeRamp(*ramp, command, std::max(count, 1));
         }
         const bool pointEdit = command == "lane-event-add" || command == "lane-event-delete" ||
                                command.starts_with("lane-event-earlier") ||
@@ -4035,6 +4185,11 @@ bool PianoRollView::operate(std::string_view op, std::string_view motion, int co
         }
         const auto& song = document_.song();
         const auto end = std::min(to, sectionEndAt(song, from));
+        if (const auto cut = rampCut(song, track_, track_, from, end))
+        {
+            host_.refuse(rampCutText(song, *cut));
+            return true;
+        }
         document_.edit("Delete " + *selectionStatus() + ", closing the gap", place(),
                        [&](core::Song& s)
                        { host_.eventRegister() = rippleDelete(s, track_, track_, from, end); });
@@ -4304,6 +4459,13 @@ bool PianoRollView::operateOnBars(std::string_view op, int count, bool time)
         const bool done = operateOn(op, notesIn(from, to), from, to - from);
         host_.eventRegister().bars = true;
         return done;
+    }
+    if (const auto cut =
+            rampCut(song, track_, track_, from,
+                    op == "operator-yank" ? to : std::min(to, sectionEndAt(song, from))))
+    {
+        host_.refuse(rampCutText(song, *cut));
+        return true;
     }
     if (op == "operator-yank")
     {
@@ -6041,6 +6203,84 @@ void PianoRollView::rampFinished(bool kept)
     {
         host_.sendValue(draft.track, *playing);
     }
+}
+
+bool PianoRollView::deleteRamp(std::size_t index)
+{
+    const auto id = *trackId();
+    if (const auto refusal = host_.eventEditRefusal(id))
+    {
+        host_.refuse(*refusal);
+        return true;
+    }
+    auto ramp = document_.song().ramps(id)[index];
+    auto& reg = host_.eventRegister();
+    reg = EventRegister{};
+    reg.tracks.emplace_back();
+    reg.span = ramp.length + 1;
+    ramp.start = 0;
+    reg.ramps.push_back({ramp});
+    document_.edit("Delete the " + toString(ramp.lane) + " ramp in " + trackName(), place(),
+                   [&](core::Song& s) { s.removeRamp(id, index); });
+    refresh();
+    host_.setMessage("Deleted the ramp: what it hid plays again", MessageKind::Information);
+    return true;
+}
+
+bool PianoRollView::retimeRamp(std::size_t index, std::string_view command, int n)
+{
+    const auto id = *trackId();
+    if (const auto refusal = host_.eventEditRefusal(id))
+    {
+        host_.refuse(*refusal);
+        return true;
+    }
+    const auto old = document_.song().ramps(id)[index];
+    auto ramp = old;
+    const bool fine = command.ends_with("-fine");
+    const bool moving = command.starts_with("lane-event-");
+    const bool forward =
+        command.starts_with("lane-event-later") || command.starts_with("lane-region-longer");
+    for (int i = 0; i < n; ++i)
+    {
+        const auto at = moving ? ramp.start : ramp.end();
+        const auto to = fine      ? nudged(at, forward ? 1 : -1)
+                        : forward ? gridAfter(at)
+                                  : gridBefore(at);
+        if (moving)
+        {
+            ramp.start = to;
+        }
+        else
+        {
+            ramp.length = to - ramp.start;
+        }
+    }
+    if (ramp.start < 0 || (moving && !forward && ramp == old))
+    {
+        host_.refuse("That's before the song's start", MessageKind::Information);
+        return true;
+    }
+    if (ramp.length <= 0)
+    {
+        host_.refuse("A ramp has to end after it starts", MessageKind::Information);
+        return true;
+    }
+    auto song = document_.song();
+    const auto changed = song.replaceRamp(id, index, ramp);
+    if (!changed.done())
+    {
+        host_.refuse(rampRefusal(changed, song), MessageKind::Warning);
+        return true;
+    }
+    document_.edit((moving ? "Move the " : "Resize the ") + toString(ramp.lane) + " ramp in " +
+                       trackName(),
+                   place(), [&](core::Song& s) { s.replaceRamp(id, index, ramp); },
+                   "ramp timing " + std::to_string(id.value) + " " + toString(ramp.lane));
+    // The cursor goes with a moved ramp, and stays in a resized one.
+    moveTo(moving ? time_ + (ramp.start - old.start) : std::clamp(time_, ramp.start, ramp.end()));
+    refresh();
+    return true;
 }
 
 bool PianoRollView::convertRamp()

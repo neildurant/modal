@@ -89,11 +89,15 @@ struct EventRegister
     std::optional<std::uint8_t> pitch = std::nullopt;
 
     std::vector<core::TrackCopy> wholeTracks = {};
+    // Controller ramps taken with the events, for each track as tracks has them, their starts
+    // from the register's start (decided 17 November 2026).
+    std::vector<std::vector<core::ControllerRamp>> ramps = {};
 
     bool empty() const
     {
         return wholeTracks.empty() && sections.empty() &&
-               std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); });
+               std::ranges::all_of(tracks, [](const auto& events) { return events.empty(); }) &&
+               std::ranges::all_of(ramps, [](const auto& each) { return each.empty(); });
     }
 
     friend bool operator==(const EventRegister&, const EventRegister&) = default;

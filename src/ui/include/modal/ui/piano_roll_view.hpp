@@ -402,6 +402,11 @@ private:
     void rampFinished(bool kept);
     // , c R: makes the cursor's ramp ordinary events.
     bool convertRamp();
+    // x on a ramp: removes it, what it hid playing again, into the register for p.
+    bool deleteRamp(std::size_t index);
+    // Alt-h, Alt-l and their fine forms move a ramp, = - + _ move its end, the curve stretched
+    // over its new length (decided 17 November 2026); steps one after another undo together.
+    bool retimeRamp(std::size_t index, std::string_view command, int n);
     void addRamps(const LaneDrawing& d, core::TrackId track) const;
 
     // The commands run in the notes area, and in the lane, moves in time.

@@ -440,3 +440,50 @@ TEST_CASE("a MIDI file is written with what plays")
           std::vector<std::pair<Tick, int>>{{0, 0}, {q, 50}, {2 * q, 100}});
     CHECK(imported.song->ramps(imported.song->tracks()[0]->id()).empty());
 }
+
+TEST_CASE("a track's events and ramps are edited together, a ramp keeping what it hides")
+{
+    Fixture f;
+    const auto q = f.q;
+    auto& song = f.song;
+    REQUIRE(song.addRamp(f.id, ramp(q, q, 0, 100)).done());
+    const auto hidden = pointsOf(song.sourceEvents(f.id));
+
+    // Everything a beat later: the ramp and the events beneath it move together.
+    const auto moved =
+        song.updateTrackContent(f.id,
+                                [&](EventList& source, std::vector<ControllerRamp>& ramps)
+                                {
+                                    EventList later;
+                                    for (auto event : source.all())
+                                    {
+                                        event.tick += q;
+                                        later.insert(std::move(event));
+                                    }
+                                    source = std::move(later);
+                                    for (auto& r : ramps)
+                                    {
+                                        r.start += q;
+                                    }
+                                });
+    REQUIRE(moved.done());
+    REQUIRE(song.ramps(f.id).size() == 1);
+    CHECK(song.ramps(f.id)[0].start == 2 * q);
+    auto expected = hidden;
+    for (auto& [tick, value] : expected)
+    {
+        tick += q;
+    }
+    CHECK(pointsOf(song.sourceEvents(f.id)) == expected);
+    CHECK(pointsOf(song.events(f.id))[1] == std::pair<Tick, int>{2 * q, 0});
+
+    // A ramp it would leave touching another is refused, changing nothing.
+    const auto before = song;
+    const auto refused =
+        song.updateTrackContent(f.id, [&](EventList&, std::vector<ControllerRamp>& ramps)
+                                { ramps.push_back(ramp(3 * q, q, 0, 1)); });
+    CHECK(refused.refusal == Song::RampRefusal::Collides);
+    CHECK(song == before);
+    CHECK(song.updateTrackContent(TrackId{99}, [](EventList&, std::vector<ControllerRamp>&) {})
+              .refusal == Song::RampRefusal::NoTrack);
+}

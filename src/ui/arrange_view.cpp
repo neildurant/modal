@@ -399,8 +399,14 @@ bool ArrangeView::deleteTime()
         return false;
     }
     const auto what = *selectionStatus();
+    if (const auto cut = rampCut(document_.song(), area->top, area->bottom, area->from, area->to))
+    {
+        host_.refuse(rampCutText(document_.song(), *cut));
+        return true;
+    }
     EventRegister taken;
     taken.tracks.resize(area->bottom - area->top + 1);
+    taken.ramps.resize(area->bottom - area->top + 1);
     taken.span = area->to - area->from;
     taken.bars = true;
     edit("Delete " + what + ", closing the gap",
@@ -423,6 +429,12 @@ bool ArrangeView::deleteTime()
                      {
                          event.tick += from - area->from;
                          taken.tracks[k].push_back(std::move(event));
+                     }
+                     for (auto ramp : k < part.ramps.size() ? part.ramps[k]
+                                                            : std::vector<core::ControllerRamp>{})
+                     {
+                         ramp.start += from - area->from;
+                         taken.ramps[k].push_back(ramp);
                      }
                  }
              }
@@ -847,6 +859,11 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, s
         area.to = std::min(area.to, sectionEndAt(song, area.from));
     }
     const auto tracks = song.tracks();
+    if (const auto cut = rampCut(song, area.top, area.bottom, area.from, area.to))
+    {
+        host_.refuse(rampCutText(song, *cut));
+        return true;
+    }
     auto taken = takeEvents(song, area.top, area.bottom, area.from, area.to);
     taken.bars = true;
     std::size_t total = 0;
@@ -944,6 +961,13 @@ bool ArrangeView::put(bool insert, bool ending)
     const auto said =
         "Put " + eventCount(total) + " in " + where +
         (ending ? ", ending at " + putPlace(m, bar, true) : " at " + putPlace(m, at, true));
+    if (const auto why =
+            rampPutRefusal(document_.song(), reg, track, at, insert,
+                           insert ? barsToInsert(document_.song(), reg, track, at) : 0))
+    {
+        host_.refuse(*why);
+        return true;
+    }
     if (!insert)
     {
         edit("Put " + eventCount(total) + " in " + where,
@@ -1055,6 +1079,13 @@ std::optional<std::string> ArrangeView::setSectionField(std::size_t section,
     if (wanted < 1)
     {
         return "A section is at least a bar long";
+    }
+    if (wanted < bars)
+    {
+        if (auto ramp = shorteningCuts(document_.song(), section, wanted - bars))
+        {
+            return ramp;
+        }
     }
     if (wanted != bars)
     {
@@ -1192,7 +1223,9 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
              [&](core::Song& s) { changed = s.resizeSection(section, bars); });
         if (!changed)
         {
-            host_.refuse(name(section) + " can't be shorter than a bar", MessageKind::Warning);
+            const auto ramp = shorteningCuts(document_.song(), section, bars);
+            host_.refuse(ramp ? *ramp : name(section) + " can't be shorter than a bar",
+                         MessageKind::Warning);
         }
         page_.setStripCursor(section);
         return true;

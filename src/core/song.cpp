@@ -1057,6 +1057,47 @@ bool Song::removeRamp(TrackId id, std::size_t which)
     return true;
 }
 
+Song::RampEdit Song::updateTrackContent(
+    TrackId id,
+    const std::function<void(EventList& source, std::vector<ControllerRamp>& ramps)>& edit)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size())
+    {
+        return {RampRefusal::NoTrack};
+    }
+    EventList source = *flattened_[index].source;
+    auto ramps = flattened_[index].ramps;
+    edit(source, ramps);
+    std::ranges::stable_sort(ramps, {}, &ControllerRamp::start);
+    for (std::size_t r = 0; r < ramps.size(); ++r)
+    {
+        const auto& ramp = ramps[r];
+        if (!ramp.valid())
+        {
+            return {RampRefusal::Invalid, r};
+        }
+        if (ramp.end() >= end())
+        {
+            return {RampRefusal::PastEnd, r};
+        }
+        if (ramp.end() >= starts_[sectionAt(ramp.start) + 1])
+        {
+            return {RampRefusal::CrossesSection, r};
+        }
+        for (std::size_t other = 0; other < r; ++other)
+        {
+            if (ramps[other].collides(ramp))
+            {
+                return {RampRefusal::Collides, r};
+            }
+        }
+    }
+    setSource(index, std::move(source));
+    setRamps(index, std::move(ramps));
+    return {};
+}
+
 bool Song::convertRamp(TrackId id, std::size_t which)
 {
     const auto index = indexOf(id);

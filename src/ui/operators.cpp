@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cstdint>
 #include <cstdlib>
@@ -1791,6 +1792,29 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
     // Each track's events as changed, or the first refusal; then all of them as one change.
     const auto& song = document_.song();
     std::vector<core::EventList> changed;
+    // A ramp's points are left alone, being made from it, and the ramps counted, to say so
+    // (decided 17 November 2026).
+    std::size_t skipped = 0;
+    const auto withoutRamps = [&](const core::EventList& events, OperatorTarget::Part part)
+    {
+        const auto ramps = song.ramps(part.track);
+        std::vector<bool> hit(ramps.size(), false);
+        std::erase_if(part.events,
+                      [&](std::size_t i)
+                      {
+                          for (std::size_t r = 0; r < ramps.size(); ++r)
+                          {
+                              if (ramps[r].owns(events[i]))
+                              {
+                                  hit[r] = true;
+                                  return true;
+                              }
+                          }
+                          return false;
+                      });
+        skipped += static_cast<std::size_t>(std::ranges::count(hit, true));
+        return part;
+    };
     for (const auto& part : target.parts)
     {
         // Cutting at the edges, the notes crossing them cut first, and what's inside taken.
@@ -1810,7 +1834,7 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
                     inside.events.push_back(i);
                 }
             }
-            auto result = change(cut, inside);
+            auto result = change(cut, withoutRamps(cut, inside));
             if (const auto* refusal = std::get_if<core::Refusal>(&result))
             {
                 refuse(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
@@ -1819,7 +1843,7 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
             changed.push_back(std::move(std::get<core::EventList>(result)));
             continue;
         }
-        auto result = change(song.events(part.track), part);
+        auto result = change(song.events(part.track), withoutRamps(song.events(part.track), part));
         if (const auto* refusal = std::get_if<core::Refusal>(&result))
         {
             refuse(refusalText(*refusal, song.meter(part.track)), MessageKind::Warning);
@@ -1832,9 +1856,13 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
     {
         any = any || changed[i] != song.events(target.parts[i].track);
     }
+    const auto ramps = skipped == 1 ? std::string{"a ramp"} : std::to_string(skipped) + " ramps";
     if (!any)
     {
-        setMessage("Nothing changed in " + target.what, MessageKind::Information);
+        setMessage(skipped > 0 ? "Nothing changed in " + target.what + "; " + ramps +
+                                     " left alone (, c R makes one events)"
+                               : "Nothing changed in " + target.what,
+                   MessageKind::Information);
         return true;
     }
     document_.edit(std::move(title), view().place(),
@@ -1847,6 +1875,12 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
                        }
                    });
     refresh();
+    if (skipped > 0)
+    {
+        auto said = ramps + " left alone (, c R makes one events)";
+        said[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(said[0])));
+        setMessage(said, MessageKind::Information);
+    }
     return true;
 }
 

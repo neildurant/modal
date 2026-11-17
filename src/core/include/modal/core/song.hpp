@@ -349,6 +349,13 @@ public:
     bool removeRamp(TrackId id, std::size_t index);
     // Makes a ramp's events ordinary ones, in place of those it hid, and removes it.
     bool convertRamp(TrackId id, std::size_t index);
+    // Edits a track's own events, those its ramps hide included, and its ramps together, both
+    // at ticks from the song's start, as moving time or putting a register does, so a ramp and
+    // what it hides stay together. Refused, changing nothing, if a ramp it leaves wouldn't be
+    // allowed where it is (see addRamp), with the index of the one at fault among those left.
+    RampEdit updateTrackContent(
+        TrackId id,
+        const std::function<void(EventList& source, std::vector<ControllerRamp>& ramps)>& edit);
 
     // Edits the tempo, the conductor's meter, a track's meter or a track's events in ticks
     // from the song's start, then shares the result out to the sections. A track's events are

@@ -475,3 +475,26 @@ TEST_CASE("recording filters named inputs, the default for none and every one fo
     REQUIRE(result.events(standard).size() == 2); // input 0's note and CC
     CHECK(std::get<Note>(result.events(standard).all()[0].data).pitch == 60);
 }
+
+TEST_CASE("a take writing a ramp's controller in its span removes the ramp, and only then")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+    const Lane modulation{.kind = Lane::Kind::Controller, .controller = 1};
+    const Lane expression{.kind = Lane::Kind::Controller, .controller = 11};
+    REQUIRE(song.addRamp(id, {.lane = modulation, .start = q, .length = q, .from = 0, .to = 100})
+                .done());
+    REQUIRE(song.addRamp(id, {.lane = expression, .start = q, .length = q, .from = 0, .to = 100})
+                .done());
+
+    Recorder recorder{song, kPlay, 0};
+    recorder.receive(stamped(750ms, {0xB0, 1, 64}));   // modulation inside its ramp
+    recorder.receive(stamped(1500ms, {0xB0, 11, 50})); // expression after its ramp
+    const Song result = recorder.finish(4 * q);
+    REQUIRE(result.ramps(id).size() == 1);
+    CHECK(result.ramps(id)[0].lane == expression);
+    CHECK(std::ranges::count(eventsOf(result, id), cc(q + q / 2, 1, 64)) == 1);
+    CHECK(song.ramps(id).size() == 2); // the song recorded onto is unchanged
+}

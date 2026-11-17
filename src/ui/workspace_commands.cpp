@@ -880,13 +880,15 @@ std::span<const CommandInfo> Workspace::commands()
         // selections and transforms work there too, but not what takes notes or pitches, nor
         // the section strip's, whose keys move and resize notes in the notes area; nor k, j,
         // Ctrl-a, Ctrl-x, Tab and Enter, which the lane's own commands take there.
-        constexpr std::array<std::string_view, 23> notInLane{
-            "octave-up",        "octave-down",          "velocity-up",        "velocity-down",
-            "cursor-note-next", "cursor-note-previous", "note-add",           "note-add-advance",
-            "default-note-set", "visual-rows",          "cut-at-edges",       "search-here",
-            "search-here-back", "cursor-up-scroll",     "cursor-down-scroll", "put-merge",
-            "put-insert",       "put-ending",           "put-merge-at-pitch", "put-insert-at-pitch",
-            "event-delete",     "cursor-chord-up",      "cursor-chord-down",
+        // p and P put there, as the lane's d and y take its events and ramps (decided 17
+        // November 2026), but not at a pitch.
+        constexpr std::array<std::string_view, 21> notInLane{
+            "octave-up",          "octave-down",          "velocity-up",        "velocity-down",
+            "cursor-note-next",   "cursor-note-previous", "note-add",           "note-add-advance",
+            "default-note-set",   "visual-rows",          "cut-at-edges",       "search-here",
+            "search-here-back",   "cursor-up-scroll",     "cursor-down-scroll", "put-ending",
+            "put-merge-at-pitch", "put-insert-at-pitch",  "event-delete",       "cursor-chord-up",
+            "cursor-chord-down",
         };
         for (auto& info : result)
         {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -312,7 +313,7 @@ TEST_CASE("a ramp's points aren't edited one by one, and , c R makes them events
     r.keep();
     REQUIRE(r.ramps().size() == 1);
     const auto playing = r.values();
-    for (const auto keys : {U"x", U"o", U"\x01"})
+    for (const auto keys : {U"o", U"\x01"})
     {
         if (std::u32string_view{keys} == U"\x01")
         {
@@ -414,4 +415,191 @@ TEST_CASE("a ramp's fields keep their places as its shape changes and as each is
     CHECK(places() == first);
     r.keep();
     CHECK(places() == first);
+}
+
+TEST_CASE("x deletes a ramp, what it hid playing again, and p puts it back")
+{
+    Ramps r;
+    const auto before = r.values();
+    r.type(U",cr\t127");
+    r.keep();
+    const auto made = r.ramps()[0];
+    r.type(U"x");
+    CHECK(r.ramps().empty());
+    CHECK(r.values() == before);
+    CHECK(r.ws.message() == "Deleted the ramp: what it hid plays again");
+    // Put at the cursor, in bar 2, as it was.
+    r.type(U"]b");
+    REQUIRE(r.view().time() == 4 * r.q());
+    r.type(U"p");
+    REQUIRE(r.ramps().size() == 1);
+    auto moved = made;
+    moved.start = 4 * r.q();
+    CHECK(r.ramps()[0] == moved);
+    r.type(U"u");
+    CHECK(r.ramps().empty());
+}
+
+TEST_CASE("Alt-h and Alt-l move a ramp, and = and - move its end, steps undoing together")
+{
+    Ramps r;
+    const auto q = r.q();
+    const auto step = q / 4; // the grid's sixteenth
+    r.type(U"vllll");        // a quarter
+    r.type(U",cr");
+    r.keep();
+    REQUIRE(r.ramps().size() == 1);
+    REQUIRE(r.ramps()[0].start == 0);
+    REQUIRE(r.ramps()[0].end() == q);
+    r.type(U"0"); // the cursor on its start
+    r.ws.handle(Key::typed(U'l', kAlt), 0);
+    r.ws.handle(Key::typed(U'l', kAlt), 0);
+    CHECK(r.ramps()[0].start == 2 * step);
+    CHECK(r.ramps()[0].length == q);    // its length kept
+    CHECK(r.view().time() == 2 * step); // the cursor with it
+    r.type(U"=");
+    CHECK(r.ramps()[0].end() == q + 3 * step);
+    r.type(U"--");
+    CHECK(r.ramps()[0].end() == q + step);
+    r.type(U"u");
+    CHECK(r.ramps()[0].start == 0);
+    CHECK(r.ramps()[0].end() == q);
+
+    // Not before the song's start, nor its end before its start.
+    r.ws.handle(Key::typed(U'h', kAlt), 0);
+    CHECK(r.ws.message() == "That's before the song's start");
+    r.type(U"5-");
+    CHECK(r.ws.message() == "A ramp has to end after it starts");
+    CHECK(r.ramps()[0].end() == q);
+}
+
+TEST_CASE("d and y in the lane take whole ramps, refusing to cut one, and p retargets them")
+{
+    Ramps r;
+    const auto q = r.q();
+    r.type(U",cr\t127");
+    r.keep();
+    REQUIRE(r.ramps().size() == 1);
+
+    // Part of it is refused, naming it.
+    r.type(U"vl");
+    r.type(U"d");
+    CHECK(r.ws.message().starts_with("That would cut the cc1 ramp at 1:1:0"));
+    CHECK(r.ramps().size() == 1);
+    if (r.ws.mode() == Mode::Visual)
+    {
+        r.ws.handle(Key::of(NamedKey::Escape), 0);
+    }
+    REQUIRE(r.view().inLane());
+
+    // The bar takes it whole, its points not as events.
+    r.type(U"yib");
+    CHECK(r.ws.message().ends_with(" and a ramp yanked"));
+
+    // Into another controller's lane, it becomes that controller's.
+    r.ws.handle(Key::of(NamedKey::Escape), 0);
+    r.line(U"lane cc11");
+    r.type(U"gl]bp");
+    REQUIRE(r.ramps().size() == 2);
+    CHECK(r.ramps()[1].lane == core::Lane{.kind = core::Lane::Kind::Controller, .controller = 11});
+    CHECK(r.ramps()[1].start == 4 * q);
+    // Not into pitch bend's.
+    r.ws.handle(Key::of(NamedKey::Escape), 0);
+    r.line(U"lane bend");
+    r.type(U"glp");
+    CHECK(r.ws.message().starts_with("A cc1 ramp can't go into the bend lane"));
+    CHECK(r.ramps().size() == 2);
+
+    // dib deletes it with the events it hid.
+    r.ws.handle(Key::of(NamedKey::Escape), 0);
+    r.line(U"lane cc1");
+    r.type(U"gl");
+    for (int i = 0; i < 16; ++i)
+    {
+        r.type(U"h");
+    }
+    REQUIRE(r.view().time() == 0);
+    r.type(U"dib");
+    REQUIRE(r.ramps().size() == 1);
+    CHECK(r.ramps()[0].lane.controller == 11);
+    CHECK(std::ranges::none_of(r.document.song().sourceEvents(r.id()).all(),
+                               [](const core::Event& event)
+                               {
+                                   const auto* change =
+                                       std::get_if<core::ControlChange>(&event.data);
+                                   return change != nullptr && change->controller == 1;
+                               }));
+}
+
+TEST_CASE("a transform leaves a ramp's points alone, saying so")
+{
+    Ramps r;
+    r.type(U",cr\t127");
+    r.keep();
+    const auto playing = r.values();
+    r.ws.handle(Key::of(NamedKey::Escape), 0); // back to the notes
+    r.line(U"thin cc1 per=1 step=64");
+    CHECK(r.values() == playing);
+    CHECK(r.ws.message().find("a ramp left alone (, c R makes one events)") != std::string::npos);
+}
+
+TEST_CASE("bars can't be deleted or inserted through a ramp")
+{
+    Ramps r;
+    const auto q = r.q();
+    // From the last beat of bar 1 into bar 2, a grid step of a sixteenth at a time.
+    for (int i = 0; i < 12; ++i)
+    {
+        r.type(U"l");
+    }
+    REQUIRE(r.view().time() == 3 * q);
+    r.type(U"vllllllll");
+    r.type(U",cr");
+    r.keep();
+    REQUIRE(r.ramps().size() == 1);
+    REQUIRE(r.ramps()[0].start == 3 * q);
+    REQUIRE(r.ramps()[0].end() == 5 * q);
+    const auto before = r.document.song();
+    CHECK(r.registry.runLine("bar-delete").message.starts_with("That would cut a ramp in Synth"));
+    CHECK(r.registry.runLine("bar-insert").message.starts_with("That would cut a ramp in Synth"));
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("taking time out and putting it back carries ramps with the events they hide")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto q = ppqn.quarter();
+    auto song = synth(ppqn);
+    const auto id = song.tracks()[0]->id();
+    const core::Lane modulation{.kind = core::Lane::Kind::Controller, .controller = 1};
+    REQUIRE(song.addRamp(id, {.lane = modulation, .start = q, .length = q, .from = 0, .to = 100})
+                .done());
+    REQUIRE(song.addRamp(id, {.lane = modulation, .start = 5 * q, .length = q, .from = 9, .to = 1})
+                .done());
+    const auto hidden = song.sourceEvents(id);
+
+    // A span through a ramp is one to refuse.
+    CHECK(rampCut(song, 0, 0, 0, q + 1));
+    CHECK_FALSE(rampCut(song, 0, 0, 0, 4 * q));
+
+    // Bar 1 out: its ramp and events into the register, the later ramp a bar earlier.
+    auto removed = rippleDelete(song, 0, 0, 0, 4 * q);
+    REQUIRE(removed.ramps.size() == 1);
+    REQUIRE(removed.ramps[0].size() == 1);
+    CHECK(removed.ramps[0][0].start == q);
+    REQUIRE(song.ramps(id).size() == 1);
+    CHECK(song.ramps(id)[0].start == q);
+
+    // And back in: as it was.
+    rippleInsert(song, removed, 0, 0);
+    REQUIRE(song.ramps(id).size() == 2);
+    CHECK(song.ramps(id)[0].start == q);
+    CHECK(song.ramps(id)[1].start == 5 * q);
+    CHECK(song.sourceEvents(id) == hidden);
+
+    // Put over what's there, a ramp landing on another is refused, the song as it was.
+    const auto before = song;
+    CHECK(rampPutRefusal(song, takeEvents(song, 0, 0, 0, 4 * q), 0, 4 * q + q / 2, false, 0)
+              .value_or("") == "A ramp would touch or overlap another of its controller there");
+    CHECK(song == before);
 }

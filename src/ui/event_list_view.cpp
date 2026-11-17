@@ -1112,6 +1112,11 @@ bool EventListView::put(bool ending)
                       (ending ? ", ending at " + putPlace(meter, here, reg.bars)
                               : " at " + putPlace(meter, at, reg.bars)) +
                       ", over what's there";
+    if (const auto why = rampPutRefusal(document_.song(), reg, track_ - 1, at, false, 0))
+    {
+        refuse(*why, MessageKind::Warning);
+        return true;
+    }
     edit("Put " + eventCount(total) + " in " + where,
          [&](core::Song& song) { putRegister(song, reg, track_ - 1, at); });
     setMessage(said, MessageKind::Information);

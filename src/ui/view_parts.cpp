@@ -782,12 +782,16 @@ Region trackBarRegion(const core::Song& song, std::size_t track, std::optional<c
 
 Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at)
 {
+    // Into each track's own events, so what goes under a ramp is kept beneath it, with the
+    // register's ramps.
     Put put;
     const auto tracks = song.tracks();
-    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    for (std::size_t i = 0;
+         i < std::max(reg.tracks.size(), reg.ramps.size()) && firstTrack + i < tracks.size(); ++i)
     {
-        auto added = reg.tracks[i];
-        if (added.empty())
+        auto added = i < reg.tracks.size() ? reg.tracks[i] : std::vector<core::Event>{};
+        auto ramps = i < reg.ramps.size() ? reg.ramps[i] : std::vector<core::ControllerRamp>{};
+        if (added.empty() && ramps.empty())
         {
             continue;
         }
@@ -795,12 +799,153 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
         {
             event.tick += at;
         }
-        put.events += added.size();
+        for (auto& ramp : ramps)
+        {
+            ramp.start += at;
+        }
+        const auto id = tracks[firstTrack + i]->id();
+        const auto count = added.size();
+        const auto done = song.updateTrackContent(
+            id,
+            [&](core::EventList& source, std::vector<core::ControllerRamp>& kept)
+            {
+                source = core::merged(source, std::move(added));
+                std::ranges::copy(ramps, std::back_inserter(kept));
+            });
+        if (!done.done())
+        {
+            put.refused = done;
+            put.refusedTrack = id;
+            return put;
+        }
+        put.events += count;
+        put.ramps += ramps.size();
         ++put.tracks;
-        song.updateEvents(tracks[firstTrack + i]->id(), [&](core::EventList& events)
-                          { events = core::merged(events, std::move(added)); });
     }
     return put;
+}
+
+std::optional<RampCut> rampCut(const core::Song& song, std::size_t first, std::size_t last,
+                               core::Tick at)
+{
+    const auto tracks = song.tracks();
+    for (auto i = first; i <= last && i < tracks.size(); ++i)
+    {
+        const auto ramps = song.ramps(tracks[i]->id());
+        for (std::size_t r = 0; r < ramps.size(); ++r)
+        {
+            if (ramps[r].start < at && ramps[r].end() >= at)
+            {
+                return RampCut{tracks[i]->id(), r};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<RampCut> rampCut(const core::Song& song, std::size_t first, std::size_t last,
+                               core::Tick from, core::Tick to)
+{
+    if (auto cut = rampCut(song, first, last, from))
+    {
+        return cut;
+    }
+    return rampCut(song, first, last, to);
+}
+
+std::string rampRefusalText(const core::Song::RampEdit& edit)
+{
+    using Refusal = core::Song::RampRefusal;
+    switch (edit.refusal)
+    {
+    case Refusal::Collides:
+        return "A ramp would touch or overlap another of its controller there";
+    case Refusal::CrossesSection:
+        return "A ramp would run past its section's end";
+    case Refusal::PastEnd:
+        return "A ramp would run past the song's end";
+    case Refusal::Invalid:
+        return "A ramp wouldn't fit there";
+    case Refusal::NoTrack:
+    case Refusal::NoRamp:
+    case Refusal::None:
+        break;
+    }
+    return "There's no ramp there";
+}
+
+std::optional<std::string> shorteningCuts(const core::Song& song, std::size_t section,
+                                          std::int64_t bars)
+{
+    if (bars >= 0 || section >= song.sections().size())
+    {
+        return std::nullopt;
+    }
+    const auto& meter = song.sections()[section]->meter();
+    const auto last = meter.toBarBeatTick(song.sections()[section]->length() - 1).bar;
+    if (last + bars < 1)
+    {
+        return std::nullopt;
+    }
+    const auto end = song.sectionStart(section) + meter.barStart(last + bars + 1);
+    if (const auto ramp = song.rampAcross(end))
+    {
+        return rampCutText(song, RampCut{ramp->track, ramp->index});
+    }
+    return std::nullopt;
+}
+
+std::size_t rampCount(const EventRegister& reg)
+{
+    std::size_t count = 0;
+    for (const auto& ramps : reg.ramps)
+    {
+        count += ramps.size();
+    }
+    return count;
+}
+
+std::optional<std::string> rampPutRefusal(const core::Song& song, const EventRegister& reg,
+                                          std::size_t firstTrack, core::Tick at, bool insert,
+                                          std::int64_t bars)
+{
+    const auto width = std::max<std::size_t>(std::max(reg.tracks.size(), reg.ramps.size()), 1);
+    if (insert)
+    {
+        if (const auto cut = rampCut(song, firstTrack, firstTrack + width - 1, at))
+        {
+            return rampCutText(song, *cut);
+        }
+    }
+    if (rampCount(reg) == 0)
+    {
+        return std::nullopt;
+    }
+    auto trial = song;
+    Put put;
+    if (insert)
+    {
+        if (bars > 0)
+        {
+            trial.resizeSection(trial.sectionAt(at), bars);
+        }
+        put = rippleInsert(trial, reg, firstTrack, at);
+    }
+    else
+    {
+        put = putRegister(trial, reg, firstTrack, at);
+    }
+    return put.refused ? std::optional{rampRefusalText(*put.refused)} : std::nullopt;
+}
+
+std::string rampCutText(const core::Song& song, const RampCut& cut)
+{
+    const auto& ramp = song.ramps(cut.track)[cut.index];
+    const auto* track = song.track(cut.track);
+    return "That would cut the " + core::toString(ramp.lane) + " ramp at " +
+           positionText(song.meter(cut.track), ramp.start) +
+           (track != nullptr && !track->name.empty() ? " in " + track->name : std::string{}) +
+           ": move it, or , c R makes it events";
 }
 
 core::Tick sectionEndAt(const core::Song& song, core::Tick tick)
@@ -848,27 +993,47 @@ EventRegister rippleDelete(core::Song& song, std::size_t first, std::size_t last
     const auto tracks = song.tracks();
     for (auto i = first; i <= last && i < tracks.size(); ++i)
     {
+        // Each track's own events and its ramps, a ramp inside the span going with it and those
+        // after it closing up as the events do; callers refuse a span through a ramp first.
         auto& taken = removed.tracks.emplace_back();
-        song.updateEvents(tracks[i]->id(),
-                          [&](core::EventList& events)
-                          {
-                              core::EventList kept;
-                              for (auto event : events.all())
-                              {
-                                  if (event.tick >= from && event.tick < to)
-                                  {
-                                      event.tick -= from;
-                                      taken.push_back(std::move(event));
-                                      continue;
-                                  }
-                                  if (event.tick >= to && event.tick < end)
-                                  {
-                                      event.tick -= to - from;
-                                  }
-                                  kept.insert(std::move(event));
-                              }
-                              events = std::move(kept);
-                          });
+        auto& takenRamps = removed.ramps.emplace_back();
+        song.updateTrackContent(
+            tracks[i]->id(),
+            [&](core::EventList& events, std::vector<core::ControllerRamp>& ramps)
+            {
+                core::EventList kept;
+                for (auto event : events.all())
+                {
+                    if (event.tick >= from && event.tick < to)
+                    {
+                        event.tick -= from;
+                        taken.push_back(std::move(event));
+                        continue;
+                    }
+                    if (event.tick >= to && event.tick < end)
+                    {
+                        event.tick -= to - from;
+                    }
+                    kept.insert(std::move(event));
+                }
+                events = std::move(kept);
+                std::vector<core::ControllerRamp> left;
+                for (auto ramp : ramps)
+                {
+                    if (ramp.start >= from && ramp.start < to)
+                    {
+                        ramp.start -= from;
+                        takenRamps.push_back(ramp);
+                        continue;
+                    }
+                    if (ramp.start >= to && ramp.start < end)
+                    {
+                        ramp.start -= to - from;
+                    }
+                    left.push_back(ramp);
+                }
+                ramps = std::move(left);
+            });
     }
     return removed;
 }
@@ -880,11 +1045,23 @@ EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t 
     const auto tracks = song.tracks();
     for (auto i = first; i <= last && i < tracks.size(); ++i)
     {
+        // A track's own events and the ramps starting in the span, so what's put plays as this
+        // did (decided 17 November 2026); callers refuse a span through a ramp first.
+        const auto id = tracks[i]->id();
         auto& events = taken.tracks.emplace_back();
-        for (auto event : song.events(tracks[i]->id()).startingIn(from, to))
+        for (auto event : song.sourceEvents(id).startingIn(from, to))
         {
             event.tick -= from;
             events.push_back(std::move(event));
+        }
+        auto& ramps = taken.ramps.emplace_back();
+        for (auto ramp : song.ramps(id))
+        {
+            if (ramp.start >= from && ramp.start < to)
+            {
+                ramp.start -= from;
+                ramps.push_back(ramp);
+            }
         }
     }
     taken.span = to - from;
@@ -926,15 +1103,31 @@ std::int64_t barsToInsert(const core::Song& song, const EventRegister& reg, std:
     const auto span = registerSpan(reg);
     const auto tracks = song.tracks();
     core::Tick latest = -1;
-    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    for (std::size_t i = 0;
+         i < std::max(reg.tracks.size(), reg.ramps.size()) && firstTrack + i < tracks.size(); ++i)
     {
-        for (const auto& event : reg.tracks[i])
+        for (const auto& event : i < reg.tracks.size() ? reg.tracks[i] : std::vector<core::Event>{})
         {
             latest = std::max(latest, at + event.tick);
         }
         for (const auto& event : song.events(tracks[firstTrack + i]->id()).startingIn(at, end))
         {
             latest = std::max(latest, event.tick + span);
+        }
+        // A ramp's end too, which must stay in the section.
+        if (i < reg.ramps.size())
+        {
+            for (const auto& ramp : reg.ramps[i])
+            {
+                latest = std::max(latest, at + ramp.end());
+            }
+        }
+        for (const auto& ramp : song.ramps(tracks[firstTrack + i]->id()))
+        {
+            if (ramp.start >= at && ramp.start < end)
+            {
+                latest = std::max(latest, ramp.end() + span);
+            }
         }
     }
     // A bar at a time, in the meter the section ends in, until it reaches.
@@ -953,22 +1146,33 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
     const auto end = sectionEndAt(song, at);
     const auto span = registerSpan(reg);
     const auto tracks = song.tracks();
-    for (std::size_t i = 0; i < reg.tracks.size() && firstTrack + i < tracks.size(); ++i)
+    for (std::size_t i = 0;
+         i < std::max(reg.tracks.size(), reg.ramps.size()) && firstTrack + i < tracks.size(); ++i)
     {
-        song.updateEvents(tracks[firstTrack + i]->id(),
-                          [&](core::EventList& events)
-                          {
-                              core::EventList moved;
-                              for (auto event : events.all())
-                              {
-                                  if (event.tick >= at && event.tick < end)
-                                  {
-                                      event.tick += span;
-                                  }
-                                  moved.insert(std::move(event));
-                              }
-                              events = std::move(moved);
-                          });
+        // The events and ramps from there to the section's end, together; callers refuse an
+        // insertion inside a ramp first.
+        song.updateTrackContent(
+            tracks[firstTrack + i]->id(),
+            [&](core::EventList& events, std::vector<core::ControllerRamp>& ramps)
+            {
+                core::EventList moved;
+                for (auto event : events.all())
+                {
+                    if (event.tick >= at && event.tick < end)
+                    {
+                        event.tick += span;
+                    }
+                    moved.insert(std::move(event));
+                }
+                events = std::move(moved);
+                for (auto& ramp : ramps)
+                {
+                    if (ramp.start >= at && ramp.start < end)
+                    {
+                        ramp.start += span;
+                    }
+                }
+            });
     }
     return putRegister(song, reg, firstTrack, at);
 }
