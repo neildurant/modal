@@ -335,6 +335,8 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     recordPoint_ = origin_ + plan_->tempo.toTime(start);
     next_ = plan_->firstAtOrAfter(startTime);
     chased_ = chased;
+    chasedValuesSent_ = chased.empty();
+    played_ = now;
     alreadySentCount_ = 0;
     nextClick_.reset();
     if (plan_->metronome)
@@ -354,6 +356,7 @@ void Scheduler::stop(nanoseconds now) noexcept
     releasePedals(now);
     playing_ = false;
     chased_ = {};
+    chasedValuesSent_ = true;
     nextClick_.reset();
     countIn_ = nullptr;
 
@@ -388,6 +391,7 @@ void Scheduler::panic(nanoseconds now) noexcept
     pedals_.clear(); // Reset All Controllers lets them up
     playing_ = false;
     chased_ = {};
+    chasedValuesSent_ = true;
     nextClick_.reset();
     countIn_ = nullptr;
     for (std::size_t d = 0; d < destinationCount_; ++d)
@@ -406,13 +410,30 @@ void Scheduler::sendDue(nanoseconds now) noexcept
     {
         return;
     }
-    for (const auto& event : chased_)
-    {
-        send(event);
-    }
-    chased_ = {};
-
+    // The chased events go at once, track by track, each one's values before its notes. Before
+    // a count-in, only the values do: the notes wait for the song to start, as it's silent
+    // until then (found in a code review, November 2026).
     const nanoseconds position = now - origin_;
+    if (!chasedValuesSent_)
+    {
+        const bool notesToo = chased_.front().time <= position;
+        for (const auto& event : chased_)
+        {
+            if (notesToo)
+            {
+                send(event);
+            }
+            else if (!event.isNoteOn())
+            {
+                sendAt(event, played_); // due now, not when the song starts
+            }
+        }
+        chasedValuesSent_ = true;
+        if (notesToo || std::ranges::none_of(chased_, &PlannedEvent::isNoteOn))
+        {
+            chased_ = {};
+        }
+    }
     const auto& events = plan_->events;
     for (;;)
     {
@@ -424,6 +445,7 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             ClickOff,
             Click,
             CountInClick,
+            Chased,
             Event,
         };
         Due due = Due::Nothing;
@@ -454,6 +476,10 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         {
             consider(Due::CountInClick, *countIn);
         }
+        if (!chased_.empty())
+        {
+            consider(Due::Chased, chased_.front().time); // the notes, all at one time
+        }
         if (next_ < events.size())
         {
             consider(Due::Event, events[next_].time);
@@ -475,6 +501,16 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         case Due::CountInClick:
             sendCountInClick();
             break;
+        case Due::Chased:
+            for (const auto& event : chased_)
+            {
+                if (event.isNoteOn())
+                {
+                    send(event);
+                }
+            }
+            chased_ = {};
+            break;
         case Due::Event:
         {
             const auto& event = events[next_++];
@@ -494,9 +530,9 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
     {
         return std::nullopt;
     }
-    if (!chased_.empty())
+    if (!chasedValuesSent_)
     {
-        return origin_ + chased_.front().time;
+        return played_;
     }
     std::optional<nanoseconds> next;
     if (next_ < plan_->events.size())
@@ -504,6 +540,10 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
         next = plan_->events[next_].time;
     }
     const auto earliest = [&](nanoseconds time) { next = next ? std::min(*next, time) : time; };
+    if (!chased_.empty())
+    {
+        earliest(chased_.front().time);
+    }
     if (const auto off = nextNoteOff())
     {
         earliest(sounding_[*off].end);
@@ -584,7 +624,11 @@ std::optional<nanoseconds> Scheduler::songTimeAt(nanoseconds time) const noexcep
 
 void Scheduler::send(const PlannedEvent& event) noexcept
 {
-    const nanoseconds due = origin_ + event.time;
+    sendAt(event, origin_ + event.time);
+}
+
+void Scheduler::sendAt(const PlannedEvent& event, nanoseconds due) noexcept
+{
     if (event.sysex)
     {
         sink_.send(event.destination, *event.sysex, due);

@@ -924,6 +924,65 @@ TEST_CASE("a count-in clicks before the record point, with the song silent until
     CHECK(scheduler.finished());
 }
 
+TEST_CASE("chased notes wait for the count-in to go by, the chased values going at once")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.events.insert({0, ControlChange{7, 90}});
+                 track.events.insert({0, Note{48, 100, 8 * q}}); // still sounding at bar 2
+                 track.events.insert({4 * q, Note{60, 100, q}});
+             });
+    const auto plan = compilePlan(song, byPortName); // the metronome is off
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+    const auto chased = chase(plan, start.playFrom);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, chased, kNow, &*start.countIn);
+    CHECK(scheduler.nextWakeTime() == kNow);
+    scheduler.sendDue(kNow);
+    CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{{{1}, {0xB0, 7, 90}, kNow}});
+    CHECK_FALSE(scheduler.finished());
+
+    runUntil(scheduler, kNow + 10s);
+    CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{
+                                                {{1}, {0xB0, 7, 90}, kNow},
+                                                {{1}, {0x90, 48, 100}, kNow + 2s},
+                                                {{1}, {0x90, 60, 100}, kNow + 2s},
+                                                {{1}, {0x80, 60, 64}, kNow + 2500ms},
+                                                {{1}, {0x80, 48, 64}, kNow + 4s},
+                                            });
+    CHECK(scheduler.finished());
+}
+
+TEST_CASE("stopping in a count-in sends no chased note")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{48, 100, 8 * q}}); });
+    const auto plan = compilePlan(song, byPortName);
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+    const auto chased = chase(plan, start.playFrom);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, chased, kNow, &*start.countIn);
+    runUntil(scheduler, kNow + 1s);
+    scheduler.stop(kNow + 1s);
+    scheduler.play(0, {}, kNow + 3s);
+    runUntil(scheduler, kNow + 3s);
+    CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{{{1}, {0x90, 48, 100}, kNow + 3s}});
+}
+
 TEST_CASE("after a count-in, the metronome carries on from the record point")
 {
     const auto ppqn = MODAL_ANY_PPQN();

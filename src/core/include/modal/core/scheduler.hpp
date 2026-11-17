@@ -69,7 +69,8 @@ public:
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
     // lead-in or a count-in, the start tick is reached after the longer of the two; the
-    // count-in clicks before it, with the song silent. If already playing, the notes sounding
+    // count-in clicks before it, with the song silent, so the chased notes wait until the
+    // count-in has gone by, while the chased values go at once. If already playing, the notes sounding
     // end first, and the pedals held down come up. Does nothing without a plan. The caller
     // keeps the count-in alive while the scheduler uses it.
     void play(Tick start, std::span<const PlannedEvent> chased, std::chrono::nanoseconds now,
@@ -159,7 +160,8 @@ private:
     // When the next count-in click is due, in plan time, if there's one to come.
     std::optional<std::chrono::nanoseconds> countInDue() const noexcept;
 
-    void send(const PlannedEvent& event) noexcept;
+    void send(const PlannedEvent& event) noexcept; // due at its own time
+    void sendAt(const PlannedEvent& event, std::chrono::nanoseconds due) noexcept;
     // Remembers which events of the tracks whose quantise changed have been sent already, by
     // the old plan's timing, though the new one has them still to come.
     void noteAlreadySent(const PlaybackPlan& old, std::chrono::nanoseconds position) noexcept;
@@ -190,7 +192,11 @@ private:
     Tick startTick_ = 0;                 // events stored before it were chased, not played
     std::chrono::nanoseconds origin_{0}; // the time on the caller's clock of plan time 0
     std::size_t next_ = 0;               // the next plan event to send
+    // What a play chased: its values are sent at once and its notes when the song starts, after
+    // any count-in, all at one time. Empty once all are sent.
     std::span<const PlannedEvent> chased_;
+    bool chasedValuesSent_ = true;
+    std::chrono::nanoseconds played_{0}; // when the last play began, on the caller's clock
 
     std::optional<Tick> nextClick_; // while the metronome clicks
     std::optional<Click> click_;
