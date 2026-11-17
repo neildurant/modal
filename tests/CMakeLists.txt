@@ -53,6 +53,7 @@ add_executable(modal_tests
     ui/block_glyphs_test.cpp
     ui/cell_grid_test.cpp
     ui/command_line_test.cpp
+    ui/command_names_test.cpp
     ui/commands_test.cpp
     ui/completion_test.cpp
     ui/palette_test.cpp
@@ -92,6 +93,9 @@ add_executable(modal_tests
 
 set_source_files_properties(ui/manual_test.cpp ui/manual_reference_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "MODAL_MANUAL_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}/docs/manual\"")
+
+set_source_files_properties(ui/command_names_test.cpp PROPERTIES
+    COMPILE_DEFINITIONS "MODAL_UI_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}/src/ui\"")
 
 target_link_libraries(modal_tests PRIVATE
     modal::core modal::platform modal::ui modal::ui_sdl modal::warnings Catch2::Catch2WithMain Threads::Threads
