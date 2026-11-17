@@ -6,7 +6,25 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
-Reset preservation in Thin is implemented in `3a18b60` and its functional trial was accepted 17 November 2026. Thin keeps every eligible selected zero event, including repeated resets and pitch bend centre; core regressions cover all three test PPQNs, with Workspace command/undo coverage. The regression first failed against the old algorithm, then passed after adding zero to its keep condition: focused thinning/Workspace tests pass (7 cases, 139 assertions). Help and manual references are updated, and both HTML and PDF manuals build. Final native Linux validation on 17 November 2026 passes all six configurations through `tools/check-linux.sh`: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 1,101 registered tests and no failures. Whole-tree formatting and `git diff --check` pass, and the GCC Debug application is newer than every tracked build input. Publication and hosted CI confirmation follow the accepted trial.
+### Controller ramps: design handoff, 17 November 2026
+
+The agreed design discussion is recorded for the next session. **No ramp implementation has started**, and this handoff does not approve one. Keep milestone 9's ramp item Doing for design work; resolve the remaining feature questions and propose an implementation plan before coding.
+
+- **Complete agreed behaviour:** [design.md, Controller ramps](design.md#controller-ramps). This covers persistent ramp objects, materialised MIDI output, retained source data, conversion and undo, right-endpoint ownership and final-value hold, default density, the lane/inspector interaction, live visual/audible preview, pedal-style timing keys and stretching, strict boundary separation, and editable yank/paste including whole-track/section copies.
+- **Reasons and refinements:** [decisions.md, Editable controller ramps](decisions.md#controller-ramp-decisions). In particular, the early replacement wording means replacing effective output, not destroying source events. Moving/resizing away reveals the source; deleting the ramp reveals it; explicit conversion commits the current generated result into the currently covered source span.
+- **Remaining decisions:** [design.md, To decide](design.md#to-decide), under controller lanes. These include supported controller kinds and creation defaults; curve/density/sampling controls; recording and bulk transforms; structural edits and cross-section ramps; clipboard bindings and cross-controller mapping; native representation/compatibility; and the draft lifecycle around save/close, track/view changes and recording.
+
+Implementation context for the next session:
+
+- The current model keeps per-section track events in `core::TrackContent` (`src/core/include/modal/core/song.hpp`). Definition, retained-source and effective-event representation still needs a design that preserves atomic edits, undo and copying.
+- `Document` exposes one preview callback and one guard; `RecordingSession` exclusively owns them during a pending take. Ramp drafts and audition must be coordinated with that ownership. Preserve the review fix that builds recording-time playback plans from the underlying song rather than the displayed take preview.
+- Event generation stays off the engine thread. Validate regeneration, direct-edit protection, source restoration, conversion, undo, collision refusals and copying at multiple PPQNs. Live audition needs cancellation tests for the held controller state at the current play position.
+- The in-conversation sketch is a discussion aid, not application code or an agreed native-format/UI implementation. The agreed visual and key behaviour is written in design.md, so the handoff does not depend on that sketch.
+
+This update changes design and handoff documents only. The implemented Thin reset-preservation work below is separately complete and accepted.
+
+
+Reset preservation in Thin is implemented in `3a18b60` and its functional trial was accepted 17 November 2026. Thin keeps every eligible selected zero event, including repeated resets and pitch bend centre; core regressions cover all three test PPQNs, with Workspace command/undo coverage. The regression first failed against the old algorithm, then passed after adding zero to its keep condition: focused thinning/Workspace tests pass (7 cases, 139 assertions). Help and manual references are updated, and both HTML and PDF manuals build. Final native Linux validation on 17 November 2026 passes all six configurations through `tools/check-linux.sh`: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 1,101 registered tests and no failures. Whole-tree formatting and `git diff --check` pass, and the GCC Debug application is newer than every tracked build input. Published through `2acb393`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44078673808), along with the manual workflow.
 
 Functional trial accepted 17 November 2026: various modulation passages, including zero values, were reported as working well. This is functional trial evidence; no hardware latency or jitter measurement is claimed.
 

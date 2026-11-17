@@ -709,3 +709,26 @@ The review identified bounded, round-robin processing of input so controller flo
 
 
 **Thin keeps resets (decided 17 November 2026).** Preserve every eligible selected zero-value event when thinning continuous controllers, pitch bend, channel pressure and per-note pressure, including repeated zeros and pitch bend centre. A reset inside a gesture matters even when spacing or value thresholds would remove it; retaining it can exceed the requested density, as retaining gesture endpoints already can. A retained reset becomes the reference for later spacing and value checks. Keep the current event filters, gesture boundaries, parameters and keys. Repeated-value removal is separate work; thinning must not discard resets on its behalf.
+
+
+<a id="controller-ramp-decisions"></a>
+
+## Editable controller ramps (17 November 2026)
+
+The current agreed specification is in [design.md, Controller ramps](design.md#controller-ramps). These decisions describe planned behaviour; no ramp implementation has started. Remaining choices are kept in design.md's To decide section.
+
+**Persistent definitions and materialised output (decided 17 November 2026).** Keep range, start/end values, curve parameters and density so a gesture can be adjusted after listening. Parameter edits regenerate ordinary controller events off the playback thread; playback remains event-based. Native songs retain definitions and underlying source data, while MIDI export carries the flattened effective result.
+
+**Non-destructive replacement (decided 17 November 2026).** A ramp expresses a new gesture, so its generated output replaces the chosen controller's events within its span in the effective event list. The initial word "replace" was clarified during discussion: retain the source events beneath editable ramps. Moving a ramp over other events and back, or resizing it out and back, must not erase those events. Moving or deleting the ramp reveals the source again. Notes and other controller streams are unaffected.
+
+**Explicit conversion (decided 17 November 2026).** Require conversion to ordinary events before individual generated points can be edited. Automatic conversion could silently discard editability, and regenerating a definition could overwrite hand edits. Conversion replaces only the currently covered source events with the ramp's current output and removes the definition. Undo restores both the editable object and its source data.
+
+**Endpoint and density (decided 17 November 2026).** The ramp owns its right endpoint, masking any source event exactly there, and its final value holds until a later event changes it. Automatically restoring the old held value could make a fade jump back up. Use an adjustable default density of 16 events per quarter note, independently of the editing grid, as a smoother starting point than a typical editing grid. Exact alternative controls and sampling details remain open.
+
+**Inspector and preview (decided 17 November 2026).** Draw a lightly tinted span with clear endcaps, the editable curve and actual generated event points. The lane cursor entering the range identifies the current ramp and shows its parameters without entering Visual mode. Both e and Enter open the inspector, matching the familiar edit route; Tab/Shift-Tab move between fields, Enter confirms and Escape cancels. Outside a ramp, Enter retains its existing controller-value behaviour. Valid changes give live visual and audible preview when playback reaches the passage. Confirmation is one undoable edit; cancellation restores the original definition, events and controller state at the current play position without a transport jump.
+
+**Familiar timing edits (decided 17 November 2026).** Reuse pedal-style movement and length keys. Moving preserves duration, values and curve shape. Resizing stretches the curve across its new span while preserving endpoint values and shape, regenerating events at the chosen density. Normal-mode timing steps apply immediately with the normal note/pedal undo grouping; inspector editing remains a draft with confirmation/cancellation. Precise independent Start and End edits are available in the inspector.
+
+**No overlapping or shared boundaries (decided 17 November 2026).** Ramps for the same controller stream on the same track must have one ending strictly before the next starts. Refuse overlap or touching during creation, movement, resizing and paste, retaining existing objects unchanged. Shared timestamps would otherwise create competing values and ownership; matching endpoint values are no exception because later edits could make them differ. Other controller streams and tracks remain independent.
+
+**Editable copies (decided 17 November 2026).** Include ramps in yank/paste as independent editable definitions, keeping relative offsets when several are copied. Copying only a ramp must not carry hidden source events from its original location: its new location retains its own source data beneath the pasted object. Whole-track and whole-section copies include both the definitions and source data. Pasting obeys the same boundary/collision rules and refuses atomically, preserving song and register. Exact bindings and cross-controller retargeting still need agreement.
