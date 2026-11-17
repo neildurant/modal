@@ -136,6 +136,8 @@ public:
     const EventListView& eventList() const { return *eventList_; }
     ArrangeView& arrangement() { return *arrange_; }
     const ArrangeView& arrangement() const { return *arrange_; }
+    // Cancels any draft open in a view, as closing the window does first.
+    void cancelDrafts();
     PianoRollView& pianoRoll() { return *pianoRoll_; }
     const PianoRollView& pianoRoll() const { return *pianoRoll_; }
 
@@ -436,6 +438,9 @@ private:
     void ask(std::string question, std::function<void()> yes, std::function<void()> no = {},
              std::function<void()> stop = {}) override;
     void playFrom(core::Tick tick) override;
+    void togglePlayback() override { transport("play-toggle"); }
+    void sendValue(core::TrackId track, const core::EventData& data) override;
+    void endSelection() override { endVisual(); }
     std::optional<Selection> selection() const override { return selection_; }
     void moveSelection(core::Tick by, int pitches,
                        std::vector<Selection::NotePosition> notes) override;

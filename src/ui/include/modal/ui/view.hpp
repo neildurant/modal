@@ -287,6 +287,13 @@ public:
 
     // Puts the play-from marker at a time and plays from there, as Enter on a section does.
     virtual void playFrom(core::Tick tick) = 0;
+    // Starts or stops playback, as Space does, while a ramp's draft holds the keys.
+    virtual void togglePlayback() {}
+    // Sends a track's controller, bend or pressure value now, while playing, as cancelling a
+    // ramp's draft puts back the value playing.
+    virtual void sendValue(core::TrackId /*track*/, const core::EventData& /*data*/) {}
+    // Ends a Visual selection, as making a ramp from one does.
+    virtual void endSelection() {}
 
     // The unit used to display coarse/fine note timing; by default the track's editing grid.
     virtual core::NoteFraction timingUnit(core::NoteFraction grid) const { return grid; }

@@ -1081,6 +1081,63 @@ TEST_CASE("a sample of controller lanes", "[.sample]")
     CHECK(window->saveFrame(base + "-choose.bmp"));
 }
 
+TEST_CASE("a sample of controller ramps", "[.sample]")
+{
+    // A swell of the expression controller across bar 2, curved, its draft open in the
+    // inspector; then kept, with a fade made from a selection in bar 3, in a taller lane.
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    registry.add(windowCommands());
+    view.setLineHandler([&](const std::string& line) { registry.runLine(line); });
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    document.edit("Expression", {},
+                  [](modal::core::Song& song)
+                  {
+                      const auto id = song.tracks()[2]->id();
+                      const auto q = song.ppqn().quarter();
+                      song.updateEvents(id,
+                                        [&](modal::core::EventList& events)
+                                        {
+                                            for (int i = 0; i < 12; ++i)
+                                            {
+                                                events.insert(
+                                                    {i * q, modal::core::ControlChange{
+                                                                11, static_cast<std::uint8_t>(
+                                                                        90 + (i % 3) * 5)}});
+                                            }
+                                        });
+                  });
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+        {
+            view.handle(key == U'\t'   ? Key::of(NamedKey::Tab)
+                        : key == U'\n' ? Key::of(NamedKey::Enter)
+                                       : Key::typed(key),
+                        0);
+        }
+    };
+    type(U"gr");
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    view.handle(Key::of(NamedKey::PageDown, kCtrl), 0);
+    type(U":lane cc11\ngl]b");
+    type(U",cr20\tc\t40\t");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-ramp-draft.bmp"));
+    type(U"\n]bvll");
+    view.handle(Key::of(NamedKey::Right, kNoModifiers), 0);
+    type(U",cr0\n,ch,ch");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-ramps.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-ramps-light.bmp"));
+}
+
 TEST_CASE("a sample of the sustain lane", "[.sample]")
 {
     // The piano's sustain as regions: plain pedalling in bar 2, half-pedalling within a region

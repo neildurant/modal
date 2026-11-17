@@ -897,6 +897,7 @@ int main(int argc, char* argv[])
     // :wq, which closes the window once it has saved, after the save dialog if it needs one.
     const auto closing = [&]
     {
+        view.cancelDrafts();
         if (auto refusal = view.recordingSession().fileOperationRefusal())
         {
             view.report(ui::CommandResult::error(std::move(*refusal)));

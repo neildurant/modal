@@ -96,6 +96,9 @@ public:
     bool typing() const override { return editor_.active() || laneChooser_.has_value(); }
     std::optional<std::string> typingHint() const override
     {
+        if (rampDraft_)
+            return "Enter keeps the ramp, Escape cancels it; Tab goes on, Up and Down step it, "
+                   "Space plays or stops";
         if (laneChooser_)
             return "Enter chooses, Escape leaves it; a number or a name narrows the list";
         if (!typing())
@@ -105,7 +108,11 @@ public:
     const InspectorEditor& inspectorEditor() const { return editor_; }
     void type(char32_t character) override
     {
-        if (laneChooser_)
+        // While a ramp's draft holds the keys, Space still plays and stops, to hear it (decided
+        // 17 November 2026); none of its fields takes a space.
+        if (rampDraft_ && character == U' ')
+            host_.togglePlayback();
+        else if (laneChooser_)
             laneChooser_->type(character);
         else
             editor_.type(character);
@@ -190,6 +197,14 @@ public:
     // current note's, or on an empty spot the default note's from the cursor, the note o would
     // add, so it shows what you'd get.
     std::pair<core::Tick, core::Tick> cursorSpan() const;
+
+    // Controller ramps in the lane (designed 17 November 2026). The ramp of the lane's
+    // controller the cursor is in, from its start to its end, by its index in the track's
+    // ramps; and whether a ramp's draft is open in the inspector.
+    std::optional<std::size_t> currentRamp() const;
+    bool draftingRamp() const { return rampDraft_.has_value(); }
+    // Cancels an open draft, as closing the window does first.
+    void cancelRampDraft() { endRampDraft(false); }
 
 private:
     const core::MeterMap& meter() const;
@@ -357,6 +372,34 @@ private:
     bool setLaneValues(const std::vector<std::size_t>& indices,
                        const std::function<int(int)>& change, std::string title,
                        std::string_view mergeKey);
+    // Controller ramps. A draft is a ramp being made or changed in the inspector: its changes
+    // are one undo step, merged by its key, kept by Enter and taken back by Escape.
+    struct RampDraft
+    {
+        core::TrackId track;
+        std::size_t index; // in the track's ramps
+        std::string key;
+        bool created; // made by , c r, so cancelling it makes none
+        core::Lane lane;
+    };
+    std::optional<core::ControllerRamp> draftRamp() const;
+    Inspection rampInspection(const core::ControllerRamp& ramp) const;
+    // Whether a lane selection takes a ramp's events, which can't be changed one by one.
+    bool rampTaken() const;
+    // , c r: a ramp across the selection or the cursor's bar, opened as a draft; and opening
+    // the cursor's ramp as one, with e or Enter.
+    bool makeRamp();
+    bool openRamp(std::size_t index, bool created, std::string key);
+    // Sets or steps a draft's field, saying why not if it can't be.
+    std::optional<std::string> setRampField(const std::string& heading, const std::string& text);
+    std::optional<std::string> stepRampField(const std::string& heading, int steps);
+    std::optional<std::string> applyRamp(const core::ControllerRamp& ramp);
+    std::string rampRefusal(const core::Song::RampEdit& edit, const core::Song& song) const;
+    void endRampDraft(bool keep);
+    // , c R: makes the cursor's ramp ordinary events.
+    bool convertRamp();
+    void addRamps(const LaneDrawing& d, core::TrackId track) const;
+
     // The commands run in the notes area, and in the lane, moves in time.
     std::optional<bool> runNotes(std::string_view command, int count);
     // Its parts, each returning nothing for a command that isn't its own.
@@ -399,6 +442,8 @@ private:
     bool pedalValues_ = false; // a pedal's lane showing its values, not its regions (, c v)
     bool zeroTyped_ = false;   // 0 typed in a controller's lane, for Enter to set 0
     std::optional<ChoiceList> laneChooser_;
+    std::optional<RampDraft> rampDraft_;
+    int rampDrafts_ = 0;                  // drafts opened, for their merge keys
     std::vector<core::Lane> laneChoices_; // what laneChooser_'s choices are
     InspectorEditor editor_;
     int width_ = 0;

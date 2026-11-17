@@ -307,11 +307,17 @@ nmap <S-Down>   lane-box-down-coarse "Box's edge down 10"
 " time, off the grid, to place a note or event exactly. There o adds an event at the cursor,
 " at the value before it, a number and Enter one at that value, x deletes the event and d a
 " selection's, and Alt-h and Alt-l move it a grid step, Alt-H and Alt-L a nudge, as for notes.
+" , c r ramps the lane's controller across a selection or the cursor's bar, from the value
+" held at its start to the value held at its end, and opens it in the inspector to shape: Tab
+" goes from field to field, Up and Down step one, Space plays and stops, Enter keeps the ramp
+" and Escape cancels it. e or Enter on a ramp opens it again, and , c R makes it events.
 " The pedalling tools are here as well as under , x P.
 ngroup <leader>c "Controllers"
 nmap <leader>cc  lane-choose       "Choose the lane"
 nmap <leader>cv  lane-values-toggle "A pedal's values, or its regions"
 nmap <leader>ch  lane-height       "Make the lane taller, and back"
+nmap <leader>cr  lane-ramp         "Ramp the controller"
+nmap <leader>cR  lane-ramp-convert "Make the ramp events"
 nmap ]c         lane-controller-next     "Next controller in the lane"
 nmap [c         lane-controller-previous "Controller before in the lane"
 nmap o          lane-event-add    "Add an event"

@@ -581,6 +581,22 @@ void Workspace::auditionHere(std::uint64_t versionBefore)
     }
 }
 
+void Workspace::sendValue(core::TrackId track, const core::EventData& data)
+{
+    if (player_ != nullptr && player_->playing())
+    {
+        (void)player_->sendValue(document_.song(), track, data);
+    }
+}
+
+void Workspace::cancelDrafts()
+{
+    if (pianoRoll_)
+    {
+        pianoRoll_->cancelRampDraft();
+    }
+}
+
 void Workspace::auditionNote(core::TrackId track, const core::Event& note)
 {
     // Not while playing or recording, when it would be heard over the song.

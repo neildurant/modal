@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -132,6 +133,11 @@ constexpr std::array kCommands{
                                "quarter of the view, half, and back"},
     CommandInfo{.name = "lane-values-toggle",
                 .description = "Show a pedal's values in the lane, or its regions again"},
+    CommandInfo{.name = "lane-ramp",
+                .description = "Ramp the lane's controller across the selection or this bar, "
+                               "then shape it in the inspector"},
+    CommandInfo{.name = "lane-ramp-convert",
+                .description = "Make the ramp here ordinary events, to edit one by one"},
     CommandInfo{.name = "lane-controller-next",
                 .description = "Show the track's next controller in the lane",
                 .count = true},
@@ -1084,6 +1090,27 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
         }
         laneChooser_->run(command);
         return true;
+    }
+    if (rampDraft_)
+    {
+        // Escape cancels the whole draft, and Enter, leaving the field, keeps it.
+        if (command == "command-line-cancel")
+        {
+            endRampDraft(false);
+            return true;
+        }
+        InspectorEditor::Hooks rampHooks{
+            .inspection = [this] { return inspection(); },
+            .set = [this](const std::string& heading, const std::string& text)
+            { return setRampField(heading, text); },
+            .step = [this](const std::string& heading, int steps)
+            { return stepRampField(heading, steps); }};
+        const auto result = editor_.run(command, host_, rampHooks);
+        if (!editor_.active())
+        {
+            endRampDraft(true);
+        }
+        return result;
     }
     // The current note's fields in the inspector, with e.
     const auto& m = meter();
@@ -3159,6 +3186,42 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return runNotes(command, count);
     }
+    if (command == "lane-ramp")
+    {
+        return makeRamp();
+    }
+    if (command == "lane-ramp-convert")
+    {
+        return convertRamp();
+    }
+    if (!velocityLane() && !isSwitchLane())
+    {
+        // A ramp's points are made from it, so they're changed through it: e or Enter opens
+        // it, and , c R makes them events to change one by one (decided 17 November 2026).
+        const auto ramp = currentRamp();
+        if (ramp && (command == "inspector-edit" ||
+                     (command == "lane-value-set" && count == 0 && !zeroTyped_)))
+        {
+            return openRamp(*ramp, false, "ramp draft " + std::to_string(++rampDrafts_));
+        }
+        const bool pointEdit = command == "lane-event-add" || command == "lane-event-delete" ||
+                               command.starts_with("lane-event-earlier") ||
+                               command.starts_with("lane-event-later") ||
+                               command.starts_with("lane-value-") || command == "cursor-first";
+        if (pointEdit && (ramp || rampTaken()) && (command != "cursor-first" || count == 0))
+        {
+            if (command == "cursor-first")
+            {
+                // 0 for Enter to set 0 isn't for a ramp's point; 0 goes to the start.
+                return runNotes(command, count);
+            }
+            zeroTyped_ = false;
+            host_.refuse("That's a ramp's: e or Enter changes the ramp, , c R makes it events "
+                         "to edit one by one",
+                         MessageKind::Information);
+            return true;
+        }
+    }
     // 0 with no count, in a controller's lane, waits for Enter to set 0 rather than going to
     // the start, a number and Enter setting a value there (decided 15 November 2026, after use).
     const bool zero = std::exchange(zeroTyped_, false);
@@ -4350,6 +4413,14 @@ Inspection PianoRollView::inspection() const
         result.fields.push_back({"Controller", laneTitle(shown)});
         return result;
     }
+    if (const auto drafted = draftRamp())
+    {
+        return rampInspection(*drafted);
+    }
+    if (const auto ramp = currentRamp())
+    {
+        return rampInspection(song.ramps(*trackId())[*ramp]);
+    }
     if (inLane_ && !velocityLane())
     {
         Inspection result;
@@ -5154,6 +5225,8 @@ void PianoRollView::addControllerValues(const LaneDrawing& d, core::TrackId trac
     const int barWidth = std::max(2 * d.lineWidth, 2);
     const int base = d.shown.kind == core::Lane::Kind::PitchBend ? d.y(0) : d.height;
     const auto onEvent = laneNote();
+    addRamps(d, track);
+    const auto ramps = song.ramps(track);
     std::optional<int> held; // the value before, and where it was set
     int heldX = 0;
     const auto hold = [&](int to)
@@ -5192,9 +5265,12 @@ void PianoRollView::addControllerValues(const LaneDrawing& d, core::TrackId trac
         const bool here = inLane_ && onEvent == i;
         const bool picked = std::ranges::binary_search(d.taken, i);
         const bool matched = search && core::matches(*search, events[i].data, song.ppqn());
+        // A ramp's points in its colour, as its own (decided 17 November 2026).
+        const bool owned = core::ownedByRamp(events[i], ramps);
         const auto role = here      ? Role::Text
                           : picked  ? Role::NoteSelected
                           : matched ? Role::Match
+                          : owned   ? Role::Accent
                                     : Role::Note;
         d.lane.under.push_back({{x, std::min(y, base), barWidth, std::max(std::abs(base - y), 1)},
                                 role,
@@ -5434,6 +5510,569 @@ void PianoRollView::stopPlayhead(std::optional<core::Tick> cursorTo)
 {
     playhead_.reset();
     moveTo(cursorTo.value_or(time_));
+}
+
+namespace
+{
+
+constexpr std::uint8_t kRampTint = 36;        // the opacity of a ramp's span
+constexpr std::uint8_t kCurrentRampTint = 64; // and of the one the cursor's in
+constexpr std::uint8_t kRampCurve = 200;      // and of its curve
+
+constexpr std::array<std::pair<core::ControllerRamp::Shape, std::string_view>, 4> kShapeNames{{
+    {core::ControllerRamp::Shape::Linear, "Linear"},
+    {core::ControllerRamp::Shape::Curve, "Curve"},
+    {core::ControllerRamp::Shape::SCurve, "S-curve"},
+    {core::ControllerRamp::Shape::EqualPower, "Equal power"},
+}};
+
+std::string shapeName(core::ControllerRamp::Shape shape)
+{
+    for (const auto& [each, name] : kShapeNames)
+    {
+        if (each == shape)
+        {
+            return std::string{name};
+        }
+    }
+    return "Linear";
+}
+
+bool sameStream(const core::Lane& a, const core::Lane& b)
+{
+    return a.kind == b.kind &&
+           (a.kind != core::Lane::Kind::Controller || a.controller == b.controller);
+}
+
+// A whole number typed into a field, or a change to one, as +5 or -5.
+std::optional<int> typedNumber(std::string_view text, int current)
+{
+    while (!text.empty() && text.front() == ' ')
+    {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && text.back() == ' ')
+    {
+        text.remove_suffix(1);
+    }
+    const bool relative = !text.empty() && (text.front() == '+' || text.front() == '-');
+    const auto digits = text.substr(relative ? 1 : 0);
+    if (digits.empty() || digits.size() > 6 ||
+        !std::ranges::all_of(digits, [](char c) { return c >= '0' && c <= '9'; }))
+    {
+        return std::nullopt;
+    }
+    const int number = std::stoi(std::string{digits});
+    if (!relative)
+    {
+        return number;
+    }
+    return text.front() == '+' ? current + number : current - number;
+}
+
+} // namespace
+
+std::optional<std::size_t> PianoRollView::currentRamp() const
+{
+    const auto id = trackId();
+    if (!inLane_ || !id || velocityLane() || isSwitchLane())
+    {
+        return std::nullopt;
+    }
+    const auto shown = lane();
+    const auto ramps = document_.song().ramps(*id);
+    for (std::size_t i = 0; i < ramps.size(); ++i)
+    {
+        if (sameStream(ramps[i].lane, shown) && ramps[i].start <= time_ && time_ <= ramps[i].end())
+        {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<core::ControllerRamp> PianoRollView::draftRamp() const
+{
+    if (!rampDraft_)
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    if (!song.track(rampDraft_->track))
+    {
+        return std::nullopt;
+    }
+    const auto ramps = song.ramps(rampDraft_->track);
+    return rampDraft_->index < ramps.size() ? std::optional{ramps[rampDraft_->index]}
+                                            : std::nullopt;
+}
+
+Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
+{
+    // Its span, its values, its shape, the curve's amount for a curve, and how dense its
+    // points are, each to change in the inspector.
+    const auto& m = meter();
+    Inspection result;
+    result.kind = "Ramp";
+    const auto add = [&](std::string heading, std::string value, std::string editText = {})
+    {
+        result.fields.push_back({.heading = std::move(heading),
+                                 .value = std::move(value),
+                                 .editable = true,
+                                 .editText = std::move(editText)});
+    };
+    add("Start", positionText(m, ramp.start));
+    add("End", positionText(m, ramp.end()));
+    add("From", std::to_string(ramp.from));
+    add("To", std::to_string(ramp.to));
+    add("Shape", shapeName(ramp.shape));
+    auto& shape = result.fields.back();
+    for (const auto& [each, name] : kShapeNames)
+    {
+        shape.choices.emplace_back(name);
+    }
+    if (ramp.shape == core::ControllerRamp::Shape::Curve)
+    {
+        add("Amount", (ramp.amount > 0 ? "+" : "") + std::to_string(ramp.amount),
+            std::to_string(ramp.amount));
+    }
+    add("Density", std::to_string(ramp.density) + " a quarter", std::to_string(ramp.density));
+    result.fields.push_back({"Controller", laneTitle(ramp.lane)});
+    return result;
+}
+
+bool PianoRollView::rampTaken() const
+{
+    if (!laneSelecting())
+    {
+        return false;
+    }
+    const auto id = *trackId();
+    const auto& song = document_.song();
+    const auto ramps = song.ramps(id);
+    return std::ranges::any_of(laneTaken(), [&](std::size_t index)
+                               { return core::ownedByRamp(song.events(id)[index], ramps); });
+}
+
+std::string PianoRollView::rampRefusal(const core::Song::RampEdit& edit,
+                                       const core::Song& song) const
+{
+    using Refusal = core::Song::RampRefusal;
+    switch (edit.refusal)
+    {
+    case Refusal::Invalid:
+        return "A ramp needs a length, values in the lane's range, an amount from -100 to 100 "
+               "and a density from 1 to " +
+               std::to_string(core::ControllerRamp::kMaxDensity);
+    case Refusal::PastEnd:
+        return "A ramp ends before the song does";
+    case Refusal::CrossesSection:
+        return "A ramp keeps to its section";
+    case Refusal::Collides:
+    {
+        const auto ramps = song.ramps(*trackId());
+        return "That would touch or overlap the ramp at " +
+               positionText(meter(), edit.index < ramps.size() ? ramps[edit.index].start : 0);
+    }
+    case Refusal::NoTrack:
+    case Refusal::NoRamp:
+    case Refusal::None:
+        break;
+    }
+    return "There's no ramp here";
+}
+
+bool PianoRollView::makeRamp()
+{
+    const auto id = trackId();
+    if (!id)
+    {
+        return false;
+    }
+    const auto shown = lane();
+    if (velocityLane() || isSwitchLane() || !core::rampable(shown))
+    {
+        host_.refuse(", c r ramps a continuous controller, pitch bend or aftertouch: , c c chooses "
+                     "one",
+                     MessageKind::Information);
+        return true;
+    }
+    // From one end of the selection to the other, or across an object's time or the cursor's
+    // bar, ending on its last tick so ramps on bars one after another don't touch.
+    core::Tick start = 0;
+    core::Tick end = 0;
+    if (laneSelecting())
+    {
+        const auto selection = *host_.selection();
+        start = selection.span ? selection.span->first : std::min(selection.anchor.tick, time_);
+        end = selection.span ? selection.span->second - 1 : std::max(selection.anchor.tick, time_);
+    }
+    else
+    {
+        const auto& m = meter();
+        const auto bar = m.toBarBeatTick(time_).bar;
+        start = m.barStart(bar);
+        end = m.barStart(bar + 1) - 1;
+    }
+    if (end <= start)
+    {
+        host_.refuse("A ramp needs time to go from one value to another: select more than one "
+                     "place",
+                     MessageKind::Information);
+        return true;
+    }
+    core::ControllerRamp ramp{.lane = shown,
+                              .start = start,
+                              .length = end - start,
+                              .from = heldValue(start),
+                              .to = heldValue(end)};
+    if (const auto refusal = host_.eventEditRefusal(*id))
+    {
+        host_.refuse(*refusal);
+        return true;
+    }
+    auto song = document_.song();
+    const auto made = song.addRamp(*id, ramp);
+    if (!made.done())
+    {
+        host_.refuse(rampRefusal(made, song), MessageKind::Warning);
+        return true;
+    }
+    const auto key = "ramp draft " + std::to_string(++rampDrafts_);
+    if (!document_.edit(
+            "Ramp " + laneLabel() + " in " + trackName(), place(),
+            [&](core::Song& s) { s.addRamp(*id, ramp); }, key))
+    {
+        if (auto why = document_.takeRefusal())
+        {
+            host_.refuse(std::move(*why));
+        }
+        return true;
+    }
+    host_.endSelection();
+    if (time_ < ramp.start || time_ > ramp.end())
+    {
+        moveTo(ramp.start);
+    }
+    return openRamp(made.index, true, key);
+}
+
+bool PianoRollView::openRamp(std::size_t index, bool created, std::string key)
+{
+    const auto id = *trackId();
+    const auto ramps = document_.song().ramps(id);
+    if (index >= ramps.size())
+    {
+        return false;
+    }
+    rampDraft_ = RampDraft{id, index, std::move(key), created, ramps[index].lane};
+    if (!editor_.open(inspection(), created ? "To" : std::string_view{}))
+    {
+        rampDraft_.reset();
+        return false;
+    }
+    host_.startTyping();
+    refresh();
+    return true;
+}
+
+std::optional<std::string> PianoRollView::setRampField(const std::string& heading,
+                                                       const std::string& text)
+{
+    auto ramp = draftRamp();
+    if (!ramp)
+    {
+        return "There's no ramp here";
+    }
+    const auto& m = meter();
+    const auto position = [&](core::Tick from) -> std::variant<core::Tick, std::string>
+    {
+        const auto moved =
+            setInspectorField({from, core::ControlChange{0, 0}}, "Position", text, m);
+        if (const auto* why = std::get_if<std::string>(&moved))
+        {
+            return *why;
+        }
+        return std::get<core::Event>(moved).tick;
+    };
+    const auto number = [&](int current, int lowest, int highest,
+                            std::string_view what) -> std::variant<int, std::string>
+    {
+        const auto typed = typedNumber(text, current);
+        if (!typed || *typed < lowest || *typed > highest)
+        {
+            return std::string{what} + " goes from " + std::to_string(lowest) + " to " +
+                   std::to_string(highest);
+        }
+        return *typed;
+    };
+    if (heading == "Start" || heading == "End")
+    {
+        // Each end on its own, the other staying where it is.
+        const auto moved = position(heading == "Start" ? ramp->start : ramp->end());
+        if (const auto* why = std::get_if<std::string>(&moved))
+        {
+            return *why;
+        }
+        const auto tick = std::get<core::Tick>(moved);
+        const auto end = heading == "Start" ? ramp->end() : tick;
+        const auto start = heading == "Start" ? tick : ramp->start;
+        if (end <= start)
+        {
+            return std::string{"A ramp has to end after it starts"};
+        }
+        ramp->start = start;
+        ramp->length = end - start;
+    }
+    else if (heading == "From" || heading == "To")
+    {
+        const auto value = number(heading == "From" ? ramp->from : ramp->to, ramp->lane.lowest(),
+                                  ramp->lane.highest(), "A value");
+        if (const auto* why = std::get_if<std::string>(&value))
+        {
+            return *why;
+        }
+        (heading == "From" ? ramp->from : ramp->to) = std::get<int>(value);
+    }
+    else if (heading == "Shape")
+    {
+        const auto it = std::ranges::find_if(kShapeNames,
+                                             [&](const auto& each) { return each.second == text; });
+        if (it == kShapeNames.end())
+        {
+            return std::string{"A shape is linear, curve, S-curve or equal power"};
+        }
+        ramp->shape = it->first;
+    }
+    else if (heading == "Amount" || heading == "Density")
+    {
+        const bool amount = heading == "Amount";
+        const auto value =
+            amount ? number(ramp->amount, -core::ControllerRamp::kMaxAmount,
+                            core::ControllerRamp::kMaxAmount, "The amount")
+                   : number(ramp->density, 1, core::ControllerRamp::kMaxDensity, "The density");
+        if (const auto* why = std::get_if<std::string>(&value))
+        {
+            return *why;
+        }
+        (amount ? ramp->amount : ramp->density) = std::get<int>(value);
+    }
+    else
+    {
+        return heading + " can't be changed";
+    }
+    return applyRamp(*ramp);
+}
+
+std::optional<std::string> PianoRollView::stepRampField(const std::string& heading, int steps)
+{
+    auto ramp = draftRamp();
+    if (!ramp)
+    {
+        return std::nullopt;
+    }
+    if (heading == "Start" || heading == "End")
+    {
+        // A grid step, the other end staying where it is.
+        const auto by = steps * gridTicks();
+        if (heading == "Start")
+        {
+            const auto start = std::max<core::Tick>(ramp->start + by, 0);
+            ramp->length = ramp->end() - start;
+            ramp->start = start;
+        }
+        else
+        {
+            ramp->length += by;
+        }
+        if (ramp->length <= 0)
+        {
+            return std::string{"A ramp has to end after it starts"};
+        }
+    }
+    else if (heading == "From" || heading == "To")
+    {
+        // By 1, or pitch bend's by 64, within the lane's range.
+        auto& value = heading == "From" ? ramp->from : ramp->to;
+        const int unit = ramp->lane.kind == core::Lane::Kind::PitchBend ? 64 : 1;
+        value = std::clamp(value + steps * unit, ramp->lane.lowest(), ramp->lane.highest());
+    }
+    else if (heading == "Shape")
+    {
+        const auto at =
+            std::ranges::find(kShapeNames, ramp->shape,
+                              &std::pair<core::ControllerRamp::Shape, std::string_view>::first);
+        const auto size = static_cast<int>(kShapeNames.size());
+        const auto next = (((at - kShapeNames.begin()) + steps) % size + size) % size;
+        ramp->shape = kShapeNames[static_cast<std::size_t>(next)].first;
+    }
+    else if (heading == "Amount")
+    {
+        ramp->amount = std::clamp(ramp->amount + steps * 5, -core::ControllerRamp::kMaxAmount,
+                                  core::ControllerRamp::kMaxAmount);
+    }
+    else if (heading == "Density")
+    {
+        ramp->density = std::clamp(ramp->density + steps, 1, core::ControllerRamp::kMaxDensity);
+    }
+    else
+    {
+        return std::nullopt;
+    }
+    return applyRamp(*ramp);
+}
+
+std::optional<std::string> PianoRollView::applyRamp(const core::ControllerRamp& ramp)
+{
+    // Each change made at once, to see and hear, and merged with the draft's others as one
+    // undo step.
+    const auto id = rampDraft_->track;
+    auto song = document_.song();
+    const auto changed = song.replaceRamp(id, rampDraft_->index, ramp);
+    if (!changed.done())
+    {
+        return rampRefusal(changed, song);
+    }
+    if (const auto refusal = host_.eventEditRefusal(id))
+    {
+        return *refusal;
+    }
+    const auto title = rampDraft_->created
+                           ? "Ramp " + toString(ramp.lane) + " in " + trackName()
+                           : "Change the " + toString(ramp.lane) + " ramp in " + trackName();
+    document_.edit(
+        title, place(), [&](core::Song& s) { s.replaceRamp(id, rampDraft_->index, ramp); },
+        rampDraft_->key);
+    if (auto why = document_.takeRefusal())
+    {
+        return why;
+    }
+    rampDraft_->index = changed.index;
+    if (time_ < ramp.start || time_ > ramp.end())
+    {
+        moveTo(std::clamp(time_, ramp.start, ramp.end()));
+    }
+    refresh();
+    return std::nullopt;
+}
+
+void PianoRollView::endRampDraft(bool keep)
+{
+    if (!rampDraft_)
+    {
+        return;
+    }
+    const auto draft = *rampDraft_;
+    rampDraft_.reset();
+    editor_.close();
+    host_.stopTyping();
+    if (keep)
+    {
+        document_.breakMerge();
+        host_.setMessage(draft.created ? "Made the ramp" : "Kept the ramp's changes",
+                         MessageKind::Information);
+        refresh();
+        return;
+    }
+    const bool undone = document_.cancelMerging(draft.key);
+    refresh();
+    host_.setMessage(draft.created ? "No ramp made" : "The ramp is as it was",
+                     MessageKind::Information);
+    if (!undone || !playhead_ || !document_.song().track(draft.track))
+    {
+        return;
+    }
+    // What plays where playback has got to goes again, the draft's value having been heard
+    // (decided 17 November 2026): the last event of the ramp's controller there, or bend's and
+    // pressure's rest.
+    std::optional<core::EventData> playing;
+    for (const auto& event : document_.song().events(draft.track).all())
+    {
+        if (event.tick > *playhead_)
+        {
+            break;
+        }
+        if (draft.lane.shows(event.data))
+        {
+            playing = event.data;
+        }
+    }
+    if (!playing && draft.lane.kind == core::Lane::Kind::PitchBend)
+    {
+        playing = core::PitchBend{0};
+    }
+    else if (!playing && draft.lane.kind == core::Lane::Kind::Pressure)
+    {
+        playing = core::ChannelPressure{0};
+    }
+    if (playing)
+    {
+        host_.sendValue(draft.track, *playing);
+    }
+}
+
+bool PianoRollView::convertRamp()
+{
+    const auto ramp = currentRamp();
+    if (!ramp)
+    {
+        host_.refuse(", c R makes a ramp events: the lane's cursor goes into one first",
+                     MessageKind::Information);
+        return true;
+    }
+    const auto id = *trackId();
+    if (const auto refusal = host_.eventEditRefusal(id))
+    {
+        host_.refuse(*refusal);
+        return true;
+    }
+    document_.edit("Make the " + laneLabel() + " ramp events in " + trackName(), place(),
+                   [&](core::Song& s) { s.convertRamp(id, *ramp); });
+    refresh();
+    host_.setMessage("The ramp is events now, to edit one by one", MessageKind::Information);
+    return true;
+}
+
+void PianoRollView::addRamps(const LaneDrawing& d, core::TrackId track) const
+{
+    // Each ramp of the lane's controller: a light tint across its span, its ends marked, and
+    // its curve, its points being drawn as the lane's events are (decided 17 November 2026).
+    const auto ramps = document_.song().ramps(track);
+    const auto current = rampDraft_ ? std::optional{rampDraft_->index} : currentRamp();
+    const int cap = std::max(2 * d.lineWidth, 2);
+    const int dot = std::max(d.lineWidth, 2);
+    for (std::size_t i = 0; i < ramps.size(); ++i)
+    {
+        const auto& ramp = ramps[i];
+        if (!sameStream(ramp.lane, d.shown) || ramp.end() < d.page.start ||
+            ramp.start >= d.page.end)
+        {
+            continue;
+        }
+        const auto first = std::max(ramp.start, d.page.start);
+        const auto last = std::min(ramp.end(), d.page.end - 1);
+        const int x0 = d.scale.toX(first);
+        const int x1 = d.scale.toX(last) + cap;
+        d.lane.under.push_back({{x0, 0, std::max(x1 - x0, 1), d.height},
+                                Role::Accent,
+                                i == current ? kCurrentRampTint : kRampTint});
+        for (const auto end : {ramp.start, ramp.end()})
+        {
+            if (end >= d.page.start && end < d.page.end)
+            {
+                d.lane.over.push_back({{d.scale.toX(end), 0, cap, d.height}, Role::Accent, 255});
+            }
+        }
+        // The curve, a dot every few pixels.
+        const int steps = std::max((x1 - x0) / std::max(2 * dot, 4), 1);
+        for (int s = 0; s <= steps; ++s)
+        {
+            const auto tick = first + (last - first) * s / steps;
+            const int value = static_cast<int>(std::lround(ramp.valueAt(tick)));
+            d.lane.over.push_back(
+                {{d.scale.toX(tick), d.y(value) - dot / 2, dot, dot}, Role::Accent, kRampCurve});
+        }
+    }
 }
 
 } // namespace modal::ui
