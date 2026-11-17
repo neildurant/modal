@@ -14,6 +14,11 @@
 namespace modal::core
 {
 
+// A path as UTF-8 text for a message, as the rest of Modal's text is. Converting to the
+// system's code page instead, as path::string() does on Windows, can throw, or give text
+// that isn't UTF-8.
+std::string textOf(const std::filesystem::path& path);
+
 // Writes a file by writing a temporary file beside it first, named at random so it's no file
 // there already, and then renaming it, so a failed write never leaves half a file. Returns an
 // error message, or an empty string.

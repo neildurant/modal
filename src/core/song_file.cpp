@@ -1828,7 +1828,7 @@ SongReadResult readSongFile(const std::filesystem::path& path, Ppqn ppqn)
     result = readSong({reinterpret_cast<const char*>(bytes.data()), bytes.size()}, ppqn);
     if (!result.error.empty())
     {
-        result.error = path.string() + ", " + result.error;
+        result.error = textOf(path) + ", " + result.error;
     }
     return result;
 }

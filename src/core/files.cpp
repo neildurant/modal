@@ -10,17 +10,11 @@
 namespace modal::core
 {
 
-namespace
-{
-
-// A path as UTF-8 text for a message, which converting to the system's code page could throw.
 std::string textOf(const std::filesystem::path& path)
 {
     const auto text = path.u8string();
     return {reinterpret_cast<const char*>(text.data()), text.size()};
 }
-
-} // namespace
 
 std::string writeFileAtomically(const std::filesystem::path& path,
                                 std::span<const std::uint8_t> bytes)
@@ -70,19 +64,19 @@ std::vector<std::uint8_t> readFile(const std::filesystem::path& path, std::uintm
     const auto size = std::filesystem::file_size(path, sizeError);
     if (sizeError)
     {
-        error = "can't read " + path.string() + ": " + sizeError.message();
+        error = "can't read " + textOf(path) + ": " + sizeError.message();
         return {};
     }
     if (size > maxSize)
     {
-        error = path.string() + " is too large to be " + what;
+        error = textOf(path) + " is too large to be " + what;
         return {};
     }
     std::ifstream stream{path, std::ios::binary};
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
     if (!stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size)))
     {
-        error = "can't read " + path.string();
+        error = "can't read " + textOf(path);
         return {};
     }
     return bytes;

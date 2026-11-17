@@ -389,6 +389,20 @@ TEST_CASE("a song file is written whole, or not at all")
     }
     const auto bad = readSongFile(directory / "bad.modal");
     CHECK(bad.error.find("bad.modal, line 3: unknown line") != std::string::npos);
+
+    // A name outside ASCII, and outside most code pages, is said in UTF-8, and never thrown.
+    const std::string name = "\xD0\xBF\xD0\xB5\xD1\x81\xD0\xBD\xD1\x8F \xE2\x99\xAB.modal";
+    const std::filesystem::path named =
+        directory / std::u8string{reinterpret_cast<const char8_t*>(name.data()), name.size()};
+    SongReadResult gone;
+    CHECK_NOTHROW(gone = readSongFile(named));
+    CHECK(gone.error.find(name) != std::string::npos);
+    {
+        std::ofstream{named} << "modal-song 1\nsong \"S\" ppqn=960\nbogus\n";
+    }
+    SongReadResult wrong;
+    CHECK_NOTHROW(wrong = readSongFile(named));
+    CHECK(wrong.error.find(name + ", line 3: unknown line") != std::string::npos);
 }
 
 TEST_CASE("a program setup is saved only as far as it's set, with zero distinct from unset")
