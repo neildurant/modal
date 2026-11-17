@@ -107,11 +107,6 @@ public:
     bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change,
               std::string_view mergeKey);
 
-    // Takes back the latest step, if it was made with this merge key and can still be merged
-    // into, as cancelling a ramp's draft does (decided 17 November 2026): the song goes back to
-    // before it, with nothing left to redo. Returns whether it did.
-    bool cancelMerging(std::string_view mergeKey);
-
     // Ends coalescing with the previous edit without changing the song or undo/redo history.
     // An explicit outer group remains one step, as a macro or recording pass requires.
     void breakMerge() noexcept;
@@ -122,6 +117,10 @@ public:
     // counts.
     void beginGroup(std::string title, const EditPlace& place);
     void endGroup();
+    // Ends the innermost group with the song as it was when it began, as cancelling an
+    // inspector does (decided 17 November 2026): its edits are no step and nothing is left to
+    // redo. False, changing nothing, if there's no group or the guard refuses.
+    bool cancelGroup();
 
     // Undoes or redoes a step, returning it, to say what was done and go back to where; or
     // nothing if there's no step to undo or redo.
@@ -187,8 +186,10 @@ private:
     std::size_t undoLevels_ = kDefaultUndoLevels;
     int groupDepth_ = 0;
     std::optional<EditStep> group_; // the step being grouped
-    std::string lastInGroup_;       // the title of its last edit, for a group without one
-    std::string mergeKey_;          // the latest step's, while it can be merged into
+    // The song as each open group began, innermost last, and its version then.
+    std::vector<std::pair<Song::Parts, std::uint64_t>> groupStarts_;
+    std::string lastInGroup_; // the title of its last edit, for a group without one
+    std::string mergeKey_;    // the latest step's, while it can be merged into
     Listener listener_;
 };
 

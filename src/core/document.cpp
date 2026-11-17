@@ -28,6 +28,7 @@ void Document::replace(Song song, std::optional<std::filesystem::path> file,
     savedId_ = songId_;
     groupDepth_ = 0;
     group_.reset();
+    groupStarts_.clear();
     mergeKey_.clear();
     changed();
 }
@@ -111,18 +112,6 @@ bool Document::edit(std::string title, const EditPlace& place,
     return true;
 }
 
-bool Document::cancelMerging(std::string_view mergeKey)
-{
-    if (mergeKey.empty() || mergeKey != mergeKey_ || groupDepth_ > 0 || current_ == 0 ||
-        canRedo() || !restore(current_ - 1))
-    {
-        return false;
-    }
-    states_.pop_back();
-    mergeKey_.clear();
-    return true;
-}
-
 void Document::breakMerge() noexcept
 {
     mergeKey_.clear();
@@ -130,15 +119,47 @@ void Document::breakMerge() noexcept
 
 void Document::beginGroup(std::string title, const EditPlace& place)
 {
+    groupStarts_.emplace_back(song_.parts(), songId_);
     if (groupDepth_++ == 0)
     {
         group_ = EditStep{std::move(title), place, std::chrono::system_clock::now()};
     }
 }
 
+bool Document::cancelGroup()
+{
+    if (groupDepth_ == 0)
+    {
+        return false;
+    }
+    auto [parts, id] = groupStarts_.back();
+    // Track IDs are never reused, even for a track added in the group.
+    parts.nextTrackId = std::max(parts.nextTrackId, song_.parts().nextTrackId);
+    Song restored{std::move(parts)};
+    if (!(restored == song_))
+    {
+        if (!allowed(restored))
+        {
+            return false;
+        }
+        song_ = std::move(restored);
+    }
+    groupStarts_.pop_back();
+    songId_ = id;
+    if (--groupDepth_ == 0)
+    {
+        group_.reset();
+        lastInGroup_.clear();
+        mergeKey_.clear();
+    }
+    changed();
+    return true;
+}
+
 void Document::endGroup()
 {
     assert(groupDepth_ > 0);
+    groupStarts_.pop_back();
     if (--groupDepth_ > 0)
     {
         return;
