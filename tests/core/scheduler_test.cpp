@@ -983,6 +983,42 @@ TEST_CASE("stopping in a count-in sends no chased note")
     CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{{{1}, {0x90, 48, 100}, kNow + 3s}});
 }
 
+TEST_CASE("a tempo edit during a count-in leaves the record point where the clicks lead to")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({4 * q, Note{60, 100, q}}); });
+    const auto plan = compilePlan(song, byPortName);
+    const auto start = planRecordStart(song, 4 * q, kClick);
+    REQUIRE(start.countIn);
+
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(start.playFrom, {}, kNow, &*start.countIn);
+    runUntil(scheduler, kNow + 1s);
+
+    // Half the tempo, a second into the two-second count-in.
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(0, Tempo{1'000'000}); });
+    const auto slower = compilePlan(song, byPortName);
+    scheduler.setPlan(slower, kNow + 1s);
+    CHECK(scheduler.countingIn(kNow + 1900ms));
+    runUntil(scheduler, kNow + 10s);
+    CHECK(sentTo(sink, kClick) == clicks({
+                                      click(76, 110, kNow),
+                                      click(77, 80, kNow + 500ms),
+                                      click(77, 80, kNow + 1000ms),
+                                      click(77, 80, kNow + 1500ms),
+                                  }));
+    // The song starts as the count-in ends, at its new tempo from there.
+    CHECK(sentTo(sink, DestinationId{1}) == std::vector<Sent>{
+                                                {{1}, {0x90, 60, 100}, kNow + 2s},
+                                                {{1}, {0x80, 60, 64}, kNow + 3s},
+                                            });
+    CHECK(scheduler.tickAt(kNow + 2s) == 4 * q);
+}
+
 TEST_CASE("after a count-in, the metronome carries on from the record point")
 {
     const auto ppqn = MODAL_ANY_PPQN();

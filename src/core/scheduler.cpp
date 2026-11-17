@@ -74,7 +74,11 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
     }
 
     sendDue(now);
-    const nanoseconds position = remap(now - origin_, plan_->tempo, plan.tempo);
+    // In a count-in, whose clicks no tempo change moves, the song still starts as it ends;
+    // otherwise playback carries on from the tick it has reached.
+    const nanoseconds position = countingIn(now)
+                                     ? now - (recordPoint_ - plan.tempo.toTime(startTick_))
+                                     : remap(now - origin_, plan_->tempo, plan.tempo);
     origin_ = now - position;
     plan_ = &plan;
 
