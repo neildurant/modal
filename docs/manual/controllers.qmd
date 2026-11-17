@@ -132,6 +132,153 @@ as one step.
 Pedals and other switch controllers are left alone by Thin: their changes
 are actions to preserve, rather than points along a continuous curve.
 
+## Ramps: a fade that stays a fade {#sec-controller-ramps}
+
+A swell of expression across a phrase, a slow rise in modulation or a bend
+that eases back to centre is, musically, one gesture: a start, an end and a
+way of getting from one to the other. As MIDI it is dozens of separate
+events. Once those events are written, the intention behind them is lost;
+making the swell arrive a beat later, or begin more gently, would mean
+drawing it again.
+
+A **ramp** keeps the intention. It remembers where it starts and ends, the
+values at either end, its shape and how densely it writes events, and
+produces the events from those. Change any of them and the events are
+written again to match. The ramp's events play exactly as ordinary ones
+would, and MIDI export writes them as ordinary events; only Modal's own song
+file remembers the ramp itself.
+
+Ramps are made in a continuous controller's lane, pitch bend's or channel
+aftertouch's. Velocity belongs to notes, and pedals are regions rather than
+curves, so neither lane offers ramps.
+
+### Making a ramp
+
+`, c r`, remembered as “controller ramp”, ramps the lane's controller across
+the cursor's bar or, with a `v` selection in the lane, from one end of the
+selection to the other. It starts from the values already held at each end,
+so a ramp over existing data begins as a reasonable approximation of it.
+The new ramp opens straight away in the inspector, as a draft, on its From
+value.
+
+For example, to give the opening phrase of the example song a swell of
+expression (controller 11) that arrives at its last bar: choose the lane
+with `:lane cc11`, enter it with `gl`, and select from the first bar to the
+fourth with `v` and `}}}`. `, c r` makes the ramp. Type `40` and Tab for
+From, `110` for To, and Ctrl-Enter keeps it. One `u` would take the whole
+ramp away again.
+
+![A swell of expression as a ramp: the tinted span with its ends marked, the curve, and the points it writes, with the draft open in the inspector.](images/controller-ramp.png){#fig-controller-ramp fig-alt="The example melody in the piano roll above a tall expression lane. A tinted span runs from bar 1 to bar 4, with marked ends, a curve rising slowly then quickly, and the generated points in the accent colour. The tinted inspector above shows Start, End, From 40, To 110, Shape Curve, Amount 40 and Density 16, with Keep and Cancel buttons."}
+
+The draft's fields are edited as any inspector's are
+(@sec-inspector-editing). Every change is made at once, so the curve
+redraws as a value is typed, and Space plays and stops the music without
+leaving the draft: a swell can be shaped by listening to it. Ctrl-Enter or
+the Keep button keeps the ramp as one undo step; Escape or Cancel leaves no
+ramp at all.
+
+| Field | Meaning |
+| --- | --- |
+| Start, End | Where the ramp begins and where its final value is written; Up and Down move each by a grid step |
+| From, To | The values at either end |
+| Shape | How it travels between them: Linear, Curve, S-curve or Equal power |
+| Amount | For a curve, how strongly it bends, from -100 to +100 |
+| Density | How many events it writes in a quarter note, from 1 to 96 |
+| Controller | The controller it ramps, shown for reference; a ramp keeps to its lane |
+
+The shapes suit different gestures:
+
+- **Linear** changes by the same amount in each step of time. How that sounds
+  depends on how the instrument responds to the controller; a linear fade
+  that seems to happen mostly at one end is a reason to try a curve.
+- **Curve** bends the line. A positive Amount stays near the starting value
+  and then moves quickly towards the end, like a swell that blooms late; a
+  negative Amount moves quickly at first and then settles. This is the
+  “tension” control familiar from many recording programs.
+- **S-curve** eases out of the starting value and into the final one, with
+  the change concentrated in the middle. It suits a gesture that should not
+  draw attention to where it begins or ends.
+- **Equal power** follows the curve used for crossfades, so that two ramps
+  in opposite directions, on two parts, keep the overall level roughly
+  steady while one replaces the other.
+
+Density decides how smooth the result is against how many messages it
+sends. Sixteen events a quarter note, the default, is smooth for most
+controllers at ordinary tempos; a very slow fade can use fewer, and a fast
+pitch gesture more. It is independent of the editing grid. A point that
+would repeat the value before it is left out, and both ends are always
+written. The final value then holds until something later changes it, just
+as an ordinary event's would.
+
+### Changing a ramp later
+
+With the lane's cursor inside a ramp, the inspector shows the ramp and the
+status line says how to change it. `e` or Enter opens it again as a draft,
+and cancelling that draft puts it back exactly as it was. The ramp's timing
+can also be changed directly, with the keys that move and lengthen notes
+and pedal regions:
+
+| On a ramp in the lane | Meaning |
+| --- | --- |
+| `e` or Enter | Open the ramp in the inspector |
+| Alt-Left / Alt-Right, or `Alt-h` / `Alt-l` | Move it by grid steps |
+| Alt-Shift-Left / Alt-Shift-Right, or `Alt-H` / `Alt-L` | Move it by a nudge |
+| `=` / `-` | Move its end later / earlier by a grid step |
+| `+` / `_` | Move its end by a nudge |
+| `x` or `dd` | Delete it, keeping it in the register |
+| `yy` | Yank it |
+| `p` / `P` | Put yanked ramps at the cursor |
+| `, c R` | Turn it into ordinary events |
+
+Moving keeps the ramp's shape and values. Changing its length stretches the
+same shape over the new span. A run of these steps undoes together, as the
+same steps do on notes.
+
+`d` and `y` with a range or a selection in the lane take the ramps lying
+wholly inside it; a range cutting through part of a ramp is refused. They
+take the ramps alone, without the events hidden beneath them (see below), so
+a put ramp hides whatever is at its destination instead. Put into another
+controller's lane, a ramp becomes that
+controller's, keeping its values: a swell copied from expression can become
+a swell of modulation. The one exception is between a 0 to 127 controller and
+pitch bend, whose values mean something quite different, which is refused.
+
+### What a ramp hides
+
+A ramp **hides** the events of its controller that were already in its
+span; it does not delete them. While the ramp is there its own events play
+instead. If it moves away, is shortened or is deleted, the hidden events
+play again where it no longer reaches. This makes it safe to try a ramp over
+a recorded performance: deleting the ramp brings the performance back.
+
+For the same reason the ramp's individual points cannot be edited one by
+one. Changing a single point would contradict the ramp's definition, which
+would rewrite it at the next change. Adding an event, stepping a value or
+selecting the points is refused inside a ramp, with a message pointing to
+`e` and to `, c R`. `, c R` converts the ramp to ordinary events, which then
+replace what it was hiding. The ramp is gone, and its events can be edited
+freely, thinned or used as a starting point for hand-drawn detail.
+
+Two ramps of the same controller on the same track may not overlap or
+touch: one must end before the next begins. A ramp also stays within one
+section. Edits that would break those rules, or cut a ramp in two, are
+refused, and the message names the ramp:
+
+- Deleting or inserting time, such as `D` or `dab`, carries whole ramps
+  along with the events they hide, but refuses a range that cuts through
+  part of one.
+- Starting a section, or deleting or inserting bars, inside a ramp is
+  refused.
+- Transforms, Thin among them, leave a ramp's points alone, and say how
+  many ramps they left.
+- Recording the same controller over a ramp replaces it: the take removes
+  the ramp, and one undo restores both.
+
+The event list shows what plays, including a ramp's points; change them
+through the ramp in the piano roll's lane. A controller ramp is also
+unrelated to the `:vel-ramp` transform, which sets a passage of notes'
+velocities from one value to another (@sec-transform-reference).
+
 ## Pedals can be understood as regions
 
 For switch-like controllers 64 to 69, the lane can show **regions** where

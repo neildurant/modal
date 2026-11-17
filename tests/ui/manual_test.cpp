@@ -46,6 +46,7 @@ struct Manual
         : document{tutorial(ppqn)}
     {
         registry.add(windowCommands());
+        ws.setLineHandler([&](const std::string& line) { registry.runLine(line); });
         ws.resize(1200, 760, {10, 20});
         ws.show(ViewKind::Arrangement);
     }
@@ -72,6 +73,18 @@ struct Manual
         type(U"gtgggrgg");
         press(NamedKey::Tab);
         press(NamedKey::Tab, kShift);
+    }
+
+    // The controllers chapter's swell: expression across the opening phrase, its draft open on
+    // To with 110 typed.
+    void swell()
+    {
+        piano();
+        type(U":lane cc11");
+        press(NamedKey::Enter);
+        type(U"glv}}},cr40");
+        press(NamedKey::Tab);
+        type(U"110");
     }
 
     core::Document document;
@@ -180,6 +193,32 @@ TEST_CASE("the manual's tutorial song and worked edits agree", "[manual]")
         m.type(U"u");
         CHECK(m.document.song() == original);
     }
+
+    SECTION("a swell of expression is one ramp, kept or cancelled whole")
+    {
+        m.swell();
+        m.press(NamedKey::Enter, kCtrl);
+        const auto ramps = m.document.song().ramps(melody);
+        REQUIRE(ramps.size() == 1);
+        CHECK(ramps[0].lane == core::Lane{.kind = core::Lane::Kind::Controller, .controller = 11});
+        CHECK(ramps[0].start == 0);
+        CHECK(ramps[0].end() == 3 * ppqn.whole());
+        CHECK(ramps[0].from == 40);
+        CHECK(ramps[0].to == 110);
+        CHECK(m.document.song().events(bass) == original.events(bass));
+        // Choosing the lane is the track's, and stays; the ramp is undone whole.
+        m.type(U"u");
+        CHECK(m.document.song().ramps(melody).empty());
+        CHECK(m.document.song().events(melody) == original.events(melody));
+
+        // Escape puts back what's typed, and then makes no ramp.
+        m.type(U"ggv}}},cr40");
+        m.press(NamedKey::Escape);
+        CHECK(m.document.song().ramps(melody).size() == 1);
+        m.press(NamedKey::Escape);
+        CHECK(m.document.song().ramps(melody).empty());
+        CHECK(m.document.song().events(melody) == original.events(melody));
+    }
 }
 
 TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
@@ -285,4 +324,16 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
            {viewWidth / 2, height - 3 * cell.height, U"9 Controller lane"},
            {viewWidth - 3 * cell.width, height - 3 * cell.height / 2, U"5 Message row"},
            {viewWidth - 3 * cell.width, height - cell.height / 2, U"6 Status line"}});
+
+    // The swell with its draft still open, shaped as a late-blooming curve, in a half-height
+    // lane.
+    m.piano();
+    m.type(U",ch,ch");
+    m.swell();
+    m.press(NamedKey::Tab);
+    m.press(NamedKey::Down);
+    m.press(NamedKey::Tab);
+    m.type(U"40");
+    m.press(NamedKey::Enter);
+    save("controller-ramp");
 }

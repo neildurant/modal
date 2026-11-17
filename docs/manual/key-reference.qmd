@@ -106,6 +106,19 @@ after counts multiply.
 | `, c v` | Pedal regions / values |
 | `, c h` | Lane height: three rows, a quarter, half |
 | Number then Enter in a lane | Set or insert a value |
+| `, c r`, `, c R` | Ramp the lane's controller; turn a ramp into events |
+| `=` `-` `+` `_` on a ramp | Move its end by a grid step / nudge |
+
+## In an open inspector
+
+| Keys | Purpose |
+| --- | --- |
+| Enter | Set the field and stay on it; on a button, press it |
+| Tab / Shift-Tab | Set the field, go to the next / previous field or button |
+| Up / Down | Step the value or choice |
+| Enter or Alt-Down on a choice | Open its list |
+| Ctrl-Enter | Keep every change, as one undo step |
+| Escape | Put back what was typed; then cancel the draft |
 
 ## Tracks, sections and transport
 
