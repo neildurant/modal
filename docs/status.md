@@ -2,13 +2,13 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. The fixes and refactoring from the 17 November review are committed locally, not pushed, and wait for review and a trial (see the handoff below).*
+*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. The fixes and refactoring from the 17 November review are published and wait for review and a trial (see the handoff below).*
 
 ## Current handoff
 
-Fifteen local commits follow `e053255` on `main`, from the whole-repository review of 17 November 2026 (its findings and what was done about each are under Review findings, below). Nothing is pushed. Windows Debug builds and passes (1,096 registered tests, two skipped); WSL Clang Debug built and passed after the last change to code (1,097 registered, three skipped); whole-tree clang-format passes. `modal.exe` was rebuilt after the last change. The manual gained the `:w` and `:export` refusals and recovery, and `tools/build-manual.cmake` built the HTML and PDF on Windows afterwards. No desktop or MIDI hardware was driven.
+Sixteen commits follow `e053255` on `main`, from the whole-repository review of 17 November 2026 (its findings and what was done about each are under Review findings, below). They were published 17 November 2026, before a trial, at the user's request, to review and try elsewhere. The first push's CI failed only GCC Release, on a false `maybe-uninitialized` warning in the newly extracted `addPedalRegions`; `db55515` replaced the optional with a sentinel, and its [CI passed on Linux and Windows](https://github.com/neildurant/modal/actions/runs/44048602925), with the manual workflow. Windows Debug builds and passes (1,096 registered tests, two skipped); WSL Clang Debug built and passed after the last change to code (1,097 registered, three skipped); whole-tree clang-format passes. `modal.exe` was rebuilt after the last change. The manual gained the `:w` and `:export` refusals and recovery, and `tools/build-manual.cmake` built the HTML and PDF on Windows afterwards. No desktop or MIDI hardware was driven.
 
-To review and try before pushing:
+To review and try:
 
 - **Windows, a file argument with letters outside ASCII:** start `modal.exe` with a song named, say, `Café.modal`, from a terminal and from Explorer. It should open; before, Modal ended before its window appeared.
 - **Count-in with a note held across the record point:** with a long note sounding through the start of bar 2 on a track that chases notes, arm another track, put the marker at bar 2 and record with a one-bar count-in. The held note should start as the count-in ends, not as it begins. Unmeasured on hardware.
