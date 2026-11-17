@@ -245,6 +245,30 @@ TEST_CASE(":export writes a MIDI file, refusing to write over one unless given !
     CHECK(f.host.suggested == "Untitled.mid");
 }
 
+TEST_CASE(":w refuses a MIDI file's name and :export a song's, from a dialog too")
+{
+    Files files;
+    const auto saved = files.run("w " + files.path("song.MID"));
+    CHECK(saved.refused);
+    CHECK(saved.message == "song.MID is a MIDI file's name: :export writes one, :w a song");
+    CHECK_FALSE(std::filesystem::exists(files.directory / "song.MID"));
+    CHECK_FALSE(files.document.file());
+    CHECK(files.run("w! " + files.path("song.midi")).refused);
+
+    const auto exported = files.run("export " + files.path("song.modal"));
+    CHECK(exported.refused);
+    CHECK(exported.message == "song.modal is a song's name: :w saves one, :export a MIDI file");
+    CHECK_FALSE(std::filesystem::exists(files.directory / "song.modal"));
+
+    files.run("w");
+    REQUIRE(files.host.asked == "save");
+    files.host.answer(files.directory / "chosen.mid");
+    REQUIRE(files.host.reported);
+    CHECK(files.host.reported->refused);
+    CHECK_FALSE(std::filesystem::exists(files.directory / "chosen.mid"));
+    CHECK_FALSE(files.document.file());
+}
+
 TEST_CASE(":new and :q refuse to lose unsaved changes unless given !")
 {
     Files f;

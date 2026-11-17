@@ -75,6 +75,10 @@ The bang follows the command, as in `:export! FILE.mid` or `:w! FILE`.
 It does not go at the end of the path. A chooser may supply its own overwrite
 confirmation.
 
+Each command keeps to its own kind of file, because a file is read back by
+its name: `:w` refuses a name ending `.mid` or `.midi`, and `:export` one
+ending `.modal`, each saying which command writes that kind.
+
 ## File-command summary
 
 | Command | Purpose |

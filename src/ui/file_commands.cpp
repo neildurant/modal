@@ -68,6 +68,39 @@ std::string named(const std::filesystem::path& file)
     return utf8Text(file.filename());
 }
 
+// A file's extension in lower case, as .mid for Song.MID.
+std::string lowerExtension(const std::filesystem::path& file)
+{
+    auto extension = utf8Text(file.extension());
+    std::ranges::transform(extension, extension.begin(), [](char c)
+                           { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
+    return extension;
+}
+
+bool namesMidi(const std::filesystem::path& file)
+{
+    const auto extension = lowerExtension(file);
+    return extension == ".mid" || extension == ".midi";
+}
+
+// Why a file's name is the wrong kind for what's being written to it, if it is: a song saved
+// as Song.mid would be found not to be a MIDI file when opened again (found in a code review,
+// November 2026).
+std::optional<CommandResult> wrongKind(const std::filesystem::path& file, bool song)
+{
+    if (song && namesMidi(file))
+    {
+        return CommandResult::error(named(file) +
+                                    " is a MIDI file's name: :export writes one, :w a song");
+    }
+    if (!song && lowerExtension(file) == ".modal")
+    {
+        return CommandResult::error(named(file) +
+                                    " is a song's name: :w saves one, :export a MIDI file");
+    }
+    return std::nullopt;
+}
+
 // Whether writing to a file would write over another one.
 bool overwrites(const std::filesystem::path& file, const std::optional<std::filesystem::path>& own)
 {
@@ -122,6 +155,10 @@ public:
     {
         if (const auto file = argument(call, ".modal"))
         {
+            if (auto wrong = wrongKind(*file, true))
+            {
+                return *wrong;
+            }
             if (!call.bang && overwrites(*file, document_.file()))
             {
                 return CommandResult::error(named(*file) + " exists: :w! " +
@@ -151,6 +188,10 @@ public:
     {
         if (const auto file = argument(call, ".mid"))
         {
+            if (auto wrong = wrongKind(*file, false))
+            {
+                return *wrong;
+            }
             if (!call.bang && overwrites(*file, std::nullopt))
             {
                 return CommandResult::error(named(*file) + " exists: :export! " +
@@ -229,6 +270,10 @@ private:
         {
             return CommandResult::error(std::move(*refusal));
         }
+        if (auto wrong = wrongKind(file, true)) // from a dialog too
+        {
+            return *wrong;
+        }
         if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
@@ -246,6 +291,10 @@ private:
         if (auto refusal = recording_.fileOperationRefusal())
         {
             return CommandResult::error(std::move(*refusal));
+        }
+        if (auto wrong = wrongKind(file, false))
+        {
+            return *wrong;
         }
         const auto result = core::exportSmfFile(document_.underlying(), file);
         if (!result.error.empty())
@@ -315,10 +364,7 @@ std::filesystem::path songFolder(const core::Document& document,
 
 OpenResult openFile(core::Document& document, const std::filesystem::path& file)
 {
-    auto extension = utf8Text(file.extension());
-    std::ranges::transform(extension, extension.begin(), [](char c)
-                           { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
-    if (extension == ".mid" || extension == ".midi")
+    if (namesMidi(file))
     {
         auto result = core::importSmfFile(file);
         if (!result.song)
