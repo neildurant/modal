@@ -70,8 +70,10 @@ read the result rather than assuming every requested target was reached.
 
 The track's Q setting applies quantise while it plays. Its grid can follow
 the editing grid or remain fixed; strength, swing and the kind of movement
-are track settings too. `, t q` toggles it. The inspector edits the parameters
-when the Quantise column is selected.
+are track settings too. `, t q` toggles it. In the Tracks view, Enter on the
+Quantise column opens these parameters in the inspector, edited as any
+inspector is (@sec-inspector-editing). Each change is heard at once while
+the song plays, so a strength or swing can be judged before it is kept.
 
 `, T q` bypasses playback quantise across tracks for comparison. The piano
 roll can mark the positions where notes will actually be heard, using

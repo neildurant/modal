@@ -45,7 +45,10 @@ Enter or `e` edits the selected cell. A fully highlighted value is replaced
 by typing; a cursor movement retains it for editing. Enter accepts,
 Escape cancels, and Tab commits and moves to the next editable column.
 Up and Down step numeric values. A field marked with a down arrow has a
-fixed-choice list; typing can help find the choice.
+fixed-choice list; typing can help find the choice. Each cell edited this
+way is its own undo step. The Quantise column is the exception: it opens
+several settings together in the inspector, as described in
+@sec-inspector-editing.
 
 Whole-row selections support batch changes. Assigning a value sets it on
 all selected tracks; stepping changes each relative to its own value. A

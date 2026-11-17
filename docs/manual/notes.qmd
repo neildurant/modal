@@ -127,14 +127,57 @@ The coarse unit normally follows the editing grid. `:set timingunit=1/16`
 fixes the inspector's unit at a sixteenth note; `:set timingunit=grid`
 restores grid-following. This is a display choice and does not move notes.
 
-`e` opens the inspector's field editor. Tab and Shift-Tab commit a field and
-move between fields; Up and Down step values. Enter accepts an edit, and
-Escape abandons the current field. The next visit remembers the last field,
-which is useful when making the same kind of adjustment to several notes.
-
 The note's release velocity, shown as Off Vel, is distinct from its attack
 velocity. Instruments vary in how they respond to it; it can be inspected
 and edited without changing the note's attack.
+
+## Editing in the inspector {#sec-inspector-editing}
+
+The inspector is also where a thing's details are changed. `e` opens it for
+editing: here the note under the cursor, and elsewhere an event in the event
+list, a section on the strip, a track's playback quantise and a controller
+ramp. Every inspector is edited the same way, so what follows applies to all
+of them.
+
+An open inspector is best thought of as a **draft**. Each change is made at
+once, so a note moved a few ticks can be seen in place and heard on the next
+pass of a loop, but the changes are held together until you decide. Keeping
+them makes the whole visit one undo step, however many fields changed; cancelling
+puts everything back as it was when the inspector opened. The panel takes a
+tint while it is being edited, and its values brighten, so a draft is never
+left open unnoticed. Values that cannot be edited stay dim.
+
+| In an open inspector | Meaning |
+| --- | --- |
+| Typing | Replace the current field's value |
+| Enter | Set the field and stay on it, to adjust it again |
+| Tab / Shift-Tab | Set the field and move to the next / previous one |
+| Up / Down | Step the field's value, or its choice |
+| Ctrl-Enter | Keep the draft, from any field |
+| Escape | Put back what was typed; then cancel the draft |
+
+Tab continues past the last field to two buttons at the panel's bottom
+right, **Keep** and **Cancel**, where Enter presses the one chosen. They
+appear only while editing. Ctrl-Enter is the quicker way to keep, from
+wherever the cursor is.
+
+Escape works in layers, undoing the most recent thing first. If a value has
+been typed but not yet set, Escape restores the field. With nothing typed,
+it cancels the draft, and every change since the inspector opened goes, with
+nothing left to redo. Pressing Escape twice is therefore a reliable way out.
+
+A field with a fixed set of choices is marked with a down arrow. Up and Down
+step through its choices without opening anything, which is often enough.
+Enter or Alt-Down opens its list to see them all; Enter there chooses one and
+closes the list.
+
+An inspector opens again on the field used last, which is useful when making
+the same kind of adjustment to several notes in turn.
+
+Editing a table's cell in place, as in the event list, Tracks and Ports, is a
+different and smaller action: Enter sets that one value and leaves, and each
+change is its own undo step. The inspector gathers several related values
+into one decision; a table cell is a single value.
 
 ## Chords and the event list
 
@@ -147,8 +190,9 @@ between chords. The `ic` object gives an operator the chord as a target.
 
 The **event list** (`ge`) is useful when the grid conceals a distinction,
 such as two events very close in time or a controller beside a note. Each
-event is a row and its fields are columns. Enter edits the current field;
-`e` opens the inspector. Numeric steps and relative entries such as `+10`
+event is a row and its fields are columns. Enter edits the current field in
+place; `e` opens the inspector on the whole event (@sec-inspector-editing).
+Numeric steps and relative entries such as `+10`
 allow an adjustment without retyping the full value.
 
 The conductor's dim rows provide landmarks among a track's events. Tempo

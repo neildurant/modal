@@ -48,7 +48,8 @@ song” means the arrangement, its strip, the piano roll or the event list;
 the Ports and other settings pages do not provide that section context.
 
 The last two controls are specific to a section focused on the strip:
-`e` edits that section's fields, and `+` / `-` change its length. They have
+`e` edits that section's fields in the inspector (@sec-inspector-editing),
+and `+` / `-` change its length. They have
 no default leader binding. `ga` opens the arrangement and `gs` focuses its
 strip, where those controls have their section-editing meaning.
 
