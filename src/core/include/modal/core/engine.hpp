@@ -109,6 +109,7 @@ struct EngineCommand
         Quit,
         ResetInputs,
         Audition,
+        Send,
     };
     Kind kind = Kind::Stop;
     std::uint64_t request = 0; // Play: its snapshot; ResetInputs: its acknowledgement
@@ -116,6 +117,7 @@ struct EngineCommand
     DestinationId destination{0};
     std::array<std::uint8_t, 3> note{};
     std::chrono::nanoseconds length{};
+    std::uint8_t size = 3; // Send: how many of note's bytes the message is
 };
 
 } // namespace detail
@@ -177,6 +179,10 @@ public:
     // but panic and quit do.
     [[nodiscard]] bool audition(DestinationId destination, std::uint8_t channel, std::uint8_t pitch,
                                 std::uint8_t velocity, std::chrono::nanoseconds length);
+
+    // Sends one short message now, of two or three bytes, such as a controller's value, as
+    // cancelling a ramp's draft puts back the value playing (decided 17 November 2026).
+    [[nodiscard]] bool send(DestinationId destination, std::span<const std::uint8_t> message);
 
     // Ends run() once the commands before it have been carried out.
     [[nodiscard]] bool quit();

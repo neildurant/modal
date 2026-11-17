@@ -94,6 +94,38 @@ TEST_CASE("an edit after undoing drops what could have been redone")
     CHECK(e.document.song().events(e.bass())[0].tick == 0);
 }
 
+TEST_CASE("cancelling a draft's merged edits takes its step back, leaving nothing to redo")
+{
+    Edited e;
+    e.addNote(0);
+    const auto draft = [&](Tick tick)
+    {
+        return e.document.edit(
+            "Draft", {},
+            [&](Song& song)
+            {
+                song.updateEvents(e.bass(), [&](EventList& events)
+                                  { events.insert({tick, Note{41, 90, 1}}); });
+            },
+            "draft 1");
+    };
+    REQUIRE(draft(5));
+    REQUIRE(draft(6));
+    CHECK(e.notes() == 3);
+    CHECK_FALSE(e.document.cancelMerging("draft 2")); // another draft's
+    CHECK(e.document.cancelMerging("draft 1"));
+    CHECK(e.notes() == 1);
+    CHECK_FALSE(e.document.canRedo());
+    CHECK(e.document.canUndo()); // the note before it stays
+    CHECK_FALSE(e.document.cancelMerging("draft 1"));
+
+    // Not once merging has ended, as confirming the draft ends it.
+    REQUIRE(draft(5));
+    e.document.breakMerge();
+    CHECK_FALSE(e.document.cancelMerging("draft 1"));
+    CHECK(e.notes() == 2);
+}
+
 TEST_CASE("an edit that changes nothing is no step")
 {
     Edited e;

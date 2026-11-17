@@ -4,9 +4,12 @@
 #include <modal/core/player.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <memory>
+#include <span>
 #include <utility>
+#include <variant>
 
 namespace modal::core
 {
@@ -160,6 +163,40 @@ bool Player::auditionNote(const Song& song, TrackId track, Tick tick, const Note
         *destination, static_cast<std::uint8_t>(found->channel - 1), *pitch,
         playbackVelocity(note.velocity, found->velocityOffset),
         std::clamp<std::chrono::nanoseconds>(heard, kMinAudition, kMaxAudition));
+}
+
+bool Player::sendValue(const Song& song, TrackId track, const EventData& data)
+{
+    const auto* found = song.track(track);
+    if (found == nullptr || !found->hasValidSettings(song.ppqn()))
+    {
+        return false;
+    }
+    const auto channel = static_cast<std::uint8_t>((found->channel - 1) & 0x0F);
+    std::array<std::uint8_t, 3> message{};
+    std::size_t size = 3;
+    if (const auto* change = std::get_if<ControlChange>(&data))
+    {
+        message = {static_cast<std::uint8_t>(0xB0 | channel), change->controller, change->value};
+    }
+    else if (const auto* bend = std::get_if<PitchBend>(&data))
+    {
+        const auto value = static_cast<unsigned>(bend->value - PitchBend::kMin);
+        message = {static_cast<std::uint8_t>(0xE0 | channel),
+                   static_cast<std::uint8_t>(value & 0x7F),
+                   static_cast<std::uint8_t>((value >> 7) & 0x7F)};
+    }
+    else if (const auto* pressure = std::get_if<ChannelPressure>(&data))
+    {
+        message = {static_cast<std::uint8_t>(0xD0 | channel), pressure->value, 0};
+        size = 2;
+    }
+    else
+    {
+        return false;
+    }
+    const auto destination = lookUp(found->port);
+    return destination && engine_.send(*destination, std::span{message.data(), size});
 }
 
 std::optional<Player::RecordPhase> Player::recordPhase() const

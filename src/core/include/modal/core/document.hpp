@@ -107,6 +107,11 @@ public:
     bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change,
               std::string_view mergeKey);
 
+    // Takes back the latest step, if it was made with this merge key and can still be merged
+    // into, as cancelling a ramp's draft does (decided 17 November 2026): the song goes back to
+    // before it, with nothing left to redo. Returns whether it did.
+    bool cancelMerging(std::string_view mergeKey);
+
     // Ends coalescing with the previous edit without changing the song or undo/redo history.
     // An explicit outer group remains one step, as a macro or recording pass requires.
     void breakMerge() noexcept;

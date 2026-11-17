@@ -145,6 +145,11 @@ public:
     static constexpr std::chrono::milliseconds kMaxAudition{1000};
     [[nodiscard]] bool auditionNote(const Song& song, TrackId track, Tick tick, const Note& note);
 
+    // Sends a track's controller, pitch bend or channel pressure value now, on its port and
+    // channel, as cancelling a ramp's draft puts back the value at the play position. False
+    // for another kind of event, or no port.
+    [[nodiscard]] bool sendValue(const Song& song, TrackId track, const EventData& data);
+
     // Space: stops if playing, and otherwise plays.
     [[nodiscard]] bool toggle();
 

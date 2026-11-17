@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <span>
 #include <utility>
 
 namespace modal::core
@@ -85,6 +86,19 @@ bool Engine::audition(DestinationId destination, std::uint8_t channel, std::uint
                     static_cast<std::uint8_t>(pitch & 0x7F),
                     static_cast<std::uint8_t>(std::clamp<int>(velocity, 1, 127))};
     command.length = length;
+    return woken(commands_.tryPush(command));
+}
+
+bool Engine::send(DestinationId destination, std::span<const std::uint8_t> message)
+{
+    if (message.size() < 2 || message.size() > 3)
+    {
+        return false;
+    }
+    Command command{Command::Kind::Send};
+    command.destination = destination;
+    std::ranges::copy(message, command.note.begin());
+    command.size = static_cast<std::uint8_t>(message.size());
     return woken(commands_.tryPush(command));
 }
 
@@ -290,6 +304,9 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
             command.destination,
             {static_cast<std::uint8_t>(0x80 | (command.note[0] & 0x0F)), command.note[1], 0},
             now + command.length};
+        return true;
+    case Command::Kind::Send:
+        sink_.send(command.destination, std::span{command.note.data(), command.size}, now);
         return true;
     case Command::Kind::Panic:
         endAudition(now);

@@ -111,6 +111,18 @@ bool Document::edit(std::string title, const EditPlace& place,
     return true;
 }
 
+bool Document::cancelMerging(std::string_view mergeKey)
+{
+    if (mergeKey.empty() || mergeKey != mergeKey_ || groupDepth_ > 0 || current_ == 0 ||
+        canRedo() || !restore(current_ - 1))
+    {
+        return false;
+    }
+    states_.pop_back();
+    mergeKey_.clear();
+    return true;
+}
+
 void Document::breakMerge() noexcept
 {
     mergeKey_.clear();

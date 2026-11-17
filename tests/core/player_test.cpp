@@ -580,6 +580,29 @@ TEST_CASE(
     CHECK_FALSE(p.player.auditionNote(song, id, 0, Note{60, 100, ppqn.quarter()}));
 }
 
+TEST_CASE("a track's controller, bend or pressure value is sent at once on its port and channel")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    auto song = fourNotes(ppqn, "b");
+    const auto id = song.tracks()[0]->id();
+    song.updateTrack(id, [](Track& track) { track.channel = 3; });
+    Playing p{song};
+    REQUIRE(p.player.sendValue(song, id, ControlChange{1, 90}));
+    REQUIRE(p.player.sendValue(song, id, PitchBend{0}));
+    REQUIRE(p.player.sendValue(song, id, PitchBend{PitchBend::kMax}));
+    REQUIRE(p.player.sendValue(song, id, ChannelPressure{40}));
+    p.engine.step();
+    REQUIRE(p.sink.sent.size() == 4);
+    CHECK(p.sink.sent[0].destination == DestinationId{2});
+    CHECK(p.sink.sent[0].bytes == std::vector<std::uint8_t>{0xB2, 1, 90});
+    CHECK(p.sink.sent[1].bytes == std::vector<std::uint8_t>{0xE2, 0, 64});
+    CHECK(p.sink.sent[2].bytes == std::vector<std::uint8_t>{0xE2, 127, 127});
+    CHECK(p.sink.sent[3].bytes == std::vector<std::uint8_t>{0xD2, 40});
+    CHECK_FALSE(p.player.sendValue(song, id, ProgramChange{5}));
+    song.updateTrack(id, [](Track& track) { track.port = "gone"; });
+    CHECK_FALSE(p.player.sendValue(song, id, ControlChange{1, 90}));
+}
+
 TEST_CASE("a finished play cannot cancel its replacement before the engine starts it")
 {
     const auto ppqn = MODAL_ANY_PPQN();

@@ -15,6 +15,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -952,6 +953,23 @@ TEST_CASE("input batching keeps a complete SysEx together at the message budget 
     REQUIRE(last.size() == 1);
     CHECK(last[0].first);
     CHECK(last[0].chunk.bytes[0] == 0x90);
+}
+
+TEST_CASE("a short message is sent at once, outside playback")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    const std::array<std::uint8_t, 3> change{0xB1, 7, 100};
+    const std::array<std::uint8_t, 2> pressure{0xD1, 40};
+    REQUIRE(engine.send(DestinationId{4}, change));
+    REQUIRE(engine.send(DestinationId{4}, pressure));
+    CHECK_FALSE(engine.send(DestinationId{4}, std::span{change.data(), 1}));
+    engine.step();
+    REQUIRE(sink.sent.size() == 2);
+    CHECK(sink.sent[0].destination == DestinationId{4});
+    CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0xB1, 7, 100});
+    CHECK(sink.sent[1].bytes == std::vector<std::uint8_t>{0xD1, 40});
 }
 
 TEST_CASE("an auditioned note sounds now and ends after its length, or as the next starts")
