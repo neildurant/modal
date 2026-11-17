@@ -5343,7 +5343,13 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
 void PianoRollView::addNewNote(Region& inspector, const core::Track& track) const
 {
     // At the inspector's right, stacked: the note o would add where the cursor is, its length
-    // and velocity, dim as e doesn't edit them; left out where the fields need the room.
+    // and velocity, dim as e doesn't edit them; left out where the fields need the room, while
+    // editing, when Keep and Cancel take its corner, and in the lane, where no note is added
+    // (decided 17 November 2026, after use).
+    if (editor_.panel() || inLane_)
+    {
+        return;
+    }
     const Style label{Role::Dim, Role::Panel, kPlain};
     const std::array<std::pair<std::u32string, std::u32string>, 2> rows{{
         {U"Length:", decodeUtf8(track.noteLength ? core::toString(*track.noteLength) : "grid")},

@@ -264,15 +264,12 @@ TEST_CASE("an inspector's values are dim but while editing, and a panel has Keep
         return std::nullopt;
     };
 
-    // Not editing: everything dim, the buttons too, and no tint.
+    // Not editing: everything dim, no buttons, and no tint.
     auto region = inspectorRegion(inspection, bounds, 1000, kCell, 9, nullptr, nullptr, true);
     CHECK(styleOf(region, U"12")->foreground == Role::Dim);
     CHECK(styleOf(region, U"big")->foreground == Role::Dim);
-    CHECK(styleOf(region, U"[ Keep ]")->foreground == Role::Dim);
-    CHECK(styleOf(region, U"[ Cancel ]")->foreground == Role::Dim);
+    CHECK_FALSE(styleOf(region, U"[ Keep ]"));
     CHECK(region.under.empty());
-    // Not an edited panel: no buttons.
-    CHECK_FALSE(styleOf(inspectorRegion(inspection, bounds, 1000, kCell, 9), U"[ Keep ]"));
 
     // Editing: the field being edited lit, read-only values still dim, the buttons bright, and
     // the panel tinted.
@@ -283,6 +280,12 @@ TEST_CASE("an inspector's values are dim but while editing, and a panel has Keep
     CHECK(styleOf(region, U"12")->background == Role::Selection);
     CHECK(styleOf(region, U"big")->foreground == Role::Dim);
     CHECK(styleOf(region, U"[ Keep ]")->foreground == Role::Text);
+    CHECK(styleOf(region, U"[ Cancel ]")->foreground == Role::Text);
+    // Editing a table's cell isn't editing a panel: no buttons.
+    InspectorEditor cell;
+    REQUIRE(cell.open(inspection));
+    CHECK_FALSE(styleOf(inspectorRegion(inspection, bounds, 1000, kCell, 9, &cell, nullptr, true),
+                        U"[ Keep ]"));
     REQUIRE_FALSE(region.under.empty());
     CHECK(region.under.front().role == Role::Selection);
     editor.abandon();

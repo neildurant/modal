@@ -94,7 +94,7 @@ inline constexpr int kTrackButtonColumns = 3;
 // and those after it left out. Every value is dim but while editing, when those that can be
 // edited are bright (decided 17 November 2026, after use, the same in every view). An
 // inspector edited as a panel (see InspectorEditor) has its Keep and Cancel buttons at its
-// bottom right, the fields kept clear of them.
+// bottom right while it's being edited, the fields always kept clear of them.
 // Notes have the kind above pitch and velocities on the left, and to the right a row each for
 // Start, Length and Ends, across their coarse, fine and exact values. With an editor, its field
 // is boxed.

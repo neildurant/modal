@@ -2341,3 +2341,25 @@ TEST_CASE("adding a track in the piano roll shows the new track there")
     CHECK(song.tracks()[1]->name == "Track 1");
     CHECK(r.view().cursor().track == song.tracks()[1]->id());
 }
+
+TEST_CASE("New note shows where a note can be added, giving its corner to Keep and Cancel while "
+          "editing")
+{
+    Rolling r;
+    CHECK(contains(r.inspectorRows(), U"New note"));
+    CHECK_FALSE(contains(r.inspectorRows(), U"[ Keep ]"));
+    r.type(U"8je"); // the E1 at the start
+    REQUIRE(r.view().inspectorEditor().panel());
+    CHECK_FALSE(contains(r.inspectorRows(), U"New note"));
+    CHECK(contains(r.inspectorRows(), U"[ Keep ]"));
+    CHECK(contains(r.inspectorRows(), U"[ Cancel ]"));
+    r.press(Key::of(NamedKey::Escape));
+    CHECK(contains(r.inspectorRows(), U"New note"));
+    CHECK_FALSE(contains(r.inspectorRows(), U"[ Keep ]"));
+    // Not in the lane, where no note is added.
+    r.type(U"gl");
+    REQUIRE(r.view().inLane());
+    CHECK_FALSE(contains(r.inspectorRows(), U"New note"));
+    r.press(Key::of(NamedKey::Escape));
+    CHECK(contains(r.inspectorRows(), U"New note"));
+}

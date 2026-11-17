@@ -281,11 +281,15 @@ int panelButtonsY(Rect bounds, CellSize cell)
 namespace
 {
 
-// A panel's Keep and Cancel buttons, at its bottom right: dim until editing, then bright, the
-// one Tab is on lit as the cursor is.
+// A panel's Keep and Cancel buttons, at its bottom right while editing, the one Tab is on lit as
+// the cursor is.
 void addPanelButtons(Region& region, const InspectorEditor* editor, CellSize cell)
 {
+    // Only while editing (decided 17 November 2026, after use): browsing, the corner is the
+    // view's own, as the piano roll's New note is.
     const bool editing = editor != nullptr && editor->panel();
+    if (!editing)
+        return;
     const int margin = BarSpacing::forCell(cell).margin;
     int x = region.bounds.width - margin - kPanelButtonColumns * cell.width;
     const int y = panelButtonsY(region.bounds, cell);
