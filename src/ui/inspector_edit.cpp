@@ -110,6 +110,55 @@ void InspectorEditor::move(const Inspection& inspection, int by)
     show(inspection, editable[static_cast<std::size_t>(((at + by) % count + count) % count)]);
 }
 
+bool InspectorEditor::setAndStay(ViewHost& host, const Hooks& hooks)
+{
+    if (!heading_)
+    {
+        return false;
+    }
+    std::optional<std::string> why;
+    if (list_)
+    {
+        const auto chosen = list_->chosen();
+        if (!chosen)
+        {
+            host.refuse(list_->nothing(), MessageKind::Warning);
+            return true;
+        }
+        if (chosen != current_)
+        {
+            why = hooks.set(*heading_, choices_[*chosen]);
+        }
+    }
+    else if (!fresh_)
+    {
+        why = hooks.set(*heading_, encodeUtf8(line_.text()));
+    }
+    if (why)
+    {
+        host.refuse(std::move(*why), MessageKind::Warning);
+        return true;
+    }
+    revert(hooks.inspection());
+    return true;
+}
+
+void InspectorEditor::revert(const Inspection& inspection)
+{
+    if (!heading_)
+    {
+        return;
+    }
+    if (const auto index = indexOf(inspection, *heading_))
+    {
+        show(inspection, *index);
+    }
+    else
+    {
+        move(inspection, 0);
+    }
+}
+
 void InspectorEditor::type(char32_t character)
 {
     if (list_)

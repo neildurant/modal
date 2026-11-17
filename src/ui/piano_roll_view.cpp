@@ -1093,18 +1093,36 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
     }
     if (rampDraft_)
     {
-        // Escape cancels the whole draft, and Enter, leaving the field, keeps it.
-        if (command == "command-line-cancel")
-        {
-            endRampDraft(false);
-            return true;
-        }
+        // Enter sets what's typed or chosen and stays on the field, and with nothing new
+        // keeps the ramp; Escape puts back what's typed, and with nothing typed cancels the
+        // whole draft (decided 17 November 2026, after use).
         InspectorEditor::Hooks rampHooks{
             .inspection = [this] { return inspection(); },
             .set = [this](const std::string& heading, const std::string& text)
             { return setRampField(heading, text); },
             .step = [this](const std::string& heading, int steps)
             { return stepRampField(heading, steps); }};
+        if (command == "command-line-cancel")
+        {
+            if (editor_.changed())
+            {
+                editor_.revert(inspection());
+            }
+            else
+            {
+                endRampDraft(false);
+            }
+            return true;
+        }
+        if (command == "command-line-run")
+        {
+            if (editor_.changed())
+            {
+                return editor_.setAndStay(host_, rampHooks);
+            }
+            endRampDraft(true);
+            return true;
+        }
         const auto result = editor_.run(command, host_, rampHooks);
         if (!editor_.active())
         {
@@ -5328,15 +5346,19 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
     std::ranges::move(cursorPlacePairs(song, meter(), time_, trackId()), std::back_inserter(right));
     frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
 
-    auto inspector =
-        inspectorRegion(inspection(), layout_.top[1], width_, cell_,
-                        static_cast<int>(positionText(meter(), lastTick()).size()), &editor_);
+    Rect listAt{};
+    auto inspector = inspectorRegion(inspection(), layout_.top[1], width_, cell_,
+                                     static_cast<int>(positionText(meter(), lastTick()).size()),
+                                     &editor_, &listAt);
     if (trackId())
     {
         addChord(inspector);
         addNewNote(inspector, *song.tracks()[track_]);
     }
     frame.push_back(std::move(inspector));
+    // A field's list of choices, such as a ramp's shapes, over the view below.
+    addChoiceList(frame, &editor_, listAt, {0, 0, width_, layout_.main.y + layout_.main.height},
+                  cell_);
 }
 
 void PianoRollView::addNewNote(Region& inspector, const core::Track& track) const
@@ -5614,11 +5636,14 @@ Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
     const auto& m = meter();
     Inspection result;
     result.kind = "Ramp";
+    // Bright while its draft is open, dim otherwise, as the Tracks view's quantise fields
+    // are while it's off (decided 17 November 2026, after use).
+    const bool open = rampDraft_.has_value();
     const auto add = [&](std::string heading, std::string value, std::string editText = {})
     {
         result.fields.push_back({.heading = std::move(heading),
                                  .value = std::move(value),
-                                 .editable = true,
+                                 .editable = open,
                                  .editText = std::move(editText)});
     };
     add("Start", positionText(m, ramp.start));

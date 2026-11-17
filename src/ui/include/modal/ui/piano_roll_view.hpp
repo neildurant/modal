@@ -97,8 +97,10 @@ public:
     std::optional<std::string> typingHint() const override
     {
         if (rampDraft_)
-            return "Enter keeps the ramp, Escape cancels it; Tab goes on, Up and Down step it, "
-                   "Space plays or stops";
+            return "Enter sets, again keeps the ramp; Escape cancels; Tab next; Space plays";
+        // On a ramp in the lane, how to change it (asked for 17 November 2026, after use).
+        if (!typing() && !host_.selection() && currentRamp())
+            return "A ramp: e or Enter changes it, , c R makes it events";
         if (laneChooser_)
             return "Enter chooses, Escape leaves it; a number or a name narrows the list";
         if (!typing())
@@ -202,6 +204,8 @@ public:
     // controller the cursor is in, from its start to its end, by its index in the track's
     // ramps; and whether a ramp's draft is open in the inspector.
     std::optional<std::size_t> currentRamp() const;
+    // What the inspector shows: the current note, the lane's event or ramp, or an open draft.
+    Inspection inspection() const;
     bool draftingRamp() const { return rampDraft_.has_value(); }
     // Cancels an open draft, as closing the window does first.
     void cancelRampDraft() { endRampDraft(false); }
@@ -244,7 +248,6 @@ private:
     std::uint8_t middlePitch() const;
     // Where ( and ) go: the start of each chord of the track's notes.
     std::vector<core::Tick> chordStarts() const;
-    Inspection inspection() const;
     // The ruler above the notes: the sections, labels and play-from marker, then the bars.
     void addRuler(Region& ruler, const TimeScale& scale, const Page& page) const;
     // What drawing a lane's contents shares: the lane's region and size, the page across it,

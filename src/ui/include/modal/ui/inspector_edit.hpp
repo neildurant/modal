@@ -63,6 +63,15 @@ public:
 
     void type(char32_t character);
 
+    // Whether anything's been typed, or another choice highlighted, since the field opened or
+    // was last set.
+    bool changed() const { return list_ ? list_->chosen() != current_ : !fresh_; }
+    // Sets what's typed or chosen and stays on the field, showing it as set, as Enter does in a
+    // ramp's draft (decided 17 November 2026, after use); saying why not if it can't be.
+    bool setAndStay(ViewHost& host, const Hooks& hooks);
+    // Puts the field back as it was when it opened or was last set, what was typed going.
+    void revert(const Inspection& inspection);
+
     // Runs a command-line command on the field, as a view's runTyping does.
     std::optional<bool> run(std::string_view command, ViewHost& host, const Hooks& hooks);
 
