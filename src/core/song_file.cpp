@@ -806,6 +806,15 @@ bool Reader::readTrack(std::span<const Token> tokens)
             }
             track.lane = *lane;
         }
+        else if (value && name == "laneheight")
+        {
+            const auto height = parseLaneHeight(*value);
+            if (!height)
+            {
+                return fail("laneheight should be rows, quarter or half");
+            }
+            track.laneHeight = *height;
+        }
         else if (value && name == "vel")
         {
             const auto velocity = parseInteger(*value, 1, 127);
@@ -1710,6 +1719,10 @@ std::string writeSong(const Song& song)
         if (track->lane != Lane{})
         {
             text += " lane=" + toString(track->lane);
+        }
+        if (track->laneHeight != LaneHeight::Rows)
+        {
+            text += " laneheight=" + std::string{toString(track->laneHeight)};
         }
         line(0, text);
     }

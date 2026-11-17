@@ -45,7 +45,7 @@ public:
 
     static constexpr int kKeyColumns = 5; // the keyboard's note names, and a space
     static constexpr int kRulerRows = 3;  // the sections and labels, marks, and bar numbers, above
-    static constexpr int kLaneRows = 3;   // the velocity lane
+    static constexpr int kLaneRows = 3;   // the lane, at its usual height
 
     // The document and the host outlive the view.
     PianoRollView(core::Document& document, ViewHost& host);
@@ -140,6 +140,9 @@ public:
     core::NoteFraction grid() const; // the track's
     void addNewNote(Region& inspector, const core::Track& track) const;
     int noteRows() const; // the pitch rows fully in view
+    // The track's lane height, , c h, and the lane's height in pixels from it.
+    core::LaneHeight laneSize() const;
+    int laneHeight() const;
 
     // The note the cursor is on, at its pitch from its start to before its end, as an index
     // into the track's events; or none. Of two, the one starting later.

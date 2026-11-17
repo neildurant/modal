@@ -104,6 +104,7 @@ after counts multiply.
 | `e`, Enter | Inspector editor, or current field as appropriate |
 | `, c c`, `[c`, `]c` | Choose lane, previous/next controller |
 | `, c v` | Pedal regions / values |
+| `, c h` | Lane height: three rows, a quarter, half |
 | Number then Enter in a lane | Set or insert a value |
 
 ## Tracks, sections and transport
@@ -111,6 +112,8 @@ after counts multiply.
 | Keys | Purpose |
 | --- | --- |
 | `, t a`, `, t i`, `, t d`, `, t r` | Add, insert, delete, rename tracks |
+| `, t y`, `, t p`, `, t P`, `, t D` | Yank, put after/before, duplicate whole tracks |
+| `p`, `P` holding whole tracks | Put them as new tracks after/before |
 | `, t o`, Alt-Up / Alt-Down | Reorder tracks, move immediately |
 | `M`, `S`, `A` | Mute, solo, arm the current track |
 | `, t c`, `, t q`, `, t f` | Chase notes, playback quantise, freeze |
@@ -120,14 +123,17 @@ after counts multiply.
 | Space, Shift-Space | Play/stop, stop and return |
 | `m` then Space, Ctrl-Space | Set play-from marker, set it and play |
 | `R`, `, r m`, `, r t` | Record, replace/overdub, track Thru |
+| `, r A` | Disarm every armed track |
+| `, l l`, `, l d`, `, l s` | Add, delete a label; section from a label |
+| `, l m`, `, l x` | List marks, delete marks by name |
 | `, m m`, `, m c`, `, m s` | Click mode, lead-in mode, Metronome page |
 | Ctrl-. | Panic |
 
 The section strip's single keys differ from the track commands: `i` and
 `a` insert sections, `c` renames, `J` joins, and `+`/`-` change length.
 Down (or `j`) moves back down to the tracks. Section reordering uses
-`Alt-h` / `Alt-l`, with no default Alt-arrow binding; @sec-customisation
-shows how to add one. The text chapters explain these contextual meanings.
+`Alt-h` / `Alt-l`, or Alt-Left / Alt-Right. The text chapters explain these
+contextual meanings.
 
 ## Search and memory
 

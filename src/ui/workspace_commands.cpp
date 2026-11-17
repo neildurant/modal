@@ -891,7 +891,7 @@ std::span<const CommandInfo> Workspace::commands()
             if (info.name == "lane-go")
                 info.where = onlyIn({PianoRoll});
             else if (info.name == "lane-choose" || info.name == "lane" ||
-                     info.name == "lane-values-toggle" ||
+                     info.name == "lane-values-toggle" || info.name == "lane-height" ||
                      info.name.starts_with("lane-controller-") ||
                      info.name.starts_with("cursor-nudge-"))
                 info.where = onlyIn({PianoRoll, Lane});

@@ -61,6 +61,32 @@ void Lane::setValue(EventData& data, int value) const
         note->velocity = static_cast<std::uint8_t>(std::clamp(value, 1, 127));
 }
 
+std::string_view toString(LaneHeight height)
+{
+    switch (height)
+    {
+    case LaneHeight::Quarter:
+        return "quarter";
+    case LaneHeight::Half:
+        return "half";
+    case LaneHeight::Rows:
+        break;
+    }
+    return "rows";
+}
+
+std::optional<LaneHeight> parseLaneHeight(std::string_view text)
+{
+    for (const auto height : {LaneHeight::Rows, LaneHeight::Quarter, LaneHeight::Half})
+    {
+        if (text == toString(height))
+        {
+            return height;
+        }
+    }
+    return std::nullopt;
+}
+
 std::string toString(const Lane& lane)
 {
     switch (lane.kind)

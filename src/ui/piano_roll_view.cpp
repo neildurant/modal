@@ -126,6 +126,9 @@ constexpr std::array kCommands{
     CommandInfo{.name = "lane-choose",
                 .description = "Choose what the lane shows: velocity, a controller, pitch bend "
                                "or aftertouch"},
+    CommandInfo{.name = "lane-height",
+                .description = "Make the lane taller for precise work: its three rows, a "
+                               "quarter of the view, half, and back"},
     CommandInfo{.name = "lane-values-toggle",
                 .description = "Show a pedal's values in the lane, or its regions again"},
     CommandInfo{.name = "lane-controller-next",
@@ -1406,8 +1409,29 @@ PianoRollView::Page PianoRollView::page() const
 
 int PianoRollView::noteRows() const
 {
-    return std::max((layout_.main.height - (kRulerRows + kLaneRows) * cell_.height) / cell_.height,
+    return std::max((layout_.main.height - kRulerRows * cell_.height - laneHeight()) / cell_.height,
                     1);
+}
+
+core::LaneHeight PianoRollView::laneSize() const
+{
+    const auto tracks = document_.song().tracks();
+    return tracks.empty() ? core::LaneHeight::Rows
+                          : tracks[std::min(track_, tracks.size() - 1)]->laneHeight;
+}
+
+int PianoRollView::laneHeight() const
+{
+    // Three rows, or a quarter or half of what's below the ruler, always leaving a row of notes
+    // (decided 17 November 2026). In a small window a quarter is still twice the three rows,
+    // and half three times, so that each step makes it taller.
+    const int h = cell_.height;
+    const int below = std::max(layout_.main.height - kRulerRows * h, 0);
+    const auto size = laneSize();
+    const int rows = size == core::LaneHeight::Half      ? std::max(below / h / 2, 3 * kLaneRows)
+                     : size == core::LaneHeight::Quarter ? std::max(below / h / 4, 2 * kLaneRows)
+                                                         : kLaneRows;
+    return std::clamp(rows * h, 0, std::max(below - h, 0));
 }
 
 void PianoRollView::follow()
@@ -3090,6 +3114,26 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
     {
         return chooseLane();
     }
+    if (command == "lane-height")
+    {
+        if (document_.song().tracks().empty())
+        {
+            return false;
+        }
+        const auto size = laneSize();
+        const auto next = size == core::LaneHeight::Rows      ? core::LaneHeight::Quarter
+                          : size == core::LaneHeight::Quarter ? core::LaneHeight::Half
+                                                              : core::LaneHeight::Rows;
+        const std::string said = next == core::LaneHeight::Rows      ? "three rows"
+                                 : next == core::LaneHeight::Quarter ? "a quarter of the view"
+                                                                     : "half the view";
+        // Stepping again before anything else undoes as one.
+        changeTrack("Lane height for " + trackName(), "lane-height",
+                    [&](core::Track& track) { track.laneHeight = next; });
+        follow();
+        host_.setMessage("The lane is " + said, MessageKind::Information);
+        return true;
+    }
     if (command == "lane-values-toggle")
     {
         if (!isPedalLane())
@@ -4519,7 +4563,7 @@ void PianoRollView::addRegions(Frame& frame) const
     const int h = cell_.height;
     const int keyWidth = kKeyColumns * cell_.width;
     const int rulerHeight = kRulerRows * h;
-    const int laneHeight = kLaneRows * h;
+    const int laneHeight = this->laneHeight();
     const int notesTop = main.y + rulerHeight;
     const int notesHeight = std::max(main.height - rulerHeight - laneHeight, 0);
     const int width = std::max(main.width - keyWidth, 0);

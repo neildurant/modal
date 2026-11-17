@@ -17,6 +17,12 @@ or number narrows the list. `:lane cc74`, `:lane bend`, `:lane pressure`
 and `:lane velocity` choose directly. `[c` and `]c` move between controllers
 the track already contains.
 
+Three rows are enough to see a shape, but not always to set values
+precisely. `, c h`, remembered as “height”, makes the lane taller: a quarter
+of the view, then half, then back to three rows. Each track keeps its own
+height in the song, so a part with detailed controller work opens with the
+room it needs.
+
 Choosing what the lane displays and moving the cursor into it are separate
 actions. `gl`, remembered as “go to lane”, puts the focus there. Escape returns
 to the notes. The lit lane name and tinted background make the current focus

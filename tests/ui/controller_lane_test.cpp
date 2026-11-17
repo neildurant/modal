@@ -922,3 +922,25 @@ TEST_CASE("p and P put whole tracks as new tracks in the piano roll and arrangem
     l.type(U"p");
     CHECK(l.document.song().tracks().size() == 4);
 }
+
+TEST_CASE("the leader keys c h make the lane taller, a quarter and then half the view, and back")
+{
+    Lanes l;
+    const auto rows = l.view().noteRows();
+    l.type(U",ch");
+    CHECK(l.track().laneHeight == core::LaneHeight::Quarter);
+    CHECK(l.ws.message() == "The lane is a quarter of the view");
+    const auto quarter = l.view().noteRows();
+    CHECK(quarter < rows);
+    l.type(U",ch");
+    CHECK(l.track().laneHeight == core::LaneHeight::Half);
+    CHECK(l.view().noteRows() < quarter);
+    l.type(U",ch");
+    CHECK(l.track().laneHeight == core::LaneHeight::Rows);
+    CHECK(l.view().noteRows() == rows);
+    CHECK(l.ws.message() == "The lane is three rows");
+    // Stepping undoes as one.
+    l.type(U",ch,ch");
+    l.type(U"u");
+    CHECK(l.track().laneHeight == core::LaneHeight::Rows);
+}

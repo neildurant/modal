@@ -137,6 +137,18 @@ struct Lane
     friend bool operator==(const Lane&, const Lane&) = default;
 };
 
+// How tall a track's lane is in the piano roll (decided 17 November 2026): its usual three
+// rows, or a quarter or a half of the notes' and lane's height, for precise work; , c h steps
+// through them. A song file writes them as rows, quarter and half.
+enum class LaneHeight : std::uint8_t
+{
+    Rows,
+    Quarter,
+    Half,
+};
+std::string_view toString(LaneHeight height);
+std::optional<LaneHeight> parseLaneHeight(std::string_view text);
+
 // A lane as a song file and the prompt write it, velocity, cc74, bend or pressure; and read
 // back, taking vel, a controller's number alone, pitchbend and aftertouch too, in any case.
 std::string toString(const Lane& lane);
@@ -189,8 +201,9 @@ public:
     NoteFraction grid = kDefaultGrid;
     std::optional<NoteFraction> noteLength;
     std::uint8_t noteVelocity = kDefaultVelocity;
-    // What its lane in the piano roll shows, kept with it as its grid is.
+    // What its lane in the piano roll shows, kept with it as its grid is, and how tall.
     Lane lane;
+    LaneHeight laneHeight = LaneHeight::Rows;
 
     NoteFraction defaultLength() const { return noteLength.value_or(grid); }
 

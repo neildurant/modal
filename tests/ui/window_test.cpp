@@ -1068,6 +1068,11 @@ TEST_CASE("a sample of controller lanes", "[.sample]")
     CHECK(window->saveFrame(base + "-between.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-between-light.bmp"));
+    // Half the view, for precise work.
+    type(U",ch,ch");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-cc-half.bmp"));
+    type(U",ch");
     type(U"]c");
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-bend.bmp"));
@@ -1152,6 +1157,11 @@ TEST_CASE("a sample of the sustain lane", "[.sample]")
     CHECK(window->saveFrame(base + "-sustain.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-sustain-light.bmp"));
+    // A quarter of the view.
+    type(U",ch");
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-sustain-quarter.bmp"));
+    type(U",ch,ch");
     // The tint too, and the values.
     view.setSustainShown(true, true);
     type(U",cv");
