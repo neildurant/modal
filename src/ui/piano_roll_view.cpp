@@ -5621,12 +5621,12 @@ Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
     result.kind = "Ramp";
     // Dim but while its draft is open, as every inspector's values are (decided 17 November
     // 2026, after use), which the drawing sees to.
-    const bool open = true;
-    const auto add = [&](std::string heading, std::string value, std::string editText = {})
+    const auto add =
+        [&](std::string heading, std::string value, std::string editText = {}, bool editable = true)
     {
         result.fields.push_back({.heading = std::move(heading),
                                  .value = std::move(value),
-                                 .editable = open,
+                                 .editable = editable,
                                  .editText = std::move(editText)});
     };
     add("Start", positionText(m, ramp.start));
@@ -5639,10 +5639,16 @@ Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
     {
         shape.choices.emplace_back(name);
     }
+    // The curve's amount always in its place, so the fields after it don't move as the shape
+    // changes (decided 17 November 2026, after use); a dash, and passed over, for another shape.
     if (ramp.shape == core::ControllerRamp::Shape::Curve)
     {
         add("Amount", (ramp.amount > 0 ? "+" : "") + std::to_string(ramp.amount),
             std::to_string(ramp.amount));
+    }
+    else
+    {
+        add("Amount", "-", {}, false);
     }
     add("Density", std::to_string(ramp.density) + " a quarter", std::to_string(ramp.density));
     result.fields.push_back({"Controller", laneTitle(ramp.lane)});

@@ -368,3 +368,50 @@ TEST_CASE("Space plays and stops while a ramp's draft is open, and the draft sta
     CHECK_FALSE(r.view().draftingRamp());
     CHECK(r.ramps().empty());
 }
+
+TEST_CASE("a ramp's fields keep their places as its shape changes and as each is edited")
+{
+    Ramps r;
+    // Where each heading is across the inspector.
+    const auto places = [&]
+    {
+        std::vector<int> xs;
+        for (const auto& region : r.ws.frame())
+        {
+            for (const auto& run : region.text)
+            {
+                for (const auto heading : {U"Start", U"End", U"From", U"To", U"Shape", U"Amount",
+                                           U"Density", U"Controller"})
+                {
+                    if (run.text == heading)
+                    {
+                        xs.push_back(run.x);
+                    }
+                }
+            }
+        }
+        return xs;
+    };
+    r.type(U",cr");
+    const auto first = places();
+    REQUIRE(first.size() == 8);
+    r.ws.handle(Key::of(NamedKey::Down), 0); // From, a value down
+    r.goTo("Shape");
+    CHECK(places() == first);
+    r.ws.handle(Key::of(NamedKey::Down), 0); // Curve, its amount editable
+    CHECK(r.ramps()[0].shape == core::ControllerRamp::Shape::Curve);
+    CHECK(places() == first);
+    r.type(U"\t");
+    CHECK(r.view().inspectorEditor().heading() == "Amount");
+    r.type(U"\t");
+    CHECK(r.view().inspectorEditor().heading() == "Density");
+    CHECK(places() == first);
+    r.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    r.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    r.ws.handle(Key::of(NamedKey::Down), 0); // S-curve: Amount is passed over
+    r.type(U"\t");
+    CHECK(r.view().inspectorEditor().heading() == "Density");
+    CHECK(places() == first);
+    r.keep();
+    CHECK(places() == first);
+}

@@ -346,7 +346,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     const auto x = [&](int column) { return margin + column * cell.width; };
     const auto widthOf = [&](std::string_view name)
     {
-        constexpr std::array<std::pair<std::string_view, int>, 16> kWidths{{
+        constexpr std::array<std::pair<std::string_view, int>, 21> kWidths{{
             {"Bar", 10},
             {"Pitch", 9},
             {"Velocity", 8},
@@ -363,8 +363,15 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
             {"Meter", 6},
             {"Bars", 10}, // as wide as Bar, so what comes after is in the same place
             {"Kind", 13},
+            // A ramp's, each as wide as its widest value, so none moves another as it
+            // changes or is edited (decided 17 November 2026, after use).
+            {"From", 6},
+            {"To", 6},
+            {"Shape", 13}, // Equal power, and the list's arrow
+            {"Amount", 6},
+            {"Density", 12},
         }};
-        if (name == "Position" || name == "Ends")
+        if (name == "Position" || name == "Ends" || name == "Start" || name == "End")
         {
             return std::max(positionWidth, 8);
         }
