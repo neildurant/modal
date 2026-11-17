@@ -448,6 +448,17 @@ std::optional<std::string> TracksView::edit(TrackField field, std::string_view t
     return {};
 }
 
+void TracksView::cancelEditing()
+{
+    if (editor_.panel())
+    {
+        editor_.abandon();
+        host_.stopTyping();
+    }
+    quantizeEditing_ = false;
+    refresh();
+}
+
 std::optional<bool> TracksView::runTyping(std::string_view command)
 {
     if (portChoice_)
@@ -465,6 +476,7 @@ std::optional<bool> TracksView::runTyping(std::string_view command)
                             { return edit(fieldFor(heading), text); },
                             .step = [this](const std::string& heading, int steps)
                             { return edit(fieldFor(heading), {}, steps); },
+                            .finished = [this](bool) { quantizeEditing_ = false; },
                         });
         quantizeEditing_ = editor_.active();
         return result;
@@ -499,11 +511,16 @@ std::optional<std::string> TracksView::typingHint() const
     }
     if (editor_.list() != nullptr)
     {
-        return "Up and Down choose, Enter or Tab takes it, Escape leaves it";
+        return editor_.panel() ? "Up and Down choose, Enter takes it, Escape closes it"
+                               : "Up and Down choose, Enter or Tab takes it, Escape leaves it";
     }
     if (quantizeEditing_)
     {
         const auto& heading = editor_.heading();
+        if (editor_.onButton())
+            return std::string{kPanelHint};
+        if (heading == "Moves")
+            return "Up and Down step it; Enter opens its list";
         if (heading == "Grid")
             return "A note length, such as 1/4, 1/8, 1/16 or 1/8t for a triplet, or grid for the "
                    "track's own; Up and Down go coarser and finer, through triplets too";
@@ -539,7 +556,7 @@ bool TracksView::openField()
 {
     if (columns()[column_].field == TrackField::QuantizeSummary)
     {
-        quantizeEditing_ = editor_.open(quantizeFields());
+        quantizeEditing_ = editor_.openPanel(quantizeFields(), document_, place());
         return quantizeEditing_;
     }
     if (columns()[column_].field != TrackField::Port &&
@@ -1084,7 +1101,8 @@ void TracksView::addRegions(Frame& frame) const
                                    cursorMeter(), layout_.top[0], width_, cell_));
     Rect fieldAt{};
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9,
-                                    quantizeEditing_ ? &editor_ : nullptr, &fieldAt));
+                                    quantizeEditing_ ? &editor_ : nullptr, &fieldAt,
+                                    this->columns()[column_].field == TrackField::QuantizeSummary));
     if (quantizeEditing_)
         addChoiceList(frame, &editor_, fieldAt,
                       {0, 0, width_, layout_.main.y + layout_.main.height}, cell_);

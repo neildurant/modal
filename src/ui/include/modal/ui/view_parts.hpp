@@ -91,7 +91,10 @@ inline constexpr int kTrackButtonColumns = 3;
 // The inspector, on a panel of its own: the kind of thing, then headings above their values.
 // Each column is as wide as its longest value can be, so the columns stay put as the cursor
 // moves, a position or end as wide as positionWidth; a value that doesn't fit is cut short,
-// and those after it left out. Values e can edit are bright, the others dim.
+// and those after it left out. Every value is dim but while editing, when those that can be
+// edited are bright (decided 17 November 2026, after use, the same in every view). An
+// inspector edited as a panel (see InspectorEditor) has its Keep and Cancel buttons at its
+// bottom right, the fields kept clear of them.
 // Notes have the kind above pitch and velocities on the left, and to the right a row each for
 // Start, Length and Ends, across their coarse, fine and exact values. With an editor, its field
 // is boxed.
@@ -105,7 +108,11 @@ void inspectorValue(Region& region, const InspectorField& field, std::u32string 
 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor = nullptr,
-                       Rect* listAt = nullptr);
+                       Rect* listAt = nullptr, bool panel = false);
+
+// How many columns a panel's Keep and Cancel buttons take, and where their row is.
+inline constexpr int kPanelButtonColumns = 20; // "[ Keep ]  [ Cancel ]"
+int panelButtonsY(Rect bounds, CellSize cell);
 
 // The editor's drop-down list, if it has one open, from the field at listAt, kept within a
 // space; to go in the frame after what it covers.

@@ -591,10 +591,7 @@ void Workspace::sendValue(core::TrackId track, const core::EventData& data)
 
 void Workspace::cancelDrafts()
 {
-    if (pianoRoll_)
-    {
-        pianoRoll_->cancelRampDraft();
-    }
+    view().cancelEditing();
 }
 
 void Workspace::auditionNote(core::TrackId track, const core::Event& note)

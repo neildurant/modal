@@ -72,6 +72,8 @@ struct Ramps
                       0);
         }
     }
+    // Ctrl-Enter, keeping what the inspector's changed.
+    void keep() { ws.handle(Key::of(NamedKey::Enter, kCtrl), 0); }
     void line(std::u32string_view text)
     {
         type(U":");
@@ -117,8 +119,8 @@ struct Ramps
 } // namespace
 
 TEST_CASE(
-    "Ramping with , c r takes the bar from the values held there, shaped in the inspector, Enter "
-    "keeping it as one step")
+    "Ramping with , c r takes the bar from the values held there, shaped in the inspector and "
+    "kept as one step")
 {
     Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
     const auto before = r.values();
@@ -131,13 +133,13 @@ TEST_CASE(
     CHECK(made.to == 80);
     CHECK(r.view().draftingRamp());
     CHECK(r.view().typing());
-    // It opens on To, the value to set first.
-    CHECK(r.view().inspectorEditor().heading() == "To");
+    // It opens on From, the first of its values.
+    CHECK(r.view().inspectorEditor().heading() == "From");
 
-    r.type(U"127\t");
+    r.type(U"\t127\n");
     CHECK(r.ramps()[0].to == 127); // at once, to hear and see
-    CHECK(r.view().inspectorEditor().heading() == "Shape");
-    r.type(U"\n");
+    CHECK(r.view().inspectorEditor().heading() == "To");
+    r.keep();
     CHECK_FALSE(r.view().draftingRamp());
     CHECK_FALSE(r.view().typing());
     CHECK(r.ramps()[0].to == 127);
@@ -156,8 +158,9 @@ TEST_CASE("Escape cancels a draft: a new ramp isn't made, and a changed one is a
 {
     Ramps r;
     const auto before = r.values();
-    r.type(U",cr50\t");
+    r.type(U",cr50\n");
     REQUIRE(r.ramps().size() == 1);
+    CHECK(r.ramps()[0].from == 50);
     r.type(U"\x1b");
     CHECK(r.ramps().empty());
     CHECK(r.values() == before);
@@ -166,25 +169,34 @@ TEST_CASE("Escape cancels a draft: a new ramp isn't made, and a changed one is a
     CHECK_FALSE(r.view().typing());
 
     // e on a ramp opens it again; its changes are cancelled together.
-    r.type(U",cr\n");
+    r.type(U",cr");
+    r.keep();
     REQUIRE(r.ramps().size() == 1);
     const auto kept = r.ramps()[0];
     r.type(U"e");
     REQUIRE(r.view().draftingRamp());
-    r.type(U"5\t");
-    CHECK(r.ramps()[0].to == 5);
-    r.type(U"\t+20\t"); // past Shape to Density, set, and round to Start
+    r.type(U"5\n\t+20\n");
+    CHECK(r.ramps()[0].from == 5);
+    CHECK(r.ramps()[0].to == 100);
     r.type(U"\x1b");
     REQUIRE(r.ramps().size() == 1);
     CHECK(r.ramps()[0] == kept);
     CHECK(r.ws.message() == "The ramp is as it was");
     CHECK_FALSE(r.document.canRedo());
+
+    // The Cancel button does the same.
+    r.type(U"e9\n");
+    r.goTo("Cancel");
+    r.type(U"\n");
+    CHECK(r.ramps()[0] == kept);
+    CHECK_FALSE(r.view().draftingRamp());
 }
 
 TEST_CASE("a ramp's fields: its ends each on their own, its values, shape, amount and density")
 {
     Ramps r;
-    r.type(U",cr\n");
+    r.type(U",cr");
+    r.keep();
     REQUIRE(r.ramps().size() == 1);
     const auto q = r.q();
     r.type(U"e");
@@ -202,12 +214,14 @@ TEST_CASE("a ramp's fields: its ends each on their own, its values, shape, amoun
     r.type(U"100\t");
     CHECK(r.ramps()[0].from == 0);
     CHECK(r.ramps()[0].to == 100);
-    r.type(U"c\t"); // the list's first choice starting with c
+    r.type(U"c\t"); // a letter opens the list at its first choice starting so
     REQUIRE(r.ramps()[0].shape == core::ControllerRamp::Shape::Curve);
     REQUIRE(r.view().inspectorEditor().heading() == "Amount");
-    r.type(U"-40\t8\n\n");
+    r.type(U"-40\t8");
+    r.keep(); // what's typed set first
     CHECK(r.ramps()[0].amount == -40);
     CHECK(r.ramps()[0].density == 8);
+    CHECK_FALSE(r.view().draftingRamp());
     // The end can't come before the start.
     r.type(U"e");
     r.goTo("End");
@@ -215,75 +229,87 @@ TEST_CASE("a ramp's fields: its ends each on their own, its values, shape, amoun
     CHECK(r.ws.message() == "A ramp has to end after it starts");
     r.type(U"\x1b\x1b"); // what was typed, then the draft
     CHECK(r.ramps()[0].end() == 3 * q);
+    CHECK_FALSE(r.view().draftingRamp());
 }
 
-TEST_CASE("a ramp's shape is chosen from its list again and again")
+TEST_CASE("a ramp's shape is stepped with its list closed, and chosen from it when open")
 {
     using Shape = core::ControllerRamp::Shape;
     Ramps r;
     r.type(U",cr");
     r.goTo("Shape");
-    r.type(U"e\t");
-    CHECK(r.ramps()[0].shape == Shape::EqualPower);
-    r.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
-    REQUIRE(r.view().inspectorEditor().heading() == "Shape");
-    r.type(U"l\t");
-    CHECK(r.ramps()[0].shape == Shape::Linear);
-    r.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
+    CHECK(r.view().inspectorEditor().list() == nullptr);
     r.ws.handle(Key::of(NamedKey::Down), 0);
-    r.ws.handle(Key::of(NamedKey::Down), 0);
-    r.type(U"\t");
-    CHECK(r.ramps()[0].shape == Shape::SCurve);
-    r.ws.handle(Key::of(NamedKey::Tab, kShift), 0);
-    r.ws.handle(Key::of(NamedKey::Up), 0);
-    r.type(U"\t");
     CHECK(r.ramps()[0].shape == Shape::Curve);
+    CHECK(r.view().inspectorEditor().list() == nullptr);
+    r.ws.handle(Key::of(NamedKey::Down), 0);
+    CHECK(r.ramps()[0].shape == Shape::SCurve);
+    r.ws.handle(Key::of(NamedKey::Up), 0);
+    CHECK(r.ramps()[0].shape == Shape::Curve);
+    // Enter opens the list; Enter there chooses and closes it, staying on the field.
+    r.type(U"\n");
+    REQUIRE(r.view().inspectorEditor().list() != nullptr);
+    r.ws.handle(Key::of(NamedKey::Down), 0);
+    r.ws.handle(Key::of(NamedKey::Down), 0);
+    r.type(U"\n");
+    CHECK(r.ramps()[0].shape == Shape::EqualPower);
+    CHECK(r.view().inspectorEditor().list() == nullptr);
+    CHECK(r.view().inspectorEditor().heading() == "Shape");
+    // Alt-Down opens it too, and Escape closes it, changing nothing.
+    r.ws.handle(Key::of(NamedKey::Down, kAlt), 0);
+    REQUIRE(r.view().inspectorEditor().list() != nullptr);
+    r.ws.handle(Key::of(NamedKey::Up), 0);
+    r.type(U"\x1b");
+    CHECK(r.view().inspectorEditor().list() == nullptr);
+    CHECK(r.ramps()[0].shape == Shape::EqualPower);
+    CHECK(r.view().draftingRamp());
+    // And round again by letters.
+    r.type(U"l\n");
+    CHECK(r.ramps()[0].shape == Shape::Linear);
 }
 
-TEST_CASE("Enter sets a ramp's field and stays on it, and with nothing new keeps the ramp")
+TEST_CASE("Enter sets a ramp's field and stays on it, and the Keep button keeps the ramp")
 {
     Ramps r;
-    r.type(U",cr");
+    r.type(U",cr\t");
     REQUIRE(r.view().inspectorEditor().heading() == "To");
     r.type(U"100\n");
     CHECK(r.ramps()[0].to == 100);
     CHECK(r.view().draftingRamp());
     CHECK(r.view().inspectorEditor().heading() == "To");
-    CHECK_FALSE(r.view().inspectorEditor().changed());
+    CHECK(r.view().inspectorEditor().replacing());
     r.type(U"90\n");
     CHECK(r.ramps()[0].to == 90);
+    // Enter with nothing new does nothing more.
+    r.type(U"\n");
+    CHECK(r.view().draftingRamp());
     // Escape puts back what's typed, staying in the draft.
     r.type(U"5\x1b");
     CHECK(r.view().draftingRamp());
     CHECK(r.ramps()[0].to == 90);
-    // A choice from the list is set by Enter, staying on it.
-    r.goTo("Shape");
-    r.type(U"s\n");
-    CHECK(r.ramps()[0].shape == core::ControllerRamp::Shape::SCurve);
-    CHECK(r.view().inspectorEditor().heading() == "Shape");
+    r.goTo("Keep");
     r.type(U"\n");
     CHECK_FALSE(r.view().draftingRamp());
     CHECK(r.ws.message() == "Made the ramp");
     CHECK(r.ramps()[0].to == 90);
 }
 
-TEST_CASE("a ramp's fields are dim until it's opened, and a hint says how")
+TEST_CASE("a hint says how to change a ramp, and another how to finish")
 {
     Ramps r;
-    r.type(U",cr\n");
-    const auto fields = [&] { return r.view().inspection().fields; };
+    r.type(U",cr");
+    r.keep();
     CHECK(r.view().inspection().kind == "Ramp");
-    CHECK(std::ranges::none_of(fields(), &InspectorField::editable));
     CHECK(r.view().typingHint() == "A ramp: e or Enter changes it, , c R makes it events");
     r.type(U"e");
-    CHECK(std::ranges::count_if(fields(), &InspectorField::editable) == 6);
-    CHECK(r.view().typingHint()->starts_with("Enter sets, again keeps"));
+    CHECK(r.view().typingHint() == std::string{kPanelHint} + "; Space plays");
 }
 
 TEST_CASE("a ramp's points aren't edited one by one, and , c R makes them events")
 {
     Ramps r;
-    r.type(U",cr\n");
+    r.type(U",cr");
+    r.keep();
     REQUIRE(r.ramps().size() == 1);
     const auto playing = r.values();
     for (const auto keys : {U"x", U"o", U"\x01"})
@@ -319,7 +345,7 @@ TEST_CASE("Ramping with , c r takes a lane selection's time, and needs a control
     CHECK(r.ramps()[0].start == 0);
     CHECK(r.ramps()[0].end() == r.q() / 2);
     CHECK(r.ws.mode() != Mode::Visual);
-    r.type(U"\n");
+    r.keep();
 
     // A second over the same time touches it, and is refused.
     r.type(U",cr");

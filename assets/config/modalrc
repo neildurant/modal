@@ -260,11 +260,13 @@ nmap _          note-shorten-fine "Shorten by a nudge"
 " Editing fields: Enter edits the field under the cursor, typing a value or a change such as
 " +10 or +1/16 (Enter sets it, Escape leaves it); + and - (or Ctrl-A and Ctrl-X) step it, with
 " counts; in the piano roll, Ctrl-A and Ctrl-X step the current note's velocity.
-" The inspector: e edits the fields of the note under the cursor in the piano roll, or the
-" section on the section strip, starting on the one it was last on; in the event list it
-" edits the field under the cursor in place, as Enter does. Tab and Shift-Tab set the field
-" and go to the next or the one before, round from the last to the first; Enter sets it and
-" leaves, Escape leaves it; Up and Down step it.
+" The inspector: e edits the fields of the note under the cursor in the piano roll, a ramp
+" in a controller's lane, an event in the event list, the section on the section strip or a
+" track's quantise settings, starting on the one it was last on. Its changes are made at once
+" and are one undo step: Enter sets a field and stays on it, Tab and Shift-Tab go round the
+" fields and the Keep and Cancel buttons, where Enter presses one; Ctrl-Enter keeps, and
+" Escape puts back what's typed or, with nothing typed, cancels every change. Up and Down
+" step a field, a choice too; Enter or Alt-Down opens a choice's list.
 keysection "Editing fields"
 nmap <CR>       field-edit        "Edit this field"
 nmap <CR>       bar-open          "Open the bar in the piano roll"
@@ -604,6 +606,8 @@ cmap <C-k>      command-line-older
 cmap <C-j>      command-line-newer
 cmap <Tab>      command-line-next       "Next field"
 cmap <S-Tab>    command-line-previous   "Field before"
+cmap <C-CR>     command-line-keep          "Keep the inspector's changes"
+cmap <A-Down>   command-line-list       "Open the field's list"
 cmap <PageDown> command-line-page-down  "A screen on"
 cmap <PageUp>   command-line-page-up    "A screen back"
 

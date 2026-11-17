@@ -675,7 +675,7 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     else if (command == "inspector-edit" && list_.rows()[row_].kind == RowKind::Event &&
              list_.track())
     {
-        if (editor_.open(inspection()))
+        if (editor_.openPanel(inspection(), document_, place()))
             host_.startTyping();
         return true;
     }
@@ -1619,6 +1619,16 @@ void EventListView::type(char32_t character)
     fieldLine_.insert(character);
 }
 
+void EventListView::cancelEditing()
+{
+    if (editor_.panel())
+    {
+        editor_.abandon();
+        host_.stopTyping();
+    }
+    refresh();
+}
+
 std::optional<bool> EventListView::runTyping(std::string_view command)
 {
     if (editor_.active())
@@ -1955,6 +1965,7 @@ std::optional<bool> EventListView::runInspector(std::string_view command)
                            { return change(heading, text, 0); },
                            .step = [&](const std::string& heading, int steps)
                            { return change(heading, {}, steps); },
+                           .finished = [this](bool) { refresh(); },
                        });
 }
 
@@ -1962,7 +1973,8 @@ Region EventListView::inspectorRegion() const
 {
     const int position =
         static_cast<int>(list_.text(list_.rows().size() - 1)[Column::Position].size());
-    return ui::inspectorRegion(inspection(), layout_.top[1], width_, cell_, position, &editor_);
+    return ui::inspectorRegion(inspection(), layout_.top[1], width_, cell_, position, &editor_,
+                               nullptr, true);
 }
 
 Region EventListView::barRegion() const

@@ -792,18 +792,24 @@ void PianoRollView::addChord(Region& inspector) const
         {U"Vel:", decodeUtf8(low == high ? std::to_string(low)
                                          : std::to_string(low) + "–" + std::to_string(high))},
     }};
+    // Read-only, so dim, as every value that can't be edited is (decided 17 November 2026).
     const Style label{Role::Dim, Role::Panel, kPlain};
-    const Style value{Role::Text, Role::Panel, kPlain};
+    const Style value{Role::Dim, Role::Panel, kPlain};
     constexpr int kLabels = 6;
     constexpr int kWide = kLabels + 1 + 9; // as wide as a long name, Bbmmaj7, or 127–127
     const int margin = BarSpacing::forCell(cell_).margin;
     int used = 0;
     for (const auto& run : inspector.text)
     {
-        used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+        // Not the Keep and Cancel buttons, on their own row at the right.
+        if (run.y < panelButtonsY(inspector.bounds, cell_))
+        {
+            used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+        }
     }
     const int x = used + 3 * cell_.width;
-    if (x + kWide * cell_.width > inspector.bounds.width - margin ||
+    if (x + kWide * cell_.width >
+            inspector.bounds.width - margin - (kPanelButtonColumns + 2) * cell_.width ||
         cell_.height * 4 > inspector.bounds.height)
     {
         return;
@@ -1093,42 +1099,14 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
     }
     if (rampDraft_)
     {
-        // Enter sets what's typed or chosen and stays on the field, and with nothing new
-        // keeps the ramp; Escape puts back what's typed, and with nothing typed cancels the
-        // whole draft (decided 17 November 2026, after use).
-        InspectorEditor::Hooks rampHooks{
-            .inspection = [this] { return inspection(); },
-            .set = [this](const std::string& heading, const std::string& text)
-            { return setRampField(heading, text); },
-            .step = [this](const std::string& heading, int steps)
-            { return stepRampField(heading, steps); }};
-        if (command == "command-line-cancel")
-        {
-            if (editor_.changed())
-            {
-                editor_.revert(inspection());
-            }
-            else
-            {
-                endRampDraft(false);
-            }
-            return true;
-        }
-        if (command == "command-line-run")
-        {
-            if (editor_.changed())
-            {
-                return editor_.setAndStay(host_, rampHooks);
-            }
-            endRampDraft(true);
-            return true;
-        }
-        const auto result = editor_.run(command, host_, rampHooks);
-        if (!editor_.active())
-        {
-            endRampDraft(true);
-        }
-        return result;
+        // A ramp's draft, in the inspector panel as any is edited.
+        return editor_.run(command, host_,
+                           {.inspection = [this] { return inspection(); },
+                            .set = [this](const std::string& heading, const std::string& text)
+                            { return setRampField(heading, text); },
+                            .step = [this](const std::string& heading, int steps)
+                            { return stepRampField(heading, steps); },
+                            .finished = [this](bool kept) { rampFinished(kept); }});
     }
     // The current note's fields in the inspector, with e.
     const auto& m = meter();
@@ -1174,7 +1152,8 @@ std::optional<bool> PianoRollView::runTyping(std::string_view command)
                     : stepInspectorField(*note, heading, steps, m);
             return std::holds_alternative<std::string>(result) ? std::nullopt
                                                                : set(heading, result);
-        }};
+        },
+        .finished = [this](bool) { refresh(); }};
     return editor_.run(command, host_, hooks);
 }
 
@@ -3220,7 +3199,7 @@ std::optional<bool> PianoRollView::run(std::string_view command, int count)
         if (ramp && (command == "inspector-edit" ||
                      (command == "lane-value-set" && count == 0 && !zeroTyped_)))
         {
-            return openRamp(*ramp, false, "ramp draft " + std::to_string(++rampDrafts_));
+            return openRamp(*ramp, false);
         }
         const bool pointEdit = command == "lane-event-add" || command == "lane-event-delete" ||
                                command.starts_with("lane-event-earlier") ||
@@ -3765,7 +3744,7 @@ std::optional<bool> PianoRollView::runNoteEdit(std::string_view command, int cou
         {
             return true;
         }
-        if (editor_.open(inspection()))
+        if (editor_.openPanel(inspection(), document_, place()))
         {
             host_.startTyping();
         }
@@ -5349,7 +5328,7 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
     Rect listAt{};
     auto inspector = inspectorRegion(inspection(), layout_.top[1], width_, cell_,
                                      static_cast<int>(positionText(meter(), lastTick()).size()),
-                                     &editor_, &listAt);
+                                     &editor_, &listAt, true);
     if (trackId())
     {
         addChord(inspector);
@@ -5384,7 +5363,11 @@ void PianoRollView::addNewNote(Region& inspector, const core::Track& track) cons
     int used = 0;
     for (const auto& run : inspector.text)
     {
-        used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+        // Not the Keep and Cancel buttons, on their own row at the right.
+        if (run.y < panelButtonsY(inspector.bounds, cell_))
+        {
+            used = std::max(used, run.x + static_cast<int>(run.text.size()) * cell_.width);
+        }
     }
     if (x < used + 3 * cell_.width || cell_.height * 3 > inspector.bounds.height)
     {
@@ -5636,9 +5619,9 @@ Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
     const auto& m = meter();
     Inspection result;
     result.kind = "Ramp";
-    // Bright while its draft is open, dim otherwise, as the Tracks view's quantise fields
-    // are while it's off (decided 17 November 2026, after use).
-    const bool open = rampDraft_.has_value();
+    // Dim but while its draft is open, as every inspector's values are (decided 17 November
+    // 2026, after use), which the drawing sees to.
+    const bool open = true;
     const auto add = [&](std::string heading, std::string value, std::string editText = {})
     {
         result.fields.push_back({.heading = std::move(heading),
@@ -5763,11 +5746,12 @@ bool PianoRollView::makeRamp()
         host_.refuse(rampRefusal(made, song), MessageKind::Warning);
         return true;
     }
-    const auto key = "ramp draft " + std::to_string(++rampDrafts_);
-    if (!document_.edit(
-            "Ramp " + laneLabel() + " in " + trackName(), place(),
-            [&](core::Song& s) { s.addRamp(*id, ramp); }, key))
+    // Made inside the panel's group, so cancelling it makes no ramp.
+    document_.beginGroup({}, place());
+    if (!document_.edit("Ramp " + laneLabel() + " in " + trackName(), place(),
+                        [&](core::Song& s) { s.addRamp(*id, ramp); }))
     {
+        document_.cancelGroup();
         if (auto why = document_.takeRefusal())
         {
             host_.refuse(std::move(*why));
@@ -5779,19 +5763,25 @@ bool PianoRollView::makeRamp()
     {
         moveTo(ramp.start);
     }
-    return openRamp(made.index, true, key);
+    return openRamp(made.index, true);
 }
 
-bool PianoRollView::openRamp(std::size_t index, bool created, std::string key)
+bool PianoRollView::openRamp(std::size_t index, bool created)
 {
     const auto id = *trackId();
     const auto ramps = document_.song().ramps(id);
     if (index >= ramps.size())
     {
+        if (created)
+        {
+            document_.cancelGroup();
+        }
         return false;
     }
-    rampDraft_ = RampDraft{id, index, std::move(key), created, ramps[index].lane};
-    if (!editor_.open(inspection(), created ? "To" : std::string_view{}))
+    rampDraft_ = RampDraft{id, index, created, ramps[index].lane};
+    // A new ramp opens on From, the first of its values (asked for 17 November 2026).
+    if (!editor_.openPanel(inspection(), document_, place(), created ? "From" : std::string_view{},
+                           created))
     {
         rampDraft_.reset();
         return false;
@@ -5949,8 +5939,8 @@ std::optional<std::string> PianoRollView::stepRampField(const std::string& headi
 
 std::optional<std::string> PianoRollView::applyRamp(const core::ControllerRamp& ramp)
 {
-    // Each change made at once, to see and hear, and merged with the draft's others as one
-    // undo step.
+    // Each change made at once, to see and hear, the panel's group making them one undo
+    // step.
     const auto id = rampDraft_->track;
     auto song = document_.song();
     const auto changed = song.replaceRamp(id, rampDraft_->index, ramp);
@@ -5965,9 +5955,8 @@ std::optional<std::string> PianoRollView::applyRamp(const core::ControllerRamp& 
     const auto title = rampDraft_->created
                            ? "Ramp " + toString(ramp.lane) + " in " + trackName()
                            : "Change the " + toString(ramp.lane) + " ramp in " + trackName();
-    document_.edit(
-        title, place(), [&](core::Song& s) { s.replaceRamp(id, rampDraft_->index, ramp); },
-        rampDraft_->key);
+    document_.edit(title, place(),
+                   [&](core::Song& s) { s.replaceRamp(id, rampDraft_->index, ramp); });
     if (auto why = document_.takeRefusal())
     {
         return why;
@@ -5981,7 +5970,18 @@ std::optional<std::string> PianoRollView::applyRamp(const core::ControllerRamp& 
     return std::nullopt;
 }
 
-void PianoRollView::endRampDraft(bool keep)
+void PianoRollView::cancelEditing()
+{
+    if (editor_.panel())
+    {
+        editor_.abandon();
+        host_.stopTyping();
+    }
+    rampDraft_.reset();
+    refresh();
+}
+
+void PianoRollView::rampFinished(bool kept)
 {
     if (!rampDraft_)
     {
@@ -5989,21 +5989,16 @@ void PianoRollView::endRampDraft(bool keep)
     }
     const auto draft = *rampDraft_;
     rampDraft_.reset();
-    editor_.close();
-    host_.stopTyping();
-    if (keep)
+    refresh();
+    if (kept)
     {
-        document_.breakMerge();
         host_.setMessage(draft.created ? "Made the ramp" : "Kept the ramp's changes",
                          MessageKind::Information);
-        refresh();
         return;
     }
-    const bool undone = document_.cancelMerging(draft.key);
-    refresh();
     host_.setMessage(draft.created ? "No ramp made" : "The ramp is as it was",
                      MessageKind::Information);
-    if (!undone || !playhead_ || !document_.song().track(draft.track))
+    if (!playhead_ || !document_.song().track(draft.track))
     {
         return;
     }

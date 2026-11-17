@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/ui/inspector.hpp>
+#include <modal/ui/inspector_edit.hpp>
 #include <modal/ui/musical_time.hpp>
 #include <modal/ui/view_parts.hpp>
 
@@ -8,7 +9,9 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace modal;
@@ -241,4 +244,47 @@ TEST_CASE("the note inspector's exact values line up their colons under B:B:T")
     {
         CHECK(colons(U"1:490").second == heading.second);
     }
+}
+
+TEST_CASE("an inspector's values are dim but while editing, and a panel has Keep and Cancel")
+{
+    constexpr CellSize kCell{10, 20};
+    const Inspection inspection{
+        "Thing", {{.heading = "Size", .value = "12", .editable = true}, {"Kind", "big"}}};
+    const Rect bounds{0, 0, 1000, inspectorHeight(kCell)};
+    const auto styleOf = [](const Region& region, std::u32string_view text) -> std::optional<Style>
+    {
+        for (const auto& run : region.text)
+        {
+            if (run.text.starts_with(text))
+            {
+                return run.style;
+            }
+        }
+        return std::nullopt;
+    };
+
+    // Not editing: everything dim, the buttons too, and no tint.
+    auto region = inspectorRegion(inspection, bounds, 1000, kCell, 9, nullptr, nullptr, true);
+    CHECK(styleOf(region, U"12")->foreground == Role::Dim);
+    CHECK(styleOf(region, U"big")->foreground == Role::Dim);
+    CHECK(styleOf(region, U"[ Keep ]")->foreground == Role::Dim);
+    CHECK(styleOf(region, U"[ Cancel ]")->foreground == Role::Dim);
+    CHECK(region.under.empty());
+    // Not an edited panel: no buttons.
+    CHECK_FALSE(styleOf(inspectorRegion(inspection, bounds, 1000, kCell, 9), U"[ Keep ]"));
+
+    // Editing: the field being edited lit, read-only values still dim, the buttons bright, and
+    // the panel tinted.
+    core::Document document;
+    InspectorEditor editor;
+    REQUIRE(editor.openPanel(inspection, document, {}));
+    region = inspectorRegion(inspection, bounds, 1000, kCell, 9, &editor, nullptr, true);
+    CHECK(styleOf(region, U"12")->background == Role::Selection);
+    CHECK(styleOf(region, U"big")->foreground == Role::Dim);
+    CHECK(styleOf(region, U"[ Keep ]")->foreground == Role::Text);
+    REQUIRE_FALSE(region.under.empty());
+    CHECK(region.under.front().role == Role::Selection);
+    editor.abandon();
+    CHECK_FALSE(editor.active());
 }

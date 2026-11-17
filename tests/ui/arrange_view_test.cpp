@@ -858,11 +858,14 @@ TEST_CASE("e edits the section's name and length in the inspector on the strip")
     CHECK(s.ws.message() == "A length is a number of bars, such as 8, or a change such as +2");
     s.press(Key::of(NamedKey::Backspace));
     s.type(U"-3");
-    s.press(Key::of(NamedKey::Enter));
-    CHECK_FALSE(editor.active());
+    s.press(Key::of(NamedKey::Enter)); // set, staying on the field
+    CHECK(editor.active());
     CHECK(song.sectionStart(2) == 3 * kBar);
-    s.type(U"u");
+    s.press(Key::of(NamedKey::Enter, kCtrl)); // kept
+    CHECK_FALSE(editor.active());
+    s.type(U"u"); // the whole edit, one step
     CHECK(s.ws.message() == "Undid: Shorten Bridge to 1 bar");
+    CHECK(s.names() == std::vector<std::string>{"A", "B", "C"});
 }
 
 namespace

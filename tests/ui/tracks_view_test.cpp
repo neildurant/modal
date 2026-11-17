@@ -289,6 +289,7 @@ TEST_CASE("note timing display follows the grid or a fixed setting without editi
     t.type(U"3");
     t.press(NamedKey::Enter);
     CHECK(t.document.song().events(id)[0].tick == start + ppqn.quarter() / 2);
+    t.press(NamedKey::Enter, kCtrl); // kept
     t.type(U"u");
     CHECK(t.document.song() == song);
     t.type(U"ge");
@@ -1560,12 +1561,14 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
     t.press(NamedKey::Up);
     CHECK(*t.track().quantize.grid == core::NoteFraction{1, 8});
     t.type(U"1/16t");
-    t.press(NamedKey::Enter);
-    CHECK_FALSE(t.ws.tracks().editingQuantize());
+    t.press(NamedKey::Enter); // set, staying on the field
+    CHECK(t.ws.tracks().editingQuantize());
     CHECK(*t.track().quantize.grid == core::NoteFraction{1, 24});
+    t.press(NamedKey::Enter, kCtrl); // kept
+    CHECK_FALSE(t.ws.tracks().editingQuantize());
     CHECK_FALSE(t.track().quantize.on); // set up, not yet turned on
 
-    // Dim in the table while off, and each change its own undo step.
+    // Dim in the table while off, and the whole edit one undo step.
     const auto summary = [&]() -> std::optional<TextRun>
     {
         const auto frame = t.ws.frame();
@@ -1580,9 +1583,10 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
     };
     REQUIRE(summary());
     t.type(U"u");
-    CHECK(t.track().quantize.grid == core::NoteFraction{1, 8});
-    t.type(U"uu");
     CHECK_FALSE(t.track().quantize.grid);
+    CHECK(t.track().quantize.strength == 100);
+    t.ws.handle(Key::typed(U'r', kCtrl), 0);
+    CHECK(t.track().quantize.strength == 75);
 
     SECTION("a value out of range keeps the field open, saying why")
     {
@@ -1592,7 +1596,9 @@ TEST_CASE("the Quantise column's settings are edited in the inspector")
         t.press(NamedKey::Enter);
         CHECK(t.ws.tracks().editingQuantize());
         CHECK(t.ws.message() == "Strength is 0% to 100%");
-        t.press(NamedKey::Escape);
+        t.press(NamedKey::Escape); // what was typed
+        CHECK(t.ws.tracks().editingQuantize());
+        t.press(NamedKey::Escape); // and the edit
         CHECK_FALSE(t.ws.tracks().editingQuantize());
         CHECK(t.track().quantize.strength == 75);
     }
@@ -1622,9 +1628,14 @@ TEST_CASE("the status line says what a field takes while it's edited")
     t.type(U"$");
     t.press(NamedKey::Enter);
     CHECK(inspectorHas(t.ws.frame(), U"or 1/8t for a triplet"));
-    t.press(NamedKey::Tab, kShift); // round to Moves
-    CHECK(
-        inspectorHas(t.ws.frame(), U"Up and Down choose, Enter or Tab takes it, Escape leaves it"));
+    for (int i = 0; i < 3; ++i)
+    {
+        t.press(NamedKey::Tab, kShift); // round past Cancel and Keep to Moves
+    }
+    CHECK(inspectorHas(t.ws.frame(), U"Up and Down step it; Enter opens its list"));
+    t.press(NamedKey::Enter);
+    CHECK(inspectorHas(t.ws.frame(), U"Up and Down choose, Enter takes it, Escape closes it"));
+    t.press(NamedKey::Escape);
     t.press(NamedKey::Escape);
 }
 
@@ -1633,9 +1644,14 @@ TEST_CASE("what playback quantise moves is chosen from a drop-down list")
     Tracking t;
     t.type(U"$");
     t.press(NamedKey::Enter);
-    t.press(NamedKey::Tab, kShift); // round to Moves
+    for (int i = 0; i < 3; ++i)
+    {
+        t.press(NamedKey::Tab, kShift); // round past Cancel and Keep to Moves
+    }
     const auto& editor = t.ws.tracks().inspectorEditor();
     REQUIRE(editor.heading() == "Moves");
+    CHECK(editor.list() == nullptr); // closed until asked for
+    t.press(NamedKey::Enter);
     REQUIRE(editor.list() != nullptr);
     // Below the inspector's field, over the table.
     const auto frame = t.ws.frame();
@@ -1651,6 +1667,11 @@ TEST_CASE("what playback quantise moves is chosen from a drop-down list")
     t.press(NamedKey::Down);
     t.press(NamedKey::Enter);
     CHECK(t.track().quantize.move == core::QuantizeMove::Both);
+    CHECK(editor.list() == nullptr);
+    CHECK(t.ws.tracks().editingQuantize());
+    t.press(NamedKey::Down); // a step, the list closed
+    CHECK(t.track().quantize.move == core::QuantizeMove::Lengths);
+    t.press(NamedKey::Enter, kCtrl);
     CHECK_FALSE(t.ws.tracks().editingQuantize());
 }
 

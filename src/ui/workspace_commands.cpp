@@ -594,6 +594,8 @@ constexpr std::array kSharedCommands{
     atPrompt("command-line-previous", "Set the field and go to the one before, in the inspector"),
     atPrompt("command-line-page-down", "A screen on in the matches of completion"),
     atPrompt("command-line-page-up", "A screen back in the matches of completion"),
+    atPrompt("command-line-keep", "Keep what's been changed in the inspector, and leave it"),
+    atPrompt("command-line-list", "Open a field's list of choices, in the inspector"),
     atPrompt("command-line-older", "Recall the line run before"),
     atPrompt("command-line-newer", "Recall the line run after"),
 };

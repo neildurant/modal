@@ -96,11 +96,14 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
         region.text.push_back({x(kExactColumn + exactWidth - static_cast<int>(heading.size())),
                                y(0), heading, label});
     }
+    const bool editing = editor != nullptr && editor->active();
     for (const auto& slot : slots)
     {
-        const auto it = std::ranges::find(inspection.fields, slot.field, &InspectorField::heading);
+        auto it = std::ranges::find(inspection.fields, slot.field, &InspectorField::heading);
         if (it == inspection.fields.end())
             continue;
+        auto shown = *it;
+        shown.editable = it->editable && editing;
         if (!slot.label.empty())
             region.text.push_back(
                 {x(slot.labelColumn), y(slot.row), decodeUtf8(slot.label), label});
@@ -119,8 +122,8 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
         }
         if (slot.field == "Position" || slot.field == "Length" || slot.field == "Ends")
             value = aligned(std::move(value));
-        inspectorValue(region, *it, decodeUtf8(value), x(slot.valueColumn), y(slot.row), slot.width,
-                       cell, editor, true);
+        inspectorValue(region, shown, decodeUtf8(value), x(slot.valueColumn), y(slot.row),
+                       slot.width, cell, editor, true);
     }
     return region;
 }
@@ -270,8 +273,34 @@ void addChoiceList(Frame& frame, const InspectorEditor* editor, Rect listAt, Rec
         frame.push_back(editor->list()->region(listAt, within, cell));
 }
 
+int panelButtonsY(Rect bounds, CellSize cell)
+{
+    return bounds.height - cell.height - cell.height / 4;
+}
+
 namespace
 {
+
+// A panel's Keep and Cancel buttons, at its bottom right: dim until editing, then bright, the
+// one Tab is on lit as the cursor is.
+void addPanelButtons(Region& region, const InspectorEditor* editor, CellSize cell)
+{
+    const bool editing = editor != nullptr && editor->panel();
+    const int margin = BarSpacing::forCell(cell).margin;
+    int x = region.bounds.width - margin - kPanelButtonColumns * cell.width;
+    const int y = panelButtonsY(region.bounds, cell);
+    for (const auto button : {InspectorEditor::kKeep, InspectorEditor::kCancel})
+    {
+        const bool on = editing && editor->heading() == button;
+        auto text = U"[ " + decodeUtf8(button) + U" ]";
+        const Style style = on        ? Style{Role::CursorText, Role::Cursor, kBold}
+                            : editing ? Style{Role::Text, Role::Panel, kPlain}
+                                      : Style{Role::Dim, Role::Panel, kPlain};
+        const auto width = static_cast<int>(text.size());
+        region.text.push_back({x, y, std::move(text), style});
+        x += (width + 2) * cell.width;
+    }
+}
 
 // The panel tinted while a field in it is being edited, as the controller lane is while the
 // cursor's in it, so where the keys go shows (asked for 17 November 2026, after use).
@@ -290,19 +319,28 @@ Region tintedWhileEditing(Region region, const InspectorEditor* editor)
 } // namespace
 
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
-                       int positionWidth, const InspectorEditor* editor, Rect* listAt)
+                       int positionWidth, const InspectorEditor* editor, Rect* listAt, bool panel)
 {
+    const bool buttons = panel && std::ranges::any_of(inspection.fields, &InspectorField::editable);
     if (inspection.kind == "Note" &&
         std::ranges::find(inspection.fields, "Units", &InspectorField::heading) !=
             inspection.fields.end())
-        return tintedWhileEditing(
-            noteInspectorRegion(inspection, bounds, width, cell, positionWidth, editor), editor);
+    {
+        auto region = noteInspectorRegion(inspection, bounds, width, cell, positionWidth, editor);
+        if (buttons)
+            addPanelButtons(region, editor, cell);
+        return tintedWhileEditing(std::move(region), editor);
+    }
     // On a panel of its own: the kind of row, then headings above their values. Each column
     // is as wide as its longest value can be, so the columns stay put as the cursor moves;
     // a value that doesn't fit is cut short, and those after it left out.
     Region region{.bounds = bounds, .background = Role::Panel, .text = {}, .under = {}, .over = {}};
     const int margin = BarSpacing::forCell(cell).margin;
-    const int columns = std::max((width - 2 * margin) / cell.width, 0);
+    // Clear of the buttons, where they share the values' row, as in an inspector of two rows.
+    const bool sharing = buttons && panelButtonsY(bounds, cell) <= cell.height / 4 + cell.height;
+    const int columns =
+        std::max((width - 2 * margin) / cell.width - (sharing ? kPanelButtonColumns + 3 : 0), 0);
+    const bool editing = editor != nullptr && editor->active();
     const Style kind{Role::Accent, Role::Panel, kBold};
     const Style heading{Role::Dim, Role::Panel, kPlain};
     const auto x = [&](int column) { return margin + column * cell.width; };
@@ -340,9 +378,11 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
     int at = widthOf("Kind") + 3;
     for (const auto& field : inspection.fields)
     {
+        auto shown = field;
+        shown.editable = field.editable && editing;
         if (field.underKind)
         {
-            inspectorValue(region, field, decodeUtf8(field.value), x(0), top + cell.height,
+            inspectorValue(region, shown, decodeUtf8(field.value), x(0), top + cell.height,
                            widthOf("Kind"), cell, editor);
             continue;
         }
@@ -373,10 +413,12 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
         const int extra = !field.choices.empty() ? 2 : edited ? 1 : 0;
         const int wide = std::max({static_cast<int>(title.size()),
                                    static_cast<int>(text.size()) + extra, widthOf(field.heading)});
-        inspectorValue(region, field, std::move(text), x(at), top + cell.height,
+        inspectorValue(region, shown, std::move(text), x(at), top + cell.height,
                        std::min(wide, room), cell, editor, false, listAt);
         at += wide + 3;
     }
+    if (buttons)
+        addPanelButtons(region, editor, cell);
     return tintedWhileEditing(std::move(region), editor);
 }
 

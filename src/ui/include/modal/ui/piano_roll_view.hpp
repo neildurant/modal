@@ -97,7 +97,7 @@ public:
     std::optional<std::string> typingHint() const override
     {
         if (rampDraft_)
-            return "Enter sets, again keeps the ramp; Escape cancels; Tab next; Space plays";
+            return std::string{kPanelHint} + "; Space plays";
         // On a ramp in the lane, how to change it (asked for 17 November 2026, after use).
         if (!typing() && !host_.selection() && currentRamp())
             return "A ramp: e or Enter changes it, , c R makes it events";
@@ -105,7 +105,7 @@ public:
             return "Enter chooses, Escape leaves it; a number or a name narrows the list";
         if (!typing())
             return std::nullopt;
-        return "Enter sets it, Tab goes on, Escape leaves it; Up and Down step it";
+        return std::string{kPanelHint};
     }
     const InspectorEditor& inspectorEditor() const { return editor_; }
     void type(char32_t character) override
@@ -207,8 +207,8 @@ public:
     // What the inspector shows: the current note, the lane's event or ramp, or an open draft.
     Inspection inspection() const;
     bool draftingRamp() const { return rampDraft_.has_value(); }
-    // Cancels an open draft, as closing the window does first.
-    void cancelRampDraft() { endRampDraft(false); }
+    // Cancels what's being edited in the inspector, as closing the window does first.
+    void cancelEditing() override;
 
 private:
     const core::MeterMap& meter() const;
@@ -381,8 +381,7 @@ private:
     {
         core::TrackId track;
         std::size_t index; // in the track's ramps
-        std::string key;
-        bool created; // made by , c r, so cancelling it makes none
+        bool created;      // made by , c r, so cancelling it makes none
         core::Lane lane;
     };
     std::optional<core::ControllerRamp> draftRamp() const;
@@ -392,13 +391,15 @@ private:
     // , c r: a ramp across the selection or the cursor's bar, opened as a draft; and opening
     // the cursor's ramp as one, with e or Enter.
     bool makeRamp();
-    bool openRamp(std::size_t index, bool created, std::string key);
+    bool openRamp(std::size_t index, bool created);
     // Sets or steps a draft's field, saying why not if it can't be.
     std::optional<std::string> setRampField(const std::string& heading, const std::string& text);
     std::optional<std::string> stepRampField(const std::string& heading, int steps);
     std::optional<std::string> applyRamp(const core::ControllerRamp& ramp);
     std::string rampRefusal(const core::Song::RampEdit& edit, const core::Song& song) const;
-    void endRampDraft(bool keep);
+    // Once a draft is kept or cancelled: says which, and on cancelling while playing sends
+    // the value at the playhead again.
+    void rampFinished(bool kept);
     // , c R: makes the cursor's ramp ordinary events.
     bool convertRamp();
     void addRamps(const LaneDrawing& d, core::TrackId track) const;
@@ -446,7 +447,6 @@ private:
     bool zeroTyped_ = false;   // 0 typed in a controller's lane, for Enter to set 0
     std::optional<ChoiceList> laneChooser_;
     std::optional<RampDraft> rampDraft_;
-    int rampDrafts_ = 0;                  // drafts opened, for their merge keys
     std::vector<core::Lane> laneChoices_; // what laneChooser_'s choices are
     InspectorEditor editor_;
     int width_ = 0;

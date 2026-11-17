@@ -492,6 +492,9 @@ public:
     // 2026); false to leave it as a count.
     virtual bool typeToEdit(char32_t /*digit*/) { return false; }
     virtual std::optional<bool> runTyping(std::string_view /*command*/) { return std::nullopt; }
+    // Cancels what's being edited in the inspector, taking its changes back, as closing the
+    // window does first.
+    virtual void cancelEditing() {}
 };
 
 // Runs one of the command line's editing commands (command-line-backspace, -delete, -left,

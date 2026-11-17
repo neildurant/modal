@@ -989,6 +989,16 @@ void ArrangeView::insertRegister(const EventRegister& reg, std::size_t track, co
               insert);
 }
 
+void ArrangeView::cancelEditing()
+{
+    if (editor_.panel())
+    {
+        editor_.abandon();
+        host_.stopTyping();
+    }
+    refresh();
+}
+
 std::optional<bool> ArrangeView::runTyping(std::string_view command)
 {
     const auto section = page_.stripCursor().value_or(0);
@@ -1004,7 +1014,8 @@ std::optional<bool> ArrangeView::runTyping(std::string_view command)
             }
             return setSectionField(section, heading,
                                    (steps < 0 ? "-" : "+") + std::to_string(std::abs(steps)));
-        }};
+        },
+        .finished = [this](bool) { refresh(); }};
     return editor_.run(command, host_, hooks);
 }
 
@@ -1125,7 +1136,7 @@ std::optional<bool> ArrangeView::runOnStrip(std::size_t section, std::string_vie
     }
     if (command == "inspector-edit")
     {
-        if (editor_.open(inspection()))
+        if (editor_.openPanel(inspection(), document_, place()))
         {
             host_.startTyping();
         }
@@ -1573,8 +1584,8 @@ void ArrangeView::addRegions(Frame& frame) const
         trackBarRegion(document_.song(), track, at, meter(), layout_.top[0], width_, cell_));
     const auto last = std::max<core::Tick>(document_.song().end() - 1, 0);
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_,
-                                    static_cast<int>(positionText(meter(), last).size()),
-                                    &editor_));
+                                    static_cast<int>(positionText(meter(), last).size()), &editor_,
+                                    nullptr, onStrip()));
 }
 
 std::string ArrangeView::position(core::Tick tick) const

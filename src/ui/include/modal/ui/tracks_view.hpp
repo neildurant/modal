@@ -39,6 +39,7 @@ public:
     std::optional<std::string> typingHint() const override;
     void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
+    void cancelEditing() override;
     const InspectorEditor& inspectorEditor() const { return editor_; }
     bool choosingPort() const { return portChoice_.has_value(); }
     bool editingQuantize() const { return quantizeEditing_; }

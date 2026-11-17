@@ -77,6 +77,7 @@ public:
     }
     void type(char32_t character) override;
     std::optional<bool> runTyping(std::string_view command) override;
+    void cancelEditing() override;
 
     // How far apart events can start and still be one chord, for ( and ) (chordwindow).
     void setChordWindow(std::chrono::milliseconds window) { chordWindow_ = window; }

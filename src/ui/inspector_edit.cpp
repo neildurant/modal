@@ -38,6 +38,13 @@ std::optional<std::size_t> indexOf(const Inspection& inspection, std::string_vie
     return std::nullopt;
 }
 
+std::string lowered(std::string text)
+{
+    for (auto& c : text)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return text;
+}
+
 } // namespace
 
 bool InspectorEditor::open(const Inspection& inspection, std::string_view heading)
@@ -58,6 +65,36 @@ bool InspectorEditor::open(const Inspection& inspection, std::string_view headin
     return true;
 }
 
+bool InspectorEditor::openPanel(const Inspection& inspection, core::Document& document,
+                                const core::EditPlace& place, std::string_view heading, bool begun)
+{
+    document_ = &document;
+    if (!open(inspection, heading))
+    {
+        document_ = nullptr;
+        if (begun)
+        {
+            document.cancelGroup();
+        }
+        return false;
+    }
+    if (!begun)
+    {
+        document.beginGroup({}, place);
+    }
+    return true;
+}
+
+void InspectorEditor::abandon()
+{
+    if (document_ != nullptr)
+    {
+        document_->cancelGroup();
+        document_ = nullptr;
+    }
+    close();
+}
+
 void InspectorEditor::show(const Inspection& inspection, std::size_t index)
 {
     const auto& field = inspection.fields[index];
@@ -67,54 +104,123 @@ void InspectorEditor::show(const Inspection& inspection, std::size_t index)
     fresh_ = true;
     list_.reset();
     choices_ = field.choices;
+    narrowing_ = field.narrowing;
     shown_ = field.value;
+    current_.reset();
     if (!field.choices.empty())
     {
-        // Opening on what it's set to, by its words whatever their case.
-        const auto lower = [](std::string text)
+        // On what it's set to, by its words whatever their case.
+        const auto at = std::ranges::find(field.choices, lowered(editText(field)), lowered);
+        current_ =
+            static_cast<std::size_t>(at == field.choices.end() ? 0 : at - field.choices.begin());
+        // In a table's cell the list opens with the field; in a panel, when asked for.
+        if (document_ == nullptr)
         {
-            for (auto& c : text)
-                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            return text;
-        };
-        const auto current = lower(editText(field));
-        const auto at = std::ranges::find(field.choices, current, lower);
-        list_.emplace(
-            field.choices,
-            static_cast<std::size_t>(at == field.choices.end() ? 0 : at - field.choices.begin()),
-            field.narrowing);
-        list_->name(lower(field.heading)); // "No port matches"
-        current_ = list_->chosen();
+            openList();
+        }
     }
+}
+
+void InspectorEditor::showButton(std::string_view button)
+{
+    heading_ = std::string{button};
+    line_.open({});
+    fresh_ = true;
+    list_.reset();
+    choices_.clear();
+    current_.reset();
+    shown_.clear();
+}
+
+void InspectorEditor::openList()
+{
+    if (choices_.empty())
+    {
+        return;
+    }
+    list_.emplace(choices_, current_.value_or(0), narrowing_);
+    list_->name(lowered(*heading_)); // "No port matches"
+    current_ = list_->chosen();
 }
 
 void InspectorEditor::move(const Inspection& inspection, int by)
 {
-    std::vector<std::size_t> editable;
-    for (std::size_t i = 0; i < inspection.fields.size(); ++i)
+    // The fields that can be edited, then in a panel its buttons.
+    std::vector<std::string> stops;
+    for (const auto& field : inspection.fields)
     {
-        if (inspection.fields[i].editable)
+        if (field.editable)
         {
-            editable.push_back(i);
+            stops.push_back(field.heading);
         }
     }
-    if (editable.empty())
+    if (stops.empty())
     {
         close();
         return;
     }
-    const auto here = std::ranges::find_if(editable, [&](std::size_t i)
-                                           { return inspection.fields[i].heading == *heading_; });
-    const auto count = static_cast<std::ptrdiff_t>(editable.size());
-    const auto at = here == editable.end() ? 0 : here - editable.begin();
-    show(inspection, editable[static_cast<std::size_t>(((at + by) % count + count) % count)]);
+    if (document_ != nullptr)
+    {
+        stops.emplace_back(kKeep);
+        stops.emplace_back(kCancel);
+    }
+    const auto here = std::ranges::find(stops, *heading_);
+    const auto count = static_cast<std::ptrdiff_t>(stops.size());
+    const auto at = here == stops.end() ? 0 : here - stops.begin();
+    const auto& to = stops[static_cast<std::size_t>(((at + by) % count + count) % count)];
+    if (const auto index = indexOf(inspection, to))
+    {
+        show(inspection, *index);
+    }
+    else
+    {
+        showButton(to);
+    }
 }
 
-bool InspectorEditor::setAndStay(ViewHost& host, const Hooks& hooks)
+void InspectorEditor::reshow(const Inspection& inspection)
 {
-    if (!heading_)
+    if (!heading_ || onButton())
     {
-        return false;
+        return;
+    }
+    if (const auto index = indexOf(inspection, *heading_))
+    {
+        show(inspection, *index);
+    }
+    else
+    {
+        move(inspection, 0); // gone, as a curve's amount does with another shape
+    }
+}
+
+void InspectorEditor::type(char32_t character)
+{
+    if (onButton())
+    {
+        return;
+    }
+    if (!list_ && document_ != nullptr && !choices_.empty())
+    {
+        openList(); // a letter on a choice field opens its list at what it starts
+    }
+    if (list_)
+    {
+        list_->type(character);
+        return;
+    }
+    if (std::exchange(fresh_, false))
+    {
+        line_.clear(); // typing replaces the value, as in a spreadsheet
+    }
+    line_.insert(character);
+}
+
+bool InspectorEditor::setHere(ViewHost& host, const Hooks& hooks)
+{
+    if (onButton())
+    {
+        return true;
     }
     std::optional<std::string> why;
     if (list_)
@@ -123,7 +229,7 @@ bool InspectorEditor::setAndStay(ViewHost& host, const Hooks& hooks)
         if (!chosen)
         {
             host.refuse(list_->nothing(), MessageKind::Warning);
-            return true;
+            return false;
         }
         if (chosen != current_)
         {
@@ -137,45 +243,140 @@ bool InspectorEditor::setAndStay(ViewHost& host, const Hooks& hooks)
     if (why)
     {
         host.refuse(std::move(*why), MessageKind::Warning);
-        return true;
+        return false;
     }
-    revert(hooks.inspection());
     return true;
 }
 
-void InspectorEditor::revert(const Inspection& inspection)
+bool InspectorEditor::finish(bool keep, ViewHost& host, const Hooks& hooks)
 {
-    if (!heading_)
+    auto* document = std::exchange(document_, nullptr);
+    if (keep)
     {
-        return;
+        document->endGroup();
     }
-    if (const auto index = indexOf(inspection, *heading_))
+    else if (!document->cancelGroup())
     {
-        show(inspection, *index);
+        document_ = document;
+        host.refuse(document->takeRefusal().value_or("The changes can't be taken back now"),
+                    MessageKind::Warning);
+        return true;
     }
-    else
+    close();
+    host.stopTyping();
+    if (hooks.finished)
     {
-        move(inspection, 0);
+        hooks.finished(keep);
     }
+    return true;
 }
 
-void InspectorEditor::type(char32_t character)
+std::optional<bool> InspectorEditor::runPanel(std::string_view command, ViewHost& host,
+                                              const Hooks& hooks)
 {
+    if (command == "command-line-keep")
+    {
+        return !setHere(host, hooks) || finish(true, host, hooks);
+    }
+    if (command == "command-line-cancel")
+    {
+        if (list_)
+        {
+            list_.reset(); // the field as it was, the list closed
+        }
+        else if (!onButton() && !fresh_)
+        {
+            reshow(hooks.inspection());
+        }
+        else
+        {
+            finish(false, host, hooks);
+        }
+        return true;
+    }
+    if (command == "command-line-run")
+    {
+        if (onButton())
+        {
+            return finish(*heading_ == kKeep, host, hooks);
+        }
+        if (!list_ && !choices_.empty())
+        {
+            openList();
+            return true;
+        }
+        if (setHere(host, hooks))
+        {
+            reshow(hooks.inspection());
+        }
+        return true;
+    }
+    if (command == "command-line-list")
+    {
+        if (!list_)
+        {
+            openList();
+        }
+        return true;
+    }
+    if (command == "command-line-next" || command == "command-line-previous")
+    {
+        if (setHere(host, hooks))
+        {
+            move(hooks.inspection(), command == "command-line-next" ? 1 : -1);
+        }
+        return true;
+    }
     if (list_)
     {
-        list_->type(character);
-        return;
+        list_->run(command);
+        return true;
     }
-    if (std::exchange(fresh_, false))
+    if (onButton())
     {
-        line_.clear(); // typing replaces the value, as in a spreadsheet
+        return true;
     }
-    line_.insert(character);
+    if (command == "command-line-older" || command == "command-line-newer")
+    {
+        // A step of the value as it is, what was typed left aside; on a choice field, the
+        // choice before or after, round from the last to the first.
+        const int by = command == "command-line-older" ? 1 : -1;
+        std::optional<std::string> why;
+        if (!choices_.empty())
+        {
+            const auto size = static_cast<int>(choices_.size());
+            const auto at = static_cast<int>(current_.value_or(0));
+            const auto next = static_cast<std::size_t>(((at - by) % size + size) % size);
+            why = hooks.set(*heading_, choices_[next]);
+        }
+        else
+        {
+            why = hooks.step(*heading_, by);
+        }
+        if (why)
+        {
+            host.refuse(std::move(*why), MessageKind::Warning);
+            return true;
+        }
+        reshow(hooks.inspection());
+        return true;
+    }
+    if (std::exchange(fresh_, false) &&
+        (command == "command-line-backspace" || command == "command-line-delete"))
+    {
+        line_.clear(); // the value is highlighted whole, so these take it whole
+        return true;
+    }
+    return editLine(line_, command);
 }
 
 std::optional<bool> InspectorEditor::run(std::string_view command, ViewHost& host,
                                          const Hooks& hooks)
 {
+    if (document_ != nullptr)
+    {
+        return runPanel(command, host, hooks);
+    }
     const auto leave = [&]
     {
         close();

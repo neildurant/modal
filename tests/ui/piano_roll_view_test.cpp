@@ -1334,7 +1334,8 @@ TEST_CASE("dab in the piano roll takes a bar out of the track, controllers too, 
     CHECK(r.ws.message() == "ab isn't in the event list, which is for events rather than time");
 }
 
-TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab going round")
+TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab going round, "
+          "Keep and Cancel too")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Rolling r{ppqn};
@@ -1350,7 +1351,7 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     CHECK(editor.heading() == "Pitch");
     for (const auto heading :
          {"Velocity", "Release", "Start step", "Start fine", "Position", "Length steps",
-          "Length fine", "Length", "Ends step", "Ends fine", "Ends", "Pitch"})
+          "Length fine", "Length", "Ends step", "Ends fine", "Ends", "Keep", "Cancel", "Pitch"})
     {
         tab();
         CHECK(editor.heading() == heading);
@@ -1363,8 +1364,8 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     tab(); // moved to bar 2, the cursor with it
     CHECK(bassNote(r, 28)->first == t.bar(2));
     CHECK(r.view().time() == t.bar(2));
-    for (int i = 0; i < 6; ++i)
-        tab(); // round the times to Pitch
+    for (int i = 0; i < 8; ++i)
+        tab(); // round the times and the buttons to Pitch
     CHECK(editor.heading() == "Pitch");
     CHECK(editor.line().text() == U"E1");
     r.type(U"A2"); // onto the A2 there
@@ -1378,7 +1379,10 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     CHECK(bassNote(r, 29)->first == t.bar(2));
     CHECK(editor.heading() == "Velocity");
     r.type(U"+10");
-    r.press(Key::of(NamedKey::Enter));
+    r.press(Key::of(NamedKey::Enter)); // set, staying on the field
+    CHECK(editor.active());
+    CHECK(editor.heading() == "Velocity");
+    r.press(Key::of(NamedKey::Enter, kCtrl)); // kept
     CHECK_FALSE(editor.active());
     REQUIRE(r.view().currentNote());
     const auto velocity = [&]
@@ -1389,11 +1393,15 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
             .velocity;
     };
     CHECK(velocity() == 106);
+    // One undo takes the whole edit back: the move, the pitch and the velocity.
     r.type(U"u");
     CHECK(r.ws.message() == "Undid: Set velocity of F1 in Bass");
+    CHECK(bassNote(r, 28)->first == 0);
+    CHECK_FALSE(bassNote(r, 29));
     CHECK(velocity() == 96);
 
-    // Again on the field last edited; Up steps it straight away; Escape leaves the rest.
+    // Again on the field last edited; Up steps it straight away; Escape puts back what's
+    // typed, and then cancels the edit, the step too.
     r.type(U"e");
     CHECK(editor.heading() == "Velocity");
     r.press(Key::of(NamedKey::Up));
@@ -1401,7 +1409,11 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     CHECK(editor.line().text() == U"97");
     r.type(U"50");
     r.press(Key::of(NamedKey::Escape));
+    CHECK(editor.active());
     CHECK(velocity() == 97);
+    r.press(Key::of(NamedKey::Escape));
+    CHECK_FALSE(editor.active());
+    CHECK(velocity() == 96);
 
     // End editing remains available in the exact-timing group, and Tab wraps to pitch.
     r.type(U"e");
@@ -1410,14 +1422,14 @@ TEST_CASE("e edits the current note's fields in the inspector, Tab and Shift-Tab
     CHECK(editor.heading() == "Ends");
     r.type(U"2:2");
     tab();
-    CHECK(bassNote(r, 29)->second == t.quarters(1));
-    CHECK(editor.heading() == "Pitch");
+    CHECK(bassNote(r, 28)->second == t.bar(2) + t.quarters(1));
+    CHECK(editor.heading() == "Keep");
     r.press(Key::of(NamedKey::Tab, kShift));
     CHECK(editor.heading() == "Ends");
     r.press(Key::of(NamedKey::Escape));
     r.type(U"e");
     CHECK(editor.heading() == "Ends");
-    r.type(U"1:4");
+    r.type(U"1:1"); // the note's own start, back at bar 1
     tab();
     CHECK(r.ws.message() == "A note has to end after it starts");
 }
