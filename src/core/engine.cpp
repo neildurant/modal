@@ -50,11 +50,19 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
     next.start = start;
     next.chased = std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start));
     next.countIn = countIn ? std::make_shared<const PlannedCountIn>(std::move(*countIn)) : nullptr;
+    PlayData data{playRequests_ + 1, next.chased, next.countIn};
     if (!publish(std::move(next)))
     {
         return false;
     }
     ++playRequests_;
+    // The scheduler reads a play's chased events and count-in until the next play starts,
+    // which can be after the snapshots that carried them have gone. So they're kept here
+    // until the engine says it has started a later play (found in a code review, November
+    // 2026).
+    const auto started = startedPlay_.load(std::memory_order_acquire);
+    std::erase_if(plays_, [&](const PlayData& play) { return play.request < started; });
+    plays_.push_back(std::move(data));
     return woken(commands_.tryPush({Command::Kind::Play, playRequests_}));
 }
 
@@ -265,6 +273,8 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
             noteStop(now);
             scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get());
             currentPlay_ = command.request;
+            // After the scheduler has let go of the play before's chased events and count-in.
+            startedPlay_.store(command.request, std::memory_order_release);
         }
         return true;
     }

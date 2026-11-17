@@ -262,6 +262,15 @@ private:
     std::shared_ptr<const Snapshot> latest_;
     std::uint64_t playRequests_ = 0;
     std::uint64_t inputResetRequests_ = 0;
+    // What each play not yet replaced was given to chase and count in with, kept alive for the
+    // scheduler, which holds them without owning them, until a later play has started.
+    struct PlayData
+    {
+        std::uint64_t request;
+        std::shared_ptr<const std::vector<PlannedEvent>> chased;
+        std::shared_ptr<const PlannedCountIn> countIn;
+    };
+    std::vector<PlayData> plays_;
 
     // Shared.
     SnapshotExchange<Snapshot, 8> snapshots_;
@@ -295,6 +304,7 @@ private:
 
     // Status, written by the engine thread only.
     std::atomic<std::uint64_t> inputsReset_{0}; // acknowledgement, after releasing held input
+    std::atomic<std::uint64_t> startedPlay_{0}; // the last play begun, once the scheduler has it
     std::atomic<bool> playing_{false};
     std::atomic<std::uint64_t> finishedPlay_{0};
     std::atomic<bool> countingIn_{false};
