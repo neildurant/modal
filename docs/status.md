@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. The fixes and refactoring from the 17 November review are published; the practical hardware and visual trial, including the deferred status-bar trial, was accepted 17 November 2026 (see the handoff below).*
+*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. The 17 November review's fixes are published and accepted on trial, as is Thin keeping resets. Editable controller ramps are designed, every open question settled, and being built in steps (see the handoff below).*
 
 ## Current handoff
 
@@ -22,7 +22,6 @@ Implementation context for the next session:
 - The in-conversation sketch is a discussion aid, not application code or an agreed native-format/UI implementation. The agreed visual and key behaviour is written in design.md, so the handoff does not depend on that sketch.
 
 This update changes design and handoff documents only. The implemented Thin reset-preservation work below is separately complete and accepted.
-
 
 Reset preservation in Thin is implemented in `3a18b60` and its functional trial was accepted 17 November 2026. Thin keeps every eligible selected zero event, including repeated resets and pitch bend centre; core regressions cover all three test PPQNs, with Workspace command/undo coverage. The regression first failed against the old algorithm, then passed after adding zero to its keep condition: focused thinning/Workspace tests pass (7 cases, 139 assertions). Help and manual references are updated, and both HTML and PDF manuals build. Final native Linux validation on 17 November 2026 passes all six configurations through `tools/check-linux.sh`: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 1,101 registered tests and no failures. Whole-tree formatting and `git diff --check` pass, and the GCC Debug application is newer than every tracked build input. Published through `2acb393`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44078673808), along with the manual workflow.
 
