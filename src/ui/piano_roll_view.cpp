@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <optional>
 #include <string>
@@ -5081,7 +5082,10 @@ void PianoRollView::addPedalRegions(const LaneDrawing& d, core::TrackId track) c
     std::optional<int> held;
     core::Tick from = d.page.start;
     bool regionStart = false;
-    const auto onRegion = inLane_ ? laneNote() : std::nullopt;
+    // The region the cursor's on, by its press, or kNone: not an optional, which GCC's release
+    // build takes for uninitialised once this is a function of its own.
+    constexpr auto kNone = std::numeric_limits<std::size_t>::max();
+    const std::size_t onRegion = inLane_ ? laneNote().value_or(kNone) : kNone;
     std::optional<std::size_t> press; // the region being drawn, by its press
     const auto segment = [&](core::Tick to)
     {
@@ -5099,7 +5103,7 @@ void PianoRollView::addPedalRegions(const LaneDrawing& d, core::TrackId track) c
         const auto alpha = static_cast<std::uint8_t>(60 + (*held - 64) * 100 / 63);
         // The region the cursor's in, in the brightest colour, as a current event is.
         // And those a selection takes in its colour, as notes are (decided 16 November 2026).
-        const auto role = press && press == onRegion ? Role::Text
+        const auto role = press && *press == onRegion ? Role::Text
                           : press && std::ranges::binary_search(d.taken, *press)
                               ? Role::NoteSelected
                               : Role::Note;
@@ -5133,7 +5137,7 @@ void PianoRollView::addPedalRegions(const LaneDrawing& d, core::TrackId track) c
     }
     segment(d.page.end);
     // Between regions, a thin line where the cursor is, as between a controller's events.
-    if (inLane_ && !onRegion && time_ >= d.page.start && time_ < d.page.end)
+    if (inLane_ && onRegion == kNone && time_ >= d.page.start && time_ < d.page.end)
     {
         d.lane.over.push_back({{d.scale.toX(time_), 0, d.lineWidth, d.height}, Role::Text, 255});
     }
