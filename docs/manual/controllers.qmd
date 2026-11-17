@@ -110,6 +110,28 @@ selection idea applies, but the vertical dimension now means value rather
 than pitch. Moving or deleting data must preserve the order and validity
 of the messages; an invalid batch is refused.
 
+## Reducing dense controller data {#sec-controller-thinning}
+
+A controller gesture can contain many more events than are needed to describe
+its shape. Thin reduces that density within the selected passage, or the
+cursor's bar when nothing is selected. For example, `:thin cc1 per=16 step=2`
+thins modulation to events spaced at least a sixteenth of a quarter note
+apart and changed by at least two value steps. Use `bend`, `aftertouch` or
+`all` in place of `cc1` for the other continuous data. The leader route is
+`, x d`, followed by a range or object and the settings it asks for.
+
+Thin always keeps each gesture's first and last events and **every zero
+value**, even repeated zeros. A pitch bend value of zero is its centre;
+a pressure value of zero releases the pressure. Removing a return to zero
+partway through a phrase could leave the instrument bent or modulated until
+the next surviving event. These protected events can exceed the requested
+density. A retained reset becomes the reference for spacing and value changes
+after it. Events outside the target remain unchanged, and the whole edit undoes
+as one step.
+
+Pedals and other switch controllers are left alone by Thin: their changes
+are actions to preserve, rather than points along a continuous curve.
+
 ## Pedals can be understood as regions
 
 For switch-like controllers 64 to 69, the lane can show **regions** where

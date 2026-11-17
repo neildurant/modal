@@ -493,7 +493,7 @@ Transformed thin(const EventList& events, std::span<const std::size_t> which, Th
             const bool last = n + 1 == end || events[points[n + 1].index].tick - tick > gestureGap;
             const bool enough = kept && tick - events[points[*kept].index].tick >= spacing &&
                                 std::abs(points[n].value - points[*kept].value) >= step;
-            if (first || last || enough)
+            if (first || last || points[n].value == 0 || enough)
             {
                 kept = n;
                 continue;

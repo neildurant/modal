@@ -1896,3 +1896,52 @@ TEST_CASE("A colon command's refusal stops a macro independently of message seve
     CHECK(o.ws.arrangement().page().track() == (refused ? std::size_t{0} : std::size_t{1}));
     CHECK(o.ws.refused() == refused);
 }
+
+TEST_CASE(":thin preserves resets in a dense controller gesture and undoes as one edit")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Operating o{ppqn};
+    const auto id = o.document.song().tracks()[0]->id();
+    const auto unit = o.q / 16;
+    o.document.edit(
+        "Controller gesture", {},
+        [&](core::Song& song)
+        {
+            song.updateEvents(
+                id,
+                [&](core::EventList& events)
+                {
+                    for (const auto& [n, value] :
+                         {std::pair{0, 64}, {1, 65}, {2, 0}, {3, 0}, {4, 6}, {5, 7}})
+                        events.insert(
+                            {n * unit, core::ControlChange{1, static_cast<std::uint8_t>(value)}});
+                });
+        });
+    o.ws.refresh();
+    o.document.markSaved();
+    const auto before = o.document.song();
+    const auto cursor = o.ws.arrangement().cursor();
+    o.ws.setLineHandler([&](const std::string& line) { o.ws.report(o.registry.runLine(line)); });
+    o.type(U":thin cc1 per=1 step=64");
+    o.press(NamedKey::Enter);
+    CHECK_FALSE(o.ws.refused());
+    CHECK(o.ws.message().empty());
+    CHECK(o.ws.arrangement().cursor() == cursor);
+    auto expected = before;
+    expected.updateEvents(id,
+                          [&](core::EventList& events)
+                          {
+                              for (std::size_t i = events.size(); i-- > 0;)
+                                  if (const auto* cc =
+                                          std::get_if<core::ControlChange>(&events[i].data);
+                                      cc && cc->controller == 1 &&
+                                      (events[i].tick == unit || events[i].tick == 4 * unit))
+                                      events.erase(i);
+                          });
+    CHECK(o.document.song() == expected);
+    CHECK(o.document.modified());
+    o.type(U"u");
+    CHECK(o.document.song() == before);
+    CHECK_FALSE(o.document.modified());
+    CHECK(o.ws.message().starts_with("Undid: Thin the cc1"));
+}

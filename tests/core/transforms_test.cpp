@@ -510,6 +510,76 @@ TEST_CASE("thinning keeps each gesture's ends and events far enough apart and ch
     CHECK(count(thin(list, allOf(list), {ThinWhat::Kind::Controller, 7}, 4 * tick, 2, q), 1) == 23);
 }
 
+TEST_CASE("thinning preserves every reset inside a dense gesture")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto unit = ppqn.quarter() / 16;
+    using Curve = std::variant<ControlChange, PitchBend, ChannelPressure, PolyPressure>;
+    const auto reset = GENERATE(Curve{ControlChange{74, 0}}, Curve{PitchBend{0}},
+                                Curve{ChannelPressure{0}}, Curve{PolyPressure{60, 0}});
+    const auto point = [&](int n, int value)
+    {
+        return std::visit(
+            [&](auto data) -> Event
+            {
+                data.value = static_cast<decltype(data.value)>(value);
+                return {n * unit, data};
+            },
+            reset);
+    };
+    const auto list =
+        listOf({point(0, 5), point(1, 6), point(2, 0), point(3, 0), point(4, 5), point(5, 6)});
+    ThinWhat what;
+    if (GENERATE(false, true))
+    {
+        what = reset.index() == 0   ? ThinWhat{ThinWhat::Kind::Controller, 74}
+               : reset.index() == 1 ? ThinWhat{ThinWhat::Kind::Bend}
+                                    : ThinWhat{ThinWhat::Kind::Aftertouch};
+    }
+    CHECK(eventsOf(thin(list, allOf(list), what, ppqn.quarter(), 64, ppqn.quarter())) ==
+          std::vector<Event>{point(0, 5), point(2, 0), point(3, 0), point(5, 6)});
+}
+
+TEST_CASE("thinning resets respects selected events and independently filtered streams")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto unit = q / 16;
+    const auto list = listOf({pedal(0, 10, 1), pedal(unit, 0, 1), pedal(2 * unit, 0, 11),
+                              pedal(3 * unit, 11, 1), pedal(4 * unit, 0, 1), pedal(5 * unit, 12, 1),
+                              pedal(6 * unit, 127, 64), note(7 * unit, 60, q)});
+    auto selected = allOf(list);
+    selected.erase(selected.begin() + 1); // an unselected reset stays untouched
+    CHECK(eventsOf(thin(list, selected, {ThinWhat::Kind::Controller, 1}, q, 64, q)) ==
+          std::vector<Event>{list[0], list[1], list[2], list[4], list[5], list[6], list[7]});
+}
+
+TEST_CASE("a retained bend reset is the reference for later thinning decisions")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto unit = q / 8;
+    SECTION("spacing is counted from the reset")
+    {
+        const auto list = listOf({{0, PitchBend{100}},
+                                  {unit, PitchBend{90}},
+                                  {2 * unit, PitchBend{0}},
+                                  {3 * unit, PitchBend{-10}},
+                                  {4 * unit, PitchBend{-11}},
+                                  {5 * unit, PitchBend{-12}}});
+        CHECK(eventsOf(thin(list, allOf(list), {}, 2 * unit, 2, q)) ==
+              std::vector<Event>{list[0], list[2], list[4], list[5]});
+    }
+    SECTION("value change is measured from the reset")
+    {
+        const auto list = listOf({{0, PitchBend{5}},
+                                  {unit, PitchBend{0}},
+                                  {2 * unit, PitchBend{8}},
+                                  {3 * unit, PitchBend{11}},
+                                  {4 * unit, PitchBend{12}}});
+        CHECK(eventsOf(thin(list, allOf(list), {}, 0, 10, q)) ==
+              std::vector<Event>{list[0], list[1], list[3], list[4]});
+    }
+}
+
 TEST_CASE("remapping changes a controller or a pitch, and removing drops the events chosen")
 {
     const auto ppqn = MODAL_ANY_PPQN();

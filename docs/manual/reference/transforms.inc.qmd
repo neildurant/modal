@@ -214,7 +214,7 @@ Make the notes a range or object takes legato, each note or chord held until the
 
 ## :thin {#ref-transform-thin}
 
-Thin out dense controller, pitch bend and aftertouch data in a range or object, asking which, the most to keep a quarter note (16) and the smallest change kept (2); each gesture's first and last kept, and never the pedals or other switches.
+Thin out dense controller, pitch bend and aftertouch data in a range or object, asking which, the most to keep a quarter note (16) and the smallest change kept (2); each gesture's first and last and every zero (including pitch bend centre) kept, and never the pedals or other switches.
 
 **Syntax:** `` :thin [all|ccN|bend|aftertouch] [per=16] [step=2] ``.
 

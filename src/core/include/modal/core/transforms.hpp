@@ -112,8 +112,9 @@ bool isThinnable(int controller);
 
 // Thinning dense continuous data (decided November 2026): of each controller's events (not
 // the switches'), pitch bend's, channel aftertouch's or each note's poly aftertouch, a gesture
-// being those with no gap longer than gestureGap, the first and last of each kept, and of the
-// rest those at least spacing after the last kept and changed from it by step or more.
+// being those with no gap longer than gestureGap. Keep the first and last of each and every
+// zero (including bend centre and repeated resets), even closer than spacing. Other events
+// need at least spacing after the last kept and a change from it of step or more.
 struct ThinWhat
 {
     enum class Kind : std::uint8_t

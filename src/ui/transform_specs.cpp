@@ -315,7 +315,8 @@ std::span<const Workspace::TransformSpec> Workspace::transformSpecs()
              .description =
                  "Thin out dense controller, pitch bend and aftertouch data in a range or object, "
                  "asking which, the most to keep a quarter note (16) and the "
-                 "smallest change kept (2); each gesture's first and last kept, "
+                 "smallest change kept (2); each gesture's first and last and every zero "
+                 "(including pitch bend centre) kept, "
                  "and never the pedals or other switches",
              .asks = Asks::InTurn,
              .label = "Thin the controllers, bends and aftertouch of {}",
