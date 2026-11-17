@@ -4,6 +4,7 @@
 
 #include <modal/core/document.hpp>
 #include <modal/core/engine.hpp>
+#include <modal/core/files.hpp>
 #include <modal/core/player.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
@@ -516,6 +517,17 @@ void fail(const std::string& message)
     ui::sdl::showError("Modal", "Modal " + message + "."); // there's no console on Windows
 }
 
+// Writes one of the state directory's files, whole or not at all, so a crash or a full disk
+// part-way can't leave half a ports table or half of what's remembered (found in a code
+// review, November 2026). A failure is left unsaid: the file is a convenience, written often.
+void writeState(const std::filesystem::path& file, const std::string& text)
+{
+    std::error_code error;
+    std::filesystem::create_directories(file.parent_path(), error);
+    static_cast<void>(core::writeFileAtomically(
+        file, {reinterpret_cast<const std::uint8_t*>(text.data()), text.size()}));
+}
+
 // modal --write-config FILE [--force]: writes the config, after modalrc, to start a modalrc
 // from (see configText). Returns the exit status.
 int writeConfig(const std::filesystem::path& file, bool force, const std::string& text)
@@ -657,13 +669,7 @@ int main(int argc, char* argv[])
             {
                 message = message.empty() ? errors.front() : message + "; " + errors.front();
             }
-            save = [file](const ui::PortTable& table)
-            {
-                std::error_code error;
-                std::filesystem::create_directories(file.parent_path(), error);
-                std::ofstream out{file, std::ios::binary | std::ios::trunc};
-                out << table.text();
-            };
+            save = [file](const ui::PortTable& table) { writeState(file, table.text()); };
         }
         playback.setPorts(std::move(ports), std::move(save));
     }
@@ -695,14 +701,8 @@ int main(int argc, char* argv[])
         std::ifstream in{file, std::ios::binary};
         const std::string text{std::istreambuf_iterator<char>{in},
                                std::istreambuf_iterator<char>{}};
-        view.setRemembered(ui::Remembered::read(text),
-                           [file](const ui::Remembered& remembered)
-                           {
-                               std::error_code error;
-                               std::filesystem::create_directories(file.parent_path(), error);
-                               std::ofstream out{file, std::ios::binary | std::ios::trunc};
-                               out << remembered.text();
-                           });
+        view.setRemembered(ui::Remembered::read(text), [file](const ui::Remembered& remembered)
+                           { writeState(file, remembered.text()); });
     }
     view.show(ui::ViewKind::Arrangement); // the home view
     // The Ports view's table, and what changing it or looking again does: listen to the

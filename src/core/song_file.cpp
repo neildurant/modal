@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "files.hpp"
-
+#include <modal/core/files.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/core/song_file.hpp>

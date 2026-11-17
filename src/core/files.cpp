@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "files.hpp"
+#include <modal/core/files.hpp>
 
 #include <cstdio>
 #include <fstream>

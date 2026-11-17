@@ -70,8 +70,8 @@ public:
     // Starts playing from a tick, after sending the chased events (from chase()). With a
     // lead-in or a count-in, the start tick is reached after the longer of the two; the
     // count-in clicks before it, with the song silent, so the chased notes wait until the
-    // count-in has gone by, while the chased values go at once. If already playing, the notes sounding
-    // end first, and the pedals held down come up. Does nothing without a plan. The caller
+    // count-in has gone by, while the chased values go at once. If already playing, the notes
+    // sounding end first, and the pedals held down come up. Does nothing without a plan. The caller
     // keeps the count-in alive while the scheduler uses it.
     void play(Tick start, std::span<const PlannedEvent> chased, std::chrono::nanoseconds now,
               const PlannedCountIn* countIn = nullptr) noexcept;
