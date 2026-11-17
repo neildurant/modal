@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <iterator>
 #include <ranges>
 #include <string>
@@ -269,13 +270,33 @@ void addChoiceList(Frame& frame, const InspectorEditor* editor, Rect listAt, Rec
         frame.push_back(editor->list()->region(listAt, within, cell));
 }
 
+namespace
+{
+
+// The panel tinted while a field in it is being edited, as the controller lane is while the
+// cursor's in it, so where the keys go shows (asked for 17 November 2026, after use).
+constexpr std::uint8_t kEditingTint = 80;
+
+Region tintedWhileEditing(Region region, const InspectorEditor* editor)
+{
+    if (editor != nullptr && editor->active())
+        region.under.insert(region.under.begin(),
+                            Shape{{0, 0, region.bounds.width, region.bounds.height},
+                                  Role::Selection,
+                                  kEditingTint});
+    return region;
+}
+
+} // namespace
+
 Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, CellSize cell,
                        int positionWidth, const InspectorEditor* editor, Rect* listAt)
 {
     if (inspection.kind == "Note" &&
         std::ranges::find(inspection.fields, "Units", &InspectorField::heading) !=
             inspection.fields.end())
-        return noteInspectorRegion(inspection, bounds, width, cell, positionWidth, editor);
+        return tintedWhileEditing(
+            noteInspectorRegion(inspection, bounds, width, cell, positionWidth, editor), editor);
     // On a panel of its own: the kind of row, then headings above their values. Each column
     // is as wide as its longest value can be, so the columns stay put as the cursor moves;
     // a value that doesn't fit is cut short, and those after it left out.
@@ -356,7 +377,7 @@ Region inspectorRegion(const Inspection& inspection, Rect bounds, int width, Cel
                        std::min(wide, room), cell, editor, false, listAt);
         at += wide + 3;
     }
-    return region;
+    return tintedWhileEditing(std::move(region), editor);
 }
 
 void addRowSigns(Region& region, std::vector<RowSign> signs, CellSize cell)
