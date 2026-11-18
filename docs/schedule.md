@@ -104,11 +104,15 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — All six Linux configurations pass; application rebuilt for the local trial.
             - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
         - [ ] **Doing** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
-            - [ ] **Doing** — Program-change remapping implemented with regressions; functional trial pending.
-            - [ ] **Doing** — Held-contour retrograde implemented with boundary, known-context and complete-selection checks; trial pending.
-            - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; trial pending.
+            - [ ] **Doing** — Program-change remapping implemented with regressions; trial requested clearer prompts.
+            - [ ] **Doing** — Held-contour retrograde implemented; trial found a two-event `v`-selection span bug.
+            - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; active-ramp refusal confirmed on trial.
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
-            - [ ] **To do** — Functional acceptance and publication.
+            - [ ] **To do** — Reproduce and fix the two-event Visual-selection retrograde span; agree its implicit right edge first. See [status.md](status.md).
+            - [ ] **To do** — Add matching retrograde menu letters; latest proposal is `, c x` and `, x x`, with the old binding's alias policy to settle.
+            - [ ] **To do** — Replace interactive remap syntax questions with Type, From and To prompts, mapping within one type.
+            - [ ] **To do** — Follow-up regressions, manual/reference updates, Linux checks and rebuilt application for trial.
+            - [ ] **To do** — Final functional acceptance and publication; current work is being pushed for continuation elsewhere with the known issue recorded.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.

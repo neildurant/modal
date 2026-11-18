@@ -782,6 +782,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Controller retrograde reverses the held contour (decided 18 November 2026, before step 3).** Reverse the audible held-value contour across the selected span, allowing boundary messages where needed. Controller messages hold their values until the next one, so merely mirroring the timestamps of the existing points would not reproduce the passage backwards. Boundary and protected-ramp details are being settled before implementation.
 
+**Remap asks for a type and two values (decided after step 3 trial, 18 November 2026; implementation pending).** Replace the interactive questions requiring `program 5`, `cc1` or a pitch with Type (Program, Controller or Note), From and To. This makes the expected input clear without knowing the command syntax. Both values belong to the chosen type: remapping does not convert between MIDI event types, so no destination-type question is offered. Keep explicit `:remap` forms for direct use.
+
 
 **Controller retrograde's edges and ramp conflicts (decided 18 November 2026, before step 3).** Hold the reversed passage's new final value until the next untouched event, consistently with ramp edits, leaving an existing event at the right boundary alone. Refuse when the starting held value is unknown rather than inventing one. Refuse an entire timing edit that would move ordinary data into a same-stream protected ramp, or retrograde across its owned span, preserving everything; conversion to ordinary events makes that passage available to transform. Splitting a timing edit around a protected ramp would obscure what was reversed.
 

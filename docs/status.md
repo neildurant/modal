@@ -2,11 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: controller shaping step 2 and the step 3 design follow-up are published with hosted CI passing. Step 3 (program remapping, held-contour retrograde and timing guards) is implemented and validated locally; a functional trial is pending before publication.*
+*Last updated 18 November 2026: step 3 is implemented in `2a485a3` and passed local validation. Functional trial found a two-event Visual-selection retrograde bug and prompted remap/menu improvements. The current implementation and this handoff are being published at the user's request for continuation on another machine; step 3 is not accepted as complete.*
 
 ## Current handoff
 
-### Controller shaping: step 3 validated locally, trial pending, 18 November 2026
+### Controller shaping: step 3 trial feedback and continuation, 18 November 2026
+
+Resume with the step 3 follow-up in [schedule.md](schedule.md), before drum maps. Trial confirmed that retrograde refuses an active editable ramp and works as expected after conversion to ordinary events. On a bar containing only two CC7 messages with different values and positions, selecting them with **`v` and movement** then applying retrograde put both near the first event, one tick apart. This is reported trial evidence; an automated reproduction of this exact selection is still needed.
+
+Inspection identifies a likely cause in `PianoRollView::laneSpan()`: an event-based lane selection ends at `lastSelectedTick + 1`, and `target()` supplies that span to held-contour retrograde. Reflecting the last transition over that span puts it one tick after the first selected event. Existing tests cover explicit bar/time spans and partial box/search refusals but missed this ordinary two-event Visual selection. Establish an appropriate musical right edge for this case, preserving explicit time ranges and avoiding accidental changes to other lane operations that share `laneSpan()`. The exact implicit endpoint policy still needs agreement before implementation; do not silently change the agreed contour semantics into timestamp mirroring. Add a failing Workspace regression first, at both test PPQNs, with core coverage as needed, and retain the boundary/context/ramp guards.
+
+Retrograde should also be discoverable under Controllers. The latest proposal is **`, c x` and `, x x`**, giving it the same letter in both menus; both are currently unbound in the built-in keymap. This replaces the earlier suggestion of `, c b`. No binding has changed: `, x R` remains the implemented route and `, c R` still converts a ramp. Settle whether the old retrograde binding remains as an alias when implementing, then update keymap tests, grammar, manual and generated references.
+
+The two free-form remap questions were awkward in trial. Agreed follow-up: ask **Type (Program / Controller / Note), From, To**, with numbers or pitches appropriate to the chosen type, choices/completion and clear labels. Mapping remains within the selected type; cross-type conversion is not supported or planned by this change, so a second type question would be misleading. Keep explicit `:remap` arguments usable and cover prompt cancellation, invalid values, repeat-last-change and undo. The agreed prompt behaviour is recorded in [design.md](design.md); its implementation and manual changes are outstanding.
+
+The implementation details and validation below describe `2a485a3`, before these follow-ups. No source code or user manual was changed for this handoff. Re-run appropriate Linux checks, regenerate references and build both manual formats after implementing the follow-ups, then rebuild for another functional trial. Publishing the current work to continue elsewhere is explicitly authorised despite the outstanding trial issue. Hosted CI for this push must be watched and its result reported.
 
 Design and implementation plan approved 18 November 2026. `core::remapProgram` and `:remap program 5 to=program 12` change only matching program-change events in the target (0–127), keeping bank messages and track setup. The existing `, x m` route asks the same forms.
 
@@ -16,14 +26,14 @@ Design and implementation plan approved 18 November 2026. `core::remapProgram` a
 
 Regressions cover program-only mapping and setup/bank preservation; CC, bend and pressure contours, right edges, held tails, reverse-twice audible equivalence, same-tick ordering and near-limit tick arithmetic; unknown/reset/program/SysEx context and partial selections; ramp ownership multiplicity and destinations; non-Visual lane timing scope, position-field refusals, undo and unchanged song versions/cursors after refusals. Focused checks pass (14 cases, 582 assertions). Native Linux validation passes all six configurations through `tools/check-linux.sh`: GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer, each with 1,170 registered tests, three skipped and no failures. The initial combined run was interrupted during Clang Debug; the remaining four configurations subsequently passed individually. Whole-tree formatting and `git diff --check` pass. Manual prose, grammar, key and generated transform references are updated; HTML/PDF build and the new controller timing/program-remapping material on PDF pages 37–38 was visually checked.
 
-Functional trial before pushing:
+Original functional trial checklist (not all items individually confirmed):
 
 - `:remap program 5 to=program 12`, or `, x m ib` and the two program forms; check only matching timeline events change and `u` restores them, with the starting Tracks patch/banks untouched.
 - In a continuous lane with a value known at its start, `:retrograde` or `, x R ib`: compare what plays, not only the dots. The manual's example is 20 on beat 1 and 100 on beat 2: reversal starts at 100 and changes to 20 on beat 4. Try a time selection, bend/aftertouch, and `u`.
 - Try an unknown starting value, an incomplete value box or filtered selection, a state-changing action partway through, and a same-stream protected ramp (all refused). An existing event exactly at the right boundary stays; another lane's ramp is unaffected.
 - `t ib`, `T ib`, `:stretch 1/2` in a lane leave notes and other controllers alone. Try moving an ordinary point into a sparse ramp with Alt-l, an operator or its event-list position field: the whole edit and cursor stay put with a ramp refusal.
 
-The step remains committed locally for trial, without pushing. The GCC Debug application at `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No hardware trial or latency/jitter measurement is claimed. After this step's acceptance, the next scheduled feature is drum maps, with their open design questions in design.md.
+The GCC Debug application at `build/linux-gcc/apps/Debug/modal` is newer than every tracked application build input. No hardware latency/jitter measurement is claimed. After this step's acceptance, the next scheduled feature is drum maps, with their open design questions in design.md. `SequencerPlusGoldManualv4.pdf` is a local, untracked reference and must not be added to the repository.
 
 ### Controller shaping: step 2 accepted and published, 18 November 2026
 
