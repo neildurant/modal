@@ -261,7 +261,7 @@ therefore gives the same result as the whole bar, and two lone messages
 in a bar simply change places.
 
 In a continuous controller lane, use `:retrograde` for the selection or
-cursor's bar, or `, x R` followed by a time target. `t` and `T` shift the
+cursor's bar, or `, c x` (or `, x x`) followed by a time target. `t` and `T` shift the
 lane's selected events later and earlier, and `:stretch` changes their
 spacing about the first selected event. Notes and other controller lanes
 stay where they are. In the notes area, retrograde still reverses notes.

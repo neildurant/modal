@@ -1100,7 +1100,7 @@ TEST_CASE("lane timing transforms affect the active contour and preserve notes a
     othersStay();
     r.type(U"u");
     CHECK(r.document.song() == before);
-    r.type(U"vib,xR");
+    r.type(U"vib,cx");
     CHECK(cleanupValues(r, 1) == std::vector<int>{40, 100, 10, 77});
     r.type(U"u");
     CHECK(r.document.song() == before);
@@ -1114,6 +1114,9 @@ TEST_CASE("lane timing transforms affect the active contour and preserve notes a
     CHECK(times() == std::vector<core::Tick>{0, q / 2, 3 * q / 2, 4 * q});
     othersStay();
     r.type(U"u");
+    CHECK(r.document.song() == before);
+    // Retrograde moved to , c x and , x x; , x R no longer reverses anything.
+    r.type(U"vib,xR");
     CHECK(r.document.song() == before);
 }
 
@@ -1217,7 +1220,7 @@ TEST_CASE("controller retrograde of selected events reverses what is heard until
     };
     setCleanupEvents(r, {{0, core::ControlChange{1, 20}}, {2 * q, core::ControlChange{1, 100}}});
     auto before = r.document.song();
-    r.type(U"v\t,xR");
+    r.type(U"v\t,xx");
     CHECK(r.ws.messageKind() != MessageKind::Warning);
     CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20});
     CHECK(times() == std::vector<core::Tick>{0, 2 * q});
@@ -1230,7 +1233,7 @@ TEST_CASE("controller retrograde of selected events reverses what is heard until
                          {3 * q, core::ControlChange{1, 60}}});
     r.type(U"[b");
     REQUIRE(r.view().cursor().tick == 0);
-    r.type(U"v\t,xR");
+    r.type(U"v\t,xx");
     CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
     CHECK(times() == std::vector<core::Tick>{0, 2 * q, 3 * q});
 
@@ -1240,7 +1243,7 @@ TEST_CASE("controller retrograde of selected events reverses what is heard until
                          {5 * q, core::ControlChange{1, 60}}});
     r.type(U"[b");
     REQUIRE(r.view().cursor().tick == 0);
-    r.type(U"v\t,xR");
+    r.type(U"v\t,xx");
     CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
     CHECK(times() == std::vector<core::Tick>{0, 2 * q, 5 * q});
 }
@@ -1321,7 +1324,7 @@ TEST_CASE("controller retrograde follows bend and aftertouch lanes and refuses s
         {{0, data(first)}, {q, data(100)}, {3 * q, data(40)}, {q / 2, core::ControlChange{1, 50}}});
     r.line(bend ? U"lane bend" : U"lane aftertouch");
     const auto before = r.document.song();
-    r.type(U",xRib");
+    r.type(U",xxib");
     std::vector<int> values;
     for (const auto& event : r.document.song().events(r.id()).all())
     {

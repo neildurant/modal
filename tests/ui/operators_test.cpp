@@ -1425,7 +1425,7 @@ TEST_CASE("Inverting goes about the first note, at Enter, and retrograde reverse
     o.press(NamedKey::Enter);                            // about E1, the lowest of the first chord
     CHECK(o.notes()[0] == std::pair{core::Tick{0}, 25}); // G1 to C#1
     CHECK(o.notes()[1] == std::pair{core::Tick{0}, 28});
-    o.type(U"u2!!R"); // bars 1 and 2: the chord's eighth and the A2's quarter
+    o.type(U"u2!!x"); // bars 1 and 2: the chord's eighth and the A2's quarter
     CHECK(o.notes()[0] == std::pair{core::Tick{0}, 45});
     CHECK(o.notes()[1].first == 4 * q + q / 2);
 }

@@ -46,7 +46,7 @@ Reverse the order in time of the notes a range or object takes, mirroring their 
 
 **Syntax:** `` :retrograde ``.
 
-**Choose before a target:** `` , x R ``.
+**Choose before a target:** `` , c x ``, `` , x x ``.
 
 ## :vel-lift {#ref-transform-velocity-lift}
 
