@@ -71,6 +71,9 @@ public:
     bool typing() const override { return field_.has_value() || editor_.active(); }
     std::optional<std::string> typingHint() const override
     {
+        // On a ramp's point, where to change it, as the piano roll's lane says on a ramp.
+        if (!typing() && !host_.selection() && rampOf(row_))
+            return "A ramp's point: change the ramp in the piano roll's lane";
         if (!typing())
             return std::nullopt;
         return "Enter sets it, Tab goes on, Escape leaves it; Up and Down step it";
@@ -146,9 +149,8 @@ private:
     bool operateRows(std::string_view op, std::size_t from, std::size_t to,
                      std::optional<core::Tick> bar = std::nullopt, core::Tick span = 0);
     // The same for some of the track's events, by index in order, the cursor going to a row.
-    bool operateEvents(std::string_view op, const std::vector<std::size_t>& indices,
-                       std::size_t row, std::optional<core::Tick> bar = std::nullopt,
-                       core::Tick span = 0);
+    bool operateEvents(std::string_view op, const std::vector<std::size_t>& taken, std::size_t row,
+                       std::optional<core::Tick> bar = std::nullopt, core::Tick span = 0);
     // The notes of the chord holding the note on the cursor's row and as many chords after it
     // as the count says less one (ic), or none, saying so, if it isn't a note's.
     std::vector<std::size_t> chordHere(int count);
@@ -157,6 +159,10 @@ private:
     // Starts editing the field under the cursor in place, with its value in it; then sets it
     // from what's typed, or steps it.
     Inspection inspection() const;
+    // The ramp whose point the row is, as its index in the track's ramps; and a refusal to
+    // edit that point one by one, saying where its ramp is changed.
+    std::optional<std::size_t> rampOf(std::size_t row) const;
+    bool refuseRampPoint(std::size_t ramp);
     std::optional<bool> runInspector(std::string_view command);
     bool openField();
     bool addNote(); // o: a note at the cursor's time, editing its pitch first

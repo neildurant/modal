@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/controllers.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/track_fields.hpp>
@@ -823,6 +824,77 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
         ++put.tracks;
     }
     return put;
+}
+
+std::string laneTitle(const core::Lane& lane)
+{
+    switch (lane.kind)
+    {
+    case core::Lane::Kind::Controller:
+    {
+        const auto name = core::controllerName(lane.controller);
+        return std::to_string(lane.controller) + (name.empty() ? "" : " " + name);
+    }
+    case core::Lane::Kind::PitchBend:
+        return "Pitch bend";
+    case core::Lane::Kind::Pressure:
+        return "Aftertouch";
+    case core::Lane::Kind::Velocity:
+        break;
+    }
+    return "Velocity";
+}
+
+std::string shapeName(core::ControllerRamp::Shape shape)
+{
+    for (const auto& [each, name] : kRampShapes)
+    {
+        if (each == shape)
+        {
+            return std::string{name};
+        }
+    }
+    return "Linear";
+}
+
+Inspection rampInspection(const core::ControllerRamp& ramp, const core::MeterMap& meter)
+{
+    Inspection result;
+    result.kind = "Ramp";
+    // Dim but while its draft is open, as every inspector's values are (decided 17 November
+    // 2026, after use), which the drawing sees to.
+    const auto add =
+        [&](std::string heading, std::string value, std::string editText = {}, bool editable = true)
+    {
+        result.fields.push_back({.heading = std::move(heading),
+                                 .value = std::move(value),
+                                 .editable = editable,
+                                 .editText = std::move(editText)});
+    };
+    add("Start", positionText(meter, ramp.start));
+    add("End", positionText(meter, ramp.end()));
+    add("From", std::to_string(ramp.from));
+    add("To", std::to_string(ramp.to));
+    add("Shape", shapeName(ramp.shape));
+    auto& shape = result.fields.back();
+    for (const auto& [each, name] : kRampShapes)
+    {
+        shape.choices.emplace_back(name);
+    }
+    // The curve's amount always in its place, so the fields after it don't move as the shape
+    // changes (decided 17 November 2026, after use); a dash, and passed over, for another shape.
+    if (ramp.shape == core::ControllerRamp::Shape::Curve)
+    {
+        add("Amount", (ramp.amount > 0 ? "+" : "") + std::to_string(ramp.amount),
+            std::to_string(ramp.amount));
+    }
+    else
+    {
+        add("Amount", "-", {}, false);
+    }
+    add("Density", std::to_string(ramp.density) + " a quarter", std::to_string(ramp.density));
+    result.fields.push_back({"Controller", laneTitle(ramp.lane)});
+    return result;
 }
 
 std::optional<RampCut> rampCut(const core::Song& song, std::size_t first, std::size_t last,

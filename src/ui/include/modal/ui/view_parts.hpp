@@ -13,6 +13,7 @@
 #include <modal/ui/view.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -285,6 +286,24 @@ Put rippleInsert(core::Song& song, const EventRegister& reg, std::size_t firstTr
 // register holds them, their ticks from its start, with its length.
 EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t last,
                          core::Tick from, core::Tick to);
+
+// How a lane is named in its list and the inspector: Velocity, 74 Brightness, Pitch bend,
+// Aftertouch.
+std::string laneTitle(const core::Lane& lane);
+
+// A ramp's shapes and their names, in the order Up and Down step through them.
+inline constexpr std::array<std::pair<core::ControllerRamp::Shape, std::string_view>, 4>
+    kRampShapes{{
+        {core::ControllerRamp::Shape::Linear, "Linear"},
+        {core::ControllerRamp::Shape::Curve, "Curve"},
+        {core::ControllerRamp::Shape::SCurve, "S-curve"},
+        {core::ControllerRamp::Shape::EqualPower, "Equal power"},
+    }};
+std::string shapeName(core::ControllerRamp::Shape shape);
+
+// A ramp in the inspector: its span, its values, its shape, the curve's amount and how dense
+// its points are, as the piano roll's lane edits them and the event list shows them.
+Inspection rampInspection(const core::ControllerRamp& ramp, const core::MeterMap& meter);
 
 // A ramp on tracks (counting from 0, first to last) that a cut at a time, or either end of a
 // span, would go through, as taking time out, inserting it or taking a span does: one starting

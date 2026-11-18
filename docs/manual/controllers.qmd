@@ -274,8 +274,12 @@ refused, and the message names the ramp:
 - Recording the same controller over a ramp replaces it: the take removes
   the ramp, and one undo restores both.
 
-The event list shows what plays, including a ramp's points; change them
-through the ramp in the piano roll's lane. A controller ramp is also
+The event list shows what plays, including a ramp's points, drawn in the
+accent colour as the lane draws them. With the cursor on one, the inspector
+shows its ramp. A point can't be deleted or changed there; change the ramp
+in the piano roll's lane instead. `d` and `y` over rows in the event list
+take the other events and leave the ramps' points, saying how many ramps
+they left. A controller ramp is also
 unrelated to the `:vel-ramp` transform, which sets a passage of notes'
 velocities from one value to another (@sec-transform-reference).
 

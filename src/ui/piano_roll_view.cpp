@@ -1686,11 +1686,6 @@ bool PianoRollView::isSwitchLane() const
     return isPedalLane() && !pedalValues_;
 }
 
-namespace
-{
-std::string laneTitle(const core::Lane& lane); // further down, with the lane's list
-} // namespace
-
 std::vector<std::size_t> PianoRollView::regionEvents(const core::PedalRegion& region) const
 {
     return core::pedalRegionEvents(document_.song().events(*trackId()), lane().controller, region);
@@ -2421,26 +2416,6 @@ std::string PianoRollView::laneLabel() const
 
 namespace
 {
-
-// How a lane is shown in the list: Velocity, 74 Brightness, Pitch bend, Aftertouch.
-std::string laneTitle(const core::Lane& lane)
-{
-    switch (lane.kind)
-    {
-    case core::Lane::Kind::Controller:
-    {
-        const auto name = core::controllerName(lane.controller);
-        return std::to_string(lane.controller) + (name.empty() ? "" : " " + name);
-    }
-    case core::Lane::Kind::PitchBend:
-        return "Pitch bend";
-    case core::Lane::Kind::Pressure:
-        return "Aftertouch";
-    case core::Lane::Kind::Velocity:
-        break;
-    }
-    return "Velocity";
-}
 
 // The lane an event's on, for a controller, pitch bend or pressure; or none.
 std::optional<core::Lane> laneOf(const core::EventData& data)
@@ -5712,25 +5687,6 @@ constexpr std::uint8_t kRampTint = 36;        // the opacity of a ramp's span
 constexpr std::uint8_t kCurrentRampTint = 64; // and of the one the cursor's in
 constexpr std::uint8_t kRampCurve = 200;      // and of its curve
 
-constexpr std::array<std::pair<core::ControllerRamp::Shape, std::string_view>, 4> kShapeNames{{
-    {core::ControllerRamp::Shape::Linear, "Linear"},
-    {core::ControllerRamp::Shape::Curve, "Curve"},
-    {core::ControllerRamp::Shape::SCurve, "S-curve"},
-    {core::ControllerRamp::Shape::EqualPower, "Equal power"},
-}};
-
-std::string shapeName(core::ControllerRamp::Shape shape)
-{
-    for (const auto& [each, name] : kShapeNames)
-    {
-        if (each == shape)
-        {
-            return std::string{name};
-        }
-    }
-    return "Linear";
-}
-
 bool sameStream(const core::Lane& a, const core::Lane& b)
 {
     return a.kind == b.kind &&
@@ -5802,45 +5758,7 @@ std::optional<core::ControllerRamp> PianoRollView::draftRamp() const
 
 Inspection PianoRollView::rampInspection(const core::ControllerRamp& ramp) const
 {
-    // Its span, its values, its shape, the curve's amount for a curve, and how dense its
-    // points are, each to change in the inspector.
-    const auto& m = meter();
-    Inspection result;
-    result.kind = "Ramp";
-    // Dim but while its draft is open, as every inspector's values are (decided 17 November
-    // 2026, after use), which the drawing sees to.
-    const auto add =
-        [&](std::string heading, std::string value, std::string editText = {}, bool editable = true)
-    {
-        result.fields.push_back({.heading = std::move(heading),
-                                 .value = std::move(value),
-                                 .editable = editable,
-                                 .editText = std::move(editText)});
-    };
-    add("Start", positionText(m, ramp.start));
-    add("End", positionText(m, ramp.end()));
-    add("From", std::to_string(ramp.from));
-    add("To", std::to_string(ramp.to));
-    add("Shape", shapeName(ramp.shape));
-    auto& shape = result.fields.back();
-    for (const auto& [each, name] : kShapeNames)
-    {
-        shape.choices.emplace_back(name);
-    }
-    // The curve's amount always in its place, so the fields after it don't move as the shape
-    // changes (decided 17 November 2026, after use); a dash, and passed over, for another shape.
-    if (ramp.shape == core::ControllerRamp::Shape::Curve)
-    {
-        add("Amount", (ramp.amount > 0 ? "+" : "") + std::to_string(ramp.amount),
-            std::to_string(ramp.amount));
-    }
-    else
-    {
-        add("Amount", "-", {}, false);
-    }
-    add("Density", std::to_string(ramp.density) + " a quarter", std::to_string(ramp.density));
-    result.fields.push_back({"Controller", laneTitle(ramp.lane)});
-    return result;
+    return ui::rampInspection(ramp, meter());
 }
 
 bool PianoRollView::rampTaken() const
@@ -6045,9 +5963,9 @@ std::optional<std::string> PianoRollView::setRampField(const std::string& headin
     }
     else if (heading == "Shape")
     {
-        const auto it = std::ranges::find_if(kShapeNames,
+        const auto it = std::ranges::find_if(kRampShapes,
                                              [&](const auto& each) { return each.second == text; });
-        if (it == kShapeNames.end())
+        if (it == kRampShapes.end())
         {
             return std::string{"A shape is linear, curve, S-curve or equal power"};
         }
@@ -6109,11 +6027,11 @@ std::optional<std::string> PianoRollView::stepRampField(const std::string& headi
     else if (heading == "Shape")
     {
         const auto at =
-            std::ranges::find(kShapeNames, ramp->shape,
+            std::ranges::find(kRampShapes, ramp->shape,
                               &std::pair<core::ControllerRamp::Shape, std::string_view>::first);
-        const auto size = static_cast<int>(kShapeNames.size());
-        const auto next = (((at - kShapeNames.begin()) + steps) % size + size) % size;
-        ramp->shape = kShapeNames[static_cast<std::size_t>(next)].first;
+        const auto size = static_cast<int>(kRampShapes.size());
+        const auto next = (((at - kRampShapes.begin()) + steps) % size + size) % size;
+        ramp->shape = kRampShapes[static_cast<std::size_t>(next)].first;
     }
     else if (heading == "Amount")
     {

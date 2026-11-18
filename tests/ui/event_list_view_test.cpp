@@ -1616,3 +1616,107 @@ TEST_CASE("the hint menu says what each toggle is set to now")
     CHECK(has("Toggle replace/overdub: overdub"));
     v.ws.handle(Key::of(NamedKey::Escape), 0);
 }
+
+TEST_CASE("a ramp's points are in the accent colour, show their ramp and aren't edited one by one")
+{
+    // A synth's bar 1 ramped from 10 to 80 on the mod wheel, hiding three values of its own, with
+    // a note in each of two bars and an expression value outside the ramp.
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const auto beat = ppqn.quarter();
+    core::Song song{ppqn};
+    const auto id = song.addTrack("Synth");
+    song.updateEvents(id,
+                      [&](core::EventList& events)
+                      {
+                          events.insert({0, core::Note{60, 90, beat}});
+                          events.insert({4 * beat, core::Note{62, 90, beat}});
+                          events.insert({0, core::ControlChange{1, 10}});
+                          events.insert({beat, core::ControlChange{1, 40}});
+                          events.insert({2 * beat, core::ControlChange{1, 80}});
+                          events.insert({5 * beat, core::ControlChange{11, 100}});
+                      });
+    song.fitToContent();
+    const core::ControllerRamp ramp{.lane = {.kind = core::Lane::Kind::Controller, .controller = 1},
+                                    .start = 0,
+                                    .length = 4 * beat - 1,
+                                    .from = 10,
+                                    .to = 80};
+    REQUIRE(song.addRamp(id, ramp).done());
+    Viewing v{song};
+    v.ws.show(ViewKind::EventList);
+    const auto playing = v.document.song().events(id);
+
+    // Each cc row of the ramp's bar in the accent colour; the notes and the value outside it not.
+    const auto list = v.ws.frame()[0];
+    int points = 0;
+    for (int line = 1; line < 21; ++line)
+    {
+        const auto text = rowText(list, line);
+        const auto at = text.find(U" cc ");
+        if (at == std::u32string::npos)
+        {
+            continue;
+        }
+        const auto style = styleAt(list, static_cast<int>(at) + 1, line);
+        if (contains(text, U" 100"))
+        {
+            CHECK(style.foreground == Role::Text);
+        }
+        else
+        {
+            CHECK(style.foreground == Role::Accent);
+            ++points;
+        }
+    }
+    CHECK(points > 3);
+
+    // To a ramp's point: its ramp in the inspector, and a hint where to change it.
+    for (int i = 0; i < 10 && !v.view.typingHint(); ++i)
+    {
+        type(v.ws, U"j");
+    }
+    REQUIRE(v.view.typingHint() == "A ramp's point: change the ramp in the piano roll's lane");
+    const auto inspector = v.ws.frame()[2];
+    for (const auto* heading : {U"Ramp", U"From", U"To", U"Shape", U"Density"})
+    {
+        CHECK(std::ranges::find(inspector.text, std::u32string_view{heading}, &TextRun::text) !=
+              inspector.text.end());
+    }
+
+    // Deleting it, editing a field, stepping it or opening the inspector are refused.
+    const auto refused = [&]
+    {
+        CHECK(v.ws.refused());
+        INFO(v.ws.message());
+        CHECK(v.ws.message().starts_with("That's a point of the cc1 ramp at 1:1:0"));
+        CHECK(v.ws.message().ends_with(
+            ": change the ramp in the piano roll's lane, where , c R makes it events"));
+        CHECK(v.document.song().events(id) == playing);
+        CHECK_FALSE(v.view.typing());
+    };
+    type(v.ws, U"x");
+    refused();
+    v.ws.handle(Key::of(NamedKey::Enter), 0);
+    refused();
+    type(v.ws, U"e");
+    refused();
+    v.ws.handle(Key::typed(U'a', kCtrl), 0);
+    refused();
+
+    // d and y over the whole track take its other events, leaving the ramp alone and saying so.
+    type(v.ws, U"ggyG");
+    CHECK(v.ws.message() == "3 events yanked; a ramp left alone");
+    type(v.ws, U"ggdG");
+    CHECK(v.ws.message() == "3 events deleted; a ramp left alone");
+    REQUIRE(v.document.song().ramps(id).size() == 1);
+    CHECK(v.document.song().ramps(id)[0] == ramp);
+    for (const auto& event : v.document.song().events(id).all())
+    {
+        CHECK(ramp.owns(event));
+    }
+
+    // Over only a ramp's points there's nothing to take.
+    type(v.ws, U"ggdG");
+    CHECK(v.ws.message() == "No events but a ramp's points; a ramp left alone (the piano roll's "
+                            "lane changes ramps)");
+}

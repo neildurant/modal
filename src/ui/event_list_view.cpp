@@ -498,6 +498,19 @@ std::optional<bool> EventListView::run(std::string_view command, int count)
     const auto tick = list_.rows()[row_].tick;
     const auto& song = document_.song();
 
+    // A ramp's points are made from it, so aren't edited one by one (decided 17 November 2026).
+    const bool pointEdit = command == "event-delete" || command == "field-edit" ||
+                           command == "inspector-edit" || command.starts_with("field-increase") ||
+                           command.starts_with("field-decrease") || command == "number-increase" ||
+                           command == "number-decrease";
+    if (pointEdit)
+    {
+        if (const auto ramp = rampOf(row_))
+        {
+            return refuseRampPoint(*ramp);
+        }
+    }
+
     if (command == "cursor-down" || command == "cursor-up")
     {
         moveRows(command == "cursor-down" ? n : -n);
@@ -1023,11 +1036,45 @@ bool EventListView::operateRows(std::string_view op, std::size_t from, std::size
     return operateEvents(op, indices, from, bar, span);
 }
 
-bool EventListView::operateEvents(std::string_view op, const std::vector<std::size_t>& indices,
+bool EventListView::operateEvents(std::string_view op, const std::vector<std::size_t>& taken,
                                   std::size_t row, std::optional<core::Tick> bar, core::Tick span)
 {
     const auto id = *list_.track();
     const auto& events = document_.song().events(id);
+    // A ramp's points are left alone, as transforms leave them, and the ramps counted, to say
+    // so (decided 17 November 2026).
+    const auto ramps = document_.song().ramps(id);
+    std::vector<std::size_t> indices;
+    std::vector<std::size_t> skipped;
+    for (const auto i : taken)
+    {
+        bool owned = false;
+        for (std::size_t r = 0; r < ramps.size() && !owned; ++r)
+        {
+            if (ramps[r].owns(events[i]))
+            {
+                owned = true;
+                if (std::ranges::find(skipped, r) == skipped.end())
+                {
+                    skipped.push_back(r);
+                }
+            }
+        }
+        if (!owned)
+        {
+            indices.push_back(i);
+        }
+    }
+    const auto left = skipped.empty()       ? std::string{}
+                      : skipped.size() == 1 ? std::string{"a ramp left alone"}
+                                            : std::to_string(skipped.size()) + " ramps left alone";
+    if (indices.empty())
+    {
+        setMessage("No events but a ramp's points; " + left +
+                       " (the piano roll's lane changes ramps)",
+                   MessageKind::Information);
+        return true;
+    }
     const auto first = bar.value_or(events[indices.front()].tick);
     auto& reg = host_.eventRegister();
     reg = EventRegister{};
@@ -1044,21 +1091,26 @@ bool EventListView::operateEvents(std::string_view op, const std::vector<std::si
         indices.size() == 1 ? std::string{"1 event"} : std::to_string(indices.size()) + " events";
     if (op == "operator-yank")
     {
-        setMessage(what + " yanked", MessageKind::Information);
+        setMessage(what + " yanked" + (left.empty() ? "" : "; " + left), MessageKind::Information);
         return true;
     }
-    edit("Delete " + what + " in " + trackName(),
-         [&](core::Song& song)
-         {
-             song.updateEvents(id,
-                               [&](core::EventList& list)
-                               {
-                                   for (auto it = indices.rbegin(); it != indices.rend(); ++it)
+    const bool deleted =
+        edit("Delete " + what + " in " + trackName(),
+             [&](core::Song& song)
+             {
+                 song.updateEvents(id,
+                                   [&](core::EventList& list)
                                    {
-                                       list.erase(*it);
-                                   }
-                               });
-         });
+                                       for (auto it = indices.rbegin(); it != indices.rend(); ++it)
+                                       {
+                                           list.erase(*it);
+                                       }
+                                   });
+             });
+    if (deleted && !left.empty())
+    {
+        setMessage(what + " deleted; " + left, MessageKind::Information);
+    }
     // On what followed, as in Vim.
     row_ = std::min(row, list_.rows().size() - 1);
     follow();
@@ -1782,6 +1834,11 @@ Region EventListView::listRegion() const
         }
         const auto text = isAdded ? added : list_.text(row);
         auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
+        // A ramp's points in the accent colour, as the lane draws them.
+        if (!isAdded && rampOf(row))
+        {
+            style.foreground = Role::Accent;
+        }
         if (!isAdded && std::ranges::binary_search(matched, row))
         {
             style.foreground = Role::Match;
@@ -1926,8 +1983,43 @@ std::optional<std::string> EventListView::describeRange(std::string_view op,
     return describeTimeRange(motion);
 }
 
+std::optional<std::size_t> EventListView::rampOf(std::size_t row) const
+{
+    const auto id = list_.track();
+    if (!id || row >= list_.rows().size() || list_.rows()[row].kind != RowKind::Event)
+    {
+        return std::nullopt;
+    }
+    const auto& song = document_.song();
+    const auto& event = song.events(*id)[list_.rows()[row].index];
+    const auto ramps = song.ramps(*id);
+    for (std::size_t i = 0; i < ramps.size(); ++i)
+    {
+        if (ramps[i].owns(event))
+        {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+bool EventListView::refuseRampPoint(std::size_t ramp)
+{
+    const auto& shown = document_.song().ramps(*list_.track())[ramp];
+    refuse("That's a point of the " + core::toString(shown.lane) + " ramp at " +
+               positionText(list_.meter(), shown.start) +
+               ": change the ramp in the piano roll's lane, where , c R makes it events",
+           MessageKind::Information);
+    return true;
+}
+
 Inspection EventListView::inspection() const
 {
+    // A ramp's point shows its ramp, as the piano roll's lane does on it.
+    if (const auto ramp = rampOf(row_))
+    {
+        return rampInspection(document_.song().ramps(*list_.track())[*ramp], list_.meter());
+    }
     auto result = inspect(list_, row_);
     if (list_.track() && list_.rows()[row_].kind == RowKind::Event)
     {
