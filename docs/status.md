@@ -2,9 +2,18 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. Editable controller ramps are built, accepted on trial and published; their manual chapter, the inspector's editing and the marking of a ramp's points in the event list are accepted and published; the shaping transforms are designed, their first step next (see schedule.md and design.md, Shaping controller values).*
+*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. Editable controller ramps are built, accepted on trial and published; their manual chapter, the inspector's editing and the marking of a ramp's points in the event list are accepted and published; the shaping transforms are designed and step 1's plan agreed, to start next session (see the handoff below).*
 
 ## Current handoff
+
+### Controller shaping, next: step 1 planned, 18 November 2026
+
+Designed and agreed 18 November 2026 (design.md, [Shaping controller values](design.md); reasons in decisions.md, including two corrections made while planning). Three steps, each tried: (1) scale, limit, invert and the keys; (2) smooth and remove repeats; (3) program remapping in `:remap` and retrograde in the lane. Step 1's plan was agreed 18 November 2026 and not yet started:
+
+- **Core** (`src/core/transforms.{hpp,cpp}`): rename Thin's `ThinWhat` to `ControlStreams` and share it; a stream's centre (0 for pitch bend, 64 for pan, cc10, and balance, cc8, 0 otherwise); `scaleControls` (a percentage towards the centre, an offset, or the passage's own lowest-to-highest fitted into `low-high`, per stream), `limitControls` and `invertControls` (127 less the value, bend negated with -8192 becoming +8191, pan and balance mirrored about 64), on continuous data only (Thin's `isThinnable` controllers, bend and aftertouch; never switches or bank select), values clipped at the range's ends, a 0 and bend's centre left where they are by scale and limit.
+- **UI:** `:ctl-scale`, `:ctl-limit`, `:ctl-invert` in `transform_specs.cpp`, applied through `Workspace::changeEvents` (so ramps' points are skipped and counted); a `{lane}` default in `Workspace::defaultAnswer` giving the piano roll lane's controller when it shows a continuous one, else no default; a setting flag (like `TransformSetting::tracks`) offering at Tab the controllers, bend and aftertouch present in the range; switches and non-continuous controllers refused as Thin refuses them. Keys in `assets/config/modalrc`: `, c s`, `, c l`, `, c i`, and a `, x K` Controllers group with the same (`m` and `u` left for step 2).
+- **Tests:** core, each form, pan and balance, bend's limits, switches untouched, rounding, several PPQNs where gestures matter; Workspace, the keys in the lane with its default, the commands from the arrangement needing a controller named, refusals, ramps skipped, undo.
+- **Docs:** grammar.md; the controllers chapter's "Shaping values"; the transform reference regenerated (`tools/manual-references.cmake`) and key reference rows. Checks: Windows Debug, WSL Clang Debug, the manual build; then `modal.exe` rebuilt for a trial before pushing.
 
 ### Controller ramps, 17 November 2026
 
