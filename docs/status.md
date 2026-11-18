@@ -2,9 +2,13 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: milestone 9 is under way. Controller shaping step 1 and the schedule-formatting convention are accepted and published, with hosted CI passing. Step 2 (smooth and remove repeats) is accepted on trial and published; all six Linux configurations and hosted Linux/Windows CI pass. See the current handoff below.*
+*Last updated 18 November 2026: controller shaping step 2 is accepted and published, with native Linux and hosted Linux/Windows CI passing. Step 3's design and implementation plan are approved; program remapping, held-contour retrograde and timing guards are now in progress. See the current handoff below.*
 
 ## Current handoff
+
+### Controller shaping: step 3 in progress, 18 November 2026
+
+The implementation plan is approved: extend `:remap` to matching program-change events (existing 0–127 numbering, bank messages and track setup untouched); reverse the audible held-value contour in a continuous controller lane, adding boundary messages as needed; make non-Visual lane timing targets consistent and refuse timing edits into protected same-stream ramps. Retrograde holds its new final value until the next untouched event, preserves an existing event exactly at the right boundary, refuses an unknown initial value and partial selections that omit lane messages, and refuses a span crossing a same-stream protected ramp. Known values follow the conservative reset/program/SysEx rules used by repeat removal. Core/Workspace regressions, manual and reference updates, native Linux checks and a rebuilt local application precede a functional trial. No step 3 code is published yet.
 
 ### Controller shaping: step 2 accepted and published, 18 November 2026
 
@@ -16,7 +20,7 @@ Core tests cover three PPQNs, centred windows using original values, strength, g
 
 Functional trial accepted 18 November 2026, reported as working beautifully. The trial included creating a ramp, adding stray values outside its span, applying Smooth and repeating it several times with `.`; the surrounding contour was reported to evolve gradually back towards the original ramp shape. This records the successful combination of ramp protection, smoothing ordinary events and repeat-last-change. No latency or jitter measurement is claimed. Implementation is in `3c1e4bd`, published through `f6a48e6`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44339289787), along with the [manual workflow](https://github.com/neildurant/modal/actions/runs/44339289796).
 
-Step 3, program remapping in `:remap` and retrograde in the controller lane, remains designed but unstarted. When doing its time work, also verify non-Visual lane timing targets: the existing target still sets `notesOnly`, unlike a Visual controller-lane selection. See [schedule.md](schedule.md) and design.md, Shaping controller values.
+Step 3, program remapping in `:remap` and retrograde in the controller lane, remains unstarted. The design discussion on 18 November 2026 settled that retrograde reverses the audible held-value contour, with boundary messages where needed. Its final value will hold until the next untouched event, an unknown starting value will cause refusal, and timing edits into a same-stream protected ramp or retrograde across one will refuse the whole edit. Partial value-box/filtered selections that omit lane messages within the span will be refused rather than expanded; remapping scope remains agreed. These choices are recorded in design.md and decisions.md. The step 3 implementation plan was approved 18 November 2026; implementation is in progress. When doing its time work, also verify non-Visual lane timing targets: the existing target still sets `notesOnly`, unlike a Visual controller-lane selection. See [schedule.md](schedule.md) and design.md, Shaping controller values.
 
 ### Controller shaping: step 1 accepted and published, 18 November 2026
 

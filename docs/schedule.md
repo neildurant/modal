@@ -103,7 +103,12 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Manual explanations, key/transform references, HTML/PDF builds and PDF review.
             - [x] **Done** — All six Linux configurations pass; application rebuilt for the local trial.
             - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
-        - [ ] **To do** — Step 3: program remapping in `:remap` and retrograde in the controller lane. Time offset and stretch already act on controllers.
+        - [ ] **Doing** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
+            - [ ] **Doing** — Remap matching program-change events with `:remap`.
+            - [ ] **To do** — Reverse the audible held-value contour, with the agreed boundary and refusal rules.
+            - [ ] **To do** — Consistent lane timing targets and protected-ramp guards for timing edits.
+            - [ ] **To do** — Regressions, manual/reference updates, Linux checks and a local build for trial.
+            - [ ] **To do** — Functional acceptance and publication.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.

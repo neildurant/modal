@@ -778,3 +778,12 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 **Known values for removing repeats (decided 18 November 2026, during implementation).** Compare a selected event with the known held value of its own stream, including context before the selection. With no known value, keep it rather than assuming a synth's initial state. Reset All Controllers, a program change or SysEx can invalidate that context, so keep the first value of each stream after those messages too. Subsequent exact repeats, including repeated zeros, can be removed without reshaping the passage.
 
 **Controller-only lane ranges (corrected 18 November 2026, during implementation).** Workspace regressions for smoothing and removing repeats exposed that range transforms refused a controller lane's bar when it held no notes. Let a controller lane with events supply that range without a note, so pure automation tracks can use the same transforms; the note and velocity areas retain their note requirement.
+
+
+**Controller retrograde reverses the held contour (decided 18 November 2026, before step 3).** Reverse the audible held-value contour across the selected span, allowing boundary messages where needed. Controller messages hold their values until the next one, so merely mirroring the timestamps of the existing points would not reproduce the passage backwards. Boundary and protected-ramp details are being settled before implementation.
+
+
+**Controller retrograde's edges and ramp conflicts (decided 18 November 2026, before step 3).** Hold the reversed passage's new final value until the next untouched event, consistently with ramp edits, leaving an existing event at the right boundary alone. Refuse when the starting held value is unknown rather than inventing one. Refuse an entire timing edit that would move ordinary data into a same-stream protected ramp, or retrograde across its owned span, preserving everything; conversion to ordinary events makes that passage available to transform. Splitting a timing edit around a protected ramp would obscure what was reversed.
+
+
+**Partial selections for controller retrograde (decided 18 November 2026, before step 3).** Refuse a value-box or filtered selection that leaves out lane messages within its time span. Reversing the complete audible contour would require changing those unselected messages too; expanding a selection implicitly would break its editing promise. Normal time selections already include the complete contour.
