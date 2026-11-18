@@ -6,6 +6,7 @@
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -80,5 +81,10 @@ EventList withRamps(const EventList& source, std::span<const ControllerRamp> ram
 
 // Whether one of the ramps owns the event.
 bool ownedByRamp(const Event& event, std::span<const ControllerRamp> ramps);
+
+// An ordinary event edit must keep every ramp-owned point intact, including its count;
+// otherwise moving a point into a ramp could silently hide it. Returns the first ramp changed.
+std::optional<std::size_t> changedRampPoints(const EventList& before, const EventList& after,
+                                             std::span<const ControllerRamp> ramps);
 
 } // namespace modal::core

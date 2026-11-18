@@ -1573,17 +1573,16 @@ std::optional<std::string> EventListView::replaceEvent(std::size_t row, const co
     {
         return why;
     }
+    auto updated = events;
+    updated.erase(index);
+    updated.insert(changed);
+    if (const auto why = rampEventEditRefusal(document_.song(), id, updated))
+    {
+        return why;
+    }
     const auto title = "Set " + fieldName(field, changed) + " in " + trackName();
-    edit(title,
-         [&](core::Song& song)
-         {
-             song.updateEvents(id,
-                               [&](core::EventList& list)
-                               {
-                                   list.erase(index);
-                                   list.insert(changed);
-                               });
-         });
+    edit(title, [&](core::Song& song)
+         { song.updateEvents(id, [&](core::EventList& list) { list = updated; }); });
     // The cursor follows the event, as a change of position moves it.
     const auto rows = list_.rows();
     const auto& now = document_.song().events(id);

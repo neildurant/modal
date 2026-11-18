@@ -414,6 +414,14 @@ bool isThinnable(int controller)
 namespace
 {
 
+// These messages can invalidate a controller value known from an earlier event.
+bool resetsControlContext(const EventData& data)
+{
+    const auto* cc = std::get_if<ControlChange>(&data);
+    return (cc && cc->controller == 121) || std::holds_alternative<ProgramChange>(data) ||
+           std::holds_alternative<SysEx>(data);
+}
+
 struct Point
 {
     std::size_t index;
@@ -763,9 +771,7 @@ Transformed dedupeControls(const EventList& events, std::span<const std::size_t>
     for (std::size_t i = 0; i < events.size(); ++i)
     {
         const auto& data = events[i].data;
-        const auto* cc = std::get_if<ControlChange>(&data);
-        if ((cc && cc->controller == 121) || std::holds_alternative<ProgramChange>(data) ||
-            std::holds_alternative<SysEx>(data))
+        if (resetsControlContext(data))
         {
             // A reset or a change of patch can invalidate values known from earlier events.
             held.clear();
@@ -780,6 +786,93 @@ Transformed dedupeControls(const EventList& events, std::span<const std::size_t>
         held[point.stream] = point.value;
     }
     return without(events, dropped);
+}
+
+Transformed retrogradeControls(const EventList& events, std::span<const std::size_t> which,
+                               Lane lane, Tick from, Tick to)
+{
+    if (from < 0 || to <= from || lane.kind == Lane::Kind::Velocity ||
+        (lane.kind == Lane::Kind::Controller && !isThinnable(lane.controller)))
+    {
+        return events;
+    }
+    std::vector<bool> selected(events.size(), false);
+    for (const auto i : which)
+    {
+        selected[i] = true;
+    }
+    std::optional<int> held;
+    std::vector<std::pair<Event, int>> transitions;
+    EventData representative = lane.kind == Lane::Kind::PitchBend ? EventData{PitchBend{0}}
+                               : lane.kind == Lane::Kind::Pressure
+                                   ? EventData{ChannelPressure{0}}
+                                   : EventData{ControlChange{lane.controller, 0}};
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto& event = events[i];
+        if (event.tick >= to)
+        {
+            break;
+        }
+        if (resetsControlContext(event.data))
+        {
+            if (event.tick > from)
+            {
+                return Refusal{Refusal::Reason::ControlStateChange, event, std::nullopt};
+            }
+            held.reset();
+        }
+        if (!lane.shows(event.data))
+        {
+            continue;
+        }
+        representative = event.data;
+        if (event.tick >= from && !selected[i])
+        {
+            return Refusal{Refusal::Reason::PartialControlContour, event, std::nullopt};
+        }
+        if (event.tick > from)
+        {
+            if (!held)
+            {
+                return Refusal{
+                    Refusal::Reason::UnknownControlValue, {from, representative}, std::nullopt};
+            }
+            transitions.emplace_back(event, *held);
+        }
+        held = lane.value(event.data);
+    }
+    if (!held)
+    {
+        return Refusal{Refusal::Reason::UnknownControlValue, {from, representative}, std::nullopt};
+    }
+    // A known constant contour already sounds the same backwards; keep its messages intact.
+    if (std::ranges::all_of(transitions, [&](const auto& each) { return each.second == *held; }))
+    {
+        return events;
+    }
+    EventList result;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto& event = events[i];
+        if (!(event.tick >= from && event.tick < to && lane.shows(event.data)))
+        {
+            result.insert(event);
+        }
+    }
+    auto boundary = Event{from, representative};
+    lane.setValue(boundary.data, *held);
+    result.insert(boundary);
+    // For each old transition the value on its left becomes the new value on its right.
+    // Reversing the iteration also preserves the correct held value at coincident messages.
+    for (auto it = transitions.rbegin(); it != transitions.rend(); ++it)
+    {
+        auto event = it->first;
+        event.tick = from + (to - event.tick);
+        lane.setValue(event.data, it->second);
+        result.insert(event);
+    }
+    return result;
 }
 
 Transformed removed(const EventList& events, std::span<const std::size_t> which,
@@ -803,6 +896,21 @@ Transformed remapController(const EventList& events, std::span<const std::size_t
             change != nullptr && change->controller == from)
         {
             change->controller = static_cast<std::uint8_t>(to);
+        }
+    }
+    return finish(events, which, changed, false);
+}
+
+Transformed remapProgram(const EventList& events, std::span<const std::size_t> which, int from,
+                         int to)
+{
+    auto changed = takenEvents(events, which);
+    for (auto& event : changed)
+    {
+        if (auto* program = std::get_if<ProgramChange>(&event.data);
+            program && program->program == from)
+        {
+            program->program = static_cast<std::uint8_t>(to);
         }
     }
     return finish(events, which, changed, false);

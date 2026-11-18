@@ -425,24 +425,32 @@ void PianoRollView::setGrid(core::NoteFraction grid)
                 [&](core::Track& track) { track.grid = grid; });
 }
 
-void PianoRollView::editEvents(std::string title,
+bool PianoRollView::editEvents(std::string title,
                                const std::function<void(core::EventList&)>& change,
                                std::string_view mergeKey)
 {
     const auto id = trackId();
     if (!id)
     {
-        return;
+        return false;
     }
     if (const auto refusal = host_.eventEditRefusal(*id))
     {
         host_.refuse(*refusal);
-        return;
+        return false;
     }
-    document_.edit(
-        std::move(title), place(), [&](core::Song& song) { song.updateEvents(*id, change); },
-        mergeKey);
+    auto changed = document_.song().events(*id);
+    change(changed);
+    if (const auto why = rampEventEditRefusal(document_.song(), *id, changed))
+    {
+        host_.refuse(*why, MessageKind::Warning);
+        return false;
+    }
+    const bool edited = document_.edit(
+        std::move(title), place(), [&](core::Song& song)
+        { song.updateEvents(*id, [&](core::EventList& events) { events = changed; }); }, mergeKey);
     refresh();
+    return edited;
 }
 
 bool PianoRollView::selecting() const
@@ -2811,21 +2819,24 @@ bool PianoRollView::moveLaneEvents(std::string_view command, int n)
         positions.emplace_back(event.tick, lanePitch(event));
     }
     const auto key = "lane move " + std::to_string(id.value);
-    editEvents(
-        "Move " + laneTaking(moving.size()) + " " + (earlier ? "earlier" : "later") + " in " +
-            trackName(),
-        [&](core::EventList& list)
-        {
-            for (auto it = moving.rbegin(); it != moving.rend(); ++it)
+    if (!editEvents(
+            "Move " + laneTaking(moving.size()) + " " + (earlier ? "earlier" : "later") + " in " +
+                trackName(),
+            [&](core::EventList& list)
             {
-                list.erase(*it);
-            }
-            for (const auto& event : moved)
-            {
-                list.insert(event);
-            }
-        },
-        key);
+                for (auto it = moving.rbegin(); it != moving.rend(); ++it)
+                {
+                    list.erase(*it);
+                }
+                for (const auto& event : moved)
+                {
+                    list.insert(event);
+                }
+            },
+            key))
+    {
+        return true;
+    }
     if (laneSelecting())
     {
         host_.moveSelection(by, 0, std::move(positions));
@@ -4332,6 +4343,7 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
         }
         result.what = laneTaking(taken.size()) + " in " + trackName();
         result.notesOnly = velocityLane();
+        result.span = laneSpan();
         return result;
     }
     if (motion == "object-chord")

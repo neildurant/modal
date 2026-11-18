@@ -110,6 +110,8 @@ after counts multiply.
 | `, c s`, `, c l`, `, c i` | Scale, limit, invert controller values, then a range or object |
 | `, c m`, `, c u` | Smooth controller values, remove exact repeats, then a range or object |
 | `, x K s/l/i/m/u` | The same controller transforms from the transform menu |
+| `, x R` in a continuous lane | Reverse a complete, known held-value contour, then a time target |
+| `, x m` | Remap controllers, notes or program-change events, then a target |
 | `=` `-` `+` `_` on a ramp | Move its end by a grid step / nudge |
 
 ## In an open inspector

@@ -12,6 +12,7 @@
 #include <modal/core/transforms.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/frame.hpp>
+#include <modal/ui/view_parts.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <algorithm>
@@ -69,6 +70,14 @@ std::string refusalText(const core::Refusal& refusal, const core::MeterMap& mete
         return text + " would overlap " + other;
     case Order:
         return text + " would move past " + other;
+    case UnknownControlValue:
+        return "No held controller value is known at " + positionText(meter, refusal.event.tick) +
+               "; set one there before retrograde";
+    case PartialControlContour:
+        return "Retrograde needs every lane message inside the span; use a complete time selection";
+    case ControlStateChange:
+        return "Retrograde cannot cross a reset, program change or SysEx at " +
+               positionText(meter, refusal.event.tick);
     }
     return text;
 }
@@ -464,6 +473,10 @@ CommandResult Workspace::transformLine(std::string_view name, std::string_view a
         target->span = std::pair{range->from, range->to};
     }
     if (selection_ && selection_->filter && !onlyMatches(*target))
+    {
+        return {true};
+    }
+    if (!prepareLaneTimingTarget(name, *target))
     {
         return {true};
     }
@@ -1020,9 +1033,74 @@ bool Workspace::applyFilter(std::string_view /*name*/, const OperatorTarget& tar
         });
 }
 
+bool Workspace::prepareLaneTimingTarget(std::string_view command, OperatorTarget& target)
+{
+    const bool timing = command == "transform-retrograde" || command == "transform-stretch" ||
+                        command == "operator-shift-later" || command == "operator-shift-earlier";
+    if (target.controlLane)
+    {
+        target.notesOnly = false;
+        target.cut.reset();
+        return true;
+    }
+    if (!timing || shown() != ViewKind::PianoRoll || !pianoRoll_->inLane() ||
+        pianoRoll_->velocityLane())
+    {
+        return true;
+    }
+    const auto lane = pianoRoll_->lane();
+    if (!core::rampable(lane))
+    {
+        refuse("These timing transforms need a continuous controller lane", MessageKind::Warning);
+        return false;
+    }
+    for (auto& part : target.parts)
+    {
+        const auto& events = document_.song().events(part.track);
+        std::erase_if(part.events,
+                      [&](std::size_t index) { return !lane.shows(events[index].data); });
+    }
+    target.notesOnly = false;
+    target.cut.reset(); // Controller points have no note lengths to cut at the edges.
+    target.controlLane = lane;
+    target.what = "the " + laneTitle(lane) + " lane";
+    return true;
+}
+
 bool Workspace::applyRetrograde(std::string_view /*name*/, const OperatorTarget& target,
                                 const std::string& /*text*/)
 {
+    if (target.controlLane)
+    {
+        if (!target.span)
+        {
+            refuse("Controller retrograde needs a time span", MessageKind::Warning);
+            return true;
+        }
+        const auto [from, to] = *target.span;
+        for (const auto& part : target.parts)
+        {
+            for (const auto& ramp : document_.song().ramps(part.track))
+            {
+                const bool same = ramp.lane.kind == target.controlLane->kind &&
+                                  (ramp.lane.kind != core::Lane::Kind::Controller ||
+                                   ramp.lane.controller == target.controlLane->controller);
+                if (same && ramp.end() >= from && ramp.start < to)
+                {
+                    refuse("Retrograde would cross a protected " + laneTitle(ramp.lane) +
+                               " ramp; , c R makes it ordinary events first",
+                           MessageKind::Warning);
+                    return true;
+                }
+            }
+        }
+        return changeEvents("Retrograde " + target.what, target,
+                            [&](const core::EventList& events, const auto& part)
+                            {
+                                return core::retrogradeControls(events, part.events,
+                                                                *target.controlLane, from, to);
+                            });
+    }
     return changeEvents("Retrograde " + target.what, target,
                         [](const core::EventList& events, const auto& part)
                         { return core::retrograde(events, part.events); });
@@ -1134,6 +1212,10 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     if (op == "operator-transform")
     {
         return openTransformMenu(std::move(*target));
+    }
+    if (!prepareLaneTimingTarget(op, *target))
+    {
+        return true;
     }
     if (const auto* spec = findTransform(op))
     {
@@ -1652,11 +1734,33 @@ bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& targ
                             [&](const core::EventList& events, const auto& part)
                             { return core::remapController(events, part.events, *a, *b); });
     }
+    const auto program = [](std::string_view word) -> std::optional<int>
+    {
+        if (!word.starts_with("program ") || word.ends_with('%'))
+        {
+            return std::nullopt;
+        }
+        return percentUpTo(trimmed(word.substr(8)), 127);
+    };
+    if (from.starts_with("program"))
+    {
+        const auto a = program(from);
+        const auto b = program(to);
+        if (!a || !b)
+        {
+            refuse("Not a program remapping; type program 5 and to=program 12 (0 to 127)",
+                   MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Remap " + from + " of " + target.what + " to " + to, target,
+                            [&](const core::EventList& events, const auto& part)
+                            { return core::remapProgram(events, part.events, *a, *b); });
+    }
     const auto a = core::parsePitch(trimmed(from));
     const auto b = core::parsePitch(trimmed(to));
     if (!a || !b)
     {
-        refuse(!a ? "Not a controller or a note: " + from + "; type cc1 or C1"
+        refuse(!a ? "Not a controller, note or program: " + from + "; type cc1, C1 or program 5"
                   : "Not a note: " + to + "; remap " + from + " to another, as D1",
                MessageKind::Warning);
         return true;
@@ -2068,6 +2172,11 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
     bool any = false;
     for (std::size_t i = 0; i < changed.size(); ++i)
     {
+        if (const auto why = rampEventEditRefusal(song, target.parts[i].track, changed[i]))
+        {
+            refuse(*why, MessageKind::Warning);
+            return true;
+        }
         any = any || changed[i] != song.events(target.parts[i].track);
     }
     const auto ramps = skipped == 1 ? std::string{"a ramp"} : std::to_string(skipped) + " ramps";

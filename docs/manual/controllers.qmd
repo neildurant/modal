@@ -239,6 +239,65 @@ Use `, c u` (unique), or `, x K u`, followed by a target. It asks only which
 stream: the active continuous lane, or `all` elsewhere. Both cleanup tools
 undo the whole passage as one step.
 
+## Reversing and moving a controller contour {#sec-controller-timing}
+
+A controller value is held until another message changes it. Reversing a
+passage therefore means reversing those held intervals, not just moving
+messages to opposite places. A short low value followed by a long high
+value becomes a long high value followed by a short low value.
+
+For example, suppose modulation is 20 on a bar's first beat and changes
+to 100 on its second beat, holding there for the rest of the bar.
+Retrograde of that bar starts at 100 and changes to 20 on the last beat.
+It can add a message at the selection's start to establish the reversed
+contour. Its new final value holds until the next untouched message;
+any message exactly at the right edge is left alone.
+
+In a continuous controller lane, use `:retrograde` for the selection or
+cursor's bar, or `, x R` followed by a time target. `t` and `T` shift the
+lane's selected events later and earlier, and `:stretch` changes their
+spacing about the first selected event. Notes and other controller lanes
+stay where they are. In the notes area, retrograde still reverses notes.
+These timing transforms require a continuous lane; pedal regions keep their
+own editing keys.
+
+Retrograde needs a **complete, known contour**:
+
+- The value at its start must be known from an event there or earlier.
+  If it is unknown, set a value explicitly first; Modal refuses to guess.
+- A reset, program change or SysEx partway through the span can invalidate
+  the held values. Choose a span between those messages. An explicit
+  starting value after a reset establishes the context again.
+- A value-box or search-filtered selection must include every message of
+  the lane inside its time span. A partial selection is refused rather
+  than expanded to change unselected messages. A normal time selection is
+  the clearest way to choose a contour.
+- Retrograde refuses to cross a protected ramp of that controller.
+  Convert the ramp with `, c R` first if its contour is to be reversed.
+
+Other timing edits also refuse to move ordinary messages into a ramp's
+owned range. The whole edit is left alone, including when changing an
+event's position in the event list. Ordinary messages cannot disappear
+beneath a ramp as a side effect of moving them. Undo restores each accepted
+transformation as one step.
+
+## Remapping program-change events {#sec-program-remapping}
+
+When a song is moved to a different set of sounds, a patch number may need
+to change wherever it occurs. `:remap program 5 to=program 12` changes
+matching program-change events in the selection, or the cursor's bar.
+Modal uses 0–127, as in its other program fields.
+
+The keyboard route is the existing `, x m`, followed by a target. Answer
+`program 5` for what to change and `program 12` for what it becomes, just
+as the same tool takes `cc1` and `cc11`, or a pair of notes. For a whole
+track's changes, use the track target `it`.
+
+Only matching events in the target change. Bank-select messages and the
+track's starting bank/program setup are left alone. If the patch is set
+only in Tracks, edit its Program field there instead. The remapping undoes
+as one step.
+
 ## Ramps: a fade that stays a fade {#sec-controller-ramps}
 
 A swell of expression across a phrase, a slow rise in modulation or a bend
@@ -376,8 +435,10 @@ refused, and the message names the ramp:
   part of one.
 - Starting a section, or deleting or inserting bars, inside a ramp is
   refused.
-- Transforms, Thin among them, leave a ramp's points alone, and say how
-  many ramps they left.
+- Value transforms, Thin among them, leave a ramp's points alone and say
+  how many ramps they left. Retrograde across one, and an edit moving
+  ordinary events into its owned range, are refused instead; see
+  @sec-controller-timing.
 - Recording the same controller over a ramp replaces it: the take removes
   the ramp, and one undo restores both.
 

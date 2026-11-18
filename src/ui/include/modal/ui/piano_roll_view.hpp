@@ -283,7 +283,7 @@ private:
                      const std::function<void(core::Track&)>& change);
     void setGrid(core::NoteFraction grid);
     // Changes the track's events as an undo step, merged as changeTrack's are.
-    void editEvents(std::string title, const std::function<void(core::EventList&)>& change,
+    bool editEvents(std::string title, const std::function<void(core::EventList&)>& change,
                     std::string_view mergeKey = {});
     // The note the cursor is on, or a message saying there's none to do something to.
     std::optional<std::size_t> noteHere(std::string_view what) const;

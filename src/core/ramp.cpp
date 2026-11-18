@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <ranges>
 #include <utility>
 
 namespace modal::core
@@ -189,6 +190,21 @@ EventList withRamps(const EventList& source, std::span<const ControllerRamp> ram
         }
     }
     return events;
+}
+
+std::optional<std::size_t> changedRampPoints(const EventList& before, const EventList& after,
+                                             std::span<const ControllerRamp> ramps)
+{
+    for (std::size_t i = 0; i < ramps.size(); ++i)
+    {
+        const auto owned = [&](const Event& event) { return ramps[i].owns(event); };
+        if (!std::ranges::equal(before.all() | std::views::filter(owned),
+                                after.all() | std::views::filter(owned)))
+        {
+            return i;
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace modal::core

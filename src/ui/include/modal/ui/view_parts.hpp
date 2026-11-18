@@ -289,6 +289,10 @@ EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t 
 
 // How a lane is named in its list and the inspector: Velocity, 74 Brightness, Pitch bend,
 // Aftertouch.
+// Why an ordinary event edit would disturb a ramp's owned points, if it would.
+std::optional<std::string> rampEventEditRefusal(const core::Song& song, core::TrackId track,
+                                                const core::EventList& changed);
+
 std::string laneTitle(const core::Lane& lane);
 
 // A ramp's shapes and their names, in the order Up and Down step through them.

@@ -487,3 +487,38 @@ TEST_CASE("a track's events and ramps are edited together, a ramp keeping what i
     CHECK(song.updateTrackContent(TrackId{99}, [](EventList&, std::vector<ControllerRamp>&) {})
               .refusal == Song::RampRefusal::NoTrack);
 }
+
+TEST_CASE("ordinary event edits preserve ramp-owned points including their multiplicity")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const ControllerRamp ramp{.lane = kModulation, .start = q, .length = q, .from = 20, .to = 80};
+    const std::vector<ControllerRamp> ramps{ramp};
+    EventList before;
+    before.insert({0, ControlChange{1, 40}});
+    for (const auto& event : rampEvents(ramp, ppqn))
+    {
+        before.insert(event);
+    }
+    CHECK_FALSE(changedRampPoints(before, before, ramps));
+    auto unrelated = before;
+    unrelated.insert({q, ControlChange{7, 100}});
+    CHECK_FALSE(changedRampPoints(before, unrelated, ramps));
+    auto outside = before;
+    outside.erase(0);
+    outside.insert({3 * q, ControlChange{1, 40}});
+    CHECK_FALSE(changedRampPoints(before, outside, ramps));
+    auto inside = before;
+    inside.erase(0);
+    inside.insert({q + 1, ControlChange{1, 40}});
+    CHECK(changedRampPoints(before, inside, ramps) == 0);
+    auto repeated = before;
+    repeated.insert(before[1]);
+    CHECK(changedRampPoints(before, repeated, ramps) == 0);
+    auto removed = before;
+    removed.erase(1);
+    CHECK(changedRampPoints(before, removed, ramps) == 0);
+    auto right = before;
+    right.insert({2 * q, ControlChange{1, 80}});
+    CHECK(changedRampPoints(before, right, ramps) == 0);
+}

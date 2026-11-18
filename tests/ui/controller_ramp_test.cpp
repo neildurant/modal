@@ -1007,3 +1007,294 @@ TEST_CASE("controller range transforms also shape a lane containing no notes")
     r.type(U"u");
     CHECK(r.document.song() == before);
 }
+
+TEST_CASE("program remapping takes matching events in the range and keeps banks and setup")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::ControlChange{0, 2}},
+                         {0, core::ControlChange{32, 3}},
+                         {0, core::ProgramChange{5}},
+                         {q, core::ProgramChange{6}},
+                         {2 * q, core::ProgramChange{5}},
+                         {4 * q, core::ProgramChange{5}}});
+    r.document.edit("Program setup", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(
+                            r.id(), [](core::Track& track)
+                            { track.programSetup = {.bankMsb = 2, .bankLsb = 3, .program = 5}; });
+                    });
+    r.type(U"ga");
+    const auto before = r.document.song();
+    const auto programs = [&]
+    {
+        std::vector<int> values;
+        for (const auto& event : r.document.song().events(r.id()).all())
+        {
+            if (const auto* p = std::get_if<core::ProgramChange>(&event.data))
+            {
+                values.push_back(p->program);
+            }
+        }
+        return values;
+    };
+    r.line(U"remap program 5 to=program 127");
+    CHECK(programs() == std::vector<int>{127, 6, 127, 5});
+    CHECK(cleanupValues(r, 0) == std::vector<int>{2});
+    CHECK(cleanupValues(r, 32) == std::vector<int>{3});
+    CHECK(r.document.song().track(r.id())->programSetup == before.track(r.id())->programSetup);
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U",xmibprogram 5\nprogram 0\n");
+    CHECK(programs() == std::vector<int>{0, 6, 0, 5});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    for (const auto line : {U"remap program 128 to=program 0", U"remap program 5 to=program -1",
+                            U"remap program 5 to=cc1", U"remap cc1 to=program 5"})
+    {
+        r.line(line);
+        CHECK(r.ws.messageKind() == MessageKind::Warning);
+        CHECK(r.document.song() == before);
+    }
+}
+
+TEST_CASE("lane timing transforms affect the active contour and preserve notes and other lanes")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    const core::Event note{q / 4, core::Note{60, 90, q / 2}};
+    const core::Event other{q / 2, core::ControlChange{7, 50}};
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}},
+                         {q, core::ControlChange{1, 100}},
+                         {3 * q, core::ControlChange{1, 40}},
+                         {4 * q, core::ControlChange{1, 77}},
+                         note,
+                         other});
+    const auto before = r.document.song();
+    const auto cursor = r.view().cursor();
+    const auto times = [&]
+    {
+        std::vector<core::Tick> ticks;
+        for (const auto& event : r.document.song().events(r.id()).all())
+        {
+            if (const auto* cc = std::get_if<core::ControlChange>(&event.data);
+                cc && cc->controller == 1)
+            {
+                ticks.push_back(event.tick);
+            }
+        }
+        return ticks;
+    };
+    const auto othersStay = [&]
+    {
+        const auto events = r.document.song().events(r.id()).all();
+        CHECK(std::ranges::find(events, note) != events.end());
+        CHECK(std::ranges::find(events, other) != events.end());
+        CHECK(r.view().cursor() == cursor);
+    };
+    r.line(U"retrograde");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{40, 100, 10, 77});
+    CHECK(times() == std::vector<core::Tick>{0, q, 3 * q, 4 * q});
+    othersStay();
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U"vib,xR");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{40, 100, 10, 77});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    const auto step = before.track(r.id())->grid.toTicks(r.ppqn);
+    r.type(U"tib");
+    CHECK(times() == std::vector<core::Tick>{step, q + step, 3 * q + step, 4 * q});
+    othersStay();
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"stretch 1/2");
+    CHECK(times() == std::vector<core::Tick>{0, q / 2, 3 * q / 2, 4 * q});
+    othersStay();
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("controller retrograde refuses unknown values and partial box or search selections")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{q, core::ControlChange{1, 100}}, {2 * q, core::ControlChange{1, 20}}});
+    auto before = r.document.song();
+    auto version = r.document.version();
+    r.line(U"retrograde");
+    CHECK(r.ws.message().starts_with("No held controller value is known"));
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}},
+                         {q, core::ControlChange{1, 100}},
+                         {2 * q, core::ControlChange{1, 20}},
+                         {3 * q, core::ControlChange{1, 40}},
+                         {4 * q, core::ControlChange{1, 77}}});
+    before = r.document.song();
+    version = r.document.version();
+    r.ws.handle(Key::typed(U'v', kCtrl), 0);
+    r.type(U"]b"); // Values 10 through 77 omit the 100 inside the span.
+    const auto cursor = r.view().cursor();
+    r.line(U"retrograde");
+    CHECK(r.ws.message().find("complete time selection") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    CHECK(r.view().cursor() == cursor);
+    r.type(U"gg/cc1=100\nvib,Sm");
+    r.line(U"retrograde");
+    CHECK(r.ws.message().find("complete time selection") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+}
+
+TEST_CASE(
+    "controller retrograde refuses its own ramps but preserves other lanes and the right edge")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    r.type(U",cr");
+    r.keep();
+    auto before = r.document.song();
+    auto version = r.document.version();
+    r.line(U"retrograde");
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    r.type(U"u");
+    r.document.edit("Other lane ramp", {},
+                    [&](core::Song& song)
+                    {
+                        REQUIRE(song.addRamp(r.id(), {.lane = {core::Lane::Kind::Controller, 11},
+                                                      .start = 0,
+                                                      .length = 3 * q,
+                                                      .from = 20,
+                                                      .to = 100})
+                                    .done());
+                    });
+    before = r.document.song();
+    const auto otherValues = cleanupValues(r, 11);
+    r.line(U"retrograde");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{80, 40, 10});
+    CHECK(cleanupValues(r, 11) == otherValues);
+    CHECK(std::ranges::equal(r.document.song().ramps(r.id()), before.ramps(r.id())));
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.document.edit("Right boundary ramp", {},
+                    [&](core::Song& song)
+                    {
+                        REQUIRE(song.addRamp(r.id(), {.lane = {core::Lane::Kind::Controller, 1},
+                                                      .start = 4 * q,
+                                                      .length = q,
+                                                      .from = 50,
+                                                      .to = 80})
+                                    .done());
+                    });
+    before = r.document.song();
+    r.line(U"retrograde");
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    CHECK(std::ranges::equal(r.document.song().events(r.id()).startingIn(4 * q, 8 * q),
+                             before.events(r.id()).startingIn(4 * q, 8 * q)));
+}
+
+TEST_CASE("timing edits refuse ramp destinations without moving events or the cursor")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::ControlChange{1, 40}},
+                         {2 * q, core::ControlChange{1, 80}},
+                         {q / 2, core::ControlChange{7, 20}}});
+    const auto step = r.document.song().track(r.id())->grid.toTicks(r.ppqn);
+    r.document.edit("Sparse ramp", {},
+                    [&](core::Song& song)
+                    {
+                        REQUIRE(song.addRamp(r.id(), {.lane = {core::Lane::Kind::Controller, 1},
+                                                      .start = step / 2,
+                                                      .length = q,
+                                                      .from = 10,
+                                                      .to = 80,
+                                                      .density = 1})
+                                    .done());
+                    });
+    const auto before = r.document.song();
+    const auto cursor = r.view().cursor();
+    const auto version = r.document.version();
+    r.type(U"tib");
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.view().cursor() == cursor);
+    CHECK(r.document.version() == version);
+    r.line(U"stretch 1/2");
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    r.ws.handle(Key::typed(U'l', kAlt), 0);
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.view().cursor() == cursor);
+    CHECK(r.document.version() == version);
+    r.line(U"remap cc7 to=cc1");
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    r.type(U"gegg");
+    auto& view = r.ws.eventList();
+    for (std::size_t n = 0;
+         n < view.list().rows().size() && (view.list().rows()[view.row()].kind != RowKind::Event ||
+                                           view.list().rows()[view.row()].tick != 0);
+         ++n)
+    {
+        r.type(U"j");
+    }
+    REQUIRE(view.list().rows()[view.row()].kind == RowKind::Event);
+    REQUIRE(view.list().rows()[view.row()].tick == 0);
+    r.type(U"0\n");
+    r.type(decodeUtf8("1:1:" + std::to_string(step) + "\n"));
+    CHECK(view.editingField());
+    CHECK(r.ws.message().find("protected") != std::string::npos);
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+    CHECK(view.cursor().tick == 0);
+}
+
+TEST_CASE("controller retrograde follows bend and aftertouch lanes and refuses switch lanes")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const bool bend = GENERATE(true, false);
+    const auto q = r.q();
+    const auto data = [bend](int value) -> core::EventData
+    {
+        return bend ? core::EventData{core::PitchBend{static_cast<std::int16_t>(value)}}
+                    : core::EventData{core::ChannelPressure{static_cast<std::uint8_t>(value)}};
+    };
+    const int first = bend ? -100 : 10;
+    setCleanupEvents(
+        r,
+        {{0, data(first)}, {q, data(100)}, {3 * q, data(40)}, {q / 2, core::ControlChange{1, 50}}});
+    r.line(bend ? U"lane bend" : U"lane aftertouch");
+    const auto before = r.document.song();
+    r.type(U",xRib");
+    std::vector<int> values;
+    for (const auto& event : r.document.song().events(r.id()).all())
+    {
+        if (const auto* value = std::get_if<core::PitchBend>(&event.data))
+        {
+            values.push_back(value->value);
+        }
+        if (const auto* value = std::get_if<core::ChannelPressure>(&event.data))
+        {
+            values.push_back(value->value);
+        }
+    }
+    CHECK(values == std::vector<int>{40, 100, first});
+    CHECK(cleanupValues(r, 1) == std::vector<int>{50});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"lane cc64");
+    const auto switched = r.document.song();
+    r.line(U"retrograde");
+    CHECK(r.ws.message().find("continuous controller lane") != std::string::npos);
+    CHECK(r.document.song() == switched);
+}

@@ -42,7 +42,7 @@ Invert the notes a range or object takes within a key's scale, mirroring them by
 
 ## :retrograde {#ref-transform-retrograde}
 
-Reverse the order in time of the notes a range or object takes, mirroring their rhythm.
+Reverse the order in time of the notes a range or object takes, mirroring their rhythm; in a continuous controller lane reverse its held-value contour over the target span, refusing unknown values, partial selections and ramp crossings.
 
 **Syntax:** `` :retrograde ``.
 
@@ -316,16 +316,16 @@ Split the notes a range or object takes at a note, moving it and those above, or
 
 ## :remap {#ref-transform-remap}
 
-Remap a controller (cc1 to cc11) or a note (C1 to D1) in a range or object, asking which and to what.
+Remap a controller (cc1 to cc11), a note (C1 to D1) or program-change events (program 5 to program 12, 0 to 127) in a range or object, asking which and to what; bank messages and track setup left alone.
 
-**Syntax:** `` :remap [ccN|NOTE] [to=ccN|NOTE] ``.
+**Syntax:** `` :remap [ccN|NOTE|program N] [to=ccN|NOTE|program N] ``.
 
 **Choose before a target:** `` , x m ``.
 
 | Parameter | Enter takes | Form or choices |
 | --- | --- | --- |
-| first argument | no fixed default | `` cc1 / C1 `` |
-| `` to `` | no fixed default | `` cc11 / D1 `` |
+| first argument | no fixed default | `` cc1 / C1 / program 5 `` |
+| `` to `` | no fixed default | `` cc11 / D1 / program 12 `` |
 
 ## :repedal {#ref-transform-pedal-repedal}
 

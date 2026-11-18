@@ -787,3 +787,6 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 
 **Partial selections for controller retrograde (decided 18 November 2026, before step 3).** Refuse a value-box or filtered selection that leaves out lane messages within its time span. Reversing the complete audible contour would require changing those unselected messages too; expanding a selection implicitly would break its editing promise. Normal time selections already include the complete contour.
+
+
+**Known context during contour reversal (implementation of the agreed refusal rule, 18 November 2026).** Use the same reset/program/SysEx context barriers as repeat removal. Refuse those actions strictly inside the reversed span: they stay in place and may invalidate a newly reversed value even where the original later messages made it known again. An explicit value after an action at the left boundary makes the starting state known; an action at the excluded right boundary is untouched. A known constant contour stays unchanged.

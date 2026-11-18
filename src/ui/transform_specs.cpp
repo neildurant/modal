@@ -90,7 +90,8 @@ std::span<const Workspace::TransformSpec> Workspace::transformSpecs()
              .usage = "",
              .description =
                  "Reverse the order in time of the notes a range or object takes, mirroring their "
-                 "rhythm",
+                 "rhythm; in a continuous controller lane reverse its held-value contour over "
+                 "the target span, refusing unknown values, partial selections and ramp crossings",
              .asks = Asks::Nothing,
              .label = "",
              .examples = "",
@@ -473,16 +474,19 @@ std::span<const Workspace::TransformSpec> Workspace::transformSpecs()
              .apply = &Workspace::splitAsked},
             {.name = "transform-remap",
              .aliases = "remap",
-             .usage = "[ccN|NOTE] [to=ccN|NOTE]",
+             .usage = "[ccN|NOTE|program N] [to=ccN|NOTE|program N]",
              .description =
-                 "Remap a controller (cc1 to cc11) or a note (C1 to D1) in a range or object, "
-                 "asking which and to what",
+                 "Remap a controller (cc1 to cc11), a note (C1 to D1) or program-change events "
+                 "(program 5 to program 12, 0 to 127) in a range or object, asking which and to "
+                 "what; "
+                 "bank messages and track setup left alone",
              .asks = Asks::InTurn,
              .label = "Remap {}",
              .examples = "",
              .answer = "",
-             .settings = {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1"},
-                          {.name = "to", .question = "to", .answer = "", .form = "cc11|D1"}},
+             .settings =
+                 {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1|program 5"},
+                  {.name = "to", .question = "to", .answer = "", .form = "cc11|D1|program 12"}},
              .apply = &Workspace::remapAsked},
             {.name = "transform-pedal-repedal",
              .aliases = "repedal",

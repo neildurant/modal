@@ -32,16 +32,19 @@ struct Refusal
 {
     enum class Reason : std::uint8_t
     {
-        AboveHighest, // a note would go above G9 (127)
-        BelowLowest,  // or below C-1 (0)
-        BeforeStart,  // an event would go before the song's start
-        PastEnd,      // or at or after its end
-        Overlap,      // a note would overlap another of its pitch
-        Order,        // a pedal would move past the next of its pedal
+        AboveHighest,          // a note would go above G9 (127)
+        BelowLowest,           // or below C-1 (0)
+        BeforeStart,           // an event would go before the song's start
+        PastEnd,               // or at or after its end
+        Overlap,               // a note would overlap another of its pitch
+        Order,                 // a pedal would move past the next of its pedal
+        UnknownControlValue,   // no held value is known at the start of the range
+        PartialControlContour, // lane messages inside the range were omitted
+        ControlStateChange,    // a reset, program change or SysEx interrupts the contour
     };
 
     Reason reason;
-    Event event;                // the event, as it would be
+    Event event;                // proposed event, or stream/time for a controller refusal
     std::optional<Event> other; // what it would overlap or move past, as that would be
 };
 
@@ -175,6 +178,13 @@ Transformed smoothControls(const EventList& events, std::span<const std::size_t>
 Transformed dedupeControls(const EventList& events, std::span<const std::size_t> which,
                            ControlStreams what);
 
+// Reverse the held contour of a continuous lane over [from, to), using earlier context for
+// its starting value. The target must include every lane message there. A boundary message
+// starts the reversed contour; the new final value holds until an untouched later event.
+// Unknown context, partial selections and state-changing messages inside the range refuse.
+Transformed retrogradeControls(const EventList& events, std::span<const std::size_t> which,
+                               Lane lane, Tick from, Tick to);
+
 // The events taken for which drop says so, removed.
 Transformed removed(const EventList& events, std::span<const std::size_t> which,
                     const std::function<bool(const Event&)>& drop);
@@ -182,6 +192,8 @@ Transformed removed(const EventList& events, std::span<const std::size_t> which,
 // A controller's events made another's, or a pitch's notes another pitch's.
 Transformed remapController(const EventList& events, std::span<const std::size_t> which, int from,
                             int to);
+Transformed remapProgram(const EventList& events, std::span<const std::size_t> which, int from,
+                         int to);
 Transformed remapPitch(const EventList& events, std::span<const std::size_t> which, int from,
                        int to);
 

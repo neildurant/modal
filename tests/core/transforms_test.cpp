@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <utility>
@@ -1060,4 +1061,171 @@ TEST_CASE("controller cleanup never shapes or deduplicates switches and controll
         CHECK(eventsOf(dedupeControls(repeats, allOf(repeats), {})) ==
               eventsOf(Transformed{repeats}));
     }
+}
+
+TEST_CASE("program remapping changes only matching selected messages, leaving bank data alone")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto events = listOf({{0, ControlChange{0, 2}},
+                                {0, ControlChange{32, 3}},
+                                {0, ProgramChange{5}},
+                                {q, ProgramChange{8}},
+                                {2 * q, ProgramChange{5}},
+                                note(q, 60, q),
+                                {q, PitchBend{12}}});
+    const std::vector<std::size_t> selected{0, 1, 2, 3, 4, 5};
+    CHECK(eventsOf(remapProgram(events, selected, 5, 127)) ==
+          eventsOf(Transformed{listOf({{0, ControlChange{0, 2}},
+                                       {0, ControlChange{32, 3}},
+                                       {0, ProgramChange{127}},
+                                       {q, ProgramChange{8}},
+                                       {q, PitchBend{12}},
+                                       note(q, 60, q),
+                                       {2 * q, ProgramChange{5}}})}));
+}
+
+TEST_CASE("controller retrograde reverses held intervals and leaves an event at the right edge")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto lane = GENERATE(Lane{Lane::Kind::Controller, 1}, Lane{Lane::Kind::PitchBend},
+                               Lane{Lane::Kind::Pressure});
+    const auto data = [lane](int value) -> EventData
+    {
+        if (lane.kind == Lane::Kind::PitchBend)
+        {
+            return PitchBend{static_cast<std::int16_t>(value)};
+        }
+        if (lane.kind == Lane::Kind::Pressure)
+        {
+            return ChannelPressure{static_cast<std::uint8_t>(value)};
+        }
+        return ControlChange{lane.controller, static_cast<std::uint8_t>(value)};
+    };
+    const auto events = listOf({{0, data(10)},
+                                {2 * q, data(100)},
+                                {4 * q, data(40)},
+                                {5 * q, data(77)},
+                                {3 * q, ControlChange{7, 88}},
+                                note(3 * q, 60, q)});
+    const auto reversed = eventsOf(retrogradeControls(events, allOf(events), lane, q, 5 * q));
+    const auto expected = listOf({{0, data(10)},
+                                  {q, data(40)},
+                                  {2 * q, data(100)},
+                                  {3 * q, ControlChange{7, 88}},
+                                  note(3 * q, 60, q),
+                                  {4 * q, data(10)},
+                                  {5 * q, data(77)}});
+    CHECK(reversed == eventsOf(Transformed{expected}));
+    const auto held = [lane](const EventList& list, Tick at) -> std::optional<int>
+    {
+        std::optional<int> value;
+        for (const auto& event : list.all())
+        {
+            if (event.tick <= at && lane.shows(event.data))
+            {
+                value = lane.value(event.data);
+            }
+        }
+        return value;
+    };
+    const auto backwards = listOf(reversed);
+    const auto twice =
+        listOf(eventsOf(retrogradeControls(backwards, allOf(backwards), lane, q, 5 * q)));
+    for (const auto at : {q, q + 1, 2 * q - 1, 2 * q, 3 * q, 4 * q - 1, 4 * q, 5 * q - 1})
+    {
+        CHECK(held(backwards, at) == held(events, q + (5 * q - 1 - at)));
+        CHECK(held(twice, at) == held(events, at));
+    }
+    CHECK(held(backwards, 5 * q) == 77);
+}
+
+TEST_CASE("controller retrograde holds its new final value without restoring the outside tail")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const Lane lane{Lane::Kind::Controller, 1};
+    const auto events = listOf({{0, ControlChange{1, 10}},
+                                {2 * q, ControlChange{1, 100}},
+                                {4 * q, ControlChange{1, 40}},
+                                {6 * q, ControlChange{1, 99}}});
+    CHECK(eventsOf(retrogradeControls(events, allOf(events), lane, q, 5 * q)) ==
+          eventsOf(Transformed{listOf({events[0],
+                                       {q, ControlChange{1, 40}},
+                                       {2 * q, ControlChange{1, 100}},
+                                       {4 * q, ControlChange{1, 10}},
+                                       events[3]})}));
+    // The manual's one-bar example: a short 20 followed by three beats at 100.
+    const auto example = listOf({{0, ControlChange{1, 20}}, {q, ControlChange{1, 100}}});
+    CHECK(
+        eventsOf(retrogradeControls(example, allOf(example), lane, 0, 4 * q)) ==
+        eventsOf(Transformed{listOf({{0, ControlChange{1, 100}}, {3 * q, ControlChange{1, 20}}})}));
+    const auto constant = listOf({{0, ControlChange{1, 10}}, {2 * q, ControlChange{1, 10}}});
+    CHECK(eventsOf(retrogradeControls(constant, allOf(constant), lane, q, 5 * q)) ==
+          eventsOf(Transformed{constant}));
+}
+
+TEST_CASE("controller retrograde refuses unknown context and incomplete selections")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const Lane lane{Lane::Kind::Controller, 1};
+    const auto unknown = listOf({{2 * q, ControlChange{1, 20}}, {3 * q, ControlChange{1, 80}}});
+    CHECK(refusalOf(retrogradeControls(unknown, allOf(unknown), lane, q, 4 * q)).reason ==
+          Refusal::Reason::UnknownControlValue);
+    const EventList empty;
+    CHECK(refusalOf(retrogradeControls(empty, {}, lane, q, 4 * q)).reason ==
+          Refusal::Reason::UnknownControlValue);
+    const auto events = listOf(
+        {{q, ControlChange{1, 0}}, {2 * q, ControlChange{1, 0}}, {3 * q, ControlChange{1, 80}}});
+    const std::vector<std::size_t> partial{0, 2};
+    CHECK(refusalOf(retrogradeControls(events, partial, lane, q, 4 * q)).reason ==
+          Refusal::Reason::PartialControlContour);
+}
+
+TEST_CASE("controller retrograde respects reset, program and SysEx context barriers")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const Lane lane{Lane::Kind::Controller, 1};
+    const auto barrier = GENERATE(EventData{ControlChange{121, 0}}, EventData{ProgramChange{5}},
+                                  EventData{SysEx{std::make_shared<const std::vector<std::uint8_t>>(
+                                      std::initializer_list<std::uint8_t>{0xf0, 0x7e, 0xf7})}});
+    const auto unknown =
+        listOf({{0, ControlChange{1, 10}}, {q / 2, barrier}, {2 * q, ControlChange{1, 80}}});
+    CHECK(refusalOf(retrogradeControls(unknown, allOf(unknown), lane, q, 4 * q)).reason ==
+          Refusal::Reason::UnknownControlValue);
+    const auto interrupted =
+        listOf({{q, ControlChange{1, 10}}, {2 * q, barrier}, {3 * q, ControlChange{1, 80}}});
+    CHECK(refusalOf(retrogradeControls(interrupted, allOf(interrupted), lane, q, 4 * q)).reason ==
+          Refusal::Reason::ControlStateChange);
+    // A value explicitly sent at the start, after the barrier, is known again.
+    const auto restored =
+        listOf({{q, barrier}, {q, ControlChange{1, 10}}, {2 * q, ControlChange{1, 80}}});
+    CHECK(std::holds_alternative<EventList>(
+        retrogradeControls(restored, allOf(restored), lane, q, 4 * q)));
+    const auto right =
+        listOf({{q, ControlChange{1, 10}}, {2 * q, ControlChange{1, 80}}, {4 * q, barrier}});
+    CHECK(
+        std::holds_alternative<EventList>(retrogradeControls(right, allOf(right), lane, q, 4 * q)));
+}
+
+TEST_CASE("controller retrograde handles simultaneous messages and times near the tick limit")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const Lane lane{Lane::Kind::Controller, 1};
+    const auto events = listOf({{0, ControlChange{1, 10}},
+                                {q, ControlChange{1, 20}},
+                                {q, ControlChange{1, 30}},
+                                {2 * q, ControlChange{1, 40}}});
+    CHECK(eventsOf(retrogradeControls(events, allOf(events), lane, 0, 4 * q)) ==
+          eventsOf(Transformed{listOf({{0, ControlChange{1, 40}},
+                                       {2 * q, ControlChange{1, 30}},
+                                       {3 * q, ControlChange{1, 20}},
+                                       {3 * q, ControlChange{1, 10}}})}));
+    const auto end = std::numeric_limits<Tick>::max();
+    const auto start = end - 4 * q;
+    const auto late = listOf({{start, ControlChange{1, 10}},
+                              {start + q, ControlChange{1, 80}},
+                              {start + 3 * q, ControlChange{1, 20}}});
+    CHECK(eventsOf(retrogradeControls(late, allOf(late), lane, start, end)) ==
+          eventsOf(Transformed{listOf({{start, ControlChange{1, 20}},
+                                       {start + q, ControlChange{1, 80}},
+                                       {start + 3 * q, ControlChange{1, 10}}})}));
 }

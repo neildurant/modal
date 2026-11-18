@@ -562,6 +562,7 @@ private:
     bool applyStretch(std::string_view name, const OperatorTarget& target, const std::string& text);
     bool applyLength(std::string_view name, const OperatorTarget& target, const std::string& text);
     bool applyFilter(std::string_view name, const OperatorTarget& target, const std::string& text);
+    bool prepareLaneTimingTarget(std::string_view command, OperatorTarget& target);
     bool applyRetrograde(std::string_view name, const OperatorTarget& target,
                          const std::string& text);
     bool applyTranspose(std::string_view name, const OperatorTarget& target,

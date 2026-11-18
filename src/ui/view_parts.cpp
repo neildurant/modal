@@ -826,6 +826,18 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
     return put;
 }
 
+std::optional<std::string> rampEventEditRefusal(const core::Song& song, core::TrackId track,
+                                                const core::EventList& changed)
+{
+    const auto ramps = song.ramps(track);
+    if (const auto index = core::changedRampPoints(song.events(track), changed, ramps))
+    {
+        return "That would change the protected " + laneTitle(ramps[*index].lane) + " ramp in " +
+               song.track(track)->name + "; , c R makes it ordinary events first";
+    }
+    return std::nullopt;
+}
+
 std::string laneTitle(const core::Lane& lane)
 {
     switch (lane.kind)
