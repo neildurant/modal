@@ -97,12 +97,12 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
         - [x] **Done** — Follow-up: mark and protect ramp points in the event list; accepted on trial 18 November 2026.
     - [ ] **Doing** — Shape existing controller values; designed 18 November 2026, each step tried before the next.
         - [x] **Done** — Step 1: scale, limit, invert and their commands/keys; accepted on trial and published 18 November 2026, with local Linux checks and hosted Linux/Windows CI passing.
-        - [ ] **Doing** — Step 2: smooth and remove repeated values; plan approved 18 November 2026. See [status.md](status.md) for validation and trial instructions.
+        - [x] **Done** — Step 2: smooth and remove repeated values; accepted on trial and published 18 November 2026. See [status.md](status.md) for validation.
             - [x] **Done** — Core smoothing and exact-repeat removal, with multi-PPQN regressions and conservative context after reset/program/SysEx messages.
             - [x] **Done** — Commands, keys, lane/all defaults and Workspace regressions; functional trial accepted 18 November 2026.
             - [x] **Done** — Manual explanations, key/transform references, HTML/PDF builds and PDF review.
             - [x] **Done** — All six Linux configurations pass; application rebuilt for the local trial.
-            - [ ] **Doing** — Functional trial accepted 18 November 2026, including repeated smoothing with `.` around a protected ramp; publication checks pending.
+            - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
         - [ ] **To do** — Step 3: program remapping in `:remap` and retrograde in the controller lane. Time offset and stretch already act on controllers.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.

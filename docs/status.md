@@ -2,11 +2,11 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: milestone 9 is under way. Controller shaping step 1 and the schedule-formatting convention are accepted and published, with hosted CI passing. Step 2 (smooth and remove repeats) is accepted on functional trial and passes all six Linux configurations; publication checks are pending. See the current handoff below.*
+*Last updated 18 November 2026: milestone 9 is under way. Controller shaping step 1 and the schedule-formatting convention are accepted and published, with hosted CI passing. Step 2 (smooth and remove repeats) is accepted on trial and published; all six Linux configurations and hosted Linux/Windows CI pass. See the current handoff below.*
 
 ## Current handoff
 
-### Controller shaping: step 2 accepted on trial, 18 November 2026
+### Controller shaping: step 2 accepted and published, 18 November 2026
 
 The implementation plan was approved 18 November 2026. `:ctl-smooth` adjusts existing continuous values towards their own stream's original mean within a centred musical window (default `strength=50% window=1/16`), preserving event times, every zero reset and each gesture's endpoints. Gestures use Thin's quarter-note gap; bar windows use each track's meter at the event. Prefix sums and binary searches avoid rescanning a dense passage for each event. `:ctl-dedupe` removes selected exact repeats of known held values, including context before the selection. Reset All Controllers, program changes and SysEx make that context unknown; the first subsequent value of each stream is retained (agreed during implementation). Repeated zeros can be removed when they restate a known held zero. Switches and controller actions remain untouched by both tools.
 
@@ -14,7 +14,7 @@ Keys: `, c m` (mean) and `, c u` (unique), mirrored at `, x K m/u`, then a targe
 
 Core tests cover three PPQNs, centred windows using original values, strength, gesture ends, resets in every continuous kind, channel/poly aftertouch isolation, selection context, reset/program/SysEx barriers and excluded controller actions. Workspace tests cover keys, commands, defaults, completion, track-meter windows, refusals, undo, controller-only tracks and ramp protection. Focused checks pass (13 cases, 643 assertions). `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,157 registered tests, three skipped and no failures. Whole-tree formatting and `git diff --check` pass. Manual explanations, keys and generated references are updated; HTML and PDF build, and the new sections on PDF page 37 and the following ramp page were visually checked.
 
-Functional trial accepted 18 November 2026, reported as working beautifully. The trial included creating a ramp, adding stray values outside its span, applying Smooth and repeating it several times with `.`; the surrounding contour was reported to evolve gradually back towards the original ramp shape. This records the successful combination of ramp protection, smoothing ordinary events and repeat-last-change. No latency or jitter measurement is claimed. Implementation is in `3c1e4bd`; publication CI is pending.
+Functional trial accepted 18 November 2026, reported as working beautifully. The trial included creating a ramp, adding stray values outside its span, applying Smooth and repeating it several times with `.`; the surrounding contour was reported to evolve gradually back towards the original ramp shape. This records the successful combination of ramp protection, smoothing ordinary events and repeat-last-change. No latency or jitter measurement is claimed. Implementation is in `3c1e4bd`, published through `f6a48e6`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44339289787), along with the [manual workflow](https://github.com/neildurant/modal/actions/runs/44339289796).
 
 Step 3, program remapping in `:remap` and retrograde in the controller lane, remains designed but unstarted. When doing its time work, also verify non-Visual lane timing targets: the existing target still sets `notesOnly`, unlike a Visual controller-lane selection. See [schedule.md](schedule.md) and design.md, Shaping controller values.
 
