@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. Editable controller ramps are built, accepted on trial and published; their manual chapter, the inspector's editing and the marking of a ramp's points in the event list are accepted and published; the shaping transforms are next to design (see the handoff below).*
+*Last updated 17 November 2026: milestone 8 is done and milestone 9 is under way. Editable controller ramps are built, accepted on trial and published; their manual chapter, the inspector's editing and the marking of a ramp's points in the event list are accepted and published; the shaping transforms are designed, their first step next (see schedule.md and design.md, Shaping controller values).*
 
 ## Current handoff
 
