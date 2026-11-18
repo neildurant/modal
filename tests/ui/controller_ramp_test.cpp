@@ -810,3 +810,200 @@ TEST_CASE("controller shaping fits ordinary points without using a ramp's points
     r.type(U"u");
     CHECK(r.document.song() == before);
 }
+
+namespace
+{
+
+void setCleanupEvents(Ramps& r, const std::vector<core::Event>& data)
+{
+    r.document.edit("Controller passage", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(r.id(),
+                                          [&](core::EventList& events)
+                                          {
+                                              events = {};
+                                              for (const auto& event : data)
+                                              {
+                                                  events.insert(event);
+                                              }
+                                          });
+                    });
+    r.document.breakMerge();
+}
+
+std::vector<int> cleanupValues(const Ramps& r, int controller)
+{
+    std::vector<int> values;
+    for (const auto& event : r.document.song().events(r.id()).all())
+    {
+        if (const auto* cc = std::get_if<core::ControlChange>(&event.data);
+            cc && cc->controller == controller)
+        {
+            values.push_back(cc->value);
+        }
+    }
+    return values;
+}
+
+} // namespace
+
+TEST_CASE("controller cleanup keys smooth the lane's values and undo as one edit")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto u = r.q() / 8;
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}},
+                         {u, core::ControlChange{1, 100}},
+                         {2 * u, core::ControlChange{1, 10}},
+                         {3 * u, core::ControlChange{1, 100}},
+                         {4 * u, core::ControlChange{1, 10}}});
+    const auto before = r.document.song();
+    const auto cursor = r.view().cursor();
+    r.type(U",cmib\n\n\n"); // lane, 50%, 1/16
+    CHECK(r.values() == std::vector<int>{10, 70, 40, 70, 10});
+    CHECK(r.view().cursor() == cursor);
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U"vib,xKm\n100%\n\n");
+    CHECK(r.values() == std::vector<int>{10, 40, 70, 40, 10});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("controller cleanup removes exact repeats using context before the selected bar")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::ControlChange{1, 40}},
+                         {4 * q, core::ControlChange{1, 40}},
+                         {4 * q + q / 8, core::ControlChange{1, 80}},
+                         {4 * q + q / 4, core::ControlChange{1, 80}}});
+    r.type(U"]b");
+    const auto before = r.document.song();
+    const auto cursor = r.view().cursor();
+    r.type(U",cuib\n");
+    CHECK(r.values() == std::vector<int>{40, 80});
+    CHECK(r.view().cursor() == cursor);
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U",xKuib\n");
+    CHECK(r.values() == std::vector<int>{40, 80});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE(
+    "controller cleanup defaults to all outside a continuous lane and offers streams with Tab")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto u = r.q() / 8;
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}},
+                         {u, core::ControlChange{1, 100}},
+                         {2 * u, core::ControlChange{1, 10}},
+                         {3 * u, core::ControlChange{1, 10}},
+                         {0, core::ControlChange{7, 20}},
+                         {u, core::ControlChange{7, 120}},
+                         {2 * u, core::ControlChange{7, 20}},
+                         {3 * u, core::ControlChange{7, 20}}});
+    r.type(U"ga");
+    const auto before = r.document.song();
+    r.line(U"ctl-smooth");
+    r.type(U"\n\n\n");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{10, 70, 25, 10});
+    CHECK(cleanupValues(r, 7) == std::vector<int>{20, 87, 37, 20});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-dedupe");
+    r.type(U"\n");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{10, 100, 10});
+    CHECK(cleanupValues(r, 7) == std::vector<int>{20, 120, 20});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    // Tab offers the streams in the target, as well as all.
+    r.line(U"ctl-dedupe");
+    r.type(U"cc\t");
+    REQUIRE(r.ws.completions());
+    CHECK(r.ws.completions()->matches == std::vector<std::string>{"cc1", "cc7"});
+    r.type(U"\x1b");
+    // A switch lane has no continuous stream of its own: default to all here too.
+    r.type(U"gr");
+    r.line(U"lane cc64");
+    r.line(U"ctl-dedupe");
+    r.type(U"\n");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{10, 100, 10});
+    CHECK(cleanupValues(r, 7) == std::vector<int>{20, 120, 20});
+}
+
+TEST_CASE("controller cleanup uses a track's meter for smoothing windows in bars")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}},
+                         {q / 4, core::ControlChange{1, 100}},
+                         {q, core::ControlChange{1, 50}},
+                         {7 * q / 4, core::ControlChange{1, 10}},
+                         {2 * q, core::ControlChange{1, 100}}});
+    r.document.edit("Track meter", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateMeter(r.id(), [](core::MeterMap& meter)
+                                         { meter = core::MeterMap{meter.ppqn(), {3, 4}}; });
+                    });
+    const auto before = r.document.song();
+    r.line(U"ctl-smooth cc1 strength=100% window=1bar");
+    CHECK(r.values() == std::vector<int>{10, 43, 54, 65, 100});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-smooth cc1 strength=100% window=1/1");
+    CHECK(r.values() == std::vector<int>{10, 54, 54, 54, 100});
+}
+
+TEST_CASE("controller cleanup refuses invalid settings and protects ramps")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto before = r.document.song();
+    for (const auto line :
+         {U"ctl-smooth cc64 strength=50% window=1/16", U"ctl-smooth cc0 strength=50% window=1/16",
+          U"ctl-smooth cc1 strength=101% window=1/16", U"ctl-smooth cc1 strength=-1% window=1/16",
+          U"ctl-smooth cc1 strength=50% window=0bar", U"ctl-smooth cc1 strength=50% window=1%bar",
+          U"ctl-smooth cc1 strength=50% window=1/0",
+          U"ctl-smooth cc1 strength=50% window=1/16 extra=1", U"ctl-dedupe cc64",
+          U"ctl-dedupe cc1 step=2"})
+    {
+        r.line(line);
+        CHECK(r.ws.messageKind() == MessageKind::Warning);
+        CHECK(r.document.song() == before);
+    }
+    r.type(U",cr");
+    r.keep();
+    const auto withRamp = r.document.song();
+    for (const auto line : {U"ctl-smooth all strength=100% window=1bar", U"ctl-dedupe all"})
+    {
+        r.line(line);
+        CHECK(r.document.song() == withRamp);
+        CHECK(r.ws.message().find("ramp") != std::string::npos);
+    }
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("controller range transforms also shape a lane containing no notes")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    setCleanupEvents(r, {{0, core::ControlChange{1, 10}}, {r.q(), core::ControlChange{1, 80}}});
+    const auto before = r.document.song();
+    r.line(U"ctl-scale cc1 50%");
+    CHECK(r.values() == std::vector<int>{5, 40});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-limit cc1 30-60");
+    CHECK(r.values() == std::vector<int>{30, 60});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-invert cc1");
+    CHECK(r.values() == std::vector<int>{117, 47});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}

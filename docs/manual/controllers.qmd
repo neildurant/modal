@@ -186,6 +186,59 @@ in a continuous controller lane. Elsewhere there is no default: choose the
 stream explicitly, with Tab offering those present in the passage. The
 scale question names the centre it will use.
 
+### Smoothing a gesture
+
+A hand-played controller curve can be uneven without needing fewer events.
+Smooth draws each selected value towards the average of its own stream's
+original values in a centred time window. A wider window softens a longer
+part of the contour; a greater strength moves each value further towards
+that average. It changes no event's time and adds no events.
+
+For example, `:ctl-smooth cc1 strength=50% window=1/16` takes modulation
+halfway towards the local average within a sixteenth-note window. The
+window extends half that length on either side of each event. Use `100%`
+to reach the average, or `0%` to leave the passage alone. A window of
+`1bar` or `2bars` uses the track's meter at each event. CCs, pitch bend,
+channel pressure and each pitch's polyphonic pressure are averaged
+separately, so different kinds of gestures do not pull one another around.
+
+Smooth keeps **every zero reset and each gesture's first and last event**.
+As with Thin, a gap longer than a quarter note separates gestures. Protected
+values still contribute to the average, but stay where they were themselves.
+A narrow window containing only one event leaves that value unchanged.
+Ramps stay protected, as with the other shaping tools.
+
+The keyboard route is `, c m` (mean), or `, x K m`, followed by a target.
+It asks which stream, how much (50% by default), and the window (1/16).
+The active continuous lane is offered; elsewhere the default is `all`.
+Controller lane range transforms work on tracks containing only controller
+data too; no accompanying notes are needed.
+
+### Removing repeated values
+
+Some imports restate the same controller value over and over. The instrument
+already holds that value, so those events add clutter without adding shape.
+`:ctl-dedupe cc1` removes selected modulation events only when they repeat
+the value known to be held before them. It leaves changes of value in place,
+without Thin's spacing or minimum-change choices.
+
+The comparison includes earlier events outside the selection, so the first
+selected value can be redundant too. An unselected event is always kept,
+but updates what is known to be held. With no known earlier value the event
+is kept, even if it is zero: Modal does not assume the instrument's initial
+state. Reset All Controllers, a program change or SysEx can invalidate that
+state; the first value of each stream after one of those messages is kept,
+then subsequent exact repeats can be removed.
+
+Unlike Thin and Smooth, repeat removal can remove **repeated zeros** when
+they only restate a known held zero. It keeps every actual change back to
+zero. Streams remain independent, switches and controller actions are left
+alone, and ramp points remain protected.
+
+Use `, c u` (unique), or `, x K u`, followed by a target. It asks only which
+stream: the active continuous lane, or `all` elsewhere. Both cleanup tools
+undo the whole passage as one step.
+
 ## Ramps: a fade that stays a fade {#sec-controller-ramps}
 
 A swell of expression across a phrase, a slow rise in modulation or a bend

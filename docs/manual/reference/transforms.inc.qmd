@@ -250,6 +250,32 @@ Invert continuous controller values: 127 less each, bend negated, pan and balanc
 | --- | --- | --- |
 | first argument | the active continuous controller lane, otherwise no default | `` cc1 / bend / aftertouch `` |
 
+## :ctl-smooth {#ref-transform-controller-smooth}
+
+Smooth existing continuous values towards their stream's mean in a centred musical window, keeping times, each gesture's ends and every zero reset; no points added, ramps left alone.
+
+**Syntax:** `` :ctl-smooth [all|ccN|bend|aftertouch] [strength=50%] [window=1/16] ``.
+
+**Choose before a target:** `` , c m ``, `` , x K m ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the active continuous controller lane, otherwise all | `` all / cc1 / bend / aftertouch `` |
+| `` strength `` | `` 50% `` | `` 0-100% `` |
+| `` window `` | `` 1/16 `` | `` 1/16 / 1bar / 2bars `` |
+
+## :ctl-dedupe {#ref-transform-controller-dedupe}
+
+Remove selected continuous values that exactly repeat the known held value, including before the selection; keep the first value after Reset All Controllers, a program change or SysEx; ramps left alone.
+
+**Syntax:** `` :ctl-dedupe [all|ccN|bend|aftertouch] ``.
+
+**Choose before a target:** `` , c u ``, `` , x K u ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the active continuous controller lane, otherwise all | `` all / cc1 / bend / aftertouch `` |
+
 ## :thin {#ref-transform-thin}
 
 Thin out dense controller, pitch bend and aftertouch data in a range or object, asking which, the most to keep a quarter note (16) and the smallest change kept (2); each gesture's first and last and every zero (including pitch bend centre) kept, and never the pedals or other switches.

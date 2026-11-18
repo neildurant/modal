@@ -550,6 +550,8 @@ private:
     using Answers = std::vector<std::pair<std::string, std::string>>;
     bool quantizeAsked(std::string_view name, const OperatorTarget& target,
                        const std::string& text);
+    bool cleanControlsAsked(std::string_view name, const OperatorTarget& target,
+                            const std::string& text);
     bool shapeControlsAsked(std::string_view name, const OperatorTarget& target,
                             const std::string& text);
     bool thinAsked(std::string_view name, const OperatorTarget& target, const std::string& text);

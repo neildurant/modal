@@ -4414,13 +4414,15 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
             }
         }
     }
-    if (notes == 0)
+    // A controller lane can contain useful data on a track with no notes at all.
+    if (notes == 0 && (!inLane_ || velocityLane() || taken.empty()))
     {
         host_.refuse("No notes there", MessageKind::Information);
         return std::nullopt;
     }
-    result.what = (notes == 1 ? core::pitchName(std::get<core::Note>(events[*only].data).pitch)
-                              : std::to_string(notes) + " notes") +
+    result.what = (notes == 0   ? laneTaking(taken.size())
+                   : notes == 1 ? core::pitchName(std::get<core::Note>(events[*only].data).pitch)
+                                : std::to_string(notes) + " notes") +
                   " in " + trackName();
     return result;
 }

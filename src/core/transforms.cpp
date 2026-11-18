@@ -693,6 +693,95 @@ Transformed invertControls(const EventList& events, std::span<const std::size_t>
                           });
 }
 
+Transformed smoothControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what, const std::function<Tick(Tick)>& window,
+                           int strength, Tick gestureGap)
+{
+    auto points = controlPoints(events, which, what);
+    std::ranges::stable_sort(points, {}, &Point::stream);
+    std::vector<double> values(events.size());
+    for (std::size_t start = 0; start < points.size();)
+    {
+        auto end = start;
+        while (end < points.size() && points[end].stream == points[start].stream)
+        {
+            ++end;
+        }
+        // Prefix sums keep dense imported automation from needing a scan for every event.
+        std::vector<double> sums{0};
+        for (auto n = start; n < end; ++n)
+        {
+            sums.push_back(sums.back() + points[n].value);
+        }
+        const auto first = points.begin() + static_cast<std::ptrdiff_t>(start);
+        const auto last = points.begin() + static_cast<std::ptrdiff_t>(end);
+        const auto tickOf = [&](const Point& point) { return events[point.index].tick; };
+        for (auto n = start; n < end; ++n)
+        {
+            const auto& point = points[n];
+            const auto tick = tickOf(point);
+            values[point.index] = point.value;
+            const bool beginning = n == start || tick - tickOf(points[n - 1]) > gestureGap;
+            const bool ending = n + 1 == end || tickOf(points[n + 1]) - tick > gestureGap;
+            if (beginning || ending || point.value == 0)
+            {
+                continue;
+            }
+            const auto half = std::max<Tick>(window(tick), 1) / 2;
+            // Compare distances rather than adding the window to a time near Tick's limit.
+            const auto low =
+                std::lower_bound(first, last, tick, [&](const Point& other, Tick at)
+                                 { return tickOf(other) < at && at - tickOf(other) > half; });
+            const auto high =
+                std::upper_bound(first, last, tick, [&](Tick at, const Point& other)
+                                 { return tickOf(other) > at && tickOf(other) - at > half; });
+            const auto lo = static_cast<std::size_t>(low - first);
+            const auto hi = static_cast<std::size_t>(high - first);
+            const double mean = (sums[hi] - sums[lo]) / static_cast<double>(hi - lo);
+            values[point.index] += (mean - point.value) * (strength / 100.0);
+        }
+        start = end;
+    }
+    return shapedControls(events, which, what, true,
+                          [&](const Point& point) { return values[point.index]; });
+}
+
+Transformed dedupeControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what)
+{
+    std::vector<bool> selected(events.size(), false);
+    for (const auto i : which)
+    {
+        selected[i] = true;
+    }
+    std::vector<std::size_t> indices(events.size());
+    std::iota(indices.begin(), indices.end(), std::size_t{0});
+    const auto points = controlPoints(events, indices, what);
+    std::size_t next = 0;
+    std::map<int, int> held;
+    std::vector<bool> dropped(events.size(), false);
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto& data = events[i].data;
+        const auto* cc = std::get_if<ControlChange>(&data);
+        if ((cc && cc->controller == 121) || std::holds_alternative<ProgramChange>(data) ||
+            std::holds_alternative<SysEx>(data))
+        {
+            // A reset or a change of patch can invalidate values known from earlier events.
+            held.clear();
+        }
+        if (next == points.size() || points[next].index != i)
+        {
+            continue;
+        }
+        const auto& point = points[next++];
+        const auto previous = held.find(point.stream);
+        dropped[i] = selected[i] && previous != held.end() && previous->second == point.value;
+        held[point.stream] = point.value;
+    }
+    return without(events, dropped);
+}
+
 Transformed removed(const EventList& events, std::span<const std::size_t> which,
                     const std::function<bool(const Event&)>& drop)
 {

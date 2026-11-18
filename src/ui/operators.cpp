@@ -161,9 +161,13 @@ std::string_view trimmed(std::string_view text)
 }
 
 // A continuous stream shared by the controller shaping commands.
-std::optional<core::ControlStreams> controlStream(std::string_view text)
+std::optional<core::ControlStreams> controlStream(std::string_view text, bool all = false)
 {
     using Kind = core::ControlStreams::Kind;
+    if (all && text == "all")
+    {
+        return core::ControlStreams{};
+    }
     if (text == "bend")
     {
         return core::ControlStreams{Kind::Bend};
@@ -284,16 +288,17 @@ std::string Workspace::defaultAnswer(std::string_view answer, const OperatorTarg
 {
     // A default worked out as it's asked: the tracks' grid, the pedalling settings, a new track
     // named after the first's and the side moved, the range's first note or the search's query.
-    if (answer == "{lane}")
+    if (answer == "{lane}" || answer == "{lane-all}")
     {
+        const auto fallback = answer == "{lane-all}" ? "all" : "";
         if (shown() != ViewKind::PianoRoll || !pianoRoll_->inLane())
         {
-            return {};
+            return fallback;
         }
         const auto lane = pianoRoll_->lane();
         if (!core::rampable(lane))
         {
-            return {};
+            return fallback;
         }
         if (lane.kind == core::Lane::Kind::PitchBend)
         {
@@ -780,7 +785,7 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
             }
         }
         auto said = told(rest, {});
-        if (name.starts_with("transform-controller-") && name != "transform-controller-invert")
+        if (name == "transform-controller-scale" || name == "transform-controller-limit")
         {
             if (const auto space = said.amount.find(' '); space != std::string::npos)
             {
@@ -1269,6 +1274,93 @@ bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quanti
                                    .move = how.move,
                                    .step = [step](core::Tick) { return step; },
                                    .nearestEnd = nearestEnd});
+        });
+}
+
+bool Workspace::cleanControlsAsked(std::string_view name, const OperatorTarget& target,
+                                   const std::string& text)
+{
+    const auto said = told(text, {});
+    const auto what = controlStream(said.amount, true);
+    if (!what)
+    {
+        refuse("Not continuous data: " + said.amount +
+                   "; type all, cc1, bend or aftertouch; switches and bank select are left alone",
+               MessageKind::Warning);
+        return true;
+    }
+    const bool smooth = name == "transform-controller-smooth";
+    if (!smooth)
+    {
+        if (!said.options.empty())
+        {
+            refuse("Remove repeats takes no settings after the stream, not " +
+                       said.options.front().first + "=",
+                   MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Remove repeated " + said.amount + " values from " + target.what,
+                            target, [&](const core::EventList& events, const auto& part)
+                            { return core::dedupeControls(events, part.events, *what); });
+    }
+    int strength = 50;
+    std::string window = "1/16";
+    for (const auto& [option, value] : said.options)
+    {
+        if (option == "strength")
+        {
+            const auto percent = core::parsePercent(value);
+            if (!percent)
+            {
+                refuse("Not a strength: " + value + "; type 0% to 100%", MessageKind::Warning);
+                return true;
+            }
+            strength = *percent;
+        }
+        else if (option == "window")
+        {
+            window = value;
+        }
+        else
+        {
+            refuse("Smooth takes strength= and window=, not " + option + "=", MessageKind::Warning);
+            return true;
+        }
+    }
+    std::optional<std::int64_t> bars;
+    std::optional<core::NoteFraction> length;
+    if (window.ends_with("bars") || window.ends_with("bar"))
+    {
+        const auto count = window.substr(0, window.find("bar"));
+        bars = count.empty() ? 1 : percentUpTo(count, 64).value_or(0);
+        if (count.ends_with('%'))
+        {
+            bars = 0;
+        }
+    }
+    else
+    {
+        length = core::parseNoteFraction(window);
+    }
+    if ((bars && *bars < 1) || (!bars && !length))
+    {
+        refuse("Not a window: " + window + "; type 1/16, 1bar or 2bars", MessageKind::Warning);
+        return true;
+    }
+    const auto& song = document_.song();
+    return changeEvents(
+        "Smooth " + said.amount + " of " + target.what + " by " + std::to_string(strength) + "%",
+        target,
+        [&](const core::EventList& events, const auto& part)
+        {
+            const auto& meter = song.meter(part.track);
+            const auto width = [&](core::Tick tick)
+            {
+                return bars ? *bars * meter.signatureAt(tick).barLength().toTicks(song.ppqn())
+                            : length->toTicks(song.ppqn());
+            };
+            return core::smoothControls(events, part.events, *what, width, strength,
+                                        song.ppqn().quarter());
         });
 }
 

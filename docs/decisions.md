@@ -773,3 +773,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 
 **Fitting a constant controller value (decided 18 November 2026, during implementation).** Fit leaves a stream with only one distinct non-zero value unchanged: there is no contour to stretch. Resets are preserved separately and excluded from the fitted bounds, so they do not manufacture a range for an otherwise constant gesture. The current behaviour is in design.md, Shaping controller values.
+
+
+**Known values for removing repeats (decided 18 November 2026, during implementation).** Compare a selected event with the known held value of its own stream, including context before the selection. With no known value, keep it rather than assuming a synth's initial state. Reset All Controllers, a program change or SysEx can invalidate that context, so keep the first value of each stream after those messages too. Subsequent exact repeats, including repeated zeros, can be removed without reshaping the passage.
+
+**Controller-only lane ranges (corrected 18 November 2026, during implementation).** Workspace regressions for smoothing and removing repeats exposed that range transforms refused a controller lane's bar when it held no notes. Let a controller lane with events supply that range without a note, so pure automation tracks can use the same transforms; the note and velocity areas retain their note requirement.

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <utility>
 #include <variant>
@@ -828,4 +829,235 @@ TEST_CASE("controller shaping parses signed bend ranges and refuses invalid valu
     }
     CHECK_FALSE(parseControlRange("-8193-8191", bend));
     CHECK_FALSE(parseControlRange("-8192-8192", bend));
+}
+
+TEST_CASE("controller smoothing uses original values in centred windows and keeps gesture ends")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto unit = q / 16;
+    const auto list = listOf({{0, ControlChange{1, 10}},
+                              {unit, ControlChange{1, 100}},
+                              {2 * unit, ControlChange{1, 10}},
+                              {3 * unit, ControlChange{1, 100}},
+                              {4 * unit, ControlChange{1, 10}},
+                              {unit, ControlChange{7, 70}},
+                              {unit, ControlChange{64, 127}},
+                              note(0, 60, q)});
+    const auto values = [&](int strength, Tick width)
+    {
+        std::vector<int> result;
+        const auto changed = smoothControls(
+            list, allOf(list), {ControlStreams::Kind::Controller, 1},
+            [width](Tick) { return width; }, strength, q);
+        for (const auto& event : eventsOf(changed))
+        {
+            if (const auto* cc = std::get_if<ControlChange>(&event.data); cc && cc->controller == 1)
+            {
+                result.push_back(cc->value);
+            }
+        }
+        return result;
+    };
+    CHECK(values(50, 2 * unit) == std::vector<int>{10, 70, 40, 70, 10});
+    CHECK(values(100, 2 * unit) == std::vector<int>{10, 40, 70, 40, 10});
+    CHECK(values(0, 2 * unit) == std::vector<int>{10, 100, 10, 100, 10});
+    CHECK(values(100, unit) == std::vector<int>{10, 100, 10, 100, 10});
+    const auto changed =
+        eventsOf(smoothControls(list, allOf(list), {}, [unit](Tick) { return 2 * unit; }, 100, q));
+    for (const auto& event : list.all())
+    {
+        if (const auto* cc = std::get_if<ControlChange>(&event.data); !cc || cc->controller != 1)
+        {
+            CHECK(std::ranges::find(changed, event) != changed.end());
+        }
+    }
+}
+
+TEST_CASE("controller smoothing preserves every reset, separate streams and unselected values")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto u = q / 16;
+    const auto list = listOf({{0, PitchBend{-100}},
+                              {u, PitchBend{100}},
+                              {2 * u, PitchBend{0}},
+                              {3 * u, PitchBend{0}},
+                              {4 * u, PitchBend{100}},
+                              {5 * u, PitchBend{-100}},
+                              {2 * q, PitchBend{200}},
+                              {2 * q + u, PitchBend{800}},
+                              {2 * q + 2 * u, PitchBend{200}},
+                              {0, ChannelPressure{10}},
+                              {u, ChannelPressure{100}},
+                              {2 * u, ChannelPressure{10}},
+                              {0, PolyPressure{60, 90}},
+                              {u, PolyPressure{60, 30}},
+                              {2 * u, PolyPressure{60, 90}},
+                              {0, PolyPressure{61, 50}},
+                              {u, PolyPressure{61, 50}},
+                              {2 * u, PolyPressure{61, 50}}});
+    const auto changed =
+        eventsOf(smoothControls(list, allOf(list), {}, [u](Tick) { return 2 * u; }, 100, q));
+    std::vector<int> bends, pressure, poly60, poly61;
+    for (const auto& event : changed)
+    {
+        if (const auto* b = std::get_if<PitchBend>(&event.data))
+        {
+            bends.push_back(b->value);
+        }
+        if (const auto* p = std::get_if<ChannelPressure>(&event.data))
+        {
+            pressure.push_back(p->value);
+        }
+        if (const auto* p = std::get_if<PolyPressure>(&event.data))
+        {
+            (p->pitch == 60 ? poly60 : poly61).push_back(p->value);
+        }
+    }
+    CHECK(bends == std::vector<int>{-100, 0, 0, 0, 0, -100, 200, 400, 200});
+    CHECK(pressure == std::vector<int>{10, 40, 10});
+    CHECK(poly60 == std::vector<int>{90, 70, 90});
+    CHECK(poly61 == std::vector<int>{50, 50, 50});
+    const auto onlyPressure = eventsOf(smoothControls(
+        list, allOf(list), {ControlStreams::Kind::Aftertouch}, [u](Tick) { return 2 * u; }, 50, q));
+    for (const auto& event : list.all())
+    {
+        if (std::holds_alternative<PitchBend>(event.data))
+        {
+            CHECK(std::ranges::find(onlyPressure, event) != onlyPressure.end());
+        }
+    }
+    // The selected points define the smoothing contour and its endpoints.
+    const auto list2 = listOf({{0, ControlChange{1, 100}},
+                               {u, ControlChange{1, 10}},
+                               {2 * u, ControlChange{1, 100}},
+                               {3 * u, ControlChange{1, 10}},
+                               {4 * u, ControlChange{1, 100}}});
+    const std::vector<std::size_t> selected{1, 2, 3};
+    CHECK(eventsOf(smoothControls(
+              list2, selected, {}, [u](Tick) { return 2 * u; }, 100, q)) ==
+          eventsOf(Transformed{listOf({{0, ControlChange{1, 100}},
+                                       {u, ControlChange{1, 10}},
+                                       {2 * u, ControlChange{1, 40}},
+                                       {3 * u, ControlChange{1, 10}},
+                                       {4 * u, ControlChange{1, 100}}})}));
+}
+
+TEST_CASE("controller repeat removal uses held context, preserves unknown first values and "
+          "isolates streams")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto list = listOf({{0, ControlChange{1, 0}},
+                              {q, ControlChange{1, 0}},
+                              {2 * q, ControlChange{1, 20}},
+                              {3 * q, ControlChange{1, 20}},
+                              {4 * q, ControlChange{1, 0}},
+                              {5 * q, ControlChange{1, 0}},
+                              {0, PitchBend{0}},
+                              {q, PitchBend{0}},
+                              {0, ChannelPressure{20}},
+                              {q, ChannelPressure{20}},
+                              {0, PolyPressure{60, 20}},
+                              {q, PolyPressure{60, 20}},
+                              {q, PolyPressure{61, 20}},
+                              {0, ControlChange{64, 127}},
+                              {q, ControlChange{64, 127}},
+                              {0, ControlChange{0, 1}},
+                              {q, ControlChange{0, 1}},
+                              note(0, 60, q)});
+    const auto expected = listOf({{0, ControlChange{1, 0}},
+                                  {0, PitchBend{0}},
+                                  {0, ChannelPressure{20}},
+                                  {0, PolyPressure{60, 20}},
+                                  {0, ControlChange{64, 127}},
+                                  {0, ControlChange{0, 1}},
+                                  note(0, 60, q),
+                                  {q, PolyPressure{61, 20}},
+                                  {q, ControlChange{64, 127}},
+                                  {q, ControlChange{0, 1}},
+                                  {2 * q, ControlChange{1, 20}},
+                                  {4 * q, ControlChange{1, 0}}});
+    CHECK(eventsOf(dedupeControls(list, allOf(list), {})) == eventsOf(Transformed{expected}));
+    // An unselected earlier value still tells us what is held; later unselected events stay.
+    const auto mod = listOf({{0, ControlChange{1, 40}},
+                             {q, ControlChange{1, 40}},
+                             {2 * q, ControlChange{1, 80}},
+                             {3 * q, ControlChange{1, 40}},
+                             {4 * q, ControlChange{1, 40}}});
+    const std::vector<std::size_t> selected{1, 3};
+    CHECK(eventsOf(dedupeControls(mod, selected, {})) ==
+          eventsOf(Transformed{listOf({mod[0], mod[2], mod[3], mod[4]})}));
+    const auto bendOnly = eventsOf(dedupeControls(list, allOf(list), {ControlStreams::Kind::Bend}));
+    CHECK(bendOnly.size() == list.size() - 1);
+    CHECK(std::ranges::count(bendOnly, Event{q, ControlChange{1, 0}}) == 1);
+}
+
+TEST_CASE("controller repeat removal forgets held values after reset, program and SysEx messages")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto barrier = GENERATE(EventData{ControlChange{121, 0}}, EventData{ProgramChange{5}},
+                                  EventData{SysEx{std::make_shared<const std::vector<std::uint8_t>>(
+                                      std::initializer_list<std::uint8_t>{0xf0, 0x7e, 0xf7})}});
+    const auto list = listOf({{0, ControlChange{1, 40}},
+                              {0, PitchBend{10}},
+                              {q, barrier},
+                              {2 * q, ControlChange{1, 40}},
+                              {2 * q, PitchBend{10}},
+                              {3 * q, ControlChange{1, 40}},
+                              {3 * q, PitchBend{10}}});
+    const auto expected = listOf({list[0], list[1], list[2], list[3], list[4]});
+    CHECK(eventsOf(dedupeControls(list, allOf(list), {})) == eventsOf(Transformed{expected}));
+    const std::vector<std::size_t> selected{3, 4, 5, 6};
+    CHECK(eventsOf(dedupeControls(list, selected, {})) == eventsOf(Transformed{expected}));
+}
+
+TEST_CASE("controller smoothing protects interior repeated resets for every continuous kind")
+{
+    const auto u = MODAL_ANY_PPQN().quarter() / 16;
+    const auto reset = GENERATE(EventData{ControlChange{1, 0}}, EventData{PitchBend{0}},
+                                EventData{ChannelPressure{0}}, EventData{PolyPressure{60, 0}});
+    EventList events;
+    Tick at = 0;
+    for (const int value : {20, 80, 0, 0, 100, 20})
+    {
+        auto data = reset;
+        std::visit(
+            [value](auto& each)
+            {
+                if constexpr (requires { each.value; })
+                {
+                    each.value = static_cast<decltype(each.value)>(value);
+                }
+            },
+            data);
+        events.insert({at, data});
+        at += u;
+    }
+    const auto result = eventsOf(
+        smoothControls(events, allOf(events), {}, [u](Tick) { return 2 * u; }, 100, 16 * u));
+    CHECK(result[0] == events[0]);
+    CHECK(result[1] != events[1]);
+    CHECK(result[2].data == reset);
+    CHECK(result[3].data == reset);
+    CHECK(result[5] == events[5]);
+}
+
+TEST_CASE("controller cleanup never shapes or deduplicates switches and controller actions")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    for (const int controller : {0, 32, 64, 65, 68, 88, 96, 98, 100, 120, 121, 127})
+    {
+        INFO(controller);
+        const auto cc = static_cast<std::uint8_t>(controller);
+        const auto events = listOf({{0, ControlChange{cc, 10}},
+                                    {q / 8, ControlChange{cc, 100}},
+                                    {q / 4, ControlChange{cc, 10}}});
+        CHECK(eventsOf(smoothControls(
+                  events, allOf(events), {}, [q](Tick) { return q; }, 100, q)) ==
+              eventsOf(Transformed{events}));
+        const auto repeats = listOf({{0, ControlChange{cc, 10}},
+                                     {q / 8, ControlChange{cc, 10}},
+                                     {q / 4, ControlChange{cc, 10}}});
+        CHECK(eventsOf(dedupeControls(repeats, allOf(repeats), {})) ==
+              eventsOf(Transformed{repeats}));
+    }
 }

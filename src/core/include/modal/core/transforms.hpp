@@ -163,6 +163,18 @@ Transformed limitControls(const EventList& events, std::span<const std::size_t> 
 Transformed invertControls(const EventList& events, std::span<const std::size_t> which,
                            ControlStreams what);
 
+// Each selected value drawn towards its stream's original average within a centred window.
+// Keep each gesture's first/last and every zero; no points are added or moved. A gesture
+// ends at a gap longer than gestureGap, as thinning's does. Strength is 0 to 100 percent.
+Transformed smoothControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what, const std::function<Tick(Tick)>& window,
+                           int strength, Tick gestureGap);
+
+// Drop selected values only when they repeat a value known to be held, including before
+// the selection. Reset All Controllers, program changes and SysEx make that value unknown.
+Transformed dedupeControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what);
+
 // The events taken for which drop says so, removed.
 Transformed removed(const EventList& events, std::span<const std::size_t> which,
                     const std::function<bool(const Event&)>& drop);

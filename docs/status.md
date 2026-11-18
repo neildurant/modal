@@ -2,9 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: milestone 9 is under way. Controller ramps and their manual are accepted and published. Controller shaping step 1 (scale, limit and invert) is accepted on trial and published; all six Linux configurations and hosted Linux/Windows CI pass. See the current handoff below.*
+*Last updated 18 November 2026: milestone 9 is under way. Controller shaping step 1 and the schedule-formatting convention are accepted and published, with hosted CI passing. Step 2 (smooth and remove repeats) is implemented locally and passes all six Linux configurations; the functional trial is pending. See the current handoff below.*
 
 ## Current handoff
+
+### Controller shaping: step 2 validated locally, trial pending, 18 November 2026
+
+The implementation plan was approved 18 November 2026. `:ctl-smooth` adjusts existing continuous values towards their own stream's original mean within a centred musical window (default `strength=50% window=1/16`), preserving event times, every zero reset and each gesture's endpoints. Gestures use Thin's quarter-note gap; bar windows use each track's meter at the event. Prefix sums and binary searches avoid rescanning a dense passage for each event. `:ctl-dedupe` removes selected exact repeats of known held values, including context before the selection. Reset All Controllers, program changes and SysEx make that context unknown; the first subsequent value of each stream is retained (agreed during implementation). Repeated zeros can be removed when they restate a known held zero. Switches and controller actions remain untouched by both tools.
+
+Keys: `, c m` (mean) and `, c u` (unique), mirrored at `, x K m/u`, then a target. Both offer the active continuous lane as their stream default, `all` elsewhere, with Tab offering streams in the target. Smooth then asks strength and window; remove repeats asks nothing else. Both reuse ramp protection/counting and grouped undo. Workspace regressions exposed and fixed the existing `No notes there` refusal for controller-only lane ranges; the step 1 transforms are covered there too. Note and velocity areas retain their note requirement.
+
+Core tests cover three PPQNs, centred windows using original values, strength, gesture ends, resets in every continuous kind, channel/poly aftertouch isolation, selection context, reset/program/SysEx barriers and excluded controller actions. Workspace tests cover keys, commands, defaults, completion, track-meter windows, refusals, undo, controller-only tracks and ramp protection. Focused checks pass (13 cases, 643 assertions). `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,157 registered tests, three skipped and no failures. Whole-tree formatting and `git diff --check` pass. Manual explanations, keys and generated references are updated; HTML and PDF build, and the new sections on PDF page 37 and the following ramp page were visually checked.
+
+Functional trial is pending before pushing. Try `:ctl-smooth cc1 strength=50% window=1/16`, then a wider window such as `1bar` and 100% strength, on a dense gesture; endpoints and zeros should stay. Try `:ctl-dedupe cc1` on repeated values, including a selected bar whose first value repeats an earlier one, and `u` after each tool. Also try `, c m ib` (Enter for lane, strength and window) and `, c u ib`, bend/aftertouch, `all` from the arrangement and a passage containing a protected ramp. The GCC Debug executable is rebuilt and newer than every tracked application build input: `build/linux-gcc/apps/Debug/modal`. The step is committed locally for this trial and is not pushed. No MIDI hardware trial or latency/jitter measurement has been run for this step.
+
+Step 3, program remapping in `:remap` and retrograde in the controller lane, remains designed but unstarted. When doing its time work, also verify non-Visual lane timing targets: the existing target still sets `notesOnly`, unlike a Visual controller-lane selection. See [schedule.md](schedule.md) and design.md, Shaping controller values.
 
 ### Controller shaping: step 1 accepted and published, 18 November 2026
 
@@ -16,9 +28,7 @@ Core regressions exercise all three PPQNs, stream/selection isolation, fit, cons
 
 Validation on the final tree, 18 November 2026: `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,145 registered tests, three skipped and no failures. Focused shaping and shared transform-default regressions pass (12 cases, 1,421 assertions). Whole-tree clang-format 22.1.8 and `git diff --check` pass. `tools/build-manual.cmake` builds HTML and PDF with the regenerated references; the new Shaping values section was visually checked on PDF pages 36–37. The GCC Debug application is newer than every tracked application build input. The functional trial was subsequently accepted 18 November 2026, reported as working well. No hardware latency or jitter measurement is claimed. Published through `b53b2f8`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44296930984), along with the [manual workflow](https://github.com/neildurant/modal/actions/runs/44296930836).
 
-The remaining shaping work stays designed but unstarted: step 2, smooth and remove repeats; step 3, program remapping in `:remap` and retrograde in the lane. Each step is tried before proceeding (design.md, Shaping controller values; schedule.md).
-
-Schedule maintenance, 18 November 2026: staged work in milestones 8 and 9 and the related engineering entries is now listed as indented sub-step checklists. The ongoing convention is recorded in `AGENTS.md` and the schedule's upkeep instructions, so future updates keep each step and its state visible.
+Schedule maintenance, 18 November 2026: staged work in milestones 8 and 9 and the related engineering entries is now listed as indented sub-step checklists. The ongoing convention is recorded in `AGENTS.md` and the schedule's upkeep instructions, so future updates keep each step and its state visible. Published through `bd0d0af`; [CI passed](https://github.com/neildurant/modal/actions/runs/44301435819) and the [manual workflow passed](https://github.com/neildurant/modal/actions/runs/44301435997).
 
 ### Controller ramps, 17 November 2026
 
