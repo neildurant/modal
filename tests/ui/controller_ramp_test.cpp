@@ -1199,6 +1199,52 @@ TEST_CASE(
                              before.events(r.id()).startingIn(4 * q, 8 * q)));
 }
 
+TEST_CASE("controller retrograde of selected events reverses what is heard until the next change")
+{
+    // An event selection has no time of its own: its last value holds until the lane's next
+    // event, or the end of its bar, and reversing that puts two lone events in each other's
+    // places rather than both at the first.
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    const auto times = [&]
+    {
+        std::vector<core::Tick> ticks;
+        for (const auto& event : r.document.song().events(r.id()).all())
+        {
+            ticks.push_back(event.tick);
+        }
+        return ticks;
+    };
+    setCleanupEvents(r, {{0, core::ControlChange{1, 20}}, {2 * q, core::ControlChange{1, 100}}});
+    auto before = r.document.song();
+    r.type(U"v\t,xR");
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20});
+    CHECK(times() == std::vector<core::Tick>{0, 2 * q});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+
+    // The next event in the bar ends what is reversed, and stays where it is.
+    setCleanupEvents(r, {{0, core::ControlChange{1, 20}},
+                         {q, core::ControlChange{1, 100}},
+                         {3 * q, core::ControlChange{1, 60}}});
+    r.type(U"[b");
+    REQUIRE(r.view().cursor().tick == 0);
+    r.type(U"v\t,xR");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
+    CHECK(times() == std::vector<core::Tick>{0, 2 * q, 3 * q});
+
+    // A next event in a later bar leaves the bar's end as the edge.
+    setCleanupEvents(r, {{0, core::ControlChange{1, 20}},
+                         {2 * q, core::ControlChange{1, 100}},
+                         {5 * q, core::ControlChange{1, 60}}});
+    r.type(U"[b");
+    REQUIRE(r.view().cursor().tick == 0);
+    r.type(U"v\t,xR");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
+    CHECK(times() == std::vector<core::Tick>{0, 2 * q, 5 * q});
+}
+
 TEST_CASE("timing edits refuse ramp destinations without moving events or the cursor")
 {
     Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};

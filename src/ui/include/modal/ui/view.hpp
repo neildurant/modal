@@ -206,6 +206,10 @@ struct OperatorTarget
     std::optional<std::pair<core::Tick, core::Tick>> span = std::nullopt;
     // The active lane for controller timing transforms; other transforms keep their usual target.
     std::optional<core::Lane> controlLane = std::nullopt;
+    // For a selection of a controller lane's events, which has no time of its own: where its
+    // last value stops being heard, at the lane's next event or the end of that value's bar.
+    // Retrograde reverses up to there, so that what is reversed is what is heard.
+    std::optional<core::Tick> heldEnd = std::nullopt;
 };
 
 // What a view asks of the workspace that shows it.

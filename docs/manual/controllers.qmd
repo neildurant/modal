@@ -253,6 +253,13 @@ It can add a message at the selection's start to establish the reversed
 contour. Its new final value holds until the next untouched message;
 any message exactly at the right edge is left alone.
 
+A selection of the lane's events, made with `v` and Tab, says which
+messages but not how long the last one lasts. Retrograde takes it to last
+as long as it is heard: until the lane's next message, or the end of its
+bar if that comes first. Selecting the two messages in the example above
+therefore gives the same result as the whole bar, and two lone messages
+in a bar simply change places.
+
 In a continuous controller lane, use `:retrograde` for the selection or
 cursor's bar, or `, x R` followed by a time target. `t` and `T` shift the
 lane's selected events later and earlier, and `:stretch` changes their

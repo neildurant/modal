@@ -4344,6 +4344,20 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
         result.what = laneTaking(taken.size()) + " in " + trackName();
         result.notesOnly = velocityLane();
         result.span = laneSpan();
+        if (!velocityLane() && laneRange() && result.span)
+        {
+            const auto last = result.span->second - 1;
+            const auto& m = meter();
+            core::Tick end = m.barStart(m.toBarBeatTick(last).bar + 1);
+            for (const auto& entry : laneEntries())
+            {
+                if (entry.tick > last)
+                {
+                    end = std::min(end, entry.tick);
+                }
+            }
+            result.heldEnd = end;
+        }
         return result;
     }
     if (motion == "object-chord")

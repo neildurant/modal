@@ -1077,7 +1077,8 @@ bool Workspace::applyRetrograde(std::string_view /*name*/, const OperatorTarget&
             refuse("Controller retrograde needs a time span", MessageKind::Warning);
             return true;
         }
-        const auto [from, to] = *target.span;
+        const auto from = target.span->first;
+        const auto to = target.heldEnd.value_or(target.span->second);
         for (const auto& part : target.parts)
         {
             for (const auto& ramp : document_.song().ramps(part.track))
