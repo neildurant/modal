@@ -132,6 +132,60 @@ as one step.
 Pedals and other switch controllers are left alone by Thin: their changes
 are actions to preserve, rather than points along a continuous curve.
 
+## Shaping values {#sec-controller-shaping}
+
+Sometimes the gesture is already right, but its values are too strong, too
+wide or too high. Shaping changes the values of the existing events,
+keeping their times. Scale changes the contour; limit trims its extremes;
+invert turns a rise into a fall. Each works on the selected passage, or the
+cursor's bar if there is no selection, and undoes as one step.
+
+For example, a modulation gesture ranging from 20 to 100 can be made half
+as strong with `:ctl-scale cc1 50%`: those values become 10 and 50. An
+offset, `:ctl-scale cc1 +10`, raises them to 30 and 110 instead. To fit the
+existing contour into particular bounds, use `:ctl-scale cc1 30-90`: its
+lowest non-zero value becomes 30, its highest 90, and the intervening
+values keep their proportions. Each aftertouch stream is fitted separately,
+including each pitch's polyphonic aftertouch. A stream with just one distinct
+non-zero value stays as it is, since it has no contour to stretch.
+
+Scale rounds to the nearest whole value and clips anything beyond the
+controller's limits. Its percentage is measured from the stream's centre:
+0 for most controllers, 64 for pan and balance, and 0 for pitch bend. Thus
+halving a pan gesture draws it towards the middle rather than to the left.
+Percentages run from 0% to 1000%; offsets may be up to 127 either way, or
+16383 for pitch bend.
+
+Limit and invert do different jobs:
+
+- `:ctl-limit cc1 30-90` clips values below 30 or above 90 to those limits;
+  the middle of the gesture stays as it was. Its first and last values are
+  clipped too. Fitting the whole contour into that range is scale's job.
+- `:ctl-invert cc1` replaces each value with 127 less itself. Pitch bend is
+  negated; pan and balance are mirrored about 64. At the asymmetric ends of
+  those ranges the result clips: bend -8192 becomes 8191, pan 0 becomes 127.
+
+**Scale and limit preserve every zero reset**, including bend centre, in
+all their forms. Resets are left out when finding the contour's bounds for
+a fit. Invert changes zeros too, since exchanging the low and high values
+is its purpose. All three leave switch controllers, bank selection and
+other controller actions alone. Editable ramps and the events they hide
+are protected; the message says how many ramps were left alone. Convert a
+ramp to ordinary events first if those events are what you want to shape.
+
+Use `bend` or `aftertouch` in place of `cc1`. Bend takes signed ranges,
+for example `:ctl-limit bend -4096-4096`. Named settings are also accepted:
+`:ctl-scale cc1 by=80%` and `:ctl-limit cc1 range=30-90`.
+
+The keyboard routes are `, c s` for scale, `, c l` for limit and `, c i`
+for invert, followed by a range or object; in Visual mode the selection
+already supplies it. The same tools are under `, x K`. For example,
+`, c s ib` scales the cursor's bar. They ask which controller and then the
+amount or range, Enter taking the lane's own controller when the cursor is
+in a continuous controller lane. Elsewhere there is no default: choose the
+stream explicitly, with Tab offering those present in the passage. The
+scale question names the centre it will use.
+
 ## Ramps: a fade that stays a fade {#sec-controller-ramps}
 
 A swell of expression across a phrase, a slow rise in modulation or a bend

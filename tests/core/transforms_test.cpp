@@ -507,7 +507,8 @@ TEST_CASE("thinning keeps each gesture's ends and events far enough apart and ch
     CHECK(count(thinned, 1) == 8); // 0, 4, 8, 12, 16, 20 and the second gesture's two
     CHECK(count(thinned, 64) == 21);
     // Only another controller: none thinned.
-    CHECK(count(thin(list, allOf(list), {ThinWhat::Kind::Controller, 7}, 4 * tick, 2, q), 1) == 23);
+    CHECK(count(thin(list, allOf(list), {ControlStreams::Kind::Controller, 7}, 4 * tick, 2, q),
+                1) == 23);
 }
 
 TEST_CASE("thinning preserves every reset inside a dense gesture")
@@ -529,12 +530,12 @@ TEST_CASE("thinning preserves every reset inside a dense gesture")
     };
     const auto list =
         listOf({point(0, 5), point(1, 6), point(2, 0), point(3, 0), point(4, 5), point(5, 6)});
-    ThinWhat what;
+    ControlStreams what;
     if (GENERATE(false, true))
     {
-        what = reset.index() == 0   ? ThinWhat{ThinWhat::Kind::Controller, 74}
-               : reset.index() == 1 ? ThinWhat{ThinWhat::Kind::Bend}
-                                    : ThinWhat{ThinWhat::Kind::Aftertouch};
+        what = reset.index() == 0   ? ControlStreams{ControlStreams::Kind::Controller, 74}
+               : reset.index() == 1 ? ControlStreams{ControlStreams::Kind::Bend}
+                                    : ControlStreams{ControlStreams::Kind::Aftertouch};
     }
     CHECK(eventsOf(thin(list, allOf(list), what, ppqn.quarter(), 64, ppqn.quarter())) ==
           std::vector<Event>{point(0, 5), point(2, 0), point(3, 0), point(5, 6)});
@@ -549,7 +550,7 @@ TEST_CASE("thinning keeps the selected resets of the stream it thins")
                               pedal(6 * unit, 127, 64), note(7 * unit, 60, q)});
     auto selected = allOf(list);
     selected.erase(selected.begin() + 1); // an unselected reset stays untouched
-    CHECK(eventsOf(thin(list, selected, {ThinWhat::Kind::Controller, 1}, q, 64, q)) ==
+    CHECK(eventsOf(thin(list, selected, {ControlStreams::Kind::Controller, 1}, q, 64, q)) ==
           std::vector<Event>{list[0], list[1], list[2], list[4], list[5], list[6], list[7]});
 }
 
@@ -651,4 +652,180 @@ TEST_CASE("legato holds a note until the next chord's earliest note, not its low
     const auto together = [](Tick first, Tick tick) { return tick - first <= 30; };
     CHECK(eventsOf(changeLengths(list, allOf(list), LengthChange::Legato, 0, together)).front() ==
           note(0, 60, 100));
+}
+
+TEST_CASE("controller scaling preserves resets and shapes only selected continuous streams")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto list = listOf({{0, ControlChange{1, 0}},
+                              {q, ControlChange{1, 20}},
+                              {2 * q, ControlChange{1, 80}},
+                              {3 * q, ControlChange{1, 100}},
+                              {q, ControlChange{7, 60}},
+                              {q, ControlChange{64, 127}},
+                              {q, ControlChange{0, 4}},
+                              note(0, 60, q)});
+    const ControlStreams mod{ControlStreams::Kind::Controller, 1};
+    const auto changed = [&](ControlScale how)
+    { return eventsOf(scaleControls(list, allOf(list), mod, how)); };
+    auto expected = std::vector<Event>{list.all().begin(), list.all().end()};
+    const auto setting = [&](int at20, int at80, int at100)
+    {
+        auto result = expected;
+        for (auto& event : result)
+        {
+            if (auto* cc = std::get_if<ControlChange>(&event.data); cc && cc->controller == 1)
+            {
+                cc->value = static_cast<std::uint8_t>(cc->value == 20    ? at20
+                                                      : cc->value == 80  ? at80
+                                                      : cc->value == 100 ? at100
+                                                                         : 0);
+            }
+        }
+        return result;
+    };
+    CHECK(changed({ControlScale::Kind::Percent, 50}) == setting(10, 40, 50));
+    CHECK(changed({ControlScale::Kind::Offset, -40}) == setting(0, 40, 60));
+    CHECK(changed({ControlScale::Kind::Offset, 70}) == setting(90, 127, 127));
+    CHECK(changed({ControlScale::Kind::Fit, 30, 110}) == setting(30, 90, 110));
+    CHECK(changed({ControlScale::Kind::Fit, 60, 60}) == setting(60, 60, 60));
+    // Selecting only the 80 leaves the reset and other values out; a constant contour stays.
+    const auto at80 =
+        std::ranges::find_if(list.all(), [q](const auto& e) { return e.tick == 2 * q; });
+    const std::vector<std::size_t> one{static_cast<std::size_t>(at80 - list.all().begin())};
+    CHECK(eventsOf(scaleControls(list, one, mod, {ControlScale::Kind::Fit, 20, 100})) == expected);
+    // A subset never collects another controller or the unselected values.
+    CHECK(eventsOf(scaleControls(list, one, mod, {ControlScale::Kind::Percent, 200}))[one[0]] ==
+          Event{2 * q, ControlChange{1, 127}});
+}
+
+TEST_CASE("controller centres, inversion and clipping respect pan, balance and bend")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto list = listOf({{0, ControlChange{10, 0}},
+                              {q, ControlChange{10, 32}},
+                              {2 * q, ControlChange{10, 64}},
+                              {3 * q, ControlChange{10, 127}},
+                              {0, ControlChange{8, 64}},
+                              {q, ControlChange{8, 100}},
+                              {0, PitchBend{-8192}},
+                              {q, PitchBend{0}},
+                              {2 * q, PitchBend{8191}},
+                              {0, ChannelPressure{0}},
+                              {q, ChannelPressure{5}},
+                              {0, PolyPressure{60, 0}},
+                              {q, PolyPressure{60, 11}}});
+    const auto all = allOf(list);
+    const auto values = [](const Transformed& changed, const auto& get)
+    {
+        std::vector<int> result;
+        for (const auto& event : eventsOf(changed))
+        {
+            if (const auto value = get(event.data))
+            {
+                result.push_back(*value);
+            }
+        }
+        return result;
+    };
+    const auto cc = [](int controller)
+    {
+        return [controller](const EventData& data) -> std::optional<int>
+        {
+            const auto* value = std::get_if<ControlChange>(&data);
+            return value && value->controller == controller ? std::optional<int>{value->value}
+                                                            : std::nullopt;
+        };
+    };
+    const auto bend = [](const EventData& data) -> std::optional<int>
+    {
+        const auto* value = std::get_if<PitchBend>(&data);
+        return value ? std::optional<int>{value->value} : std::nullopt;
+    };
+    CHECK(values(scaleControls(list, all, {}, {ControlScale::Kind::Percent, 50}), cc(10)) ==
+          std::vector<int>{0, 48, 64, 96});
+    CHECK(values(scaleControls(list, all, {}, {ControlScale::Kind::Percent, 50}), cc(8)) ==
+          std::vector<int>{64, 82});
+    CHECK(values(invertControls(list, all, {}), cc(10)) == std::vector<int>{127, 96, 64, 1});
+    CHECK(values(invertControls(list, all, {}), cc(8)) == std::vector<int>{64, 28});
+    CHECK(values(invertControls(list, all, {}), bend) == std::vector<int>{8191, 0, -8191});
+    CHECK(values(scaleControls(list, all, {}, {ControlScale::Kind::Percent, 50}), bend) ==
+          std::vector<int>{-4096, 0, 4096});
+    CHECK(values(limitControls(list, all, {ControlStreams::Kind::Bend}, -1000, 1000), bend) ==
+          std::vector<int>{-1000, 0, 1000});
+    CHECK(values(limitControls(list, all, {ControlStreams::Kind::Bend}, 100, 1000), bend) ==
+          std::vector<int>{100, 0, 1000});
+    const auto pressure = [](const EventData& data) -> std::optional<int>
+    {
+        if (const auto* value = std::get_if<ChannelPressure>(&data))
+        {
+            return value->value;
+        }
+        if (const auto* value = std::get_if<PolyPressure>(&data))
+        {
+            return value->value;
+        }
+        return std::nullopt;
+    };
+    CHECK(values(scaleControls(list, all, {ControlStreams::Kind::Aftertouch},
+                               {ControlScale::Kind::Percent, 50}),
+                 pressure) == std::vector<int>{0, 0, 3, 6});
+    CHECK(values(limitControls(list, all, {ControlStreams::Kind::Aftertouch}, 20, 100), pressure) ==
+          std::vector<int>{0, 0, 20, 20});
+    CHECK(values(invertControls(list, all, {ControlStreams::Kind::Aftertouch}), pressure) ==
+          std::vector<int>{127, 127, 122, 116});
+}
+
+TEST_CASE("shaping fits each aftertouch stream separately and leaves controller actions alone")
+{
+    const auto q = MODAL_ANY_PPQN().quarter();
+    const auto list = listOf({{0, ChannelPressure{10}},
+                              {q, ChannelPressure{20}},
+                              {0, PolyPressure{60, 40}},
+                              {q, PolyPressure{60, 80}},
+                              {0, PolyPressure{61, 70}},
+                              {q, PolyPressure{61, 70}}});
+    CHECK(eventsOf(scaleControls(list, allOf(list), {ControlStreams::Kind::Aftertouch},
+                                 {ControlScale::Kind::Fit, 30, 90})) ==
+          eventsOf(Transformed{listOf({{0, ChannelPressure{30}},
+                                       {0, PolyPressure{60, 30}},
+                                       {0, PolyPressure{61, 70}},
+                                       {q, ChannelPressure{90}},
+                                       {q, PolyPressure{60, 90}},
+                                       {q, PolyPressure{61, 70}}})}));
+    for (int cc = 0; cc <= 127; ++cc)
+    {
+        if (isThinnable(cc))
+        {
+            continue;
+        }
+        const auto actions = listOf({{0, ControlChange{static_cast<std::uint8_t>(cc), 23}}});
+        const auto expected = std::vector<Event>{actions[0]};
+        CHECK(eventsOf(invertControls(actions, allOf(actions), {})) == expected);
+        CHECK(eventsOf(scaleControls(actions, allOf(actions), {},
+                                     {ControlScale::Kind::Offset, 10})) == expected);
+        CHECK(eventsOf(limitControls(actions, allOf(actions), {}, 30, 100)) == expected);
+    }
+}
+
+TEST_CASE("controller shaping parses signed bend ranges and refuses invalid values")
+{
+    const ControlStreams cc{ControlStreams::Kind::Controller, 1};
+    const ControlStreams bend{ControlStreams::Kind::Bend};
+    REQUIRE(parseControlRange("-8192-8191", bend));
+    CHECK(parseControlRange("-8192-8191", bend)->first == -8192);
+    CHECK(parseControlRange("-4000--1000", bend)->second == -1000);
+    CHECK(parseControlScale("+16383", bend)->first == 16383);
+    CHECK(parseControlScale("1000%", cc)->first == 1000);
+    CHECK(parseControlRange("0-127", cc)->second == 127);
+    for (const auto text : {"-1-127", "0-128", "80-20", "20", "", "0-10x", "0-10-20"})
+    {
+        CHECK_FALSE(parseControlRange(text, cc));
+    }
+    for (const auto text : {"80", "1001%", "-10%", "+128", "80%extra", "9999999999999999", "+"})
+    {
+        CHECK_FALSE(parseControlScale(text, cc));
+    }
+    CHECK_FALSE(parseControlRange("-8193-8191", bend));
+    CHECK_FALSE(parseControlRange("-8192-8192", bend));
 }

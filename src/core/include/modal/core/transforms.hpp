@@ -110,12 +110,9 @@ bool isSwitchController(int controller);
 // each of which is an action or part of one, nor the least significant halves (32 to 63).
 bool isThinnable(int controller);
 
-// Thinning dense continuous data (decided November 2026): of each controller's events (not
-// the switches'), pitch bend's, channel aftertouch's or each note's poly aftertouch, a gesture
-// being those with no gap longer than gestureGap. Keep the first and last of each and every
-// zero (including bend centre and repeated resets), even closer than spacing. Other events
-// need at least spacing after the last kept and a change from it of step or more.
-struct ThinWhat
+// The continuous streams taken by thinning and controller shaping. Aftertouch includes
+// channel pressure and each pitch's polyphonic pressure as independent streams.
+struct ControlStreams
 {
     enum class Kind : std::uint8_t
     {
@@ -128,11 +125,43 @@ struct ThinWhat
     Kind kind = Kind::All;
     int controller = 0;
 
-    friend bool operator==(const ThinWhat&, const ThinWhat&) = default;
+    friend bool operator==(const ControlStreams&, const ControlStreams&) = default;
 };
 
-Transformed thin(const EventList& events, std::span<const std::size_t> which, ThinWhat what,
+// Thinning dense continuous data (decided November 2026): of each controller's events (not
+// the switches'), pitch bend's, channel aftertouch's or each note's poly aftertouch, a gesture
+// being those with no gap longer than gestureGap. Keep the first and last of each and every
+// zero (including bend centre and repeated resets), even closer than spacing. Other events
+// need at least spacing after the last kept and a change from it of step or more.
+Transformed thin(const EventList& events, std::span<const std::size_t> which, ControlStreams what,
                  Tick spacing, int step, Tick gestureGap);
+
+// Continuous values shaped about their stream's centre: pan and balance about 64,
+// pitch bend about 0, the rest from 0. Scale and limit preserve resets (0), invert changes
+// them. Values round to the nearest integer and clip to the stream's legal range.
+int controlCentre(ControlStreams what);
+struct ControlScale
+{
+    enum class Kind : std::uint8_t
+    {
+        Percent,
+        Offset,
+        Fit
+    };
+    Kind kind = Kind::Percent;
+    int first = 100;
+    int second = 127;
+};
+
+// Signed values are allowed for bend; ranges are ordered, within the stream's limits.
+std::optional<ControlScale> parseControlRange(std::string_view text, ControlStreams what);
+std::optional<ControlScale> parseControlScale(std::string_view text, ControlStreams what);
+Transformed scaleControls(const EventList& events, std::span<const std::size_t> which,
+                          ControlStreams what, ControlScale scale);
+Transformed limitControls(const EventList& events, std::span<const std::size_t> which,
+                          ControlStreams what, int low, int high);
+Transformed invertControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what);
 
 // The events taken for which drop says so, removed.
 Transformed removed(const EventList& events, std::span<const std::size_t> which,

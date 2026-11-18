@@ -212,6 +212,44 @@ Make the notes a range or object takes legato, each note or chord held until the
 
 **Syntax:** `` :legato ``.
 
+## :ctl-scale {#ref-transform-controller-scale}
+
+Scale continuous controller values by a percentage about their centre, an offset or into a new range; resets kept, values clipped; pan and balance centred on 64, bend on 0.
+
+**Syntax:** `` :ctl-scale [ccN|bend|aftertouch] [by=80%|+10|20-100] ``.
+
+**Choose before a target:** `` , c s ``, `` , x K s ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the active continuous controller lane, otherwise no default | `` cc1 / bend / aftertouch `` |
+| `` by `` | no fixed default | `` 80% / +10 / 20-100 `` |
+
+## :ctl-limit {#ref-transform-controller-limit}
+
+Clip continuous controller values to a range, preserving resets; defaults to the controller lane's stream when in the lane.
+
+**Syntax:** `` :ctl-limit [ccN|bend|aftertouch] [range=30-110] ``.
+
+**Choose before a target:** `` , c l ``, `` , x K l ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the active continuous controller lane, otherwise no default | `` cc1 / bend / aftertouch `` |
+| `` range `` | no fixed default | `` 30-110 / -4096-4096 `` |
+
+## :ctl-invert {#ref-transform-controller-invert}
+
+Invert continuous controller values: 127 less each, bend negated, pan and balance mirrored about 64; includes zero values.
+
+**Syntax:** `` :ctl-invert [ccN|bend|aftertouch] ``.
+
+**Choose before a target:** `` , c i ``, `` , x K i ``.
+
+| Parameter | Enter takes | Form or choices |
+| --- | --- | --- |
+| first argument | the active continuous controller lane, otherwise no default | `` cc1 / bend / aftertouch `` |
+
 ## :thin {#ref-transform-thin}
 
 Thin out dense controller, pitch bend and aftertouch data in a range or object, asking which, the most to keep a quarter note (16) and the smallest change kept (2); each gesture's first and last and every zero (including pitch bend centre) kept, and never the pedals or other switches.

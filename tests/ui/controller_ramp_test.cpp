@@ -628,3 +628,185 @@ TEST_CASE("dd and yy on a ramp take it, without a selection")
     CHECK(r.ramps().size() == 1);
     CHECK(r.values().size() > before.size()); // bar 1's ramp still playing
 }
+
+TEST_CASE("controller shaping keys take the lane's stream, change a selection and undo whole")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto before = r.document.song();
+    r.type(U"vib,cs\n50%\n");
+    CHECK(r.values() == std::vector<int>{5, 20, 40});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U",clib\n30-60\n");
+    CHECK(r.values() == std::vector<int>{30, 40, 60});
+    r.type(U"u,ciib\n");
+    CHECK(r.values() == std::vector<int>{117, 87, 47});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U",xKsib\n+10\n");
+    CHECK(r.values() == std::vector<int>{20, 50, 90});
+    r.type(U"u,xKlib\n30-60\n");
+    CHECK(r.values() == std::vector<int>{30, 40, 60});
+    r.type(U"u,xKiib\n");
+    CHECK(r.values() == std::vector<int>{117, 87, 47});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("controller shaping commands accept positional and named amounts and refuse actions")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto before = r.document.song();
+    r.line(U"ctl-scale cc1 20-100");
+    CHECK(r.values() == std::vector<int>{20, 54, 100});
+    r.type(U"u");
+    r.line(U"ctl-scale cc1 by=+10");
+    CHECK(r.values() == std::vector<int>{20, 50, 90});
+    r.type(U"u");
+    r.line(U"ctl-limit cc1 30-60");
+    CHECK(r.values() == std::vector<int>{30, 40, 60});
+    r.type(U"u");
+    r.line(U"ctl-limit cc1 range=30-60");
+    CHECK(r.values() == std::vector<int>{30, 40, 60});
+    r.type(U"u");
+    r.line(U"ctl-invert cc1");
+    CHECK(r.values() == std::vector<int>{117, 87, 47});
+    r.type(U"u");
+    for (const auto line : {U"ctl-scale cc64 by=50%", U"ctl-scale cc0 by=50%",
+                            U"ctl-limit cc32 range=20-100", U"ctl-invert all"})
+    {
+        r.line(line);
+        CHECK(r.ws.message().starts_with("Not a continuous controller:"));
+        CHECK(r.document.song() == before);
+    }
+    r.line(U"ctl-limit cc1 100-20");
+    CHECK(r.ws.message().starts_with("Not a controller range:"));
+    r.line(U"ctl-scale cc1 128-200");
+    CHECK(r.ws.message().starts_with("Not a controller scale:"));
+    r.line(U"ctl-invert cc1 extra=1");
+    CHECK(r.ws.message().starts_with("Unexpected controller setting:"));
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("shaping from the arrangement asks which stream, with Tab offering those in its range")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto before = r.document.song();
+    r.type(U"ga");
+    r.line(U"ctl-scale");
+    r.type(U"\n"); // No lane default: an empty answer cancels, as in other prompts.
+    CHECK(r.ws.mode() == Mode::Normal);
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-scale");
+    r.type(U"\t\n50%\n"); // Only cc1 is present, so Tab completes it.
+    CHECK(r.values() == std::vector<int>{5, 20, 40});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    // An inactive lane is not a default for editing the piano roll's notes either.
+    r.type(U"gr\x1b");
+    r.line(U"ctl-invert");
+    r.type(U"\n");
+    CHECK(r.document.song() == before);
+    r.line(U"ctl-invert");
+    r.type(U"cc1\n");
+    CHECK(r.values() == std::vector<int>{117, 87, 47});
+}
+
+TEST_CASE("controller shaping skips ramps and their hidden source events, counting them")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.type(U",cr");
+    r.keep();
+    const auto before = r.document.song();
+    for (const auto line : {U"ctl-scale cc1 50%", U"ctl-limit cc1 20-60", U"ctl-invert cc1"})
+    {
+        r.line(line);
+        CHECK(r.document.song() == before);
+        CHECK(r.ws.message().find("ramp") != std::string::npos);
+    }
+    r.type(U"u");
+    CHECK(r.document.song().ramps(r.id()).empty());
+    CHECK(r.values() == std::vector<int>{10, 40, 80});
+}
+
+TEST_CASE("controller shaping lane defaults distinguish bend and pressure from switches")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.document.edit("Other streams", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(r.id(),
+                                          [&](core::EventList& events)
+                                          {
+                                              events.insert({0, core::PitchBend{-8192}});
+                                              events.insert({r.q(), core::PitchBend{0}});
+                                              events.insert({2 * r.q(), core::PitchBend{8191}});
+                                              events.insert({0, core::ChannelPressure{10}});
+                                          });
+                    });
+    r.line(U"lane bend");
+    const auto before = r.document.song();
+    r.type(U",csib\n50%\n");
+    std::vector<int> bends;
+    for (const auto& event : r.document.song().events(r.id()).all())
+    {
+        if (const auto* bend = std::get_if<core::PitchBend>(&event.data))
+        {
+            bends.push_back(bend->value);
+        }
+    }
+    CHECK(bends == std::vector<int>{-4096, 0, 4096});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.line(U"lane aftertouch");
+    const auto pressureBefore = r.document.song();
+    r.type(U",ciib\n");
+    const auto& events = r.document.song().events(r.id());
+    const auto pressure =
+        std::ranges::find_if(events.all(), [](const auto& e)
+                             { return std::holds_alternative<core::ChannelPressure>(e.data); });
+    REQUIRE(pressure != events.all().end());
+    CHECK(std::get<core::ChannelPressure>(pressure->data).value == 117);
+    r.type(U"u");
+    CHECK(r.document.song() == pressureBefore);
+    r.line(U"lane cc64");
+    const auto switchBefore = r.document.song();
+    r.line(U"ctl-invert");
+    r.type(U"\n");
+    CHECK(r.document.song() == switchBefore);
+    CHECK(r.ws.mode() == Mode::Normal);
+}
+
+TEST_CASE("controller shaping fits ordinary points without using a ramp's points as bounds")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.document.edit("Ramp and ordinary points", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateEvents(
+                            r.id(), [&](core::EventList& events)
+                            { events.insert({3 * r.q(), core::ControlChange{1, 20}}); });
+                        REQUIRE(song.addRamp(r.id(), {.lane = {core::Lane::Kind::Controller, 1},
+                                                      .start = 0,
+                                                      .length = r.q(),
+                                                      .from = 0,
+                                                      .to = 127})
+                                    .done());
+                    });
+    const auto before = r.document.song();
+    r.line(U"ctl-scale cc1 30-90");
+    CHECK(r.ws.message().find("ramp") != std::string::npos);
+    CHECK(r.document.song().ramps(r.id())[0] == before.ramps(r.id())[0]);
+    const auto& source = r.document.song().sourceEvents(r.id());
+    std::vector<int> values;
+    for (const auto& event : source.all())
+    {
+        if (const auto* cc = std::get_if<core::ControlChange>(&event.data))
+        {
+            values.push_back(cc->value);
+        }
+    }
+    CHECK(values == std::vector<int>{10, 40, 90, 30});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}

@@ -6,6 +6,7 @@
 #include "workspace_commands.hpp"
 
 #include <modal/core/pitch.hpp>
+#include <modal/core/transforms.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
@@ -162,6 +163,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         {
             text = std::exchange(prompt_.answerDefault, {});
         }
+        prompt_.answerTarget.reset();
         if (const auto answer = std::exchange(prompt_.answer, {}); !text.empty())
         {
             answer(text);
@@ -203,6 +205,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         mode_ = Mode::Normal;
         prompt_.answer = {};
+        prompt_.answerTarget.reset();
         if (std::exchange(prompt_.keyPrompt, false))
         {
             prompt_.line.clear();
@@ -397,6 +400,43 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
                 }
             }
         };
+        const auto addControls = [&]
+        {
+            const auto& target = prompt_.answerTarget;
+            if (!target)
+            {
+                return;
+            }
+            std::vector<std::string> streams;
+            for (const auto& part : target->parts)
+            {
+                const auto& events = document_.song().events(part.track);
+                for (const auto index : part.events)
+                {
+                    const auto& data = events[index].data;
+                    if (const auto* cc = std::get_if<core::ControlChange>(&data);
+                        cc && core::isThinnable(cc->controller))
+                    {
+                        streams.push_back("cc" + std::to_string(cc->controller));
+                    }
+                    else if (std::holds_alternative<core::PitchBend>(data))
+                    {
+                        streams.emplace_back("bend");
+                    }
+                    else if (std::holds_alternative<core::ChannelPressure>(data) ||
+                             std::holds_alternative<core::PolyPressure>(data))
+                    {
+                        streams.emplace_back("aftertouch");
+                    }
+                }
+            }
+            std::ranges::sort(streams);
+            streams.erase(std::unique(streams.begin(), streams.end()), streams.end());
+            for (const auto& stream : streams)
+            {
+                found.push_back(stream);
+            }
+        };
         if (prompt_.answer)
         {
             if (prompt_.answerSetting < options.size())
@@ -409,6 +449,10 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
                 if (setting.lengths)
                 {
                     addLengths({});
+                }
+                if (setting.controls)
+                {
+                    addControls();
                 }
                 if (setting.tracks)
                 {
@@ -713,6 +757,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.answerLabel = std::move(label);
     prompt_.answer = std::move(answer);
     prompt_.answerDefault = std::move(defaultAnswer);
+    prompt_.answerTarget.reset();
     prompt_.answerCommand.clear();
     prompt_.answerSetting = 0;
 }

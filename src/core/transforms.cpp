@@ -12,6 +12,7 @@
 #include <numeric>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -413,33 +414,17 @@ bool isThinnable(int controller)
 namespace
 {
 
-// The events with those marked dropped left out.
-EventList without(const EventList& events, const std::vector<bool>& dropped)
+struct Point
 {
-    EventList kept;
-    for (std::size_t i = 0; i < events.size(); ++i)
-    {
-        if (!dropped[i])
-        {
-            kept.insert(events[i]);
-        }
-    }
-    return kept;
-}
+    std::size_t index;
+    int stream;
+    int value;
+};
 
-} // namespace
-
-Transformed thin(const EventList& events, std::span<const std::size_t> which, ThinWhat what,
-                 Tick spacing, int step, Tick gestureGap)
+std::vector<Point> controlPoints(const EventList& events, std::span<const std::size_t> which,
+                                 ControlStreams what)
 {
-    using Kind = ThinWhat::Kind;
-    // Each event's stream (a kind and a number) and value, if it's one to thin.
-    struct Point
-    {
-        std::size_t index;
-        int stream;
-        int value;
-    };
+    using Kind = ControlStreams::Kind;
     std::vector<Point> points;
     for (const auto i : which)
     {
@@ -475,6 +460,29 @@ Transformed thin(const EventList& events, std::span<const std::size_t> which, Th
             }
         }
     }
+    return points;
+}
+
+// The events with those marked dropped left out.
+EventList without(const EventList& events, const std::vector<bool>& dropped)
+{
+    EventList kept;
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (!dropped[i])
+        {
+            kept.insert(events[i]);
+        }
+    }
+    return kept;
+}
+
+} // namespace
+
+Transformed thin(const EventList& events, std::span<const std::size_t> which, ControlStreams what,
+                 Tick spacing, int step, Tick gestureGap)
+{
+    auto points = controlPoints(events, which, what);
     std::ranges::stable_sort(points, {}, &Point::stream);
     std::vector<bool> dropped(events.size(), false);
     for (std::size_t start = 0; start < points.size();)
@@ -503,6 +511,186 @@ Transformed thin(const EventList& events, std::span<const std::size_t> which, Th
         start = end;
     }
     return without(events, dropped);
+}
+
+int controlCentre(ControlStreams what)
+{
+    return what.kind == ControlStreams::Kind::Controller &&
+                   (what.controller == 8 || what.controller == 10)
+               ? 64
+               : 0;
+}
+
+namespace
+{
+
+std::optional<int> controlNumber(std::string_view text, int low, int high)
+{
+    if (text.starts_with('+'))
+    {
+        text.remove_prefix(1);
+    }
+    int value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (text.empty() || error != std::errc{} || end != text.data() + text.size() || value < low ||
+        value > high)
+    {
+        return std::nullopt;
+    }
+    return value;
+}
+
+EventList shapedControls(const EventList& events, std::span<const std::size_t> which,
+                         ControlStreams what, bool resets,
+                         const std::function<double(const Point&)>& shape)
+{
+    std::vector<Event> changed(events.all().begin(), events.all().end());
+    for (const auto& point : controlPoints(events, which, what))
+    {
+        if (resets && point.value == 0)
+        {
+            continue;
+        }
+        const int low = point.stream == 1000 ? -8192 : 0;
+        const int high = point.stream == 1000 ? 8191 : 127;
+        const int value =
+            static_cast<int>(std::lround(std::clamp(shape(point), double(low), double(high))));
+        auto event = events[point.index];
+        std::visit(
+            [&](auto& data)
+            {
+                using T = std::decay_t<decltype(data)>;
+                if constexpr (std::is_same_v<T, ControlChange> || std::is_same_v<T, PitchBend> ||
+                              std::is_same_v<T, ChannelPressure> || std::is_same_v<T, PolyPressure>)
+                {
+                    data.value = static_cast<decltype(data.value)>(value);
+                }
+            },
+            event.data);
+        changed[point.index] = std::move(event);
+    }
+    EventList result;
+    for (auto& event : changed)
+    {
+        result.insert(std::move(event));
+    }
+    return result;
+}
+
+} // namespace
+
+std::optional<ControlScale> parseControlRange(std::string_view text, ControlStreams what)
+{
+    const bool bend = what.kind == ControlStreams::Kind::Bend;
+    const auto dash = text.find('-', text.starts_with('-') ? 1 : 0);
+    if (dash == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    const auto low = controlNumber(text.substr(0, dash), bend ? -8192 : 0, bend ? 8191 : 127);
+    const auto high = controlNumber(text.substr(dash + 1), bend ? -8192 : 0, bend ? 8191 : 127);
+    if (!low || !high || *low > *high)
+    {
+        return std::nullopt;
+    }
+    return ControlScale{ControlScale::Kind::Fit, *low, *high};
+}
+
+std::optional<ControlScale> parseControlScale(std::string_view text, ControlStreams what)
+{
+    if (text.ends_with('%'))
+    {
+        const auto value = controlNumber(text.substr(0, text.size() - 1), 0, 1000);
+        if (value)
+        {
+            return ControlScale{ControlScale::Kind::Percent, *value};
+        }
+        return std::nullopt;
+    }
+    if (const auto range = parseControlRange(text, what))
+    {
+        return range;
+    }
+    if (text.starts_with('+') || text.starts_with('-'))
+    {
+        const int most = what.kind == ControlStreams::Kind::Bend ? 16383 : 127;
+        if (const auto value = controlNumber(text, -most, most))
+        {
+            return ControlScale{ControlScale::Kind::Offset, *value};
+        }
+    }
+    return std::nullopt;
+}
+
+Transformed scaleControls(const EventList& events, std::span<const std::size_t> which,
+                          ControlStreams what, ControlScale scale)
+{
+    // Resets aren't part of the contour fitted into a new range.
+    std::map<int, std::pair<int, int>> bounds;
+    if (scale.kind == ControlScale::Kind::Fit)
+    {
+        for (const auto& point : controlPoints(events, which, what))
+        {
+            if (point.value == 0)
+            {
+                continue;
+            }
+            const auto [it, inserted] = bounds.try_emplace(point.stream, point.value, point.value);
+            if (!inserted)
+            {
+                it->second.first = std::min(it->second.first, point.value);
+                it->second.second = std::max(it->second.second, point.value);
+            }
+        }
+    }
+    return shapedControls(
+        events, which, what, true,
+        [&](const Point& point) -> double
+        {
+            switch (scale.kind)
+            {
+            case ControlScale::Kind::Percent:
+            {
+                const int centre = controlCentre({ControlStreams::Kind::Controller, point.stream});
+                return centre + (point.value - centre) * (scale.first / 100.0);
+            }
+            case ControlScale::Kind::Offset:
+                return point.value + scale.first;
+            case ControlScale::Kind::Fit:
+            {
+                const auto [low, high] = bounds.at(point.stream);
+                if (low == high)
+                {
+                    return point.value;
+                }
+                return scale.first +
+                       double(point.value - low) * (scale.second - scale.first) / (high - low);
+            }
+            }
+            return point.value;
+        });
+}
+
+Transformed limitControls(const EventList& events, std::span<const std::size_t> which,
+                          ControlStreams what, int low, int high)
+{
+    return shapedControls(events, which, what, true,
+                          [&](const Point& point) { return std::clamp(point.value, low, high); });
+}
+
+Transformed invertControls(const EventList& events, std::span<const std::size_t> which,
+                           ControlStreams what)
+{
+    return shapedControls(events, which, what, false,
+                          [](const Point& point)
+                          {
+                              if (point.stream == 1000)
+                              {
+                                  return -point.value;
+                              }
+                              return (point.stream == 8 || point.stream == 10 ? 128 : 127) -
+                                     point.value;
+                          });
 }
 
 Transformed removed(const EventList& events, std::span<const std::size_t> which,

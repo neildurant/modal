@@ -8,6 +8,7 @@
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pedalling.hpp>
 #include <modal/core/pitch.hpp>
+#include <modal/core/ramp.hpp>
 #include <modal/core/transforms.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/frame.hpp>
@@ -159,6 +160,28 @@ std::string_view trimmed(std::string_view text)
     return text.substr(start, text.find_last_not_of(" \t") - start + 1);
 }
 
+// A continuous stream shared by the controller shaping commands.
+std::optional<core::ControlStreams> controlStream(std::string_view text)
+{
+    using Kind = core::ControlStreams::Kind;
+    if (text == "bend")
+    {
+        return core::ControlStreams{Kind::Bend};
+    }
+    if (text == "aftertouch")
+    {
+        return core::ControlStreams{Kind::Aftertouch};
+    }
+    if (text.starts_with("cc") && !text.ends_with('%'))
+    {
+        if (const auto cc = percentUpTo(text.substr(2), 127); cc && core::isThinnable(*cc))
+        {
+            return core::ControlStreams{Kind::Controller, *cc};
+        }
+    }
+    return std::nullopt;
+}
+
 // A number of semitones, up or down: 7, +12, -3.
 std::optional<int> semitones(std::string_view text)
 {
@@ -206,7 +229,16 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
         auto label = std::string{findTransform(op)->label};
         label.replace(label.find("{}"), 2, target.what);
         const auto answer = defaultAnswer(settings[i].answer, target, answers);
-        label += ", " + std::string{settings[i].question} + " (" +
+        std::string question{settings[i].question};
+        if (const auto at = question.find("{centre}"); at != std::string::npos)
+        {
+            const auto which =
+                std::ranges::find(answers, std::string{}, &Answers::value_type::first);
+            const auto stream =
+                which == answers.end() ? std::nullopt : controlStream(which->second);
+            question.replace(at, 8, stream ? std::to_string(core::controlCentre(*stream)) : "0");
+        }
+        label += ", " + question + " (" +
                  (answer.empty() ? std::string{settings[i].form} : answer) + "): ";
         askFor(
             std::move(label),
@@ -222,6 +254,7 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
             answer);
         prompt_.answerCommand = op;
         prompt_.answerSetting = i;
+        prompt_.answerTarget = target;
         return;
     }
     // In the settings' order, so the last (a track's name, which may have spaces) comes last;
@@ -251,6 +284,27 @@ std::string Workspace::defaultAnswer(std::string_view answer, const OperatorTarg
 {
     // A default worked out as it's asked: the tracks' grid, the pedalling settings, a new track
     // named after the first's and the side moved, the range's first note or the search's query.
+    if (answer == "{lane}")
+    {
+        if (shown() != ViewKind::PianoRoll || !pianoRoll_->inLane())
+        {
+            return {};
+        }
+        const auto lane = pianoRoll_->lane();
+        if (!core::rampable(lane))
+        {
+            return {};
+        }
+        if (lane.kind == core::Lane::Kind::PitchBend)
+        {
+            return "bend";
+        }
+        if (lane.kind == core::Lane::Kind::Pressure)
+        {
+            return "aftertouch";
+        }
+        return "cc" + std::to_string(lane.controller);
+    }
     if (answer == "{grid}")
     {
         return gridOf(target);
@@ -725,7 +779,16 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
                 rest.erase(at);
             }
         }
-        const auto said = told(rest, {});
+        auto said = told(rest, {});
+        if (name.starts_with("transform-controller-") && name != "transform-controller-invert")
+        {
+            if (const auto space = said.amount.find(' '); space != std::string::npos)
+            {
+                answers.emplace_back(name == "transform-controller-scale" ? "by" : "range",
+                                     trimmed(std::string_view{said.amount}.substr(space + 1)));
+                said.amount.erase(space);
+            }
+        }
         for (const auto& option : said.options)
         {
             answers.push_back(option);
@@ -1209,19 +1272,78 @@ bool Workspace::quantize(const OperatorTarget& target, bool pedals, const Quanti
         });
 }
 
+bool Workspace::shapeControlsAsked(std::string_view name, const OperatorTarget& target,
+                                   const std::string& text)
+{
+    const auto said = told(text, {});
+    const auto what = controlStream(said.amount);
+    if (!what)
+    {
+        refuse("Not a continuous controller: " + said.amount +
+                   "; type cc1, bend or aftertouch; switches and bank select are left alone",
+               MessageKind::Warning);
+        return true;
+    }
+    const bool scale = name == "transform-controller-scale";
+    const bool invert = name == "transform-controller-invert";
+    const std::string option = scale ? "by" : "range";
+    std::string amount;
+    for (const auto& [key, value] : said.options)
+    {
+        if (invert || key != option || !amount.empty())
+        {
+            refuse("Unexpected controller setting: " + key + "=", MessageKind::Warning);
+            return true;
+        }
+        amount = value;
+    }
+    std::optional<core::ControlScale> how;
+    if (!invert)
+    {
+        how =
+            scale ? core::parseControlScale(amount, *what) : core::parseControlRange(amount, *what);
+        if (!how)
+        {
+            refuse("Not a controller " + std::string{scale ? "scale: " : "range: "} + amount +
+                       (scale ? "; type 80%, +10 or 20-100 (signed values for bend)"
+                              : "; type low-high, within 0-127 or -8192-8191 for bend"),
+                   MessageKind::Warning);
+            return true;
+        }
+    }
+    return changeEvents(std::string{invert  ? "Invert "
+                                    : scale ? "Scale "
+                                            : "Limit "} +
+                            said.amount + " of " + target.what,
+                        target,
+                        [&](const core::EventList& events, const auto& part) -> core::Transformed
+                        {
+                            if (invert)
+                            {
+                                return core::invertControls(events, part.events, *what);
+                            }
+                            if (scale)
+                            {
+                                return core::scaleControls(events, part.events, *what, *how);
+                            }
+                            return core::limitControls(events, part.events, *what, how->first,
+                                                       how->second);
+                        });
+}
+
 bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& target,
                           const std::string& text)
 {
     const auto said = told(text, {});
-    core::ThinWhat what;
+    core::ControlStreams what;
     const auto& which = said.amount;
     if (which == "bend")
     {
-        what.kind = core::ThinWhat::Kind::Bend;
+        what.kind = core::ControlStreams::Kind::Bend;
     }
     else if (which == "aftertouch")
     {
-        what.kind = core::ThinWhat::Kind::Aftertouch;
+        what.kind = core::ControlStreams::Kind::Aftertouch;
     }
     else if (which.starts_with("cc"))
     {
@@ -1239,7 +1361,7 @@ bool Workspace::thinAsked(std::string_view /*name*/, const OperatorTarget& targe
                    MessageKind::Warning);
             return true;
         }
-        what = {core::ThinWhat::Kind::Controller, *controller};
+        what = {core::ControlStreams::Kind::Controller, *controller};
     }
     else if (which != "all")
     {

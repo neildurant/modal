@@ -84,6 +84,8 @@ std::string settingsReference()
 
 std::string answer(std::string_view value)
 {
+    if (value == "{lane}")
+        return "the active continuous controller lane, otherwise no default";
     if (value == "{grid}")
         return "the track's grid";
     if (value == "{lift}")

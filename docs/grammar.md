@@ -274,6 +274,7 @@ Velocities stop at 1 and 127. Steps one after another on a note undo together, a
 - **Pitch and time:** `t` transpose by semitones, `T` in a key, `i` invert, `I` in a key, `R` retrograde, `q` quantise (asking how), `s` stretch, `n` note lengths, `h` humanise, `y` split at a note to a track.
 - **Velocity:** `v` velocity, `l` lift, `L` lower, `M` limit, `r` ramp, `c` compress, `e` expand, `p` phrase.
 - **Chords and controllers:** `a` accent chords' top notes, `b` balance chords, `C` compress chords, `E` expand chords, `m` remap a controller or note, `d` thin controller density, `f` filter (delete matches).
+- **Controller values,** `, c` or `, x K`: `s` scale (percentage, offset or fit to a range), `l` limit, `i` invert; then a range or object. `:ctl-scale cc1 80%`, `:ctl-limit cc1 30-110`, `:ctl-invert cc1` take the selection or cursor's bar; named amounts `by=` and `range=` are also accepted. Each asks which stream (continuous `ccN`, `bend`, `aftertouch`), defaulting to the active controller lane; elsewhere it must be named, Tab offering those in the range. Scale names its centre (64 for pan and balance, 0 otherwise). Scale and limit keep resets; ramps are skipped and counted.
 - **Pedalling,** `, x P`: `r` re-pedal at chord changes, `t` re-time the pedalling, `b` pedal each bar or beat, `c` clean up, `x` clear a pedal, `o` offset, `k` bake the sustain into notes.
 
 `2!!` transforms this bar and the next.

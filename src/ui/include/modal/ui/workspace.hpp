@@ -60,7 +60,8 @@ struct TransformSetting
     std::string_view form = {};
     std::vector<std::string_view> values = {};
     bool lengths = false;
-    bool tracks = false; // the tracks' names, offered too
+    bool tracks = false;   // the tracks' names, offered too
+    bool controls = false; // continuous streams present in the range
 };
 
 std::span<const TransformSetting> transformSettings(std::string_view command);
@@ -549,6 +550,8 @@ private:
     using Answers = std::vector<std::pair<std::string, std::string>>;
     bool quantizeAsked(std::string_view name, const OperatorTarget& target,
                        const std::string& text);
+    bool shapeControlsAsked(std::string_view name, const OperatorTarget& target,
+                            const std::string& text);
     bool thinAsked(std::string_view name, const OperatorTarget& target, const std::string& text);
     bool splitAsked(std::string_view name, const OperatorTarget& target, const std::string& given);
     bool remapAsked(std::string_view name, const OperatorTarget& target, const std::string& text);
@@ -1101,6 +1104,7 @@ private:
         std::string answerDefault;
         std::string answerCommand;
         std::size_t answerSetting = 0;
+        std::optional<OperatorTarget> answerTarget;
         std::optional<PaletteState> palette;
         std::optional<Completing> completing;
     };

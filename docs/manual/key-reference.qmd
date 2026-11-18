@@ -107,6 +107,8 @@ after counts multiply.
 | `, c h` | Lane height: three rows, a quarter, half |
 | Number then Enter in a lane | Set or insert a value |
 | `, c r`, `, c R` | Ramp the lane's controller; turn a ramp into events |
+| `, c s`, `, c l`, `, c i` | Scale, limit, invert controller values, then a range or object |
+| `, x K s`, `, x K l`, `, x K i` | The same controller transforms from the transform menu |
 | `=` `-` `+` `_` on a ramp | Move its end by a grid step / nudge |
 
 ## In an open inspector
