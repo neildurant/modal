@@ -18,6 +18,8 @@ Validation on the final tree, 18 November 2026: `tools/check-linux.sh` passes al
 
 The remaining shaping work stays designed but unstarted: step 2, smooth and remove repeats; step 3, program remapping in `:remap` and retrograde in the lane. Each step is tried before proceeding (design.md, Shaping controller values; schedule.md).
 
+Schedule maintenance, 18 November 2026: staged work in milestones 8 and 9 and the related engineering entries is now listed as indented sub-step checklists. The ongoing convention is recorded in `AGENTS.md` and the schedule's upkeep instructions, so future updates keep each step and its state visible.
+
 ### Controller ramps, 17 November 2026
 
 The design's open questions were settled 17 November 2026 (design.md, [Controller ramps](design.md#controller-ramps); reasons in decisions.md, [Editable controller ramps](decisions.md#controller-ramp-decisions)), and the plan agreed: four steps, each tested at several PPQNs.
