@@ -2,11 +2,11 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: milestone 9 is under way. Controller ramps and their manual are accepted and published. Controller shaping step 1 (scale, limit and invert) is accepted on trial; all six Linux configurations pass, with publication checks pending. See the current handoff below.*
+*Last updated 18 November 2026: milestone 9 is under way. Controller ramps and their manual are accepted and published. Controller shaping step 1 (scale, limit and invert) is accepted on trial and published; all six Linux configurations and hosted Linux/Windows CI pass. See the current handoff below.*
 
 ## Current handoff
 
-### Controller shaping: step 1 accepted on trial, 18 November 2026
+### Controller shaping: step 1 accepted and published, 18 November 2026
 
 The agreed first step is implemented in `b627a6c` and accepted on functional trial 18 November 2026: `:ctl-scale`, `:ctl-limit`, `:ctl-invert`; `, c s/l/i` and the same under `, x K`. Commands accept a stream followed by an amount (`:ctl-scale cc1 80%`, `:ctl-limit bend -4096-4096`), or named `by=` / `range=` settings. In a continuous controller lane Enter takes that stream; elsewhere the stream must be chosen explicitly, Tab offering those in the target. Enter with no default cancels, as in the other transform prompts. Scale names the centre it uses.
 
@@ -14,7 +14,7 @@ The agreed first step is implemented in `b627a6c` and accepted on functional tri
 
 Core regressions exercise all three PPQNs, stream/selection isolation, fit, constants, centres, clipping, rounding, signed parsing, channel/poly aftertouch and the non-continuous controllers. Workspace regressions cover both key routes, the commands, defaults, Tab completion, refusals, undo and mixed ordinary/ramp data. The controllers chapter's Shaping values, key reference and grammar are updated; transform references regenerated, with a readable description of the lane default.
 
-Validation on the final tree, 18 November 2026: `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,145 registered tests, three skipped and no failures. Focused shaping and shared transform-default regressions pass (12 cases, 1,421 assertions). Whole-tree clang-format 22.1.8 and `git diff --check` pass. `tools/build-manual.cmake` builds HTML and PDF with the regenerated references; the new Shaping values section was visually checked on PDF pages 36–37. The GCC Debug application is newer than every tracked application build input. The functional trial was subsequently accepted 18 November 2026, reported as working well. No hardware latency or jitter measurement is claimed. Publication CI is pending.
+Validation on the final tree, 18 November 2026: `tools/check-linux.sh` passes all six configurations (GCC Debug/Release, Clang Debug/Release, ASan/UBSan and ThreadSanitizer), each with 1,145 registered tests, three skipped and no failures. Focused shaping and shared transform-default regressions pass (12 cases, 1,421 assertions). Whole-tree clang-format 22.1.8 and `git diff --check` pass. `tools/build-manual.cmake` builds HTML and PDF with the regenerated references; the new Shaping values section was visually checked on PDF pages 36–37. The GCC Debug application is newer than every tracked application build input. The functional trial was subsequently accepted 18 November 2026, reported as working well. No hardware latency or jitter measurement is claimed. Published through `b53b2f8`; [Linux and Windows CI passed](https://github.com/neildurant/modal/actions/runs/44296930984), along with the [manual workflow](https://github.com/neildurant/modal/actions/runs/44296930836).
 
 The remaining shaping work stays designed but unstarted: step 2, smooth and remove repeats; step 3, program remapping in `:remap` and retrograde in the lane. Each step is tried before proceeding (design.md, Shaping controller values; schedule.md).
 

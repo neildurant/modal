@@ -96,7 +96,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
         - [x] **Done** — Step 4: manual chapter, worked example, illustration and key/reference updates; accepted on reading 18 November 2026.
         - [x] **Done** — Follow-up: mark and protect ramp points in the event list; accepted on trial 18 November 2026.
     - [ ] **Doing** — Shape existing controller values; designed 18 November 2026, each step tried before the next.
-        - [ ] **Doing** — Step 1: scale, limit, invert and their commands/keys; all six Linux configurations pass and the functional trial was accepted 18 November 2026; publication CI is pending.
+        - [x] **Done** — Step 1: scale, limit, invert and their commands/keys; accepted on trial and published 18 November 2026, with local Linux checks and hosted Linux/Windows CI passing.
         - [ ] **To do** — Step 2: smooth and remove repeated values.
         - [ ] **To do** — Step 3: program remapping in `:remap` and retrograde in the controller lane. Time offset and stretch already act on controllers.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
