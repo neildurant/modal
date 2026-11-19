@@ -105,10 +105,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
         - [ ] **Doing** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
             - [ ] **Doing** — Program-change remapping implemented with regressions; trial requested clearer prompts.
-            - [ ] **Doing** — Held-contour retrograde implemented; trial found a two-event `v`-selection span bug.
+            - [x] **Done** — Held-contour retrograde implemented; its event-selection span fixed and accepted on trial.
             - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; active-ramp refusal confirmed on trial.
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
-            - [ ] **Doing** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); awaiting trial. See [status.md](status.md).
+            - [x] **Done** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); accepted on trial. See [status.md](status.md).
             - [x] **Done** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); accepted on trial.
             - [ ] **To do** — Replace interactive remap syntax questions with Type, From and To prompts, mapping within one type.
             - [ ] **To do** — Follow-up regressions, manual/reference updates, Linux checks and rebuilt application for trial.
