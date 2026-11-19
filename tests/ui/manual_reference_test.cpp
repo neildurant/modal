@@ -100,6 +100,10 @@ std::string answer(std::string_view value)
         return "the current search";
     if (value == "{track}")
         return "a suggested destination track";
+    if (value == "{remap-type}")
+        return "controller in a controller lane, otherwise note";
+    if (value == "{remap-from}")
+        return "the lane's controller, or the first of the type in the range";
     return value.empty() ? "no fixed default" : code(value);
 }
 

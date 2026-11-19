@@ -980,6 +980,13 @@ private:
     bool applyKeyed(std::string_view op, const OperatorTarget& target, const core::Key& key,
                     const std::string& text);
     std::string firstPitch(const OperatorTarget& target) const;
+    // Remapping's questions: what was answered for a setting, how one is written once the type
+    // is known, what of a type the range holds, and the first controller or program there.
+    static std::string givenAnswer(const Answers& answers, std::string_view name);
+    std::string settingForm(std::string_view op, std::size_t setting, const Answers& answers) const;
+    std::vector<std::string> remapChoices(std::string_view type,
+                                          const OperatorTarget& target) const;
+    std::string firstOfType(std::string_view type, const OperatorTarget& target) const;
     core::VelocityLimits velocityLimits_;
     QuantizePedal quantizePedal_ = QuantizePedal::Follow;
     bool quantizeMarks_ = true;
@@ -1108,6 +1115,7 @@ private:
         std::string answerCommand;
         std::size_t answerSetting = 0;
         std::optional<OperatorTarget> answerTarget;
+        Answers answerGiven; // a transform's settings answered before this one
         std::optional<PaletteState> palette;
         std::optional<Completing> completing;
     };

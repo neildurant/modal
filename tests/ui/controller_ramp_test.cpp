@@ -1060,6 +1060,123 @@ TEST_CASE("program remapping takes matching events in the range and keeps banks 
     }
 }
 
+TEST_CASE("remap asks the type, then from and to in that type's form, offering the range's")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::Note{60, 90, q}},
+                         {q, core::Note{64, 90, q}},
+                         {0, core::ControlChange{1, 10}},
+                         {q, core::ControlChange{7, 40}},
+                         {0, core::ProgramChange{5}},
+                         {2 * q, core::ProgramChange{12}}});
+    const auto before = r.document.song();
+    const auto version = r.document.version();
+    // The prompt's row, with its question and the hint for what is asked.
+    const auto asking = [&](std::u32string_view text)
+    {
+        std::u32string row;
+        const auto frame = r.ws.frame();
+        for (const auto& run : frame[frame.size() - 2].text)
+        {
+            row += run.text;
+        }
+        return row.find(text) != std::u32string::npos;
+    };
+    const auto pitches = [&]
+    {
+        std::vector<int> result;
+        for (const auto& event : r.document.song().events(r.id()).all())
+        {
+            if (const auto* note = std::get_if<core::Note>(&event.data))
+            {
+                result.push_back(note->pitch);
+            }
+        }
+        return result;
+    };
+    const auto programs = [&]
+    {
+        std::vector<int> result;
+        for (const auto& event : r.document.song().events(r.id()).all())
+        {
+            if (const auto* program = std::get_if<core::ProgramChange>(&event.data))
+            {
+                result.push_back(program->program);
+            }
+        }
+        return result;
+    };
+
+    // In a controller's lane: a controller, the lane's own, Tab offering those in the range.
+    r.type(U",xmib");
+    CHECK(asking(U"type (controller)"));
+    r.type(U"\n");
+    CHECK(asking(U"from controller (cc1)"));
+    r.type(U"cc\t");
+    REQUIRE(r.ws.completions());
+    CHECK(r.ws.completions()->matches == std::vector<std::string>{"cc1", "cc7"});
+    r.type(U"\x1b");
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+
+    // Enter twice and a number: cc1 becomes cc11, undone as one step and repeated with dot.
+    r.type(U",xmib\n\n");
+    CHECK(asking(U"to controller"));
+    CHECK(asking(U"0 to 127, or cc11"));
+    r.type(U"11\n");
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    CHECK(cleanupValues(r, 11) == std::vector<int>{10});
+    CHECK(cleanupValues(r, 1).empty());
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    r.type(U".");
+    CHECK(cleanupValues(r, 11) == std::vector<int>{10});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+
+    // In the notes: a note, the range's first.
+    r.type(U"\x1b");
+    r.type(U",xmib");
+    CHECK(asking(U"type (note)"));
+    r.type(U"\n");
+    CHECK(asking(U"from note (C4)"));
+    r.type(U"\nD4\n");
+    CHECK(pitches() == std::vector<int>{62, 64});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+
+    // Programs, by number, from the arrangement.
+    r.type(U"ga");
+    r.type(U",xmibprogram\n");
+    CHECK(asking(U"from program (5)"));
+    r.type(U"\n");
+    CHECK(asking(U"to program (0 to 127)"));
+    r.type(U"9\n");
+    CHECK(programs() == std::vector<int>{9, 12});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+
+    // Refusals change nothing: a value outside the type, a type there isn't, a mismatch.
+    r.type(U",xmibprogram\n\n200\n");
+    CHECK(r.ws.message() == "Not a program: 200; type 0 to 127");
+    r.type(U",xmibbogus\n");
+    CHECK(r.ws.message().starts_with("Not a type to remap: bogus"));
+    r.type(U",xmibnote\n\ncc7\n");
+    CHECK(r.ws.message().starts_with("Not a note: cc7"));
+    CHECK(r.document.song() == before);
+    CHECK(r.document.version() == version);
+
+    // The command line takes the type, or a form that says it, asking nothing.
+    r.line(U"remap type=program 12 to=13");
+    CHECK(programs() == std::vector<int>{5, 13});
+    r.type(U"u");
+    r.line(U"remap cc7 to=cc10");
+    CHECK(cleanupValues(r, 10) == std::vector<int>{40});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
 TEST_CASE("lane timing transforms affect the active contour and preserve notes and other lanes")
 {
     Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};

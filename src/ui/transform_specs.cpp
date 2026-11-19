@@ -474,19 +474,29 @@ std::span<const Workspace::TransformSpec> Workspace::transformSpecs()
              .apply = &Workspace::splitAsked},
             {.name = "transform-remap",
              .aliases = "remap",
-             .usage = "[ccN|NOTE|program N] [to=ccN|NOTE|program N]",
+             .usage = "[type=program|controller|note] [ccN|NOTE|program N] "
+                      "[to=ccN|NOTE|program N]",
              .description =
                  "Remap a controller (cc1 to cc11), a note (C1 to D1) or program-change events "
-                 "(program 5 to program 12, 0 to 127) in a range or object, asking which and to "
-                 "what; "
-                 "bank messages and track setup left alone",
+                 "(program 5 to program 12, 0 to 127) in a range or object, asking the type, "
+                 "then from and to which of that type; bank messages and track setup left alone",
              .asks = Asks::InTurn,
              .label = "Remap {}",
              .examples = "",
              .answer = "",
+             // The forms of from and to follow the type (remapForm); those typed in full, as
+             // cc1 or program 5, say their type, which isn't then asked.
              .settings =
-                 {{.name = "", .question = "changing", .answer = "", .form = "cc1|C1|program 5"},
-                  {.name = "to", .question = "to", .answer = "", .form = "cc11|D1|program 12"}},
+                 {{.name = "type",
+                   .question = "type",
+                   .answer = "{remap-type}",
+                   .form = "program|controller|note",
+                   .values = {"program", "controller", "note"}},
+                  {.name = "",
+                   .question = "from {type}",
+                   .answer = "{remap-from}",
+                   .form = "cc1|C1|5"},
+                  {.name = "to", .question = "to {type}", .answer = "", .form = "cc11|D1|12"}},
              .apply = &Workspace::remapAsked},
             {.name = "transform-pedal-repedal",
              .aliases = "repedal",

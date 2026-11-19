@@ -159,7 +159,8 @@ name creates a track.
 **Remap** changes a note pitch or controller number, for example redirecting
 modulation data from `cc1` to expression on `cc11`. Controller numbers are
 addresses; their effect depends on the receiver. Changing the address is
-not the same as scaling its values.
+not the same as scaling its values. It asks the type first, then what to
+change from and to (@sec-program-remapping).
 
 **Filter** deletes events matching a search query. Its name means filtering
 material out, not merely hiding it from view. The current search can supply

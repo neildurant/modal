@@ -110,7 +110,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
             - [x] **Done** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); accepted on trial. See [status.md](status.md).
             - [x] **Done** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); accepted on trial.
-            - [ ] **To do** — Replace interactive remap syntax questions with Type, From and To prompts, mapping within one type.
+            - [ ] **Doing** — Remap asks Type, From and To, mapping within one type; built 19 November 2026, awaiting trial.
             - [ ] **To do** — Follow-up regressions, manual/reference updates, Linux checks and rebuilt application for trial.
             - [ ] **To do** — Final functional acceptance and publication; current work is being pushed for continuation elsewhere with the known issue recorded.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.

@@ -213,6 +213,22 @@ std::optional<int> semitones(std::string_view text)
     return value;
 }
 
+// The type a remapping's from says when typed in full: cc1, program 5 or C1; or nothing.
+std::string remapType(std::string_view from)
+{
+    from = trimmed(from);
+    if (from.size() > 2 && from.starts_with("cc") &&
+        std::isdigit(static_cast<unsigned char>(from[2])) != 0)
+    {
+        return "controller";
+    }
+    if (from.starts_with("program"))
+    {
+        return "program";
+    }
+    return core::parsePitch(from) ? "note" : "";
+}
+
 } // namespace
 
 bool isOperator(std::string_view command)
@@ -251,8 +267,12 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
                 which == answers.end() ? std::nullopt : controlStream(which->second);
             question.replace(at, 8, stream ? std::to_string(core::controlCentre(*stream)) : "0");
         }
-        label += ", " + question + " (" +
-                 (answer.empty() ? std::string{settings[i].form} : answer) + "): ";
+        if (const auto at = question.find("{type}"); at != std::string::npos)
+        {
+            question.replace(at, 6, givenAnswer(answers, "type"));
+        }
+        label += ", " + question + " (" + (answer.empty() ? settingForm(op, i, answers) : answer) +
+                 "): ";
         askFor(
             std::move(label),
             [this, op, target, answers, name](const std::string& text) mutable
@@ -261,13 +281,32 @@ void Workspace::askSettings(const std::string& op, const OperatorTarget& target,
                 {
                     answers.emplace_back(option, given);
                 }
-                answers.emplace_back(name, told(text, {}).amount);
+                const auto amount = told(text, {}).amount;
+                if (op == "transform-remap" && name == "type" && amount != "program" &&
+                    amount != "controller" && amount != "note" && !remapType(amount).empty())
+                {
+                    // What to remap from typed in full, cc1, program 5 or C1, says the type.
+                    answers.emplace_back("type", remapType(amount));
+                    answers.emplace_back("", amount);
+                }
+                else if (op == "transform-remap" && name == "type" && amount != "program" &&
+                         amount != "controller" && amount != "note")
+                {
+                    refuse("Not a type to remap: " + amount + "; type program, controller or note",
+                           MessageKind::Warning);
+                    return;
+                }
+                else
+                {
+                    answers.emplace_back(name, amount);
+                }
                 askSettings(op, target, std::move(answers));
             },
             answer);
         prompt_.answerCommand = op;
         prompt_.answerSetting = i;
         prompt_.answerTarget = target;
+        prompt_.answerGiven = answers;
         return;
     }
     // In the settings' order, so the last (a track's name, which may have spaces) comes last;
@@ -344,7 +383,138 @@ std::string Workspace::defaultAnswer(std::string_view answer, const OperatorTarg
     {
         return searching_.query ? searching_.text : std::string{};
     }
+    if (answer == "{remap-type}")
+    {
+        // A controller's in its lane, a note's elsewhere (decided 19 November 2026).
+        const bool controllerLane = shown() == ViewKind::PianoRoll && pianoRoll_->inLane() &&
+                                    !pianoRoll_->velocityLane() &&
+                                    pianoRoll_->lane().kind == core::Lane::Kind::Controller;
+        return controllerLane ? "controller" : "note";
+    }
+    if (answer == "{remap-from}")
+    {
+        // The lane's controller, or the first of the type in the range.
+        const auto type = givenAnswer(answers, "type");
+        if (type == "controller" && shown() == ViewKind::PianoRoll && pianoRoll_->inLane() &&
+            !pianoRoll_->velocityLane() && pianoRoll_->lane().kind == core::Lane::Kind::Controller)
+        {
+            return "cc" + std::to_string(pianoRoll_->lane().controller);
+        }
+        const auto present = remapChoices(type, target);
+        if (type == "note")
+        {
+            return present.empty() ? std::string{} : firstPitch(target);
+        }
+        return present.empty() ? std::string{} : firstOfType(type, target);
+    }
     return std::string{answer};
+}
+
+std::string Workspace::givenAnswer(const Answers& answers, std::string_view name)
+{
+    const auto given = std::ranges::find(answers, std::string{name}, &Answers::value_type::first);
+    return given == answers.end() ? std::string{} : given->second;
+}
+
+std::string Workspace::settingForm(std::string_view op, std::size_t setting,
+                                   const Answers& answers) const
+{
+    // How a setting is written; remapping's from and to as its type writes them.
+    const auto settings = transformSettings(op);
+    if (setting >= settings.size())
+    {
+        return {};
+    }
+    if (op == "transform-remap" && setting > 0)
+    {
+        const auto type = givenAnswer(answers, "type");
+        if (type == "controller")
+        {
+            return setting == 1 ? "0 to 127, or cc1" : "0 to 127, or cc11";
+        }
+        if (type == "program")
+        {
+            return "0 to 127";
+        }
+        if (type == "note")
+        {
+            return setting == 1 ? "a note, as C1" : "a note, as D1";
+        }
+    }
+    return std::string{settings[setting].form};
+}
+
+std::vector<std::string> Workspace::remapChoices(std::string_view type,
+                                                 const OperatorTarget& target) const
+{
+    // What of a type the range holds, in order: controllers as cc1, notes by pitch, programs.
+    std::vector<int> numbers;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = document_.song().events(part.track);
+        for (const auto i : part.events)
+        {
+            const auto& data = events[i].data;
+            if (const auto* cc = std::get_if<core::ControlChange>(&data);
+                cc && type == "controller")
+            {
+                numbers.push_back(cc->controller);
+            }
+            else if (const auto* note = std::get_if<core::Note>(&data); note && type == "note")
+            {
+                numbers.push_back(note->pitch);
+            }
+            else if (const auto* program = std::get_if<core::ProgramChange>(&data);
+                     program && type == "program")
+            {
+                numbers.push_back(program->program);
+            }
+        }
+    }
+    std::ranges::sort(numbers);
+    numbers.erase(std::unique(numbers.begin(), numbers.end()), numbers.end());
+    std::vector<std::string> result;
+    for (const auto number : numbers)
+    {
+        result.push_back(type == "controller" ? "cc" + std::to_string(number)
+                         : type == "note"     ? core::pitchName(static_cast<std::uint8_t>(number))
+                                              : std::to_string(number));
+    }
+    return result;
+}
+
+std::string Workspace::firstOfType(std::string_view type, const OperatorTarget& target) const
+{
+    // The earliest controller or program change the range holds, as remapping writes it.
+    std::optional<std::pair<core::Tick, int>> first;
+    for (const auto& part : target.parts)
+    {
+        const auto& events = document_.song().events(part.track);
+        for (const auto i : part.events)
+        {
+            std::optional<int> number;
+            if (const auto* cc = std::get_if<core::ControlChange>(&events[i].data);
+                cc && type == "controller")
+            {
+                number = cc->controller;
+            }
+            else if (const auto* program = std::get_if<core::ProgramChange>(&events[i].data);
+                     program && type == "program")
+            {
+                number = program->program;
+            }
+            if (number)
+            {
+                first = std::min(first.value_or(std::pair{events[i].tick, *number}),
+                                 std::pair{events[i].tick, *number});
+            }
+        }
+    }
+    if (!first)
+    {
+        return {};
+    }
+    return (type == "controller" ? "cc" : "") + std::to_string(first->second);
 }
 
 bool Workspace::askTransform(const TransformSpec& spec, const OperatorTarget& target)
@@ -814,6 +984,14 @@ bool Workspace::applyTransform(std::string_view name, const OperatorTarget& targ
         if (!said.amount.empty())
         {
             answers.emplace_back("", said.amount);
+        }
+        if (name == "transform-remap" && givenAnswer(answers, "type").empty())
+        {
+            // cc1, program 5 or C1 says which type it is, which isn't then asked.
+            if (const auto type = remapType(said.amount); !type.empty())
+            {
+                answers.emplace_back("type", type);
+            }
         }
         askSettings(std::string{name}, target, std::move(answers));
         return true;
@@ -1702,68 +1880,86 @@ bool Workspace::splitAsked(std::string_view /*name*/, const OperatorTarget& targ
 bool Workspace::remapAsked(std::string_view /*name*/, const OperatorTarget& target,
                            const std::string& text)
 {
+    // The type asked for or said by the form typed; from and to then each in that type's form,
+    // its prefix (cc, program) optional. Mapping stays within the type (decided 18 November 2026).
     const auto said = told(text, {});
     std::string to;
+    std::string type;
     for (const auto& [option, value] : said.options)
     {
-        if (option != "to")
+        if (option == "to")
         {
-            refuse("Remap takes to=, not " + option + "=", MessageKind::Warning);
+            to = value;
+        }
+        else if (option == "type")
+        {
+            type = value;
+        }
+        else
+        {
+            refuse("Remap takes type= and to=, not " + option + "=", MessageKind::Warning);
             return true;
         }
-        to = value;
     }
-    const auto controller = [](std::string_view word) -> std::optional<int>
-    {
-        if (!word.starts_with("cc") || word.ends_with('%'))
-        {
-            return std::nullopt;
-        }
-        return percentUpTo(word.substr(2), 127);
-    };
     const auto from = said.amount;
-    if (const auto a = controller(from))
+    if (type.empty())
     {
-        const auto b = controller(to);
-        if (!b)
-        {
-            refuse("Not a controller: " + to + "; remap " + from + " to another, as cc11",
-                   MessageKind::Warning);
-            return true;
-        }
-        return changeEvents("Remap " + from + " of " + target.what + " to " + to, target,
-                            [&](const core::EventList& events, const auto& part)
-                            { return core::remapController(events, part.events, *a, *b); });
+        type = remapType(from);
     }
-    const auto program = [](std::string_view word) -> std::optional<int>
+    const auto number = [](std::string_view word, std::string_view prefix) -> std::optional<int>
     {
-        if (!word.starts_with("program ") || word.ends_with('%'))
+        word = trimmed(word);
+        if (word.starts_with(prefix))
+        {
+            word = trimmed(word.substr(prefix.size()));
+        }
+        if (word.ends_with('%'))
         {
             return std::nullopt;
         }
-        return percentUpTo(trimmed(word.substr(8)), 127);
+        return percentUpTo(word, 127);
     };
-    if (from.starts_with("program"))
+    if (type == "controller")
     {
-        const auto a = program(from);
-        const auto b = program(to);
+        const auto a = number(from, "cc");
+        const auto b = number(to, "cc");
         if (!a || !b)
         {
-            refuse("Not a program remapping; type program 5 and to=program 12 (0 to 127)",
+            refuse("Not a controller: " + (!a ? from : to) + "; type 0 to 127, or cc11",
                    MessageKind::Warning);
             return true;
         }
-        return changeEvents("Remap " + from + " of " + target.what + " to " + to, target,
-                            [&](const core::EventList& events, const auto& part)
+        return changeEvents("Remap cc" + std::to_string(*a) + " of " + target.what + " to cc" +
+                                std::to_string(*b),
+                            target, [&](const core::EventList& events, const auto& part)
+                            { return core::remapController(events, part.events, *a, *b); });
+    }
+    if (type == "program")
+    {
+        const auto a = number(from, "program");
+        const auto b = number(to, "program");
+        if (!a || !b)
+        {
+            refuse("Not a program: " + (!a ? from : to) + "; type 0 to 127", MessageKind::Warning);
+            return true;
+        }
+        return changeEvents("Remap program " + std::to_string(*a) + " of " + target.what +
+                                " to program " + std::to_string(*b),
+                            target, [&](const core::EventList& events, const auto& part)
                             { return core::remapProgram(events, part.events, *a, *b); });
+    }
+    if (type != "note")
+    {
+        refuse("Not a type to remap: " + (type.empty() ? from : type) +
+                   "; type program, controller or note",
+               MessageKind::Warning);
+        return true;
     }
     const auto a = core::parsePitch(trimmed(from));
     const auto b = core::parsePitch(trimmed(to));
     if (!a || !b)
     {
-        refuse(!a ? "Not a controller, note or program: " + from + "; type cc1, C1 or program 5"
-                  : "Not a note: " + to + "; remap " + from + " to another, as D1",
-               MessageKind::Warning);
+        refuse("Not a note: " + (!a ? from : to) + "; type a note, as D1", MessageKind::Warning);
         return true;
     }
     return changeEvents("Remap the " + core::pitchName(*a) + "s of " + target.what + " to " +

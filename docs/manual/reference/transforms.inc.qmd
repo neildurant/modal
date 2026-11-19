@@ -316,16 +316,17 @@ Split the notes a range or object takes at a note, moving it and those above, or
 
 ## :remap {#ref-transform-remap}
 
-Remap a controller (cc1 to cc11), a note (C1 to D1) or program-change events (program 5 to program 12, 0 to 127) in a range or object, asking which and to what; bank messages and track setup left alone.
+Remap a controller (cc1 to cc11), a note (C1 to D1) or program-change events (program 5 to program 12, 0 to 127) in a range or object, asking the type, then from and to which of that type; bank messages and track setup left alone.
 
-**Syntax:** `` :remap [ccN|NOTE|program N] [to=ccN|NOTE|program N] ``.
+**Syntax:** `` :remap [type=program|controller|note] [ccN|NOTE|program N] [to=ccN|NOTE|program N] ``.
 
 **Choose before a target:** `` , x m ``.
 
 | Parameter | Enter takes | Form or choices |
 | --- | --- | --- |
-| first argument | no fixed default | `` cc1 / C1 / program 5 `` |
-| `` to `` | no fixed default | `` cc11 / D1 / program 12 `` |
+| `` type `` | controller in a controller lane, otherwise note | `` program / controller / note `` |
+| first argument | the lane's controller, or the first of the type in the range | `` cc1 / C1 / 5 `` |
+| `` to `` | no fixed default | `` cc11 / D1 / 12 `` |
 
 ## :repedal {#ref-transform-pedal-repedal}
 

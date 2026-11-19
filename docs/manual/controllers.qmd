@@ -296,10 +296,19 @@ to change wherever it occurs. `:remap program 5 to=program 12` changes
 matching program-change events in the selection, or the cursor's bar.
 Modal uses 0–127, as in its other program fields.
 
-The keyboard route is the existing `, x m`, followed by a target. Answer
-`program 5` for what to change and `program 12` for what it becomes, just
-as the same tool takes `cc1` and `cc11`, or a pair of notes. For a whole
+The keyboard route is the existing `, x m`, followed by a target. It asks
+three questions in turn. First the **type**: program, controller or note,
+as remapping never turns one kind of event into another. Then **from** and
+**to**, each written as that type writes it: a number from 0 to 127 for a
+program, a number or `cc1` for a controller, a pitch such as `C1` for a
+note. Tab offers those of the type already in the target, and Enter takes
+the default shown: the controller of the lane you are in, or the first of
+the type in the target. To change program 5 to program 12 in a bar, type
+`, x m ib`, then `program`, Enter, `5`, Enter, `12`, Enter. For a whole
 track's changes, use the track target `it`.
+
+Typing what to change in full at the first question, as `program 5`, `cc1`
+or `C1`, also says its type, and the next question is then **to**.
 
 Only matching events in the target change. Bank-select messages and the
 track's starting bank/program setup are left alone. If the patch is set

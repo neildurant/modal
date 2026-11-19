@@ -164,6 +164,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
             text = std::exchange(prompt_.answerDefault, {});
         }
         prompt_.answerTarget.reset();
+        prompt_.answerGiven.clear();
         if (const auto answer = std::exchange(prompt_.answer, {}); !text.empty())
         {
             answer(text);
@@ -206,6 +207,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         mode_ = Mode::Normal;
         prompt_.answer = {};
         prompt_.answerTarget.reset();
+        prompt_.answerGiven.clear();
         if (std::exchange(prompt_.keyPrompt, false))
         {
             prompt_.line.clear();
@@ -460,6 +462,13 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
                     {
                         found.push_back(track->name);
                     }
+                }
+                if (prompt_.answerCommand == "transform-remap" && prompt_.answerSetting > 0 &&
+                    prompt_.answerTarget)
+                {
+                    // Remapping from and to: what of the chosen type the range holds.
+                    found = remapChoices(givenAnswer(prompt_.answerGiven, "type"),
+                                         *prompt_.answerTarget);
                 }
             }
             return found;
@@ -758,6 +767,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.answer = std::move(answer);
     prompt_.answerDefault = std::move(defaultAnswer);
     prompt_.answerTarget.reset();
+    prompt_.answerGiven.clear();
     prompt_.answerCommand.clear();
     prompt_.answerSetting = 0;
 }
@@ -1257,9 +1267,8 @@ std::string Workspace::argumentHint() const
     if (prompt_.answer)
     {
         // A transform's setting: how it's written, until something's typed.
-        const auto settings = transformSettings(prompt_.answerCommand);
-        return prompt_.line.text().empty() && prompt_.answerSetting < settings.size()
-                   ? std::string{settings[prompt_.answerSetting].form}
+        return prompt_.line.text().empty()
+                   ? settingForm(prompt_.answerCommand, prompt_.answerSetting, prompt_.answerGiven)
                    : std::string{};
     }
     if (prompt_.searchPrompt)
