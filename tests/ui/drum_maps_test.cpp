@@ -162,7 +162,9 @@ TEST_CASE("go to pitch accepts drum names and unnamed pitches without moving in 
     Maps m{GENERATE(core::kPpqn, core::Ppqn{96})};
     m.project(kit("Kick Centre"));
     const auto before = m.ws.pianoRoll().cursor();
-    m.type(U"gpKICK CENTRE\n");
+    m.type(U"gpKICK C\t");
+    CHECK(m.ws.commandLine().text() == U"Kick Centre ");
+    m.type(U"\n");
     CHECK(m.ws.pianoRoll().cursor().pitch == 36);
     CHECK(m.ws.pianoRoll().cursor().tick == before.tick);
     m.type(U"''");
@@ -196,13 +198,25 @@ TEST_CASE("a drum search asks which pitch to use when a name is ambiguous", "[dr
     Maps m;
     auto map = kit();
     map.notes[38] = "Snare Centre";
+    map.notes[40] = "Snare Edge";
     map.notes[42] = "Snare Rim";
+    {
+        auto song = m.document.song();
+        song.updateEvents(m.id(),
+                          [&](core::EventList& events)
+                          {
+                              events.insert({3 * core::kPpqn.quarter(),
+                                             core::Note{42, 90, core::kPpqn.quarter() / 4}});
+                          });
+        m.document.replace(std::move(song), std::nullopt);
+    }
     m.project(map);
     m.type(U"/SNARE\n");
     REQUIRE(m.ws.mode() == Mode::CommandLine);
-    m.has(U"Snare Centre [38]");
-    m.has(U"Snare Rim [42]");
-    m.type(U"\t\t\n");
+    m.has(U"Snare Centre [38] · 1 note");
+    m.has(U"Snare Edge [40] · 0 notes");
+    m.has(U"Snare Rim [42] · 2 notes");
+    m.type(U"\t\n");
     CHECK(m.ws.mode() == Mode::Normal);
     CHECK(m.ws.pianoRoll().cursor().pitch == 42);
     CHECK(m.ws.pianoRoll().cursor().tick == 2 * core::kPpqn.quarter());
@@ -224,8 +238,8 @@ TEST_CASE("the palette lists the current track's drum pitches", "[drum-maps]")
     const auto before = m.ws.pianoRoll().cursor();
     m.ws.handle(Key::typed(U'p', kCtrl), 0);
     m.type(U"~SNARE");
-    m.has(U"MIDI 38");
-    m.has(U"MIDI 42");
+    m.has(U"D2   · MIDI 38");
+    m.has(U"F#2  · MIDI 42");
     m.press(NamedKey::Down);
     m.type(U"\n");
     CHECK(m.ws.pianoRoll().cursor().pitch == 42);

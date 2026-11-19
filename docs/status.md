@@ -14,6 +14,8 @@ In the piano roll, `gp` goes to a pitch row and `:select pitch PITCH` selects th
 
 **To try.** Open `/tmp/modal-ssd-drum-map-trial.modal` in `build/linux-gcc/apps/Debug/modal`. Try `gp` then `Kick Center` and Enter, `/snare` with Tab and Enter to choose an articulation, `:select pitch Hi-Hat Tip Closed` (or note `42`) then Escape, and Ctrl-P then `~snare`. Compare rows with the MIDI numbers in the palette and check that direct pitch moves keep the cursor's time.
 
+**Trial refinements.** The name-based search worked on trial. Its ambiguous choices now show note counts on the current track and sort by most notes first, leaving zero-count pitches available. In `gp`, Tab completes drum names and note spellings. The palette aligns the MIDI column. The GCC and Clang Debug suites pass with updated regressions, and both manual formats build. To try the refinements, search `/snare`, complete `gp` with `Kick C` then Tab, and compare sharp and natural pitches under Ctrl-P `~`.
+
 **File dialog report.** `:e` also failed to show a picker on the desktop, confirming that the symptom extends beyond drum maps. The previous window callback discarded SDL's native error and treated it as cancellation. The error now reaches the message row with the explicit-filename route as a fallback. An offscreen test exercises SDL's error callback. Recheck `:e`, `:drum-map-load` or `:drum-map-save` in the rebuilt app to identify the desktop failure from the message.
 
 ### Schedule reordered, 19 November 2026

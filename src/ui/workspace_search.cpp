@@ -69,7 +69,7 @@ bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std
         return false;
     if (name.size() >= 2 && name.front() == '"' && name.back() == '"')
         name = name.substr(1, name.size() - 2);
-    const auto pitches = matchingDrumPitches(*map, name);
+    auto pitches = matchingDrumPitches(*map, name);
     if (pitches.empty())
         return false;
     if (pitches.size() == 1)
@@ -77,9 +77,21 @@ bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std
         use(pitches.front());
         return true;
     }
+    std::array<std::size_t, 128> counts{};
+    for (const auto& event : document_.song().events(*view().cursor().track).all())
+    {
+        if (const auto* note = std::get_if<core::Note>(&event.data))
+            ++counts[note->pitch];
+    }
+    std::ranges::stable_sort(pitches, std::greater{},
+                             [&](std::uint8_t pitch) { return counts[pitch]; });
     std::vector<std::string> labels;
     for (const auto pitch : pitches)
-        labels.push_back(map->notes[pitch] + " [" + std::to_string(pitch) + "]");
+    {
+        const auto count = counts[pitch];
+        labels.push_back(map->notes[pitch] + " [" + std::to_string(pitch) + "] · " +
+                         std::to_string(count) + (count == 1 ? " note" : " notes"));
+    }
     askFor("Choose a drum pitch: ",
            [this, pitches, labels, use = std::move(use)](const std::string& answer)
            {
@@ -104,6 +116,7 @@ CommandResult Workspace::pitchCommand(std::string_view text, bool selecting)
         askFor(selecting ? "Select pitch: " : "Go to pitch: ",
                [this, selecting](const std::string& answer)
                { report(pitchCommand(answer, selecting)); });
+        prompt_.answerChoices = Choices::Pitch;
         return {true};
     }
     const auto number = midiPitch(text);

@@ -811,6 +811,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Drum pitches in the palette (decided 19 November 2026).** Use `~` to browse the current piano-roll track's named pitches, following the palette's existing destination prefixes. Show the MIDI number alongside each name so duplicate names can be told apart. Document all five prefixes in the manual's palette section.
 
+**Resolving drum names after trial (19 November 2026).** Show counts for matching pitches and put those with the most notes first, so recorded articulations are easy to recognise when a kit defines many similar names. Counts are for the current track, and pitches with zero notes remain available. Complete names at `gp` with Tab and align the pitch details in the palette.
+
 ## Work order (19 November 2026)
 
 **Loop recording and comping before step entry.** Prioritise the loop/punch/take workflow ahead of step entry. Move take lanes and comping from milestone 16 into that recording milestone, retaining their detailed design as unresolved feature notes. Loops, punch recording and takes is now milestone 11; step entry and remaining input features is milestone 12. Milestone 16 keeps its other alternatives and reusable-material work. Version-1 scope reflects the move; detailed comping behaviour remains to be designed. See schedule.md for the revised order.

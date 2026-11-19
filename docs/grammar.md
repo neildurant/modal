@@ -64,7 +64,7 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 
 `k` and `j` move a semitone, `K` and `J` an octave.
 
-`gp` asks for a pitch and moves to its row without changing time. `:select pitch PITCH` moves there and selects the row as `V` would. Both take a pitch such as `C2`, a MIDI number such as `36`, or a name from the current track's drum map. The palette's `~` prefix lists those names with their pitches and MIDI numbers.
+`gp` asks for a pitch and moves to its row without changing time. Tab completes drum names and note spellings. `:select pitch PITCH` moves there and selects the row as `V` would. Both take a pitch such as `C2`, a MIDI number such as `36`, or a name from the current track's drum map. The palette's `~` prefix lists those names with their pitches and MIDI numbers.
 
 ### Finding and searching
 
@@ -79,6 +79,8 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 | `/` Enter, `:noh`, `, S c` | Clear the matches |
 
 A find or search counts (`3fE`, `3n`). After an operator, `f` takes the range through the note it finds, `F` from it, and `n` up to the match. A `#` or `b` straight after a find's letter makes it a sharp or flat; after an operator it does the operator again to the sharp or flat, as one change, and Escape then undoes it.
+
+If several drum pitches match, choose by name, MIDI number and the number of notes in the current track. The most-used pitch is offered first.
 
 ### Marks
 

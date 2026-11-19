@@ -47,9 +47,10 @@ the feedback. `n` and `N` visit the next and previous matches, wrapping at
 the ends.
 
 When searching by drum name, enter the name on its own. A short name such
-as `/snare` can match several articulations. Use Tab or the arrow keys to
-choose a pitch by its full name and MIDI number, then press Enter. The usual
-search keys then move between hits on that pitch.
+as `/snare` can match several articulations. Each choice shows the full name,
+MIDI number and the number of notes on that pitch in the current track. The
+most-used pitches come first. Use Tab or the arrow keys to choose one, then
+press Enter. The usual search keys then move between hits on that pitch.
 
 `*` and `#` start a search for the exact pitch under the cursor,
 forwards or backwards, without typing a `/` query.

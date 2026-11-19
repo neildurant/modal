@@ -1167,6 +1167,7 @@ private:
         bool pitchChoice = false;
         std::string answerLabel;
         std::function<void(const std::string&)> answer;
+        Choices answerChoices = Choices::None;
         std::string answerDefault;
         std::string answerCommand;
         std::size_t answerSetting = 0;

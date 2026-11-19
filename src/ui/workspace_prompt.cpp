@@ -100,8 +100,9 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     }
     if (command == "command-line-next" || command == "command-line-previous")
     {
-        const bool options = prompt_.answer && (prompt_.keyPrompt ||
-                                                !transformSettings(prompt_.answerCommand).empty());
+        const bool options =
+            prompt_.answer && (prompt_.keyPrompt || prompt_.answerChoices != Choices::None ||
+                               !transformSettings(prompt_.answerCommand).empty());
         return (!prompt_.answer || options || prompt_.pitchChoice) &&
                complete(command == "command-line-next" ? 1 : -1);
     }
@@ -349,6 +350,18 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
         }
         return found;
     }
+    case Choices::Pitch:
+        if (const auto* map = currentDrumMap())
+        {
+            for (const auto& name : map->notes)
+            {
+                if (!name.empty() && std::ranges::find(found, name) == found.end())
+                    found.push_back(name);
+            }
+        }
+        for (int pitch = 0; pitch < 128; ++pitch)
+            found.push_back(core::pitchName(static_cast<std::uint8_t>(pitch)));
+        return found;
     case Choices::Query:
     {
         // After inside or outside, a key's tonic and then its scale; otherwise the keywords.
@@ -556,6 +569,8 @@ Workspace::CompletingWord Workspace::completingWord() const
                           Choices::Command};
     if (prompt_.answer)
     {
+        if (prompt_.answerChoices == Choices::Pitch)
+            return {0, encodeUtf8(text.substr(0, prompt_.line.cursor())), Choices::Pitch};
         // A transform's question: its options, wherever they're typed; or a key.
         result.kind = prompt_.keyPrompt ? Choices::Key : Choices::Option;
         return result;
@@ -776,6 +791,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.line.open();
     prompt_.answerLabel = std::move(label);
     prompt_.answer = std::move(answer);
+    prompt_.answerChoices = Choices::None;
     prompt_.pitchChoice = false;
     prompt_.answerDefault = std::move(defaultAnswer);
     prompt_.answerTarget.reset();
@@ -914,8 +930,8 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
             {
                 if (!map->notes[pitch].empty())
                     item(std::to_string(pitch), map->notes[pitch],
-                         core::pitchName(static_cast<std::uint8_t>(pitch)) + " · MIDI " +
-                             std::to_string(pitch));
+                         padText(core::pitchName(static_cast<std::uint8_t>(pitch)), 4, false) +
+                             " · MIDI " + std::to_string(pitch));
             }
         }
     }
