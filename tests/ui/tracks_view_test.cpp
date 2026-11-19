@@ -1014,9 +1014,19 @@ TEST_CASE("Tab goes through the bank fields and Program, and on to the later col
     REQUIRE(t.ws.tracks().inspectorEditor().heading() == "Prog");
     t.type(U"5");
     t.press(NamedKey::Tab);
+    CHECK_FALSE(t.ws.tracks().inspectorEditor().active()); // Drum map opens the shared chooser.
+    t.press(NamedKey::Escape);
+    t.type(U"l");
+    t.press(NamedKey::Enter);
+    REQUIRE(t.ws.tracks().inspectorEditor().active());
     CHECK(t.ws.tracks().inspectorEditor().heading() == "Trans");
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});
     t.press(NamedKey::Tab, kShift);
+    CHECK_FALSE(t.ws.tracks().inspectorEditor().active());
+    t.press(NamedKey::Escape);
+    t.type(U"h");
+    t.press(NamedKey::Enter);
+    REQUIRE(t.ws.tracks().inspectorEditor().active());
     CHECK(t.ws.tracks().inspectorEditor().heading() == "Prog");
     t.press(NamedKey::Escape);
     CHECK(t.track().programSetup == core::ProgramSetup{1, 2, 5});

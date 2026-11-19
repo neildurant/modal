@@ -514,6 +514,24 @@ constexpr std::array kSharedCommands{
     CommandInfo{.name = "track-quantize-toggle",
                 .description = "Quantise this track as it plays, or stop, keeping its settings",
                 .modes = modeBit(Mode::Normal)},
+    CommandInfo{.name = "drum-map",
+                .description = "Choose this track's drum map or review its saved copies",
+                .modes = modeBit(Mode::Normal)},
+    CommandInfo{.name = "drum-map-load",
+                .description =
+                    "Load a drum map into this track, reviewing a differing copy of the same name",
+                .usage = "[FILE]",
+                .modes = modeBit(Mode::Normal),
+                .keys = false,
+                .choices = {Choices::DrumMapFile}},
+    CommandInfo{.name = "drum-map-save",
+                .description =
+                    "Save this track's drum map; ! reviews an existing file before replacing it",
+                .usage = "[FILE]",
+                .modes = modeBit(Mode::Normal),
+                .bang = true,
+                .keys = false,
+                .choices = {Choices::DrumMapFile}},
     CommandInfo{.name = "track-reorder",
                 .description = "Move this track or the selected tracks through the others: j and "
                                "k move, Enter accepts, Escape puts them back"},
@@ -665,7 +683,7 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 134> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 137> where{{
             {"ports-refresh", onlyIn({PortList})},
             {"tracks-mute-toggle", onlyIn({Tracks, TrackList})},
             {"tracks-solo-toggle", onlyIn({Tracks, TrackList})},
@@ -679,6 +697,9 @@ std::span<const CommandInfo> Workspace::commands()
             {"event-insert", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-reorder", onlyIn({Tracks, TrackList})},
             {"track-freeze", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"drum-map", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"drum-map-load", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
+            {"drum-map-save", onlyIn({Tracks, PianoRoll, EventList, TrackList})},
             {"track-move-up", onlyIn({Tracks, TrackList})},
             {"track-move-down", onlyIn({Tracks, TrackList})},
             {"track-mute-toggle", onlyIn({Tracks, PianoRoll, EventList, TrackList})},

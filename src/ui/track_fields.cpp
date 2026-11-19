@@ -35,6 +35,7 @@ constexpr std::array kColumns{
     TrackColumn{TrackField::BankMsb, "MSB", 4, true},
     TrackColumn{TrackField::BankLsb, "LSB", 4, true},
     TrackColumn{TrackField::Program, "Prog", 6, true},
+    TrackColumn{TrackField::DrumMap, "Drum map", 21},
     TrackColumn{TrackField::Transpose, "Trans", 6, true},
     TrackColumn{TrackField::VelocityOffset, "Vel +/-", 8, true},
     // A wider gap after it, as its values align on the right and Quantise's on the left.
@@ -130,6 +131,8 @@ std::string trackFieldText(TrackField field, const core::Track& track, std::size
         return core::offsetText(track.timeOffset);
     case TrackField::ChaseNotes:
         return track.chaseNotes ? "C" : "-";
+    case TrackField::DrumMap:
+        return track.drumMap ? track.drumMap->name : "None";
     case TrackField::Program:
         return setupText(track.programSetup.program);
     case TrackField::BankMsb:
@@ -203,6 +206,8 @@ std::string_view trackFieldDescription(TrackField field)
         return "Bank select MSB, sent before the program";
     case TrackField::BankLsb:
         return "Bank select LSB, sent before the program";
+    case TrackField::DrumMap:
+        return "Names for drum pitches: Enter chooses a map or reviews saved copies";
     case TrackField::Program:
         return "Program, sent when playback starts";
     case TrackField::Transpose:

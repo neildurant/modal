@@ -315,6 +315,12 @@ TEST_CASE("Ctrl-. panics, at the prompt too")
     p.press(Key::typed(U'.', kCtrl));
     CHECK_FALSE(p.player.playing());
 
+    p.type(U" ,tk");
+    REQUIRE(p.player.playing());
+    p.press(Key::typed(U'.', kCtrl));
+    CHECK_FALSE(p.player.playing());
+    p.press(Key::of(NamedKey::Escape));
+
     p.type(U" :");
     REQUIRE(p.ws.mode() == Mode::CommandLine);
     p.press(Key::typed(U'.', kCtrl));

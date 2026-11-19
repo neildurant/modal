@@ -269,6 +269,14 @@ Inspection TracksView::inspection() const
         }
         return result;
     }
+    if (field == TrackField::DrumMap)
+    {
+        result.fields.push_back({"Drum map", track.drumMap ? track.drumMap->name : "None"});
+        if (track.drumMap)
+            result.fields.push_back({"Saved copy", host_.drumMapSummary(*track.drumMap)});
+        result.fields.push_back(about);
+        return result;
+    }
     result.fields.push_back(about);
     if (field == TrackField::Thru && track.thru && !track.arm)
     {
@@ -350,8 +358,8 @@ Inspection TracksView::editableFields() const
     for (const auto& column : columns())
     {
         if (column.field != TrackField::Number && column.field != TrackField::Port &&
-            column.field != TrackField::Input && column.field != TrackField::QuantizeSummary &&
-            !isTrackButton(column.field))
+            column.field != TrackField::Input && column.field != TrackField::DrumMap &&
+            column.field != TrackField::QuantizeSummary && !isTrackButton(column.field))
         {
             const auto text = trackFieldText(column.field, track, row());
             result.fields.push_back({std::string{column.heading}, text, true, text});
@@ -554,6 +562,11 @@ std::optional<std::string> TracksView::typingHint() const
 
 bool TracksView::openField()
 {
+    if (columns()[column_].field == TrackField::DrumMap)
+    {
+        host_.chooseDrumMap();
+        return false; // the workspace owns this chooser, in every track view
+    }
     if (columns()[column_].field == TrackField::QuantizeSummary)
     {
         quantizeEditing_ = editor_.openPanel(quantizeFields(), document_, place());
@@ -980,9 +993,10 @@ void TracksView::addRegions(Frame& frame) const
             {
                 text += programEvents(document_.song(), track->id()).count > 0 ? U'•' : U' ';
             }
-            // A port is chosen from a list, which the arrow at its right says.
+            // A port or drum map is chosen from a list, which the arrow at its right says.
             const bool listed =
-                track && (column.field == TrackField::Port || column.field == TrackField::Input);
+                track && (column.field == TrackField::Port || column.field == TrackField::Input ||
+                          column.field == TrackField::DrumMap);
             const int textRoom = listed ? room - 2 : room;
             if (text.size() > static_cast<std::size_t>(textRoom))
             {

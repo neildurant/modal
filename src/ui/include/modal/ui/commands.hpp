@@ -33,20 +33,21 @@ constexpr ModeSet modeBit(Mode mode)
 enum class Choices : std::uint8_t
 {
     None,
-    Command,    // a command's name or alias
-    Setting,    // a setting's name, or NAME=VALUE with its values
-    Role,       // a theme role
-    Port,       // an output port
-    File,       // a file or folder, from the current directory
-    ConfigFile, // a file or folder in the config directory
-    Section,    // a section's name
-    Meter,      // a time signature, such as 3/4
-    Length,     // a note length, such as 1/8 or 1/16t
-    Option,     // a transform's option, NAME=VALUE, with its values
-    Key,        // a key: a tonic, then a scale
-    EventKind,  // a kind of event to insert
-    FreezePart, // all, or one playback transform to commit to events
-    Query,      // a search's terms: keywords, and keys after inside and outside
+    Command,     // a command's name or alias
+    Setting,     // a setting's name, or NAME=VALUE with its values
+    Role,        // a theme role
+    Port,        // an output port
+    File,        // a file or folder, from the current directory
+    ConfigFile,  // a file or folder in the config directory
+    DrumMapFile, // a reusable map or folder in drum-maps/
+    Section,     // a section's name
+    Meter,       // a time signature, such as 3/4
+    Length,      // a note length, such as 1/8 or 1/16t
+    Option,      // a transform's option, NAME=VALUE, with its values
+    Key,         // a key: a tonic, then a scale
+    EventKind,   // a kind of event to insert
+    FreezePart,  // all, or one playback transform to commit to events
+    Query,       // a search's terms: keywords, and keys after inside and outside
 };
 inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Query) + 1;
 

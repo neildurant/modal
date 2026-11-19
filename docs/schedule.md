@@ -117,7 +117,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [x] **Done** — Step 1: map data, shared General MIDI names, song persistence and reusable map files; seven new core tests and GCC/Clang Debug suites pass. See status.md.
     - [ ] **Doing** — Step 2: choosing maps, file management and names; plan approved 19 November 2026. See design.md and status.md.
         - [ ] **Doing** — Piano-roll labels and inspector names; implemented with regressions, trial pending.
-        - [ ] **To do** — Map chooser, reusable-file load/save and same-name comparison/review actions.
+        - [ ] **Doing** — Map chooser, reusable-file load/save and same-name comparison/review actions; implemented and validated locally, trial pending.
         - [ ] **To do** — Manual updates, dark/light renders, Linux validation and functional trial.
     - [ ] **To do** — Step 3: names in navigation, search, selection and the palette; tests, manual updates and functional trial.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
@@ -268,6 +268,7 @@ These support the milestones rather than forming a separate feature milestone. S
 
 No milestone or implementation commitment. Keep these unchecked unless they are explicitly promoted into the schedule.
 
+- [ ] **Unscheduled** — Playback drum-map translation (kept unscheduled 19 November 2026): suggest source-to-destination drum pitches from names and aliases, review ambiguous/unmatched guesses, and apply an accepted mapping at playback while preserving written notes. Playback/audition/export details need a separate design before implementation.
 - [ ] **Unscheduled** — Musical search/replace by interval or rhythm pattern.
 - [ ] **Unscheduled** — Linked variations and linked sections.
 - [ ] **Unscheduled** — Retrospective capture.

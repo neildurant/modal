@@ -12,6 +12,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 
 namespace modal::ui
 {
@@ -28,6 +29,7 @@ public:
         Song,   // a song to open: .modal, or a MIDI file to import
         Midi,   // a MIDI file to export
         Config, // a config file, written by write-config
+        DrumMap,
     };
 
     // Asks for a file to open or to save to, suggesting one (beside the song's file, or the
@@ -36,6 +38,10 @@ public:
     // thread, after other events, so the command has finished by then.
     using Chosen = std::function<void(std::optional<std::filesystem::path>)>;
     virtual void chooseOpen(Chosen done) = 0;
+    virtual void chooseOpenFile(FileKind, const std::filesystem::path&, Chosen done)
+    {
+        chooseOpen(std::move(done));
+    }
     virtual void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) = 0;
 
     virtual void quit() = 0;

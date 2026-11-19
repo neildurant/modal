@@ -32,6 +32,7 @@ enum class TrackField
     BankMsb,
     BankLsb,
     Program,
+    DrumMap,
     Quantize,        // the Q button
     QuantizeSummary, // the Quantise column, its settings edited in the inspector
     QuantizeGrid,

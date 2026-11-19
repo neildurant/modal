@@ -16,6 +16,8 @@ add_library(modal_ui STATIC
     metronome_view.cpp
     remembered.cpp
     config.cpp
+    drum_maps.cpp
+    workspace_drum_maps.cpp
     demo_song.cpp
     event_list.cpp
     event_text.cpp

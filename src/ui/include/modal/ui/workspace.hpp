@@ -11,6 +11,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/command_line.hpp>
 #include <modal/ui/commands.hpp>
+#include <modal/ui/drum_maps.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/key.hpp>
@@ -44,6 +45,7 @@ namespace modal::ui
 {
 
 class Settings;
+class FileHost;
 
 // Whether a command is an operator, waiting for a range or object: d, y, > and the others.
 bool isOperator(std::string_view command);
@@ -283,6 +285,8 @@ public:
     // song's folder: see songFolder).
     void setFolders(std::optional<std::filesystem::path> config,
                     std::optional<std::filesystem::path> home);
+    void setFileHost(FileHost* host) { fileHost_ = host; }
+    std::string takeDrumMapNotice() { return std::exchange(drumMapNotice_, {}); }
     struct Completions
     {
         std::vector<std::string> matches;
@@ -410,6 +414,52 @@ public:
     MessageKind messageKind() const { return messageKind_; }
 
 private:
+    CommandResult drumMap();
+    CommandResult drumMapFile(const CommandCall& call, bool save);
+    CommandResult applyDrumMap(core::TrackId track, std::optional<core::DrumMap> map);
+    std::filesystem::path drumMapFolder() const;
+    void reloadDrumMaps(bool announce);
+    std::string drumMapSummary(const core::DrumMap& map) const override;
+    void chooseDrumMap() override { report(drumMap()); }
+    bool drumMapChoiceKey(const Key& key);
+    Region drumMapChoiceRegion() const;
+    void reviewDrumMap(core::TrackId track, std::optional<SavedDrumMap> saved);
+    CommandResult loadDrumMap(core::TrackId track, const std::filesystem::path& file);
+    CommandResult saveDrumMap(core::TrackId track, const std::filesystem::path& file,
+                              bool overwrite);
+    void saveDrumMapAs(core::TrackId track);
+    CommandResult writeDrumMapCopy(const core::DrumMap& map, const std::filesystem::path& file);
+    enum class DrumMapAction
+    {
+        Keep,
+        UseSaved,
+        ReplaceSaved,
+        SaveAs
+    };
+    struct DrumMapChoice
+    {
+        enum class Stage
+        {
+            Maps,
+            Copies,
+            Review
+        };
+        core::TrackId track;
+        std::optional<core::DrumMap> original = std::nullopt;
+        std::vector<SavedDrumMap> offered{};
+        std::optional<std::size_t> current = std::nullopt;
+        ChoiceList list{std::vector<std::string>{}, 0, true};
+        Stage stage = Stage::Maps;
+        std::optional<SavedDrumMap> saved = std::nullopt;
+        std::vector<DrumMapDifference> differences{};
+        std::vector<DrumMapAction> actions{};
+        std::size_t top = 0;
+    };
+    std::optional<DrumMapChoice> drumMapChoice_;
+    DrumMapLibrary drumMaps_;
+    std::string drumMapNotice_;
+    FileHost* fileHost_ = nullptr;
+    std::uint64_t drumMapDialog_ = 0;
     CommandResult trackFreeze(std::string_view arguments);
     CommandResult applyFreeze(std::span<const core::TrackId> tracks, core::FreezePart part);
     using FreezePreparation = std::variant<std::vector<core::FrozenTrack>, std::string>;

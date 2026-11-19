@@ -122,6 +122,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                 {
                     return trackFreeze(call.arguments);
                 }
+                if (name == "drum-map")
+                    return drumMap();
+                if (name == "drum-map-load" || name == "drum-map-save")
+                    return drumMapFile(call, name == "drum-map-save");
                 if (name == "section-insert-before" || name == "section-insert-after" ||
                     name == "section-join")
                 {
@@ -430,6 +434,8 @@ void Workspace::refresh()
 
 void Workspace::showSong()
 {
+    drumMapChoice_.reset();
+    ++drumMapDialog_;
     eventList_->showSong();
     arrange_->showSong();
     pianoRoll_->showSong();
@@ -442,6 +448,7 @@ void Workspace::showSong()
     if (player_ != nullptr)
         player_->setMarker(0);
     layOut();
+    reloadDrumMaps(true);
 }
 
 ViewKind Workspace::shown() const
@@ -1043,6 +1050,13 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (drumMapChoice_)
+    {
+        const auto match = keymap_.match(mode_, std::vector<Key>{key});
+        if (match.binding != nullptr && match.binding->command == "panic")
+            return run("panic", 0).changed;
+        return drumMapChoiceKey(key);
+    }
     if (freezeChoice_)
     {
         return freezeChoiceKey(key);
@@ -1416,9 +1430,12 @@ void Workspace::report(const CommandResult& result)
     {
         refuse(result.message, kind);
     }
-    else if (!result.message.empty())
+    else if (!result.message.empty() || !drumMapNotice_.empty())
     {
-        setMessage(result.message, kind);
+        auto message = result.message;
+        if (auto notice = takeDrumMapNotice(); !notice.empty())
+            message = message.empty() ? notice : message + "; " + notice;
+        setMessage(std::move(message), kind);
     }
     // An edit the document refused, as one to a track being recorded, whatever the command
     // went on to say.

@@ -229,6 +229,7 @@ void Workspace::setFolders(std::optional<std::filesystem::path> config,
 {
     configFolder_ = std::move(config);
     home_ = std::move(home);
+    reloadDrumMaps(true);
 }
 
 std::optional<std::filesystem::path> Workspace::fileFolder(Choices kind) const
@@ -239,6 +240,8 @@ std::optional<std::filesystem::path> Workspace::fileFolder(Choices kind) const
     {
         return songFolder(document_, home_);
     }
+    if (kind == Choices::DrumMapFile)
+        return drumMapFolder();
     return kind == Choices::ConfigFile ? configFolder_ : std::nullopt;
 }
 

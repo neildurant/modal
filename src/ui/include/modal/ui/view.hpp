@@ -272,6 +272,9 @@ public:
     virtual void auditionNote(core::TrackId, const core::Event&) {}
     virtual void changePorts(const PortTable&) {}
     virtual void lookForPorts() {}
+    // Opens the current track's map chooser, shared with :drum-map in other track views.
+    virtual void chooseDrumMap() {}
+    virtual std::string drumMapSummary(const core::DrumMap&) const { return {}; }
 
     // Shows another view at the cursor; or opens it afresh there, as Enter on a bar in the
     // arrangement does (see View::open).

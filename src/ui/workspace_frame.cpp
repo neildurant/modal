@@ -104,6 +104,8 @@ Frame Workspace::frame() const
     {
         frame.push_back(freezeChoiceRegion());
     }
+    if (drumMapChoice_)
+        frame.push_back(drumMapChoiceRegion());
     frame.push_back(messageRowRegion());
     if (mode_ == Mode::CommandLine && !view().typing())
     {
@@ -281,6 +283,15 @@ Bar Workspace::messageBar(bool withMessage) const
         if (withMessage)
             row.left.push_back({message_, {role, Role::MessageLine, kPlain}});
     }
+    else if (drumMapChoice_)
+    {
+        row.left.push_back(
+            {"Drum map: " + encodeUtf8(drumMapChoice_->list.typed()) +
+                 (drumMapChoice_->stage == DrumMapChoice::Stage::Review
+                      ? "  PageUp/Down scroll; Up/Down choose, Enter takes, Escape leaves"
+                      : "  Type to narrow; Up/Down choose, Enter takes, Escape leaves"),
+             text});
+    }
     else if (freezeChoice_)
     {
         row.left.push_back({"Up and Down choose, Enter freezes, Escape cancels", text});
@@ -341,7 +352,8 @@ Bar Workspace::statusBar() const
 {
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
-    state.mode = freezeChoice_     ? StatusMode::Freeze
+    state.mode = drumMapChoice_    ? StatusMode::Edit
+                 : freezeChoice_   ? StatusMode::Freeze
                  : trackMove_      ? StatusMode::Move
                  : view().typing() ? StatusMode::Edit
                  : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_)
