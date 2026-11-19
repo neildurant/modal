@@ -126,10 +126,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
         - [x] **Done** — Trial refinements accepted: note counts and ordering in ambiguous choices, aligned MIDI numbers, and `gp` completion.
         - [x] **Done** — Note counts in the drum palette. Accepted on trial.
         - [x] **Done** — Regressions, manual updates and functional trial. See [status.md](status.md).
-- [ ] **Doing** — In-app file picker, brought forward after the Linux dialog trials. See [design.md](design.md#file-picker).
-    - [ ] **Doing** — Folder panel, parent and subfolders, Places, filtering and path completion. Implemented, trial pending.
-    - [ ] **Doing** — Song open/save and drum-map load/save, including overwrite confirmation. Implemented, trial pending.
-    - [ ] **Doing** — Regressions, manual and functional trial. See [status.md](status.md).
+- [x] **Done** — In-app file picker, accepted on trial 19 November 2026. See [design.md](design.md#file-picker).
+    - [x] **Done** — Folder panel, parent and subfolders, Places, filtering and path completion.
+    - [x] **Done** — Song open/save and drum-map load/save, including overwrite confirmation.
+    - [x] **Done** — Regressions, manual and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.
