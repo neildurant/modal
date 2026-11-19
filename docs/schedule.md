@@ -123,7 +123,8 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [ ] **Doing** — Step 3: names in navigation, search, selection and the palette. See [design.md](design.md#drum-maps).
         - [ ] **Doing** — Resolve pitch names from the current track and offer choices for ambiguous names. Implemented, trial pending.
         - [ ] **Doing** — Navigation, search, selection and palette entry points. Implemented, trial pending.
-        - [ ] **Doing** — Trial refinements: note counts and ordering, aligned MIDI numbers, and `gp` completion.
+        - [x] **Done** — Trial refinements accepted: note counts and ordering in ambiguous choices, aligned MIDI numbers, and `gp` completion.
+        - [ ] **Doing** — Note counts in the drum palette. Trial pending.
         - [ ] **Doing** — Regressions, manual updates and functional trial. See [status.md](status.md).
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.

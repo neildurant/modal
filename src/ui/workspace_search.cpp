@@ -62,6 +62,21 @@ const core::DrumMap* Workspace::currentDrumMap() const
     return track && track->drumMap ? &*track->drumMap : nullptr;
 }
 
+const Workspace::PitchCounts& Workspace::pitchCounts(core::TrackId track) const
+{
+    const auto version = document_.version();
+    if (!pitchCounts_ || pitchCounts_->track != track || pitchCounts_->version != version)
+    {
+        auto& usage = pitchCounts_.emplace(TrackPitchCounts{track, version});
+        for (const auto& event : document_.song().events(track).all())
+        {
+            if (const auto* note = std::get_if<core::Note>(&event.data))
+                ++usage.counts[note->pitch];
+        }
+    }
+    return pitchCounts_->counts;
+}
+
 bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std::uint8_t)> use)
 {
     const auto* map = currentDrumMap();
@@ -77,12 +92,7 @@ bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std
         use(pitches.front());
         return true;
     }
-    std::array<std::size_t, 128> counts{};
-    for (const auto& event : document_.song().events(*view().cursor().track).all())
-    {
-        if (const auto* note = std::get_if<core::Note>(&event.data))
-            ++counts[note->pitch];
-    }
+    const auto& counts = pitchCounts(*view().cursor().track);
     std::ranges::stable_sort(pitches, std::greater{},
                              [&](std::uint8_t pitch) { return counts[pitch]; });
     std::vector<std::string> labels;

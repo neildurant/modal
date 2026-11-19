@@ -988,6 +988,15 @@ private:
     bool search(const std::string& text);
     bool searchPitch(core::EventQuery query, std::string text);
     const core::DrumMap* currentDrumMap() const;
+    using PitchCounts = std::array<std::size_t, 128>;
+    struct TrackPitchCounts
+    {
+        core::TrackId track;
+        std::uint64_t version;
+        PitchCounts counts{};
+    };
+    mutable std::optional<TrackPitchCounts> pitchCounts_;
+    const PitchCounts& pitchCounts(core::TrackId track) const;
     bool withNamedDrumPitch(std::string_view name, std::function<void(std::uint8_t)> use);
     CommandResult pitchCommand(std::string_view text, bool selecting);
     void goToPitch(std::uint8_t pitch, bool selecting);

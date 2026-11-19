@@ -185,7 +185,8 @@ or setting.
 ]
 ```
 
-Choosing a drum pitch moves the cursor to its row at the current time.
+The drum pitch list shows how many notes use each pitch on this track.
+Choosing a pitch moves the cursor to its row at the current time.
 
 ## The command line and settings
 

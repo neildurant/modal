@@ -234,17 +234,25 @@ TEST_CASE("the palette lists the current track's drum pitches", "[drum-maps]")
     auto map = kit();
     map.notes[38] = "Snare";
     map.notes[42] = "Snare";
+    map.notes[44] = "Snare";
     m.project(map);
     const auto before = m.ws.pianoRoll().cursor();
     m.ws.handle(Key::typed(U'p', kCtrl), 0);
     m.type(U"~SNARE");
-    m.has(U"D2   · MIDI 38");
-    m.has(U"F#2  · MIDI 42");
+    m.has(U"D2   · MIDI 38  · 1 note");
+    m.has(U"F#2  · MIDI 42  · 1 note");
+    m.has(U"G#2  · MIDI 44  · 0 notes");
     m.press(NamedKey::Down);
     m.type(U"\n");
     CHECK(m.ws.pianoRoll().cursor().pitch == 42);
     CHECK(m.ws.pianoRoll().cursor().tick == before.tick);
     CHECK_FALSE(m.document.modified());
+
+    m.type(U":select pitch 42\nd");
+    m.ws.handle(Key::typed(U'p', kCtrl), 0);
+    m.type(U"~snare");
+    m.has(U"F#2  · MIDI 42  · 0 notes");
+    m.press(NamedKey::Escape);
 
     m.press(NamedKey::PageDown, kCtrl);
     m.ws.handle(Key::typed(U'p', kCtrl), 0);

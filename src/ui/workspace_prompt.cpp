@@ -926,12 +926,15 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
     {
         if (const auto* map = currentDrumMap())
         {
+            const auto& counts = pitchCounts(*view().cursor().track);
             for (std::size_t pitch = 0; pitch < map->notes.size(); ++pitch)
             {
                 if (!map->notes[pitch].empty())
                     item(std::to_string(pitch), map->notes[pitch],
                          padText(core::pitchName(static_cast<std::uint8_t>(pitch)), 4, false) +
-                             " · MIDI " + std::to_string(pitch));
+                             " · MIDI " + padText(std::to_string(pitch), 3, false) + " · " +
+                             std::to_string(counts[pitch]) +
+                             (counts[pitch] == 1 ? " note" : " notes"));
             }
         }
     }
