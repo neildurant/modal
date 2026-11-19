@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum maps step 1 is published at `ea1430e` with all hosted CI and manual checks passing. Step 2 map selection/management and its manual are ready for a functional trial. All six Linux configurations and both manual builds pass; UI changes remain local pending the trial.*
+*Last updated 19 November 2026: drum maps step 1 is published at `ea1430e` with all hosted CI and manual checks passing. Step 2 was accepted on trial. All six Linux configurations and both manual builds pass locally.*
 
 ## Current handoff
 
@@ -10,7 +10,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 The revised work order is in [schedule.md](schedule.md): loop, punch and take workflows now precede step entry, with take lanes and comping included in that recording milestone. Related milestone references are updated; comping's detailed feature notes remain ideas to weigh before implementation.
 
-### Drum maps step 2 ready for trial, 19 November 2026
+### Drum maps step 2 accepted on trial, 19 November 2026
 
 The approved chooser and file-management extension are implemented: Drum map in Tracks, `:drum-map` and `, t k`; reusable `.drum-map` files and load/save dialogs; embedded-map comparison by internal name with a brief opening notice, explicit duplicate-file choice and Song/Saved review. Keep/use/replace/save-as actions retain the embedded copy unless chosen otherwise. Use is one undo step; saving as another asks for a distinct name and renames the track's copy after successful saving. File writes stay outside undo. General MIDI is a built-in reference. External file changes are reviewed again, failed/cancelled dialogs leave the song alone, and stale callbacks cannot change a replaced song. The catalogue is scanned at explicit lifecycle points, not per frame. See design.md, Drum maps.
 
@@ -22,7 +22,7 @@ The approved chooser and file-management extension are implemented: Drum map in 
 
 **To try.** Run `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal`. Check the named rows and full note inspector, `, t k` and the Tracks map field, None/General MIDI/SSD choices and undo. Load `/tmp/modal-ssd-map-comparison.drum-map` with `:drum-map-load` to review differences, use the copy and undo, or replace that disposable file. Try Save as another with a distinct name and cancellation. Check Panic during playback with the chooser open.
 
-**Remaining.** A functional UI trial is required before publication and step 3 (names in commands/search); folding remains separate. Windows CI for step 2 awaits publication after that trial. Playback drum-map translation is explicitly unscheduled in schedule.md. No desktop has been driven and no hardware measurements are claimed.
+**Trial.** The appearance and behaviour were accepted on 19 November 2026. Next is step 3, adding drum names to navigation, search, selection and the palette. Folding remains separate. Playback drum-map translation is unscheduled in schedule.md.
 
 ### Drum maps step 1 complete and published, 19 November 2026
 
@@ -30,7 +30,7 @@ Design and three-step plan approved; see [design.md, Drum maps](design.md#drum-m
 
 **Validation.** Seven new core test cases pass (251 assertions), covering GM names, sparse maps, escaping/raw text, CRLF/comments, invalid versions/entries, duplicate numbers, song round trips/rescaling at two PPQNs, independent tracks/copies, undo/redo and file errors. Native GCC Debug and Clang Debug build without warnings and each passes the full suite: 1,181 registered tests, three MIDI-dependent skips, no failures. Whole-tree formatting (clang-format 22.1.8), formatting of the new files and `git diff --check` pass. The first incremental GCC discovery tried to write a temporary file under the sandbox's read-only runtime directory; the successful builds use `env -u XDG_RUNTIME_DIR TMPDIR=/tmp`. Hosted [CI](https://github.com/neildurant/modal/actions/runs/44504926240) passes all six Linux configurations and Windows Debug/Release at `ea1430e`, and the [manual workflow](https://github.com/neildurant/modal/actions/runs/44504926285) builds HTML and PDF. Local Release/sanitizer configurations were not rerun for this persistence-only step.
 
-**Next.** Step 2 is implemented above and awaits its UI trial. Step 3 adds names in navigation, search, selection and the palette; folding remains separate. The untracked `SequencerPlusGoldManualv4.pdf` remains untouched.
+**Next.** Step 2 was accepted on trial as recorded above. Step 3 adds names in navigation, search, selection and the palette; folding remains separate. The untracked `SequencerPlusGoldManualv4.pdf` remains untouched.
 
 ### Controller shaping complete, 19 November 2026
 
