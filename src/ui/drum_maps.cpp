@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/drum_map_file.hpp>
+#include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/drum_maps.hpp>
 
@@ -15,6 +16,30 @@ bool sameDrumMapName(std::string_view a, std::string_view b)
 {
     const auto lower = [](char c) { return c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c; };
     return a.size() == b.size() && std::ranges::equal(a, b, {}, lower, lower);
+}
+
+std::vector<std::uint8_t> matchingDrumPitches(const core::DrumMap& map, std::string_view name)
+{
+    std::vector<std::uint8_t> pitches;
+    if (name.empty())
+        return pitches;
+    std::vector<std::string> names;
+    for (std::size_t i = 0; i < map.notes.size(); ++i)
+    {
+        if (sameDrumMapName(map.notes[i], name))
+            pitches.push_back(static_cast<std::uint8_t>(i));
+        else if (!map.notes[i].empty())
+            names.push_back(map.notes[i]);
+    }
+    if (!pitches.empty())
+        return pitches;
+    const auto found = matching(names, name);
+    for (std::size_t i = 0; i < map.notes.size(); ++i)
+    {
+        if (std::ranges::find(found, map.notes[i]) != found.end())
+            pitches.push_back(static_cast<std::uint8_t>(i));
+    }
+    return pitches;
 }
 
 std::string SavedDrumMap::label() const

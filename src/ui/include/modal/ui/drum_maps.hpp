@@ -33,6 +33,8 @@ struct DrumMapLibrary
 
 DrumMapLibrary readDrumMapLibrary(const std::filesystem::path& folder);
 bool sameDrumMapName(std::string_view a, std::string_view b);
+// Exact names take precedence over partial names, with each matching pitch retained.
+std::vector<std::uint8_t> matchingDrumPitches(const core::DrumMap& map, std::string_view name);
 std::vector<std::size_t> matchingDrumMaps(const core::DrumMap& map, const DrumMapLibrary& library);
 
 struct DrumMapDifference

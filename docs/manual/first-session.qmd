@@ -166,10 +166,26 @@ Up and Down choose a match, and Enter runs it. Tab puts the chosen command
 on the command line, where its arguments can be inspected or extended;
 Escape closes the palette.
 
-The palette can also find destinations and settings. A first `@` searches
-sections, `#` tracks, `'` labels (named positions) or marks (lettered
-bookmarks), and `?` settings. For example,
-`@Answer` finds the Answer section. These prefixes belong to palette queries.
+```{=typst}
+#block(breakable: false)[
+```
+
+Start a palette query with one of these prefixes to search for a destination
+or setting.
+
+| Prefix | Looks for | Example |
+| --- | --- | --- |
+| `@` | Sections | `@Answer` finds the Answer section |
+| `#` | Tracks | `#Bass` finds the Bass track |
+| `'` | Labels and marks | `'Answer starts` finds a label at that position |
+| `?` | Settings | `?audition` finds the audition setting and shows its value |
+| `~` | Named drum pitches on the current piano-roll track | `~snare` lists the mapped snare articulations |
+
+```{=typst}
+]
+```
+
+Choosing a drum pitch moves the cursor to its row at the current time.
 
 ## The command line and settings
 

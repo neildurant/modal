@@ -120,7 +120,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
         - [x] **Done** — Map chooser, reusable-file load/save and same-name comparison/review actions.
         - [x] **Done** — Manual updates, HTML/PDF builds, dark/light renders and all six Linux configurations; see status.md.
         - [x] **Done** — Functional trial accepted with the SSD test material.
-    - [ ] **To do** — Step 3: names in navigation, search, selection and the palette; tests, manual updates and functional trial.
+    - [ ] **Doing** — Step 3: names in navigation, search, selection and the palette. See [design.md](design.md#drum-maps).
+        - [ ] **Doing** — Resolve pitch names from the current track and offer choices for ambiguous names. Implemented, trial pending.
+        - [ ] **Doing** — Navigation, search, selection and palette entry points. Implemented, trial pending.
+        - [ ] **Doing** — Regressions, manual updates and functional trial. See [status.md](status.md).
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.

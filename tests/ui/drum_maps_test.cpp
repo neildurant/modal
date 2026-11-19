@@ -156,6 +156,88 @@ struct Maps
 };
 } // namespace
 
+TEST_CASE("go to pitch accepts drum names and unnamed pitches without moving in time",
+          "[drum-maps]")
+{
+    Maps m{GENERATE(core::kPpqn, core::Ppqn{96})};
+    m.project(kit("Kick Centre"));
+    const auto before = m.ws.pianoRoll().cursor();
+    m.type(U"gpKICK CENTRE\n");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 36);
+    CHECK(m.ws.pianoRoll().cursor().tick == before.tick);
+    m.type(U"''");
+    CHECK(m.ws.pianoRoll().cursor() == before);
+    m.type(U"gp127\n");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 127);
+    m.type(U"gpC4\n");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 60);
+    m.type(U"gp128\n");
+    CHECK(m.ws.message().find("Unknown pitch") != std::string::npos);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 60);
+    CHECK_FALSE(m.document.modified());
+}
+
+TEST_CASE("a drum name can select one pitch row for an edit", "[drum-maps]")
+{
+    Maps m{GENERATE(core::kPpqn, core::Ppqn{96})};
+    m.project(kit());
+    m.type(U":select pitch closed hh\n");
+    REQUIRE(m.ws.mode() == Mode::Visual);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    m.type(U"d");
+    const auto events = m.document.song().events(m.id()).all();
+    REQUIRE(events.size() == 2);
+    CHECK(std::get<core::Note>(events[0].data).pitch == 36);
+    CHECK(std::get<core::Note>(events[1].data).pitch == 38);
+}
+
+TEST_CASE("a drum search asks which pitch to use when a name is ambiguous", "[drum-maps]")
+{
+    Maps m;
+    auto map = kit();
+    map.notes[38] = "Snare Centre";
+    map.notes[42] = "Snare Rim";
+    m.project(map);
+    m.type(U"/SNARE\n");
+    REQUIRE(m.ws.mode() == Mode::CommandLine);
+    m.has(U"Snare Centre [38]");
+    m.has(U"Snare Rim [42]");
+    m.type(U"\t\t\n");
+    CHECK(m.ws.mode() == Mode::Normal);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    CHECK(m.ws.pianoRoll().cursor().tick == 2 * core::kPpqn.quarter());
+    m.type(U"/Snare Centre\n");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 38);
+    m.type(U"/snare\n\x1b");
+    CHECK(m.ws.mode() == Mode::Normal);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 38);
+    CHECK_FALSE(m.document.modified());
+}
+
+TEST_CASE("the palette lists the current track's drum pitches", "[drum-maps]")
+{
+    Maps m;
+    auto map = kit();
+    map.notes[38] = "Snare";
+    map.notes[42] = "Snare";
+    m.project(map);
+    const auto before = m.ws.pianoRoll().cursor();
+    m.ws.handle(Key::typed(U'p', kCtrl), 0);
+    m.type(U"~SNARE");
+    m.has(U"MIDI 38");
+    m.has(U"MIDI 42");
+    m.press(NamedKey::Down);
+    m.type(U"\n");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    CHECK(m.ws.pianoRoll().cursor().tick == before.tick);
+    CHECK_FALSE(m.document.modified());
+
+    m.press(NamedKey::PageDown, kCtrl);
+    m.ws.handle(Key::typed(U'p', kCtrl), 0);
+    m.type(U"~snare");
+    CHECK(m.visible().find(U"MIDI 42") == std::u32string::npos);
+}
+
 TEST_CASE("drum maps can be chosen and removed from the piano roll as single undo steps",
           "[drum-maps]")
 {

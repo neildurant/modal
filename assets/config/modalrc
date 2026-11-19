@@ -64,6 +64,7 @@ nmap <Tab>      cursor-note-next          "Next note"
 nmap <S-Tab>    cursor-note-previous      "Note before"
 nmap gk         cursor-chord-up           "Up the chord"
 nmap gj         cursor-chord-down         "Down the chord"
+nmap gp         go-pitch                  "Go to pitch"
 nmap g<Up>      cursor-chord-up           "Up the chord"
 nmap g<Down>    cursor-chord-down         "Down the chord"
 

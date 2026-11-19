@@ -126,6 +126,20 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return drumMap();
                 if (name == "drum-map-load" || name == "drum-map-save")
                     return drumMapFile(call, name == "drum-map-save");
+                if (name == "go-pitch")
+                    return pitchCommand(call.arguments, false);
+                if (name == "select")
+                {
+                    auto arguments = call.arguments;
+                    if (arguments == "pitch" || arguments.starts_with("pitch ") ||
+                        arguments.starts_with("pitch\t"))
+                    {
+                        arguments.remove_prefix(5);
+                        return pitchCommand(arguments, true);
+                    }
+                    return CommandResult::error(
+                        "Use :select pitch followed by a pitch or drum name");
+                }
                 if (name == "section-insert-before" || name == "section-insert-after" ||
                     name == "section-join")
                 {

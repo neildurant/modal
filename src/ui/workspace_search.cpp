@@ -9,6 +9,7 @@
 #include <modal/ui/bar.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
+#include <modal/ui/drum_maps.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
@@ -30,6 +31,108 @@
 namespace modal::ui
 {
 
+namespace
+{
+
+std::string_view pitchText(std::string_view text)
+{
+    const auto first = text.find_first_not_of(" \t");
+    return first == text.npos ? std::string_view{}
+                              : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+}
+
+std::optional<std::uint8_t> midiPitch(std::string_view text)
+{
+    if (text.empty())
+        return std::nullopt;
+    int value = 0;
+    const auto end = text.data() + text.size();
+    const auto [after, error] = std::from_chars(text.data(), end, value);
+    if (after == end && error == std::errc{} && value >= 0 && value <= 127)
+        return static_cast<std::uint8_t>(value);
+    return std::nullopt;
+}
+
+} // namespace
+
+const core::DrumMap* Workspace::currentDrumMap() const
+{
+    const auto id = view().cursor().track;
+    const auto* track = id ? document_.song().track(*id) : nullptr;
+    return track && track->drumMap ? &*track->drumMap : nullptr;
+}
+
+bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std::uint8_t)> use)
+{
+    const auto* map = currentDrumMap();
+    if (!map)
+        return false;
+    if (name.size() >= 2 && name.front() == '"' && name.back() == '"')
+        name = name.substr(1, name.size() - 2);
+    const auto pitches = matchingDrumPitches(*map, name);
+    if (pitches.empty())
+        return false;
+    if (pitches.size() == 1)
+    {
+        use(pitches.front());
+        return true;
+    }
+    std::vector<std::string> labels;
+    for (const auto pitch : pitches)
+        labels.push_back(map->notes[pitch] + " [" + std::to_string(pitch) + "]");
+    askFor("Choose a drum pitch: ",
+           [this, pitches, labels, use = std::move(use)](const std::string& answer)
+           {
+               if (const auto label = std::ranges::find(labels, answer); label != labels.end())
+                   use(pitches[static_cast<std::size_t>(label - labels.begin())]);
+               else
+                   refuse("Choose a drum pitch with Tab or the arrow keys",
+                          MessageKind::Information);
+           });
+    prompt_.pitchChoice = true;
+    prompt_.completing = Completing{std::move(labels), std::nullopt, 0, {}, 0};
+    return true;
+}
+
+CommandResult Workspace::pitchCommand(std::string_view text, bool selecting)
+{
+    if (where() != Where::PianoRoll)
+        return CommandResult::error("This command works only in the piano roll's notes");
+    text = pitchText(text);
+    if (text.empty())
+    {
+        askFor(selecting ? "Select pitch: " : "Go to pitch: ",
+               [this, selecting](const std::string& answer)
+               { report(pitchCommand(answer, selecting)); });
+        return {true};
+    }
+    const auto number = midiPitch(text);
+    const auto pitch = number ? number : core::parsePitch(text);
+    if (pitch)
+        goToPitch(*pitch, selecting);
+    else if (!withNamedDrumPitch(text, [this, selecting](std::uint8_t note)
+                                 { goToPitch(note, selecting); }))
+        return CommandResult::error("Unknown pitch \"" + std::string{text} + "\"");
+    return {true};
+}
+
+void Workspace::goToPitch(std::uint8_t pitch, bool selecting)
+{
+    const auto before = view().cursor();
+    auto to = before;
+    to.pitch = pitch;
+    view().setCursor(to);
+    if (before != to)
+    {
+        if (!selection_)
+            jumpedFrom_ = before;
+        if (wasPlaying_)
+            following_ = false;
+    }
+    if (selecting)
+        run("visual-rows", 0);
+}
+
 bool Workspace::search(const std::string& text)
 {
     // An empty search has nothing to match, so clears the matches (decided November 2026).
@@ -42,12 +145,23 @@ bool Workspace::search(const std::string& text)
     const auto parsed = core::parseQuery(text, scales());
     if (!parsed.query)
     {
+        const auto name = pitchText(text);
+        if (const auto pitch = midiPitch(name))
+            return searchPitch(core::EventQuery{.pitch = *pitch}, std::string{name});
+        if (withNamedDrumPitch(name, [this, name = std::string{name}](std::uint8_t pitch)
+                               { searchPitch(core::EventQuery{.pitch = pitch}, name); }))
+            return true;
         refuse(parsed.error, MessageKind::Warning);
         macros_.failed = macros_.depth > 0;
         return true;
     }
-    searching_.query = parsed.query;
-    searching_.text = text.substr(start, text.find_last_not_of(' ') - start + 1);
+    return searchPitch(*parsed.query, std::string{pitchText(text)});
+}
+
+bool Workspace::searchPitch(core::EventQuery query, std::string text)
+{
+    searching_.query = query;
+    searching_.text = std::move(text);
     searching_.forward = true;
     return goToMatch(true, 0);
 }

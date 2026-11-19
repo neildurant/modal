@@ -986,6 +986,11 @@ private:
     // match in the search's direction, or the one before; and searching for what's under the
     // cursor (* and #).
     bool search(const std::string& text);
+    bool searchPitch(core::EventQuery query, std::string text);
+    const core::DrumMap* currentDrumMap() const;
+    bool withNamedDrumPitch(std::string_view name, std::function<void(std::uint8_t)> use);
+    CommandResult pitchCommand(std::string_view text, bool selecting);
+    void goToPitch(std::uint8_t pitch, bool selecting);
     bool goToMatch(bool next, int count);
     bool searchHere(bool forward, int count);
     // The , s group: selecting the bar, section, track or what's visible, or the matches in
@@ -1159,6 +1164,7 @@ private:
         CommandLine keyLine;
         bool searchPrompt = false;
         bool keyPrompt = false;
+        bool pitchChoice = false;
         std::string answerLabel;
         std::function<void(const std::string&)> answer;
         std::string answerDefault;

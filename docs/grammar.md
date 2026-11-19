@@ -64,6 +64,8 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 
 `k` and `j` move a semitone, `K` and `J` an octave.
 
+`gp` asks for a pitch and moves to its row without changing time. `:select pitch PITCH` moves there and selects the row as `V` would. Both take a pitch such as `C2`, a MIDI number such as `36`, or a name from the current track's drum map. The palette's `~` prefix lists those names with their pitches and MIDI numbers.
+
 ### Finding and searching
 
 | Keys | Does |
@@ -71,6 +73,7 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 | `f` `F` and a note name | The next or previous note of that pitch class, any octave: `fE`, `fF#`, `fbb` (B flat); the letter in either case |
 | `;` / `Alt-;` | The last find again, the way it went / the other way |
 | `/` | Search the track: `/C1`, `/C`, `/>A3`, `/A3-A5`, `/vel<60`, `/len<1/32`, `/cc64>63`, `/bend`, terms together (`/C1 vel<60`); `/outside D dorian` and `/inside D dorian` |
+| `/36` or `/snare` | Search for one exact MIDI pitch by number or by a name from the current track's drum map |
 | `n` `N` | The next and previous match, round past the ends, keeping the search's way |
 | `*` `#` | Search forwards and back for the exact pitch under the cursor |
 | `/` Enter, `:noh`, `, S c` | Clear the matches |

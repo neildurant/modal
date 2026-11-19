@@ -33,6 +33,8 @@ hint menus. A sequence written without spaces is typed one key at a time.
 | `(` / `)` | Previous / next chord |
 | Up / Down (or `k` / `j`); `K` / `J` | Piano-roll semitone movement; octave movement |
 | `g` then Up / Down, or `gk` / `gj` | Move up / down within the chord |
+| `gp` | Go to a pitch row by pitch, MIDI number or drum name |
+| `:select pitch PITCH` | Select the pitch row across the track |
 | `zi`, `zo`, `z0` | Zoom in, out, reset |
 | `z` then Left / Right (or `zh` / `zl`), Ctrl-T | Finer / coarser editing grid, triplets |
 | `zz`, `zf` | Centre cursor, resume following playback |

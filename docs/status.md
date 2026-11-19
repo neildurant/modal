@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum maps step 1 is published at `ea1430e` with all hosted CI and manual checks passing. Step 2 was accepted on trial. All six Linux configurations and both manual builds pass locally.*
+*Last updated 19 November 2026: drum maps steps 1 and 2 are published. Step 3 is implemented locally and awaits a functional trial.*
 
 ## Current handoff
+
+### Drum maps step 3 implemented locally, 19 November 2026
+
+In the piano roll, `gp` goes to a pitch row and `:select pitch PITCH` selects that row. Both keep the same time and accept the track's drum names, MIDI numbers and ordinary pitches. `/` accepts a whole drum name or MIDI number as a pitch search. Ambiguous names offer the full names and MIDI numbers before acting. Ctrl-P with `~` browses the track's names and moves to the selected row. The manual now has a table covering all five palette prefixes. See [design.md](design.md#drum-maps) and [schedule.md](schedule.md).
+
+**Validation.** GCC and Clang Debug/Release, ASan/UBSan and ThreadSanitizer each pass with 1,204 registered tests and three MIDI-dependent skips. New Workspace tests cover case-insensitive names, direct pitches, keeping time, jumping back, row edits, ambiguous search and palette choices scoped to the current track. The key-sequence expectations include the new `gp` entry. Whole-tree formatting, `git diff --check` and both generated reference checks pass. Quarto 1.11.9 built HTML and PDF, and the palette table was checked in HTML and on PDF page 10.
+
+**To try.** Open `/tmp/modal-ssd-drum-map-trial.modal` in `build/linux-gcc/apps/Debug/modal`. Try `gp` then `Kick Center` and Enter, `/snare` with Tab and Enter to choose an articulation, `:select pitch Hi-Hat Tip Closed` (or note `42`) then Escape, and Ctrl-P then `~snare`. Compare rows with the MIDI numbers in the palette and check that direct pitch moves keep the cursor's time.
+
+**File dialog report.** `:e` also failed to show a picker on the desktop, confirming that the symptom extends beyond drum maps. The previous window callback discarded SDL's native error and treated it as cancellation. The error now reaches the message row with the explicit-filename route as a fallback. An offscreen test exercises SDL's error callback. Recheck `:e`, `:drum-map-load` or `:drum-map-save` in the rebuilt app to identify the desktop failure from the message.
 
 ### Schedule reordered, 19 November 2026
 

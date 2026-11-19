@@ -102,7 +102,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         const bool options = prompt_.answer && (prompt_.keyPrompt ||
                                                 !transformSettings(prompt_.answerCommand).empty());
-        return (!prompt_.answer || options) && complete(command == "command-line-next" ? 1 : -1);
+        return (!prompt_.answer || options || prompt_.pitchChoice) &&
+               complete(command == "command-line-next" ? 1 : -1);
     }
     if (prompt_.searchPrompt && (command == "command-line-run" || command == "command-line-cancel"))
     {
@@ -150,7 +151,9 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     if (command == "command-line-run" && prompt_.answer)
     {
         // An answer to a question, kept out of the : prompt's history; a key in its own.
-        mode_ = Mode::Normal;
+        const bool choosingPitch = std::exchange(prompt_.pitchChoice, false);
+        const bool fromVisual = selection_.has_value();
+        mode_ = choosingPitch && fromVisual ? Mode::Visual : Mode::Normal;
         auto text = encodeUtf8(prompt_.line.text());
         prompt_.line.clear();
         if (std::exchange(prompt_.keyPrompt, false))
@@ -169,11 +172,13 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         {
             answer(text);
         }
-        endVisual(); // a selection the question was about
+        if (fromVisual && !choosingPitch)
+            endVisual(); // a selection the question was about
         return true;
     }
     if (command == "command-line-run")
     {
+        const bool fromVisual = selection_.has_value();
         mode_ = Mode::Normal;
         const auto text = prompt_.line.take();
         if (selection_ && !text.empty())
@@ -196,7 +201,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         {
             lineHandler_(text);
         }
-        endVisual();
+        if (fromVisual)
+            endVisual();
         return true;
     }
     // Escape gives it up. Backspace on an empty line does nothing, rather than closing it as
@@ -204,7 +210,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     // go back a view (decided November 2026, after use); the same in every line typed into.
     if (command == "command-line-cancel")
     {
-        mode_ = Mode::Normal;
+        const bool choosingPitch = std::exchange(prompt_.pitchChoice, false);
+        mode_ = choosingPitch && selection_ ? Mode::Visual : Mode::Normal;
         prompt_.answer = {};
         prompt_.answerTarget.reset();
         prompt_.answerGiven.clear();
@@ -213,7 +220,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
             prompt_.line.clear();
             std::swap(prompt_.line, prompt_.keyLine);
         }
-        endVisual(); // a selection the question or the line was about
+        if (!choosingPitch)
+            endVisual(); // a selection the question or the line was about
         return true;
     }
     return editLine(prompt_.line, command);
@@ -768,6 +776,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.line.open();
     prompt_.answerLabel = std::move(label);
     prompt_.answer = std::move(answer);
+    prompt_.pitchChoice = false;
     prompt_.answerDefault = std::move(defaultAnswer);
     prompt_.answerTarget.reset();
     prompt_.answerGiven.clear();
@@ -827,7 +836,7 @@ std::optional<char> Workspace::palettePrefix() const
     // A first character that searches something else than the commands.
     const auto& text = prompt_.line.text();
     if (!text.empty() &&
-        std::u32string_view{U"@#'?"}.find(text.front()) != std::u32string_view::npos)
+        std::u32string_view{U"@#'?~"}.find(text.front()) != std::u32string_view::npos)
     {
         return static_cast<char>(text.front());
     }
@@ -836,8 +845,7 @@ std::optional<char> Workspace::palettePrefix() const
 
 std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
 {
-    // @ sections, # tracks, ' labels and ? settings (decided October 2026), each with what
-    // helps choose it: its bars and meter, its port and channel, where it is, its value.
+    // Each kind of item shows the details that help choose it.
     const auto& song = document_.song();
     std::vector<PaletteItem> items;
     const auto item = [&](std::string id, std::string title, std::string about)
@@ -898,6 +906,19 @@ std::vector<PaletteItem> Workspace::prefixItems(char prefix) const
                  formatValue(setting.value) + "  " + std::string{setting.description});
         }
     }
+    else if (prefix == '~' && where() == Where::PianoRoll)
+    {
+        if (const auto* map = currentDrumMap())
+        {
+            for (std::size_t pitch = 0; pitch < map->notes.size(); ++pitch)
+            {
+                if (!map->notes[pitch].empty())
+                    item(std::to_string(pitch), map->notes[pitch],
+                         core::pitchName(static_cast<std::uint8_t>(pitch)) + " · MIDI " +
+                             std::to_string(pitch));
+            }
+        }
+    }
     return items;
 }
 
@@ -950,6 +971,11 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
         return run("view-conductor", 0).changed;
     }
     const auto index = static_cast<std::size_t>(std::stoul(item.name));
+    if (prefix == '~')
+    {
+        goToPitch(static_cast<std::uint8_t>(index), false);
+        return true;
+    }
     auto cursor = view().cursor();
     if (!selection_)
     {
