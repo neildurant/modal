@@ -135,10 +135,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [x] **Done** — Occupied, named and combined rows, with whole-track and current-section scope.
     - [x] **Done** — Toggle, chooser, navigation and selection of displayed pitches.
     - [x] **Done** — Regressions, manual and accepted functional trial. See [status.md](status.md).
-- [ ] **Doing** — Drum-map Always show marks for folding.
-    - [ ] **Doing** — Store the marked pitches in songs and reusable drum maps. Implemented and regression tested.
-    - [ ] **Doing** — Toggle and show marks in the piano roll and saved-map review. Implemented, trial pending.
-    - [ ] **Doing** — Regressions, manual updates and functional trial. See [status.md](status.md).
+- [x] **Done** — Drum-map Always show marks for folding.
+    - [x] **Done** — Store the marked pitches in songs and reusable drum maps.
+    - [x] **Done** — Toggle and show marks in the piano roll and saved-map review.
+    - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.
 
