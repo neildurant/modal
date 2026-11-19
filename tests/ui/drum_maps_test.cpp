@@ -260,6 +260,117 @@ TEST_CASE("the palette lists the current track's drum pitches", "[drum-maps]")
     CHECK(m.visible().find(U"MIDI 42") == std::u32string::npos);
 }
 
+TEST_CASE("folding separates occupied and named rows and reveals directly reached pitches",
+          "[drum-maps][folding]")
+{
+    Maps m;
+    auto map = kit();
+    map.notes[38].clear();
+    map.notes[50] = "Bell";
+    m.project(map);
+    m.type(U"gp36\nza");
+    m.has(U"Fold");
+    CHECK(m.visible().find(U"Bell") == std::u32string::npos);
+    m.type(U"k");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 38);
+    m.type(U"k");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+
+    m.type(U"zF\t\t\t\n"); // Named · Whole track
+    m.has(U"Bell");
+    m.type(U"j");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 36);
+    m.type(U"gp39\n");
+    m.has(U"D#2");
+    m.type(U"k");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    CHECK(m.visible().find(U"D#2") == std::u32string::npos);
+
+    m.type(U"zF\t\t\t\t\t\n"); // Both · Whole track
+    m.has(U"Bell");
+    m.type(U"j");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 38);
+    m.press(NamedKey::PageDown, kCtrl);
+    CHECK(m.visible().find(U"Fold") == std::u32string::npos);
+    m.press(NamedKey::PageUp, kCtrl);
+    m.has(U"Fold");
+    m.type(U"zak");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 39);
+    CHECK_FALSE(m.document.modified());
+}
+
+TEST_CASE("folded pitch row edits leave hidden pitches between the endpoints alone",
+          "[drum-maps][folding]")
+{
+    Maps m{GENERATE(core::kPpqn, core::Ppqn{96})};
+    auto map = kit();
+    map.notes[38].clear();
+    m.project(map);
+    m.type(U"zF\t\t\t\ngp36\nVk");
+    REQUIRE(m.ws.mode() == Mode::Visual);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    m.type(U"d");
+    const auto events = m.document.song().events(m.id()).all();
+    REQUIRE(events.size() == 1);
+    CHECK(std::get<core::Note>(events.front().data).pitch == 38);
+    m.type(U"u");
+    CHECK(m.document.song().events(m.id()).size() == 3);
+}
+
+TEST_CASE("section folding shows occupied pitches in the current section", "[folding]")
+{
+    Maps m{GENERATE(core::kPpqn, core::Ppqn{96})};
+    auto song = m.document.song();
+    const auto boundary = song.ppqn().whole();
+    const auto duration = song.ppqn().quarter();
+    REQUIRE(song.splitSection(boundary, "Next"));
+    song.updateEvents(m.id(),
+                      [&](core::EventList& events)
+                      {
+                          events.insert({boundary - duration / 2, core::Note{50, 90, duration}});
+                          events.insert({boundary, core::Note{60, 90, duration}});
+                      });
+    m.document.replace(std::move(song), std::nullopt);
+    m.project(std::nullopt);
+    m.type(U"gp36\nzF\t\t\n"); // Occupied · Current section
+    m.has(U"sec");
+    CHECK(m.visible().find(U"C4") == std::u32string::npos);
+    m.type(U"]s");
+    CHECK(m.ws.pianoRoll().cursor().tick == boundary);
+    m.has(U"C4");
+    m.has(U"D3"); // the note sounding into the section
+    m.type(U"k");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 50);
+    m.type(U"k");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 60);
+}
+
+TEST_CASE("cutting at the edges of a folded row selection leaves a hidden note intact", "[folding]")
+{
+    Maps m;
+    auto song = m.document.song();
+    const auto bar = song.ppqn().whole();
+    const auto beat = song.ppqn().quarter();
+    song.updateEvents(m.id(),
+                      [&](core::EventList& events)
+                      {
+                          events.insert({bar - beat, core::Note{38, 90, 2 * beat}});
+                          events.insert({bar, core::Note{36, 90, beat}});
+                          events.insert({bar, core::Note{42, 90, beat}});
+                      });
+    m.document.replace(std::move(song), std::nullopt);
+    auto map = kit();
+    map.notes[38].clear();
+    m.project(map);
+    m.type(U"2ggzF\t\t\t\ngp36\nVibk|d");
+    const auto events = m.document.song().events(m.id()).all();
+    REQUIRE(events.size() == 4);
+    CHECK(events.back().tick == bar - beat);
+    const auto& note = std::get<core::Note>(events.back().data);
+    CHECK(note.pitch == 38);
+    CHECK(note.duration == 2 * beat);
+}
+
 TEST_CASE("drum maps can be chosen and removed from the piano roll as single undo steps",
           "[drum-maps]")
 {

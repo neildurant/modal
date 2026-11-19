@@ -151,6 +151,8 @@ nmap zi         zoom-in           "Zoom in"
 nmap zo         zoom-out          "Zoom out"
 nmap z0         zoom-reset        "Zoom as at the start"
 nmap zf         playhead-follow   "Follow the playhead again"
+nmap za         fold-toggle       "Toggle folded pitch rows"
+nmap zF         fold              "Choose folded pitch rows"
 
 " Scrolling. Ctrl with a direction moves the cursor and scrolls with it, so it stays in
 " place on screen, until the view can't scroll further; in the arrangement and the piano roll,

@@ -14,6 +14,7 @@
 #include <modal/ui/view.hpp>
 
 #include <array>
+#include <bitset>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -58,6 +59,16 @@ public:
     // (gridadvance).
     void setGridAdvance(bool grid) { gridAdvance_ = grid; }
     bool gridAdvance() const { return gridAdvance_; }
+
+    enum class FoldMode : std::uint8_t
+    {
+        Occupied,
+        Named,
+        Both
+    };
+    bool hasDrumMap() const;
+    bool toggleFold();
+    void setFold(FoldMode mode, bool section);
 
     std::string_view name() const override { return "the piano roll"; }
     std::optional<std::string> selectionStatus() const override;
@@ -243,6 +254,27 @@ private:
     // Keeps the cursor's pitch in view, scrolling no further than it must; or puts it in the
     // middle of the view.
     void follow();
+    struct Fold
+    {
+        FoldMode mode = FoldMode::Occupied;
+        bool section = false;
+        bool enabled = false;
+    };
+    using PitchMask = std::bitset<128>;
+    struct PitchRows
+    {
+        std::array<int, 128> pitches{};
+        std::array<int, 128> index{};
+        int count = 0;
+    };
+    const Fold* activeFold() const;
+    const PitchMask& foldPitches() const;
+    PitchMask displayedPitches() const;
+    std::optional<PitchMask> foldedSelectionPitches() const;
+    PitchRows pitchRows() const;
+    int topRow(const PitchRows& pitches) const;
+    void stepPitchRows(int by, bool scroll = false);
+    void startFold();
     void centre();
     // The middle of the track's notes' range, or middle C if it has none.
     std::uint8_t middlePitch() const;
@@ -444,6 +476,16 @@ private:
     bool opened_ = false;                            // on a track yet, since the song was shown
     std::map<core::TrackId, std::uint8_t> pitches_;  // the pitch last used on each track
     std::map<core::TrackId, std::size_t> pageSizes_; // and the page size
+    std::map<core::TrackId, Fold> folds_;
+    struct FoldCache
+    {
+        core::TrackId track;
+        std::uint64_t version;
+        FoldMode mode;
+        std::optional<std::size_t> section;
+        PitchMask pitches{};
+    };
+    mutable std::optional<FoldCache> foldCache_;
     std::chrono::milliseconds chordWindow_{30};
     std::chrono::milliseconds nudge_{5};
     bool gridAdvance_ = false;

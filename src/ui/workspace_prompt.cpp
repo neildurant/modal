@@ -105,7 +105,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         const bool options =
             prompt_.answer && (prompt_.keyPrompt || prompt_.answerChoices != Choices::None ||
                                !transformSettings(prompt_.answerCommand).empty());
-        return (!prompt_.answer || options || prompt_.pitchChoice) &&
+        return (!prompt_.answer || options || prompt_.fixedChoices) &&
                complete(command == "command-line-next" ? 1 : -1);
     }
     if (prompt_.searchPrompt && (command == "command-line-run" || command == "command-line-cancel"))
@@ -154,9 +154,9 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     if (command == "command-line-run" && prompt_.answer)
     {
         // An answer to a question, kept out of the : prompt's history; a key in its own.
-        const bool choosingPitch = std::exchange(prompt_.pitchChoice, false);
+        const bool choosing = std::exchange(prompt_.fixedChoices, false);
         const bool fromVisual = selection_.has_value();
-        mode_ = choosingPitch && fromVisual ? Mode::Visual : Mode::Normal;
+        mode_ = choosing && fromVisual ? Mode::Visual : Mode::Normal;
         auto text = encodeUtf8(prompt_.line.text());
         prompt_.line.clear();
         if (std::exchange(prompt_.keyPrompt, false))
@@ -175,7 +175,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         {
             answer(text);
         }
-        if (fromVisual && !choosingPitch)
+        if (fromVisual && !choosing)
             endVisual(); // a selection the question was about
         return true;
     }
@@ -213,8 +213,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     // go back a view (decided November 2026, after use); the same in every line typed into.
     if (command == "command-line-cancel")
     {
-        const bool choosingPitch = std::exchange(prompt_.pitchChoice, false);
-        mode_ = choosingPitch && selection_ ? Mode::Visual : Mode::Normal;
+        const bool choosing = std::exchange(prompt_.fixedChoices, false);
+        mode_ = choosing && selection_ ? Mode::Visual : Mode::Normal;
         prompt_.answer = {};
         prompt_.answerTarget.reset();
         prompt_.answerGiven.clear();
@@ -223,7 +223,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
             prompt_.line.clear();
             std::swap(prompt_.line, prompt_.keyLine);
         }
-        if (!choosingPitch)
+        if (!choosing)
             endVisual(); // a selection the question or the line was about
         return true;
     }
@@ -799,12 +799,27 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.answerLabel = std::move(label);
     prompt_.answer = std::move(answer);
     prompt_.answerChoices = Choices::None;
-    prompt_.pitchChoice = false;
+    prompt_.fixedChoices = false;
     prompt_.answerDefault = std::move(defaultAnswer);
     prompt_.answerTarget.reset();
     prompt_.answerGiven.clear();
     prompt_.answerCommand.clear();
     prompt_.answerSetting = 0;
+}
+
+void Workspace::askChoice(std::string label, std::vector<std::string> choices,
+                          std::function<void(std::size_t)> use)
+{
+    askFor(std::move(label),
+           [this, choices, use = std::move(use)](const std::string& answer)
+           {
+               if (const auto item = std::ranges::find(choices, answer); item != choices.end())
+                   use(static_cast<std::size_t>(item - choices.begin()));
+               else
+                   refuse("Choose an item with Tab or the arrow keys", MessageKind::Information);
+           });
+    prompt_.fixedChoices = true;
+    prompt_.completing = Completing{std::move(choices), std::nullopt, 0, {}, 0};
 }
 
 void Workspace::askName(std::string label, std::string name,

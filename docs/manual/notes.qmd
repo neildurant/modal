@@ -31,6 +31,24 @@ Note fractions describe durations: `1/4` is a quarter note, `1/8` an eighth,
 `1/8.` a dotted eighth and `1/8t` an eighth-note triplet. They describe musical
 length, not elapsed seconds. The tempo determines how long they take to play.
 
+## Folding the pitch rows {#sec-pitch-folding}
+
+Folding brings the rows you use closer together. A bass part can show just
+its occupied pitches. A drum part can also show the names of articulations
+you have yet to use, so you can add them without unfolding.
+
+`za` toggles folding on the current track. The first fold shows pitches
+occupied anywhere in that track. `zF` opens a choice of occupied pitches,
+named drum rows or both, for the whole track or the current section. Use
+Tab or the arrow keys to choose and Enter to apply. Modal remembers the
+choice for this track while the song is open.
+
+With folding on, `j` and `k` move across the rows you can see. A direct
+jump with `gp` will bring a hidden row into view while you use it. A `V`
+selection can edit only displayed pitches. The fold's scope decides which
+rows you see, and the selection's time range still decides where an edit
+takes effect.
+
 ## A default note belongs to the track
 
 A new note needs a length and velocity before it exists. Each track therefore

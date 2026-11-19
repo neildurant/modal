@@ -15,6 +15,7 @@
 #include <modal/ui/layout.hpp>
 
 #include <algorithm>
+#include <bitset>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -181,9 +182,12 @@ struct CutRange
     core::Tick to = 0;
     std::optional<std::pair<std::uint8_t, std::uint8_t>> pitches;
 
+    std::optional<std::bitset<128>> displayed = std::nullopt;
+
     bool takes(const core::Note& note) const
     {
-        return !pitches || (note.pitch >= pitches->first && note.pitch <= pitches->second);
+        return (!pitches || (note.pitch >= pitches->first && note.pitch <= pitches->second)) &&
+               (!displayed || (*displayed)[note.pitch]);
     }
 };
 

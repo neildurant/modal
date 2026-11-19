@@ -130,7 +130,11 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [x] **Done** — Folder panel, parent and subfolders, Places, filtering and path completion.
     - [x] **Done** — Song open/save and drum-map load/save, including overwrite confirmation.
     - [x] **Done** — Regressions, manual and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
+- [ ] **Doing** — File picker follow-up for `:write-config`. Implemented, trial pending.
+- [ ] **Doing** — Piano-roll folding. See [design.md](design.md#drum-maps).
+    - [ ] **Doing** — Occupied, named and combined rows, with whole-track and current-section scope. Implemented, trial pending.
+    - [ ] **Doing** — Toggle, chooser, navigation and selection of displayed pitches. Implemented, trial pending.
+    - [ ] **Doing** — Regressions, manual and functional trial. See [status.md](status.md).
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.
 

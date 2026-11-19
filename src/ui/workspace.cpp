@@ -128,6 +128,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return drumMapFile(call, name == "drum-map-save");
                 if (name == "go-pitch")
                     return pitchCommand(call.arguments, false);
+                if (name == "fold" || name == "fold-toggle")
+                    return foldPianoRoll(name == "fold-toggle");
                 if (name == "select")
                 {
                     auto arguments = call.arguments;

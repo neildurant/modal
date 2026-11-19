@@ -815,6 +815,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Linux file pickers (decided 19 November 2026).** Enable SDL's D-Bus support so it can use the desktop's XDG file chooser portal. Zenity had failed both inside and outside the application, and the installed portal advertised open and save dialogs. SDL loads the system D-Bus library at runtime. Use core D-Bus in vcpkg for the build headers, with the optional systemd integration disabled.
 
+**Piano-roll folding (decided 19 November 2026).** Use `za` to toggle and `zF` to choose which rows appear and over which scope. Whole-track scope gives a stable set of rows across sections. Section scope brings the piano roll down to the pitches in the passage being edited, including notes sounding in. A direct pitch jump can bring a row back for editing. A `V` selection edits only displayed pitches so hidden notes between its endpoints survive. Keep the fold as per-track view state for the session.
+
 ## Work order (19 November 2026)
 
 **Bring the file picker forward.** Song and drum-map file dialogs remained unavailable in the Linux desktop trials, including with portal support. Use the agreed Folder panel for open and save. It keeps the directory visible, supports parent and subfolder navigation, and reuses path completion. A Places menu keeps the main list compact and makes the command's normal directory easy to regain. `:w` uses it when a filename is needed. Keep Recent Songs with the songs milestone.

@@ -2,11 +2,23 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum maps step 3 and the in-app file picker were accepted on trial. Piano-roll folding is next.*
+*Last updated 19 November 2026: drum maps step 3 and the in-app file picker are published. Piano-roll folding is implemented locally for trial.*
 
 ## Current handoff
 
+### Piano-roll folding, 19 November 2026
+
+`za` toggles and `zF` or `:fold` chooses Occupied, Named or Both and whole-track or current-section scope. `j` and `k` step by displayed rows, and `gp` can reveal a hidden pitch temporarily. `V` edits only displayed pitches, including when cutting notes at the edges. The choice is remembered per track during the session. See [design.md](design.md#drum-maps) and [schedule.md](schedule.md).
+
+**Validation.** Four Workspace cases cover the three modes, temporary pitch reveal, per-track choices, section occupancy including a sounding note at the start, and hidden-pitch protection during `V` edits and edge cuts. The folding change passes all six Linux configurations. Dark and light offscreen renders of the SSD fold and the chooser were inspected. Both manual formats build and their generated references pass. Functional trial is pending.
+
+**To try.** Open `/tmp/modal-ssd-drum-map-trial.modal`, then use `gr` and `za` to show the occupied rows. Try `j`/`k`, `gp 39` then Enter for a hidden pitch, and `zF` to try Named or Both. With a sparse named map, try a `V` selection spanning an unnamed occupied pitch and check with undo that the hidden notes survive the edit. Use `zF` with Current section in a song with several sections.
+
 ### In-app file picker accepted on trial, 19 November 2026
+
+Published through `051f9e1`. An explicit initialization of the picker state avoids a default-constructibility error in the hosted Clang build. The rerun passed [CI on Linux and Windows](https://github.com/neildurant/modal/actions/runs/44566331189) and [the manual workflow](https://github.com/neildurant/modal/actions/runs/44566331416).
+
+**Follow-up.** `:write-config` without a filename also failed with the system dialog on trial. The local extension opens Modal's picker in Config and suggests `modalrc`. The Workspace regression checks that declining the overwrite keeps the existing file, and that writing to a new subfolder leaves the chosen config filename intact. The combined build passes GCC Debug, Clang Debug and ThreadSanitizer with 1,217 tests registered and three MIDI-dependent skips. Both manual formats build. Follow-up desktop trial pending.
 
 The Folder panel was brought forward after the Linux native picker trials. `:e`, `:w` and `:wq` when a filename is needed, and the drum-map file commands without a filename now use the panel. It lists relevant files and folders, accepts typed paths and Tab completion, and offers Song, Config, Drum maps and State through Alt-Down. A save suggests a filename and checks for an existing file after appending its default extension. Declining overwrite returns to the panel. See [design.md](design.md#file-picker) and [schedule.md](schedule.md).
 

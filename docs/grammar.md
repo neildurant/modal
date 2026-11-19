@@ -66,6 +66,8 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 
 `gp` asks for a pitch and moves to its row without changing time. Tab completes drum names and note spellings. `:select pitch PITCH` moves there and selects the row as `V` would. Both take a pitch such as `C2`, a MIDI number such as `36`, or a name from the current track's drum map. The palette's `~` prefix lists those names with their pitches and MIDI numbers.
 
+`za` toggles pitch folding. `zF` or `:fold` chooses Occupied, Named or Both, across the whole track or current section. When folded, `j` and `k` move through the displayed rows and `V` edits only those pitches. A direct jump such as `gp` temporarily brings its destination into view.
+
 ### Finding and searching
 
 | Keys | Does |

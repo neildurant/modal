@@ -521,8 +521,10 @@ bool PianoRollView::takes(core::Tick tick, std::uint8_t pitch) const
         return id && selection->movedNotes->contains(*id, tick, pitch);
     }
     const auto starts = selection && selection->starts ? selection->starts : span;
+    const auto displayed = foldedSelectionPitches();
     return starts && tick >= starts->first && tick < starts->second &&
-           (!pitches || (pitch >= pitches->first && pitch <= pitches->second));
+           (!pitches || (pitch >= pitches->first && pitch <= pitches->second)) &&
+           (!displayed || (*displayed)[pitch]);
 }
 
 std::optional<CutRange> PianoRollView::cutRange(std::string_view motion, int count)
@@ -553,7 +555,8 @@ std::optional<CutRange> PianoRollView::cutRange(std::string_view motion, int cou
     return CutRange{.tracks = {*id},
                     .from = span->first,
                     .to = span->second,
-                    .pitches = motion == "visual" ? selectedPitches() : std::nullopt};
+                    .pitches = motion == "visual" ? selectedPitches() : std::nullopt,
+                    .displayed = motion == "visual" ? foldedSelectionPitches() : std::nullopt};
 }
 
 std::optional<std::pair<core::Tick, core::Tick>> PianoRollView::rowsSpan() const
@@ -1503,6 +1506,12 @@ int PianoRollView::laneHeight() const
 
 void PianoRollView::follow()
 {
+    if (activeFold())
+    {
+        const auto pitches = pitchRows();
+        topPitch_ = static_cast<std::uint8_t>(pitches.pitches[topRow(pitches)]);
+        return;
+    }
     const int rows = noteRows();
     int top = std::clamp(int{topPitch_}, std::min(rows - 1, 127), 127);
     top = std::max(top, int{pitch_});
@@ -1512,10 +1521,198 @@ void PianoRollView::follow()
 
 void PianoRollView::centre()
 {
+    if (activeFold())
+    {
+        const auto pitches = pitchRows();
+        const int first = std::clamp(pitches.index[pitch_] - noteRows() / 2, 0,
+                                     std::max(pitches.count - noteRows(), 0));
+        topPitch_ = static_cast<std::uint8_t>(pitches.pitches[first]);
+        return;
+    }
     const int rows = noteRows();
     topPitch_ =
         static_cast<std::uint8_t>(std::clamp(pitch_ + rows / 2, std::min(rows - 1, 127), 127));
     follow();
+}
+
+bool PianoRollView::hasDrumMap() const
+{
+    const auto id = trackId();
+    return id && document_.song().track(*id)->drumMap.has_value();
+}
+
+bool PianoRollView::toggleFold()
+{
+    const auto id = trackId();
+    if (!id)
+        return false;
+    auto& fold = folds_[*id];
+    fold.enabled = !fold.enabled;
+    if (fold.enabled)
+        startFold();
+    else
+        follow();
+    return fold.enabled;
+}
+
+void PianoRollView::setFold(FoldMode mode, bool section)
+{
+    if (const auto id = trackId())
+    {
+        folds_[*id] = Fold{mode, section, true};
+        startFold();
+    }
+}
+
+const PianoRollView::Fold* PianoRollView::activeFold() const
+{
+    if (const auto id = trackId())
+    {
+        const auto fold = folds_.find(*id);
+        if (fold != folds_.end() && fold->second.enabled)
+            return &fold->second;
+    }
+    return nullptr;
+}
+
+const PianoRollView::PitchMask& PianoRollView::foldPitches() const
+{
+    const auto id = *trackId();
+    const auto& fold = *activeFold();
+    const auto& song = document_.song();
+    const auto section = fold.section ? std::optional{song.sectionAt(time_)} : std::nullopt;
+    const auto version = document_.version();
+    if (foldCache_ && foldCache_->track == id && foldCache_->version == version &&
+        foldCache_->section == section && foldCache_->mode == fold.mode)
+        return foldCache_->pitches;
+    foldCache_ = FoldCache{id, version, fold.mode, section, {}};
+    auto& pitches = foldCache_->pitches;
+    const auto& map = song.track(id)->drumMap;
+    if (map && fold.mode != FoldMode::Occupied)
+    {
+        for (std::size_t pitch = 0; pitch < map->notes.size(); ++pitch)
+        {
+            if (!map->notes[pitch].empty())
+                pitches.set(pitch);
+        }
+    }
+    if (fold.mode != FoldMode::Named || !map)
+    {
+        const auto from = section ? song.sectionStart(*section) : core::Tick{0};
+        const auto to = section ? song.sectionStart(*section + 1) : song.end();
+        for (const auto& event : song.events(id).all())
+        {
+            if (event.tick >= to)
+                break;
+            if (const auto* note = std::get_if<core::Note>(&event.data);
+                note && (!section || event.tick + note->duration > from))
+                pitches.set(note->pitch);
+        }
+    }
+    return pitches;
+}
+
+PianoRollView::PitchMask PianoRollView::displayedPitches() const
+{
+    if (!activeFold())
+    {
+        PitchMask all;
+        all.set();
+        return all;
+    }
+    auto mask = foldPitches();
+    // Direct moves can reveal a hidden row. Keep the selection visible when its notes move.
+    mask.set(pitch_);
+    const auto id = trackId();
+    if (const auto selection = host_.selection();
+        selection && selection->where == Where::PianoRoll &&
+        selection->kind == SelectionKind::Rows && selection->anchor.track == id)
+    {
+        if (selection->anchor.pitch)
+            mask.set(*selection->anchor.pitch);
+        if (selection->movedNotes && selection->movedNotes->track == *id)
+        {
+            for (const auto& position : selection->movedNotes->positions)
+                mask.set(position.second);
+        }
+    }
+    return mask;
+}
+
+std::optional<PianoRollView::PitchMask> PianoRollView::foldedSelectionPitches() const
+{
+    if (!activeFold())
+        return std::nullopt;
+    const auto selection = host_.selection();
+    if (selection && selection->where == Where::PianoRoll && selection->kind == SelectionKind::Rows)
+        return displayedPitches();
+    return std::nullopt;
+}
+
+PianoRollView::PitchRows PianoRollView::pitchRows() const
+{
+    const auto displayed = displayedPitches();
+    PitchRows rows;
+    rows.index.fill(-1);
+    for (int pitch = 127; pitch >= 0; --pitch)
+    {
+        if (displayed[static_cast<std::size_t>(pitch)])
+        {
+            rows.index[pitch] = rows.count;
+            rows.pitches[rows.count++] = pitch;
+        }
+    }
+    return rows;
+}
+
+int PianoRollView::topRow(const PitchRows& pitches) const
+{
+    const auto first = pitches.pitches.begin();
+    const auto at = std::lower_bound(first, first + pitches.count, topPitch_, std::greater{});
+    const int cursor = pitches.index[pitch_];
+    const int room = noteRows();
+    return std::clamp(static_cast<int>(at - first), std::max(cursor - room + 1, 0),
+                      std::min(cursor, std::max(pitches.count - room, 0)));
+}
+
+void PianoRollView::stepPitchRows(int by, bool scroll)
+{
+    if (!activeFold())
+    {
+        if (scroll)
+            topPitch_ = static_cast<std::uint8_t>(std::clamp(topPitch_ + by, 0, 127));
+        moveToPitch(pitch_ + by);
+        return;
+    }
+    const auto pitches = pitchRows();
+    const int current = pitches.index[pitch_];
+    const int next = std::clamp(current - by, 0, pitches.count - 1);
+    if (scroll)
+        topPitch_ = static_cast<std::uint8_t>(
+            pitches.pitches[std::clamp(topRow(pitches) + next - current, 0, pitches.count - 1)]);
+    moveToPitch(pitches.pitches[next]);
+}
+
+void PianoRollView::startFold()
+{
+    const auto& pitches = foldPitches();
+    // On entering a fold, start on its nearest row. The empty fold keeps the cursor as a row.
+    for (int distance = 0; distance < 128; ++distance)
+    {
+        const int above = pitch_ + distance;
+        const int below = pitch_ - distance;
+        if (above < 128 && pitches[static_cast<std::size_t>(above)])
+        {
+            pitch_ = static_cast<std::uint8_t>(above);
+            break;
+        }
+        if (below >= 0 && pitches[static_cast<std::size_t>(below)])
+        {
+            pitch_ = static_cast<std::uint8_t>(below);
+            break;
+        }
+    }
+    centre();
 }
 
 std::uint8_t PianoRollView::middlePitch() const
@@ -3510,10 +3707,7 @@ std::optional<bool> PianoRollView::runNoteMove(std::string_view command, int cou
         return true;
     };
     const auto scroll = [&](int by) // down if positive
-    {
-        topPitch_ = static_cast<std::uint8_t>(std::clamp(topPitch_ - by, 0, 127));
-        moveToPitch(pitch_ - by);
-    };
+    { stepPitchRows(-by, true); };
 
     // Moves the cursor and the view together, so the cursor stays put on screen, the view
     // keeping its length so its scale stays put too; at the song's start the view stops and
@@ -3613,7 +3807,7 @@ std::optional<bool> PianoRollView::runNoteMove(std::string_view command, int cou
     }
     else if (command == "cursor-up" || command == "cursor-down")
     {
-        moveToPitch(pitch_ + (command == "cursor-up" ? n : -n));
+        stepPitchRows(command == "cursor-up" ? n : -n);
     }
     else if (command == "octave-up" || command == "octave-down")
     {
@@ -4889,15 +5083,20 @@ void PianoRollView::addRegions(Frame& frame) const
     const int rows = (notesHeight + h - 1) / h; // the last perhaps only partly shown
     const int lineWidth = hairline(cell_);
     const auto p = page();
-    const auto rowOf = [&](int pitch) { return topPitch_ - pitch; };
-    const auto shown = [&](int pitch) { return pitch <= topPitch_ && rowOf(pitch) < rows; };
+    const auto rowsByPitch = pitchRows();
+    const int firstRow = activeFold() ? topRow(rowsByPitch) : 127 - topPitch_;
+    const int drawnRows = std::min(rows, rowsByPitch.count - firstRow);
+    const auto pitchAt = [&](int row) { return rowsByPitch.pitches[firstRow + row]; };
+    const auto rowOf = [&](int pitch) { return rowsByPitch.index[pitch] - firstRow; };
+    const auto shown = [&](int pitch)
+    { return pitch >= 0 && pitch < 128 && rowOf(pitch) >= 0 && rowOf(pitch) < rows; };
 
     // The keyboard: each row's note name, the black keys' rows shaded faintly, the C's bold
     // and the cursor's pitch highlighted.
     CellGrid keys{keyColumns, rows};
-    for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
+    for (int row = 0; row < drawnRows; ++row)
     {
-        const int pitch = topPitch_ - row;
+        const int pitch = pitchAt(row);
         const bool named = map && !map->notes[static_cast<std::size_t>(pitch)].empty();
         auto name = decodeUtf8(named ? map->notes[static_cast<std::size_t>(pitch)]
                                      : core::pitchName(static_cast<std::uint8_t>(pitch)));
@@ -4917,9 +5116,9 @@ void PianoRollView::addRegions(Frame& frame) const
     }
     auto keyboard =
         gridRegion(keys, {main.x, notesTop, keyWidth, notesHeight}, cell_, Role::Background);
-    for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
+    for (int row = 0; row < drawnRows; ++row)
     {
-        if (isBlackKey(topPitch_ - row) && topPitch_ - row != pitch_)
+        if (isBlackKey(pitchAt(row)) && pitchAt(row) != pitch_)
         {
             keyboard.under.push_back({{0, row * h, keyWidth, h}, Role::Panel, kBlackKeys});
         }
@@ -4948,9 +5147,9 @@ void PianoRollView::addRegions(Frame& frame) const
                 .under = {},
                 .over = {}};
     const TimeScale scale{.start = p.start, .length = p.end - p.start, .x = 0, .width = width};
-    for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
+    for (int row = 0; row < drawnRows; ++row)
     {
-        if (isBlackKey(topPitch_ - row))
+        if (isBlackKey(pitchAt(row)))
         {
             notes.under.push_back({{0, row * h, width, h}, Role::Panel, kBlackKeys});
         }
@@ -4981,11 +5180,16 @@ void PianoRollView::addRegions(Frame& frame) const
         const int x1 = scale.toX(std::min(span->second, p.end));
         if (const auto pitches = selectedPitches())
         {
-            const int top = std::max(rowOf(pitches->second), 0) * h;
-            const int bottom = std::min(rowOf(pitches->first) + 1, rows) * h;
+            int top = 0;
+            while (top < drawnRows && pitchAt(top) > pitches->second)
+                ++top;
+            int bottom = top;
+            while (bottom < drawnRows && pitchAt(bottom) >= pitches->first)
+                ++bottom;
             if (bottom > top)
             {
-                notes.under.push_back({{x0, top, x1 - x0, bottom - top}, Role::Selection, 255});
+                notes.under.push_back(
+                    {{x0, top * h, x1 - x0, (bottom - top) * h}, Role::Selection, 255});
             }
         }
         else
@@ -5341,11 +5545,18 @@ void PianoRollView::addRegions(Frame& frame) const
     }
     frame.push_back(std::move(notes));
     frame.push_back(std::move(lane));
-    frame.push_back(Region{.bounds = {main.x, main.y, keyWidth, rulerHeight},
-                           .background = Role::Background,
-                           .text = {},
-                           .under = {},
-                           .over = {}});
+    Region keyRuler{.bounds = {main.x, main.y, keyWidth, rulerHeight},
+                    .background = Role::Background,
+                    .text = {},
+                    .under = {},
+                    .over = {}};
+    if (const auto* fold = activeFold(); fold && keyColumns >= 4)
+    {
+        keyRuler.text.push_back({0, h, U"Fold", {Role::Accent, Role::Background, kPlain}});
+        keyRuler.text.push_back(
+            {0, 2 * h, fold->section ? U"sec" : U"trk", {Role::Text, Role::Background, kPlain}});
+    }
+    frame.push_back(std::move(keyRuler));
     frame.push_back(std::move(ruler));
 
     addBars(frame, p);
@@ -5654,6 +5865,7 @@ void PianoRollView::setCursor(const SongCursor& cursor)
 
 void PianoRollView::open(const SongCursor& cursor)
 {
+    foldCache_.reset();
     openedBars_.reset();
     inLane_ = false;
     setCursor(cursor);
@@ -5699,6 +5911,7 @@ void PianoRollView::restore(const core::EditPlace& place)
 
 void PianoRollView::refresh()
 {
+    foldCache_.reset();
     const auto tracks = document_.song().tracks();
     track_ = tracks.empty() ? 0 : std::min(track_, tracks.size() - 1);
     moveTo(time_);
@@ -5719,6 +5932,8 @@ void PianoRollView::showSong()
     opened_ = false;
     pitches_.clear();
     pageSizes_.clear();
+    folds_.clear();
+    foldCache_.reset();
 }
 
 void PianoRollView::showPlayhead(core::Tick playhead, Follow follow)

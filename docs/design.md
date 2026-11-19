@@ -419,7 +419,7 @@ A track can have a drum map, a name for each note number. Choose None, General M
 
 On trial, ambiguous choices were given note counts across the current track, with the most notes first and equal counts in MIDI order. The `gp` prompt completes drum names and ordinary note spellings with Tab, including names with spaces. The palette aligns MIDI numbers after pitches of different widths and shows the same counts, listing its rows in MIDI order.
 
-**Folding (agreed design).** show occupied pitch rows (in the track, or optionally the section), named drum-map rows even if empty, or their union, so a drum track shows a useful set of rows rather than 128. Its keys are still to decide: they change how the piano roll looks rather than switching views, so belong with the `z` keys rather than `, v`, and Vim's fold keys (`zc`, `za` and so on) are kept free for folding here and for take lanes and drum maps (noted 15 November 2026). With folding on, `j` / `k` step between the rows shown, and so does extending a `V` selection. For example: fold a drum track, put the cursor on Kick, `V`, and adjust.
+**Folding (agreed 19 November 2026).** `za` switches between all pitches and the last fold on this track. `zF` or `:fold` chooses Occupied, Named drum-map rows including empty ones, or Both, and the whole track or current section. The first fold is Occupied on the whole track. Section occupancy includes notes still sounding across its start. Choices belong to the track's view for the session. Entering the fold goes to the nearest included pitch if necessary, and an empty fold retains a cursor row. `j` and `k` step through the displayed rows, including when extending `V`. A direct move such as `gp` shows a hidden destination until the cursor leaves it, or until a selection anchored there ends. A `V` edit takes only displayed pitches, even when cutting at the edges. The fold's scope decides which rows appear; the selection's existing time range decides where it edits.
 
 **The section strip (decided October 2026)**
 
@@ -902,7 +902,7 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 
 **Controller lanes, drum maps and folding**
 
-- Folding scope (whole track or current section), controls for occupied/named/combined rows, and rows used only by ghosts.
+- When ghost notes are added, decide whether folding can also show pitches used only by ghosts.
 - Switch-region editing details beyond the agreed keys; controller-lane adding and deleting to be confirmed when CC lanes are built.
 
 **Songs, copying and histories**

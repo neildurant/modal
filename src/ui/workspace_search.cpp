@@ -14,6 +14,7 @@
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
+#include <modal/ui/piano_roll_view.hpp>
 #include <modal/ui/settings.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -102,18 +103,41 @@ bool Workspace::withNamedDrumPitch(std::string_view name, std::function<void(std
         labels.push_back(map->notes[pitch] + " [" + std::to_string(pitch) + "] · " +
                          std::to_string(count) + (count == 1 ? " note" : " notes"));
     }
-    askFor("Choose a drum pitch: ",
-           [this, pitches, labels, use = std::move(use)](const std::string& answer)
-           {
-               if (const auto label = std::ranges::find(labels, answer); label != labels.end())
-                   use(pitches[static_cast<std::size_t>(label - labels.begin())]);
-               else
-                   refuse("Choose a drum pitch with Tab or the arrow keys",
-                          MessageKind::Information);
-           });
-    prompt_.pitchChoice = true;
-    prompt_.completing = Completing{std::move(labels), std::nullopt, 0, {}, 0};
+    askChoice("Choose a drum pitch: ", std::move(labels),
+              [pitches = std::move(pitches), use = std::move(use)](std::size_t at)
+              { use(pitches[at]); });
     return true;
+}
+
+CommandResult Workspace::foldPianoRoll(bool toggle)
+{
+    if (where() != Where::PianoRoll)
+        return CommandResult::error("Folding works only in the piano roll's notes");
+    if (toggle)
+        return {true, pianoRoll_->toggleFold() ? "Folded pitches" : "All pitches", false};
+
+    using FoldMode = PianoRollView::FoldMode;
+    const std::array options{std::pair{FoldMode::Occupied, "Occupied"},
+                             std::pair{FoldMode::Named, "Named"},
+                             std::pair{FoldMode::Both, "Both"}};
+    std::vector<std::string> labels;
+    std::vector<std::pair<FoldMode, bool>> choices;
+    for (const auto& [mode, text] : options)
+    {
+        if (mode != FoldMode::Occupied && !pianoRoll_->hasDrumMap())
+            continue;
+        labels.push_back(std::string{text} + " · Whole track");
+        choices.emplace_back(mode, false);
+        labels.push_back(std::string{text} + " · Current section");
+        choices.emplace_back(mode, true);
+    }
+    askChoice("Fold rows: ", std::move(labels),
+              [this, choices = std::move(choices)](std::size_t at)
+              {
+                  const auto [mode, section] = choices[at];
+                  pianoRoll_->setFold(mode, section);
+              });
+    return {true};
 }
 
 CommandResult Workspace::pitchCommand(std::string_view text, bool selecting)

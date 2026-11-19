@@ -978,6 +978,9 @@ private:
     // An answer given nothing takes the default, if there's one, as a transform's does.
     void askFor(std::string label, std::function<void(const std::string&)> answer,
                 std::string defaultAnswer = {});
+    void askChoice(std::string label, std::vector<std::string> choices,
+                   std::function<void(std::size_t)> use);
+    CommandResult foldPianoRoll(bool toggle);
     void askSettings(const std::string& op, const OperatorTarget& target, Answers answers);
     std::string optionsCommand() const;
     // Search (/C1): what the last looks for, as read and as typed, and whether it went
@@ -1213,7 +1216,7 @@ private:
         CommandLine keyLine;
         bool searchPrompt = false;
         bool keyPrompt = false;
-        bool pitchChoice = false;
+        bool fixedChoices = false;
         std::string answerLabel;
         std::function<void(const std::string&)> answer;
         Choices answerChoices = Choices::None;
