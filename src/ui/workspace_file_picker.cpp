@@ -66,7 +66,8 @@ std::u32string fitted(std::string_view text, std::size_t cells, bool keepEnd = f
 void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs,
                          PickedFile done)
 {
-    auto& picker = filePicker_.emplace();
+    filePicker_ = FilePicker{};
+    auto& picker = *filePicker_;
     picker.kind = kind;
     picker.version = document_.version();
     picker.done = std::move(done);
