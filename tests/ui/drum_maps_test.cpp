@@ -371,6 +371,49 @@ TEST_CASE("cutting at the edges of a folded row selection leaves a hidden note i
     CHECK(note.duration == 2 * beat);
 }
 
+TEST_CASE("Always show keeps an empty articulation folded in and is saved with the map",
+          "[drum-maps][folding]")
+{
+    Maps m;
+    auto map = kit();
+    map.notes[50] = "Ride bell";
+    const auto saved = m.file("Studio.drum-map", map);
+    m.project(map);
+    m.type(U"gp36\nza");
+    CHECK(m.visible().find(U"Ride bell") == std::u32string::npos);
+    m.type(U"gp50\nzPj");
+    REQUIRE(m.map());
+    CHECK(m.map()->alwaysShow[50]);
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    m.has(U"Ride bell");
+    m.has(U"•");
+    CHECK(core::readDrumMapFile(saved).map == map);
+
+    m.review();
+    m.has(U"Always show");
+    m.press(NamedKey::Escape);
+    m.line(U"drum-map-save Marked");
+    CHECK(core::readDrumMapFile(m.folder() / "Marked.drum-map").map == m.map());
+
+    m.type(U"u");
+    REQUIRE_FALSE(m.map()->alwaysShow[50]);
+    m.type(U"j");
+    CHECK(m.visible().find(U"Ride bell") == std::u32string::npos);
+}
+
+TEST_CASE("a marked unnamed pitch stays in a named fold scoped to the section",
+          "[drum-maps][folding]")
+{
+    Maps m;
+    m.project(kit());
+    m.type(U"zF\t\t\t\t\ngp51\nzPj");
+    CHECK(m.ws.pianoRoll().cursor().pitch == 42);
+    m.has(U"D#3");
+    m.type(U"kzPj");
+    CHECK_FALSE(m.map()->alwaysShow[51]);
+    CHECK(m.visible().find(U"D#3") == std::u32string::npos);
+}
+
 TEST_CASE("drum maps can be chosen and removed from the piano roll as single undo steps",
           "[drum-maps]")
 {

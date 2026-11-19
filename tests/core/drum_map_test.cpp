@@ -41,10 +41,13 @@ TEST_CASE("reusable drum maps round trip sparse names with the song format's tex
     map.notes[38] = "Caisse claire \xC3\xA9";
     map.notes[40] = "Kick"; // duplicate names are allowed, duplicate numbers aren't
     map.notes[127] = std::string{"Raw \xE9"};
+    map.alwaysShow.set(36).set(37).set(127);
     const auto text = writeDrumMap(map);
     CHECK(text.starts_with("modal-drum-map 1\nname \"Kit \\\"A\\\" \\\\ portable\"\n"));
     CHECK(text.find("36 \"Kick\"\n") != std::string::npos);
     CHECK(text.find("37 ") == std::string::npos);
+    CHECK(text.find("always-show 36\n") != std::string::npos);
+    CHECK(text.find("always-show 37\n") != std::string::npos);
     const auto back = readDrumMap(text);
     REQUIRE(back.map);
     CHECK(back.error.empty());
@@ -61,6 +64,7 @@ TEST_CASE("reusable drum maps round trip sparse names with the song format's tex
                                      "name \"Kit\"\r\n  \" another comment\r\n36 \"Kick\"");
     REQUIRE(windows.map);
     CHECK(windows.map->notes[36] == "Kick");
+    CHECK(windows.map->alwaysShow.none());
 }
 
 TEST_CASE("broken drum maps refuse the whole file and identify the line")
@@ -81,6 +85,10 @@ TEST_CASE("broken drum maps refuse the whole file and identify the line")
              {header + "36 \"Kick\n", 3},
              {header + "36 \"\\q\"\n", 3},
              {header + "36 \"Kick\"\n36 \"Snare\"\n", 4},
+             {header + "always-show -1\n", 3},
+             {header + "always-show 128\n", 3},
+             {header + "always-show \"36\"\n", 3},
+             {header + "always-show 36\nalways-show 36\n", 4},
          })
     {
         INFO(text);
@@ -105,12 +113,15 @@ TEST_CASE("a track keeps its drum map through song saves and independent copies"
                          track.drumMap->notes[36] = "Custom \"kick\"";
                          track.drumMap->notes[0] = "Low";
                          track.drumMap->notes[127] = "High";
+                         track.drumMap->alwaysShow.set(0).set(37);
                      });
     song.updateTrack(unmapped, [](Track& track) { track.channel = 10; });
     CHECK_FALSE(song.track(unmapped)->drumMap);
     CHECK(song.track(drums)->drumMap->notes[36] == "Bass Drum 1");
     const auto text = writeSong(song);
     CHECK(text.find("drum-note 36 \"Custom \\\"kick\\\"\"") != std::string::npos);
+    CHECK(text.find("drum-always-show 37\n") != std::string::npos);
+    CHECK(song.track(drums)->drumMap->alwaysShow.none());
     const auto back = readSong(text, ppqn);
     INFO(back.error);
     REQUIRE(back.song);
@@ -139,6 +150,10 @@ TEST_CASE("song drum-map lines must belong to one header track and name each pit
              track + map + "drum-note 36 \"\"\n",
              track + map + "drum-note 36 \"Kick\" extra\n",
              track + map + "drum-note 36 \"Kick\"\ndrum-note 36 \"Snare\"\n",
+             track + "drum-always-show 36\n",
+             track + map + "drum-always-show 128\n",
+             track + map + "drum-always-show 36 extra\n",
+             track + map + "drum-always-show 36\ndrum-always-show 36\n",
              track + tail + map,
          })
     {

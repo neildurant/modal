@@ -2,9 +2,17 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum maps step 3 and the in-app file picker are published. Piano-roll folding and the write-config picker were accepted on trial.*
+*Last updated 19 November 2026: piano-roll folding and the write-config picker were accepted on trial and published. Always show marks are implemented locally.*
 
 ## Current handoff
+
+### Drum-map Always show marks, 19 November 2026
+
+`zP` toggles the current pitch's mark on a mapped track and a dot identifies the row. All fold modes and scopes include the marked pitch even when it is unnamed or empty. The song keeps the edit in its embedded map as one undo step. Reusable maps save the same flags, and the saved-copy review shows differences in the flags. See [design.md](design.md#drum-maps) and [schedule.md](schedule.md).
+
+**Validation.** The persistence and Workspace regressions cover old files, malformed marks, empty and unnamed rows, undo, and saved-copy review. The dot and retained Ride Bell row were checked in dark and light offscreen renders. The HTML and PDF manuals build and their references pass. Desktop trial is pending.
+
+**To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal`, then `gr` and `za`. Use `gp` and enter `53` (Ride Bell), then `zP` and `j`. The Ride Bell row stays visible with a dot even though it has no notes. `u` undoes the mark. Save a reusable copy with `:drum-map-save FILE` to test carrying the marks to another song.
 
 ### Piano-roll folding accepted on trial, 19 November 2026
 

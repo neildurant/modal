@@ -1588,6 +1588,8 @@ const PianoRollView::PitchMask& PianoRollView::foldPitches() const
     foldCache_ = FoldCache{id, version, fold.mode, section, {}};
     auto& pitches = foldCache_->pitches;
     const auto& map = song.track(id)->drumMap;
+    if (map)
+        pitches = map->alwaysShow;
     if (map && fold.mode != FoldMode::Occupied)
     {
         for (std::size_t pitch = 0; pitch < map->notes.size(); ++pitch)
@@ -5111,8 +5113,11 @@ void PianoRollView::addRegions(Frame& frame) const
                             : named           ? Style{Role::Text, Role::Background, kPlain}
                             : pitch % 12 == 0 ? Style{Role::Text, Role::Background, kBold}
                                               : Style{Role::Dim, Role::Background, kPlain};
-        keys.write(named ? 1 : keyColumns - 1 - static_cast<int>(name.size()), row,
-                   encodeUtf8(name), style);
+        const int nameX = named ? 1 : keyColumns - 1 - static_cast<int>(name.size());
+        keys.write(nameX, row, encodeUtf8(name), style);
+        if (map && nameX > 0 && keyColumns > 1 && map->alwaysShow[static_cast<std::size_t>(pitch)])
+            keys.write(0, row, "•",
+                       pitch == pitch_ ? style : Style{Role::Accent, Role::Background, kPlain});
     }
     auto keyboard =
         gridRegion(keys, {main.x, notesTop, keyWidth, notesHeight}, cell_, Role::Background);

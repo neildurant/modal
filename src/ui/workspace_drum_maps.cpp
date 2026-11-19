@@ -157,14 +157,32 @@ CommandResult Workspace::drumMap()
     return {true};
 }
 
-CommandResult Workspace::applyDrumMap(core::TrackId id, std::optional<core::DrumMap> map)
+CommandResult Workspace::togglePitchAlwaysShow()
+{
+    if (where() != Where::PianoRoll)
+        return CommandResult::error("Always show works only in the piano roll's notes");
+    const auto cursor = view().cursor();
+    const auto* track = cursor.track ? document_.song().track(*cursor.track) : nullptr;
+    if (!track || !track->drumMap || !cursor.pitch)
+        return CommandResult::error("Choose a drum map for this track first");
+    auto map = *track->drumMap;
+    const auto pitch = *cursor.pitch;
+    map.alwaysShow.flip(pitch);
+    const auto title =
+        (map.alwaysShow[pitch] ? "Always show " : "Stop always showing ") + core::pitchName(pitch);
+    return applyDrumMap(*cursor.track, std::move(map), title);
+}
+
+CommandResult Workspace::applyDrumMap(core::TrackId id, std::optional<core::DrumMap> map,
+                                      std::string title)
 {
     const auto* track = document_.song().track(id);
     if (track == nullptr)
         return CommandResult::error("No track to give a drum map");
     if (auto why = recording_.eventEditRefusal(id))
         return CommandResult::error(std::move(*why));
-    const auto title = "Drum map of " + track->name + ": " + (map ? map->name : "None");
+    if (title.empty())
+        title = "Drum map of " + track->name + ": " + (map ? map->name : "None");
     const bool changed =
         document_.edit(title, view().place(), [&](core::Song& song)
                        { song.updateTrack(id, [&](core::Track& into) { into.drumMap = map; }); });

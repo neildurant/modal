@@ -21,6 +21,8 @@ std::string writeDrumMap(const DrumMap& map)
         {
             text += std::to_string(note) + " " + textFormat::quotedText(map.notes[note]) + "\n";
         }
+        if (map.alwaysShow[note])
+            text += "always-show " + std::to_string(note) + "\n";
     }
     return text;
 }
@@ -75,6 +77,18 @@ DrumMapReadResult readDrumMap(std::string_view text)
             }
             map.name = tokens[1].text;
             stage = Stage::Notes;
+        }
+        else if (tokens[0].text == "always-show")
+        {
+            const auto note = tokens.size() == 2 && !tokens[1].quoted
+                                  ? textFormat::parseInteger(tokens[1].text, 0, 127)
+                                  : std::nullopt;
+            if (!note)
+                return fail("always-show needs a note number from 0 to 127");
+            const auto pitch = static_cast<std::size_t>(*note);
+            if (map.alwaysShow[pitch])
+                return fail("always-show is already set for note " + tokens[1].text);
+            map.alwaysShow.set(pitch);
         }
         else
         {

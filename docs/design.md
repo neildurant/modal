@@ -421,6 +421,8 @@ On trial, ambiguous choices were given note counts across the current track, wit
 
 **Folding (agreed 19 November 2026).** `za` switches between all pitches and the last fold on this track. `zF` or `:fold` chooses Occupied, Named drum-map rows including empty ones, or Both, and the whole track or current section. The first fold is Occupied on the whole track. Section occupancy includes notes still sounding across its start. Choices belong to the track's view for the session. Entering the fold goes to the nearest included pitch if necessary, and an empty fold retains a cursor row. `j` and `k` step through the displayed rows, including when extending `V`. A direct move such as `gp` shows a hidden destination until the cursor leaves it, or until a selection anchored there ends. A `V` edit takes only displayed pitches, even when cutting at the edges. The fold's scope decides which rows appear; the selection's existing time range decides where it edits.
 
+**Always show (agreed 19 November 2026).** On a mapped track, `zP` or `:pitch-always-show` toggles the current pitch's Always show mark. A dot identifies the marked row. The pitch appears in every fold mode and scope even when it is unnamed or has no events. The edit is undoable and changes the song's embedded map. Saving a reusable map carries the marks; comparing copies shows mark differences. Reusable maps store marks as optional `always-show N` lines and songs use `drum-always-show N` under the owning map. Existing files without the lines have no marks.
+
 **The section strip (decided October 2026)**
 
 ```

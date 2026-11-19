@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <bitset>
 #include <string>
 #include <string_view>
 
@@ -15,6 +16,7 @@ struct DrumMap
 {
     std::string name;
     std::array<std::string, 128> notes{};
+    std::bitset<128> alwaysShow{};
 
     friend bool operator==(const DrumMap&, const DrumMap&) = default;
 };

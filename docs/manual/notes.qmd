@@ -49,6 +49,11 @@ selection can edit only displayed pitches. The fold's scope decides which
 rows you see, and the selection's time range still decides where an edit
 takes effect.
 
+On a track with a drum map, use `zP` on a pitch you want available in every
+fold, even before it has any notes. A dot marks the row. For a kit you use
+often, mark your kick, snare and hi-hat and save the map once. Later songs can
+load that map and fold to Occupied with those rows already available.
+
 ## A default note belongs to the track
 
 A new note needs a length and velocity before it exists. Each track therefore

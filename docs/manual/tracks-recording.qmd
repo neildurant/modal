@@ -106,6 +106,7 @@ name "Studio kit"
 38 "Snare"
 42 "Closed hi-hat"
 46 "Open hi-hat"
+always-show 46
 ```
 
 The numbers are MIDI note numbers, from 0 to 127. Name each number at most
@@ -114,6 +115,11 @@ for example when an instrument offers two ways to trigger one articulation.
 The `name` line is the map's identity; its filename can be different.
 An instrument chart's octave labels may differ from Modal's, so establish
 the MIDI numbers before copying its names.
+
+An optional `always-show` line keeps that MIDI pitch visible in every fold.
+Set or clear the mark from the piano roll with `zP`. The song keeps the edit
+as part of its own map. To carry the mark to another song, save a reusable copy
+and load it there. The saved-copy review shows differences in these marks too.
 
 ### Reviewing different copies
 

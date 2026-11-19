@@ -68,6 +68,8 @@ Counts set a motion's distance, as `3l` or `2]b`; with `gg` and `G` they choose 
 
 `za` toggles pitch folding. `zF` or `:fold` chooses Occupied, Named or Both, across the whole track or current section. When folded, `j` and `k` move through the displayed rows and `V` edits only those pitches. A direct jump such as `gp` temporarily brings its destination into view.
 
+`zP` or `:pitch-always-show` toggles the current pitch's Always show mark on a track with a drum map. A dot identifies the row. The mark travels with the map and keeps the pitch in every fold even when it has no notes.
+
 ### Finding and searching
 
 | Keys | Does |

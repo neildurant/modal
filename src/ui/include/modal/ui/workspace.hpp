@@ -427,8 +427,10 @@ public:
 
 private:
     CommandResult drumMap();
+    CommandResult togglePitchAlwaysShow();
     CommandResult drumMapFile(const CommandCall& call, bool save);
-    CommandResult applyDrumMap(core::TrackId track, std::optional<core::DrumMap> map);
+    CommandResult applyDrumMap(core::TrackId track, std::optional<core::DrumMap> map,
+                               std::string title = {});
     std::filesystem::path drumMapFolder() const;
     void reloadDrumMaps(bool announce);
     std::string drumMapSummary(const core::DrumMap& map) const override;

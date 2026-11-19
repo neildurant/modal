@@ -89,10 +89,18 @@ std::vector<DrumMapDifference> drumMapDifferences(const core::DrumMap& song,
     std::vector<DrumMapDifference> changes;
     if (song.name != saved.name)
         changes.push_back({std::nullopt, song.name, saved.name});
+    const auto label = [](const core::DrumMap& map, std::size_t pitch)
+    {
+        auto name = map.notes[pitch];
+        if (map.alwaysShow[pitch])
+            name += name.empty() ? "Always show" : " · Always show";
+        return name;
+    };
     for (std::size_t pitch = 0; pitch < song.notes.size(); ++pitch)
-        if (song.notes[pitch] != saved.notes[pitch])
+        if (song.notes[pitch] != saved.notes[pitch] ||
+            song.alwaysShow[pitch] != saved.alwaysShow[pitch])
             changes.push_back(
-                {static_cast<std::uint8_t>(pitch), song.notes[pitch], saved.notes[pitch]});
+                {static_cast<std::uint8_t>(pitch), label(song, pitch), label(saved, pitch)});
     return changes;
 }
 

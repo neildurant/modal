@@ -124,6 +124,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                 }
                 if (name == "drum-map")
                     return drumMap();
+                if (name == "pitch-always-show")
+                    return togglePitchAlwaysShow();
                 if (name == "drum-map-load" || name == "drum-map-save")
                     return drumMapFile(call, name == "drum-map-save");
                 if (name == "go-pitch")

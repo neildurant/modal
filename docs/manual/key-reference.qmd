@@ -35,6 +35,7 @@ hint menus. A sequence written without spaces is typed one key at a time.
 | `g` then Up / Down, or `gk` / `gj` | Move up / down within the chord |
 | `gp` | Go to a pitch row by pitch, MIDI number or drum name |
 | `za`, `zF` | Toggle pitch folding, choose which rows and scope to show |
+| `zP` | Toggle Always show for the current pitch in the drum map |
 | `:select pitch PITCH` | Select the pitch row across the track |
 | `zi`, `zo`, `z0` | Zoom in, out, reset |
 | `z` then Left / Right (or `zh` / `zl`), Ctrl-T | Finer / coarser editing grid, triplets |

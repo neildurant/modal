@@ -355,7 +355,7 @@ bool Reader::readLine(std::span<const Token> tokens)
     {
         return stage_ == Stage::Header ? readTrack(tokens) : readBlock(tokens);
     }
-    if (word == "drum-map" || word == "drum-note")
+    if (word == "drum-map" || word == "drum-note" || word == "drum-always-show")
     {
         return readDrumMap(tokens);
     }
@@ -582,7 +582,20 @@ bool Reader::readDrumMap(std::span<const Token> tokens)
     }
     if (!map)
     {
-        return fail("drum-note needs a drum-map line first");
+        return fail(tokens[0].text + " needs a drum-map line first");
+    }
+    if (tokens[0].text == "drum-always-show")
+    {
+        const auto note = tokens.size() == 2 && !tokens[1].quoted
+                              ? parseInteger(tokens[1].text, 0, 127)
+                              : std::nullopt;
+        if (!note)
+            return fail("drum-always-show needs a note number from 0 to 127");
+        const auto pitch = static_cast<std::size_t>(*note);
+        if (map->alwaysShow[pitch])
+            return fail("drum-always-show is already set for note " + tokens[1].text);
+        map->alwaysShow.set(pitch);
+        return true;
     }
     if (tokens.size() != 3 || !tokens[2].quoted || tokens[2].text.empty())
     {
@@ -1764,6 +1777,8 @@ std::string writeSong(const Song& song)
                     line(1, "drum-note " + std::to_string(note) + " " +
                                 quotedText(track->drumMap->notes[note]));
                 }
+                if (track->drumMap->alwaysShow[note])
+                    line(1, "drum-always-show " + std::to_string(note));
             }
         }
     }

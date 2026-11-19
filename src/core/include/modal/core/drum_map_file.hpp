@@ -12,7 +12,7 @@
 namespace modal::core
 {
 
-// Reusable map copies: modal-drum-map 1, name "Kit", then 36 "Kick" and so on.
+// Reusable map copies: modal-drum-map 1, name "Kit", then 36 "Kick" and optional always-show 36.
 // Quoting, escaping and whole-line comments follow the native song format.
 struct DrumMapReadResult
 {
