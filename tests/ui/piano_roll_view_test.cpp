@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/document.hpp>
+#include <modal/core/pitch.hpp>
 #include <modal/ui/demo_song.hpp>
+#include <modal/ui/inspector.hpp>
 #include <modal/ui/key_notation.hpp>
+#include <modal/ui/settings.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
@@ -2362,4 +2365,85 @@ TEST_CASE("New note shows where a note can be added, giving its corner to Keep a
     CHECK_FALSE(contains(r.inspectorRows(), U"New note"));
     r.press(Key::of(NamedKey::Escape));
     CHECK(contains(r.inspectorRows(), U"New note"));
+}
+
+TEST_CASE("drum-map rows have room for names and the inspector keeps their full text",
+          "[drum-maps]")
+{
+    Settings timing;
+    REQUIRE(timing.set("timingunit", "1/128.").empty());
+    Rolling r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.ws.setSettings(&timing);
+    r.press(Key::of(NamedKey::Tab)); // an actual note, with the inspector's musical timing fields
+    const auto id = *r.view().cursor().track;
+    const auto pitch = r.view().pitch();
+    const std::string longName = "Caisse claire tr\xC3\xA8s longue";
+    r.document.edit("Set drum map", {},
+                    [&](core::Song& song)
+                    {
+                        song.updateTrack(id,
+                                         [&](core::Track& track)
+                                         {
+                                             track.drumMap = core::DrumMap{};
+                                             track.drumMap->name = "Custom kit";
+                                             track.drumMap->notes[pitch] = "Low hit";
+                                             track.drumMap->notes[pitch - 1] = longName;
+                                         });
+                    });
+    r.ws.refresh();
+    const auto labels = [&]()
+    {
+        const auto frame = r.ws.frame();
+        const auto keyboard =
+            std::ranges::find_if(frame,
+                                 [](const Region& region)
+                                 {
+                                     return region.bounds.x == 0 &&
+                                            region.bounds.width == 20 * kCell.width &&
+                                            region.bounds.height > 3 * kCell.height;
+                                 });
+        REQUIRE(keyboard != frame.end());
+        std::u32string text;
+        for (const auto& run : keyboard->text)
+            text += run.text;
+        return text;
+    };
+    CHECK(contains(labels(), U"Low hit"));
+    CHECK(contains(r.inspectorRows(), U"Low hit"));
+    CHECK(contains(r.inspectorRows(), decodeUtf8(pitchText(pitch))));
+    if (r.t.ppqn == core::Ppqn{96})
+    {
+        const auto frame = r.ws.frame();
+        std::optional<TextRun> drum;
+        std::optional<TextRun> rounded;
+        for (const auto& region : frame)
+            for (const auto& run : region.text)
+            {
+                if (run.text == U"Drum:")
+                    drum = run;
+                if (run.text == U"Unit rounded to ticks")
+                    rounded = run;
+            }
+        REQUIRE(drum);
+        REQUIRE(rounded);
+        CHECK(drum->x + static_cast<int>(drum->text.size()) * kCell.width <= rounded->x);
+    }
+    r.type(U"j");
+    CHECK(r.view().pitch() == pitch - 1);
+    CHECK(contains(labels(), U"Caisse claire trè…"));
+    CHECK(contains(r.inspectorRows(), decodeUtf8(longName)));
+    r.type(U"j");
+    CHECK(contains(labels(), decodeUtf8(core::pitchName(r.view().pitch()))));
+    CHECK_FALSE(contains(r.inspectorRows(), U"Drum:"));
+    r.type(U"u");
+    CHECK_FALSE(r.document.song().track(id)->drumMap);
+    const auto frame = r.ws.frame();
+    CHECK(std::ranges::any_of(frame,
+                              [](const Region& region)
+                              {
+                                  return region.bounds.x == 0 &&
+                                         region.bounds.width ==
+                                             PianoRollView::kKeyColumns * kCell.width &&
+                                         region.bounds.height > 3 * kCell.height;
+                              }));
 }

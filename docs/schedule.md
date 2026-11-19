@@ -115,7 +115,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Final functional acceptance 19 November 2026 and publication through `a198f31`.
 - [ ] **Doing** — General MIDI and reusable custom drum maps; behaviour and validation in [design.md](design.md#drum-maps) and [status.md](status.md).
     - [x] **Done** — Step 1: map data, shared General MIDI names, song persistence and reusable map files; seven new core tests and GCC/Clang Debug suites pass. See status.md.
-    - [ ] **To do** — Step 2: choose maps and show names in the piano roll and inspector; manual updates and functional trial.
+    - [ ] **Doing** — Step 2: choosing maps, file management and names; plan approved 19 November 2026. See design.md and status.md.
+        - [ ] **Doing** — Piano-roll labels and inspector names; implemented with regressions, trial pending.
+        - [ ] **To do** — Map chooser, reusable-file load/save and same-name comparison/review actions.
+        - [ ] **To do** — Manual updates, dark/light renders, Linux validation and functional trial.
     - [ ] **To do** — Step 3: names in navigation, search, selection and the palette; tests, manual updates and functional trial.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.

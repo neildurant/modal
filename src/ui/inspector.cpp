@@ -111,6 +111,15 @@ void addNoteFields(Inspection& inspection, const core::Song& song, const core::M
     add("Release", std::to_string(note.releaseVelocity));
 }
 
+void addDrumField(Inspection& inspection, const core::Track& track, std::uint8_t pitch)
+{
+    if (!track.drumMap || track.drumMap->notes[pitch].empty())
+        return;
+    const auto at = std::ranges::find(inspection.fields, "Pitch", &InspectorField::heading);
+    inspection.fields.insert(at == inspection.fields.end() ? at : at + 1,
+                             {"Drum", track.drumMap->notes[pitch]});
+}
+
 void markEditable(Inspection& inspection)
 {
     for (auto& field : inspection.fields)
@@ -187,6 +196,7 @@ Inspection inspect(const EventList& list, std::size_t row)
             if constexpr (std::is_same_v<T, core::Note>)
             {
                 addNoteFields(result, song, meter, event.tick, data);
+                addDrumField(result, *song.track(id), data.pitch);
             }
             else if constexpr (std::is_same_v<T, core::ControlChange>)
             {

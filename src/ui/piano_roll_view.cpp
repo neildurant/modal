@@ -4653,6 +4653,7 @@ Inspection PianoRollView::inspection() const
         const auto& event = song.events(*trackId())[*index];
         result.fields.push_back({"Position", positionText(m, event.tick)});
         addNoteFields(result, song, m, event.tick, std::get<core::Note>(event.data));
+        addDrumField(result, *song.track(*trackId()), std::get<core::Note>(event.data).pitch);
         markEditable(result);
         addMusicalTiming(result, event, m, host_.timingUnit(grid()));
         return result;
@@ -4660,6 +4661,8 @@ Inspection PianoRollView::inspection() const
     result.kind = "No note";
     result.fields.push_back({"Position", positionText(m, time_)});
     result.fields.push_back({"Pitch", pitchText(pitch_)});
+    if (const auto id = trackId())
+        addDrumField(result, *song.track(*id), pitch_);
     return result;
 }
 
@@ -4871,7 +4874,13 @@ void PianoRollView::addRegions(Frame& frame) const
     const auto& song = document_.song();
     const auto& main = layout_.main;
     const int h = cell_.height;
-    const int keyWidth = kKeyColumns * cell_.width;
+    const auto id = trackId();
+    const auto* track = id ? song.track(*id) : nullptr;
+    const auto* map = track && track->drumMap ? &*track->drumMap : nullptr;
+    constexpr int kDrumColumns = 20;
+    const int keyColumns =
+        std::min(map ? kDrumColumns : kKeyColumns, std::max(main.width / cell_.width - 1, 0));
+    const int keyWidth = keyColumns * cell_.width;
     const int rulerHeight = kRulerRows * h;
     const int laneHeight = this->laneHeight();
     const int notesTop = main.y + rulerHeight;
@@ -4885,15 +4894,26 @@ void PianoRollView::addRegions(Frame& frame) const
 
     // The keyboard: each row's note name, the black keys' rows shaded faintly, the C's bold
     // and the cursor's pitch highlighted.
-    CellGrid keys{kKeyColumns, rows};
+    CellGrid keys{keyColumns, rows};
     for (int row = 0; row < rows && topPitch_ - row >= 0; ++row)
     {
         const int pitch = topPitch_ - row;
-        const auto name = core::pitchName(static_cast<std::uint8_t>(pitch));
+        const bool named = map && !map->notes[static_cast<std::size_t>(pitch)].empty();
+        auto name = decodeUtf8(named ? map->notes[static_cast<std::size_t>(pitch)]
+                                     : core::pitchName(static_cast<std::uint8_t>(pitch)));
+        const auto room = static_cast<std::size_t>(std::max(keyColumns - 2, 0));
+        if (named && name.size() > room)
+        {
+            name.resize(room);
+            if (!name.empty())
+                name.back() = U'…';
+        }
         const Style style = pitch == pitch_   ? Style{Role::CursorText, Role::Cursor, kBold}
+                            : named           ? Style{Role::Text, Role::Background, kPlain}
                             : pitch % 12 == 0 ? Style{Role::Text, Role::Background, kBold}
                                               : Style{Role::Dim, Role::Background, kPlain};
-        keys.write(kKeyColumns - 1 - static_cast<int>(name.size()), row, name, style);
+        keys.write(named ? 1 : keyColumns - 1 - static_cast<int>(name.size()), row,
+                   encodeUtf8(name), style);
     }
     auto keyboard =
         gridRegion(keys, {main.x, notesTop, keyWidth, notesHeight}, cell_, Role::Background);

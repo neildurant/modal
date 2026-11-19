@@ -41,6 +41,7 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
     };
     const int exactWidth = std::max(positionWidth, 9) + inspection.beatDigits - 1;
     constexpr int kExactColumn = 48;
+    const auto drum = std::ranges::find(inspection.fields, "Drum", &InspectorField::heading);
     const std::array slots{
         Slot{"Pitch", "Pitch:", 1, 0, 10, 9},
         Slot{"Velocity", "Velocity:", 2, 0, 10, 9},
@@ -118,13 +119,39 @@ Region noteInspectorRegion(const Inspection& inspection, Rect bounds, int width,
         {
             if (slot.field == "Units" && value.find("(rounded)") != std::string::npos)
                 region.text.push_back(
-                    {x(kExactColumn + exactWidth + 2), y(0), U"Unit rounded to ticks", label});
+                    {x(kExactColumn + exactWidth + 2 + (drum == inspection.fields.end() ? 0 : 8)),
+                     y(0), U"Unit rounded to ticks", label});
             value = value.substr(0, value.find(" ("));
         }
         if (slot.field == "Position" || slot.field == "Length" || slot.field == "Ends")
             value = aligned(std::move(value));
         inspectorValue(region, shown, decodeUtf8(value), x(slot.valueColumn), y(slot.row),
                        slot.width, cell, editor, true);
+    }
+    // Keep the timing fields fixed while giving a drum articulation its full name in the
+    // space beside them. Two rows leave the panel's Keep/Cancel row clear while editing.
+    if (drum != inspection.fields.end())
+    {
+        const int column = kExactColumn + exactWidth + 3;
+        const int room = std::max(columns - (column - left), 0);
+        if (room > 0)
+        {
+            region.text.push_back({x(column), y(0), U"Drum:", label});
+            const auto name = decodeUtf8(drum->value);
+            for (std::size_t row = 0; row < 2; ++row)
+            {
+                const auto first = row * static_cast<std::size_t>(room);
+                if (first >= name.size())
+                    break;
+                auto part = name.substr(first, static_cast<std::size_t>(room));
+                if (row == 1 && first + part.size() < name.size())
+                    part.back() = U'…';
+                region.text.push_back({x(column),
+                                       y(static_cast<int>(row) + 1),
+                                       std::move(part),
+                                       {Role::Text, Role::Panel, kPlain}});
+            }
+        }
     }
     return region;
 }

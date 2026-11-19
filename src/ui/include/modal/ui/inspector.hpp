@@ -57,6 +57,10 @@ Inspection inspect(const EventList& list, std::size_t row);
 void addNoteFields(Inspection& inspection, const core::Song& song, const core::MeterMap& meter,
                    core::Tick tick, const core::Note& note);
 
+// The full drum name next to the pitch, when the track's map names it. Kept separate from
+// the editable pitch so changing a note still takes a pitch name or MIDI number.
+void addDrumField(Inspection& inspection, const core::Track& track, std::uint8_t pitch);
+
 // Marks the fields of an event that e can edit: those an event list column holds, and a
 // note's end (see setInspectorField).
 void markEditable(Inspection& inspection);
