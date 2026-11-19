@@ -310,6 +310,10 @@ track's changes, use the track target `it`.
 Typing what to change in full at the first question, as `program 5`, `cc1`
 or `C1`, also says its type, and the next question is then **to**.
 
+A bar with program changes but no notes can be remapped from the piano
+roll's notes too. Other transforms there still say there are no notes,
+since notes are what they change.
+
 Only matching events in the target change. Bank-select messages and the
 track's starting bank/program setup are left alone. If the patch is set
 only in Tracks, edit its Program field there instead. The remapping undoes
@@ -453,7 +457,8 @@ refused, and the message names the ramp:
 - Starting a section, or deleting or inserting bars, inside a ramp is
   refused.
 - Value transforms, Thin among them, leave a ramp's points alone and say
-  how many ramps they left. Retrograde across one, and an edit moving
+  how many ramps they left, counting only ramps they would have changed:
+  remapping a note says nothing of a modulation ramp in the same bar. Retrograde across one, and an edit moving
   ordinary events into its owned range, are refused instead; see
   @sec-controller-timing.
 - Recording the same controller over a ramp replaces it: the take removes

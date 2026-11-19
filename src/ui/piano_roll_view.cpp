@@ -4452,12 +4452,14 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
             }
         }
     }
-    // A controller lane can contain useful data on a track with no notes at all.
-    if (notes == 0 && (!inLane_ || velocityLane() || taken.empty()))
+    // A controller lane can contain useful data on a track with no notes at all; so can the
+    // notes, for remapping a range's program changes, which the workspace sorts out.
+    if (notes == 0 && (velocityLane() || taken.empty()))
     {
         host_.refuse("No notes there", MessageKind::Information);
         return std::nullopt;
     }
+    result.noNotes = notes == 0 && !inLane_;
     result.what = (notes == 0   ? laneTaking(taken.size())
                    : notes == 1 ? core::pitchName(std::get<core::Note>(events[*only].data).pitch)
                                 : std::to_string(notes) + " notes") +

@@ -210,6 +210,9 @@ struct OperatorTarget
     // last value is taken to end, as long after it as the gap before it, but not past the
     // lane's next event or the end of that value's bar. Retrograde reverses up to there.
     std::optional<core::Tick> heldEnd = std::nullopt;
+    // A range of the piano roll's notes holding other events but no notes: only remapping
+    // takes it, the other transforms saying there are no notes (decided 19 November 2026).
+    bool noNotes = false;
 };
 
 // What a view asks of the workspace that shows it.

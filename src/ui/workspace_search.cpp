@@ -194,6 +194,11 @@ bool Workspace::operateOnMatches(std::string_view op)
     // d and y on the matches in the selection: taken as a register holds them, from the
     // selection's start, as the selection would be, only fewer.
     auto target = view().target("visual", 0);
+    if (target && target->noNotes)
+    {
+        refuse("No notes there", MessageKind::Information);
+        return true;
+    }
     if (!target || !onlyMatches(*target))
     {
         return true;

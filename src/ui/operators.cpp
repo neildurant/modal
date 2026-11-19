@@ -638,6 +638,11 @@ CommandResult Workspace::transformLine(std::string_view name, std::string_view a
     {
         return {true};
     }
+    if (target->noNotes && name != "transform-remap")
+    {
+        refuse("No notes there", MessageKind::Information);
+        return {true};
+    }
     if (const auto range = view().cutRange(motion, count))
     {
         target->span = std::pair{range->from, range->to};
@@ -1391,6 +1396,11 @@ bool Workspace::transform(std::string_view op, int amount, std::string_view moti
     if (op == "operator-transform")
     {
         return openTransformMenu(std::move(*target));
+    }
+    if (target->noNotes && op != "transform-remap")
+    {
+        refuse("No notes there", MessageKind::Information);
+        return true;
     }
     if (!prepareLaneTimingTarget(op, *target))
     {
@@ -2308,12 +2318,13 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
     const auto& song = document_.song();
     std::vector<core::EventList> changed;
     // A ramp's points are left alone, being made from it, and the ramps counted, to say so
-    // (decided 17 November 2026).
+    // (decided 17 November 2026): only those the change would have changed, so remapping a
+    // note doesn't mention a controller's ramp (corrected 19 November 2026, after trial).
     std::size_t skipped = 0;
     const auto withoutRamps = [&](const core::EventList& events, OperatorTarget::Part part)
     {
         const auto ramps = song.ramps(part.track);
-        std::vector<bool> hit(ramps.size(), false);
+        std::vector<std::vector<std::size_t>> owned(ramps.size());
         std::erase_if(part.events,
                       [&](std::size_t i)
                       {
@@ -2321,13 +2332,25 @@ bool Workspace::changeEvents(std::string title, const OperatorTarget& target,
                           {
                               if (ramps[r].owns(events[i]))
                               {
-                                  hit[r] = true;
+                                  owned[r].push_back(i);
                                   return true;
                               }
                           }
                           return false;
                       });
-        skipped += static_cast<std::size_t>(std::ranges::count(hit, true));
+        for (auto& points : owned)
+        {
+            if (points.empty())
+            {
+                continue;
+            }
+            const auto alone = change(events, OperatorTarget::Part{part.track, std::move(points)});
+            const auto* same = std::get_if<core::EventList>(&alone);
+            if (same == nullptr || *same != events)
+            {
+                ++skipped;
+            }
+        }
         return part;
     };
     for (const auto& part : target.parts)

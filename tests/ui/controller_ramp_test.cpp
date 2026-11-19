@@ -543,6 +543,24 @@ TEST_CASE("a transform leaves a ramp's points alone, saying so")
     CHECK(r.ws.message().find("a ramp left alone (, c R makes one events)") != std::string::npos);
 }
 
+TEST_CASE("a transform that wouldn't change a ramp's points doesn't say it left the ramp alone")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.type(U",cr\t127");
+    r.keep();
+    r.ws.handle(Key::of(NamedKey::Escape), 0); // back to the notes
+    r.type(U"gg");
+    r.line(U"remap C4 to=D4");
+    CHECK(r.ws.message().find("ramp") == std::string::npos);
+    const auto events = r.document.song().events(r.id()).all();
+    const auto note = std::ranges::find_if(events, [](const core::Event& e) { return e.isNote(); });
+    REQUIRE(note != events.end());
+    CHECK(std::get<core::Note>(note->data).pitch == 62);
+    r.type(U"u");
+    r.line(U"remap cc1 to=cc11");
+    CHECK(r.ws.message().find("a ramp left alone") != std::string::npos);
+}
+
 TEST_CASE("bars can't be deleted or inserted through a ramp")
 {
     Ramps r;
@@ -979,12 +997,14 @@ TEST_CASE("controller cleanup refuses invalid settings and protects ramps")
     r.type(U",cr");
     r.keep();
     const auto withRamp = r.document.song();
-    for (const auto line : {U"ctl-smooth all strength=100% window=1bar", U"ctl-dedupe all"})
-    {
-        r.line(line);
-        CHECK(r.document.song() == withRamp);
-        CHECK(r.ws.message().find("ramp") != std::string::npos);
-    }
+    // Smoothing would change the ramp's points, so says it left them; a ramp writes no
+    // repeats, so removing them wouldn't, and says nothing of it.
+    r.line(U"ctl-smooth all strength=100% window=1bar");
+    CHECK(r.document.song() == withRamp);
+    CHECK(r.ws.message().find("ramp") != std::string::npos);
+    r.line(U"ctl-dedupe all");
+    CHECK(r.document.song() == withRamp);
+    CHECK(r.ws.message().find("ramp") == std::string::npos);
     r.type(U"u");
     CHECK(r.document.song() == before);
 }
@@ -1174,6 +1194,41 @@ TEST_CASE("remap asks the type, then from and to in that type's form, offering t
     r.line(U"remap cc7 to=cc10");
     CHECK(cleanupValues(r, 10) == std::vector<int>{40});
     r.type(U"u");
+    CHECK(r.document.song() == before);
+}
+
+TEST_CASE("remap in the notes takes a range's other events where it holds no notes")
+{
+    // Program changes alone in a bar, from the notes: remapping them needs no note there.
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    const auto q = r.q();
+    setCleanupEvents(r, {{0, core::ProgramChange{5}}, {2 * q, core::ProgramChange{12}}});
+    r.ws.handle(Key::of(NamedKey::Escape), 0); // back to the notes
+    const auto before = r.document.song();
+    r.type(U",xmibprogram\n\n9\n");
+    CHECK(r.ws.messageKind() != MessageKind::Warning);
+    std::vector<int> programs;
+    for (const auto& event : r.document.song().events(r.id()).all())
+    {
+        if (const auto* program = std::get_if<core::ProgramChange>(&event.data))
+        {
+            programs.push_back(program->program);
+        }
+    }
+    CHECK(programs == std::vector<int>{9, 12});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    // So does ! with a range, which takes it before the transform is chosen.
+    r.type(U"!ibmprogram\n\n9\n");
+    CHECK(r.document.song().events(r.id()).all().front().data ==
+          core::EventData{core::ProgramChange{9}});
+    r.type(U"u");
+    CHECK(r.document.song() == before);
+    // Transforms of notes still say there are none.
+    r.line(U"transpose 2");
+    CHECK(r.ws.message() == "No notes there");
+    r.type(U"!ibt");
+    CHECK(r.ws.message() == "No notes there");
     CHECK(r.document.song() == before);
 }
 
