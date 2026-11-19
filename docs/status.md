@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum-map Always show marks were published and the single save confirmation was accepted on trial.*
+*Last updated 19 November 2026: drum-map Always show marks and the single save confirmation are accepted and published. The next song-handling milestone includes a configurable Songs folder.*
 
 ## Current handoff
 
@@ -10,9 +10,13 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 The Folder panel goes directly to the comparison when saving over a differing file. Cancel save leaves the file untouched and Replace the saved copy writes the map. The command with a typed filename and `!` uses the same confirmation. The map chooser keeps its full set of review actions. See [design.md](design.md#drum-maps).
 
-**Validation.** Workspace regressions cover selecting an existing filename, cancelling without a write, replacing it with updated Always show marks, and handling changes to the saved file during review. GCC and Clang Debug pass with 1,220 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The HTML and PDF manuals build and their references pass. The desktop trial was accepted on 19 November 2026.
+**Validation.** Workspace regressions cover selecting an existing filename, cancelling without a write, replacing it with updated Always show marks, and handling changes to the saved file during review. All six Linux configurations pass with 1,220 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The HTML and PDF manuals build and their references pass. The desktop trial was accepted on 19 November 2026.
+
+Published with Always show through `eb24c01`. The [combined Linux and Windows CI run](https://github.com/neildurant/modal/actions/runs/44583800970) covers this code and the [manual workflow passed](https://github.com/neildurant/modal/actions/runs/44583800904).
 
 **To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal` and use `gr`, `gp 53` then Enter, and `zP`. Run `:drum-map-save` and select `/tmp/modal-ssd-map-save-trial.drum-map`. Try Cancel save, then open it again and choose Replace the saved copy. Only the replacement should write the file.
+
+**Next work.** The `, e` insertion interface remains the final item in milestone 9. Agree the scope before changing it. Pitch-row selection and named navigation were delivered in drum-map step 3. The proposed Songs and Current Folder locations for Alt-Down Places belong to milestone 10. See [schedule.md](schedule.md) and [song-handling design questions](design.md#to-decide).
 
 ### Drum-map Always show marks, 19 November 2026
 
