@@ -76,6 +76,8 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
 
 ## 9. Controllers, drums and folding
 
+Completed 19 November 2026. See [status.md](status.md#guided-event-insertion-19-november-2026) for the final validation.
+
 - [x] **Done** — Editable velocity, controller, pitch bend and aftertouch lanes; all steps accepted on trial and published by 15 November 2026. See [design.md](design.md) (Editing in the lane) and [status.md](status.md).
     - [x] **Done** — Step 1: velocity lane navigation, value editing, chords fanned out, time selections and value boxes; accepted on the fifth trial.
     - [x] **Done** — Step 1b: chords as a whole with `gk` / `gj`, the inspector's range and `^ic`, including chord names in the inspector.

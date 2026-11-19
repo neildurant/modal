@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: guided event insertion was accepted on trial, completing milestone 9's feature work. The next milestone is Songs, navigation and copying.*
+*Last updated 19 November 2026: milestone 9 is complete. The next milestone is Songs, navigation and copying.*
 
 ## Current handoff
 
@@ -11,6 +11,8 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 `, e` opens a searchable list of event types and asks for their fields. The last Enter inserts at the cursor as one undo step. Escape cancels from the list or any field, and an invalid value can be retried. The typed `:event-insert EVENT` form still works. See [design.md](design.md#event-insertion) and [schedule.md](schedule.md).
 
 **Validation.** Workspace regressions cover type filtering, controller fields, retrying invalid input, cancellation, plain lyric text, conductor tempo and undo. All six Linux configurations pass with 1,222 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The chooser and value prompt were inspected in offscreen renders. The HTML and PDF manuals build and their references pass. The desktop trial was accepted on 19 November 2026.
+
+Published through `b684ad1`. [Hosted Linux and Windows CI](https://github.com/neildurant/modal/actions/runs/44627872786) and the [manual workflow](https://github.com/neildurant/modal/actions/runs/44627872973) passed.
 
 **To try.** Start `build/linux-gcc/apps/Debug/modal --demo` and use `gr` to open a track's piano roll. Press `, e`, type `control` and press Enter. Enter `7` and then `100`, pressing Enter after each. `u` undoes the insertion. Try `, e`, `lyric` and text with quotes, or Escape at the second Control change field to cancel.
 
