@@ -4874,9 +4874,9 @@ void PianoRollView::addRegions(Frame& frame) const
     const auto& song = document_.song();
     const auto& main = layout_.main;
     const int h = cell_.height;
-    const auto id = trackId();
-    const auto* track = id ? song.track(*id) : nullptr;
-    const auto* map = track && track->drumMap ? &*track->drumMap : nullptr;
+    const auto selectedTrackId = trackId();
+    const auto* selectedTrack = selectedTrackId ? song.track(*selectedTrackId) : nullptr;
+    const auto* map = selectedTrack && selectedTrack->drumMap ? &*selectedTrack->drumMap : nullptr;
     constexpr int kDrumColumns = 20;
     const int keyColumns =
         std::min(map ? kDrumColumns : kKeyColumns, std::max(main.width / cell_.width - 1, 0));

@@ -24,6 +24,8 @@ The approved chooser and file-management extension are implemented: Drum map in 
 
 **Trial.** The appearance and behaviour were accepted on 19 November 2026. Next is step 3, adding drum names to navigation, search, selection and the palette. Folding remains separate. Playback drum-map translation is unscheduled in schedule.md.
 
+**Hosted checks.** The first [CI run](https://github.com/neildurant/modal/actions/runs/44522588303) passed formatting, Clang Debug/Release and ThreadSanitizer. GCC and ASan stopped during package installation. MSVC rejected local names that shadowed the track variables in the piano roll. The outer variables have been renamed, with the same rendering behaviour. The [manual workflow](https://github.com/neildurant/modal/actions/runs/44522588148) passed.
+
 ### Drum maps step 1 complete and published, 19 November 2026
 
 Design and three-step plan approved; see [design.md, Drum maps](design.md#drum-maps), [decisions.md](decisions.md) and [schedule.md](schedule.md). Step 1 adds value-owned `DrumMap` data on each track, shared General MIDI percussion names (the metronome's existing names unchanged), embedded song maps and reusable text-map readers/writers. Standalone maps use `modal-drum-map 1`, `name "Kit"`, then numbered entries; songs use `drum-map` and `drum-note` after the owning track's header declaration. Song quoting/escaping and integer parsing now live in a private shared text-format helper. Saving a reusable map uses the existing atomic writer. File errors include the path and line; invalid or repeated pitch numbers refuse the whole read. A channel-10 track has no map unless one was explicitly supplied; existing songs acquire none. Copies and undo keep maps independent.
