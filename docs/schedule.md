@@ -154,6 +154,9 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [ ] **To do** — Shared registers for events, bars, tracks and sections copied between songs.
 - [ ] **To do** — Cross-song mapping for different section layouts, meters, tempos and PPQN.
 - [ ] **To do** — `:read FILE` to bring tracks into the current song.
+- [ ] **To do** — Default song folder and picker Places. See [song-handling design questions](design.md#to-decide).
+    - [ ] **To do** — Add a `modalrc` setting for the default Songs folder.
+    - [ ] **To do** — Give Alt-Down Places entries for Songs and the active song's folder.
 - [ ] **To do** — Opening a recently used song, from a list kept between sessions in the state directory (asked for 13 November 2026); how it's reached (a command, a pick list, keys) to be designed with the buffer list.
 - [ ] **To do** — Numbered backups and safe save/close behaviour across modified buffers.
 - [ ] **To do** — Jump history across positions, views and buffers.

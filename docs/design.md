@@ -911,6 +911,7 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 
 **Songs, copying and histories**
 
+- Default song folder (proposed 19 November 2026). A path in `modalrc` sets the usual location for songs. Alt-Down in the Folder panel would offer **Songs** for that location and **Current Folder** for the active song's own directory, including a song opened elsewhere. Decide the setting name, picker starting locations for open and first save, how typed relative paths and completion are affected, and what to show when there is no configured or current song folder.
 - Cross-song timing and section mapping, buffer state and playback ownership.
 - Which moves enter jump history, and how does it relate to marks and buffer lifetimes?
 - Paste-history keys, capacity, whether deletes enter it, and numbered-register/clipboard representation.
