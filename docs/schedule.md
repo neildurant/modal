@@ -142,9 +142,9 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
 - [x] **Done** — Single confirmation for replacing a saved drum map.
     - [x] **Done** — Confirm in the save comparison and keep the chooser's review actions.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **Doing** — Guided event insertion with `, e`. See [design.md](design.md#event-insertion).
-    - [ ] **Doing** — Search by event type and enter its fields at the cursor.
-    - [ ] **Doing** — Regressions, manual updates and functional trial. See [status.md](status.md).
+- [x] **Done** — Guided event insertion with `, e`. See [design.md](design.md#event-insertion).
+    - [x] **Done** — Search by event type and enter its fields at the cursor.
+    - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 
 Drum maps precede folding by named rows. Settle map storage, lane navigation and folding behaviour before their implementation. Several simultaneous controller lanes are scheduled with the later view work.
 
