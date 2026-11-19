@@ -113,7 +113,10 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Remap asks Type, From and To, mapping within one type; accepted on trial 19 November 2026, with its no-notes and ramp-message corrections.
             - [x] **Done** — Follow-up regressions, manual/reference updates and trials; Windows Debug and WSL Clang Debug pass locally, and hosted CI passes all six Linux configurations and Windows Debug/Release.
             - [x] **Done** — Final functional acceptance 19 November 2026 and publication through `a198f31`.
-- [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
+- [ ] **Doing** — General MIDI and reusable custom drum maps; behaviour and validation in [design.md](design.md#drum-maps) and [status.md](status.md).
+    - [x] **Done** — Step 1: map data, shared General MIDI names, song persistence and reusable map files; seven new core tests and GCC/Clang Debug suites pass. See status.md.
+    - [ ] **To do** — Step 2: choose maps and show names in the piano roll and inspector; manual updates and functional trial.
+    - [ ] **To do** — Step 3: names in navigation, search, selection and the palette; tests, manual updates and functional trial.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.

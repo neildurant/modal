@@ -1,4 +1,7 @@
 add_library(modal_core STATIC
+    drum_map.cpp
+    drum_map_file.cpp
+    text_format.cpp
     engine.cpp
     files.cpp
     freeze.cpp

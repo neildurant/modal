@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/core/drum_map.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
 #include <modal/ui/bar.hpp>
@@ -35,59 +36,6 @@ constexpr int kVelocityWidth = 5; // a cell more than the digits for the cursor,
 constexpr int kVelocityLabel = 4; // Vel, before it
 constexpr int kNumberWidth = 6;   // a count-in's or pre-roll's, then whether bars or beats
 constexpr int kUnitWidth = 9;
-
-// The General MIDI percussion names, which most drum sounds follow, from 35 to 81.
-std::string_view drumName(std::uint8_t note)
-{
-    static constexpr std::array<std::string_view, 47> kNames{"Acoustic Bass Drum",
-                                                             "Bass Drum 1",
-                                                             "Side Stick",
-                                                             "Acoustic Snare",
-                                                             "Hand Clap",
-                                                             "Electric Snare",
-                                                             "Low Floor Tom",
-                                                             "Closed Hi-Hat",
-                                                             "High Floor Tom",
-                                                             "Pedal Hi-Hat",
-                                                             "Low Tom",
-                                                             "Open Hi-Hat",
-                                                             "Low-Mid Tom",
-                                                             "Hi-Mid Tom",
-                                                             "Crash Cymbal 1",
-                                                             "High Tom",
-                                                             "Ride Cymbal 1",
-                                                             "Chinese Cymbal",
-                                                             "Ride Bell",
-                                                             "Tambourine",
-                                                             "Splash Cymbal",
-                                                             "Cowbell",
-                                                             "Crash Cymbal 2",
-                                                             "Vibraslap",
-                                                             "Ride Cymbal 2",
-                                                             "Hi Bongo",
-                                                             "Low Bongo",
-                                                             "Mute Hi Conga",
-                                                             "Open Hi Conga",
-                                                             "Low Conga",
-                                                             "High Timbale",
-                                                             "Low Timbale",
-                                                             "High Agogo",
-                                                             "Low Agogo",
-                                                             "Cabasa",
-                                                             "Maracas",
-                                                             "Short Whistle",
-                                                             "Long Whistle",
-                                                             "Short Guiro",
-                                                             "Long Guiro",
-                                                             "Claves",
-                                                             "Hi Wood Block",
-                                                             "Low Wood Block",
-                                                             "Mute Cuica",
-                                                             "Open Cuica",
-                                                             "Mute Triangle",
-                                                             "Open Triangle"};
-    return note >= 35 && note <= 81 ? kNames[note - 35] : std::string_view{};
-}
 
 std::string_view label(Setting setting)
 {
@@ -839,8 +787,8 @@ void MetronomeView::addRegions(Frame& frame) const
             const bool down = setting == Setting::Downbeat;
             field(setting, Field::Value, valueX, kNoteWidth - 1, false);
             const auto note = down ? song.metronome.downbeatNote : song.metronome.beatNote;
-            page.text.push_back(
-                {valueX + kNoteWidth * cell_.width, y, decodeUtf8(drumName(note)), dim});
+            page.text.push_back({valueX + kNoteWidth * cell_.width, y,
+                                 decodeUtf8(core::generalMidiDrumName(note)), dim});
             const int labelX = valueX + (kNoteWidth + kDrumWidth) * cell_.width;
             page.text.push_back({labelX, y, U"Vel", dim});
             const int velocityX = labelX + kVelocityLabel * cell_.width;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "text_format.hpp"
+
 #include <modal/core/files.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/pitch.hpp>
@@ -24,6 +26,11 @@ namespace modal::core
 namespace
 {
 
+using textFormat::parseInteger;
+using textFormat::quotedText;
+using textFormat::Token;
+using textFormat::tokenize;
+
 constexpr int kVersion = 1;
 constexpr std::uintmax_t kMaxFileSize = 256u * 1024 * 1024;
 constexpr std::int64_t kMaxPpqn = std::int64_t{1} << 20;
@@ -35,72 +42,6 @@ constexpr std::int64_t kFractionDenominators = 768;
 constexpr std::string_view kHexDigits = "0123456789ABCDEF";
 
 // Writing.
-
-// The length of the UTF-8 sequence starting at `i`, or 0 if there isn't a valid one.
-std::size_t utf8Length(std::string_view text, std::size_t i)
-{
-    const auto lead = static_cast<unsigned char>(text[i]);
-    std::size_t length = 0;
-    if (lead < 0x80)
-    {
-        length = 1;
-    }
-    else if (lead >= 0xC2 && lead <= 0xDF)
-    {
-        length = 2;
-    }
-    else if (lead >= 0xE0 && lead <= 0xEF)
-    {
-        length = 3;
-    }
-    else if (lead >= 0xF0 && lead <= 0xF4)
-    {
-        length = 4;
-    }
-    if (length == 0 || i + length > text.size())
-    {
-        return 0;
-    }
-    for (std::size_t k = 1; k < length; ++k)
-    {
-        if ((static_cast<unsigned char>(text[i + k]) & 0xC0) != 0x80)
-        {
-            return 0;
-        }
-    }
-    return length;
-}
-
-// Text in double quotes, with \" and \\, and \xNN for control characters and for bytes that
-// aren't UTF-8, as an imported file's raw text may have.
-std::string quotedText(std::string_view text)
-{
-    std::string out = "\"";
-    for (std::size_t i = 0; i < text.size();)
-    {
-        const auto byte = static_cast<unsigned char>(text[i]);
-        const auto length = utf8Length(text, i);
-        if (byte == '"' || byte == '\\')
-        {
-            out += '\\';
-            out += text[i++];
-        }
-        else if (length == 0 || byte < 0x20 || byte == 0x7F)
-        {
-            out += "\\x";
-            out += kHexDigits[byte >> 4];
-            out += kHexDigits[byte & 0xF];
-            ++i;
-        }
-        else
-        {
-            out += text.substr(i, length);
-            i += length;
-        }
-    }
-    out += '"';
-    return out;
-}
 
 std::string positionText(const MeterMap& meter, Tick tick)
 {
@@ -198,95 +139,6 @@ constexpr std::array<std::string_view, 3> kModes{"none", "countin", "preroll"};
 
 // Reading.
 
-struct Token
-{
-    std::string text;
-    bool quoted = false; // the token starts with a quote, so it's text, never a setting
-};
-
-// Splits a line into tokens at spaces and tabs, reading quoted text with its escapes, also
-// as part of a token (port="My Port"). Returns an error message for a broken quote.
-std::string tokenize(std::string_view line, std::vector<Token>& tokens)
-{
-    const auto hex = [](char c) -> int
-    {
-        const auto at = kHexDigits.find(static_cast<char>(c >= 'a' ? c - 'a' + 'A' : c));
-        return at == std::string_view::npos ? -1 : static_cast<int>(at);
-    };
-    std::size_t i = 0;
-    for (;;)
-    {
-        while (i < line.size() && (line[i] == ' ' || line[i] == '\t'))
-        {
-            ++i;
-        }
-        if (i == line.size())
-        {
-            return {};
-        }
-        Token token;
-        token.quoted = line[i] == '"';
-        while (i < line.size() && line[i] != ' ' && line[i] != '\t')
-        {
-            if (line[i] != '"')
-            {
-                token.text += line[i++];
-                continue;
-            }
-            ++i;
-            for (;;)
-            {
-                if (i == line.size())
-                {
-                    return "a quote isn't closed";
-                }
-                const char c = line[i++];
-                if (c == '"')
-                {
-                    break;
-                }
-                if (c != '\\')
-                {
-                    token.text += c;
-                    continue;
-                }
-                const char escaped = i < line.size() ? line[i++] : '\0';
-                if (escaped == '"' || escaped == '\\')
-                {
-                    token.text += escaped;
-                }
-                else if (escaped == 'x' && i + 2 <= line.size() && hex(line[i]) >= 0 &&
-                         hex(line[i + 1]) >= 0)
-                {
-                    token.text += static_cast<char>(hex(line[i]) * 16 + hex(line[i + 1]));
-                    i += 2;
-                }
-                else
-                {
-                    return "unknown escape in quoted text";
-                }
-            }
-        }
-        tokens.push_back(std::move(token));
-    }
-}
-
-std::optional<std::int64_t> parseInteger(std::string_view text, std::int64_t min, std::int64_t max)
-{
-    if (!text.empty() && text[0] == '+')
-    {
-        text.remove_prefix(1);
-    }
-    std::int64_t value = 0;
-    const auto* const end = text.data() + text.size();
-    const auto [ptr, error] = std::from_chars(text.data(), end, value);
-    if (text.empty() || error != std::errc{} || ptr != end || value < min || value > max)
-    {
-        return std::nullopt;
-    }
-    return value;
-}
-
 std::optional<BarBeatTick> parsePosition(std::string_view text)
 {
     const auto first = text.find(':');
@@ -348,6 +200,7 @@ private:
     bool readCountIn(std::span<const Token> tokens);
     bool readRecord(std::span<const Token> tokens);
     bool readTrack(std::span<const Token> tokens);
+    bool readDrumMap(std::span<const Token> tokens);
     bool readSection(std::span<const Token> tokens);
     bool readMeter(std::span<const Token> tokens);
     bool readTempo(std::span<const Token> tokens);
@@ -501,6 +354,10 @@ bool Reader::readLine(std::span<const Token> tokens)
     if (word == "track")
     {
         return stage_ == Stage::Header ? readTrack(tokens) : readBlock(tokens);
+    }
+    if (word == "drum-map" || word == "drum-note")
+    {
+        return readDrumMap(tokens);
     }
     if (word == "metronome" || word == "countin" || word == "record")
     {
@@ -699,6 +556,49 @@ bool Reader::readCountIn(std::span<const Token> tokens)
         }
         *field = static_cast<int>(*number);
     }
+    return true;
+}
+
+bool Reader::readDrumMap(std::span<const Token> tokens)
+{
+    if (stage_ != Stage::Header || tracks_.empty())
+    {
+        return fail("a drum map belongs after its track declaration, before the sections");
+    }
+    auto& map = tracks_.back().drumMap;
+    if (tokens[0].text == "drum-map")
+    {
+        if (tokens.size() != 2 || !tokens[1].quoted)
+        {
+            return fail("drum-map needs its name in quotes");
+        }
+        if (map)
+        {
+            return fail("this track already has a drum map");
+        }
+        map.emplace();
+        map->name = tokens[1].text;
+        return true;
+    }
+    if (!map)
+    {
+        return fail("drum-note needs a drum-map line first");
+    }
+    if (tokens.size() != 3 || !tokens[2].quoted || tokens[2].text.empty())
+    {
+        return fail("drum-note needs a note number and a non-empty name in quotes");
+    }
+    const auto note = parseInteger(tokens[1].text, 0, 127);
+    if (!note)
+    {
+        return fail("a drum note number should be from 0 to 127");
+    }
+    auto& name = map->notes[static_cast<std::size_t>(*note)];
+    if (!name.empty())
+    {
+        return fail("there's already a name for drum note " + tokens[1].text);
+    }
+    name = tokens[2].text;
     return true;
 }
 
@@ -1854,6 +1754,18 @@ std::string writeSong(const Song& song)
             text += " laneheight=" + std::string{toString(track->laneHeight)};
         }
         line(0, text);
+        if (track->drumMap)
+        {
+            line(1, "drum-map " + quotedText(track->drumMap->name));
+            for (std::size_t note = 0; note < track->drumMap->notes.size(); ++note)
+            {
+                if (!track->drumMap->notes[note].empty())
+                {
+                    line(1, "drum-note " + std::to_string(note) + " " +
+                                quotedText(track->drumMap->notes[note]));
+                }
+            }
+        }
     }
 
     const EventText eventText{ppqn};

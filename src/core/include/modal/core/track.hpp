@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/drum_map.hpp>
 #include <modal/core/event.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/tick.hpp>
@@ -189,6 +190,7 @@ public:
     bool thru = true;       // while armed, send MIDI input on to the track's port and channel
     bool chaseNotes = true; // off for drums and other sounds where a late attack sounds wrong
     ProgramSetup programSetup;
+    std::optional<DrumMap> drumMap; // no map unless explicitly chosen; saved with the track
 
     // Applied at playback only; the stored events never change.
     int transpose = 0;

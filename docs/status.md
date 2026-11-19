@@ -2,9 +2,17 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: controller shaping step 3 is accepted and published through `a198f31`, completing controller ramps and shaping. The next scheduled feature is drum maps, whose open design questions in design.md come first.*
+*Last updated 19 November 2026: drum maps step 1 is implemented and validated locally; hosted CI is pending publication. Next: agree step 2's map chooser and name display before implementation.*
 
 ## Current handoff
+
+### Drum maps step 1 complete locally, 19 November 2026
+
+Design and three-step plan approved; see [design.md, Drum maps](design.md#drum-maps), [decisions.md](decisions.md) and [schedule.md](schedule.md). Step 1 adds value-owned `DrumMap` data on each track, shared General MIDI percussion names (the metronome's existing names unchanged), embedded song maps and reusable text-map readers/writers. Standalone maps use `modal-drum-map 1`, `name "Kit"`, then numbered entries; songs use `drum-map` and `drum-note` after the owning track's header declaration. Song quoting/escaping and integer parsing now live in a private shared text-format helper. Saving a reusable map uses the existing atomic writer. File errors include the path and line; invalid or repeated pitch numbers refuse the whole read. A channel-10 track has no map unless one was explicitly supplied; existing songs acquire none. Copies and undo keep maps independent.
+
+**Validation.** Seven new core test cases pass (251 assertions), covering GM names, sparse maps, escaping/raw text, CRLF/comments, invalid versions/entries, duplicate numbers, song round trips/rescaling at two PPQNs, independent tracks/copies, undo/redo and file errors. Native GCC Debug and Clang Debug build without warnings and each passes the full suite: 1,181 registered tests, three MIDI-dependent skips, no failures. Whole-tree formatting (clang-format 22.1.8), formatting of the new files and `git diff --check` pass. The first incremental GCC discovery tried to write a temporary file under the sandbox's read-only runtime directory; the successful builds use `env -u XDG_RUNTIME_DIR TMPDIR=/tmp`. Hosted CI is pending publication; local Release/sanitizer configurations were not rerun for this persistence-only step.
+
+**Next.** Agree the short UI plan for step 2: choosing None/General MIDI/custom maps, loading/saving reusable copies in `drum-maps/` beside `modalrc`, piano-roll labels and inspector names, with manual updates and a functional trial. The core accepts explicit paths; configuration-directory selection belongs to that UI step. Step 3 adds names in navigation, search, selection and the palette. Folding remains separate. This step adds no map-selection commands or new visible behaviour, so no UI trial or manual changes are needed yet; explain the user workflow with step 2 and name-based operations with step 3 before those steps are Done. No hardware measurements are claimed. The untracked `SequencerPlusGoldManualv4.pdf` remains untouched.
 
 ### Controller shaping complete, 19 November 2026
 
