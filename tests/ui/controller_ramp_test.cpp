@@ -1202,11 +1202,11 @@ TEST_CASE(
                              before.events(r.id()).startingIn(4 * q, 8 * q)));
 }
 
-TEST_CASE("controller retrograde of selected events reverses what is heard until the next change")
+TEST_CASE("controller retrograde of selected events reverses them over their own spacing")
 {
-    // An event selection has no time of its own: its last value holds until the lane's next
-    // event, or the end of its bar, and reversing that puts two lone events in each other's
-    // places rather than both at the first.
+    // An event selection has no time of its own: its last value counts as lasting as long as
+    // the gap before it, but not past the lane's next event or the end of its bar. Two lone
+    // events then change places, and a converted ramp's points reverse where they are.
     Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
     const auto q = r.q();
     const auto times = [&]
@@ -1227,25 +1227,38 @@ TEST_CASE("controller retrograde of selected events reverses what is heard until
     r.type(U"u");
     CHECK(r.document.song() == before);
 
-    // The next event in the bar ends what is reversed, and stays where it is.
+    // A ramp over the first half of a bar, made events: its points reverse within that half,
+    // the rest of the bar holding its first value where it held its last.
+    setCleanupEvents(r, {{0, core::ControlChange{1, 40}},
+                         {q / 2, core::ControlChange{1, 60}},
+                         {q, core::ControlChange{1, 80}},
+                         {3 * q / 2, core::ControlChange{1, 100}},
+                         {2 * q, core::ControlChange{1, 120}}});
+    r.type(U"[b");
+    REQUIRE(r.view().cursor().tick == 0);
+    r.type(U"v\t\t\t\t,xx");
+    CHECK(cleanupValues(r, 1) == std::vector<int>{120, 100, 80, 60, 40});
+    CHECK(times() == std::vector<core::Tick>{0, q / 2, q, 3 * q / 2, 2 * q});
+
+    // The next event ends what is reversed if it comes sooner, and stays where it is.
     setCleanupEvents(r, {{0, core::ControlChange{1, 20}},
-                         {q, core::ControlChange{1, 100}},
+                         {2 * q, core::ControlChange{1, 100}},
                          {3 * q, core::ControlChange{1, 60}}});
     r.type(U"[b");
     REQUIRE(r.view().cursor().tick == 0);
     r.type(U"v\t,xx");
     CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
-    CHECK(times() == std::vector<core::Tick>{0, 2 * q, 3 * q});
+    CHECK(times() == std::vector<core::Tick>{0, q, 3 * q});
 
-    // A next event in a later bar leaves the bar's end as the edge.
+    // So does the end of the bar.
     setCleanupEvents(r, {{0, core::ControlChange{1, 20}},
-                         {2 * q, core::ControlChange{1, 100}},
+                         {3 * q, core::ControlChange{1, 100}},
                          {5 * q, core::ControlChange{1, 60}}});
     r.type(U"[b");
     REQUIRE(r.view().cursor().tick == 0);
     r.type(U"v\t,xx");
     CHECK(cleanupValues(r, 1) == std::vector<int>{100, 20, 60});
-    CHECK(times() == std::vector<core::Tick>{0, 2 * q, 5 * q});
+    CHECK(times() == std::vector<core::Tick>{0, q, 5 * q});
 }
 
 TEST_CASE("timing edits refuse ramp destinations without moving events or the cursor")

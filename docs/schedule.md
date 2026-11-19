@@ -108,8 +108,8 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [ ] **Doing** — Held-contour retrograde implemented; trial found a two-event `v`-selection span bug.
             - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; active-ramp refusal confirmed on trial.
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
-            - [x] **Done** — Two-event Visual-selection retrograde span: edge agreed (the lane's next event or the bar's end), fixed with a regression and accepted on trial. See [status.md](status.md).
-            - [ ] **Doing** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); committed locally, awaiting trial.
+            - [ ] **Doing** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); awaiting trial. See [status.md](status.md).
+            - [x] **Done** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); accepted on trial.
             - [ ] **To do** — Replace interactive remap syntax questions with Type, From and To prompts, mapping within one type.
             - [ ] **To do** — Follow-up regressions, manual/reference updates, Linux checks and rebuilt application for trial.
             - [ ] **To do** — Final functional acceptance and publication; current work is being pushed for continuation elsewhere with the known issue recorded.

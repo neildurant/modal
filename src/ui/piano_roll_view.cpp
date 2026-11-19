@@ -4346,15 +4346,27 @@ std::optional<OperatorTarget> PianoRollView::target(std::string_view motion, int
         result.span = laneSpan();
         if (!velocityLane() && laneRange() && result.span)
         {
+            // The last value lasts as long as the gap before it, so evenly spaced points
+            // reverse where they are, but not past the lane's next event or its bar's end
+            // (decided 18 November 2026, after trial).
             const auto last = result.span->second - 1;
             const auto& m = meter();
             core::Tick end = m.barStart(m.toBarBeatTick(last).bar + 1);
+            std::optional<core::Tick> before;
             for (const auto& entry : laneEntries())
             {
                 if (entry.tick > last)
                 {
                     end = std::min(end, entry.tick);
                 }
+                else if (entry.tick < last && entry.tick >= result.span->first)
+                {
+                    before = std::max(before.value_or(entry.tick), entry.tick);
+                }
+            }
+            if (before)
+            {
+                end = std::min(end, last + (last - *before));
             }
             result.heldEnd = end;
         }

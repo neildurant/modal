@@ -255,10 +255,11 @@ any message exactly at the right edge is left alone.
 
 A selection of the lane's events, made with `v` and Tab, says which
 messages but not how long the last one lasts. Retrograde takes it to last
-as long as it is heard: until the lane's next message, or the end of its
-bar if that comes first. Selecting the two messages in the example above
-therefore gives the same result as the whole bar, and two lone messages
-in a bar simply change places.
+as long as the gap before it, but not past the lane's next message or the
+end of its bar. Two lone messages in a bar therefore change places, and
+a ramp made into events, selected point by point, reverses where it is:
+a rise over the first half of a bar becomes a fall over that half. Use a
+time range such as `ib` when the whole bar is to be reversed.
 
 In a continuous controller lane, use `:retrograde` for the selection or
 cursor's bar, or `, c x` (or `, x x`) followed by a time target. `t` and `T` shift the
