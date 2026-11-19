@@ -66,7 +66,7 @@ std::u32string fitted(std::string_view text, std::size_t cells, bool keepEnd = f
 } // namespace
 
 void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs,
-                         PickedFile done)
+                         PickedFile done, bool confirmOverwrite)
 {
     filePicker_ = FilePicker{};
     auto& picker = *filePicker_;
@@ -74,6 +74,7 @@ void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> s
     picker.version = document_.version();
     picker.done = std::move(done);
     picker.save = saveAs.has_value();
+    picker.confirmOverwrite = confirmOverwrite;
     const auto songs = songFolder(document_, home_);
     const auto maps = drumMapFolder();
     picker.places.emplace_back("Song", songs);
@@ -318,12 +319,15 @@ void Workspace::submitFilePicker()
                    MessageKind::Warning);
             return;
         }
-        mode_ = Mode::Normal; // the confirmation goes on the message row instead of the filename
-        const auto resume = [this] { mode_ = Mode::CommandLine; };
-        ask(
-            "Replace " + utf8Text(path) + "?", [this, path] { finishFilePicker(path); }, resume,
-            resume);
-        return;
+        if (picker.confirmOverwrite)
+        {
+            mode_ = Mode::Normal; // put the confirmation on the message row
+            const auto resume = [this] { mode_ = Mode::CommandLine; };
+            ask(
+                "Replace " + utf8Text(path) + "?", [this, path] { finishFilePicker(path); }, resume,
+                resume);
+            return;
+        }
     }
     finishFilePicker(std::move(path));
 }

@@ -297,7 +297,8 @@ public:
         Config
     };
     using PickedFile = std::function<void(std::optional<std::filesystem::path>)>;
-    void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done);
+    void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done,
+                  bool confirmOverwrite = true);
     std::string takeDrumMapNotice() { return std::exchange(drumMapNotice_, {}); }
     struct Completions
     {
@@ -437,7 +438,7 @@ private:
     void chooseDrumMap() override { report(drumMap()); }
     bool drumMapChoiceKey(const Key& key);
     Region drumMapChoiceRegion() const;
-    void reviewDrumMap(core::TrackId track, std::optional<SavedDrumMap> saved);
+    void reviewDrumMap(core::TrackId track, std::optional<SavedDrumMap> saved, bool saving = false);
     CommandResult loadDrumMap(core::TrackId track, const std::filesystem::path& file);
     CommandResult saveDrumMap(core::TrackId track, const std::filesystem::path& file,
                               bool overwrite);
@@ -468,6 +469,7 @@ private:
         std::vector<DrumMapDifference> differences{};
         std::vector<DrumMapAction> actions{};
         std::size_t top = 0;
+        bool saving = false;
     };
     std::optional<DrumMapChoice> drumMapChoice_;
     DrumMapLibrary drumMaps_;
@@ -1181,6 +1183,7 @@ private:
         std::size_t place = 0;
         bool choosingPlace = false;
         bool save = false;
+        bool confirmOverwrite = true;
         std::string error;
     };
     std::optional<FilePicker> filePicker_;

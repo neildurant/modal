@@ -45,10 +45,11 @@ struct Pickers final : FileHost
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
         using Picker = Workspace::PickerKind;
-        const auto picker = kind == FileKind::Config    ? Picker::Config
-                            : kind == FileKind::DrumMap ? Picker::DrumMap
-                                                        : Picker::Song;
-        workspace.pickFile(picker, suggested, std::move(done));
+        const bool review = kind == FileKind::DrumMapSave;
+        const auto picker = kind == FileKind::Config              ? Picker::Config
+                            : kind == FileKind::DrumMap || review ? Picker::DrumMap
+                                                                  : Picker::Song;
+        workspace.pickFile(picker, suggested, std::move(done), !review);
     }
     void quit() override { quitRequested = true; }
     void songReplaced() override { workspace.showSong(); }
@@ -193,6 +194,39 @@ TEST_CASE("the drum map commands open the picker in the map directory")
     p.press(NamedKey::Escape);
     CHECK(p.workspace.mode() == Mode::Normal);
     CHECK_FALSE(std::filesystem::exists(library / "General MIDI.drum-map"));
+}
+
+TEST_CASE("saving over a drum map from the file picker asks for replacement once")
+{
+    Pickers p;
+    const auto path = p.temporary / "Config/drum-maps/Kit.drum-map";
+    auto saved = core::generalMidiDrumMap();
+    saved.name = "Kit";
+    REQUIRE(core::writeDrumMapFile(saved, path).empty());
+    p.type(U":drum-map-load Kit\n");
+    const auto track = p.document.song().tracks().front()->id();
+    auto marked = saved;
+    marked.alwaysShow.set(36);
+    p.type(U"grgp36\nzP");
+    REQUIRE(p.document.song().track(track)->drumMap == marked);
+
+    p.type(U":drum-map-save\nKit\n");
+    CHECK(p.shows(U"Always show"));
+    CHECK(p.shows(U"Cancel save"));
+    CHECK(p.shows(U"Replace the saved copy"));
+    CHECK_FALSE(p.shows(U"Keep the song's copy"));
+    CHECK_FALSE(p.shows(U"Use the saved copy"));
+    CHECK_FALSE(p.shows(U"Save as another map"));
+    CHECK(core::readDrumMapFile(path).map == saved);
+    p.press(NamedKey::Enter); // Cancel save is selected first.
+    CHECK(core::readDrumMapFile(path).map == saved);
+
+    p.type(U":drum-map-save\nKit\n");
+    p.press(NamedKey::Down);
+    p.press(NamedKey::Enter);
+    CHECK(core::readDrumMapFile(path).map == marked);
+    CHECK(p.document.song().track(track)->drumMap == marked);
+    CHECK(p.workspace.message().starts_with("Saved drum map to "));
 }
 
 TEST_CASE("the first save from write and quit only quits after saving")

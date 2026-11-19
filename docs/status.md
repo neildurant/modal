@@ -2,9 +2,17 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: piano-roll folding and the write-config picker were accepted on trial and published. Drum-map Always show marks were accepted on trial.*
+*Last updated 19 November 2026: drum-map Always show marks were accepted on trial. The save confirmation follow-up is ready for trial locally.*
 
 ## Current handoff
+
+### Drum-map save confirmation, 19 November 2026
+
+The Folder panel goes directly to the comparison when saving over a differing file. Cancel save leaves the file untouched and Replace the saved copy writes the map. The command with a typed filename and `!` uses the same confirmation. The map chooser keeps its full set of review actions. See [design.md](design.md#drum-maps).
+
+**Validation.** Workspace regressions cover selecting an existing filename, cancelling without a write, replacing it with updated Always show marks, and handling changes to the saved file during review. The HTML and PDF manuals build and their references pass. Desktop trial is pending.
+
+**To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal` and use `gr`, `gp 53` then Enter, and `zP`. Run `:drum-map-save` and select `/tmp/modal-ssd-map-save-trial.drum-map`. Try Cancel save, then open it again and choose Replace the saved copy. Only the replacement should write the file.
 
 ### Drum-map Always show marks, 19 November 2026
 

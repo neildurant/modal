@@ -117,9 +117,10 @@ An instrument chart's octave labels may differ from Modal's, so establish
 the MIDI numbers before copying its names.
 
 An optional `always-show` line keeps that MIDI pitch visible in every fold.
-Set or clear the mark from the piano roll with `zP`. The song keeps the edit
-as part of its own map. To carry the mark to another song, save a reusable copy
-and load it there. The saved-copy review shows differences in these marks too.
+Set or clear the mark from the piano roll with `zP`. `:w` saves the edit in
+the song's own map. To update a reusable map on disk, use `:drum-map-save`,
+select the existing file and confirm **Replace the saved copy**. Choose a
+new filename to keep both files. The comparison shows changes to these marks.
 
 ### Reviewing different copies
 
@@ -149,11 +150,12 @@ unchanged. Undo can restore the track's former map or name; it does not
 remove or restore reusable files. Other tracks and songs retain their own
 copies.
 
-A command-line save refuses to overwrite an existing file. Use
-`:drum-map-save! FILE` to review a differing existing copy, then choose
-**Replace the saved copy** to confirm. A same-name load also opens review
-when its names differ. If a saved file changes while a review is open, Modal
-shows the current comparison before a replacement can proceed.
+Selecting a differing file in the drum-map save picker opens a comparison.
+Choose **Replace the saved copy** to write the file or **Cancel save** to
+leave it as it was. A save with a typed filename needs `:drum-map-save! FILE`
+to reach the same confirmation. A same-name load also opens review when the
+copies differ. If a saved file changes while a review is open, Modal shows
+the current comparison before a replacement can proceed.
 
 ## Mute, Solo, Arm and Thru
 

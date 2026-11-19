@@ -192,7 +192,7 @@ CommandResult Workspace::applyDrumMap(core::TrackId id, std::optional<core::Drum
     return {changed, title, false};
 }
 
-void Workspace::reviewDrumMap(core::TrackId id, std::optional<SavedDrumMap> saved)
+void Workspace::reviewDrumMap(core::TrackId id, std::optional<SavedDrumMap> saved, bool saving)
 {
     const auto* track = document_.song().track(id);
     if (track == nullptr)
@@ -203,10 +203,11 @@ void Workspace::reviewDrumMap(core::TrackId id, std::optional<SavedDrumMap> save
     DrumMapChoice choice{.track = id, .original = track->drumMap};
     choice.stage = DrumMapChoice::Stage::Review;
     choice.saved = std::move(saved);
+    choice.saving = saving;
     choice.actions.push_back(DrumMapAction::Keep);
-    std::vector<std::string> labels{"Keep the song's copy"};
+    std::vector<std::string> labels{saving ? "Cancel save" : "Keep the song's copy"};
     const auto* map = choice.saved && choice.saved->map ? &*choice.saved->map : nullptr;
-    if (map && choice.original != *map)
+    if (!saving && map && choice.original != *map)
     {
         choice.actions.push_back(DrumMapAction::UseSaved);
         labels.emplace_back("Use the saved copy");
@@ -216,7 +217,7 @@ void Workspace::reviewDrumMap(core::TrackId id, std::optional<SavedDrumMap> save
         choice.actions.push_back(DrumMapAction::ReplaceSaved);
         labels.emplace_back("Replace the saved copy");
     }
-    if (choice.original)
+    if (!saving && choice.original)
     {
         choice.actions.push_back(DrumMapAction::SaveAs);
         labels.emplace_back("Save as another map...");
@@ -286,7 +287,7 @@ CommandResult Workspace::saveDrumMap(core::TrackId id, const std::filesystem::pa
         auto loaded = core::readDrumMapFile(file);
         if (loaded.map == track->drumMap)
             return {false, "The saved drum map already matches", false};
-        reviewDrumMap(id, SavedDrumMap{file, std::move(loaded.map), std::move(loaded.error)});
+        reviewDrumMap(id, SavedDrumMap{file, std::move(loaded.map), std::move(loaded.error)}, true);
         return {true};
     }
     return writeDrumMapCopy(*track->drumMap, file);
@@ -342,7 +343,7 @@ CommandResult Workspace::drumMapFile(const CommandCall& call, bool save)
         std::filesystem::create_directories(drumMapFolder(), error);
         if (error)
             return CommandResult::error("Can't create drum-map folder: " + error.message());
-        fileHost_->chooseSave(FileHost::FileKind::DrumMap,
+        fileHost_->chooseSave(FileHost::FileKind::DrumMapSave,
                               suggestedDrumMap(drumMapFolder(), track->drumMap->name), done);
     }
     else
@@ -495,8 +496,10 @@ bool Workspace::drumMapChoiceKey(const Key& key)
                     auto fresh = core::readDrumMapFile(*saved.file);
                     if (fresh.map != saved.map || fresh.error != saved.error)
                     {
-                        reviewDrumMap(id, SavedDrumMap{saved.file, std::move(fresh.map),
-                                                       std::move(fresh.error)});
+                        reviewDrumMap(
+                            id,
+                            SavedDrumMap{saved.file, std::move(fresh.map), std::move(fresh.error)},
+                            choice.saving);
                         setMessage("The saved file changed; review its current copy",
                                    MessageKind::Warning);
                         return true;
@@ -607,8 +610,8 @@ Region Workspace::drumMapChoiceRegion() const
     };
     const auto source = choice.saved ? choice.saved->label() : std::string{"no saved copy"};
     put(margin, 0,
-        decodeUtf8("Drum map: " + (choice.original ? choice.original->name : "None") + " — " +
-                   source),
+        decodeUtf8((choice.saving ? "Save drum map: " : "Drum map: ") +
+                   (choice.original ? choice.original->name : "None") + " — " + source),
         heading, columns);
     const int songX = margin + pitchColumns * w;
     const int savedX = songX + (valueColumns + 2) * w;

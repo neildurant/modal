@@ -429,10 +429,11 @@ public:
         if (kind != FileKind::Midi)
         {
             using Picker = ui::Workspace::PickerKind;
-            const auto picker = kind == FileKind::Config    ? Picker::Config
-                                : kind == FileKind::DrumMap ? Picker::DrumMap
-                                                            : Picker::Song;
-            view_.pickFile(picker, suggested, std::move(done));
+            const bool review = kind == FileKind::DrumMapSave;
+            const auto picker = kind == FileKind::Config              ? Picker::Config
+                                : kind == FileKind::DrumMap || review ? Picker::DrumMap
+                                                                      : Picker::Song;
+            view_.pickFile(picker, suggested, std::move(done), !review);
             return;
         }
         chooseFile(true, {{"MIDI files", "mid"}}, suggested, std::move(done));

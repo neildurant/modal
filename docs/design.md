@@ -423,6 +423,8 @@ On trial, ambiguous choices were given note counts across the current track, wit
 
 **Always show (agreed 19 November 2026).** On a mapped track, `zP` or `:pitch-always-show` toggles the current pitch's Always show mark. A dot identifies the marked row. The pitch appears in every fold mode and scope even when it is unnamed or has no events. The edit is undoable and changes the song's embedded map. Saving a reusable map carries the marks; comparing copies shows mark differences. Reusable maps store marks as optional `always-show N` lines and songs use `drum-always-show N` under the owning map. Existing files without the lines have no marks.
 
+**Confirming a map save (agreed 19 November 2026).** When `:drum-map-save` selects a differing existing file in the Folder panel, the comparison is the overwrite confirmation. It offers Cancel save and Replace the saved copy, as does `:drum-map-save! FILE`. Cancelling leaves the file as it was. An identical file needs no write. Reviewing through the chooser or loading a differing same-name copy still offers the applicable review actions above.
+
 **The section strip (decided October 2026)**
 
 ```
@@ -691,7 +693,7 @@ section "Verse 1" bars=16 colour=blue
 
 The Folder panel is used by `:e`, by `:w` or `:wq` when they need a filename, and by the drum-map load and save commands and `:write-config` without a filename. Song commands start in the song's directory or at home for a new song. Drum-map commands start in the reusable maps directory, and `:write-config` starts in Config and suggests `modalrc` without adding an extension. The panel shows its current path, subfolders, and files of the relevant kind. Up and Down choose a row, Enter enters a folder or accepts a file, and `../` goes to its parent. Alt-Down opens Places with Song, Config, Drum maps and State where available. Escape from Places returns to the file list, and Escape from the file list cancels the command.
 
-The filename line filters the list and also takes a relative, absolute or home-relative path. Tab uses the command line's shared-prefix completion, then cycles choices, with a trailing separator on a folder so completion can continue inside it. A save suggests its name and asks explicitly before overwriting an existing file, after applying the default extension. Declining returns to the panel. A changed song invalidates a pending choice. Existing checks, including the drum-map comparison and recording guards, still apply. Recent Songs stays with the later song work and can reuse the panel style for paths from several places.
+The filename line filters the list and also takes a relative, absolute or home-relative path. Tab uses the command line's shared-prefix completion, then cycles choices, with a trailing separator on a folder so completion can continue inside it. A save suggests its name and asks explicitly before overwriting an existing file, after applying the default extension. Declining the generic overwrite question returns to the panel. The drum-map save command confirms replacement in its comparison. A changed song invalidates a pending choice. Recording guards still apply. Recent Songs stays with the later song work and can reuse the panel style for paths from several places.
 
 ## Architecture
 

@@ -585,6 +585,12 @@ TEST_CASE("drum-map file commands use the map folder, protect overwrites and com
     CHECK(core::readDrumMapFile(path).map == kit("Another kick"));
     m.line(U"drum-map-save! \"Another kit\"");
     m.has(U"Another kick");
+    m.has(U"Cancel save");
+    REQUIRE(core::writeDrumMapFile(kit("Edited outside"), path).empty());
+    m.type(U"r\n");
+    CHECK(core::readDrumMapFile(path).map == kit("Edited outside"));
+    m.has(U"Edited outside");
+    m.has(U"Cancel save");
     m.type(U"r\n");
     CHECK(core::readDrumMapFile(path).map == kit());
     const auto choices = m.ws.choices(Choices::DrumMapFile, "My");

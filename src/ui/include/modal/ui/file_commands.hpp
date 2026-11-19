@@ -30,6 +30,7 @@ public:
         Midi,   // a MIDI file to export
         Config, // a config file, written by write-config
         DrumMap,
+        DrumMapSave, // the save command confirms replacement in its comparison
     };
 
     // Asks for a file to open or to save to, suggesting one (beside the song's file, or the
