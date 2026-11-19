@@ -617,12 +617,20 @@ struct PendingDialog
     std::string suggested;
     Uint32 event = 0;
     std::optional<std::filesystem::path> chosen;
+    std::string error;
 };
 
 void SDLCALL dialogAnswered(void* userdata, const char* const* files, int)
 {
     auto* pending = static_cast<PendingDialog*>(userdata);
-    if (files != nullptr && files[0] != nullptr)
+    if (files == nullptr)
+    {
+        // SDL keeps errors on the callback thread, so copy this before queuing the answer.
+        pending->error = SDL_GetError();
+        if (pending->error.empty())
+            pending->error = "The system did not provide a reason";
+    }
+    else if (files[0] != nullptr && files[0][0] != '\0')
     {
         pending->chosen = utf8Path(files[0]);
     }
@@ -643,6 +651,11 @@ void Window::chooseFile(bool save, std::vector<FileFilter> filters,
     if (impl_->dialogEvent == 0)
     {
         impl_->dialogEvent = SDL_RegisterEvents(1);
+        if (impl_->dialogEvent == 0)
+        {
+            done(std::nullopt, "Could not register the file dialog event");
+            return;
+        }
     }
     auto pending = std::make_unique<PendingDialog>();
     pending->done = std::move(done);
@@ -673,7 +686,7 @@ void Window::answerDialog(const SDL_Event& event)
     const std::unique_ptr<PendingDialog> pending{static_cast<PendingDialog*>(event.user.data1)};
     if (pending->done)
     {
-        pending->done(pending->chosen);
+        pending->done(std::move(pending->chosen), std::move(pending->error));
     }
 }
 

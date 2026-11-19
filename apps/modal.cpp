@@ -414,31 +414,30 @@ public:
     void chooseOpen(Chosen done) override
     {
         const auto& file = document_.file() ? document_.file() : document_.importedFrom();
-        window_.chooseFile(false,
-                           {{"Songs and MIDI files", "modal;mid;midi"},
-                            {"Songs", "modal"},
-                            {"MIDI files", "mid;midi"}},
-                           file ? file->parent_path() : std::filesystem::path{}, std::move(done));
+        chooseFile(false,
+                   {{"Songs and MIDI files", "modal;mid;midi"},
+                    {"Songs", "modal"},
+                    {"MIDI files", "mid;midi"}},
+                   file ? file->parent_path() : std::filesystem::path{}, std::move(done));
     }
 
     void chooseOpenFile(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
         if (kind == FileKind::DrumMap)
-            window_.chooseFile(false, {{"Drum maps", "drum-map"}, {"All files", "*"}}, suggested,
-                               std::move(done));
+            chooseFile(false, {{"Drum maps", "drum-map"}, {"All files", "*"}}, suggested,
+                       std::move(done));
         else
             chooseOpen(std::move(done));
     }
 
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
-        window_.chooseFile(true,
-                           {kind == FileKind::Song   ? ui::sdl::FileFilter{"Songs", "modal"}
-                            : kind == FileKind::Midi ? ui::sdl::FileFilter{"MIDI files", "mid"}
-                            : kind == FileKind::DrumMap
-                                ? ui::sdl::FileFilter{"Drum maps", "drum-map"}
-                                : ui::sdl::FileFilter{"All files", "*"}},
-                           suggested, std::move(done));
+        chooseFile(true,
+                   {kind == FileKind::Song      ? ui::sdl::FileFilter{"Songs", "modal"}
+                    : kind == FileKind::Midi    ? ui::sdl::FileFilter{"MIDI files", "mid"}
+                    : kind == FileKind::DrumMap ? ui::sdl::FileFilter{"Drum maps", "drum-map"}
+                                                : ui::sdl::FileFilter{"All files", "*"}},
+                   suggested, std::move(done));
     }
 
     void quit() override { window_.close(); }
@@ -459,6 +458,22 @@ public:
     std::string takeMissingPorts() { return std::exchange(missing_, {}); }
 
 private:
+    void chooseFile(bool save, std::vector<ui::sdl::FileFilter> filters,
+                    const std::filesystem::path& suggested, Chosen done)
+    {
+        window_.chooseFile(
+            save, std::move(filters), suggested,
+            [this, done = std::move(done)](std::optional<std::filesystem::path> file,
+                                           std::string error)
+            {
+                if (error.empty())
+                    done(std::move(file));
+                else
+                    report(ui::CommandResult::error("Could not open the file dialog: " + error +
+                                                    ". Give a filename with the command."));
+            });
+    }
+
     ui::sdl::Window& window_;
     ui::Workspace& view_;
     core::Document& document_;

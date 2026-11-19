@@ -503,6 +503,25 @@ TEST_CASE("a window can open at a size in cells")
     CHECK(window.pixelHeight() == 10 * window.cellSize().height);
 }
 
+TEST_CASE("file dialog failures reach the window thread as errors")
+{
+    auto window = offscreen(320, 200);
+    bool answered = false;
+    // SDL refuses this filter before trying to show a native dialog.
+    window->chooseFile(false, {{"Invalid filter", "invalid filter"}}, {},
+                       [&](std::optional<std::filesystem::path> file, std::string error)
+                       {
+                           answered = true;
+                           CHECK_FALSE(file);
+                           CHECK_FALSE(error.empty());
+                       });
+    SDL_Event quit{};
+    quit.type = SDL_EVENT_QUIT;
+    REQUIRE(SDL_PushEvent(&quit));
+    window->run({.redraw = [](Window&) {}, .key = {}, .deadline = {}, .wake = {}});
+    CHECK(answered);
+}
+
 namespace
 {
 

@@ -131,7 +131,7 @@ public:
     // over a file itself), offering the filters' kinds of file and starting from a suggested
     // file. done gets the file chosen, or nothing if the dialog was cancelled or couldn't be
     // shown, later, from run's event loop.
-    using FileChosen = std::function<void(std::optional<std::filesystem::path>)>;
+    using FileChosen = std::function<void(std::optional<std::filesystem::path>, std::string error)>;
     void chooseFile(bool save, std::vector<FileFilter> filters,
                     const std::filesystem::path& suggested, FileChosen done);
 
