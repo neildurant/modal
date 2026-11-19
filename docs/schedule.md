@@ -104,14 +104,14 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — All six Linux configurations pass; application rebuilt for the local trial.
             - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
         - [ ] **Doing** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
-            - [ ] **Doing** — Program-change remapping implemented with regressions; trial requested clearer prompts.
+            - [x] **Done** — Program-change remapping implemented with regressions; clearer prompts accepted on trial.
             - [x] **Done** — Held-contour retrograde implemented; its event-selection span fixed and accepted on trial.
             - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; active-ramp refusal confirmed on trial.
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
             - [x] **Done** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); accepted on trial. See [status.md](status.md).
             - [x] **Done** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); accepted on trial.
-            - [ ] **Doing** — Remap asks Type, From and To, mapping within one type; built 19 November 2026, awaiting trial.
-            - [ ] **To do** — Follow-up regressions, manual/reference updates, Linux checks and rebuilt application for trial.
+            - [x] **Done** — Remap asks Type, From and To, mapping within one type; accepted on trial 19 November 2026, with its no-notes and ramp-message corrections.
+            - [ ] **Doing** — Follow-up regressions, manual/reference updates and trials done (Windows Debug and WSL Clang Debug pass); the full six-configuration Linux check is outstanding.
             - [ ] **To do** — Final functional acceptance and publication; current work is being pushed for continuation elsewhere with the known issue recorded.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
