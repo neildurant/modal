@@ -43,6 +43,8 @@ As well as the commands below, the prompt takes:
 - `port NAME` sets the current track's output port, by its full name or any part of it that matches only one port, ignoring case; `port` alone says which port the track plays to and lists the output ports.
 - The file commands, as in Vim: `e FILE` (or `edit`) opens a song or imports a MIDI file, `w` (or `write`) saves, `w FILE` saves as FILE, `export FILE` writes a Standard MIDI File, `new` starts a new song, `q` (or `quit`) quits and `wq` saves and quits. With no FILE, `e`, `w` (for a song never saved) and `export` show the system's file dialog. `e`, `new` and `q` refuse while there are changes not saved, and `w FILE` and `export FILE` refuse to write over a file; add `!` to go ahead anyway (`q!`, `w! FILE`). A FILE with no extension gets `.modal` (or `.mid` for `export`).
 
+On Linux, SDL uses the desktop's XDG file chooser portal when it is available, with Zenity as its fallback when there is no portal. The portal requires a desktop session with D-Bus and a file chooser backend. File commands also accept paths typed directly at the prompt.
+
 Any command keys can be bound to can be run at the prompt too, by name, such as `:track-next`; one that takes a count takes it after its name, so `:cursor-down 3` moves down three rows. `write-config` and `quit` can't go in `modalrc`, and the movement and window commands can't either, since there's nothing to move when it runs; the file says so if they're there.
 
 ## Commands

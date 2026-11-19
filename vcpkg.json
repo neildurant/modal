@@ -5,11 +5,13 @@
   "builtin-baseline": "357b1a6f8343064ca982a20771e420fcecfe7efc",
   "dependencies": [
     "catch2",
+    { "name": "dbus", "default-features": false, "platform": "linux" },
     "libremidi",
     {
       "name": "sdl3",
       "default-features": false,
       "features": [
+        { "name": "dbus", "platform": "linux" },
         { "name": "wayland", "platform": "linux" },
         { "name": "x11", "platform": "linux" }
       ]

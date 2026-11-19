@@ -813,6 +813,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Resolving drum names after trial (19 November 2026).** Show counts for matching pitches and put those with the most notes first, so recorded articulations are easy to recognise when a kit defines many similar names. Counts are for the current track, and pitches with zero notes remain available. Complete names at `gp` with Tab and align the pitch details in the palette.
 
+**Linux file pickers (decided 19 November 2026).** Enable SDL's D-Bus support so it can use the desktop's XDG file chooser portal. Zenity had failed both inside and outside the application, and the installed portal advertised open and save dialogs. SDL loads the system D-Bus library at runtime. Use core D-Bus in vcpkg for the build headers, with the optional systemd integration disabled.
+
 ## Work order (19 November 2026)
 
 **Loop recording and comping before step entry.** Prioritise the loop/punch/take workflow ahead of step entry. Move take lanes and comping from milestone 16 into that recording milestone, retaining their detailed design as unresolved feature notes. Loops, punch recording and takes is now milestone 11; step entry and remaining input features is milestone 12. Milestone 16 keeps its other alternatives and reusable-material work. Version-1 scope reflects the move; detailed comping behaviour remains to be designed. See schedule.md for the revised order.
