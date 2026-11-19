@@ -94,6 +94,8 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
     {
         return view().runTyping(command);
     }
+    if (filePicker_)
+        return runFilePicker(command);
     if (prompt_.palette)
     {
         return runPalette(command);
@@ -256,6 +258,8 @@ std::optional<std::filesystem::path> Workspace::fileFolder(Choices kind) const
 
 std::vector<std::string> Workspace::choices(Choices kind, std::string_view word) const
 {
+    if (filePicker_ && kind == Choices::File)
+        return filePickerChoices(word);
     if (const auto folder = fileFolder(kind))
     {
         return fileChoices(*folder, word, home_);
@@ -547,8 +551,9 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
 
 std::optional<Workspace::Completions> Workspace::completions() const
 {
-    if (mode_ != Mode::CommandLine || view().typing() || prompt_.palette || !prompt_.completing ||
-        prompt_.completing->line != prompt_.line.text() || prompt_.completing->matches.size() < 2)
+    if (mode_ != Mode::CommandLine || view().typing() || prompt_.palette || filePicker_ ||
+        !prompt_.completing || prompt_.completing->line != prompt_.line.text() ||
+        prompt_.completing->matches.size() < 2)
     {
         return std::nullopt;
     }
@@ -563,6 +568,8 @@ std::optional<Workspace::Completions> Workspace::completions() const
 Workspace::CompletingWord Workspace::completingWord() const
 {
     const auto& text = prompt_.line.text();
+    if (filePicker_)
+        return {0, encodeUtf8(text.substr(0, prompt_.line.cursor())), Choices::File};
     const auto word = wordAt(text, prompt_.line.cursor());
     CompletingWord result{word.start,
                           encodeUtf8(text.substr(word.start, prompt_.line.cursor() - word.start)),
@@ -1211,6 +1218,8 @@ Region Workspace::paletteRegion() const
 
 std::u32string Workspace::promptLabel() const
 {
+    if (filePicker_)
+        return filePicker_->choosingPlace ? U"Choose a place" : U"File name: ";
     // ":", or a question's label, for its answer; or from Visual mode, what's selected, which
     // the line acts on.
     if (prompt_.answer)
@@ -1309,6 +1318,11 @@ Region Workspace::promptRegion() const
 
 std::string Workspace::argumentHint() const
 {
+    if (filePicker_)
+        return !filePicker_->choosingPlace && !filePicker_->suggested.empty() &&
+                       prompt_.line.text().empty()
+                   ? "Enter for " + filePicker_->suggested
+                   : std::string{};
     // At the : prompt, once the line holds a command and a space: its arguments from the one
     // being typed on, as its usage writes them, brackets for those it can do without (decided
     // October 2026, so :bar-insert says it takes [N] [METER]).

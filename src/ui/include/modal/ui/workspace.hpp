@@ -286,6 +286,17 @@ public:
     void setFolders(std::optional<std::filesystem::path> config,
                     std::optional<std::filesystem::path> home);
     void setFileHost(FileHost* host) { fileHost_ = host; }
+    void setStateFolder(std::optional<std::filesystem::path> state)
+    {
+        stateFolder_ = std::move(state);
+    }
+    enum class PickerKind
+    {
+        Song,
+        DrumMap
+    };
+    using PickedFile = std::function<void(std::optional<std::filesystem::path>)>;
+    void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done);
     std::string takeDrumMapNotice() { return std::exchange(drumMapNotice_, {}); }
     struct Completions
     {
@@ -1149,6 +1160,34 @@ private:
     std::array<ChoiceSource, kChoicesCount> sources_;
     std::optional<std::filesystem::path> configFolder_;
     std::optional<std::filesystem::path> home_;
+    std::optional<std::filesystem::path> stateFolder_;
+    struct FilePicker
+    {
+        PickerKind kind;
+        std::uint64_t version;
+        PickedFile done;
+        std::string suggested;
+        std::filesystem::path folder;
+        std::filesystem::path listingFolder;
+        std::vector<std::pair<std::string, std::filesystem::path>> places;
+        std::vector<std::string> entries;
+        std::optional<std::size_t> selected;
+        std::size_t place = 0;
+        bool choosingPlace = false;
+        bool save = false;
+        std::string error;
+    };
+    std::optional<FilePicker> filePicker_;
+    void enterPickerFolder(std::filesystem::path folder);
+    void listPickerFolder();
+    std::vector<std::string> filePickerMatches() const;
+    std::vector<std::string> filePickerChoices(std::string_view word) const;
+    void filePickerEdited();
+    std::optional<bool> runFilePicker(std::string_view command);
+    void submitFilePicker();
+    void finishFilePicker(std::optional<std::filesystem::path> path);
+    int filePickerRows() const;
+    Region filePickerRegion() const;
     // The folder a kind of file argument starts from, if it's a file.
     std::optional<std::filesystem::path> fileFolder(Choices kind) const;
     // Completing at the prompt: the matches, the one chosen as Tab goes round them, where the

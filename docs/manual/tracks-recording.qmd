@@ -92,8 +92,8 @@ copies it into the track; changing that file later does not silently change
 the song. Copying a whole track includes its map.
 
 `:drum-map-load FILE` loads a copy, and `:drum-map-save FILE` writes the
-track's map for reuse. Without a filename, either command opens a file
-dialog. Relative paths start in the `drum-maps/` directory, and a filename
+track's map for reuse. Without a filename, either command opens Modal's
+file picker (@sec-file-picker). Relative paths start in the `drum-maps/` directory, and a filename
 without an extension gains `.drum-map`. Tab completes filenames; quote one
 containing spaces, as in `:drum-map-load "Studio kit.drum-map"`.
 
@@ -138,7 +138,7 @@ choose an action and Enter takes it. Escape keeps both copies as they are.
 | Save as another map | Ask for a new map name and filename, then rename this track's copy after saving |
 
 Choose a new filename when saving as another map to keep both files. Escape
-at the name question or Cancel in the file dialog leaves the song's name
+at the name question or in the file picker leaves the song's name
 unchanged. Undo can restore the track's former map or name; it does not
 remove or restore reusable files. Other tracks and songs retain their own
 copies.

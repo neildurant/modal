@@ -14,7 +14,7 @@ so moving a section need not rewrite every event's position in the document.
 The file can be inspected or kept in version control, but editing it by hand
 is not required for normal work.
 
-`:w` saves the current native song. A new song opens a save chooser; `:w FILE`
+`:w` saves the current native song. A new song opens Modal's file picker; `:w FILE`
 saves to a named file. With no extension Modal adds `.modal`. `:wq` saves
 and quits. Native saves use a temporary file and replacement to avoid leaving
 a partially written song if writing fails.
@@ -33,6 +33,28 @@ The native `.modal` file format is still under development. Compatibility
 between files written by different development versions is not yet guaranteed.
 Keep separate copies of important work before trying a newer build.
 Undo history is a working-session facility, not a substitute for saved copies.
+
+## Choosing a file {#sec-file-picker}
+
+The picker lets you see the directory as you type or browse. `:e` opens it
+beside the current song, or in your home directory for a new song. `:w` and
+`:wq` use it when the song needs a filename. Drum-map commands without a
+filename start in the reusable maps directory.
+
+Use Up and Down to choose a row and Enter to open it. A folder leads to its
+contents, and `../` goes up to the parent. Alt-Down opens **Places**, where
+you can jump to **Song**, **Config**, **Drum maps** or **State**. For example,
+**State** is useful when opening a recovered song. Escape backs out of Places
+or cancels the picker.
+
+Typing narrows the list. Tab completes the common part of matching names
+and then cycles through the choices. Completed folders end in `/` so you
+can keep completing inside them. You can also type an absolute path, or a
+path relative to the folder shown.
+
+When saving, Enter on an empty filename accepts the suggestion. Type another
+name to save elsewhere. If a file already exists, Modal asks before replacing
+it. Press `n` or Escape to return to the picker and choose a different name.
 
 ## Importing MIDI
 

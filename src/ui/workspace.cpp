@@ -1064,6 +1064,12 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (filePicker_ && question_ && mode_ == Mode::Normal)
+    {
+        const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});
+        if (match.binding != nullptr && match.binding->command == "panic")
+            return run("panic", 0).changed;
+    }
     if (drumMapChoice_)
     {
         const auto match = keymap_.match(mode_, std::vector<Key>{key});
@@ -1203,13 +1209,17 @@ bool Workspace::takeKey(const Key& key, std::int64_t now)
             }
             else
             {
+                if (filePicker_ && filePicker_->choosingPlace)
+                    return true;
                 const bool listed = completions().has_value();
                 prompt_.line.insert(key.character);
                 if (prompt_.palette)
                 {
                     prompt_.palette->chosen = 0; // the best of what now matches
                 }
-                if (listed)
+                if (filePicker_)
+                    filePickerEdited();
+                else if (listed)
                 {
                     refilter(); // the matches follow what's typed
                 }

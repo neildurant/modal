@@ -106,6 +106,8 @@ Frame Workspace::frame() const
     }
     if (drumMapChoice_)
         frame.push_back(drumMapChoiceRegion());
+    if (filePicker_ && !question_)
+        frame.push_back(filePickerRegion());
     frame.push_back(messageRowRegion());
     if (mode_ == Mode::CommandLine && !view().typing())
     {
@@ -352,10 +354,10 @@ Bar Workspace::statusBar() const
 {
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
-    state.mode = drumMapChoice_    ? StatusMode::Edit
-                 : freezeChoice_   ? StatusMode::Freeze
-                 : trackMove_      ? StatusMode::Move
-                 : view().typing() ? StatusMode::Edit
+    state.mode = drumMapChoice_ || filePicker_ ? StatusMode::Edit
+                 : freezeChoice_               ? StatusMode::Freeze
+                 : trackMove_                  ? StatusMode::Move
+                 : view().typing()             ? StatusMode::Edit
                  : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_)
                      ? StatusMode::Visual
                      : StatusMode::Normal;

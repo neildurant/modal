@@ -219,8 +219,8 @@ are saved separately for this machine, as described below.
 ## Opening songs
 
 Modal can start with a new song, open a native `.modal` song, or import a
-Standard MIDI File. `:e` opens the file chooser; `:e FILE` names a file
-directly. `modal --demo` starts with a larger built-in demonstration song.
+Standard MIDI File. `:e` opens the file picker (@sec-file-picker), and `:e FILE`
+names a file directly. `modal --demo` starts with a larger built-in demonstration song.
 
 A song can also be given when launching the application from a terminal.
 These examples show the native path notation on each system, from the

@@ -136,15 +136,19 @@ std::vector<std::string> fileChoices(const std::filesystem::path& folder, std::s
     const char sep = in.empty() ? '/' : in.back();
     std::vector<std::string> found;
     std::error_code error;
-    for (const auto& entry :
-         std::filesystem::directory_iterator{typedPath(in.empty() ? "." : in, folder, home), error})
+    auto entry =
+        std::filesystem::directory_iterator{typedPath(in.empty() ? "." : in, folder, home), error};
+    for (; !error && entry != std::filesystem::directory_iterator{}; entry.increment(error))
     {
-        auto file = utf8Text(entry.path().filename());
+        auto file = utf8Text(entry->path().filename());
         if (file.starts_with('.') && !name.starts_with('.'))
         {
             continue;
         }
-        found.push_back(in + file + (entry.is_directory(error) ? std::string{sep} : ""));
+        std::error_code typeError;
+        const bool directory = entry->is_directory(typeError);
+        if (!typeError)
+            found.push_back(in + file + (directory ? std::string{sep} : ""));
     }
     std::ranges::sort(found);
     // In quotes, all of them alike, if the word is or any has a space: a folder's left open

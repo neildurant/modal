@@ -2,11 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum maps steps 1 and 2 are published. Step 3 is implemented locally and awaits a functional trial.*
+*Last updated 19 November 2026: drum maps steps 1 and 2 are published and step 3 was accepted on trial. The in-app file picker is the current work.*
 
 ## Current handoff
 
-### Drum maps step 3 implemented locally, 19 November 2026
+### In-app file picker, 19 November 2026
+
+The Folder panel was brought forward after the Linux native picker trials. `:e`, `:w` and `:wq` when a filename is needed, and the drum-map file commands without a filename now use the panel. It lists relevant files and folders, accepts typed paths and Tab completion, and offers Song, Config, Drum maps and State through Alt-Down. A save suggests a filename and checks for an existing file after appending its default extension. Declining overwrite returns to the panel. See [design.md](design.md#file-picker) and [schedule.md](schedule.md).
+
+**Validation.** Eight new Workspace tests cover parent and subfolders, completion with spaces and shared prefixes, Places, first save and write-and-quit, declining overwrite, loading and saving maps, and refusing a pending choice after the song changes. All six Linux configurations pass with 1,212 tests registered and three MIDI-dependent skips. The combined check was interrupted during ThreadSanitizer, which passed on its separate rerun. Whole-tree formatting and the patch whitespace checks pass. The picker and Places were inspected in dark and light offscreen renders. Both manual formats build and the references pass. The desktop trial is pending.
+
+**To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal`. Try `:e`, browse through a folder and `../`, complete a path with Tab and try Alt-Down for Places. Load the SSD map with `:drum-map-load`, and save a temporary copy with `:drum-map-save` to `/tmp/modal-picker-map-trial`. Try saving the same name again and decline. Start an unnamed song to try `:w` with a path such as `/tmp/modal-picker-song-trial`, then `:w` again to save straight to that file.
+
+### Drum maps step 3 accepted on trial, 19 November 2026
 
 In the piano roll, `gp` goes to a pitch row and `:select pitch PITCH` selects that row. Both keep the same time and accept the track's drum names, MIDI numbers and ordinary pitches. `/` accepts a whole drum name or MIDI number as a pitch search. Ambiguous names offer the full names and MIDI numbers before acting. Ctrl-P with `~` browses the track's names and moves to the selected row. The manual now has a table covering all five palette prefixes. See [design.md](design.md#drum-maps) and [schedule.md](schedule.md).
 
@@ -14,9 +22,9 @@ In the piano roll, `gp` goes to a pitch row and `:select pitch PITCH` selects th
 
 **To try.** Open `/tmp/modal-ssd-drum-map-trial.modal` in `build/linux-gcc/apps/Debug/modal`. Try `gp` then `Kick Center` and Enter, `/snare` with Tab and Enter to choose an articulation, `:select pitch Hi-Hat Tip Closed` (or note `42`) then Escape, and Ctrl-P then `~snare`. Compare rows with the MIDI numbers in the palette and check that direct pitch moves keep the cursor's time.
 
-**Trial refinements.** The name-based search worked on trial. Ambiguous choices show note counts and sort by most notes first, leaving zero-count pitches available. Tab completes drum names and note spellings in `gp`, and the palette aligns the MIDI column. These refinements were accepted on trial. The palette now shows the same counts in MIDI order, refreshing them after an edit or track change. GCC and Clang Debug both pass all 1,204 registered tests with three MIDI-dependent skips. Both manual formats build. To try the addition, use Ctrl-P `~` and check the counts, including mapped pitches with zero notes.
+**Trial refinements.** The name-based search worked on trial. Ambiguous choices show note counts and sort by most notes first, leaving zero-count pitches available. Tab completes drum names and note spellings in `gp`, and the palette aligns the MIDI column. The palette shows the same counts in MIDI order, refreshing them after an edit or track change. The refinements and counts were accepted on trial. GCC and Clang Debug both pass with 1,204 registered tests and three MIDI-dependent skips. Both manual formats build. Publication is pending the picker trial.
 
-**File dialog report.** `:e`, both drum-map commands and Zenity run directly failed to show a picker on the desktop. An offscreen probe showed that Zenity can report GTK initialisation failure as cancellation. Modal displays errors SDL provides. The desktop advertises the XDG FileChooser portal, and the approved Linux build enables SDL's D-Bus support. In a private D-Bus test, SDL chose that backend for opening and saving and returned the selected path. All six Linux configurations passed for the portal build. The follow-up desktop trial still showed no picker, so the native issue remains open. A Modal picker that reuses path completion and offers the relevant directory roots is under discussion.
+**File dialog report.** `:e`, both drum-map commands and Zenity run directly failed to show a picker on the desktop. An offscreen probe showed that Zenity can report GTK initialisation failure as cancellation. Modal displays errors SDL provides. The desktop advertises the XDG FileChooser portal, and the approved Linux build enables SDL's D-Bus support. In a private D-Bus test, SDL chose that backend for opening and saving and returned the selected path. All six Linux configurations passed for the portal build. The follow-up desktop trial still showed no picker, leading to the in-app picker above.
 
 ### Schedule reordered, 19 November 2026
 

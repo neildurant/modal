@@ -413,30 +413,29 @@ public:
 
     void chooseOpen(Chosen done) override
     {
-        const auto& file = document_.file() ? document_.file() : document_.importedFrom();
-        chooseFile(false,
-                   {{"Songs and MIDI files", "modal;mid;midi"},
-                    {"Songs", "modal"},
-                    {"MIDI files", "mid;midi"}},
-                   file ? file->parent_path() : std::filesystem::path{}, std::move(done));
+        view_.pickFile(ui::Workspace::PickerKind::Song, std::nullopt, std::move(done));
     }
 
-    void chooseOpenFile(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
+    void chooseOpenFile(FileKind kind, const std::filesystem::path&, Chosen done) override
     {
         if (kind == FileKind::DrumMap)
-            chooseFile(false, {{"Drum maps", "drum-map"}, {"All files", "*"}}, suggested,
-                       std::move(done));
+            view_.pickFile(ui::Workspace::PickerKind::DrumMap, std::nullopt, std::move(done));
         else
             chooseOpen(std::move(done));
     }
 
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
+        if (kind == FileKind::Song || kind == FileKind::DrumMap)
+        {
+            view_.pickFile(kind == FileKind::Song ? ui::Workspace::PickerKind::Song
+                                                  : ui::Workspace::PickerKind::DrumMap,
+                           suggested, std::move(done));
+            return;
+        }
         chooseFile(true,
-                   {kind == FileKind::Song      ? ui::sdl::FileFilter{"Songs", "modal"}
-                    : kind == FileKind::Midi    ? ui::sdl::FileFilter{"MIDI files", "mid"}
-                    : kind == FileKind::DrumMap ? ui::sdl::FileFilter{"Drum maps", "drum-map"}
-                                                : ui::sdl::FileFilter{"All files", "*"}},
+                   {kind == FileKind::Midi ? ui::sdl::FileFilter{"MIDI files", "mid"}
+                                           : ui::sdl::FileFilter{"All files", "*"}},
                    suggested, std::move(done));
     }
 
@@ -849,6 +848,7 @@ int main(int argc, char* argv[])
                     });
     const auto home = platform::homeDirectory();
     view.setFolders(configDirectory, home);
+    view.setStateFolder(platform::stateDirectory());
     if (auto notice = view.takeDrumMapNotice(); !notice.empty())
         message = message.empty() ? notice : message + "; " + notice;
     if (auto error = apply(settings, window, view, document, playback); !error.empty())

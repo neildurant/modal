@@ -69,6 +69,7 @@ add_executable(modal_tests
     ui/event_list_test.cpp
     ui/event_text_test.cpp
     ui/file_commands_test.cpp
+    ui/file_picker_test.cpp
     ui/freeze_test.cpp
     ui/inspector_test.cpp
     ui/grid_cursor_test.cpp
