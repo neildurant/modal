@@ -134,16 +134,16 @@ Editing follows Vim's model: `[count] operator [count] range-or-object`, with `.
 
 - **Insert mode and step entry**, with `c` as change (delete the range and start step entry there, `cib`) and `Ctrl-Space` as its leader.
 - **Scale lock** (`, T s` proposed), `k` / `j` then moving by scale steps, with a semitone motion that ignores it (key to decide); following a key's scale waits for a key or chord track.
-- **Moving in pitch:** `gk` / `gj` to the next note above or below sounding at the cursor's time, and `gp` and a pitch to go straight to it (proposed).
+- **Moving in pitch:** `gk` / `gj` to the next note above or below sounding at the cursor's time (proposed).
 - **Default note length from the leader,** `, l` and keys (`, l 8 t` for 1/8T) (proposed).
 - **Sections:** recolouring (`, s c`), `:section length N`.
 - **Track command grouping:** `, t` groups track management; actual commands and bindings are listed in grammar.md.
-- **Search:** across tracks in the arrangement, drum-map names (`/kick`), matching controllers highlighted in the lane, interval and rhythm patterns.
+- **Search:** across tracks in the arrangement, matching controllers highlighted in the lane, interval and rhythm patterns.
 - **Ripple to the end of a track** (`:ripple track`), for rare cases.
 - **Undo:** an undo tree; Vim's other registers (`"0`, `"_`, `"+`).
 - **A jump list (requested November 2026):** `Ctrl-o` and `Ctrl-i` go back and forward through the places jumped from and to, as in Vim, across views: jump to the bridge to check something, and `Ctrl-o` goes straight back to where editing was. Which moves count as jumps (marks, `gg`/`G`, sections, search, opening another view) is to decide, as is how it sits with `` ` `` / `'`, which already go back to before the last jump.
 - **Paste history (requested November 2026):** as Emacs's kill ring and yank-pop: straight after a put, one key replaces what was put with the copy before, and again with the one before that, so a phrase copied a few moves ago isn't lost. Vim's numbered registers (`"1` to `"9`) are the same history by name; the key, how far back it goes, and whether deletes go into it as well as yanks are to decide.
-- **Visual mode:** `:select pitch C1 in section` and drum-map names; hand-picked notes and pitch rows apart, with folding.
+- **Visual mode:** A section-limited form such as `:select pitch C1 in section`, and hand-picked notes alongside row selections.
 
 ## MIDI transforms
 

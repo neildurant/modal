@@ -113,7 +113,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Remap asks Type, From and To, mapping within one type; accepted on trial 19 November 2026, with its no-notes and ramp-message corrections.
             - [x] **Done** — Follow-up regressions, manual/reference updates and trials; Windows Debug and WSL Clang Debug pass locally, and hosted CI passes all six Linux configurations and Windows Debug/Release.
             - [x] **Done** — Final functional acceptance 19 November 2026 and publication through `a198f31`.
-- [ ] **Doing** — General MIDI and reusable custom drum maps; behaviour and validation in [design.md](design.md#drum-maps) and [status.md](status.md).
+- [x] **Done** — General MIDI and reusable custom drum maps; behaviour and validation in [design.md](design.md#drum-maps) and [status.md](status.md).
     - [x] **Done** — Step 1: map data, shared General MIDI names, song persistence and reusable map files; seven new core tests and GCC/Clang Debug suites pass. See status.md.
     - [x] **Done** — Step 2: choosing maps, file management and names; accepted on trial 19 November 2026. See design.md and status.md.
         - [x] **Done** — Piano-roll labels and inspector names.
@@ -122,7 +122,7 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
         - [x] **Done** — Functional trial accepted with the SSD test material.
     - [x] **Done** — Step 3: names in navigation, search, selection and the palette. See [design.md](design.md#drum-maps).
         - [x] **Done** — Resolve pitch names from the current track and offer choices for ambiguous names.
-        - [x] **Done** — Navigation, search, selection and palette entry points.
+        - [x] **Done** — Pitch-row selection and direct navigation by drum name, including search and the palette.
         - [x] **Done** — Trial refinements accepted: note counts and ordering in ambiguous choices, aligned MIDI numbers, and `gp` completion.
         - [x] **Done** — Note counts in the drum palette. Accepted on trial.
         - [x] **Done** — Regressions, manual updates and functional trial. See [status.md](status.md).
@@ -142,7 +142,6 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
 - [x] **Done** — Single confirmation for replacing a saved drum map.
     - [x] **Done** — Confirm in the save comparison and keep the chooser's review actions.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.
 
 Drum maps precede folding by named rows. Settle map storage, lane navigation and folding behaviour before their implementation. Several simultaneous controller lanes are scheduled with the later view work.
