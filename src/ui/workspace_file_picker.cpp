@@ -419,4 +419,77 @@ Region Workspace::filePickerRegion() const
     return region;
 }
 
+void Workspace::chooseSong(std::vector<OpenSong> songs, std::size_t active,
+                           std::function<void(std::size_t)> chosen)
+{
+    std::vector<std::string> labels;
+    std::vector<std::u32string> locations;
+    std::vector<std::size_t> rowWidths;
+    for (std::size_t i = 0; i < songs.size(); ++i)
+    {
+        const auto& song = songs[i];
+        labels.push_back((i == active ? "› " : "  ") + std::string{song.modified ? "+ " : "  "} +
+                         song.name + "  ·  " + song.location);
+        locations.push_back(decodeUtf8(song.location));
+        rowWidths.push_back(decodeUtf8(labels.back()).size() + 2);
+    }
+    songChoice_.emplace(SongChoice{ChoiceList{std::move(labels), active, true},
+                                   std::move(locations), std::move(rowWidths), std::move(chosen)});
+    songChoice_->list.name("song");
+}
+
+bool Workspace::songChoiceKey(const Key& key)
+{
+    message_.clear();
+    const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});
+    const auto command =
+        match.binding ? std::string_view{match.binding->command} : std::string_view{};
+    if (command == "panic")
+        return run("panic", 0).changed;
+    if (command == "command-line-cancel")
+        songChoice_.reset();
+    else if (command == "command-line-run")
+    {
+        if (const auto index = songChoice_->list.chosen())
+        {
+            auto chosen = std::move(songChoice_->chosen);
+            songChoice_.reset();
+            chosen(*index);
+        }
+    }
+    else if (!songChoice_->list.run(command) && key.named == NamedKey::None &&
+             (key.modifiers & (kCtrl | kAlt)) == 0)
+        songChoice_->list.type(key.character);
+    return true;
+}
+
+Region Workspace::songChoiceRegion() const
+{
+    const auto& choice = *songChoice_;
+    const auto bar = messageRow();
+    const int margin = BarSpacing::forCell(cell_).margin;
+    const auto columns =
+        static_cast<std::size_t>(std::max((bar.width - 2 * margin) / cell_.width, 1));
+    std::u32string detail;
+    if (const auto chosen = choice.list.chosen(); chosen && choice.rowWidths[*chosen] > columns)
+        detail = choice.locations[*chosen];
+    const auto maxRows = static_cast<std::size_t>(std::max(bar.y / cell_.height - 8, 1));
+    const auto rows = std::min((detail.size() + columns - 1) / columns, maxRows);
+    if (detail.size() > rows * columns)
+    {
+        detail.resize(rows * columns);
+        detail.back() = U'…';
+    }
+    const int detailHeight = static_cast<int>(rows) * cell_.height;
+    const Rect field{0, bar.y - detailHeight, bar.width, cell_.height};
+    auto region = choice.list.region(field, {0, 0, bar.width, field.y}, cell_);
+    for (std::size_t i = 0; i < rows; ++i)
+        region.text.push_back({margin,
+                               region.bounds.height + static_cast<int>(i) * cell_.height,
+                               detail.substr(i * columns, columns),
+                               {Role::Accent, Role::Panel, kPlain}});
+    region.bounds.height += detailHeight;
+    return region;
+}
+
 } // namespace modal::ui

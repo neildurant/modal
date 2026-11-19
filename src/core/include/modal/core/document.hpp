@@ -96,6 +96,11 @@ public:
     void replace(Song song, std::optional<std::filesystem::path> file,
                  std::optional<std::filesystem::path> importedFrom = std::nullopt);
 
+    // Swap songs and their histories while keeping each document's session hooks. The
+    // caller must finish edits and recording before switching.
+    bool canSwitchSong() const { return groupDepth_ == 0 && !preview_; }
+    void swapSong(Document& other);
+
     // Changes a copy of the song and keeps it, as one undo step, unless the change left the
     // song as it was. Returns whether it changed the song.
     bool edit(std::string title, const EditPlace& place, const std::function<void(Song&)>& change);
@@ -180,7 +185,6 @@ private:
     std::optional<std::filesystem::path> importedFrom_;
     std::deque<State> states_;
     std::size_t current_ = 0;
-    std::uint64_t nextId_ = 0;
     std::uint64_t songId_ = 0; // the song as it is now, a version's or one in a group
     std::uint64_t savedId_ = 0;
     std::size_t undoLevels_ = kDefaultUndoLevels;

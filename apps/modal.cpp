@@ -441,6 +441,13 @@ public:
 
     void quit() override { window_.close(); }
 
+    void chooseSong(std::vector<ui::OpenSong> songs, std::size_t active, SongChosen done) override
+    {
+        view_.chooseSong(std::move(songs), active, std::move(done));
+    }
+
+    bool stopSongPlayback() override { return playback_.player().stop(); }
+
     void songReplaced() override
     {
         view_.showSong();
@@ -451,10 +458,16 @@ public:
         }
     }
 
-    void report(const ui::CommandResult& result) override { view_.report(result); }
-
-    // Which ports a new song names that weren't found, once, to show after what opened it.
-    std::string takeMissingPorts() { return std::exchange(missing_, {}); }
+    void report(const ui::CommandResult& result) override
+    {
+        auto shown = result;
+        if (auto missing = std::exchange(missing_, {}); !missing.empty())
+        {
+            shown.message = shown.message.empty() ? missing : shown.message + "; " + missing;
+            shown.warning = true;
+        }
+        view_.report(shown);
+    }
 
 private:
     void chooseFile(bool save, std::vector<ui::sdl::FileFilter> filters,
@@ -901,7 +914,8 @@ int main(int argc, char* argv[])
     FileHost files{window, view, document, playback};
     view.setFileHost(&files);
     ui::addPromptCommands(commands, reader, config, configDirectory, &files, home);
-    ui::addFileCommands(commands, view.recordingSession(), files, home);
+    const auto otherSongsModified =
+        ui::addFileCommands(commands, view.recordingSession(), files, home);
     view.setLineHandler(
         [&](const std::string& line)
         {
@@ -914,12 +928,7 @@ int main(int argc, char* argv[])
                 result.warning = true;
                 result.refused = true;
             }
-            if (auto missing = files.takeMissingPorts(); !missing.empty())
-            {
-                result.message = result.message.empty() ? missing : result.message + "; " + missing;
-                result.warning = true;
-            }
-            view.report(result);
+            files.report(result);
         });
 
     // Closing with unsaved changes asks first (decided in milestone 4). Saving goes through
@@ -930,6 +939,12 @@ int main(int argc, char* argv[])
         if (auto refusal = view.recordingSession().fileOperationRefusal())
         {
             view.report(ui::CommandResult::error(std::move(*refusal)));
+            return false;
+        }
+        if (otherSongsModified())
+        {
+            view.report(ui::CommandResult::error(
+                "Other open songs have unsaved changes. Use :song-select"));
             return false;
         }
         if (!document.modified())

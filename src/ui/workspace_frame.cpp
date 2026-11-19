@@ -106,6 +106,8 @@ Frame Workspace::frame() const
     }
     if (drumMapChoice_)
         frame.push_back(drumMapChoiceRegion());
+    if (songChoice_)
+        frame.push_back(songChoiceRegion());
     if (eventInsertChoice_)
     {
         const auto row = messageRow();
@@ -310,6 +312,11 @@ Bar Workspace::messageBar(bool withMessage) const
         row.left.push_back({"Insert event: " + encodeUtf8(eventInsertChoice_->typed()), text});
         row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
     }
+    else if (songChoice_)
+    {
+        row.left.push_back({"Open songs: " + encodeUtf8(songChoice_->list.typed()), text});
+        row.right.push_back({"› Active · + Unsaved edits · ↑↓ Choose · Enter switches", dim});
+    }
     else if (trackMove_)
     {
         row.left.push_back({"j and k move, Enter accepts, Escape puts back", text});
@@ -366,13 +373,13 @@ Bar Workspace::statusBar() const
 {
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
-    state.mode = drumMapChoice_ || filePicker_ || eventInsertChoice_ ? StatusMode::Edit
-                 : freezeChoice_                                     ? StatusMode::Freeze
-                 : trackMove_                                        ? StatusMode::Move
-                 : view().typing()                                   ? StatusMode::Edit
-                 : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_)
-                     ? StatusMode::Visual
-                     : StatusMode::Normal;
+    state.mode =
+        drumMapChoice_ || filePicker_ || eventInsertChoice_ || songChoice_    ? StatusMode::Edit
+        : freezeChoice_                                                       ? StatusMode::Freeze
+        : trackMove_                                                          ? StatusMode::Move
+        : view().typing()                                                     ? StatusMode::Edit
+        : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_) ? StatusMode::Visual
+                                                                              : StatusMode::Normal;
     const auto& song = document_.song();
     state.overdub = song.recordMode == core::RecordMode::Overdub;
     if (player_)

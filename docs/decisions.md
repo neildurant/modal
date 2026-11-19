@@ -825,6 +825,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 ## Work order (19 November 2026)
 
+**Open songs (agreed after milestone 9).** Use `:song-select` and `:song-close` so the commands identify the song and describe the action. The chooser shows the name, location, active song and modified state. Keep each song's undo and edits in memory, stop playback on a switch and disallow switching while a take is pending. Close checks prevent an inactive song's edits being lost. Restore the inactive song's cursor and views in the next step. See design.md, Open songs.
+
 **Bring the file picker forward.** Song and drum-map file dialogs remained unavailable in the Linux desktop trials, including with portal support. Use the agreed Folder panel for open and save. It keeps the directory visible, supports parent and subfolder navigation, and reuses path completion. A Places menu keeps the main list compact and makes the command's normal directory easy to regain. `:w` uses it when a filename is needed. Keep Recent Songs with the songs milestone.
 
 **Loop recording and comping before step entry.** Prioritise the loop/punch/take workflow ahead of step entry. Move take lanes and comping from milestone 16 into that recording milestone, retaining their detailed design as unresolved feature notes. Loops, punch recording and takes is now milestone 11; step entry and remaining input features is milestone 12. Milestone 16 keeps its other alternatives and reusable-material work. Version-1 scope reflects the move; detailed comping behaviour remains to be designed. See schedule.md for the revised order.

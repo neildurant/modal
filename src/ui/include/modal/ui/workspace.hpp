@@ -46,6 +46,7 @@ namespace modal::ui
 
 class Settings;
 class FileHost;
+struct OpenSong;
 
 // Whether a command is an operator, waiting for a range or object: d, y, > and the others.
 bool isOperator(std::string_view command);
@@ -299,6 +300,8 @@ public:
     using PickedFile = std::function<void(std::optional<std::filesystem::path>)>;
     void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done,
                   bool confirmOverwrite = true);
+    void chooseSong(std::vector<OpenSong> songs, std::size_t active,
+                    std::function<void(std::size_t)> chosen);
     std::string takeDrumMapNotice() { return std::exchange(drumMapNotice_, {}); }
     struct Completions
     {
@@ -1192,6 +1195,16 @@ private:
         std::string error;
     };
     std::optional<FilePicker> filePicker_;
+    struct SongChoice
+    {
+        ChoiceList list;
+        std::vector<std::u32string> locations;
+        std::vector<std::size_t> rowWidths;
+        std::function<void(std::size_t)> chosen;
+    };
+    std::optional<SongChoice> songChoice_;
+    bool songChoiceKey(const Key& key);
+    Region songChoiceRegion() const;
     void enterPickerFolder(std::filesystem::path folder);
     void listPickerFolder();
     std::vector<std::string> filePickerMatches() const;

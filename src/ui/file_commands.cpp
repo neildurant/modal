@@ -10,6 +10,7 @@
 #include <array>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <string_view>
 #include <system_error>
 #include <utility>
@@ -20,7 +21,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 6> kFileCommands{{
+constexpr std::array<CommandInfo, 8> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
@@ -44,6 +45,8 @@ constexpr std::array<CommandInfo, 6> kFileCommands{{
     {.name = "new", .description = "Start a new song", .bang = true, .keys = false},
     {.name = "quit", .description = "Quit", .aliases = "q", .bang = true},
     {.name = "wq", .description = "Save the song, then quit", .keys = false},
+    {.name = "song-select", .description = "Select an open song", .keys = false},
+    {.name = "song-close", .description = "Close the current song", .bang = true, .keys = false},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -121,6 +124,25 @@ CommandResult unsaved(std::string_view command)
                                 "! " + (command == "q" ? "quits anyway" : "discards them"));
 }
 
+std::filesystem::path absolutePath(const std::filesystem::path& file)
+{
+    std::error_code error;
+    const auto absolute = std::filesystem::absolute(file, error);
+    return error ? file : absolute;
+}
+
+bool sameFile(const std::filesystem::path& left, const std::filesystem::path& right)
+{
+    std::error_code error;
+    if (std::filesystem::equivalent(left, right, error))
+        return true;
+    const auto leftPath = std::filesystem::weakly_canonical(absolutePath(left), error);
+    if (error)
+        return left == right;
+    const auto rightPath = std::filesystem::weakly_canonical(absolutePath(right), error);
+    return error ? left == right : leftPath == rightPath;
+}
+
 class FileCommands
 {
 public:
@@ -131,24 +153,21 @@ public:
         , host_(host)
         , home_(std::move(home))
     {
+        songs_.push_back({nullptr, 1});
     }
 
     CommandResult edit(const CommandCall& call)
     {
-        if (document_.modified() && !call.bang)
-        {
-            return unsaved("e");
-        }
         if (const auto file = argument(call, ".modal"))
         {
             return opened(*file, call.bang);
         }
         host_.chooseOpen(
-            [this, force = call.bang](std::optional<std::filesystem::path> file)
+            [this, force = call.bang, activation = activation_](auto file)
             {
                 if (file)
                 {
-                    host_.report(opened(*file, force));
+                    host_.report(activation == activation_ ? opened(*file, force) : songChanged());
                 }
             });
         return {};
@@ -177,11 +196,12 @@ public:
         auto suggested = imported ? std::filesystem::path{*imported}.replace_extension(".modal")
                                   : std::filesystem::path{"Untitled.modal"};
         host_.chooseSave(FileHost::FileKind::Song, suggested,
-                         [this, thenQuit](std::optional<std::filesystem::path> file)
+                         [this, thenQuit, activation = activation_](auto file)
                          {
                              if (file)
                              {
-                                 host_.report(saved(*file, thenQuit));
+                                 host_.report(activation == activation_ ? saved(*file, thenQuit)
+                                                                        : songChanged());
                              }
                          });
         return {};
@@ -206,11 +226,12 @@ public:
         auto suggested = file ? std::filesystem::path{*file}.replace_extension(".mid")
                               : std::filesystem::path{"Untitled.mid"};
         host_.chooseSave(FileHost::FileKind::Midi, suggested,
-                         [this](std::optional<std::filesystem::path> chosen)
+                         [this, activation = activation_](auto chosen)
                          {
                              if (chosen)
                              {
-                                 host_.report(exported(*chosen));
+                                 host_.report(activation == activation_ ? exported(*chosen)
+                                                                        : songChanged());
                              }
                          });
         return {};
@@ -218,17 +239,13 @@ public:
 
     CommandResult newSong(const CommandCall& call)
     {
-        if (document_.modified() && !call.bang)
-        {
-            return unsaved("new");
-        }
-        document_.replace(ui::newSong(), std::nullopt);
-        host_.songReplaced();
-        return {true};
+        return activateNew(std::make_unique<core::Document>(ui::newSong()), call.bang);
     }
 
     CommandResult quit(const CommandCall& call)
     {
+        if (!call.bang && otherModified())
+            return CommandResult::error("Other open songs have unsaved changes. Use :song-select");
         if (document_.modified() && !call.bang)
         {
             return unsaved("q");
@@ -237,7 +254,131 @@ public:
         return {true};
     }
 
+    bool otherModified() const
+    {
+        return std::ranges::any_of(songs_, [](const auto& song)
+                                   { return song.document && song.document->modified(); });
+    }
+
+    CommandResult selectSong()
+    {
+        std::vector<OpenSong> choices;
+        for (std::size_t i = 0; i < songs_.size(); ++i)
+            choices.push_back(describe(i));
+        host_.chooseSong(
+            std::move(choices), active_, [this, activation = activation_](auto index)
+            { host_.report(activation == activation_ ? activate(index, false) : songChanged()); });
+        return {true};
+    }
+
+    CommandResult closeSong(const CommandCall& call)
+    {
+        if (document_.modified() && !call.bang)
+            return unsaved("song-close");
+        if (songs_.size() == 1)
+            return activateNew(std::make_unique<core::Document>(ui::newSong()), true);
+        return activate(active_ == 0 ? 1 : active_ - 1, true);
+    }
+
 private:
+    struct SongSlot
+    {
+        std::unique_ptr<core::Document> document;
+        std::size_t number;
+    };
+
+    const core::Document& at(std::size_t index) const
+    {
+        return index == active_ ? document_ : *songs_[index].document;
+    }
+
+    OpenSong describe(std::size_t index) const
+    {
+        const auto& song = at(index);
+        const auto& file = song.file() ? song.file() : song.importedFrom();
+        const auto& title = song.underlying().title;
+        auto name = !title.empty() ? title : file ? named(*file) : std::string{"Untitled"};
+        if (!file)
+            return {name + " " + std::to_string(songs_[index].number), "Unsaved", song.modified()};
+        const auto location = utf8Text(absolutePath(*file).lexically_normal());
+        return {std::move(name), song.file() ? location : "Imported from " + location,
+                song.modified()};
+    }
+
+    std::optional<std::size_t> openedFile(const std::filesystem::path& file,
+                                          bool includeImports) const
+    {
+        for (std::size_t i = 0; i < songs_.size(); ++i)
+        {
+            const auto& song = at(i);
+            const auto& source = includeImports && !song.file() ? song.importedFrom() : song.file();
+            if (source && sameFile(file, *source))
+                return i;
+        }
+        return std::nullopt;
+    }
+
+    static CommandResult songChanged()
+    {
+        return CommandResult::error("The active song changed. Open the chooser again");
+    }
+
+    std::optional<CommandResult> beforeChange() const
+    {
+        if (auto refusal = recording_.fileOperationRefusal())
+            return CommandResult::error(std::move(*refusal));
+        if (!document_.canSwitchSong())
+            return CommandResult::error("Finish the current edit before changing songs");
+        if (!host_.stopSongPlayback())
+            return CommandResult::error("The engine is busy. Try switching songs again");
+        return std::nullopt;
+    }
+
+    void changedSong()
+    {
+        ++activation_;
+        host_.songReplaced();
+    }
+
+    CommandResult activate(std::size_t index, bool closeCurrent)
+    {
+        if (index >= songs_.size())
+            return songChanged();
+        if (index == active_)
+            return {};
+        if (auto refusal = beforeChange())
+            return *refusal;
+        const auto previous = active_;
+        document_.swapSong(*songs_[index].document);
+        songs_[previous].document = std::move(songs_[index].document);
+        active_ = index;
+        if (closeCurrent)
+        {
+            songs_.erase(songs_.begin() + static_cast<std::ptrdiff_t>(previous));
+            if (previous < index)
+                --active_;
+        }
+        changedSong();
+        return {true};
+    }
+
+    CommandResult activateNew(std::unique_ptr<core::Document> song, bool replace)
+    {
+        if (!replace)
+            songs_.reserve(songs_.size() + 1);
+        if (auto refusal = beforeChange())
+            return *refusal;
+        document_.swapSong(*song);
+        if (!replace)
+        {
+            songs_[active_].document = std::move(song);
+            active_ = songs_.size();
+            songs_.push_back({nullptr, nextNumber_++});
+        }
+        changedSong();
+        return {true};
+    }
+
     std::optional<std::filesystem::path> argument(const CommandCall& call,
                                                   std::string_view extension) const
     {
@@ -250,16 +391,25 @@ private:
         {
             return CommandResult::error(std::move(*refusal));
         }
-        if (document_.modified() && !force)
+        if (const auto existing = openedFile(file, true);
+            existing && (!force || *existing != active_))
         {
-            return unsaved("e");
+            const auto switched = activate(*existing, force);
+            if (switched.refused)
+                return switched;
+            return {true, "Opened " + named(file), false};
         }
-        auto result = openFile(document_, file);
+        auto song = std::make_unique<core::Document>();
+        auto result = openFile(*song, file);
         if (!result.opened)
         {
             return CommandResult::error(std::move(result.message));
         }
-        host_.songReplaced();
+        const bool empty = songs_.size() == 1 && !document_.file() && !document_.importedFrom() &&
+                           !document_.modified() && !document_.canUndo() && !document_.canRedo() &&
+                           document_.underlying() == ui::newSong();
+        if (const auto switched = activateNew(std::move(song), force || empty); switched.refused)
+            return switched;
         if (!result.message.empty())
         {
             return {true, std::move(result.message), true}; // opened, with a warning
@@ -277,6 +427,8 @@ private:
         {
             return *wrong;
         }
+        if (const auto existing = openedFile(file, false); existing && *existing != active_)
+            return CommandResult::error(named(file) + " is already open in another song");
         if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
@@ -284,6 +436,10 @@ private:
         document_.markSaved(file);
         if (thenQuit)
         {
+            if (otherModified())
+                return CommandResult::error(
+                    "Saved " + named(file) +
+                    ". Other open songs have unsaved changes. Use :song-select");
             host_.quit();
         }
         return {true, "Saved " + named(file), false};
@@ -311,6 +467,11 @@ private:
     core::Document& document_;
     FileHost& host_;
     std::optional<std::filesystem::path> home_;
+    // A null document marks the active slot, which uses the workspace's stable document.
+    std::vector<SongSlot> songs_;
+    std::size_t active_ = 0;
+    std::size_t nextNumber_ = 2;
+    std::uint64_t activation_ = 0;
 };
 
 } // namespace
@@ -320,8 +481,8 @@ std::span<const CommandInfo> fileCommands()
     return kFileCommands;
 }
 
-void addFileCommands(CommandRegistry& registry, core::RecordingSession& recording, FileHost& host,
-                     std::optional<std::filesystem::path> home)
+std::function<bool()> addFileCommands(CommandRegistry& registry, core::RecordingSession& recording,
+                                      FileHost& host, std::optional<std::filesystem::path> home)
 {
     // Kept as long as the registry runs them.
     auto commands = std::make_shared<FileCommands>(recording, host, std::move(home));
@@ -348,6 +509,10 @@ void addFileCommands(CommandRegistry& registry, core::RecordingSession& recordin
     add(kFileCommands[4], [commands](const CommandCall& call) { return commands->quit(call); });
     add(kFileCommands[5],
         [commands](const CommandCall& call) { return commands->write(call, true); });
+    add(kFileCommands[6], [commands](const CommandCall&) { return commands->selectSong(); });
+    add(kFileCommands[7],
+        [commands](const CommandCall& call) { return commands->closeSong(call); });
+    return [commands] { return commands->otherModified(); };
 }
 
 std::filesystem::path songFolder(const core::Document& document,

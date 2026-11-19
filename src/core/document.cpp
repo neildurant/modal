@@ -3,11 +3,22 @@
 #include <modal/core/document.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <utility>
 
 namespace modal::core
 {
+
+namespace
+{
+std::uint64_t nextSongVersion()
+{
+    // Histories move between documents. A version must still identify a particular song state.
+    static std::atomic<std::uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+} // namespace
 
 Document::Document(Song song, std::optional<std::filesystem::path> file)
     : song_(std::move(song))
@@ -22,7 +33,7 @@ void Document::replace(Song song, std::optional<std::filesystem::path> file,
     file_ = std::move(file);
     importedFrom_ = std::move(importedFrom);
     states_.clear();
-    songId_ = nextId_++;
+    songId_ = nextSongVersion();
     states_.push_back({song_.parts(), songId_, std::nullopt});
     current_ = 0;
     savedId_ = songId_;
@@ -31,6 +42,27 @@ void Document::replace(Song song, std::optional<std::filesystem::path> file,
     groupStarts_.clear();
     mergeKey_.clear();
     changed();
+}
+
+void Document::swapSong(Document& other)
+{
+    assert(canSwitchSong() && other.canSwitchSong());
+    using std::swap;
+    swap(song_, other.song_);
+    swap(file_, other.file_);
+    swap(importedFrom_, other.importedFrom_);
+    swap(states_, other.states_);
+    swap(current_, other.current_);
+    swap(songId_, other.songId_);
+    swap(savedId_, other.savedId_);
+    for (auto* document : {this, &other})
+    {
+        document->breakMerge();
+        document->refusal_.reset();
+    }
+    trim();
+    changed();
+    other.changed();
 }
 
 bool Document::edit(std::string title, const EditPlace& place,
@@ -81,7 +113,7 @@ bool Document::edit(std::string title, const EditPlace& place,
         return false;
     }
     song_ = std::move(edited);
-    songId_ = nextId_++;
+    songId_ = nextSongVersion();
     const bool merging = !mergeKey.empty() && mergeKey == mergeKey_ && groupDepth_ == 0 &&
                          current_ > 0 && !canRedo() && states_[current_].id != savedId_;
     if (merging && Song{states_[current_ - 1].parts} == song_)

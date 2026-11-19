@@ -13,9 +13,17 @@
 #include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace modal::ui
 {
+
+struct OpenSong
+{
+    std::string name;
+    std::string location;
+    bool modified;
+};
 
 // What the file commands need from the program: the system's file dialogs, quitting, and
 // somewhere to show what happened.
@@ -47,6 +55,10 @@ public:
 
     virtual void quit() = 0;
 
+    using SongChosen = std::function<void(std::size_t)>;
+    virtual void chooseSong(std::vector<OpenSong>, std::size_t, SongChosen) {}
+    virtual bool stopSongPlayback() { return true; }
+
     // The document has a new song, opened or new, to show from the start.
     virtual void songReplaced() = 0;
 
@@ -57,13 +69,15 @@ public:
 // The file commands (decided in milestone 4, following Vim):
 //
 //   edit, e [FILE]     opens a song, or imports a MIDI file (.mid, .midi); with no file, the
-//                      open dialog; refused with unsaved changes, unless edit!
+//                      open picker; switches to an already open song
 //   write, w [FILE]    saves the song, to its file or else through the save dialog; with a
 //                      file, saves it there and makes that the song's file, refusing to write
 //                      over another file unless write!
 //   export [FILE]      writes a Standard MIDI File, through the save dialog if none is given;
 //                      refusing to write over a file unless export!
-//   new                starts a new song; refused with unsaved changes, unless new!
+//   new                opens another untitled song
+//   song-select        chooses among the open songs
+//   song-close[!]      closes the current song, with ! to discard changes
 //   quit, q            quits; refused with unsaved changes, unless quit!
 //   wq                 saves, then quits
 //
@@ -72,9 +86,11 @@ public:
 std::span<const CommandInfo> fileCommands();
 
 // Gives the registry file commands for the session's document. The session, its document
-// and the host outlive the commands' use of them. home is what ~ stands for.
-void addFileCommands(CommandRegistry& registry, core::RecordingSession& recording, FileHost& host,
-                     std::optional<std::filesystem::path> home = std::nullopt);
+// and the host outlive the commands' use of them. Returns a check for unsaved changes in
+// other songs, used by the window's close action. home is what ~ stands for.
+std::function<bool()> addFileCommands(CommandRegistry& registry, core::RecordingSession& recording,
+                                      FileHost& host,
+                                      std::optional<std::filesystem::path> home = std::nullopt);
 
 // Where a song's files typed with a relative path are (decided November 2026, rather than the
 // program's current directory, which means little when it's started from a menu): the folder

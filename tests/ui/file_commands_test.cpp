@@ -165,44 +165,47 @@ TEST_CASE("a relative file is in the song's folder, or the home folder for a new
     CHECK(songFolder(core::Document{newSong()}, f.directory) == f.directory);
 }
 
-TEST_CASE(":e opens a song or imports a MIDI file, refusing to lose unsaved changes")
+TEST_CASE("opening and switching songs preserves their own changes and undo")
 {
     Files f;
     auto song = newSong();
     song.title = "Saved one";
-    REQUIRE(core::writeSongFile(song, f.directory / "song.modal").empty());
+    const auto file = f.directory / "song.modal";
+    REQUIRE(core::writeSongFile(song, file).empty());
     REQUIRE(core::exportSmfFile(song, f.directory / "song.mid").error.empty());
 
     f.change();
-    CHECK(f.run("e " + f.path("song.modal")) ==
-          CommandResult::error("Unsaved changes: :w saves them, or :e! discards them"));
-    CHECK(f.document.song().title == "Changed");
-
-    CHECK(f.run("e! " + f.path("song.modal")) == CommandResult{true, "Opened song.modal", false});
+    const auto version = f.document.version();
+    CHECK(f.run("e " + f.path("song.modal")) == CommandResult{true, "Opened song.modal", false});
     CHECK(f.document.song().title == "Saved one");
-    CHECK(f.document.file() == f.directory / "song.modal");
-    CHECK(f.host.replaced == 1);
+    CHECK(f.document.file() == file);
+    CHECK(f.document.version() != version);
+    CHECK_FALSE(f.document.canUndo());
+    REQUIRE(f.document.edit("Rename", {}, [](core::Song& song) { song.title = "Edited one"; }));
 
-    // Imported, it has no file of its own, and saving asks where, suggesting a .modal.
     CHECK(f.run("e " + f.path("song.mid")) == CommandResult{true, "Opened song.mid", false});
     CHECK_FALSE(f.document.file());
     CHECK(f.document.importedFrom() == f.directory / "song.mid");
     f.run("w");
-    CHECK(f.host.suggested == f.directory / "song.modal"); // beside the MIDI file
+    CHECK(f.host.suggested == file);
     f.host.answer(std::nullopt);
 
-    // With no file, the open dialog.
     CHECK(f.run("e") == CommandResult{});
-    CHECK(f.host.asked == "open");
-    f.host.answer(f.directory / "song.modal");
-    CHECK(f.host.reported == CommandResult{true, "Opened song.modal", false});
+    f.host.answer(file);
+    REQUIRE(f.host.reported);
+    CHECK_FALSE(f.host.reported->refused);
+    CHECK(f.document.song().title == "Edited one");
+    CHECK(f.document.modified());
+    REQUIRE(f.document.undo());
+    CHECK(f.document.song().title == "Saved one");
+    CHECK_FALSE(f.document.modified());
 
-    // A file that can't be read leaves the song as it was.
-    const auto missing = f.run("e " + f.path("missing.modal"));
-    CHECK(missing.warning);
+    const auto missing = f.run("e missing");
+    CHECK(missing.refused);
     CHECK(missing.message.starts_with("Can't open "));
-    CHECK(f.document.file() == f.directory / "song.modal");
+    CHECK(f.document.file() == file);
     CHECK(f.host.replaced == 3);
+    CHECK(f.run("q").refused); // the original untitled song is still modified
 }
 
 TEST_CASE("Importing MIDI with a warning succeeds without refusing the command")
@@ -269,27 +272,51 @@ TEST_CASE(":w refuses a MIDI file's name and :export a song's, from a dialog too
     CHECK_FALSE(files.document.file());
 }
 
-TEST_CASE(":new and :q refuse to lose unsaved changes unless given !")
+TEST_CASE("new and close protect open songs with unsaved changes")
 {
     Files f;
+    f.change();
+    CHECK(f.run("new") == CommandResult{true});
+    CHECK(f.document.song().title.empty());
+    CHECK(f.run("q").refused);
+    CHECK_FALSE(f.host.quitted);
+    CHECK(f.run("song-close") == CommandResult{true});
+    CHECK(f.document.song().title == "Changed");
+    CHECK(f.document.modified());
+    CHECK(f.run("song-close").refused);
+    CHECK(f.run("song-close!") == CommandResult{true});
+    CHECK_FALSE(f.document.modified());
+    CHECK(f.document.song().title.empty());
     CHECK(f.run("q") == CommandResult{true});
     CHECK(f.host.quitted);
+}
 
-    Files changed;
-    changed.change();
-    CHECK(changed.run("new") ==
-          CommandResult::error("Unsaved changes: :w saves them, or :new! discards them"));
-    CHECK(changed.run("q") ==
-          CommandResult::error("Unsaved changes: :w saves them, or :q! quits anyway"));
-    CHECK_FALSE(changed.host.quitted);
-    CHECK(changed.run("new!") == CommandResult{true});
-    CHECK(changed.document.song().title.empty());
-    CHECK_FALSE(changed.document.modified());
-    CHECK(changed.host.replaced == 1);
+TEST_CASE("saving and quitting guard other open songs and reject stale picker results")
+{
+    Files f;
+    f.change();
+    REQUIRE(f.run("w first").changed);
+    REQUIRE(f.document.edit("Rename", {}, [](core::Song& song) { song.title = "Unsaved edit"; }));
+    CHECK(f.run("new") == CommandResult{true});
+    CHECK(f.run("w! first").refused);
+    CHECK(core::readSongFile(f.directory / "first.modal").song->title == "Changed");
 
-    changed.change();
-    CHECK(changed.run("quit!") == CommandResult{true});
-    CHECK(changed.host.quitted);
+    CHECK_FALSE(f.run("w").changed);
+    REQUIRE(f.run("e first").changed);
+    f.host.answer(f.directory / "stale.modal");
+    REQUIRE(f.host.reported);
+    CHECK(f.host.reported->refused);
+    CHECK_FALSE(std::filesystem::exists(f.directory / "stale.modal"));
+
+    CHECK(f.run("new") == CommandResult{true});
+    CHECK(f.run("wq") == CommandResult{});
+    f.host.answer(f.directory / "second.modal");
+    REQUIRE(f.host.reported);
+    CHECK(f.host.reported->refused);
+    CHECK(std::filesystem::exists(f.directory / "second.modal"));
+    CHECK_FALSE(f.host.quitted);
+    CHECK(f.run("q!") == CommandResult{true});
+    CHECK(f.host.quitted);
 }
 
 TEST_CASE(":wq saves and quits, once the song has a file")

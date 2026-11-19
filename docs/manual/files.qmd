@@ -19,15 +19,31 @@ saves to a named file. With no extension Modal adds `.modal`. `:wq` saves
 and quits. Native saves use a temporary file and replacement to avoid leaving
 a partially written song if writing fails.
 
-Unsaved changes are a property of the current song. Opening another song,
-starting a new one or quitting refuses to discard them unless the corresponding
-forced command is used. Closing the window offers the save decision. During
-recording, the take must be stopped and finalised first, even for forced
-commands.
+## Working with several songs
 
-Modal currently edits one song at a time: opening or creating another song
-replaces the current one, subject to the unsaved-change checks above. There
-are no song tabs or multiple open-song buffers in this version.
+Open another song with `:e FILE` or create one with `:new`. Each open song
+keeps its own unsaved edits and undo history. Opening the same file again
+selects its existing copy. Opening a file from a sole, untouched new song
+uses that song's place in the list.
+
+Use `:song-select` to see the open songs. The list shows the song name and
+its path, or **Unsaved** for a new song and **Imported from** for a MIDI
+source. The active song starts highlighted and has a `›` mark. A `+` marks
+unsaved edits. Type part of a name or path to narrow the list, use Up and
+Down to choose, and press Enter to switch. Escape cancels. Long paths can
+wrap under the highlighted row's list. Switching stops playback and
+starts the new song's play position at the beginning. Stop recording and
+let the take finish before changing songs.
+
+`:song-close` closes the current song and requires `!` if it has unsaved
+edits. The last close leaves a new untitled song. `:q` quits only when all
+open songs have been saved or are unchanged. `:wq` saves the current song
+and checks the other open songs before quitting. If closing the window
+reports unsaved edits in other songs, use `:song-select` to reach them.
+`:q!` explicitly discards all remaining unsaved edits.
+
+`:e! FILE` and `:new!` replace the current song and can discard its unsaved
+edits. Use the plain forms to keep it open.
 
 The native `.modal` file format is still under development. Compatibility
 between files written by different development versions is not yet guaranteed.
@@ -108,7 +124,9 @@ ending `.modal`, each saying which command writes that kind.
 | Command | Purpose |
 | --- | --- |
 | `:e` / `:e FILE` | Choose or name a song or MIDI file to open |
-| `:new` | Start a new song |
+| `:new` | Open a new untitled song |
+| `:song-select` | List and switch between open songs |
+| `:song-close[!]` | Close the current song, with `!` to discard its unsaved edits |
 | `:w` / `:w FILE` | Save the native song, or save to a chosen path |
 | `:export` / `:export FILE.mid` | Write a MIDI interchange copy |
 | `:q` | Quit, protecting unsaved changes |

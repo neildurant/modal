@@ -51,6 +51,10 @@ struct Pickers final : FileHost
                                                                   : Picker::Song;
         workspace.pickFile(picker, suggested, std::move(done), !review);
     }
+    void chooseSong(std::vector<OpenSong> songs, std::size_t active, SongChosen done) override
+    {
+        workspace.chooseSong(std::move(songs), active, std::move(done));
+    }
     void quit() override { quitRequested = true; }
     void songReplaced() override { workspace.showSong(); }
     void report(const CommandResult& result) override { workspace.report(result); }
@@ -272,4 +276,47 @@ TEST_CASE("write-config uses the file picker and keeps the chosen filename")
     CHECK(p.workspace.mode() == Mode::Normal);
     CHECK(std::filesystem::is_regular_file(p.temporary / "Config/Nested/modalrc"));
     CHECK_FALSE(std::filesystem::exists(p.temporary / "Config/Nested/modalrc.modal"));
+}
+
+TEST_CASE("song select shows active and modified songs and narrows by path")
+{
+    Pickers p;
+    p.makeSong("Rehearsal/Same.modal", "Same title");
+    p.makeSong("Studio/Same.modal", "Same title");
+    p.type(U":e Rehearsal/Same\n");
+    CHECK(p.document.song().title == "Same title");
+    p.document.edit("Rename track", {},
+                    [](core::Song& song)
+                    {
+                        song.updateTrack(song.tracks().front()->id(),
+                                         [](core::Track& track) { track.name = "Rehearsal edit"; });
+                    });
+    p.type(U":e ../Studio/Same\n:song-select\n");
+    CHECK(p.shows(U"Open songs"));
+    CHECK(p.shows(U"›   Same title"));
+    CHECK(p.shows(U"+ Same title"));
+    CHECK(p.shows(U"Studio"));
+    CHECK(p.shows(U"Rehearsal"));
+    p.type(U"Rehearsal\n");
+    CHECK(p.document.song().tracks().front()->name == "Rehearsal edit");
+    CHECK(p.document.modified());
+    p.type(U"u");
+    CHECK_FALSE(p.document.modified());
+    p.type(U":new\n:song-select\n");
+    CHECK(p.shows(U"Untitled"));
+    CHECK(p.shows(U"Unsaved"));
+    p.type(U"Studio");
+    p.press(NamedKey::Escape);
+    CHECK_FALSE(p.document.file());
+}
+
+TEST_CASE("song select shows the rest of a long location beneath the list")
+{
+    Pickers p;
+    p.workspace.resize(800, 640, {10, 20});
+    const auto folder = std::string(50, 'a') + "/" + std::string(50, 'b');
+    p.makeSong(folder + "/test-ending.modal", "Long location");
+    p.type(decodeUtf8(":e " + folder + "/test-ending\n:song-select\n"));
+    CHECK(p.shows(U"Long location"));
+    CHECK(p.shows(U"test-ending.modal"));
 }

@@ -293,6 +293,12 @@ bool Player::toggle()
     return playing_ ? stop() : play();
 }
 
+void Player::resetMarkerForSong()
+{
+    marker_ = 0;
+    stopExact_ = true;
+}
+
 bool Player::panic()
 {
     if (!engine_.panic())

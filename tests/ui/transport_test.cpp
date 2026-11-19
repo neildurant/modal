@@ -802,21 +802,54 @@ void playNote(Playing& p, std::uint8_t pitch)
 class RecordingFiles final : public FileHost
 {
 public:
+    explicit RecordingFiles(Playing* playing = nullptr)
+        : playing_(playing)
+    {
+    }
     void chooseOpen(Chosen done) override { pending = std::move(done); }
     void chooseSave(FileKind, const std::filesystem::path&, Chosen done) override
     {
         pending = std::move(done);
     }
     void quit() override { quitted = true; }
-    void songReplaced() override { replaced = true; }
+    bool stopSongPlayback() override { return !playing_ || playing_->player.stop(); }
+    void songReplaced() override
+    {
+        replaced = true;
+        if (playing_)
+            playing_->ws.showSong();
+    }
     void report(const CommandResult& result) override { reported = result; }
 
     Chosen pending;
     bool quitted = false;
     bool replaced = false;
     std::optional<CommandResult> reported;
+
+private:
+    Playing* playing_;
 };
 } // namespace
+
+TEST_CASE("changing songs stops playback without carrying the old play position over")
+{
+    Playing p;
+    RecordingFiles files{&p};
+    addFileCommands(p.registry, p.ws.recordingSession(), files);
+    p.document.setListener([&](const auto& song) { p.player.update(song); });
+    p.ws.setRewind(false);
+    p.player.setMarker(p.document.song().ppqn().quarter());
+    REQUIRE(p.player.play());
+    p.runFor(100ms);
+    REQUIRE(p.player.playing());
+
+    CHECK(p.registry.runLine("new").changed);
+    CHECK(files.replaced);
+    CHECK_FALSE(p.player.playing());
+    CHECK(p.player.marker() == 0);
+    p.runFor(100ms);
+    CHECK(p.player.marker() == 0);
+}
 
 TEST_CASE("file operations refuse a pending recording take, even after stop and with bang")
 {
@@ -838,7 +871,8 @@ TEST_CASE("file operations refuse a pending recording take, even after stop and 
     {
         const auto before = p.document.underlying();
         for (const auto command :
-             {U"q", U"q!", U"w", U"w!", U"wq", U"export", U"export!", U"e", U"e!", U"new", U"new!"})
+             {U"q", U"q!", U"w", U"w!", U"wq", U"export", U"export!", U"e", U"e!", U"new", U"new!",
+              U"song-select", U"song-close", U"song-close!"})
         {
             p.type(U":");
             p.type(command);
@@ -896,7 +930,7 @@ TEST_CASE("a file dialog answered during recording cannot change or save the son
     CHECK(saved.song->title == "Existing file");
 }
 
-TEST_CASE("an open dialog rechecks unsaved changes after a take is finalised")
+TEST_CASE("an open picker keeps the finalised take in its song unless replacement was requested")
 {
     Playing p;
     RecordingFiles files;
@@ -921,19 +955,17 @@ TEST_CASE("an open dialog rechecks unsaved changes after a take is finalised")
     const auto callback = std::move(files.pending);
     callback(path);
     REQUIRE(files.reported);
-    if (force)
+    CHECK_FALSE(files.reported->refused);
+    CHECK(files.replaced);
+    CHECK_FALSE(p.document.modified());
+    REQUIRE(p.registry.runLine("song-close").changed);
+    if (!force)
     {
-        CHECK_FALSE(files.reported->refused);
-        CHECK(files.replaced);
-        CHECK_FALSE(p.document.modified());
+        CHECK(p.document.underlying() == before);
+        CHECK(p.document.modified());
     }
     else
-    {
-        CHECK(*files.reported ==
-              CommandResult::error("Unsaved changes: :w saves them, or :e! discards them"));
-        CHECK_FALSE(files.replaced);
-        CHECK(p.document.underlying() == before);
-    }
+        CHECK_FALSE(p.document.modified());
 }
 
 TEST_CASE("a recording session remains bound and protected while its stop is pending")

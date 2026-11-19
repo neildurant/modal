@@ -451,6 +451,7 @@ void Workspace::refresh()
 
 void Workspace::showSong()
 {
+    songChoice_.reset();
     drumMapChoice_.reset();
     eventInsertChoice_.reset();
     ++drumMapDialog_;
@@ -461,10 +462,15 @@ void Workspace::showSong()
     ports_->showSong();
     metronome_->showSong();
     history_.clear();
+    jumpedFrom_.reset();
+    playedFrom_.reset();
+    heard_.reset();
+    wasPlaying_ = false;
+    returning_ = false;
     // A different song plays from its start, not from where the last one's marker was (found
     // in the hardware trial, 13 November 2026).
     if (player_ != nullptr)
-        player_->setMarker(0);
+        player_->resetMarkerForSong();
     layOut();
     reloadDrumMaps(true);
 }
@@ -1068,6 +1074,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (songChoice_)
+        return songChoiceKey(key);
     if (filePicker_ && question_ && mode_ == Mode::Normal)
     {
         const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});
