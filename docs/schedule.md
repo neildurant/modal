@@ -140,17 +140,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 
 Resolve the related [design questions](design.md#to-decide) before implementation. Large-song measurements support this milestone; see Engineering work as needed.
 
-## 11. Step entry and remaining input features
-
-- [ ] **To do** — Detailed per-input channel, message-type and range filtering.
-- [ ] **To do** — MIDI keyboard step entry: notes, chords, rests, ties and cursor advancement.
-- [ ] **To do** — Computer-keyboard step entry and Insert mode, including `c` as change followed by entry.
-- [ ] **To do** — Convenient default-note length and velocity controls, including the proposed length menu.
-- [ ] **To do** — Playable computer keyboard, with note-off on key release.
-
-Build on milestone 8's input and monitoring. Settle the Insert-mode palette/step-entry keys before binding them.
-
-## 12. Loops, punch recording and takes
+## 11. Loops, punch recording and takes
 
 Deliver in this order, building on linear recording:
 
@@ -160,8 +150,19 @@ Deliver in this order, building on linear recording:
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
 - [ ] **To do** — Count-in and pre-roll choices between passes, with each pass an undo step.
+- [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 
-Resolve the related [design questions](design.md#to-decide) before implementation. Take lanes and comping follow in milestone 16.
+Resolve the related [design questions](design.md#to-decide) before implementation.
+
+## 12. Step entry and remaining input features
+
+- [ ] **To do** — Detailed per-input channel, message-type and range filtering.
+- [ ] **To do** — MIDI keyboard step entry: notes, chords, rests, ties and cursor advancement.
+- [ ] **To do** — Computer-keyboard step entry and Insert mode, including `c` as change followed by entry.
+- [ ] **To do** — Convenient default-note length and velocity controls, including the proposed length menu.
+- [ ] **To do** — Playable computer keyboard, with note-off on key release.
+
+Build on milestone 8's input and monitoring. Settle the Insert-mode palette/step-entry keys before binding them.
 
 ## 13. Views and section navigation
 
@@ -211,7 +212,6 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 
 ## 16. Takes, alternatives and reusable material
 
-- [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 - [ ] **To do** — Section alternatives, auditionable in place.
 - [ ] **To do** — Persistent musical notebook: named/tagged fragments with source date, song, section, key, tempo and meter.
 - [ ] **To do** — Yank or record into the notebook; search by name, tag or source, audition and put fragments into songs.

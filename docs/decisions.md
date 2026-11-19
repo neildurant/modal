@@ -621,7 +621,7 @@ Each milestone ends with something runnable and testable on both platforms. Timi
 
 - Most important from SPG: a fast, stable key-binding model that builds muscle memory.
 - Vim-like modal editing, plus a Doom Emacs-style leader key with a hint menu.
-- Leader key is `,`, with Ctrl-Space as an alternative leader in Insert mode (milestone 11; in Normal mode it plays from the cursor, decided in milestone 6); Space stays play/stop.
+- Leader key is `,`, with Ctrl-Space as an alternative leader in Insert mode (milestone 12; in Normal mode it plays from the cursor, decided in milestone 6); Space stays play/stop.
 - `q` is quantise; macros move to another key (`Q` proposed).
 - 960 PPQN, fixed internally, matching the common DAW editing resolution; kept as one constant so it can be raised later.
 - Arrangement is the home view; piano roll for editing a track.
@@ -806,3 +806,7 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 ## Drum maps (19 November 2026)
 
 **Track-owned maps and reusable copies.** Choose None, General MIDI or a custom map explicitly per track, without inferring one from channel 10. Store each track's complete map in the song, so names survive moving between machines and external edits never change an existing song silently. Reusable plain-text files live in `drum-maps/` beside `modalrc`; loading copies a map into the track. Names match without regard to case, with choices for ambiguous names and pitch/number access to unnamed rows. Build data and persistence first, then choosing and displaying maps, then name-based operations, with UI trials for the latter steps. Folding follows separately. See design.md, Drum maps, and schedule.md.
+
+## Work order (19 November 2026)
+
+**Loop recording and comping before step entry.** Prioritise the loop/punch/take workflow ahead of step entry. Move take lanes and comping from milestone 16 into that recording milestone, retaining their detailed design as unresolved feature notes. Loops, punch recording and takes is now milestone 11; step entry and remaining input features is milestone 12. Milestone 16 keeps its other alternatives and reusable-material work. Version-1 scope reflects the move; detailed comping behaviour remains to be designed. See schedule.md for the revised order.

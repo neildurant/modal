@@ -6,6 +6,10 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Schedule reordered, 19 November 2026
+
+The revised work order is in [schedule.md](schedule.md): loop, punch and take workflows now precede step entry, with take lanes and comping included in that recording milestone. Related milestone references are updated; comping's detailed feature notes remain ideas to weigh before implementation.
+
 ### Drum maps step 1 complete locally, 19 November 2026
 
 Design and three-step plan approved; see [design.md, Drum maps](design.md#drum-maps), [decisions.md](decisions.md) and [schedule.md](schedule.md). Step 1 adds value-owned `DrumMap` data on each track, shared General MIDI percussion names (the metronome's existing names unchanged), embedded song maps and reusable text-map readers/writers. Standalone maps use `modal-drum-map 1`, `name "Kit"`, then numbered entries; songs use `drum-map` and `drum-note` after the owning track's header declaration. Song quoting/escaping and integer parsing now live in a private shared text-format helper. Saving a reusable map uses the existing atomic writer. File errors include the path and line; invalid or repeated pitch numbers refuse the whole read. A channel-10 track has no map unless one was explicitly supplied; existing songs acquire none. Copies and undo keep maps independent.
