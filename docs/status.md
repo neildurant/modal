@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum-map Always show marks were accepted on trial. The save confirmation follow-up is ready for trial locally.*
+*Last updated 19 November 2026: drum-map Always show marks were published and the single save confirmation was accepted on trial.*
 
 ## Current handoff
 
@@ -10,7 +10,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 The Folder panel goes directly to the comparison when saving over a differing file. Cancel save leaves the file untouched and Replace the saved copy writes the map. The command with a typed filename and `!` uses the same confirmation. The map chooser keeps its full set of review actions. See [design.md](design.md#drum-maps).
 
-**Validation.** Workspace regressions cover selecting an existing filename, cancelling without a write, replacing it with updated Always show marks, and handling changes to the saved file during review. The HTML and PDF manuals build and their references pass. Desktop trial is pending.
+**Validation.** Workspace regressions cover selecting an existing filename, cancelling without a write, replacing it with updated Always show marks, and handling changes to the saved file during review. GCC and Clang Debug pass with 1,220 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The HTML and PDF manuals build and their references pass. The desktop trial was accepted on 19 November 2026.
 
 **To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal` and use `gr`, `gp 53` then Enter, and `zP`. Run `:drum-map-save` and select `/tmp/modal-ssd-map-save-trial.drum-map`. Try Cancel save, then open it again and choose Replace the saved copy. Only the replacement should write the file.
 
@@ -20,6 +20,8 @@ The Folder panel goes directly to the comparison when saving over a differing fi
 
 **Validation.** The persistence and Workspace regressions cover old files, malformed marks, empty and unnamed rows, undo, and saved-copy review. All six Linux configurations pass with 1,219 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The dot and retained Ride Bell row were checked in dark and light offscreen renders. The HTML and PDF manuals build and their references pass. The desktop trial was accepted on 19 November 2026.
 
+Published through `b78b01c`. The combined hosted checks also cover the accepted save confirmation follow-up.
+
 **To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal`, then `gr` and `za`. Use `gp` and enter `53` (Ride Bell), then `zP` and `j`. The Ride Bell row stays visible with a dot even though it has no notes. `u` undoes the mark. Save a reusable copy with `:drum-map-save FILE` to test carrying the marks to another song.
 
 ### Piano-roll folding accepted on trial, 19 November 2026
@@ -27,6 +29,8 @@ The Folder panel goes directly to the comparison when saving over a differing fi
 `za` toggles and `zF` or `:fold` chooses Occupied, Named or Both and whole-track or current-section scope. `j` and `k` step by displayed rows, and `gp` can reveal a hidden pitch temporarily. `V` edits only displayed pitches, including when cutting notes at the edges. The choice is remembered per track during the session. See [design.md](design.md#drum-maps) and [schedule.md](schedule.md).
 
 **Validation.** Four Workspace cases cover the three modes, temporary pitch reveal, per-track choices, section occupancy including a sounding note at the start, and hidden-pitch protection during `V` edits and edge cuts. The folding change passes all six Linux configurations. Dark and light offscreen renders of the SSD fold and the chooser were inspected. Both manual formats build and their generated references pass. The functional trial was accepted on 19 November 2026.
+
+Folding and the `:write-config` picker were published through `0d0b9f2`, with [Linux and Windows CI](https://github.com/neildurant/modal/actions/runs/44579214705) and the [manual workflow](https://github.com/neildurant/modal/actions/runs/44579214614) passing.
 
 **To try.** Open `/tmp/modal-ssd-drum-map-trial.modal`, then use `gr` and `za` to show the occupied rows. Try `j`/`k`, `gp 39` then Enter for a hidden pitch, and `zF` to try Named or Both. With a sparse named map, try a `V` selection spanning an unnamed occupied pitch and check with undo that the hidden notes survive the edit. Use `zF` with Current section in a song with several sections.
 

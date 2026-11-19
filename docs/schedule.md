@@ -139,9 +139,9 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [x] **Done** — Store the marked pitches in songs and reusable drum maps.
     - [x] **Done** — Toggle and show marks in the piano roll and saved-map review.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **Doing** — Single confirmation for replacing a saved drum map.
-    - [ ] **Doing** — Confirm in the save comparison and keep the chooser's review actions.
-    - [ ] **Doing** — Regressions, manual updates and functional trial. See [status.md](status.md).
+- [x] **Done** — Single confirmation for replacing a saved drum map.
+    - [x] **Done** — Confirm in the save comparison and keep the chooser's review actions.
+    - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.
 - [ ] **To do** — Improve the temporary `, e` event-insertion interface alongside the new editing routes.
 
