@@ -88,14 +88,14 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
     - [x] **Done** — Part 2: edit regions with the familiar note keys; accepted on the second trial and published 16 November 2026, with grid-step `h` / `l` and value boxes refused among regions.
 - [x] **Done** — Program-change event markers in the piano-roll ruler, delivered with bank/program setup; validation and the accepted trial are recorded in status.md.
 - [x] **Done** — Thin keeps resets to 0 (asked for 16 November 2026, after Sequencer Plus Gold's): never removing a controller's, pitch bend's or aftertouch's event of 0 (or pitch bend's centre), so a reset survives thinning, as well as each gesture's first and last. Implemented with core/Workspace regressions; all six Linux configurations pass and the modulation trial was accepted 17 November 2026. See status.md.
-- [ ] **Doing** — Controller ramps and shaping. Agreed behaviour is in [design.md](design.md) (Controller ramps; Shaping controller values), reasons in [decisions.md](decisions.md), and validation in [status.md](status.md).
+- [x] **Done** — Controller ramps and shaping. Agreed behaviour is in [design.md](design.md) (Controller ramps; Shaping controller values), reasons in [decisions.md](decisions.md), and validation in [status.md](status.md).
     - [x] **Done** — Editable ramps; designed, built, tried and published 17–18 November 2026.
         - [x] **Done** — Step 1: persistent ramp definitions, source events, materialised playback events, validation and native-file storage.
         - [x] **Done** — Step 2: lane drawing and inspector editing with visual/audible preview; accepted after the trial refinements.
         - [x] **Done** — Step 3: timing keys, delete/yank/paste, recording taking precedence, protected points in transforms and clear structural refusals.
         - [x] **Done** — Step 4: manual chapter, worked example, illustration and key/reference updates; accepted on reading 18 November 2026.
         - [x] **Done** — Follow-up: mark and protect ramp points in the event list; accepted on trial 18 November 2026.
-    - [ ] **Doing** — Shape existing controller values; designed 18 November 2026, each step tried before the next.
+    - [x] **Done** — Shape existing controller values; designed 18 November 2026, each step tried before the next; completed 19 November 2026.
         - [x] **Done** — Step 1: scale, limit, invert and their commands/keys; accepted on trial and published 18 November 2026, with local Linux checks and hosted Linux/Windows CI passing.
         - [x] **Done** — Step 2: smooth and remove repeated values; accepted on trial and published 18 November 2026. See [status.md](status.md) for validation.
             - [x] **Done** — Core smoothing and exact-repeat removal, with multi-PPQN regressions and conservative context after reset/program/SysEx messages.
@@ -103,16 +103,16 @@ The input foundation precedes step entry and loops. Behaviour and unresolved rec
             - [x] **Done** — Manual explanations, key/transform references, HTML/PDF builds and PDF review.
             - [x] **Done** — All six Linux configurations pass; application rebuilt for the local trial.
             - [x] **Done** — Functional trial accepted and published 18 November 2026, including repeated smoothing with `.` around a protected ramp; hosted CI passes.
-        - [ ] **Doing** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
+        - [x] **Done** — Step 3: program remapping and controller retrograde; design and implementation plan approved 18 November 2026. See [status.md](status.md).
             - [x] **Done** — Program-change remapping implemented with regressions; clearer prompts accepted on trial.
             - [x] **Done** — Held-contour retrograde implemented; its event-selection span fixed and accepted on trial.
-            - [ ] **Doing** — Lane timing targets and shared ramp ownership guards implemented; active-ramp refusal confirmed on trial.
+            - [x] **Done** — Lane timing targets and shared ramp ownership guards; `t` / `T` / `:stretch` in a lane (notes untouched) and the active-ramp refusal accepted on trial 19 November 2026.
             - [x] **Done** — Regressions, manual/reference updates, HTML/PDF builds and PDF review; all six Linux configurations pass and the application is rebuilt for trial.
             - [x] **Done** — Event-selection retrograde span: the last value lasts the gap before it, capped by the next event and bar end (revised after a second trial); accepted on trial. See [status.md](status.md).
             - [x] **Done** — Retrograde on `, c x` and `, x x`, `, x R` dropped (agreed 18 November 2026); accepted on trial.
             - [x] **Done** — Remap asks Type, From and To, mapping within one type; accepted on trial 19 November 2026, with its no-notes and ramp-message corrections.
-            - [ ] **Doing** — Follow-up regressions, manual/reference updates and trials done (Windows Debug and WSL Clang Debug pass); the full six-configuration Linux check is outstanding.
-            - [ ] **To do** — Final functional acceptance and publication; current work is being pushed for continuation elsewhere with the known issue recorded.
+            - [x] **Done** — Follow-up regressions, manual/reference updates and trials; Windows Debug and WSL Clang Debug pass locally, and hosted CI passes all six Linux configurations and Windows Debug/Release.
+            - [x] **Done** — Final functional acceptance 19 November 2026 and publication through `a198f31`.
 - [ ] **To do** — General MIDI and reusable custom drum maps; names in the piano roll, inspector, navigation, search, selection and palette.
 - [ ] **To do** — Folding modes for occupied pitches, named drum-map pitches even when empty, and their union; whole-track or current-section scope.
 - [ ] **To do** — Pitch-row selection and direct navigation to named pitches.

@@ -2,11 +2,15 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 18 November 2026: step 3 is implemented in `2a485a3` and passed local validation. Functional trial found a two-event Visual-selection retrograde bug and prompted remap/menu improvements. The current implementation and this handoff are being published at the user's request for continuation on another machine; step 3 is not accepted as complete.*
+*Last updated 19 November 2026: controller shaping step 3 is accepted and published through `a198f31`, completing controller ramps and shaping. The next scheduled feature is drum maps, whose open design questions in design.md come first.*
 
 ## Current handoff
 
-### Controller shaping: step 3 trial feedback and continuation, 18 November 2026
+### Controller shaping complete, 19 November 2026
+
+Step 3 accepted on trial 19 November 2026: the retrograde span and keys, the remap questions and their corrections (below), and lane timing (`t` / `T` / `:stretch` in a lane leaving notes alone, notes moving in the notes area as intended, and the ramp refusal). [CI passed](https://github.com/neildurant/modal/actions/runs/44438251975) on all six Linux configurations and Windows Debug/Release, with the [manual workflow](https://github.com/neildurant/modal/actions/runs/44438251966), at `a198f31`. No hardware latency or jitter measurement is claimed. Next: drum maps (schedule.md), starting with their open questions in design.md before a plan.
+
+### Controller shaping: step 3 trial feedback and continuation, 18–19 November 2026
 
 **Retrograde span for an event selection: fixed in `5c91e38` and accepted on trial 18 November 2026,** all four trial cases reported working as expected. The right edge was agreed: an event selection's span runs until its last value stops being heard, at the lane's next event or the end of that value's bar, whichever comes first (design.md, Time in the lane; decisions.md). `PianoRollView::target()` supplies it as `OperatorTarget::heldEnd`, which only retrograde uses; `laneSpan()`, drawing, yanking, shift and stretch are unchanged, as are explicit time ranges. Regression `controller retrograde of selected events reverses what is heard until the next change` (two PPQNs) first reproduced the trial (events at ticks 0 and 1), then passed, also covering a later event in the bar (kept, ending the span) and one in the next bar (the bar's end used). Manual, grammar and design updated. Windows Debug passes 1,170 registered tests (two skipped); WSL Clang Debug builds without warnings and passes (three skipped); whole-tree formatting and `git diff --check` pass; `tools/build-manual.cmake` built HTML and PDF on Windows (PDF not looked at). To try: in a CC lane with two lone values in a bar, `v` Tab then `, x R` (they change places); with a third value later in the bar, the first two reverse up to it and it stays; `u`.
 
