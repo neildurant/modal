@@ -426,17 +426,16 @@ public:
 
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
-        if (kind == FileKind::Song || kind == FileKind::DrumMap)
+        if (kind != FileKind::Midi)
         {
-            view_.pickFile(kind == FileKind::Song ? ui::Workspace::PickerKind::Song
-                                                  : ui::Workspace::PickerKind::DrumMap,
-                           suggested, std::move(done));
+            using Picker = ui::Workspace::PickerKind;
+            const auto picker = kind == FileKind::Config    ? Picker::Config
+                                : kind == FileKind::DrumMap ? Picker::DrumMap
+                                                            : Picker::Song;
+            view_.pickFile(picker, suggested, std::move(done));
             return;
         }
-        chooseFile(true,
-                   {kind == FileKind::Midi ? ui::sdl::FileFilter{"MIDI files", "mid"}
-                                           : ui::sdl::FileFilter{"All files", "*"}},
-                   suggested, std::move(done));
+        chooseFile(true, {{"MIDI files", "mid"}}, suggested, std::move(done));
     }
 
     void quit() override { window_.close(); }

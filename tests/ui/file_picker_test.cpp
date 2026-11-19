@@ -6,6 +6,7 @@
 #include <modal/core/song_file.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/file_commands.hpp>
+#include <modal/ui/prompt.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -30,6 +31,7 @@ struct Pickers final : FileHost
         workspace.resize(1200, 640, {10, 20});
         workspace.show(ViewKind::Arrangement);
         addFileCommands(registry, workspace.recordingSession(), *this, temporary.path());
+        addPromptCommands(registry, reader, config, temporary / "Config", this, temporary.path());
     }
     void chooseOpen(Chosen done) override
     {
@@ -42,9 +44,11 @@ struct Pickers final : FileHost
     }
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
-        workspace.pickFile(kind == FileKind::DrumMap ? Workspace::PickerKind::DrumMap
-                                                     : Workspace::PickerKind::Song,
-                           suggested, std::move(done));
+        using Picker = Workspace::PickerKind;
+        const auto picker = kind == FileKind::Config    ? Picker::Config
+                            : kind == FileKind::DrumMap ? Picker::DrumMap
+                                                        : Picker::Song;
+        workspace.pickFile(picker, suggested, std::move(done));
     }
     void quit() override { quitRequested = true; }
     void songReplaced() override { workspace.showSong(); }
@@ -82,6 +86,8 @@ struct Pickers final : FileHost
     test::TempDirectory temporary{"modal-picker"};
     core::Document document{newSong()};
     CommandRegistry registry;
+    Config config;
+    ConfigReader reader{config, registry};
     Workspace workspace{registry, document};
     bool quitRequested = false;
 };
@@ -213,4 +219,23 @@ TEST_CASE("an open picker cannot replace a song edited after it opened")
     p.type(U"Another\n");
     CHECK(p.document.song().title == "Keep this");
     CHECK(p.workspace.message().starts_with("The song changed"));
+}
+
+TEST_CASE("write-config uses the file picker and keeps the chosen filename")
+{
+    Pickers p;
+    const auto existing = p.temporary.write("Config/modalrc", "\" Existing configuration\n");
+    p.type(U":write-config\n");
+    CHECK(p.shows(U"Write configuration"));
+    CHECK(p.shows(U"Enter for modalrc"));
+    p.type(U"\n");
+    CHECK(p.workspace.message().starts_with("Replace "));
+    p.type(U"n");
+    CHECK(p.workspace.mode() == Mode::CommandLine);
+    CHECK(std::filesystem::file_size(existing) ==
+          std::string_view{"\" Existing configuration\n"}.size());
+    p.type(U"Nested/modalrc\n");
+    CHECK(p.workspace.mode() == Mode::Normal);
+    CHECK(std::filesystem::is_regular_file(p.temporary / "Config/Nested/modalrc"));
+    CHECK_FALSE(std::filesystem::exists(p.temporary / "Config/Nested/modalrc.modal"));
 }

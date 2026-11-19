@@ -39,7 +39,8 @@ Undo history is a working-session facility, not a substitute for saved copies.
 The picker lets you see the directory as you type or browse. `:e` opens it
 beside the current song, or in your home directory for a new song. `:w` and
 `:wq` use it when the song needs a filename. Drum-map commands without a
-filename start in the reusable maps directory.
+filename start in the reusable maps directory. `:write-config` starts in
+the configuration directory and suggests `modalrc`.
 
 Use Up and Down to choose a row and Enter to open it. A folder leads to its
 contents, and `../` goes up to the parent. Alt-Down opens **Places**, where

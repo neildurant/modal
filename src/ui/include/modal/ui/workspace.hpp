@@ -293,7 +293,8 @@ public:
     enum class PickerKind
     {
         Song,
-        DrumMap
+        DrumMap,
+        Config
     };
     using PickedFile = std::function<void(std::optional<std::filesystem::path>)>;
     void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done);

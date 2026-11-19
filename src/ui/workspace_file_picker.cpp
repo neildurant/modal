@@ -42,6 +42,8 @@ std::pair<std::string_view, std::string_view> splitFilename(std::string_view tex
 
 bool shownFile(Workspace::PickerKind kind, bool save, const std::filesystem::path& path)
 {
+    if (kind == Workspace::PickerKind::Config)
+        return true;
     const auto extension = utf8Text(path.extension());
     if (kind == Workspace::PickerKind::DrumMap)
         return sameDrumMapName(extension, ".drum-map");
@@ -80,7 +82,9 @@ void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> s
     picker.places.emplace_back("Drum maps", maps);
     if (stateFolder_)
         picker.places.emplace_back("State", *stateFolder_);
-    auto folder = kind == PickerKind::Song ? songs : maps;
+    auto folder = kind == PickerKind::DrumMap  ? maps
+                  : kind == PickerKind::Config ? configFolder_.value_or(songs)
+                                               : songs;
     if (saveAs)
     {
         picker.suggested = utf8Text(saveAs->filename());
@@ -134,7 +138,8 @@ void Workspace::listPickerFolder()
                  shownFile(picker.kind, picker.save, item.path()))
             files.push_back(std::move(name));
     }
-    if (error)
+    if (error &&
+        !(picker.kind == PickerKind::Config && error == std::errc::no_such_file_or_directory))
         picker.error = "Can't list this directory: " + error.message();
     std::ranges::sort(folders);
     std::ranges::sort(files);
@@ -272,7 +277,7 @@ void Workspace::submitFilePicker()
         refuse("Can't open folder " + utf8Text(path), MessageKind::Warning);
         return;
     }
-    if (!path.has_extension())
+    if (picker.kind != PickerKind::Config && !path.has_extension())
         path += picker.kind == PickerKind::Song ? ".modal" : ".drum-map";
     error.clear();
     if (!picker.save)
@@ -292,7 +297,8 @@ void Workspace::submitFilePicker()
         return;
     }
     const auto parent = path.parent_path();
-    if (!parent.empty() && !isFolder(parent))
+    // The config writer creates the directory when saving a first configuration.
+    if (picker.kind != PickerKind::Config && !parent.empty() && !isFolder(parent))
     {
         refuse("The destination directory doesn't exist: " + utf8Text(parent),
                MessageKind::Warning);
@@ -329,7 +335,7 @@ void Workspace::finishFilePicker(std::optional<std::filesystem::path> path)
     mode_ = Mode::Normal;
     prompt_.line.clear();
     prompt_.completing.reset();
-    if (path && picker.version != document_.version())
+    if (path && picker.kind != PickerKind::Config && picker.version != document_.version())
     {
         refuse("The song changed while choosing a file; open the picker again",
                MessageKind::Warning);
@@ -374,10 +380,11 @@ Region Workspace::filePickerRegion() const
         region.text.push_back(
             {margin, static_cast<int>(row) * h, fitted(value, width, keepEnd), style});
     };
-    const auto title = picker.choosingPlace              ? "Places"
-                       : picker.kind == PickerKind::Song ? picker.save ? "Save song" : "Open song"
-                       : picker.save                     ? "Save drum map"
-                                                         : "Load drum map";
+    const auto title = picker.choosingPlace                ? "Places"
+                       : picker.kind == PickerKind::Config ? "Write configuration"
+                       : picker.kind == PickerKind::Song   ? picker.save ? "Save song" : "Open song"
+                       : picker.save                       ? "Save drum map"
+                                                           : "Load drum map";
     draw(0, title, label);
     draw(1, utf8Text(picker.listingFolder), text, true);
     if (total == 0)

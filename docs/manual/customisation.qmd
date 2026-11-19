@@ -31,8 +31,8 @@ set hintdelay=200
 set theme=light
 ```
 
-`:write-config` opens a save dialogue in the configuration directory. With
-a filename, `:write-config modalrc` writes there directly, refusing an
+`:write-config` opens Modal's file picker in the configuration directory,
+with `modalrc` suggested. With a filename, `:write-config modalrc` writes there directly, refusing an
 existing file unless `:write-config! modalrc` is used. The generated file
 writes changed choices as commands and leaves unchanged defaults commented,
 with descriptions. It is a useful starting point rather than a file that
