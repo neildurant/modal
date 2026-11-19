@@ -12,7 +12,7 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E env
     WORKING_DIRECTORY "${modalRoot}" COMMAND_ERROR_IS_FATAL ANY)
 file(MAKE_DIRECTORY "${modalRoot}/docs/manual/images")
 foreach(name arrangement piano-roll selection operator-hints palette arrangement-guide piano-roll-guide
-        velocity-lane tracks metronome controller-ramp)
+        velocity-lane tracks metronome controller-ramp drum-map drum-map-review)
     execute_process(COMMAND "${MAGICK_EXECUTABLE}" "${imageBuild}/${name}.bmp"
         "${modalRoot}/docs/manual/images/${name}.png" COMMAND_ERROR_IS_FATAL ANY)
 endforeach()

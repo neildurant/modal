@@ -9,4 +9,6 @@
   radius: 2pt,
   text(font: "JetBrains Mono NL", size: 0.85em, fill: rgb("#543780"), it),
 )
+// Highlighted code marks line endings with raw newlines; they must not become boxed keys.
+#show raw.where(block: false, text: "\n"): linebreak()
 #set table(inset: 7pt)

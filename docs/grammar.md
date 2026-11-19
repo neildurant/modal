@@ -162,6 +162,8 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 
 ## Whole tracks and their settings
 
+**Drum maps:** Enter on Drum map in Tracks, `, t k` (kit) or `:drum-map` opens a chooser for this track: None, General MIDI, reusable `.drum-map` files and its embedded copy. Type to narrow, Up/Down choose, Enter takes and Escape leaves. The piano roll uses 20 cells for drum names and the inspector shows the full name beside the pitch and MIDI number; unnamed rows keep pitch labels. Choosing a map undoes once. `:drum-map-load FILE` and `:drum-map-save FILE` take relative paths in `drum-maps/` beside `modalrc`, adding `.drum-map` to a filename without an extension; no FILE opens a dialog. The chooser flags differences from saved maps of the same internal name and reviews their Song/Saved pitch names, PageUp/Down scrolling. Keep leaves both, Use replaces this track's map as one undo step, Replace writes over the reviewed file, and Save as another asks for a new name and filename, renaming this track's copy only after saving. Duplicate saved names require choosing a file. `:drum-map-save! FILE` reviews a differing existing file before replacement; a same-name load reviews differences too. File writes are outside song undo.
+
 In the Tracks view, `j` / `k` select rows and `h` / `l` select columns. `0` / `$` go to the first/last column; `gg` / `G` go to the first/last track, or track N with a count. Page keys scroll through rows. Space keeps its transport meaning.
 
 - The hint menu gives a toggle's name and what it's set to now, such as `Rewind: on` or `Mute this track: off`.

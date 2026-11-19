@@ -46,20 +46,108 @@ by typing; a cursor movement retains it for editing. Enter accepts,
 Escape cancels, and Tab commits and moves to the next editable column.
 Up and Down step numeric values. A field marked with a down arrow has a
 fixed-choice list; typing can help find the choice. Each cell edited this
-way is its own undo step. The Quantise column is the exception: it opens
-several settings together in the inspector, as described in
-@sec-inspector-editing.
+way is its own undo step. Quantise opens several settings together in the
+inspector, as described in @sec-inspector-editing. Drum map opens the map
+chooser and comparison panel described below.
 
 Whole-row selections support batch changes. Assigning a value sets it on
 all selected tracks; stepping changes each relative to its own value. A
 batch that would make any row invalid is refused as a whole. Names remain
 individual, since giving every part the same name would obscure its identity.
+Drum maps are also chosen on one track at a time.
 
 Output chooses a destination, Input chooses what the track listens to, and
 Channel is the MIDI channel the part uses. `Default` follows the machine's
 chosen port; `All` on Input receives from all enabled inputs. An unavailable
 saved choice remains visible with a warning, rather than silently falling
 back to another device.
+
+## Naming a drum part {#sec-drum-maps}
+
+On a drum instrument, a note number identifies a sound: a kick, a snare or
+one of several hi-hat articulations. A **drum map** gives those numbers useful
+names. The stored notes continue playing their existing pitches; the map
+makes the part easier to read and inspect.
+
+Choose the **Drum map** field in Tracks and press Enter, or use `, t k`
+(**k** for kit) from a view with a current track. `:drum-map` opens the same
+chooser. Up and Down choose, typing narrows the list, Enter accepts and
+Escape leaves things as they were. Choose **None**, **General MIDI**, or a
+reusable map file. Maps are chosen on one track at a time, independently of
+its MIDI channel. Putting a track on channel 10 does not choose a map.
+
+The piano roll makes room for the drum names in its keyboard column. Rows
+without names keep their pitch labels. Long names are shortened in the
+column; the inspector shows the drum name alongside the ordinary pitch and
+MIDI number. The same note-editing keys still apply, and the Pitch field
+remains editable as a pitch or number. Choosing another map is one undo step.
+
+![A two-bar pattern with kicks on beats one and three, snares on two and four, and hi-hats between them.](images/drum-map.png){#fig-drum-map fig-alt="A piano roll whose pitch rows are labelled Kick, Snare, Closed hi-hat and Open hi-hat, with the kick's pitch and full drum name in the inspector."}
+
+### A song owns its copy
+
+The song stores the complete map with the track, so its names travel with it.
+Reusable `.drum-map` files live in `drum-maps/` beside `modalrc`. Loading one
+copies it into the track; changing that file later does not silently change
+the song. Copying a whole track includes its map.
+
+`:drum-map-load FILE` loads a copy, and `:drum-map-save FILE` writes the
+track's map for reuse. Without a filename, either command opens a file
+dialog. Relative paths start in the `drum-maps/` directory, and a filename
+without an extension gains `.drum-map`. Tab completes filenames; quote one
+containing spaces, as in `:drum-map-load "Studio kit.drum-map"`.
+
+Custom maps are edited as text at this stage. A small map can look like this:
+
+```text
+modal-drum-map 1
+name "Studio kit"
+36 "Kick"
+38 "Snare"
+42 "Closed hi-hat"
+46 "Open hi-hat"
+```
+
+The numbers are MIDI note numbers, from 0 to 127. Name each number at most
+once; leave unnamed numbers out. Several numbers may have the same name,
+for example when an instrument offers two ways to trigger one articulation.
+The `name` line is the map's identity; its filename can be different.
+An instrument chart's octave labels may differ from Modal's, so establish
+the MIDI numbers before copying its names.
+
+### Reviewing different copies
+
+Opening a song compares its maps with reusable files of the same internal
+name. A brief notice flags differences; the Drum map chooser marks the
+song's copy too. General MIDI can also be compared with the built-in map.
+The song continues using its embedded copy until you choose otherwise.
+
+Open `, t k` and press Enter on the song's current map to review it. If
+several saved files have that name, choose the file to compare first. The
+review shows changed names under **Song** and **Saved**, including entries
+added or removed. PageUp and PageDown scroll long comparisons; Up and Down
+choose an action and Enter takes it. Escape keeps both copies as they are.
+
+![Reviewing two differently named articulations before choosing which map to keep.](images/drum-map-review.png){#fig-drum-map-review fig-alt="A comparison of Studio kit showing Kick and Snare in the Song column, Acoustic kick and Snare centre in Saved, and the keep, use, replace and save-as actions below."}
+
+| Action | Result |
+| --- | --- |
+| Keep the song's copy | Leave both copies as they are |
+| Use the saved copy | Replace this track's map, as one undo step |
+| Replace the saved copy | Write the song's map over the reviewed file |
+| Save as another map | Ask for a new map name and filename, then rename this track's copy after saving |
+
+Choose a new filename when saving as another map to keep both files. Escape
+at the name question or Cancel in the file dialog leaves the song's name
+unchanged. Undo can restore the track's former map or name; it does not
+remove or restore reusable files. Other tracks and songs retain their own
+copies.
+
+A command-line save refuses to overwrite an existing file. Use
+`:drum-map-save! FILE` to review a differing existing copy, then choose
+**Replace the saved copy** to confirm. A same-name load also opens review
+when its names differ. If a saved file changes while a review is open, Modal
+shows the current comparison before a replacement can proceed.
 
 ## Mute, Solo, Arm and Thru
 

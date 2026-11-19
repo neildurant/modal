@@ -2,12 +2,15 @@
 
 #include "support/fake_clock.hpp"
 #include "support/playback.hpp"
+#include "support/temp_directory.hpp"
 
 #include <modal/core/document.hpp>
+#include <modal/core/drum_map_file.hpp>
 #include <modal/core/player.hpp>
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
@@ -23,6 +26,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -1232,4 +1236,98 @@ TEST_CASE("a sample of the sustain lane", "[.sample]")
     type(U",cv");
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-sustain-values.bmp"));
+}
+
+TEST_CASE("a sample of drum names and saved-map comparison", "[.sample][.manual-images]")
+{
+    using namespace modal;
+    const char* manual = std::getenv("MODAL_MANUAL_IMAGES");
+    const char* sample = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = sample != nullptr ? sample : "sample.bmp";
+    base = base.substr(0, base.rfind('.')) + "-drum-map";
+    if (manual != nullptr)
+    {
+        std::filesystem::create_directories(utf8Path(manual));
+        base = utf8Text(utf8Path(manual) / "drum-map");
+    }
+    const test::TempDirectory temporary{"modal-drum-map-samples"};
+    const auto folder = temporary.path() / "drum-maps";
+    std::filesystem::create_directories(folder);
+    core::DrumMap map;
+    map.name = "Studio kit";
+    map.notes[36] = "Kick";
+    map.notes[38] = "Snare";
+    map.notes[42] = "Closed hi-hat";
+    map.notes[46] = "Open hi-hat";
+    auto saved = map;
+    saved.notes[36] = "Acoustic kick";
+    saved.notes[38] = "Snare centre";
+    REQUIRE(core::writeDrumMapFile(saved, folder / "Studio kit.drum-map").empty());
+    core::Song song;
+    const auto id = song.addTrack("Drums");
+    song.updateTrack(id,
+                     [&](core::Track& track)
+                     {
+                         track.drumMap = map;
+                         track.channel = 10;
+                     });
+    song.updateEvents(
+        id,
+        [&](core::EventList& events)
+        {
+            const auto q = song.ppqn().quarter();
+            for (int bar = 0; bar < 2; ++bar)
+            {
+                const auto start = bar * 4 * q;
+                for (int i = 0; i < 8; ++i)
+                    events.insert(
+                        {start + i * q / 2,
+                         core::Note{static_cast<std::uint8_t>(i == 7 ? 46 : 42), 70, q / 4}});
+                events.insert({start, core::Note{36, 100, q / 4}});
+                events.insert({start + 2 * q, core::Note{36, 90, q / 4}});
+                events.insert({start + q, core::Note{38, 100, q / 4}});
+                events.insert({start + 3 * q, core::Note{38, 100, q / 4}});
+            }
+        });
+    song.fitToContent();
+    core::Document document{song};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    registry.add(windowCommands());
+    view.setFolders(temporary.path(), temporary.path());
+    view.takeDrumMapNotice();
+    auto window = offscreen(1200, 760);
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    view.show(ViewKind::Arrangement);
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const auto c : keys)
+            view.handle(c == U'\n' ? Key::of(NamedKey::Enter) : Key::typed(c), 0);
+    };
+    const auto save = [&](const std::string& suffix, std::string_view theme = "dark")
+    {
+        window->draw(view.frame(), *builtInTheme(theme));
+        CHECK(window->saveFrame(base + suffix + ".bmp"));
+    };
+    type(U"gr");
+    view.handle(Key::of(NamedKey::Tab), 0);
+    view.handle(Key::of(NamedKey::Tab, kShift), 0);
+    save("");
+    save("-light", "light");
+    type(U",tk");
+    save("-chooser");
+    save("-chooser-light", "light");
+    type(U"\n");
+    save("-review");
+    save("-review-light", "light");
+    view.handle(Key::of(NamedKey::Escape), 0);
+    type(U"gt0");
+    for (const auto& column : trackColumns())
+    {
+        if (column.field == TrackField::DrumMap)
+            break;
+        type(U"l");
+    }
+    save("-tracks");
+    save("-tracks-light", "light");
 }

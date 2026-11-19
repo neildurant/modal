@@ -8,7 +8,8 @@ interchange copy for a complete working document.
 ## Native files keep the arrangement
 
 The `.modal` format stores sections, track settings, local meters and the
-musical events in plain text. Positions within the file belong to sections,
+musical events in plain text. A track's drum-map names are embedded too,
+so moving the song preserves them without a separate map file. Positions within the file belong to sections,
 so moving a section need not rewrite every event's position in the document.
 The file can be inspected or kept in version control, but editing it by hand
 is not required for normal work.
@@ -91,9 +92,13 @@ ending `.modal`, each saying which command writes that kind.
 | `:wq` | Save and quit |
 | `:source` | Re-read application configuration; it does not open a song |
 | `:write-config` | Write application preferences; it does not save the song |
+| `:drum-map-load [FILE]` | Load a drum map into the current track, or choose a file |
+| `:drum-map-save[!] [FILE]` | Save a reusable map; `!` reviews an existing copy before replacing it |
 
 Relative song paths start in the song's folder, or the home folder for an
-unsaved song. Configuration commands use the configuration directory instead.
+unsaved song. Configuration commands use the configuration directory instead;
+drum-map files start in its `drum-maps/` subdirectory. See @sec-drum-maps for
+map ownership and comparison.
 Completion shows the base directory when offering filenames. A path beginning
 with `~` starts at the home directory.
 

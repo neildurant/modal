@@ -135,6 +135,7 @@ after counts multiply.
 | `, t o`, Alt-Up / Alt-Down | Reorder tracks, move immediately |
 | `M`, `S`, `A` | Mute, solo, arm the current track |
 | `, t c`, `, t q`, `, t f` | Chase notes, playback quantise, freeze |
+| `, t k` | Choose or review the track's drum map (**k** for kit) |
 | `, s r`, `, s i`, `, s a`, `, s j` | Rename, insert before/after, join sections |
 | `, s s`, `, s l`, `, s f` | Split at bar, label to section, follow meter |
 | `, b i`, `, b d`, `, b m` | Song-bar insert/delete, meter or Visual rebar |

@@ -200,6 +200,10 @@ and meter are edited in the conductor's own list (`gc`), rather than by
 altering those contextual rows on a note track. The list and piano roll
 are complementary views of the same stored performance.
 
+A track with a drum map shows articulation names in its pitch rows and
+inspector, while using these same editing keys. @sec-drum-maps explains
+choosing maps and keeping reusable copies.
+
 ## Seeing the right amount of music
 
 `zi`, `zo` and `z0` zoom in, out and back to the normal scale. `zz` centres

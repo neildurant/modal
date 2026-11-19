@@ -66,7 +66,7 @@ and Typst packages that are not bundled with the pinned Quarto release.
 - The reference chapters collect compact key tables and include generated
   settings and transform definitions from `reference/`.
 - `examples/first-phrase.modal` is the common starting point for worked examples.
-- `images/` holds actual offscreen renders of that song, committed so publishing
+- `images/` holds actual offscreen renders of the example song and worked patterns, committed so publishing
   does not require building Modal.
 - `_brand.yml` holds the shared accent palette. `styles/` holds the HTML light
   and dark themes, common CSS and PDF typography.
