@@ -537,8 +537,8 @@ cmap <C-.>      panic             "Panic"
 " starts one at the label at or before the cursor. , s f (:meter follow) sets the cursor's
 " track following the song's meter in this section again, or in Visual mode the selected tracks
 " in the sections selected, whole sections only. The strip's own keys do the same there.
-" , e asks for an event to insert at the cursor, of any kind but a note, as :event-insert does;
-" Tab completes the kind, and what it should be followed by is explained if it's wrong.
+" , e lists event types, then asks for the fields needed to insert one at the cursor.
+" :event-insert EVENT takes the whole event on the command line.
 nmap <leader>e  event-insert      "Insert an event"
 
 " Labels and marks, from any view: , l l puts a label at the cursor, asking its name (or renames

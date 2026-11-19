@@ -1493,28 +1493,107 @@ TEST_CASE("any kind of event but a note can be inserted at the cursor, as one un
     CHECK(v.registry.runLine("event-insert program 5").warning);
 }
 
-TEST_CASE("the key for inserting an event asks which, completing the kind")
+TEST_CASE("the event chooser searches by name and prompts for a controller and its value")
 {
     Viewing v;
-    const auto id = v.document.song().tracks()[0]->id();
-    const auto before = v.document.song().events(id).size();
-    v.ws.setLineHandler([&](const std::string& line) { v.registry.runLine(line); });
-    type(v.ws, U",e");
-    CHECK(v.ws.mode() == Mode::CommandLine);
-    CHECK(v.ws.choices(Choices::EventKind, "") ==
-          std::vector<std::string>{"bend", "cc", "copyright", "cue", "instrument", "lyric",
-                                   "polypressure", "pressure", "program", "sysex", "tempo",
-                                   "text"});
-    type(v.ws, U"program 7");
-    v.ws.handle(Key::of(NamedKey::Enter), 0);
-    CHECK(v.ws.mode() == Mode::Normal);
-    REQUIRE(v.document.song().events(id).size() == before + 1);
+    const auto cursor = v.view.cursor();
+    REQUIRE(cursor.track);
+    const auto before = v.document.song();
+    const auto enter = [&] { v.ws.handle(Key::of(NamedKey::Enter), 0); };
+    const auto shown = [&](std::u32string_view text)
+    { return contains(bottomText(v.ws.frame()), text); };
 
-    // Asked and left without an answer, nothing changes.
-    type(v.ws, U",e");
-    v.ws.handle(Key::of(NamedKey::Escape), 0);
+    type(v.ws, U",echange");
+    const auto chooser = v.ws.frame();
+    const auto offers = [&](std::u32string_view text)
+    {
+        return std::ranges::any_of(chooser,
+                                   [&](const Region& region)
+                                   {
+                                       return std::ranges::any_of(
+                                           region.text, [&](const auto& run)
+                                           { return contains(run.text, text); });
+                                   });
+    };
+    CHECK(offers(U"Program change"));
+    CHECK(offers(U"Control change"));
+    CHECK_FALSE(offers(U"Pitch bend"));
+    v.ws.handle(Key::of(NamedKey::Down), 0);
+    enter();
+    CHECK(shown(U"Controller number"));
+    type(v.ws, U"128");
+    enter();
+    CHECK(shown(U"Invalid input. Controller number"));
+    type(v.ws, U"7");
+    enter();
+    CHECK(shown(U"Controller value"));
+    CHECK(v.document.song() == before);
+    type(v.ws, U"100");
+    enter();
     CHECK(v.ws.mode() == Mode::Normal);
-    CHECK(v.document.song().events(id).size() == before + 1);
+    CHECK(v.ws.message().starts_with("Inserted at "));
+    const auto events = v.document.song().events(*cursor.track).all();
+    CHECK(std::ranges::find(events, core::Event{cursor.tick, core::ControlChange{7, 100}}) !=
+          events.end());
+    type(v.ws, U"u");
+    CHECK(v.document.song() == before);
+}
+
+TEST_CASE("guided event insertion cancels without edits and preserves plain lyric text")
+{
+    Viewing v;
+    const auto before = v.document.song();
+    const auto cursor = v.view.cursor();
+    REQUIRE(cursor.track);
+    const auto enter = [&] { v.ws.handle(Key::of(NamedKey::Enter), 0); };
+    const auto escape = [&] { v.ws.handle(Key::of(NamedKey::Escape), 0); };
+
+    type(v.ws, U",e");
+    escape();
+    CHECK(v.document.song() == before);
+    type(v.ws, U",econtrol");
+    enter();
+    type(v.ws, U"7");
+    enter();
+    escape();
+    CHECK(v.ws.mode() == Mode::Normal);
+    CHECK(v.document.song() == before);
+
+    type(v.ws, U",elyr");
+    enter();
+    CHECK(contains(bottomText(v.ws.frame()), U"Lyric"));
+    type(v.ws, U"  Say \"hello\" — then go  ");
+    enter();
+    const auto events = v.document.song().events(*cursor.track).all();
+    CHECK(std::ranges::find(events, core::Event{cursor.tick, core::makeMetaText(
+                                                                 core::MetaText::Kind::Lyric,
+                                                                 "  Say \"hello\" — then go  ")}) !=
+          events.end());
+}
+
+TEST_CASE("the event chooser offers tempo on the conductor and retries invalid input")
+{
+    Viewing v;
+    v.ws.handle(Key::of(NamedKey::PageUp, kCtrl), 0);
+    REQUIRE_FALSE(v.view.cursor().track);
+    const auto before = v.document.song();
+    const auto enter = [&] { v.ws.handle(Key::of(NamedKey::Enter), 0); };
+
+    type(v.ws, U",eprogram");
+    enter();
+    CHECK(v.document.song() == before);
+    CHECK(contains(bottomText(v.ws.frame()), U"Insert event"));
+    v.ws.handle(Key::typed(U'u', kCtrl), 0);
+    enter();
+    CHECK(contains(bottomText(v.ws.frame()), U"BPM"));
+    enter();
+    CHECK(contains(bottomText(v.ws.frame()), U"Invalid input. Tempo"));
+    CHECK(v.document.song() == before);
+    type(v.ws, U"96.5");
+    enter();
+    CHECK(v.document.song().tempo().tempoAt(0) == core::Tempo::fromBpm(96.5));
+    type(v.ws, U"u");
+    CHECK(v.document.song() == before);
 }
 
 TEST_CASE("a tempo change can be inserted at the cursor, from any track or the conductor")

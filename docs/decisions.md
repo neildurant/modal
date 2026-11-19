@@ -821,6 +821,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **One drum-map save confirmation (decided 19 November 2026).** Use the comparison itself to confirm replacement. On trial, the Folder panel's overwrite question could make it look as though the write had already happened, and the subsequent review offered actions unrelated to saving. The save command's review offers Cancel save and Replace the saved copy. See design.md, Drum maps.
 
+**Guided event insertion (agreed 19 November 2026).** Use `, e` to choose an event by name and enter labelled fields. This makes less common MIDI and text events available without needing to recall their command syntax. Keep the complete typed form of `:event-insert` for direct entry. See design.md, Event insertion.
+
 ## Work order (19 November 2026)
 
 **Bring the file picker forward.** Song and drum-map file dialogs remained unavailable in the Linux desktop trials, including with portal support. Use the agreed Folder panel for open and save. It keeps the directory visible, supports parent and subfolder navigation, and reuses path completion. A Places menu keeps the main list compact and makes the command's normal directory easy to regain. `:w` uses it when a filename is needed. Keep Recent Songs with the songs milestone.

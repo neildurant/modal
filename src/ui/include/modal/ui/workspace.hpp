@@ -681,6 +681,11 @@ private:
     bool trackMoveKey(const Key& key);
 
     // :event-insert puts an event of any kind but a note in the cursor's track at its time.
+    std::optional<ChoiceList> eventInsertChoice_;
+    bool eventInsertChoiceKey(const Key& key);
+    void askEventField(std::size_t kind, const SongCursor& cursor, std::uint64_t version,
+                       std::optional<std::string> first = std::nullopt, bool retry = false);
+    CommandResult putEvent(const SongCursor& cursor, core::EventData data);
     CommandResult insertEvent(std::string_view text);
 
     // :section-split NAME starts a new section at the bar line of the cursor's bar, in the view's
@@ -979,9 +984,9 @@ private:
     std::optional<Question> question_;
     // A question answered at the prompt, such as ^'s velocity: its label, shown in place of
     // the :, and what runs with the line typed.
-    // An answer given nothing takes the default, if there's one, as a transform's does.
+    // A blank answer takes the default unless the question accepts the input as typed.
     void askFor(std::string label, std::function<void(const std::string&)> answer,
-                std::string defaultAnswer = {});
+                std::string defaultAnswer = {}, bool acceptEmpty = false);
     void askChoice(std::string label, std::vector<std::string> choices,
                    std::function<void(std::size_t)> use);
     CommandResult foldPianoRoll(bool toggle);
@@ -1222,6 +1227,7 @@ private:
         bool searchPrompt = false;
         bool keyPrompt = false;
         bool fixedChoices = false;
+        bool acceptEmpty = false;
         std::string answerLabel;
         std::function<void(const std::string&)> answer;
         Choices answerChoices = Choices::None;

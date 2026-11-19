@@ -2,9 +2,17 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: drum-map Always show marks and the single save confirmation are accepted and published. The next song-handling milestone includes a configurable Songs folder.*
+*Last updated 19 November 2026: guided event insertion is implemented for the final milestone 9 trial. The next song-handling milestone includes a configurable Songs folder.*
 
 ## Current handoff
+
+### Guided event insertion, 19 November 2026
+
+`, e` opens a searchable list of event types and asks for their fields. The last Enter inserts at the cursor as one undo step. Escape cancels from the list or any field, and an invalid value can be retried. The typed `:event-insert EVENT` form still works. See [design.md](design.md#event-insertion) and [schedule.md](schedule.md).
+
+**Validation.** Workspace regressions cover type filtering, controller fields, retrying invalid input, cancellation, plain lyric text, conductor tempo and undo. The chooser and the value prompt were inspected in offscreen renders. The HTML and PDF manuals build and their references pass. Desktop trial is pending.
+
+**To try.** Start `build/linux-gcc/apps/Debug/modal --demo` and use `gr` to open a track's piano roll. Press `, e`, type `control` and press Enter. Enter `7` and then `100`, pressing Enter after each. `u` undoes the insertion. Try `, e`, `lyric` and text with quotes, or Escape at the second Control change field to cancel.
 
 ### Drum-map save confirmation, 19 November 2026
 
@@ -16,7 +24,7 @@ Published with Always show through `eb24c01`. The [combined Linux and Windows CI
 
 **To try.** Start `build/linux-gcc/apps/Debug/modal /tmp/modal-ssd-drum-map-trial.modal` and use `gr`, `gp 53` then Enter, and `zP`. Run `:drum-map-save` and select `/tmp/modal-ssd-map-save-trial.drum-map`. Try Cancel save, then open it again and choose Replace the saved copy. Only the replacement should write the file.
 
-**Next work.** The `, e` insertion interface remains the final item in milestone 9. Agree the scope before changing it. Pitch-row selection and named navigation were delivered in drum-map step 3. The proposed Songs and Current Folder locations for Alt-Down Places belong to milestone 10. See [schedule.md](schedule.md) and [song-handling design questions](design.md#to-decide).
+**Next milestone.** The proposed Songs and Current Folder locations for Alt-Down Places belong to milestone 10. See [schedule.md](schedule.md) and [song-handling design questions](design.md#to-decide).
 
 ### Drum-map Always show marks, 19 November 2026
 

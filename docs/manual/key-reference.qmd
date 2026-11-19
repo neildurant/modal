@@ -99,6 +99,7 @@ after counts multiply.
 | Keys | Purpose |
 | --- | --- |
 | `o`, `O` in notes | Add a note, add and advance |
+| `, e` | Choose a non-note event type and enter its fields |
 | `, n` | Default note from the current note |
 | `x`, `Y` | Delete / yank current note or event |
 | Alt with directions | Move a note or suitable lane event |

@@ -3,7 +3,6 @@
 #include "workspace_commands.hpp"
 
 #include <modal/core/pitch.hpp>
-#include <modal/core/song_file.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
@@ -453,6 +452,7 @@ void Workspace::refresh()
 void Workspace::showSong()
 {
     drumMapChoice_.reset();
+    eventInsertChoice_.reset();
     ++drumMapDialog_;
     eventList_->showSong();
     arrange_->showSong();
@@ -1085,6 +1085,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     {
         return freezeChoiceKey(key);
     }
+    if (eventInsertChoice_)
+        return eventInsertChoiceKey(key);
     if (trackMove_)
     {
         return trackMoveKey(key);
@@ -3368,58 +3370,6 @@ bool Workspace::trackMoveKey(const Key& key)
         move.number = 0;
     }
     return true;
-}
-
-CommandResult Workspace::insertEvent(std::string_view text)
-{
-    const auto cursor = view().cursor();
-    const auto first = text.find_first_not_of(" \t");
-    if (first == std::string_view::npos)
-    {
-        // From its key: asks which, with the kinds to complete from.
-        openPrompt("event-insert ");
-        return {true, {}, false};
-    }
-    text = text.substr(first, text.find_last_not_of(" \t") - first + 1);
-    if (text == "tempo" || text.starts_with("tempo "))
-    {
-        // The conductor's, whichever track the cursor is on.
-        auto number = text.substr(std::min(text.size(), std::string_view{"tempo"}.size()));
-        number.remove_prefix(std::min(number.find_first_not_of(' '), number.size()));
-        double bpm = 0;
-        const auto [end, error] =
-            std::from_chars(number.data(), number.data() + number.size(), bpm);
-        if (error != std::errc{} || end != number.data() + number.size() || !(bpm >= 1) ||
-            bpm > 1000)
-        {
-            return CommandResult::error("A tempo must be from 1 to 1000 BPM");
-        }
-        const auto tempo = core::Tempo::fromBpm(bpm);
-        document_.edit(
-            "Set tempo to " + core::bpmText(tempo), view().place(), [&](core::Song& song)
-            { song.updateTempo([&](core::TempoMap& map) { map.set(cursor.tick, tempo); }); });
-        view().refresh();
-        return {true, "Tempo " + core::bpmText(tempo) + " from " + view().position(cursor.tick),
-                false};
-    }
-    if (!cursor.track)
-    {
-        return CommandResult::error("The conductor holds only tempo and meter changes");
-    }
-    auto parsed = core::parseEvent(text);
-    if (!parsed.data)
-    {
-        return CommandResult::error(parsed.error);
-    }
-    const core::Event event{cursor.tick, std::move(*parsed.data)};
-    document_.edit("Insert an event", view().place(),
-                   [&](core::Song& song)
-                   {
-                       song.updateEvents(*cursor.track,
-                                         [&](core::EventList& events) { events.insert(event); });
-                   });
-    view().refresh();
-    return {true, "Inserted at " + view().position(cursor.tick), false};
 }
 
 CommandResult Workspace::port(std::string_view name)

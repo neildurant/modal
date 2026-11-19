@@ -165,13 +165,14 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
             prompt_.line.take();
             std::swap(prompt_.line, prompt_.keyLine);
         }
-        if (text.find_first_not_of(' ') == std::string::npos)
+        const bool acceptEmpty = std::exchange(prompt_.acceptEmpty, false);
+        if (!acceptEmpty && text.find_first_not_of(' ') == std::string::npos)
         {
             text = std::exchange(prompt_.answerDefault, {});
         }
         prompt_.answerTarget.reset();
         prompt_.answerGiven.clear();
-        if (const auto answer = std::exchange(prompt_.answer, {}); !text.empty())
+        if (const auto answer = std::exchange(prompt_.answer, {}); acceptEmpty || !text.empty())
         {
             answer(text);
         }
@@ -216,6 +217,7 @@ std::optional<bool> Workspace::runCommandLine(std::string_view command)
         const bool choosing = std::exchange(prompt_.fixedChoices, false);
         mode_ = choosing && selection_ ? Mode::Visual : Mode::Normal;
         prompt_.answer = {};
+        prompt_.acceptEmpty = false;
         prompt_.answerTarget.reset();
         prompt_.answerGiven.clear();
         if (std::exchange(prompt_.keyPrompt, false))
@@ -792,7 +794,7 @@ Region Workspace::completionRegion(const Completions& shown) const
 }
 
 void Workspace::askFor(std::string label, std::function<void(const std::string&)> answer,
-                       std::string defaultAnswer)
+                       std::string defaultAnswer, bool acceptEmpty)
 {
     mode_ = Mode::CommandLine;
     prompt_.line.open();
@@ -800,6 +802,7 @@ void Workspace::askFor(std::string label, std::function<void(const std::string&)
     prompt_.answer = std::move(answer);
     prompt_.answerChoices = Choices::None;
     prompt_.fixedChoices = false;
+    prompt_.acceptEmpty = acceptEmpty;
     prompt_.answerDefault = std::move(defaultAnswer);
     prompt_.answerTarget.reset();
     prompt_.answerGiven.clear();

@@ -106,6 +106,13 @@ Frame Workspace::frame() const
     }
     if (drumMapChoice_)
         frame.push_back(drumMapChoiceRegion());
+    if (eventInsertChoice_)
+    {
+        const auto row = messageRow();
+        const int margin = BarSpacing::forCell(cell_).margin;
+        const Rect field{margin, row.y, 26 * cell_.width, row.height};
+        frame.push_back(eventInsertChoice_->region(field, {0, 0, width_, row.y}, cell_));
+    }
     if (filePicker_ && !question_)
         frame.push_back(filePickerRegion());
     frame.push_back(messageRowRegion());
@@ -298,6 +305,11 @@ Bar Workspace::messageBar(bool withMessage) const
     {
         row.left.push_back({"Up and Down choose, Enter freezes, Escape cancels", text});
     }
+    else if (eventInsertChoice_)
+    {
+        row.left.push_back({"Insert event: " + encodeUtf8(eventInsertChoice_->typed()), text});
+        row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
+    }
     else if (trackMove_)
     {
         row.left.push_back({"j and k move, Enter accepts, Escape puts back", text});
@@ -354,10 +366,10 @@ Bar Workspace::statusBar() const
 {
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
-    state.mode = drumMapChoice_ || filePicker_ ? StatusMode::Edit
-                 : freezeChoice_               ? StatusMode::Freeze
-                 : trackMove_                  ? StatusMode::Move
-                 : view().typing()             ? StatusMode::Edit
+    state.mode = drumMapChoice_ || filePicker_ || eventInsertChoice_ ? StatusMode::Edit
+                 : freezeChoice_                                     ? StatusMode::Freeze
+                 : trackMove_                                        ? StatusMode::Move
+                 : view().typing()                                   ? StatusMode::Edit
                  : mode_ == Mode::Visual || (mode_ == Mode::CommandLine && selection_)
                      ? StatusMode::Visual
                      : StatusMode::Normal;

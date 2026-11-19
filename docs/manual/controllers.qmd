@@ -537,14 +537,21 @@ part of judging the phrasing.
 
 ## Other MIDI event types
 
-The event list provides access to messages outside the displayed lane.
-`, e` or `:event-insert` adds a non-note event at the cursor. Examples include
-`:event-insert cc 7 100`, `:event-insert program 5`, `:event-insert bend -200`
-and `:event-insert pressure 60`. Note entry has its own commands because a
-note also needs a duration.
+Use `, e` to add a non-note event at the cursor, including messages outside
+the displayed lane. Type part of the event name to narrow the list, use Up
+or Down to move and press Enter to choose. For example, choose **Control
+change**, enter `7` for channel volume and `100` for its value. The last
+Enter inserts the event in one undo step. Escape cancels the insertion from
+the list or any field. Tempo goes on the conductor. Use the note-entry keys
+to give a note its pitch, velocity and duration.
+
+For direct entry, type a whole event such as `:event-insert cc 7 100`,
+`:event-insert program 5` or `:event-insert bend -200`.
 
 The insertion command also accepts polyphonic aftertouch, SysEx and text
 kinds. Polyphonic aftertouch is pressure for a particular pitch, distinct
 from the channel pressure shown in the lane. SysEx data is device-specific;
 its byte sequence belongs to the receiving instrument's specification.
 Text events can retain lyrics, cues or other information alongside the music.
+In the chooser's text fields, type the words as you want them to appear. In
+the direct command, enclose the text in quotes.

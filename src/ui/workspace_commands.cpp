@@ -384,11 +384,12 @@ constexpr std::array kSharedCommands{
                 .choices = {Choices::Port}},
     CommandInfo{.name = "event-insert",
                 .description =
-                    "Insert an event at the cursor: cc 7 100, program 5, bend -200, "
+                    "Choose an event type and enter its fields, or give the event directly: "
+                    "cc 7 100, program 5, bend -200, "
                     "pressure 60, polypressure C4 60, sysex F0 7D 01 F7, or text, "
                     "lyric, cue, copyright or instrument with words in quotes; or tempo 96, "
                     "the conductor's",
-                .usage = "EVENT",
+                .usage = "[EVENT]",
                 .choices = {Choices::EventKind}},
     CommandInfo{.name = "section-insert-before",
                 .description = "Insert a new section before the cursor's, of {count} bars (4), "

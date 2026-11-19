@@ -18,6 +18,7 @@ add_library(modal_ui STATIC
     config.cpp
     drum_maps.cpp
     workspace_drum_maps.cpp
+    workspace_event_insert.cpp
     workspace_file_picker.cpp
     demo_song.cpp
     event_list.cpp
