@@ -168,7 +168,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — Copying between songs through the shared registers (agreed 20 November 2026). See [design.md](design.md#copying-between-songs).
     - [x] **Done** — Sections: match track content by name, adding unmatched tracks with their settings. Accepted on trial.
-    - [ ] **Doing** — Whole tracks: lay along time, re-cut at the destination's sections, adding a section for anything past the end, keeping their bars. Built; trial pending.
+    - [x] **Done** — Whole tracks: lay along time, re-cut at the destination's sections, adding a section for anything past the end, keeping their bars. Accepted on trial.
     - [ ] **To do** — Whole bars (`yy`, `ab`, the arrangement's bars) carry their meter; other material lands in the destination's bars.
     - [ ] **To do** — Regressions, manual updates and functional trials, one per step.
 - [ ] **To do** — `:read FILE` to bring tracks into the current song.

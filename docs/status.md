@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial; step 2, whole tracks, awaits its trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial; step 2, whole tracks, was accepted on trial. Next is step 3, whole bars carrying their meter.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ A whole track put in a song with different sections is no longer refused. It is 
 
 **Validation.** Core tests put two bars of 7/8 into two bars of 4/4 (same times, the track's own 7/8 with the song's meter untouched and a remainder bar after), into one bar (a section added), and into the same 7/8 bars under other names (no meter of its own). Another turns a ramp across a destination section into the same played events. A Workspace test yanks a whole track with `, t y` in one song and puts it with `, t p` in a shorter song with another section name, checking the note's time, the message and that undo removes the added section. Two earlier tests that expected refusals for other section layouts now check the PPQN refusal, the one still made. MSVC Debug passes all 1,236 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,237 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **To try.** In the demo, open the Tracks view or arrangement on a track and yank it with `, t y`. Press `, f n` for a new song, which has different sections, and put it with `, t p`. The notes should keep their times, a section should be added if the demo is longer, and the message names it. For bars, change a demo section to 7/8 with `, b m` before yanking the track, and check in the new song that the track shows its own 7/8 (the arrangement tints its bars) while the song stays in 4/4.
 
