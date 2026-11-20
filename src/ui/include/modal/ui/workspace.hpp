@@ -300,7 +300,8 @@ public:
     {
         Song,
         DrumMap,
-        Config
+        Config,
+        Midi, // exporting a Standard MIDI File (decided 20 November 2026)
     };
     using PickedFile = std::function<void(std::optional<std::filesystem::path>)>;
     void pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs, PickedFile done,

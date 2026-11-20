@@ -47,6 +47,8 @@ bool shownFile(Workspace::PickerKind kind, bool save, const std::filesystem::pat
     const auto extension = utf8Text(path.extension());
     if (kind == Workspace::PickerKind::DrumMap)
         return sameDrumMapName(extension, ".drum-map");
+    if (kind == Workspace::PickerKind::Midi)
+        return sameDrumMapName(extension, ".mid") || sameDrumMapName(extension, ".midi");
     return sameDrumMapName(extension, ".modal") ||
            (!save && (sameDrumMapName(extension, ".mid") || sameDrumMapName(extension, ".midi")));
 }
@@ -279,7 +281,9 @@ void Workspace::submitFilePicker()
         return;
     }
     if (picker.kind != PickerKind::Config && !path.has_extension())
-        path += picker.kind == PickerKind::Song ? ".modal" : ".drum-map";
+        path += picker.kind == PickerKind::Song   ? ".modal"
+                : picker.kind == PickerKind::Midi ? ".mid"
+                                                  : ".drum-map";
     error.clear();
     if (!picker.save)
     {
@@ -386,6 +390,7 @@ Region Workspace::filePickerRegion() const
     };
     const auto title = picker.choosingPlace                ? "Places"
                        : picker.kind == PickerKind::Config ? "Write configuration"
+                       : picker.kind == PickerKind::Midi   ? "Export MIDI"
                        : picker.kind == PickerKind::Song   ? picker.save ? "Save song" : "Open song"
                        : picker.save                       ? "Save drum map"
                                                            : "Load drum map";

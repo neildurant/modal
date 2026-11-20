@@ -426,17 +426,15 @@ public:
 
     void chooseSave(FileKind kind, const std::filesystem::path& suggested, Chosen done) override
     {
-        if (kind != FileKind::Midi)
-        {
-            using Picker = ui::Workspace::PickerKind;
-            const bool review = kind == FileKind::DrumMapSave;
-            const auto picker = kind == FileKind::Config              ? Picker::Config
-                                : kind == FileKind::DrumMap || review ? Picker::DrumMap
-                                                                      : Picker::Song;
-            view_.pickFile(picker, suggested, std::move(done), !review);
-            return;
-        }
-        chooseFile(true, {{"MIDI files", "mid"}}, suggested, std::move(done));
+        // Modal's own Folder panel for every kind, MIDI exports too (decided 20 November 2026,
+        // as the system's dialogs failed on Linux desktops).
+        using Picker = ui::Workspace::PickerKind;
+        const bool review = kind == FileKind::DrumMapSave;
+        const auto picker = kind == FileKind::Config              ? Picker::Config
+                            : kind == FileKind::DrumMap || review ? Picker::DrumMap
+                            : kind == FileKind::Midi              ? Picker::Midi
+                                                                  : Picker::Song;
+        view_.pickFile(picker, suggested, std::move(done), !review);
     }
 
     void quit() override { window_.close(); }
@@ -474,22 +472,6 @@ public:
     }
 
 private:
-    void chooseFile(bool save, std::vector<ui::sdl::FileFilter> filters,
-                    const std::filesystem::path& suggested, Chosen done)
-    {
-        window_.chooseFile(
-            save, std::move(filters), suggested,
-            [this, done = std::move(done)](std::optional<std::filesystem::path> file,
-                                           std::string error)
-            {
-                if (error.empty())
-                    done(std::move(file));
-                else
-                    report(ui::CommandResult::error("Could not open the file dialog: " + error +
-                                                    ". Give a filename with the command."));
-            });
-    }
-
     ui::sdl::Window& window_;
     ui::Workspace& view_;
     core::Document& document_;

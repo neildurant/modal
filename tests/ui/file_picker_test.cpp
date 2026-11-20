@@ -52,6 +52,7 @@ struct Pickers final : FileHost
         const bool review = kind == FileKind::DrumMapSave;
         const auto picker = kind == FileKind::Config              ? Picker::Config
                             : kind == FileKind::DrumMap || review ? Picker::DrumMap
+                            : kind == FileKind::Midi              ? Picker::Midi
                                                                   : Picker::Song;
         workspace.pickFile(picker, suggested, std::move(done), !review);
     }
@@ -538,6 +539,33 @@ TEST_CASE("whole bars bring their meter to another song, and a bar's events don'
     const auto& after = p.document.song();
     CHECK(after.meter(after.tracks().front()->id()).signatureAt(0) == core::TimeSignature{4, 4});
     CHECK(p.workspace.message().find("keeping") == std::string::npos);
+}
+
+TEST_CASE("export without a filename uses the Folder panel for MIDI files")
+{
+    Pickers p;
+    p.temporary.write("Earlier take.mid", "MThd");
+    p.temporary.write("Notes.txt", "not MIDI");
+    p.makeSong("Session.modal", "Session");
+    p.type(U":e Session\n:export\n");
+    CHECK(p.shows(U"Export MIDI"));
+    CHECK(p.shows(U"Enter for Session.mid"));
+    CHECK(p.shows(U"Earlier take.mid"));
+    CHECK_FALSE(p.shows(U"Notes.txt"));
+    CHECK_FALSE(p.shows(U"Session.modal"));
+    p.type(U"\n");
+    CHECK(std::filesystem::exists(p.temporary / "Session.mid"));
+    CHECK(p.workspace.message() == "Exported Session.mid");
+
+    // A typed name gets .mid, and an existing file is replaced only when confirmed.
+    p.type(U":export\nEarlier take\n");
+    CHECK(p.workspace.message().starts_with("Replace "));
+    p.type(U"n");
+    CHECK(p.workspace.mode() == Mode::CommandLine);
+    p.press(NamedKey::Escape);
+    CHECK(std::filesystem::file_size(p.temporary / "Earlier take.mid") == 4);
+    p.type(U":export\nMix\n");
+    CHECK(std::filesystem::exists(p.temporary / "Mix.mid"));
 }
 
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")

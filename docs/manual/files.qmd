@@ -148,7 +148,9 @@ Undo history is a working-session facility, not a substitute for saved copies.
 
 The picker lets you see the directory as you type or browse. `:e` opens it
 beside the current song, or in your home directory for a new song. `:w` and
-`:wq` use it when the song needs a filename. Drum-map commands without a
+`:wq` use it when the song needs a filename, and `:song-save-as` always does.
+`:export` with no filename opens it beside the song too, listing MIDI files
+and suggesting the song's name as a `.mid` file. Drum-map commands without a
 filename start in the reusable maps directory. `:write-config` starts in
 the configuration directory and suggests `modalrc`.
 
@@ -187,8 +189,8 @@ responsibilities.
 
 ## Exporting MIDI
 
-`:export FILE.mid` writes a Standard MIDI File; with no filename it opens a
-chooser. Export uses the stored events and their channels. Playback-only
+`:export FILE.mid` writes a Standard MIDI File; with no filename it opens the
+file picker (@sec-file-picker). Export uses the stored events and their channels. Playback-only
 transpose, velocity, timing and quantise settings are not all baked into it,
 and mute or solo does not select a subset for export. Freeze a chosen
 playback result first when the destination should receive those changes.
@@ -206,8 +208,8 @@ when those distinctions matter.
 
 An existing named output file is protected from accidental overwrite.
 The bang follows the command, as in `:export! FILE.mid` or `:w! FILE`.
-It does not go at the end of the path. A chooser may supply its own overwrite
-confirmation.
+It does not go at the end of the path. Choosing an existing file in the
+picker asks before replacing it.
 
 Each command keeps to its own kind of file, because a file is read back by
 its name: `:w` refuses a name ending `.mid` or `.midi`, and `:export` one

@@ -162,7 +162,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [x] **Done** — Keys for the next and previous open song, without the chooser (asked for 20 November 2026). See [design.md](design.md#the-files-group).
     - [x] **Done** — `]f` / `[f` and Ctrl-Tab / Ctrl-Shift-Tab, going round, with a count.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — `:export` without a filename uses the Folder panel instead of the system dialog.
+- [ ] **Doing** — `:export` without a filename uses the Folder panel instead of the system dialog. Built; trial pending.
 - [x] **Done** — Restore each song's view and places on switching (agreed 20 November 2026). See [design.md](design.md#open-songs).
     - [x] **Done** — Keep each song's views and places, the view shown, its history, `''`, `gv` and the play-from marker.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).

@@ -2,9 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel awaits its trial.*
 
 ## Current handoff
+
+### Export through the Folder panel, 20 November 2026
+
+`:export` with no filename, and `, f x`, open Modal's Folder panel instead of the system's save dialog, which had failed on the Linux desktop. The panel starts beside the song, is titled Export MIDI, lists `.mid` and `.midi` files, suggests the song's name as `.mid`, adds `.mid` to a typed name, and asks before replacing a file. No command now uses the system's file dialogs; the app's wrapper for them is removed. See [design.md](design.md#file-picker).
+
+**Validation.** A Workspace test checks the title, suggestion and listing (MIDI files shown, the song and a text file not), exporting with Enter, declining a replacement with the file untouched, and a typed name gaining `.mid`. MSVC Debug passes all 1,238 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,239 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial, ideally on the Linux laptop too.
+
+**Question.** The SDL window's own file-dialog code (`Window::chooseFile`) is now unused, as is the D-Bus support enabled for the desktop portal. Both are left in place until it's decided whether to remove them.
+
+**To try.** Run `:export` or `, f x` in the demo: check the panel's title and suggestion, export with Enter, then try again choosing the same file and decline the replacement. On the Linux laptop this is the case that previously showed no dialog.
 
 ### Copying between songs, step 3: whole bars bring their bars, 20 November 2026
 
