@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs await their trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial. Next is numbered backups and safe save and close.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ Song files opened (by `:e`, the picker, the recent list or at startup) or saved 
 
 **Validation.** Tests cover the time wording at fixed local times, the list's order, limit, repeats, spaces in paths and reading back, and, by keys, the chooser's narrowing and opening, Delete leaving the file, removing a missing file, a MIDI import replaced on saving, and `recentsongs=0`. A `[.sample]` render with real and missing files was checked in dark and light. The generated settings reference includes `recentsongs`. MSVC Debug passes all 1,248 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,249 tests with three MIDI-dependent skips, after removing an explicit lambda capture Clang flagged as unneeded in the sample test. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
 
-**Pending.** The desktop trial.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **Note.** As in the Open songs chooser, the line where typing narrows the list shows no cursor; a change for both, if wanted, is a separate step.
 
