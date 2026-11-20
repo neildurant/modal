@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 19 November 2026: the first open-song step of milestone 10 is ready for a functional trial.*
+*Last updated 20 November 2026: the first open-song step of milestone 10 is ready for a functional trial.*
 
 ## Current handoff
 
@@ -10,9 +10,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 `:e` opens or switches to a song, `:new` adds an untitled song, `:song-select` lists open songs with paths and modified state, and `:song-close` closes the active song. Independent contents and undo history survive switching. Save and quit checks cover inactive songs, and switching stops playback and is refused during a recording take. See [design.md](design.md#open-songs).
 
-**Validation.** Workspace and file-command tests cover path filtering, wrapped locations, undo after switching, saving and quitting with other songs open, and recording and playback guards. The chooser was checked in dark and light SDL offscreen renders. Both manual formats build and their references pass. Desktop trial is pending.
+**Validation.** Workspace and file-command tests cover path filtering, wrapped locations, undo after switching, saving and quitting with other songs open, and recording and playback guards. All six Linux configurations pass with 1,226 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The chooser was checked in dark and light SDL offscreen renders. Both manual formats build and their references pass. Desktop trial is pending.
 
-**To try.** Start `build/linux-gcc/apps/Debug/modal --demo`. Make an edit, run `:new`, then open `:song-select`. Choose the demo again, check that the edit is still there and undo it with `u`. Open two files and filter by part of the path. Try `:q` with unsaved edits in the other song, then save it or explicitly discard it with `:song-close!`.
+**To try.** Start `build/linux-gcc/apps/Debug/modal --demo`. Make an edit, run `:new`, then open `:song-select`. Choose Test arrangement, check that the edit is still there and undo it with `u`. Open two files and filter by part of the path. Try `:q` with unsaved edits in the other song, then save it or explicitly discard it with `:song-close!`.
 
 **Next.** Restore each song's cursor and view settings when switching. Crash recovery still covers the active song. See [schedule.md](schedule.md).
 
