@@ -850,7 +850,51 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
         put.ramps += ramps.size();
         ++put.tracks;
     }
+    putBars(song, reg, firstTrack, at);
     return put;
+}
+
+void takeBars(EventRegister& reg, const core::Song& song, std::size_t first, core::Tick from)
+{
+    const auto tracks = song.tracks();
+    const auto span = registerSpan(reg);
+    reg.meters.clear();
+    for (auto i = first; i < first + reg.tracks.size() && i < tracks.size(); ++i)
+    {
+        const auto& meter = song.meter(tracks[i]->id());
+        core::MeterMap bars{song.ppqn(), meter.signatureAt(from)};
+        for (const auto& change : meter.changes())
+        {
+            if (change.tick > from && change.tick < from + span)
+                bars.set(change.tick - from, change.signature);
+        }
+        reg.meters.push_back(std::move(bars));
+    }
+}
+
+bool putBars(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at)
+{
+    if (!reg.bars)
+        return false;
+    const auto tracks = song.tracks();
+    const auto span = registerSpan(reg);
+    bool changed = false;
+    for (std::size_t i = 0; i < reg.meters.size() && firstTrack + i < tracks.size(); ++i)
+        changed = song.keepBars(tracks[firstTrack + i]->id(), at, span, reg.meters[i]) || changed;
+    return changed;
+}
+
+std::string keptBarsText(const core::Song& song, const EventRegister& reg, std::size_t firstTrack,
+                         core::Tick at)
+{
+    if (!reg.bars || reg.meters.empty())
+        return {};
+    auto tried = song; // cheap: copies share their tracks and sections
+    if (!putBars(tried, reg, firstTrack, at))
+        return {};
+    const auto signature = reg.meters.front().signatureAt(0);
+    return ", keeping its " + std::to_string(signature.numerator) + "/" +
+           std::to_string(signature.denominator);
 }
 
 std::optional<std::string> rampEventEditRefusal(const core::Song& song, core::TrackId track,
@@ -1157,6 +1201,7 @@ EventRegister rippleDelete(core::Song& song, std::size_t first, std::size_t last
                 ramps = std::move(left);
             });
     }
+    takeBars(removed, song, first, from);
     return removed;
 }
 
@@ -1187,6 +1232,7 @@ EventRegister takeEvents(const core::Song& song, std::size_t first, std::size_t 
         }
     }
     taken.span = to - from;
+    takeBars(taken, song, first, from);
     return taken;
 }
 

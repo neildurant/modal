@@ -2,9 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial; step 2, whole tracks, was accepted on trial. Next is step 3, whole bars carrying their meter.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial; step 2, whole tracks, was accepted on trial; step 3, whole bars carrying their meter, awaits its trial.*
 
 ## Current handoff
+
+### Copying between songs, step 3: whole bars bring their bars, 20 November 2026
+
+Material taken as whole bars (`yy`, `dd`, `ab`, `as`, `it`, `ie` and the arrangement's bars) notes each track's bars over it. Where it's put on tracks whose bars differ there, they take the copy's meter as their own over the span, the meter before resuming after it with a remainder bar where needed; the message adds `, keeping its 7/8`. `ib` and `is` take events, which land in the destination's bars. Appending to a register (`"Ayy`) drops the bars, as joined material has none of its own. This applies within a song too. Bars are applied in the shared put helper, through `Song::keepBars`, which whole-track puts now use as well. See [design.md](design.md#copying-between-songs).
+
+**Validation.** A Workspace test yanks two bars of 7/8 with `2yy`, puts them with `p` in a 4/4 song, and checks the same times, the track's own 7/8, the song's 4/4 and the message; then `yib` puts one bar's events with the track left in 4/4 and no mention of bars. Every existing put test passes unchanged. The manual's files chapter now has a section on copying between songs covering all three steps. MSVC Debug passes all 1,237 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,238 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial.
+
+**Linking note.** On Windows, `modal_tests.exe` stayed locked after a full test run with no process holding it; moving it aside let it relink.
+
+**To try.** In the demo, change a section to 7/8 with `, b m`, then in the arrangement yank two bars of a track there with `2yy`. Press `, f n` and put them with `p`: the message should say `keeping its 7/8`, the track's bars there are tinted as its own, and the song stays in 4/4. Undo, then try `yib` instead: the notes land in 4/4 with no mention of bars. Copying within the demo from a 7/8 section into a 4/4 one should keep the 7/8 too.
 
 ### Copying between songs, step 2: whole tracks, 20 November 2026
 

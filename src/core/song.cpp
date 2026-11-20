@@ -456,22 +456,30 @@ std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& 
     offset = 0;
     for (const auto& part : copy.parts)
     {
-        const auto& bars = part.content.meter ? *part.content.meter : part.conductor;
-        if (!sameBars(meter_, offset, part.length, bars))
-        {
-            const auto changes = bars.changes();
-            for (std::size_t i = 0; i < changes.size(); ++i)
-            {
-                const auto from = offset + changes[i].tick;
-                const auto to =
-                    offset + (i + 1 < changes.size() ? changes[i + 1].tick : part.length);
-                if (from < to)
-                    setMeter(id, from, to, changes[i].signature);
-            }
-        }
+        keepBars(id, offset, part.length,
+                 part.content.meter ? *part.content.meter : part.conductor);
         offset += part.length;
     }
     return id;
+}
+
+bool Song::keepBars(TrackId id, Tick from, Tick length, const MeterMap& bars)
+{
+    if (!track(id))
+        return false;
+    length = std::min(length, end() - from);
+    if (length <= 0 || sameBars(meter(id), from, length, bars))
+        return false;
+    const auto changes = bars.changes();
+    for (std::size_t i = 0; i < changes.size() && changes[i].tick < length; ++i)
+    {
+        const auto start = from + changes[i].tick;
+        const auto stop =
+            from + std::min(i + 1 < changes.size() ? changes[i + 1].tick : length, length);
+        if (start < stop)
+            setMeter(id, start, stop, changes[i].signature);
+    }
+    return true;
 }
 
 bool Song::removeTrack(TrackId id)

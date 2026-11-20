@@ -163,7 +163,8 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 | `P` | In, moving the rest of the section later (`put-insert`), asking to lengthen it if it must | Sections before this one | In place of the selection |
 | `Alt-p` `Alt-P` | As `p` and `P`, at the cursor's pitch too (piano roll only) | — | — |
 
-- What was taken as bars (`dd`, `ib`, `ab`, the arrangement's bars) goes to the start of the cursor's bar; anything else to the cursor. The event list has `p` but not `P`.
+- What was taken as bars (`dd`, `ib`, `ab`, the arrangement's bars) goes to the start of the cursor's bar; anything else to the cursor.
+- Whole bars (`yy` and `dd`, `ab`, `as`, `it`, `ie`, the arrangement's bars) bring their bars: where the tracks they land on have other bars there, those tracks take the copy's meter as their own over it, said in the message (`…, keeping its 7/8`). `ib` and `is` take events, which land in the bars where they're put. In another song, sections give their content to the tracks of the same names, adding any without a match, and whole tracks are laid along time, a section being added for anything past the end. See [design.md](design.md#copying-between-songs). The event list has `p` but not `P`.
 - **At the cursor's pitch,** the notes keep their intervals to the pitch the cursor was on when they were taken (in Visual mode, the pitch the selection was started on; taken outside the piano roll, their lowest), so a riff or chord shape moves to another pitch.
 - **`:put-ending`** (no key) puts the register over what's there so it ends at the cursor, or at its bar line for bars: a sweep ending on a downbeat.
 - After a put the message row says what, how and where ("Put 4 events in Bass at bar 3, over what's there").

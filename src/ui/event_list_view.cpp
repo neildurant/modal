@@ -1087,6 +1087,8 @@ bool EventListView::operateEvents(std::string_view op, const std::vector<std::si
         event.tick -= first;
         reg.tracks.front().push_back(std::move(event));
     }
+    if (bar && track_ > 0)
+        takeBars(reg, document_.song(), track_ - 1, first);
     const auto what =
         indices.size() == 1 ? std::string{"1 event"} : std::to_string(indices.size()) + " events";
     if (op == "operator-yank")
@@ -1163,7 +1165,7 @@ bool EventListView::put(bool ending)
     const auto said = "Put " + eventCount(total) + " in " + where +
                       (ending ? ", ending at " + putPlace(meter, here, reg.bars)
                               : " at " + putPlace(meter, at, reg.bars)) +
-                      ", over what's there";
+                      keptBarsText(document_.song(), reg, track_ - 1, at) + ", over what's there";
     if (const auto why = rampPutRefusal(document_.song(), reg, track_ - 1, at, false, 0))
     {
         refuse(*why, MessageKind::Warning);

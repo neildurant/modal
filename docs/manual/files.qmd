@@ -92,6 +92,53 @@ reports unsaved edits in other songs, use `:song-select` to reach them.
 `:e! FILE` and `:new!` replace the current song and can discard its unsaved
 edits. Use the plain forms to keep it open.
 
+## Copying between songs
+
+The registers are shared by every open song, so copying from one song to
+another needs no new keys: yank in one, switch with `]f` or `, f o`, and put
+in the other. What changes is what the material meets when it arrives: other
+tracks, other sections, other bars and another tempo. Modal keeps the music
+as it was and fits it in as follows.
+
+**Notes keep their timing.** Material keeps its length in time and plays at
+the destination's tempo, since tempo belongs to the whole song and can't
+travel with part of it. Every song Modal opens is converted to the same
+resolution, so nothing is rounded on the way.
+
+**Whole bars bring their bars.** If you took bars whole, with `yy` or `dd`
+(`2yy` for two), `yab`, a section's time with `yas`, a whole track with `yit`,
+or bars selected in the arrangement, the bar lines come with them. Copy two
+bars of a 7/8 riff from one song into a 4/4 song, and the notes land at the
+same times; the track they land on takes the riff's 7/8 as a meter of its own
+over those bars, then rejoins the song's 4/4, with a short bar in between if
+the riff ends partway through one. The rest of the song stays in 4/4. The
+message says so: `…, keeping its 7/8`.
+
+**A bar's events are just notes.** `yib` and `yis` take the events in a bar
+or section, not the bars, and other motions and selections take a stretch of
+time. These land in the destination's bars, so the same riff copied with
+`yib` simply sits in 4/4. Either way you can change your mind afterwards:
+`, s f` sets a track following the song's meter again, and `, b m` rebars a
+selection.
+
+**Sections find their tracks by name.** A section taken from the section
+strip with `Y` brings its own meter, tempo and labels. Its notes go to the
+tracks with the same names in the destination: the source's Bass part to the
+destination's Bass track, wherever that track is in the list. A source track
+with no match is added at the end, with its settings, and the message names
+it, so nothing is dropped.
+
+**Whole tracks are laid along time.** A track yanked with `, t y` and put
+with `, t p` brings its settings: port, channel, drum map and playback
+transforms. In a song with different sections, it is laid along time from the
+song's start and cut where the destination's sections begin. If it runs past
+the end, a section is added to hold the rest, named in the message. Where
+its bars differ from the song's, it keeps them as its own meter. Because a
+section always starts a bar, a destination section beginning partway through
+one of the track's bars cuts that bar there.
+
+Each put is a single undo step, including any tracks or sections it added.
+
 The native `.modal` file format is still under development. Compatibility
 between files written by different development versions is not yet guaranteed.
 Keep separate copies of important work before trying a newer build.

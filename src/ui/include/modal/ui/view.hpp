@@ -94,6 +94,11 @@ struct EventRegister
     // from the register's start (decided 17 November 2026).
     std::vector<std::vector<core::ControllerRamp>> ramps = {};
 
+    // Taken as whole bars (yy, dd, ab, as, it, ie, the arrangement's bars), each track's bars
+    // over it, from its start, which a put keeps where the destination's differ (decided
+    // 20 November 2026); none for a bar's or section's events (ib, is), which are notes in time.
+    std::vector<core::MeterMap> meters = {};
+
     // For sections, the song they were taken from and its tracks then, so a put in another
     // song can give their content to its tracks of the same names (decided 20 November 2026).
     std::uint64_t fromSong = 0;

@@ -493,6 +493,53 @@ TEST_CASE("a whole track put in a song with other sections is laid along time")
     CHECK(p.document.song().sections().size() == 1);
 }
 
+TEST_CASE("whole bars bring their meter to another song, and a bar's events don't")
+{
+    Pickers p;
+    auto source = newSong();
+    source.title = "Source";
+    const auto q = source.ppqn().quarter();
+    const auto eighth = q / 2;
+    source.updateMeter([](core::MeterMap& meter) { meter.set(0, core::TimeSignature{7, 8}); });
+    const auto track = source.tracks().front()->id();
+    source.updateEvents(track,
+                        [&](core::EventList& events)
+                        {
+                            events.insert({0, core::Note{40, 100, q}});
+                            events.insert({7 * eighth, core::Note{43, 100, q}});
+                        });
+    REQUIRE(core::writeSongFile(source, p.temporary / "Source.modal").empty());
+    auto destination = newSong();
+    destination.title = "Destination";
+    REQUIRE(core::writeSongFile(destination, p.temporary / "Destination.modal").empty());
+    const auto ticks = [&]
+    {
+        std::vector<core::Tick> found;
+        const auto& song = p.document.song();
+        for (const auto& event : song.events(song.tracks().front()->id()).all())
+            found.push_back(event.tick);
+        return found;
+    };
+
+    // Two whole bars of 7/8 into 4/4: the same times, in the track's own 7/8.
+    p.type(U":e Source\n2yy:e Destination\np");
+    REQUIRE(p.document.song().title == "Destination");
+    CHECK(ticks() == std::vector<core::Tick>{0, 7 * eighth});
+    const auto& song = p.document.song();
+    const auto& bars = song.meter(song.tracks().front()->id());
+    CHECK(bars.signatureAt(0) == core::TimeSignature{7, 8});
+    CHECK(bars.toBarBeatTick(7 * eighth) == core::BarBeatTick{2, 1, 0});
+    CHECK(song.meter().signatureAt(0) == core::TimeSignature{4, 4});
+    CHECK(p.workspace.message().find(", keeping its 7/8") != std::string::npos);
+
+    // A bar's events are notes in time, landing in the destination's bars.
+    p.type(U"u:e Source\nyib:e Destination\np");
+    CHECK(ticks() == std::vector<core::Tick>{0});
+    const auto& after = p.document.song();
+    CHECK(after.meter(after.tracks().front()->id()).signatureAt(0) == core::TimeSignature{4, 4});
+    CHECK(p.workspace.message().find("keeping") == std::string::npos);
+}
+
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")
 {
     Pickers p;

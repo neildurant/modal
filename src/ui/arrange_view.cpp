@@ -960,7 +960,8 @@ bool ArrangeView::put(bool insert, bool ending)
     const auto where = name + (reg.tracks.size() > 1 ? " and the tracks after it" : "");
     const auto said =
         "Put " + eventCount(total) + " in " + where +
-        (ending ? ", ending at " + putPlace(m, bar, true) : " at " + putPlace(m, at, true));
+        (ending ? ", ending at " + putPlace(m, bar, true) : " at " + putPlace(m, at, true)) +
+        keptBarsText(document_.song(), reg, track, at);
     if (const auto why =
             rampPutRefusal(document_.song(), reg, track, at, insert,
                            insert ? barsToInsert(document_.song(), reg, track, at) : 0))

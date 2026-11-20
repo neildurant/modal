@@ -855,6 +855,7 @@ EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
     }
     to.span = more.span > 0 ? offset + more.span : 0;
     to.bars = to.bars && more.bars;
+    to.meters.clear(); // material joined together has no one set of bars to bring
     return to;
 }
 
@@ -2469,7 +2470,17 @@ bool Workspace::runOperator(std::string_view command, int count)
     }
     // Counts before the operator and after it multiply, as in Vim: 2d3j is d6j.
     const int total = op.count == 0 && count == 0 ? 0 : std::max(op.count, 1) * std::max(count, 1);
-    const auto run = [&] { return view().operate(op.name, command, total); };
+    const auto run = [&]
+    {
+        // A bar's or a section's events are notes in time, landing in the bars where they're
+        // put; what else is taken as bars brings them (decided 20 November 2026).
+        const bool inner = command == "object-bar-contents" || command == "object-section-contents";
+        const auto before = inner ? std::optional{register_} : std::nullopt;
+        const bool done = view().operate(op.name, command, total);
+        if (before && !(register_ == *before))
+            register_.meters.clear();
+        return done;
+    };
     return cut ? cutThen(op.name, command, total, run) : run();
 }
 

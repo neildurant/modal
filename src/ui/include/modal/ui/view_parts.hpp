@@ -236,6 +236,18 @@ struct Put
 };
 Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at);
 
+// Notes the bars of the tracks a register was taken from, from the first, over its span from a
+// tick, for material taken as whole bars, which brings them.
+void takeBars(EventRegister& reg, const core::Song& song, std::size_t first, core::Tick from);
+
+// Gives the tracks a register is put on, from the first, the bars it brought, where theirs
+// differ there (putRegister does, after the events). Returns whether any track's changed.
+bool putBars(core::Song& song, const EventRegister& reg, std::size_t firstTrack, core::Tick at);
+
+// What a put there will say of the bars it brings: ", keeping its 7/8", or nothing.
+std::string keptBarsText(const core::Song& song, const EventRegister& reg, std::size_t firstTrack,
+                         core::Tick at);
+
 // Ripple, staying inside the section (see How far ripple reaches in the design). The end of
 // the section holding a time.
 core::Tick sectionEndAt(const core::Song& song, core::Tick tick);

@@ -1075,7 +1075,8 @@ bool PianoRollView::put(bool insert, bool ending, bool atPitch)
                       " in " + where +
                       (ending ? ", ending at " + putPlace(m, bar, reg.bars)
                               : " at " + putPlace(m, at, reg.bars)) +
-                      (atPitch && here ? ", from " + core::pitchName(*here) : std::string{});
+                      (atPitch && here ? ", from " + core::pitchName(*here) : std::string{}) +
+                      keptBarsText(song, reg, track_, at);
     if (!insert)
     {
         document_.edit("Put " + eventCount(total) + " in " + where, place(),

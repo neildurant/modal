@@ -398,6 +398,12 @@ public:
     // song, or a signature whose beat isn't a whole number of ticks.
     bool setMeter(std::optional<TrackId> track, Tick from, Tick to, TimeSignature signature);
 
+    // Gives a track the bars of another meter (from that meter's start) over a span, as its own
+    // meter, where they differ from the track's bars there; the meter before resumes after the
+    // span as setMeter leaves it. For material brought with its bars (decided 20 November
+    // 2026). Returns whether the track's bars changed.
+    bool keepBars(TrackId id, Tick from, Tick length, const MeterMap& bars);
+
     // Sets the track following the conductor's meter in every section, or in those a span of
     // time touches. Returns false if there's no such track.
     bool followConductor(TrackId id);
