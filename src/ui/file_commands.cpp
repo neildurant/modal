@@ -419,7 +419,8 @@ private:
     std::optional<std::filesystem::path> argument(const CommandCall& call,
                                                   std::string_view extension) const
     {
-        return fileArgument(call.arguments, extension, songFolder(document_, home_), home_);
+        return fileArgument(call.arguments, extension,
+                            songFolder(document_, home_, host_.songsFolder()), home_);
     }
 
     CommandResult opened(const std::filesystem::path& file, bool force)
@@ -559,11 +560,18 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
 }
 
 std::filesystem::path songFolder(const core::Document& document,
-                                 const std::optional<std::filesystem::path>& home)
+                                 const std::optional<std::filesystem::path>& home,
+                                 const std::optional<std::filesystem::path>& songs)
 {
+    // The song's own folder first, its context outweighing the usual one (decided 20 November
+    // 2026), then the Songs folder, then home.
     if (const auto& file = document.file() ? document.file() : document.importedFrom())
     {
         return file->parent_path();
+    }
+    if (songs)
+    {
+        return *songs;
     }
     if (home)
     {

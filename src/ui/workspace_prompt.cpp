@@ -251,7 +251,7 @@ std::optional<std::filesystem::path> Workspace::fileFolder(Choices kind) const
     // November 2026, as many programs keep a folder for each kind of file).
     if (kind == Choices::File)
     {
-        return songFolder(document_, home_);
+        return songsHere();
     }
     if (kind == Choices::DrumMapFile)
         return drumMapFolder();
@@ -1303,6 +1303,8 @@ Region Workspace::promptRegion() const
     { return margin + static_cast<int>(column) * cell_.width; };
     const auto lead = label.size();
     region.text.push_back({x(0), 0, label, plain});
+    if (filePicker_ && filePicker_->choosingPlace)
+        return region; // nothing is typed while choosing a place, so no cursor (after use)
     // A value it was opened with, highlighted while a number typed would replace it.
     region.text.push_back(
         {x(lead), 0, text.substr(first, cursor - first),

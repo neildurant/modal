@@ -296,6 +296,11 @@ public:
     {
         stateFolder_ = std::move(state);
     }
+    // The songfolder setting's folder, if it's set (decided 20 November 2026).
+    std::optional<std::filesystem::path> songsFolder() const;
+    // Where a song's files are looked for: its own folder, or else the Songs folder or home.
+    std::filesystem::path songsHere() const;
+
     enum class PickerKind
     {
         Song,
@@ -1204,7 +1209,14 @@ private:
         std::string suggested;
         std::filesystem::path folder;
         std::filesystem::path listingFolder;
-        std::vector<std::pair<std::string, std::filesystem::path>> places;
+        // Places: each one's name, folder, and a note after it, as the setting it comes from.
+        struct Place
+        {
+            std::string name;
+            std::filesystem::path folder;
+            std::string note = {};
+        };
+        std::vector<Place> places;
         std::vector<std::string> entries;
         std::optional<std::size_t> selected;
         std::size_t place = 0;

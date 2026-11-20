@@ -450,6 +450,11 @@ public:
 
     std::shared_ptr<void> leaveSong() override { return view_.leaveSong(); }
 
+    std::optional<std::filesystem::path> songsFolder() const override
+    {
+        return view_.songsFolder();
+    }
+
     void returnToSong(std::shared_ptr<void> kept) override
     {
         view_.returnToSong(std::move(kept));

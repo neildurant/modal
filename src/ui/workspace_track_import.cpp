@@ -44,7 +44,7 @@ CommandResult Workspace::importTracks(const CommandCall& call)
     if (auto why = recording_.fileOperationRefusal())
         return CommandResult::error(std::move(*why));
     const auto text = trimmedText(call.arguments);
-    const auto folder = songFolder(document_, home_);
+    const auto folder = songsHere();
     const auto pathOf = [&](std::string_view typed)
     {
         auto path = typedPath(typed, folder, home_);

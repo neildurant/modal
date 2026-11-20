@@ -79,6 +79,10 @@ Settings::Settings()
                   std::string{}),
           setting("fontsize", "The font's size in points, before the display's scaling", 12.0, 4,
                   72),
+          setting("songfolder",
+                  "The folder songs are usually kept in, where the file picker starts for a new "
+                  "song and which Places offers as Songs; empty for the home folder",
+                  std::string{}),
           setting("minsize", "The smallest the window can be made, in cells", CellCount{120, 30},
                   20, 1000),
           setting("timeoutlen",

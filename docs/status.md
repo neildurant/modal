@@ -2,9 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker await their trial.*
 
 ## Current handoff
+
+### Songs folder and a clearer file picker, 20 November 2026
+
+The `songfolder` setting names where songs are usually kept; empty, the default, means home. A song with a file starts the picker, typed relative paths and completion in its own folder; one without starts them in the Songs folder, or home. Places lists Songs first, followed by `(songfolder)` (or `(songfolder, not found)`, which Enter refuses), then This song's folder when the song has a file, Home, Config, Drum maps and State. Modal never creates the folder. As asked on trial, the picker's listing now sits on the window's background apart from the lines around it, the folder line is labelled `Folder:`, and the line beneath Places no longer shows a cursor. See [design.md](design.md#file-picker).
+
+**Validation.** A Workspace test covers the unset setting (Songs at home with its label, Home offered, no This song's folder), a set folder used for a new song's picker and for typed paths, a song with a file keeping to its own folder with This song's folder offered and Songs reachable, and a missing folder marked and refused. The Places test now steps past Home. A `[.sample]` render of the picker and Places was checked in dark and light. The generated settings reference includes `songfolder`. MSVC Debug passes all 1,245 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,246 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Hosted fix.** CI failed on Windows at `4745acc`: the track-import test compared the recalled `:read` line with the temporary path as the test wrote it, while the runner resolved it to another spelling. `4d5e616` checks the command and the file and tracks named instead, pushed alone from a worktree on `origin/main`; the new Songs-folder test checks the folder by its name for the same reason.
+
+**Pending.** The desktop trial.
+
+**To try.** Add `set songfolder=` with a folder of yours to `modalrc` (or `:set songfolder=…`). In a new song, `, f f` should start there and Alt-Down should list Songs first with `(songfolder)`. Open a song from elsewhere and check `, f f` starts beside it, with This song's folder and Home in Places. Check the listing stands apart from the lines around it, the `Folder:` label, and no cursor on "Choose a place". Try a `songfolder` that doesn't exist.
 
 ### Importing tracks from a file, 20 November 2026
 

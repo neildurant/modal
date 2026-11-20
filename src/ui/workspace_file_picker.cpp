@@ -5,6 +5,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/drum_maps.hpp>
 #include <modal/ui/file_commands.hpp>
+#include <modal/ui/settings.hpp>
 #include <modal/ui/view_parts.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -67,6 +68,20 @@ std::u32string fitted(std::string_view text, std::size_t cells, bool keepEnd = f
 
 } // namespace
 
+std::optional<std::filesystem::path> Workspace::songsFolder() const
+{
+    if (settings_ == nullptr || settings_->text("songfolder").empty())
+        return std::nullopt;
+    std::error_code error;
+    return typedPath(settings_->text("songfolder"),
+                     home_.value_or(std::filesystem::current_path(error)), home_);
+}
+
+std::filesystem::path Workspace::songsHere() const
+{
+    return songFolder(document_, home_, songsFolder());
+}
+
 void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> saveAs,
                          PickedFile done, bool confirmOverwrite)
 {
@@ -77,14 +92,26 @@ void Workspace::pickFile(PickerKind kind, std::optional<std::filesystem::path> s
     picker.done = std::move(done);
     picker.save = saveAs.has_value();
     picker.confirmOverwrite = confirmOverwrite;
-    const auto songs = songFolder(document_, home_);
+    const auto songs = songsHere();
     const auto maps = drumMapFolder();
-    picker.places.emplace_back("Song", songs);
+    // Songs always, the setting named so it can be found; the song's own folder where it has
+    // one; and home, for getting about (decided 20 November 2026).
+    std::error_code error;
+    const auto usual = songsFolder();
+    const auto songsPlace = usual ? *usual : home_.value_or(std::filesystem::current_path(error));
+    picker.places.push_back({"Songs", songsPlace,
+                             std::filesystem::is_directory(songsPlace, error)
+                                 ? "(songfolder)"
+                                 : "(songfolder, not found)"});
+    if (const auto& file = document_.file() ? document_.file() : document_.importedFrom())
+        picker.places.push_back({"This song's folder", file->parent_path()});
+    if (home_)
+        picker.places.push_back({"Home", *home_});
     if (configFolder_)
-        picker.places.emplace_back("Config", *configFolder_);
-    picker.places.emplace_back("Drum maps", maps);
+        picker.places.push_back({"Config", *configFolder_});
+    picker.places.push_back({"Drum maps", maps});
     if (stateFolder_)
-        picker.places.emplace_back("State", *stateFolder_);
+        picker.places.push_back({"State", *stateFolder_});
     auto folder = kind == PickerKind::DrumMap  ? maps
                   : kind == PickerKind::Config ? configFolder_.value_or(songs)
                                                : songs;
@@ -208,7 +235,16 @@ std::optional<bool> Workspace::runFilePicker(std::string_view command)
     if (command == "command-line-run")
     {
         if (picker.choosingPlace)
-            enterPickerFolder(picker.places[picker.place].second);
+        {
+            const auto& place = picker.places[picker.place];
+            std::error_code error;
+            if (std::filesystem::is_directory(place.folder, error))
+                enterPickerFolder(place.folder);
+            else
+                picker.error =
+                    "Folder not found: " + utf8Text(place.folder) +
+                    (place.name == "Songs" ? "; set songfolder to one that exists" : std::string{});
+        }
         else
             submitFilePicker();
         return true;
@@ -380,6 +416,10 @@ Region Workspace::filePickerRegion() const
                   .over = {}};
     const Style label{Role::Accent, Role::Panel, kBold};
     const Style text{Role::Text, Role::Panel, kPlain};
+    // What can be chosen, set apart from the lines around it (decided 20 November 2026, after
+    // use): on the window's background, as a well in the panel.
+    const Style listed{Role::Text, Role::Background, kPlain};
+    const Style listedDim{Role::Dim, Role::Background, kPlain};
     const Style dim{Role::Dim, Role::Panel, kPlain};
     const Style cursor{Role::CursorText, Role::Cursor, kPlain};
     const auto draw =
@@ -395,11 +435,22 @@ Region Workspace::filePickerRegion() const
                        : picker.save                       ? "Save drum map"
                                                            : "Load drum map";
     draw(0, title, label);
-    draw(1, utf8Text(picker.listingFolder), text, true);
+    // The folder listed, labelled as such.
+    const std::string in = "Folder: ";
+    region.text.push_back({margin, h, decodeUtf8(in), dim});
+    region.text.push_back(
+        {margin + static_cast<int>(in.size()) * cell_.width, h,
+         fitted(utf8Text(picker.listingFolder), width > in.size() ? width - in.size() : 1, true),
+         text});
+    region.under.push_back(
+        {{0, 2 * h, base.width, static_cast<int>(shown) * h}, Role::Background, 255});
     if (total == 0)
-        draw(2, "No matching files or folders", dim);
+        draw(2, "No matching files or folders", listedDim);
     else
     {
+        std::size_t nameWidth = 0;
+        for (const auto& place : picker.places)
+            nameWidth = std::max(nameWidth, place.name.size());
         for (std::size_t i = 0; i < shown; ++i)
         {
             const auto at = first + i;
@@ -407,10 +458,14 @@ Region Workspace::filePickerRegion() const
             if (selected == at)
                 region.under.push_back(
                     {{0, static_cast<int>(row) * h, base.width, h}, Role::Cursor, 255});
-            const auto line = picker.choosingPlace ? padText(picker.places[at].first, 9, false) +
-                                                         "  " + utf8Text(picker.places[at].second)
-                                                   : rows[at];
-            draw(row, line, selected == at ? cursor : text);
+            std::string line = rows.empty() || picker.choosingPlace ? std::string{} : rows[at];
+            if (picker.choosingPlace)
+            {
+                const auto& place = picker.places[at];
+                line = padText(place.name, nameWidth, false) + "  " + utf8Text(place.folder) +
+                       (place.note.empty() ? "" : "  " + place.note);
+            }
+            draw(row, line, selected == at ? cursor : listed);
         }
     }
     const std::array hints{"Alt-Down Places  ·  Tab completes  ·  Up/Down choose  ·  Enter opens",

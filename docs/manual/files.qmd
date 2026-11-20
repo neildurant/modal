@@ -186,7 +186,8 @@ Undo history is a working-session facility, not a substitute for saved copies.
 ## Choosing a file {#sec-file-picker}
 
 The picker lets you see the directory as you type or browse. `:e` opens it
-beside the current song, or in your home directory for a new song. `:w` and
+beside the current song, or for a new song in your Songs folder, which is
+your home folder until you choose one (see below). `:w` and
 `:wq` use it when the song needs a filename, and `:song-save-as` always does.
 `:export` with no filename opens it beside the song too, listing MIDI files
 and suggesting the song's name as a `.mid` file. Drum-map commands without a
@@ -195,9 +196,20 @@ the configuration directory and suggests `modalrc`.
 
 Use Up and Down to choose a row and Enter to open it. A folder leads to its
 contents, and `../` goes up to the parent. Alt-Down opens **Places**, where
-you can jump to **Song**, **Config**, **Drum maps** or **State**. For example,
-**State** is useful when opening a recovered song. Escape backs out of Places
-or cancels the picker.
+you can jump to **Songs**, **This song's folder** (when the song has a file),
+**Home**, **Config**, **Drum maps** or **State**. For example, **State** is
+useful when opening a recovered song. Escape backs out of Places or cancels
+the picker.
+
+If you keep your songs in one folder, tell Modal where it is with a line in
+`modalrc`, such as `set songfolder=~/Music/Songs` (see @sec-customisation).
+A new song then opens and saves there, typed paths such as `:e Ideas/Riff`
+start there, and Places lists it first as **Songs**, followed by
+`(songfolder)` as a reminder of the setting that moves it. Until you set it,
+Songs is your home folder. A song that already has a file always starts
+beside its own file instead, so working on a song keeps you near it. Modal
+doesn't create the folder: if it's missing, Places marks it
+`(songfolder, not found)`.
 
 Typing narrows the list. Tab completes the common part of matching names
 and then cycles through the choices. Completed folders end in `/` so you

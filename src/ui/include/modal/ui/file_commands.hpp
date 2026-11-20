@@ -64,6 +64,9 @@ public:
     // The document has a new song, opened or new, to show from the start.
     virtual void songReplaced() = 0;
 
+    // The songfolder setting's folder, if set: where a song without a file starts.
+    virtual std::optional<std::filesystem::path> songsFolder() const { return std::nullopt; }
+
     // Before another song is shown, what the window keeps of the active one (its views and
     // places), opaque here; and, after, showing a song returned to with what was kept, or as
     // a new one if nothing was.
@@ -109,7 +112,8 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
 // of the song's file, or of the file it was imported from; or else the home folder; or else
 // the current directory.
 std::filesystem::path songFolder(const core::Document& document,
-                                 const std::optional<std::filesystem::path>& home);
+                                 const std::optional<std::filesystem::path>& home,
+                                 const std::optional<std::filesystem::path>& songs = std::nullopt);
 
 // Opens a song file, or imports a MIDI file, into the document, replacing its song: whether
 // it did, and what went wrong, or else the first warning and how many more, if any.

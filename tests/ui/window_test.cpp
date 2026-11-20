@@ -847,6 +847,40 @@ TEST_CASE("a sample of the Metronome page and the Ports and Tracks views", "[.sa
     }
 }
 
+TEST_CASE("a sample of the file picker and its Places", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::test::TempDirectory folder{"modal-picker-sample"};
+    std::filesystem::create_directories(folder / "Config");
+    std::filesystem::create_directories(folder / "Ideas");
+    for (const auto* name : {"Ballad.modal", "Groove.modal", "Morning phrase.modal", "Drums.mid"})
+        REQUIRE(modal::core::writeSongFile(demoSong(), folder / name).empty());
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    view.setFolders(folder / "Config", folder.path());
+    for (const auto& theme : {"dark", "light"})
+    {
+        auto window = offscreen(1200, 600);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        const auto save = [&](const std::string& name)
+        {
+            window->draw(view.frame(), *builtInTheme(theme));
+            CHECK(window->saveFrame(base + "-picker-" + name + "-" + theme + ".bmp"));
+        };
+        view.pickFile(Workspace::PickerKind::Song, std::nullopt, [](auto) {});
+        view.handle(Key::of(NamedKey::Down), 0);
+        save("files");
+        view.handle(Key::of(NamedKey::Down, kAlt), 0);
+        save("places");
+        view.handle(Key::of(NamedKey::Escape), 0);
+        view.handle(Key::of(NamedKey::Escape), 0);
+    }
+}
+
 TEST_CASE("a sample of the track-import chooser", "[.sample]")
 {
     const char* path = std::getenv("MODAL_SAMPLE_BMP");

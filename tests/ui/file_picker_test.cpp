@@ -8,6 +8,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/prompt.hpp>
+#include <modal/ui/settings.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -64,6 +65,10 @@ struct Pickers final : FileHost
     void quit() override { quitRequested = true; }
     void songReplaced() override { workspace.showSong(); }
     std::shared_ptr<void> leaveSong() override { return workspace.leaveSong(); }
+    std::optional<std::filesystem::path> songsFolder() const override
+    {
+        return workspace.songsFolder();
+    }
     void returnToSong(std::shared_ptr<void> kept) override
     {
         workspace.returnToSong(std::move(kept));
@@ -160,11 +165,60 @@ TEST_CASE("the picker can reach the state directory from Places")
     CHECK(p.shows(U"Config"));
     CHECK(p.shows(U"Drum maps"));
     CHECK(p.shows(U"State"));
-    p.press(NamedKey::Down);
-    p.press(NamedKey::Down);
-    p.press(NamedKey::Down);
+    for (int i = 0; i < 4; ++i)
+        p.press(NamedKey::Down);
     p.type(U"\nrec\n");
     CHECK(p.document.song().title == "Recovered");
+}
+
+TEST_CASE("the songfolder setting is where a new song's files start, and a Place")
+{
+    Pickers p;
+    Settings settings;
+    p.workspace.setSettings(&settings);
+    p.makeSong("Songs/Ballad.modal", "Ballad");
+    p.makeSong("Elsewhere/Sketch.modal", "Sketch");
+
+    // Unset, Songs is home, the setting named after it; a new song starts there.
+    p.type(U":e\n");
+    CHECK(p.shows(U"Folder: "));
+    // By the folder's own name, as the picker shows it resolved, which may be spelled otherwise.
+    CHECK(p.shows(decodeUtf8(utf8Text(p.temporary.path().filename()))));
+    p.press(NamedKey::Down, kAlt);
+    CHECK(p.shows(U"Songs"));
+    CHECK(p.shows(decodeUtf8(utf8Text(p.temporary.path())) + U"  (songfolder)"));
+    CHECK(p.shows(U"Home"));
+    CHECK_FALSE(p.shows(U"This song's folder"));
+    p.press(NamedKey::Escape);
+    p.press(NamedKey::Escape);
+
+    // Set, a new song's picker and typed paths start there.
+    REQUIRE(settings.set("songfolder", utf8Text(p.temporary / "Songs")).empty());
+    p.type(U":e\n");
+    CHECK(p.shows(U"Ballad.modal"));
+    p.type(U"Ballad\n");
+    CHECK(p.document.song().title == "Ballad");
+    p.type(U":new\n:e Ballad\n");
+    CHECK(p.workspace.message() == "Opened Ballad.modal");
+
+    // A song with a file keeps to its own folder, which Places offers too.
+    p.type(U":e ../Elsewhere/Sketch\n:e\n");
+    CHECK(p.shows(U"Sketch.modal"));
+    p.press(NamedKey::Down, kAlt);
+    CHECK(p.shows(U"This song's folder"));
+    p.press(NamedKey::Enter); // Songs
+    CHECK(p.shows(U"Ballad.modal"));
+    p.press(NamedKey::Escape);
+
+    // A Songs folder that isn't there is marked, and not entered.
+    REQUIRE(settings.set("songfolder", utf8Text(p.temporary / "Missing")).empty());
+    p.type(U":new\n:e\n");
+    p.press(NamedKey::Down, kAlt);
+    CHECK(p.shows(U"(songfolder, not found)"));
+    p.press(NamedKey::Enter);
+    CHECK(p.shows(U"Folder not found: "));
+    p.press(NamedKey::Escape);
+    p.press(NamedKey::Escape);
 }
 
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")
