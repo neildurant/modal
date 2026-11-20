@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel awaits its trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support is being removed.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** A Workspace test checks the title, suggestion and listing (MIDI files shown, the song and a text file not), exporting with Enter, declining a replacement with the file untouched, and a typed name gaining `.mid`. MSVC Debug passes all 1,238 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,239 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
 
-**Pending.** The desktop trial, ideally on the Linux laptop too.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **Question.** The SDL window's own file-dialog code (`Window::chooseFile`) is now unused, as is the D-Bus support enabled for the desktop portal. Both are left in place until it's decided whether to remove them.
 
