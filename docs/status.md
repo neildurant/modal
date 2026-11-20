@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial; step 2, whole tracks, was accepted on trial; step 3, whole bars carrying their meter, awaits its trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ Material taken as whole bars (`yy`, `dd`, `ab`, `as`, `it`, `ie` and the arrange
 
 **Validation.** A Workspace test yanks two bars of 7/8 with `2yy`, puts them with `p` in a 4/4 song, and checks the same times, the track's own 7/8, the song's 4/4 and the message; then `yib` puts one bar's events with the track left in 4/4 and no mention of bars. Every existing put test passes unchanged. The manual's files chapter now has a section on copying between songs covering all three steps. MSVC Debug passes all 1,237 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,238 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
 
-**Pending.** The desktop trial.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **Linking note.** On Windows, `modal_tests.exe` stayed locked after a full test run with no process holding it; moving it aside let it relink.
 
