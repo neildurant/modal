@@ -292,6 +292,13 @@ Bar Workspace::messageBar(bool withMessage) const
     const Style text{Role::BarText, Role::MessageLine, kPlain};
     const Style dim{Role::Dim, Role::MessageLine, kPlain};
     const Style accent{Role::Accent, Role::MessageLine, kPlain};
+    // A list narrowed by typing: its label, what's typed and the cursor after it, as the :
+    // prompt has, so it's plain it can be typed into (decided 20 November 2026, after use).
+    const auto typing = [&](std::string label, const std::u32string& typed)
+    {
+        row.left.push_back({std::move(label) + encodeUtf8(typed), text});
+        row.left.push_back({" ", {Role::CursorText, Role::Cursor, kPlain}});
+    };
     if (!message_.empty())
     {
         const auto role = messageKind_ == MessageKind::Warning ? Role::Warning : Role::Message;
@@ -300,12 +307,17 @@ Bar Workspace::messageBar(bool withMessage) const
     }
     else if (drumMapChoice_)
     {
-        row.left.push_back(
-            {"Drum map: " + encodeUtf8(drumMapChoice_->list.typed()) +
-                 (drumMapChoice_->stage == DrumMapChoice::Stage::Review
-                      ? "  PageUp/Down scroll; Up/Down choose, Enter takes, Escape leaves"
-                      : "  Type to narrow; Up/Down choose, Enter takes, Escape leaves"),
-             text});
+        if (drumMapChoice_->stage == DrumMapChoice::Stage::Review)
+            row.left.push_back(
+                {"Drum map: " + encodeUtf8(drumMapChoice_->list.typed()) +
+                     "  PageUp/Down scroll; Up/Down choose, Enter takes, Escape leaves",
+                 text});
+        else
+        {
+            typing("Drum map: ", drumMapChoice_->list.typed());
+            row.left.push_back(
+                {"  Type to narrow; Up/Down choose, Enter takes, Escape leaves", text});
+        }
     }
     else if (freezeChoice_)
     {
@@ -313,12 +325,12 @@ Bar Workspace::messageBar(bool withMessage) const
     }
     else if (eventInsertChoice_)
     {
-        row.left.push_back({"Insert event: " + encodeUtf8(eventInsertChoice_->typed()), text});
+        typing("Insert event: ", eventInsertChoice_->typed());
         row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
     }
     else if (recentChoice_)
     {
-        row.left.push_back({"Recent songs: " + encodeUtf8(recentChoice_->list->typed()), text});
+        typing("Recent songs: ", recentChoice_->list->typed());
         row.right.push_back(
             {"Type to narrow · ↑↓ choose · Enter opens · Del removes from the list", dim});
     }
@@ -335,7 +347,7 @@ Bar Workspace::messageBar(bool withMessage) const
     }
     else if (songChoice_)
     {
-        row.left.push_back({"Open songs: " + encodeUtf8(songChoice_->list.typed()), text});
+        typing("Open songs: ", songChoice_->list.typed());
         row.right.push_back({"› Active · + Unsaved edits · ↑↓ Choose · Enter switches", dim});
     }
     else if (trackMove_)

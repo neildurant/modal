@@ -240,6 +240,13 @@ TEST_CASE("recent songs list the files opened and saved, to open one again")
     // Newest first, the gone one marked; typing narrows; Enter opens.
     p.type(U",fr");
     CHECK(p.shows(U"Recent songs: "));
+    // A cursor after what's typed, so it's plain the line takes typing.
+    bool cursor = false;
+    for (const auto& region : p.workspace.frame())
+        for (std::size_t i = 0; i + 1 < region.text.size(); ++i)
+            cursor = cursor || (region.text[i].text == U"Recent songs: " &&
+                                region.text[i + 1].style.background == Role::Cursor);
+    CHECK(cursor);
     CHECK(p.shows(U"Del removes from the list"));
     CHECK(p.shows(U"not found"));
     CHECK(p.shows(U"today "));
