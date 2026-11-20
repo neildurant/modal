@@ -543,6 +543,65 @@ bool Song::insertSections(std::size_t index,
     return true;
 }
 
+std::vector<std::string>
+Song::insertSectionsFrom(std::size_t index,
+                         std::span<const std::shared_ptr<const Section>> sections,
+                         std::span<const std::shared_ptr<const Track>> from)
+{
+    std::map<TrackId, TrackId> to;
+    std::vector<TrackId> used;
+    std::vector<std::string> added;
+    for (const auto& source : from)
+    {
+        const auto id = source->id();
+        if (std::ranges::none_of(sections,
+                                 [id](const auto& s) { return s->content(id) != nullptr; }))
+            continue;
+        const auto match =
+            std::ranges::find_if(tracks_,
+                                 [&](const auto& track)
+                                 {
+                                     return track->name == source->name &&
+                                            std::ranges::find(used, track->id()) == used.end();
+                                 });
+        if (match != tracks_.end())
+        {
+            to[id] = (*match)->id();
+            used.push_back((*match)->id());
+            continue;
+        }
+        const std::string base = source->name.empty() ? "Track" : source->name;
+        std::string name = base;
+        for (int n = 2;
+             std::ranges::any_of(tracks_, [&](const auto& t) { return t->name == name; }); ++n)
+            name = numbered(base, n);
+        const auto addedId = addTrack(tracks_.size(), name);
+        updateTrack(addedId,
+                    [&](Track& track)
+                    {
+                        track = source->withId(addedId);
+                        track.name = name;
+                    });
+        to[id] = addedId;
+        used.push_back(addedId);
+        added.push_back(name);
+    }
+    std::vector<std::shared_ptr<const Section>> mapped;
+    for (const auto& section : sections)
+    {
+        auto copy = std::make_shared<Section>(*section);
+        copy->content_.clear();
+        for (const auto& [id, content] : section->content_)
+        {
+            if (const auto it = to.find(id); it != to.end())
+                copy->content_[it->second] = content;
+        }
+        mapped.push_back(std::move(copy));
+    }
+    insertSections(index, mapped);
+    return added;
+}
+
 bool Song::insertEmptySection(std::size_t index, std::string name, std::int64_t bars)
 {
     if (bars < 1)

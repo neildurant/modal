@@ -94,6 +94,11 @@ struct EventRegister
     // from the register's start (decided 17 November 2026).
     std::vector<std::vector<core::ControllerRamp>> ramps = {};
 
+    // For sections, the song they were taken from and its tracks then, so a put in another
+    // song can give their content to its tracks of the same names (decided 20 November 2026).
+    std::uint64_t fromSong = 0;
+    std::vector<std::shared_ptr<const core::Track>> fromTracks = {};
+
     bool empty() const
     {
         return wholeTracks.empty() && sections.empty() &&
@@ -103,6 +108,13 @@ struct EventRegister
 
     friend bool operator==(const EventRegister&, const EventRegister&) = default;
 };
+
+// Notes the song a register's sections were taken from.
+inline void takeSectionsFrom(EventRegister& reg, const core::Song& song)
+{
+    reg.fromSong = song.identity();
+    reg.fromTracks.assign(song.tracks().begin(), song.tracks().end());
+}
 
 // A Visual selection (milestone 6): where it started, the cursor being its other end, and its
 // kind: v a time range, V whole rows, Ctrl-v a box. Where the view counts in rows a time can't

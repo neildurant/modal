@@ -422,6 +422,46 @@ TEST_CASE("returning to a song brings back its view, its places, Backspace and g
     CHECK_FALSE(p.document.file());
 }
 
+TEST_CASE("a section put in another song keeps its notes on the tracks of the same names")
+{
+    Pickers p;
+    auto source = newSong();
+    source.title = "Source";
+    const auto bass = source.addTrack("Bass");
+    source.updateEvents(bass, [&](core::EventList& events)
+                        { events.insert({0, core::Note{40, 100, source.ppqn().quarter()}}); });
+    REQUIRE(core::writeSongFile(source, p.temporary / "Source.modal").empty());
+    // The destination's Piano has the number the source's Bass has.
+    auto destination = newSong();
+    destination.title = "Destination";
+    destination.addTrack("Piano");
+    destination.addTrack("Bass");
+    REQUIRE(core::writeSongFile(destination, p.temporary / "Destination.modal").empty());
+
+    p.type(U":e Source\ngsY");
+    INFO(p.workspace.message());
+    p.type(U":e Destination\ngsp");
+    INFO(p.workspace.message());
+    const auto& song = p.document.song();
+    REQUIRE(song.title == "Destination");
+    REQUIRE(song.sections().size() == 2);
+    REQUIRE(song.tracks().size() == 3);
+    CHECK(song.events(song.tracks()[1]->id()).all().empty());
+    const auto& put = song.events(song.tracks()[2]->id()).all();
+    REQUIRE(put.size() == 1);
+    CHECK(put.front().tick == song.sectionStart(1));
+
+    // A track with no match comes too, named in the message.
+    p.type(U":e Source\n");
+    p.document.edit(
+        "Rename", {}, [&](core::Song& s)
+        { s.updateTrack(s.tracks()[1]->id(), [](core::Track& t) { t.name = "Cello"; }); });
+    p.type(U"gsY:e Destination\ngsp");
+    CHECK(p.document.song().tracks().size() == 4);
+    CHECK(p.document.song().tracks().back()->name == "Cello");
+    CHECK(p.workspace.message().find("added track Cello") != std::string::npos);
+}
+
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")
 {
     Pickers p;

@@ -825,6 +825,11 @@ EventRegister Workspace::appended(EventRegister to, const EventRegister& more)
     }
     if (!more.sections.empty() || !to.sections.empty())
     {
+        if (to.sections.empty())
+        {
+            to.fromSong = more.fromSong;
+            to.fromTracks = more.fromTracks;
+        }
         to.sections.insert(to.sections.end(), more.sections.begin(), more.sections.end());
         return to;
     }
@@ -2991,6 +2996,7 @@ bool Workspace::operateOnSections(std::string_view op, int count)
     {
         register_.sections.push_back(song.sections()[i]);
     }
+    takeSectionsFrom(register_, song);
     if (op == "operator-yank")
     {
         setMessage(what + " yanked; p on the section strip puts it back", MessageKind::Information);
@@ -4011,6 +4017,7 @@ CommandResult Workspace::deleteBars(core::Tick from, core::Tick to)
                    [&](core::Song& s) { s = edited; });
     register_ = EventRegister{};
     register_.sections = edit.removed;
+    takeSectionsFrom(register_, song);
     refresh();
     return {true,
             "Deleted " + bars +

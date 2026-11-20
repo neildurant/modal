@@ -166,8 +166,11 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [x] **Done** — Restore each song's view and places on switching (agreed 20 November 2026). See [design.md](design.md#open-songs).
     - [x] **Done** — Keep each song's views and places, the view shown, its history, `''`, `gv` and the play-from marker.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Shared registers for events, bars, tracks and sections copied between songs.
-- [ ] **To do** — Cross-song mapping for different section layouts, meters, tempos and PPQN.
+- [ ] **Doing** — Copying between songs through the shared registers (agreed 20 November 2026). See [design.md](design.md#copying-between-songs).
+    - [ ] **Doing** — Sections: match track content by name, adding unmatched tracks with their settings.
+    - [ ] **To do** — Whole tracks: lay along time, re-cut at the destination's sections, adding a section for anything past the end, keeping their bars.
+    - [ ] **To do** — Whole bars (`yy`, `ab`, the arrangement's bars) carry their meter; other material lands in the destination's bars.
+    - [ ] **To do** — Regressions, manual updates and functional trials, one per step.
 - [ ] **To do** — `:read FILE` to bring tracks into the current song.
 - [ ] **To do** — Default song folder and picker Places. See [song-handling design questions](design.md#to-decide).
     - [ ] **To do** — Add a `modalrc` setting for the default Songs folder.

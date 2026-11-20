@@ -1351,6 +1351,7 @@ bool ArrangeView::operateOnStrip(std::size_t section, std::string_view op, std::
     {
         taken.sections.push_back(song.sections()[i]);
     }
+    takeSectionsFrom(taken, song);
     reg = std::move(taken);
     if (op == "operator-yank")
     {
@@ -1388,9 +1389,25 @@ bool ArrangeView::putSections(std::size_t section, bool before)
     const auto& song = document_.song();
     const auto title =
         "Put " + what + (before ? " before " : " after ") + song.sections()[section]->name();
-    edit(title, [&](core::Song& s) { s.insertSections(at, reg.sections); });
+    std::vector<std::string> added;
+    edit(title,
+         [&](core::Song& s)
+         {
+             // From another song, its tracks' content goes to the tracks of the same names.
+             if (reg.fromSong == s.identity())
+                 s.insertSections(at, reg.sections);
+             else
+                 added = s.insertSectionsFrom(at, reg.sections, reg.fromTracks);
+         });
     page_.setStripCursor(at);
-    host_.setMessage(title, MessageKind::Information);
+    std::string addedText;
+    for (const auto& name : added)
+        addedText += (addedText.empty() ? "" : ", ") + name;
+    host_.setMessage(addedText.empty()
+                         ? title
+                         : title + (added.size() == 1 ? "; added track " : "; added tracks ") +
+                               addedText,
+                     MessageKind::Information);
     return true;
 }
 

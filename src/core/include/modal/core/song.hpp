@@ -247,6 +247,14 @@ public:
     bool insertSections(std::size_t index,
                         std::span<const std::shared_ptr<const Section>> sections);
 
+    // Inserts copies of sections taken from another song, whose tracks are given, as
+    // insertSections does. Each of its tracks' content goes to this song's track of the same
+    // name, each used once; a track with content and no match here is added after the others,
+    // with its settings (decided 20 November 2026). Returns the names of the tracks added.
+    std::vector<std::string>
+    insertSectionsFrom(std::size_t index, std::span<const std::shared_ptr<const Section>> sections,
+                       std::span<const std::shared_ptr<const Track>> from);
+
     // Inserts an empty section of whole bars before an index (or after the last), in the meter
     // and at the tempo where it goes, numbered if another section has its name. Returns
     // whether it could.

@@ -102,6 +102,42 @@ TEST_CASE("inserted copies of sections keep what's in them, numbered if their na
     CHECK(s.pitches().front() == 42);
 }
 
+TEST_CASE("sections from another song give their content to the tracks of the same names")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    Sections s{ppqn};
+    const auto drums = s.song.addTrack("Drums");
+    s.song.updateTrack(drums, [](Track& track) { track.channel = 10; });
+    s.song.updateEvents(drums, [&](EventList& events)
+                        { events.insert({2 * s.bar, Note{36, 100, ppqn.quarter()}}); });
+
+    // The destination numbers its tracks from 1 too, so its first track has the Bass's number.
+    Song other{ppqn};
+    const auto piano = other.addTrack("Piano");
+    const auto bass = other.addTrack("Bass");
+    REQUIRE(piano == s.track);
+    const std::vector chorus{s.song.sections()[1]};
+    const auto added = other.insertSectionsFrom(1, chorus, s.song.tracks());
+    CHECK(added == std::vector<std::string>{"Drums"});
+    CHECK(other.events(piano).all().empty());
+    std::vector<int> pitches;
+    for (const auto& event : other.events(bass).all())
+        pitches.push_back(std::get<Note>(event.data).pitch);
+    CHECK(pitches == std::vector<int>{42, 43, 44});
+    REQUIRE(other.tracks().size() == 3);
+    const auto& copied = *other.tracks().back();
+    CHECK(copied.name == "Drums");
+    CHECK(copied.channel == 10);
+    REQUIRE(other.events(copied.id()).all().size() == 1);
+    CHECK(other.events(copied.id()).all().front().tick == other.sectionStart(1));
+
+    // Tracks with nothing in the sections aren't added, and a name is matched only once.
+    Song third{ppqn};
+    third.addTrack("Bass");
+    CHECK(third.insertSectionsFrom(0, std::vector{s.song.sections()[0]}, s.song.tracks()).empty());
+    CHECK(third.tracks().size() == 1);
+}
+
 TEST_CASE("an empty section goes in where it's put, in the meter there")
 {
     Sections s{MODAL_ANY_PPQN()};

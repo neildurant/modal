@@ -703,6 +703,17 @@ A window edits one active song and can keep others open. Each song owns its cont
 
 Changing song stops playback. Recording and a take awaiting finalisation prevent a switch. Returning to a song brings back where it was left: the view it was shown in; each view's place (the arrangement's cursor, top track, left edge, zoom and strip cursor; the piano roll's track, time, pitch, scroll, page and size, with each track's remembered pitch, page size and fold choice; the event list's track, row and scroll; the Tracks view's row, column and scroll); the Backspace view history, `''` and `gv`; and the song's own play-from marker. Registers, macros, the search pattern, settings, toggles and command-line history are shared between songs. An inspector edit, chooser or prompt open at the switch closes, and Visual mode ends. A newly opened song starts as before. The state lasts for the session: closing a song discards it and `:e!` starts afresh.
 
+### Copying between songs
+
+Registers are shared between open songs, so material yanked in one is put in another with the usual keys. Everything Modal opens is at its one PPQN, so material keeps its length in ticks; a put plays at the destination's tempo, which belongs to the song and can't come with it.
+
+- **What was taken as whole bars brings its bars.** `yy` and `dd` (with a count, `2yy`), `ab` and the arrangement's whole bars carry the meter they were taken in, the conductor's or the track's own. Where the destination's bars differ, each track the material lands on gets that meter as its own over the span put, and follows its meter before again after it, with a remainder bar where the span ends inside one of its bars. Notes land at the same times either way.
+- **Anything else is notes in time.** `ib`, other objects, motions and Visual ranges land in the destination's bars. `, s f` and a rebar change either result afterwards.
+- **Sections** bring their meter, tempo and labels, as within a song. Their tracks' content goes to the destination's tracks of the same name; a source track with no match is added, with its settings, and the message names the tracks added.
+- **Whole tracks** bring their settings. In a song with different sections they are laid along time from the song's start and cut at the destination's sections; a section is added at the end for anything past the song's end. Where their bars differ from the destination's, they keep them as their own meter.
+
+Within one song the same rules apply, so copying whole bars from a 7/8 section into a 4/4 one keeps them in 7/8.
+
 ### File picker
 
 The Folder panel is used by `:e`, by `:w` or `:wq` when they need a filename, and by the drum-map load and save commands and `:write-config` without a filename. Song commands start in the song's directory or at home for a new song. Drum-map commands start in the reusable maps directory, and `:write-config` starts in Config and suggests `modalrc` without adding an extension. The panel shows its current path, subfolders, and files of the relevant kind. Up and Down choose a row, Enter enters a folder or accepts a file, and `../` goes to its parent. Alt-Down opens Places with Song, Config, Drum maps and State where available. Escape from Places returns to the file list, and Escape from the file list cancels the command.
@@ -932,7 +943,6 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 **Songs, copying and histories**
 
 - Default song folder (proposed 19 November 2026). A path in `modalrc` sets the usual location for songs. Alt-Down in the Folder panel would offer **Songs** for that location and **Current Folder** for the active song's own directory, including a song opened elsewhere. Decide the setting name, picker starting locations for open and first save, how typed relative paths and completion are affected, and what to show when there is no configured or current song folder.
-- Cross-song timing and section mapping.
 - Which moves enter jump history, and how does it relate to marks and buffer lifetimes?
 - Paste-history keys, capacity, whether deletes enter it, and numbered-register/clipboard representation.
 - Song-format compatibility between versions; the format remains experimental until this policy is agreed.
