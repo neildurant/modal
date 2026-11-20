@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the first open-song step of milestone 10 was accepted on trial. Next is restoring each song's cursor and view settings.*
+*Last updated 20 November 2026: the first open-song step of milestone 10 and the aligned location column were accepted on trial. Next is restoring each song's cursor and view settings.*
 
 ## Current handoff
 
@@ -16,7 +16,7 @@ Published through `0526677`. The [hosted Linux and Windows checks](https://githu
 
 **To try.** Start `build/linux-gcc/apps/Debug/modal --demo`. Make an edit, run `:new`, then open `:song-select`. Choose Test arrangement, check that the edit is still there and undo it with `u`. Open two files and filter by part of the path. Try `:q` with unsaved edits in the other song, then save it or explicitly discard it with `:song-close!`.
 
-**Chooser follow-up.** Paths, MIDI import sources and Unsaved begin in the same column. The name column leaves room for locations, and filtering uses full names and paths. The regression compares column positions and finds a song by a part of its name that is shortened on screen. GCC and Clang Debug pass, the HTML and PDF manuals build, and the offscreen chooser shows the aligned paths. Desktop trial is pending.
+**Chooser follow-up.** Paths, MIDI import sources and Unsaved begin in the same column. The name column leaves room for locations, and filtering uses full names and paths. The regression compares column positions and finds a song by a part of its name that is shortened on screen. GCC and Clang Debug pass, the HTML and PDF manuals build, and the offscreen chooser shows the aligned paths. The desktop trial was accepted on 20 November 2026.
 
 **Next.** Restore each song's cursor and view settings when switching. Crash recovery still covers the active song. See [schedule.md](schedule.md).
 
