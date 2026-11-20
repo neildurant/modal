@@ -195,6 +195,11 @@ public:
     // the document, opened or new, from its start.
     void refresh();
     void showSong();
+    // The active song's views and places, taken away while another song is shown, and given
+    // back on returning to it (decided 20 November 2026): the view shown, each view's place,
+    // the views gone back through, '', gv and the play-from marker. Opaque to its keeper.
+    std::shared_ptr<void> leaveSong();
+    void returnToSong(std::shared_ptr<void> place);
 
     // The player the transport commands play the song with, or none, when they do nothing.
     // It must outlive the workspace.
@@ -784,6 +789,9 @@ private:
     PortControl portControl_;
     View* current_ = nullptr;
     std::vector<View*> history_; // the views shown before, for Backspace
+    struct SongPlace;
+    // What changing song resets, whether to a song new to the window or one returned to.
+    void resetForSong();
     Keymap keymap_;
     Keymap operatorKeymap_;
     KeyDispatcher keys_;

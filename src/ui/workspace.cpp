@@ -25,6 +25,7 @@
 #include <cctype>
 #include <charconv>
 #include <map>
+#include <memory>
 #include <span>
 #include <string>
 #include <tuple>
@@ -451,30 +452,102 @@ void Workspace::refresh()
     metronome_->refresh();
 }
 
-void Workspace::showSong()
+void Workspace::resetForSong()
 {
     songChoice_.reset();
     drumMapChoice_.reset();
     eventInsertChoice_.reset();
     ++drumMapDialog_;
-    eventList_->showSong();
-    arrange_->showSong();
-    pianoRoll_->showSong();
-    tracks_->showSong();
     ports_->showSong();
     metronome_->showSong();
+    lastSelection_.reset(); // gv's, which belongs to the song left
     history_.clear();
     jumpedFrom_.reset();
     playedFrom_.reset();
     heard_.reset();
     wasPlaying_ = false;
     returning_ = false;
+}
+
+void Workspace::showSong()
+{
+    resetForSong();
+    eventList_->showSong();
+    arrange_->showSong();
+    pianoRoll_->showSong();
+    tracks_->showSong();
     // A different song plays from its start, not from where the last one's marker was (found
     // in the hardware trial, 13 November 2026).
     if (player_ != nullptr)
         player_->resetMarkerForSong();
     layOut();
     reloadDrumMaps(true);
+}
+
+// A song's own views, holding their places, with what else names places in that song. The
+// Ports and Metronome pages are the window's, shown afresh for each song.
+struct Workspace::SongPlace
+{
+    std::unique_ptr<EventListView> eventList;
+    std::unique_ptr<ArrangeView> arrange;
+    std::unique_ptr<PianoRollView> pianoRoll;
+    std::unique_ptr<TracksView> tracks;
+    View* current = nullptr;
+    std::vector<View*> history;
+    std::optional<SavedSelection> lastSelection;
+    std::optional<SongCursor> jumpedFrom;
+    core::Tick marker = 0;
+};
+
+std::shared_ptr<void> Workspace::leaveSong()
+{
+    if (selection_)
+        endVisual();
+    current_->stopPlayhead(std::nullopt);
+    auto place = std::make_shared<SongPlace>();
+    place->current = current_;
+    place->history = std::exchange(history_, {});
+    place->lastSelection = std::exchange(lastSelection_, std::nullopt);
+    place->jumpedFrom = jumpedFrom_;
+    place->marker = player_ != nullptr ? player_->marker() : 0;
+    auto& host = static_cast<ViewHost&>(*this);
+    place->eventList = std::exchange(eventList_, std::make_unique<EventListView>(document_, host));
+    place->arrange = std::exchange(arrange_, std::make_unique<ArrangeView>(document_, host));
+    place->pianoRoll = std::exchange(pianoRoll_, std::make_unique<PianoRollView>(document_, host));
+    place->tracks = std::exchange(tracks_, std::make_unique<TracksView>(document_, host));
+    // The same kind of view goes on being shown, until the next song says which.
+    const auto* shown = place->current;
+    current_ = shown == place->eventList.get()   ? static_cast<View*>(eventList_.get())
+               : shown == place->arrange.get()   ? arrange_.get()
+               : shown == place->pianoRoll.get() ? pianoRoll_.get()
+               : shown == place->tracks.get()    ? tracks_.get()
+                                                 : current_;
+    return place;
+}
+
+void Workspace::returnToSong(std::shared_ptr<void> kept)
+{
+    auto place = std::static_pointer_cast<SongPlace>(std::move(kept));
+    if (!place)
+    {
+        showSong();
+        return;
+    }
+    resetForSong();
+    eventList_ = std::move(place->eventList);
+    arrange_ = std::move(place->arrange);
+    pianoRoll_ = std::move(place->pianoRoll);
+    tracks_ = std::move(place->tracks);
+    current_ = place->current;
+    history_ = std::move(place->history);
+    lastSelection_ = std::move(place->lastSelection);
+    jumpedFrom_ = place->jumpedFrom;
+    if (player_ != nullptr)
+        player_->resetMarkerForSong(place->marker);
+    refresh();
+    layOut();
+    // The drum maps' notice was given when the song was opened.
+    reloadDrumMaps(false);
 }
 
 ViewKind Workspace::shown() const

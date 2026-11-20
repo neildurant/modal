@@ -701,7 +701,7 @@ A window edits one active song and can keep others open. Each song owns its cont
 
 `:song-close` closes the current song, requiring `!` to discard its edits. It selects an adjacent open song or leaves a blank song if none remain. `:q` checks all open songs, `:wq` saves the active one before checking the others, and `:q!` discards outstanding edits. A window close with other unsaved songs stays open and points to the chooser. When just the active song has edits, the window offers Save, Don't save and Cancel.
 
-Changing song stops playback and resets the play position. Recording and a take awaiting finalisation prevent a switch. Switching uses each view's normal song-opening reset. Restoring the song's previous cursor and view settings is the next step.
+Changing song stops playback. Recording and a take awaiting finalisation prevent a switch. Returning to a song brings back where it was left: the view it was shown in; each view's place (the arrangement's cursor, top track, left edge, zoom and strip cursor; the piano roll's track, time, pitch, scroll, page and size, with each track's remembered pitch, page size and fold choice; the event list's track, row and scroll; the Tracks view's row, column and scroll); the Backspace view history, `''` and `gv`; and the song's own play-from marker. Registers, macros, the search pattern, settings, toggles and command-line history are shared between songs. An inspector edit, chooser or prompt open at the switch closes, and Visual mode ends. A newly opened song starts as before. The state lasts for the session: closing a song discards it and `:e!` starts afresh.
 
 ### File picker
 
@@ -932,7 +932,7 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 **Songs, copying and histories**
 
 - Default song folder (proposed 19 November 2026). A path in `modalrc` sets the usual location for songs. Alt-Down in the Folder panel would offer **Songs** for that location and **Current Folder** for the active song's own directory, including a song opened elsewhere. Decide the setting name, picker starting locations for open and first save, how typed relative paths and completion are affected, and what to show when there is no configured or current song folder.
-- Cross-song timing and section mapping, and which cursor and view state to restore on returning to a song.
+- Cross-song timing and section mapping.
 - Which moves enter jump history, and how does it relate to marks and buffer lifetimes?
 - Paste-history keys, capacity, whether deletes enter it, and numbered-register/clipboard representation.
 - Song-format compatibility between versions; the format remains experimental until this policy is agreed.

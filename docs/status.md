@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Next is restoring each song's cursor and view settings.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places awaits its trial.*
 
 ## Current handoff
+
+### Returning to a song, 20 November 2026
+
+Coming back to a song shows the view it was left in, with each view's place: cursors, scroll, zoom, piano-roll pages, per-track pitches and fold choices. The Backspace history, `''`, `gv` and the play-from marker belong to each song. Each song keeps its own view objects, set aside while another song is shown; the Ports and Metronome pages are shared and open afresh. A new song starts at its beginning in the kind of view in use. See [design.md](design.md#open-songs) and [decisions.md](decisions.md).
+
+**Validation.** A Workspace test leaves a piano roll mid-song with a selection, checks a new song starts afresh with nothing for `gv`, and returns with `[f` to the same view, pitch, time, `gv` selection and Backspace history; the new song comes back in the event list it was left in. A transport test checks each song's play-from marker. MSVC Debug passes all 1,231 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,232 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial, then pushing and the hosted checks. The Files group and next/previous song passed [hosted CI](https://github.com/neildurant/modal/actions) at `1dd87da`.
+
+**To try.** Start `modal --demo`. Open the piano roll with `gr`, move to another track, pitch and page, fold with `za`, and put the marker somewhere with `m Space`. Press `, f n`, use the event list there, then `[f`: the piano roll should be as you left it, with Space playing from your marker. Try Backspace and `gv` after returning, and `]f` to find the new song in its event list.
 
 ### Next and previous open song, 20 November 2026
 

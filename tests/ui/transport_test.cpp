@@ -21,6 +21,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -819,6 +820,17 @@ public:
         if (playing_)
             playing_->ws.showSong();
     }
+    std::shared_ptr<void> leaveSong() override
+    {
+        return playing_ ? playing_->ws.leaveSong() : nullptr;
+    }
+    void returnToSong(std::shared_ptr<void> kept) override
+    {
+        if (kept)
+            playing_->ws.returnToSong(std::move(kept));
+        else
+            songReplaced();
+    }
     void report(const CommandResult& result) override { reported = result; }
 
     Chosen pending;
@@ -849,6 +861,23 @@ TEST_CASE("changing songs stops playback without carrying the old play position 
     CHECK(p.player.marker() == 0);
     p.runFor(100ms);
     CHECK(p.player.marker() == 0);
+}
+
+TEST_CASE("each open song keeps its own play-from marker")
+{
+    Playing p;
+    RecordingFiles files{&p};
+    addFileCommands(p.registry, p.ws.recordingSession(), files);
+    p.document.setListener([&](const auto& song) { p.player.update(song); });
+    const auto quarter = p.document.song().ppqn().quarter();
+    p.player.setMarker(quarter);
+    CHECK(p.registry.runLine("new").changed);
+    CHECK(p.player.marker() == 0);
+    p.player.setMarker(2 * quarter);
+    CHECK(p.registry.runLine("song-previous").changed);
+    CHECK(p.player.marker() == quarter);
+    CHECK(p.registry.runLine("song-next").changed);
+    CHECK(p.player.marker() == 2 * quarter);
 }
 
 TEST_CASE("file operations refuse a pending recording take, even after stop and with bang")

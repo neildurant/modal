@@ -448,9 +448,13 @@ public:
 
     bool stopSongPlayback() override { return playback_.player().stop(); }
 
-    void songReplaced() override
+    void songReplaced() override { returnToSong(nullptr); }
+
+    std::shared_ptr<void> leaveSong() override { return view_.leaveSong(); }
+
+    void returnToSong(std::shared_ptr<void> kept) override
     {
-        view_.showSong();
+        view_.returnToSong(std::move(kept));
         playback_.songReplaced();
         if (auto missing = playback_.update(document_.underlying()); !missing.empty())
         {

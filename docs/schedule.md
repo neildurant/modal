@@ -163,7 +163,9 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — `]f` / `[f` and Ctrl-Tab / Ctrl-Shift-Tab, going round, with a count.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — `:export` without a filename uses the Folder panel instead of the system dialog.
-- [ ] **To do** — Restore each song's cursor and view state on switching.
+- [ ] **Doing** — Restore each song's view and places on switching (agreed 20 November 2026). See [design.md](design.md#open-songs).
+    - [x] **Done** — Keep each song's views and places, the view shown, its history, `''`, `gv` and the play-from marker.
+    - [ ] **Doing** — Regressions and manual updates done; functional trial pending. See [status.md](status.md).
 - [ ] **To do** — Shared registers for events, bars, tracks and sections copied between songs.
 - [ ] **To do** — Cross-song mapping for different section layouts, meters, tempos and PPQN.
 - [ ] **To do** — `:read FILE` to bring tracks into the current song.
@@ -305,6 +307,8 @@ These support the milestones rather than forming a separate feature milestone. S
 
 No milestone or implementation commitment. Keep these unchecked unless they are explicitly promoted into the schedule.
 
+- [ ] **Unscheduled** — Saved sessions (suggested 20 November 2026): reopen a set of songs together, each at the view and place it was left, across program runs.
+- [ ] **Unscheduled** — View snapshots (suggested 20 November 2026): save how a song is being looked at (view, places, zoom, folds) and restore it later, without changing the music. Shares a value-type capture of each view's place with saved sessions; song switching could then use the same capture.
 - [ ] **Unscheduled** — Playback drum-map translation (kept unscheduled 19 November 2026): suggest source-to-destination drum pitches from names and aliases, review ambiguous/unmatched guesses, and apply an accepted mapping at playback while preserving written notes. Playback/audition/export details need a separate design before implementation.
 - [ ] **Unscheduled** — Musical search/replace by interval or rhythm pattern.
 - [ ] **Unscheduled** — Linked variations and linked sections.

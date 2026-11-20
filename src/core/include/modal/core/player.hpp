@@ -77,8 +77,9 @@ public:
     // Where playback starts from.
     Tick marker() const { return marker_; }
     void setMarker(Tick tick) { marker_ = tick; }
-    // After a song switch, an acknowledgement from the previous song cannot move the marker.
-    void resetMarkerForSong();
+    // After a song switch, an acknowledgement from the previous song cannot move the marker,
+    // which goes to the song's start, or back to where it was in a song returned to.
+    void resetMarkerForSong(Tick tick = 0);
 
     // Whether the marker stays put when playback stops (on to begin with).
     void setRewind(bool rewind) { rewind_ = rewind; }

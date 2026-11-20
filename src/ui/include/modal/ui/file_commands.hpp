@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -62,6 +63,16 @@ public:
 
     // The document has a new song, opened or new, to show from the start.
     virtual void songReplaced() = 0;
+
+    // Before another song is shown, what the window keeps of the active one (its views and
+    // places), opaque here; and, after, showing a song returned to with what was kept, or as
+    // a new one if nothing was.
+    virtual std::shared_ptr<void> leaveSong() { return nullptr; }
+    virtual void returnToSong(std::shared_ptr<void> kept)
+    {
+        if (!kept)
+            songReplaced();
+    }
 
     // Shows the outcome of a command finished after a dialog, as a command's result would be.
     virtual void report(const CommandResult& result) = 0;

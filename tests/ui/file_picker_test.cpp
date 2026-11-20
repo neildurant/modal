@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -60,6 +61,11 @@ struct Pickers final : FileHost
     }
     void quit() override { quitRequested = true; }
     void songReplaced() override { workspace.showSong(); }
+    std::shared_ptr<void> leaveSong() override { return workspace.leaveSong(); }
+    void returnToSong(std::shared_ptr<void> kept) override
+    {
+        workspace.returnToSong(std::move(kept));
+    }
     void report(const CommandResult& result) override { workspace.report(result); }
 
     void type(std::u32string_view keys)
@@ -375,6 +381,45 @@ TEST_CASE("]f and [f step through the open songs, going round at either end")
     CHECK(p.document.song().title == "First");
     p.type(U"3]f");
     CHECK(p.document.song().title == "First");
+}
+
+TEST_CASE("returning to a song brings back its view, its places, Backspace and gv")
+{
+    Pickers p;
+    p.makeSong("First.modal", "First");
+    p.type(U":e First\n");
+    p.type(U"grkkkll");
+    REQUIRE(p.workspace.shown() == ViewKind::PianoRoll);
+    p.type(U"vl");
+    p.press(NamedKey::Escape);
+    const auto pitch = p.workspace.pianoRoll().pitch();
+    const auto time = p.workspace.pianoRoll().time();
+    REQUIRE(pitch == 63);
+    REQUIRE(time > 0);
+
+    // A new song keeps the kind of view, starting afresh, with no selection for gv.
+    p.type(U",fn");
+    CHECK(p.workspace.shown() == ViewKind::PianoRoll);
+    CHECK(p.workspace.pianoRoll().pitch() == 60);
+    CHECK(p.workspace.pianoRoll().time() == 0);
+    p.type(U"gv");
+    CHECK(p.workspace.mode() == Mode::Normal);
+    p.type(U"ge");
+
+    p.type(U"[f");
+    CHECK(p.workspace.shown() == ViewKind::PianoRoll);
+    CHECK(p.workspace.pianoRoll().pitch() == pitch);
+    CHECK(p.workspace.pianoRoll().time() == time);
+    p.type(U"gv");
+    CHECK(p.workspace.mode() == Mode::Visual);
+    p.press(NamedKey::Escape);
+    p.press(NamedKey::Backspace);
+    CHECK(p.workspace.shown() == ViewKind::Arrangement);
+
+    // And the new song comes back in the event list it was left in.
+    p.type(U"]f");
+    CHECK(p.workspace.shown() == ViewKind::EventList);
+    CHECK_FALSE(p.document.file());
 }
 
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")

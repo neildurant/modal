@@ -316,6 +316,7 @@ private:
     {
         std::unique_ptr<core::Document> document;
         std::size_t number;
+        std::shared_ptr<void> place = nullptr; // the window's views of it while inactive
     };
 
     const core::Document& at(std::size_t index) const
@@ -379,8 +380,11 @@ private:
         if (auto refusal = beforeChange())
             return *refusal;
         const auto previous = active_;
+        auto leaving = closeCurrent ? nullptr : host_.leaveSong();
         document_.swapSong(*songs_[index].document);
         songs_[previous].document = std::move(songs_[index].document);
+        songs_[previous].place = std::move(leaving);
+        auto returning = std::move(songs_[index].place);
         active_ = index;
         if (closeCurrent)
         {
@@ -388,7 +392,8 @@ private:
             if (previous < index)
                 --active_;
         }
-        changedSong();
+        ++activation_;
+        host_.returnToSong(std::move(returning));
         return {true};
     }
 
@@ -398,10 +403,12 @@ private:
             songs_.reserve(songs_.size() + 1);
         if (auto refusal = beforeChange())
             return *refusal;
+        auto leaving = replace ? nullptr : host_.leaveSong();
         document_.swapSong(*song);
         if (!replace)
         {
             songs_[active_].document = std::move(song);
+            songs_[active_].place = std::move(leaving);
             active_ = songs_.size();
             songs_.push_back({nullptr, nextNumber_++});
         }

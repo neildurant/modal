@@ -57,9 +57,22 @@ or labels an imported path as a **MIDI import**. The active song starts
 highlighted and has a `›` mark. A `+` marks unsaved edits. Type part of a name
 or path to narrow the list, use Up and
 Down to choose, and press Enter to switch. Escape cancels. Long paths can
-wrap under the highlighted row's list. Switching stops playback and
-starts the new song's play position at the beginning. Stop recording and
-let the take finish before changing songs.
+wrap under the highlighted row's list. Switching stops playback. Stop
+recording and let the take finish before changing songs.
+
+Each song remembers where you were in it. Coming back to a song shows the
+view you left it in, with every view's cursor, scroll and zoom as they were:
+the piano roll returns to the same page and pitch, with each track's fold
+choice, and the arrangement to the same tracks and bars. Backspace, `''` and
+`gv` go back through that song's own places, and Space plays from its own
+play-from marker (▶). So you can leave the piano roll of one song in the
+middle of a phrase, check something in another song, and come back ready to
+carry on. A song opened or created for the first time starts at its
+beginning, in the view you were using.
+
+Macros, the last search, settings and toggles are shared between songs.
+These places last while Modal is running; closing a song or reloading
+it with `:e!` starts it afresh.
 
 When two or three songs are open, stepping between them is quicker than
 choosing. `]f` goes to the next open song and `[f` to the one before, in the

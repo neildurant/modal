@@ -293,9 +293,9 @@ bool Player::toggle()
     return playing_ ? stop() : play();
 }
 
-void Player::resetMarkerForSong()
+void Player::resetMarkerForSong(Tick tick)
 {
-    marker_ = 0;
+    marker_ = tick;
     stopExact_ = true;
 }
 
