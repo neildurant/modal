@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker await their trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Next is recently used songs.*
 
 ## Current handoff
 
@@ -14,7 +14,7 @@ The `songfolder` setting names where songs are usually kept; empty, the default,
 
 **Hosted fix.** CI failed on Windows at `4745acc`: the track-import test compared the recalled `:read` line with the temporary path as the test wrote it, while the runner resolved it to another spelling. `4d5e616` checks the command and the file and tracks named instead, pushed alone from a worktree on `origin/main`; the new Songs-folder test checks the folder by its name for the same reason.
 
-**Pending.** The desktop trial.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **To try.** Add `set songfolder=` with a folder of yours to `modalrc` (or `:set songfolder=…`). In a new song, `, f f` should start there and Alt-Down should list Songs first with `(songfolder)`. Open a song from elsewhere and check `, f f` starts beside it, with This song's folder and Home in Places. Check the listing stands apart from the lines around it, the `Folder:` label, and no cursor on "Choose a place". Try a `songfolder` that doesn't exist.
 

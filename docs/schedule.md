@@ -175,11 +175,11 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Read a `.modal` or `.mid` file from disk and import the tracks named by typed numbers and ranges.
     - [x] **Done** — The tick chooser with typed ranges, and `, f i`.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **Doing** — Default song folder and picker Places (agreed 20 November 2026). See [design.md](design.md#file-picker).
+- [x] **Done** — Default song folder and picker Places (agreed 20 November 2026). See [design.md](design.md#file-picker).
     - [x] **Done** — Add the `songfolder` setting, used where a song has no file of its own.
     - [x] **Done** — Places: Songs (with `(songfolder)`), This song's folder, Home, then Config, Drum maps and State.
     - [x] **Done** — Picker clarity from trial: the listing on a background of its own, `Folder:` labelled, no cursor while choosing a place.
-    - [ ] **Doing** — Regressions and manual updates done; functional trial pending. See [status.md](status.md).
+    - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Opening a recently used song, from a list kept between sessions in the state directory (asked for 13 November 2026); decide how it is reached alongside the open-song chooser.
 - [ ] **To do** — Numbered backups and safe save/close behaviour across modified buffers.
 - [ ] **To do** — Jump history across positions, views and buffers.
