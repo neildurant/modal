@@ -4,6 +4,7 @@
 
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -259,10 +260,11 @@ TEST_CASE("roles and colours read back as they're written")
 
 TEST_CASE("the default config changes nothing, and uncommented gives the defaults")
 {
-    // The commands of the built-in modalrc: the event list's and the window's.
+    // The commands of the built-in modalrc: the views', the window's and the file commands.
     CommandRegistry commands;
     commands.add(Workspace::commands());
     commands.add(windowCommands());
+    commands.add(fileCommands());
     const auto text = defaultConfigText(commands);
     CHECK(text.find("\"set timeoutlen=500\n") != std::string::npos);
     CHECK(text.find("\"set font=\"\"\n") != std::string::npos);
@@ -321,6 +323,7 @@ TEST_CASE("the config text has what's changed as commands, and reads back the sa
     CommandRegistry commands;
     commands.add(Workspace::commands());
     commands.add(windowCommands());
+    commands.add(fileCommands());
     Config config;
     ConfigReader reader{config, commands};
     runStartupFiles(reader, std::nullopt);

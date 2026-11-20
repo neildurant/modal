@@ -823,6 +823,10 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Guided event insertion (agreed 19 November 2026).** Use `, e` to choose an event by name and enter labelled fields. This makes less common MIDI and text events available without needing to recall their command syntax. Keep the complete typed form of `:event-insert` for direct entry. See design.md, Event insertion.
 
+## Files leader group (20 November 2026)
+
+**A Files group rather than buffers (decided 20 November 2026).** Put the file and open-song commands in one leader group, `, f`, before restoring each song's view state. Vim and Doom Emacs separate files from buffers, but in Modal a song and its file are nearly always the same thing, and the distinction would get in the way for those who don't know those editors. "Files" is the universal name for this menu in software. The keys follow Doom Emacs where it helps (`f f` to find a file) and otherwise their initials: `o` for the chooser titled Open songs, `n` new, `s` save, `S` the bigger save as, `c` close, `x` export; `r` is kept for recent songs. The October 2026 note deferring `, f` until the file commands were registered before the built-in bindings no longer applied: the program now describes them before the config is read, and they were only still marked as not bindable. Save as is a command of its own, `song-save-as` beside `song-select` and `song-close`, with Vim's `saveas` as its alias, because `:w` has no way to choose a new file for a song that already has one. Keys for the next and previous open song are scheduled separately.
+
 ## Work order (19 November 2026)
 
 **Open songs (agreed after milestone 9).** Use `:song-select` and `:song-close` so the commands identify the song and describe the action. The chooser shows the name, location, active song and modified state. Keep each song's undo and edits in memory, stop playback on a switch and disallow switching while a take is pending. Close checks prevent an inactive song's edits being lost. Restore the inactive song's cursor and views in the next step. See design.md, Open songs.

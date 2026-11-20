@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the first open-song step of milestone 10 and the aligned location column were accepted on trial. Next is restoring each song's cursor and view settings.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` await their desktop trial. Next is keys for the next and previous open song, then restoring each song's cursor and view settings.*
 
 ## Current handoff
+
+### Files leader group, 20 November 2026
+
+`, f` gathers the file commands: `f` open a file, `o` switch to an open song, `n` new song, `s` save, `S` save as, `c` close this song and `x` export MIDI. `:song-save-as [FILE]` (alias `:saveas`) is new: without FILE it opens the Folder panel with the current name suggested, and the song then belongs to the new file. The file commands other than `:wq` can now be bound to keys. See [design.md](design.md#the-files-group) and [decisions.md](decisions.md).
+
+**Validation.** Two new Workspace tests drive the group by keys: the hint menu's keys after `, f`, opening through the picker, switching, a new song, closing refused with edits, save as leaving the old file as it was, saving on to the new file and the typed form refusing an existing file. The config and built-in-keymap tests now include the file commands. MSVC Debug passes all 1,228 tests with two MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The WSL Clang Debug build, the desktop trial, then pushing and the hosted checks. Export without a filename still uses the system dialog; moving it to the Folder panel is scheduled.
+
+**To try.** Start `modal --demo`. Press `,` and pause, then `f` and pause, to see the Files menu. Try `, f n`, then `, f o` to switch back. Use `, f S` to save as a new file in a folder of your choice, then edit and `, f s` to check it saves there. Use `, f c` with unsaved edits to see the refusal, and `, f f` to open a song.
 
 ### Open, select and close songs
 

@@ -21,32 +21,35 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 8> kFileCommands{{
+constexpr std::array<CommandInfo, 9> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
      .usage = "[FILE]",
      .bang = true,
-     .keys = false,
      .choices = {Choices::File}},
     {.name = "write",
      .description = "Save the song, to its file or to FILE",
      .aliases = "w",
      .usage = "[FILE]",
      .bang = true,
-     .keys = false,
      .choices = {Choices::File}},
     {.name = "export",
      .description = "Export the song as a Standard MIDI File",
      .usage = "[FILE]",
      .bang = true,
-     .keys = false,
      .choices = {Choices::File}},
-    {.name = "new", .description = "Start a new song", .bang = true, .keys = false},
+    {.name = "new", .description = "Start a new song", .bang = true},
     {.name = "quit", .description = "Quit", .aliases = "q", .bang = true},
     {.name = "wq", .description = "Save the song, then quit", .keys = false},
-    {.name = "song-select", .description = "Select an open song", .keys = false},
-    {.name = "song-close", .description = "Close the current song", .bang = true, .keys = false},
+    {.name = "song-select", .description = "Select an open song"},
+    {.name = "song-close", .description = "Close the current song", .bang = true},
+    {.name = "song-save-as",
+     .description = "Save the song as another file; with no file, choose one",
+     .aliases = "saveas",
+     .usage = "[FILE]",
+     .bang = true,
+     .choices = {Choices::File}},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -173,7 +176,9 @@ public:
         return {};
     }
 
-    CommandResult write(const CommandCall& call, bool thenQuit)
+    // Saving: to FILE when given, or to the song's own file, or else to one chosen in the
+    // picker, as saving as always does.
+    CommandResult write(const CommandCall& call, bool thenQuit, bool saveAs = false)
     {
         if (const auto file = argument(call, ".modal"))
         {
@@ -183,18 +188,20 @@ public:
             }
             if (!call.bang && overwrites(*file, document_.file()))
             {
-                return CommandResult::error(named(*file) + " exists: :w! " +
+                return CommandResult::error(named(*file) +
+                                            " exists: :" + (saveAs ? "song-save-as! " : "w! ") +
                                             std::string{call.arguments} + " writes over it");
             }
             return saved(*file, thenQuit);
         }
-        if (document_.file())
+        if (document_.file() && !saveAs)
         {
             return saved(*document_.file(), thenQuit);
         }
         const auto& imported = document_.importedFrom();
-        auto suggested = imported ? std::filesystem::path{*imported}.replace_extension(".modal")
-                                  : std::filesystem::path{"Untitled.modal"};
+        auto suggested = document_.file() ? *document_.file()
+                         : imported ? std::filesystem::path{*imported}.replace_extension(".modal")
+                                    : std::filesystem::path{"Untitled.modal"};
         host_.chooseSave(FileHost::FileKind::Song, suggested,
                          [this, thenQuit, activation = activation_](auto file)
                          {
@@ -511,6 +518,8 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
     add(kFileCommands[6], [commands](const CommandCall&) { return commands->selectSong(); });
     add(kFileCommands[7],
         [commands](const CommandCall& call) { return commands->closeSong(call); });
+    add(kFileCommands[8],
+        [commands](const CommandCall& call) { return commands->write(call, false, true); });
     return [commands] { return commands->otherModified(); };
 }
 

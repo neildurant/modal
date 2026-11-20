@@ -11,6 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
+#include <vector>
+
 using namespace modal;
 using namespace modal::ui;
 
@@ -308,6 +311,69 @@ TEST_CASE("song select shows active and modified songs and narrows by path")
     p.type(U"Studio");
     p.press(NamedKey::Escape);
     CHECK_FALSE(p.document.file());
+}
+
+TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
+{
+    Pickers p;
+    p.makeSong("First.modal", "First");
+    p.workspace.setHints(true, 0);
+    p.type(U",f");
+    const auto shown = p.workspace.hints();
+    REQUIRE(shown);
+    std::vector<std::string> keys;
+    for (const auto& hint : *shown)
+        keys.push_back(hint.keys);
+    CHECK(keys == std::vector<std::string>{"c", "f", "n", "o", "s", "S", "x"});
+    p.press(NamedKey::Escape);
+    p.workspace.setHints(false, 0);
+    p.type(U",ff");
+    CHECK(p.workspace.mode() == Mode::CommandLine);
+    p.type(U"First\n");
+    CHECK(p.document.song().title == "First");
+    p.type(U",fn");
+    CHECK_FALSE(p.document.file());
+    p.type(U",fo");
+    CHECK(p.shows(U"Open songs"));
+    p.type(U"First\n");
+    CHECK(p.document.song().title == "First");
+
+    // Closing keeps unsaved edits until the forced command discards them.
+    p.document.edit("Rename", {}, [](core::Song& song) { song.title = "Edited"; });
+    p.type(U",fc");
+    CHECK(p.document.song().title == "Edited");
+    CHECK(p.workspace.message().find(":song-close!") != std::string::npos);
+    p.type(U":song-close!\n");
+    CHECK_FALSE(p.document.file());
+    p.type(U",fo");
+    CHECK_FALSE(p.shows(U"First.modal"));
+    p.press(NamedKey::Escape);
+}
+
+TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")
+{
+    Pickers p;
+    p.makeSong("Take.modal", "Take");
+    p.type(U":e Take\n");
+    p.document.edit("Rename", {}, [](core::Song& song) { song.title = "Edited"; });
+    p.type(U",fS");
+    CHECK(p.shows(U"Enter for Take.modal"));
+    p.type(U"Take two\n");
+    REQUIRE(p.document.file());
+    CHECK(std::filesystem::equivalent(*p.document.file(), p.temporary / "Take two.modal"));
+    CHECK_FALSE(p.document.modified());
+    const auto original = core::readSongFile(p.temporary / "Take.modal");
+    REQUIRE(original.song);
+    CHECK(original.song->title == "Take");
+
+    // Saving goes on to the new file; a typed name already taken needs the forced form.
+    p.document.edit("Rename again", {}, [](core::Song& song) { song.title = "Again"; });
+    p.type(U",fs");
+    CHECK_FALSE(p.document.modified());
+    CHECK(core::readSongFile(p.temporary / "Take two.modal").song->title == "Again");
+    p.type(U":song-save-as Take\n");
+    CHECK(p.workspace.message().find(":song-save-as! Take") != std::string::npos);
+    CHECK(std::filesystem::equivalent(*p.document.file(), p.temporary / "Take two.modal"));
 }
 
 TEST_CASE("song select shows the rest of a long location beneath the list")

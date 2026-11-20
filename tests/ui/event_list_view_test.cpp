@@ -810,12 +810,13 @@ TEST_CASE("the list shows the song as it is after a change, at the same time")
     CHECK(v.view.list().rows().size() == 11);
 }
 
-TEST_CASE("the built-in modalrc binds keys only to the event list's and the window's commands")
+TEST_CASE("the built-in modalrc binds keys only to the views', the window's and the file commands")
 {
     Config config;
     CommandRegistry commands;
     commands.add(Workspace::commands());
     commands.add(windowCommands());
+    commands.add(fileCommands());
     ConfigReader reader{config, commands};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     CHECK(reader.errors().empty());

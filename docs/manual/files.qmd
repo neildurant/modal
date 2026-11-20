@@ -19,6 +19,31 @@ saves to a named file. With no extension Modal adds `.modal`. `:wq` saves
 and quits. Native saves use a temporary file and replacement to avoid leaving
 a partially written song if writing fails.
 
+To keep the version on disk and carry on in a copy, save as another file with
+`:song-save-as`. It opens the picker in the song's folder with its current
+name suggested, so changing a word or adding a number is quick. From then on
+the song belongs to the new file, and `:w` saves there; the old file stays as
+it was last saved.
+
+## The Files keys
+
+The everyday file commands have keys in the leader's **Files** group,
+`, f`. After `, f`, pause to see the menu:
+
+| Keys | Does | Same as |
+| --- | --- | --- |
+| `, f f` | Open a song or import a MIDI file, choosing it in the picker (**f**ind a file) | `:e` |
+| `, f o` | Switch to another **o**pen song | `:song-select` |
+| `, f n` | Start a **n**ew song alongside the others | `:new` |
+| `, f s` | **S**ave | `:w` |
+| `, f S` | Save as another file (a capital for the bigger save) | `:song-save-as` |
+| `, f c` | **C**lose this song | `:song-close` |
+| `, f x` | E**x**port a Standard MIDI File | `:export` |
+
+The keys run the plain forms of the commands, so none of them discards unsaved
+edits: closing a song with edits is refused until it is saved, or closed with
+`:song-close!`.
+
 ## Working with several songs
 
 Open another song with `:e FILE` or create one with `:new`. Each open song
@@ -26,7 +51,7 @@ keeps its own unsaved edits and undo history. Opening the same file again
 selects its existing copy. Opening a file from a sole, untouched new song
 uses that song's place in the list.
 
-Use `:song-select` to see the open songs. The list shows the song name and
+Use `:song-select` (`, f o`) to see the open songs. The list shows the song name and
 its path in a separate column. That column shows **Unsaved** for a new song
 or labels an imported path as a **MIDI import**. The active song starts
 highlighted and has a `›` mark. A `+` marks unsaved edits. Type part of a name
@@ -129,6 +154,7 @@ ending `.modal`, each saying which command writes that kind.
 | `:song-select` | List and switch between open songs |
 | `:song-close[!]` | Close the current song, with `!` to discard its unsaved edits |
 | `:w` / `:w FILE` | Save the native song, or save to a chosen path |
+| `:song-save-as[!] [FILE]` | Save as another file, choosing it in the picker without FILE |
 | `:export` / `:export FILE.mid` | Write a MIDI interchange copy |
 | `:q` | Quit, protecting unsaved changes |
 | `:wq` | Save and quit |

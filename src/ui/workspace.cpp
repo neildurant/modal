@@ -8,6 +8,7 @@
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/ports.hpp>
@@ -78,6 +79,7 @@ Keymap Workspace::defaultKeymap()
     CommandRegistry all;
     all.add(commands());
     all.add(windowCommands());
+    all.add(fileCommands());
     ConfigReader reader{config, all};
     reader.runText(builtInModalrc(), "built-in modalrc", {});
     assert(reader.errors().empty()); // the tests run the built-in modalrc too

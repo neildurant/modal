@@ -555,6 +555,20 @@ nmap <leader>lx mark-delete       "Delete mark(s) by name"
 vgroup <leader>l "Labels and marks"
 vmap <leader>ld label-delete      "Delete the labels selected"
 
+" Files and open songs, from any view: , f f opens a song or imports a MIDI file, choosing it
+" in the file picker (:e); , f o switches to another open song (:song-select); , f n starts a
+" new song (:new); , f s saves (:w) and , f S saves as another file (:song-save-as); , f c
+" closes this song (:song-close); and , f x exports it as a Standard MIDI File (:export).
+keysection "Files"
+ngroup <leader>f "Files"
+nmap <leader>ff edit              "Open a file"
+nmap <leader>fo song-select       "Switch to an open song"
+nmap <leader>fn new               "New song"
+nmap <leader>fs write             "Save"
+nmap <leader>fS song-save-as      "Save as"
+nmap <leader>fc song-close        "Close this song"
+nmap <leader>fx export            "Export as MIDI"
+
 keysection "Sections"
 ngroup <leader>s "Sections"
 nmap <leader>sr section-rename     "Rename this section"
