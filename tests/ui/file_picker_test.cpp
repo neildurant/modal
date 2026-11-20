@@ -350,6 +350,33 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     p.press(NamedKey::Escape);
 }
 
+TEST_CASE("]f and [f step through the open songs, going round at either end")
+{
+    Pickers p;
+    p.type(U"]f");
+    CHECK(p.workspace.message() == "Only one song is open");
+    p.makeSong("First.modal", "First");
+    p.makeSong("Second.modal", "Second");
+    p.type(U":e First\n:e Second\n:new\n");
+    CHECK_FALSE(p.document.file());
+
+    // Each song keeps its edits as the keys move between them.
+    p.document.edit("Rename", {}, [](core::Song& song) { song.title = "Third"; });
+    p.type(U"]f");
+    CHECK(p.document.song().title == "First");
+    CHECK(p.workspace.message() == "Song 1 of 3: First");
+    p.type(U"[f");
+    CHECK(p.document.song().title == "Third");
+    p.type(U"2[f");
+    CHECK(p.document.song().title == "First");
+    p.press(NamedKey::Tab, kCtrl);
+    CHECK(p.document.song().title == "Second");
+    p.press(NamedKey::Tab, kCtrl | kShift);
+    CHECK(p.document.song().title == "First");
+    p.type(U"3]f");
+    CHECK(p.document.song().title == "First");
+}
+
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")
 {
     Pickers p;

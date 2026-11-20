@@ -153,6 +153,7 @@ after counts multiply.
 | `, m m`, `, m c`, `, m s` | Click mode, lead-in mode, Metronome page |
 | `, f f`, `, f o`, `, f n` | Open a file, switch open songs, new song |
 | `, f s`, `, f S`, `, f c`, `, f x` | Save, save as, close the song, export MIDI |
+| `]f` / `[f`, Ctrl-Tab / Ctrl-Shift-Tab | Next / previous open song, going round |
 | Ctrl-. | Panic |
 
 The section strip's single keys differ from the track commands: `i` and

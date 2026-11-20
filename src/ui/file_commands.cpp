@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
@@ -21,7 +22,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 9> kFileCommands{{
+constexpr std::array<CommandInfo, 11> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
@@ -50,6 +51,12 @@ constexpr std::array<CommandInfo, 9> kFileCommands{{
      .usage = "[FILE]",
      .bang = true,
      .choices = {Choices::File}},
+    {.name = "song-next",
+     .description = "Switch to the next open song, round to the first after the last",
+     .count = true},
+    {.name = "song-previous",
+     .description = "Switch to the open song before, round to the last before the first",
+     .count = true},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -276,6 +283,23 @@ public:
             std::move(choices), active_, [this, activation = activation_](auto index)
             { host_.report(activation == activation_ ? activate(index, false) : songChanged()); });
         return {true};
+    }
+
+    // Steps through the open songs in the chooser's order, going round at either end, as
+    // there are usually only a few.
+    CommandResult stepSong(int count, bool forward)
+    {
+        const auto open = songs_.size();
+        if (open < 2)
+            return {false, "Only one song is open", false, true};
+        const auto steps = static_cast<std::size_t>(std::max(count, 1)) % open;
+        const auto index = forward ? (active_ + steps) % open : (active_ + open - steps) % open;
+        if (auto switched = activate(index, false); switched.refused)
+            return switched;
+        return {true,
+                "Song " + std::to_string(active_ + 1) + " of " + std::to_string(open) + ": " +
+                    describe(active_).name,
+                false};
     }
 
     CommandResult closeSong(const CommandCall& call)
@@ -520,6 +544,10 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
         [commands](const CommandCall& call) { return commands->closeSong(call); });
     add(kFileCommands[8],
         [commands](const CommandCall& call) { return commands->write(call, false, true); });
+    add(kFileCommands[9],
+        [commands](const CommandCall& call) { return commands->stepSong(call.count, true); });
+    add(kFileCommands[10],
+        [commands](const CommandCall& call) { return commands->stepSong(call.count, false); });
     return [commands] { return commands->otherModified(); };
 }
 

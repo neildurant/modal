@@ -61,6 +61,14 @@ wrap under the highlighted row's list. Switching stops playback and
 starts the new song's play position at the beginning. Stop recording and
 let the take finish before changing songs.
 
+When two or three songs are open, stepping between them is quicker than
+choosing. `]f` goes to the next open song and `[f` to the one before, in the
+chooser's order, as `]s` and `[s` step through sections. They go round at
+either end, so with three songs open, `]f` from the last returns to the first.
+A count steps further: `2]f` skips a song. Ctrl-Tab and Ctrl-Shift-Tab do the
+same, as they move between tabs in a web browser. The message row names the
+song reached and its place, such as `Song 2 of 3: Morning`.
+
 `:song-close` closes the current song and requires `!` if it has unsaved
 edits. The last close leaves a new untitled song. `:q` quits only when all
 open songs have been saved or are unchanged. `:wq` saves the current song

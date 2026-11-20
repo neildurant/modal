@@ -159,7 +159,9 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [x] **Done** — A `, f` Files leader group (agreed 20 November 2026). See [grammar.md](grammar.md#the-leader).
     - [x] **Done** — Bind open, open songs, new, save, save as, close and export; add the save-as command.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Keys for the next and previous open song, without the chooser (asked for 20 November 2026).
+- [ ] **Doing** — Keys for the next and previous open song, without the chooser (asked for 20 November 2026). See [design.md](design.md#the-files-group).
+    - [x] **Done** — `]f` / `[f` and Ctrl-Tab / Ctrl-Shift-Tab, going round, with a count.
+    - [ ] **Doing** — Regressions and manual updates done; functional trial pending. See [status.md](status.md).
 - [ ] **To do** — `:export` without a filename uses the Folder panel instead of the system dialog.
 - [ ] **To do** — Restore each song's cursor and view state on switching.
 - [ ] **To do** — Shared registers for events, bars, tracks and sections copied between songs.

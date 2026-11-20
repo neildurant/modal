@@ -559,6 +559,8 @@ vmap <leader>ld label-delete      "Delete the labels selected"
 " in the file picker (:e); , f o switches to another open song (:song-select); , f n starts a
 " new song (:new); , f s saves (:w) and , f S saves as another file (:song-save-as); , f c
 " closes this song (:song-close); and , f x exports it as a Standard MIDI File (:export).
+" ]f and [f (or Ctrl-Tab and Ctrl-Shift-Tab) switch to the next and previous open song, in the
+" chooser's order, going round at either end; a count steps that many songs.
 keysection "Files"
 ngroup <leader>f "Files"
 nmap <leader>ff edit              "Open a file"
@@ -568,6 +570,10 @@ nmap <leader>fs write             "Save"
 nmap <leader>fS song-save-as      "Save as"
 nmap <leader>fc song-close        "Close this song"
 nmap <leader>fx export            "Export as MIDI"
+nmap ]f          song-next         "Next open song"
+nmap [f          song-previous     "Open song before"
+nmap <C-Tab>     song-next
+nmap <C-S-Tab>   song-previous
 
 keysection "Sections"
 ngroup <leader>s "Sections"

@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Next is keys for the next and previous open song, then restoring each song's cursor and view settings.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song await their trial. Next is restoring each song's cursor and view settings.*
 
 ## Current handoff
+
+### Next and previous open song, 20 November 2026
+
+`]f` and `[f`, or Ctrl-Tab and Ctrl-Shift-Tab, switch to the next and previous open song in the chooser's order, going round at either end. A count steps that many songs, and the message row names the song reached and its place. See [design.md](design.md#the-files-group).
+
+**Validation.** A Workspace test steps through three songs by each key, with counts, going round, a count that returns to the same song, and the refusal with one song open; an edited untitled song keeps its edit. MSVC Debug passes all 1,229 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,230 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial, then pushing and the hosted checks.
+
+**To try.** Start `modal --demo`, then `, f n` twice. Press `]f` and `[f` and watch the message row, try `2]f`, and try Ctrl-Tab and Ctrl-Shift-Tab.
 
 ### Files leader group, 20 November 2026
 

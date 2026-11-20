@@ -713,6 +713,8 @@ The filename line filters the list and also takes a relative, absolute or home-r
 
 The leader's **Files** group, `, f`, gathers the file and song commands used every day, so they can be found from the hint menu rather than recalled as `:` commands: `, f f` opens a file (`:e`, through the Folder panel), `, f o` switches to an open song (`:song-select`), `, f n` starts a new song, `, f s` saves, `, f S` saves as, `, f c` closes this song and `, f x` exports MIDI. The keys run the plain commands, so none of them discards unsaved edits. `:song-save-as [FILE]` (alias `saveas`) saves to FILE, refusing an existing one without `!`; without FILE it opens the Folder panel in the song's folder, suggesting its current name, an imported file's name as `.modal`, or `Untitled.modal`. The song then belongs to the file saved. `, f r` is kept for recent songs.
 
+`]f` and `[f` step to the next and previous open song without the chooser, as `]s` and `[s` step through sections, with Ctrl-Tab and Ctrl-Shift-Tab as browser-like alternatives (`song-next` and `song-previous`). They follow the chooser's order and go round at either end. A count steps that many songs. The message row names the song reached and its place, as `Song 2 of 3: Morning`. With one song open they say so and change nothing. Switching follows the chooser's rules: playback stops, and a recording or a take awaiting finalisation prevents it.
+
 ## Architecture
 
 The engine is a separate library running its own high-priority thread; the UI is a client of it. The two communicate only through lock-free queues and atomically swapped song snapshots, so a slow redraw or file save can never delay a MIDI event.
