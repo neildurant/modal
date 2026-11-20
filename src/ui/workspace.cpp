@@ -128,6 +128,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return drumMap();
                 if (name == "pitch-always-show")
                     return togglePitchAlwaysShow();
+                if (name == "track-import")
+                    return importTracks(call);
                 if (name == "drum-map-load" || name == "drum-map-save")
                     return drumMapFile(call, name == "drum-map-save");
                 if (name == "go-pitch")
@@ -461,6 +463,7 @@ void Workspace::resetForSong()
     ports_->showSong();
     metronome_->showSong();
     lastSelection_.reset(); // gv's, which belongs to the song left
+    trackImportChoice_.reset();
     history_.clear();
     jumpedFrom_.reset();
     playedFrom_.reset();
@@ -1157,6 +1160,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     refused_ = false;
     if (songChoice_)
         return songChoiceKey(key);
+    if (trackImportChoice_)
+        return trackImportKey(key);
     if (filePicker_ && question_ && mode_ == Mode::Normal)
     {
         const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});
@@ -4696,7 +4701,8 @@ CommandResult Workspace::yankTracks(bool duplicate, int count)
             false};
 }
 
-CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool before, int count)
+CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool before, int count,
+                                   std::string title)
 {
     if (copies.empty())
     {
@@ -4724,7 +4730,9 @@ CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool bef
     std::optional<core::TrackId> first;
     std::size_t made = 0;
     const auto sections = song.sections().size();
-    document_.edit(copies.size() == 1 ? "Put a whole track" : "Put whole tracks", view().place(),
+    if (title.empty())
+        title = copies.size() == 1 ? "Put a whole track" : "Put whole tracks";
+    document_.edit(title, view().place(),
                    [&](core::Song& edited)
                    {
                        for (int n = 0; n < std::max(count, 1); ++n)

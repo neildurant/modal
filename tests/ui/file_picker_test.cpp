@@ -3,6 +3,7 @@
 #include "support/temp_directory.hpp"
 
 #include <modal/core/drum_map_file.hpp>
+#include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/file_commands.hpp>
@@ -331,7 +332,7 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     std::vector<std::string> keys;
     for (const auto& hint : *shown)
         keys.push_back(hint.keys);
-    CHECK(keys == std::vector<std::string>{"c", "f", "n", "o", "s", "S", "x"});
+    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "s", "S", "x"});
     p.press(NamedKey::Escape);
     p.workspace.setHints(false, 0);
     p.type(U",ff");
@@ -566,6 +567,118 @@ TEST_CASE("export without a filename uses the Folder panel for MIDI files")
     CHECK(std::filesystem::file_size(p.temporary / "Earlier take.mid") == 4);
     p.type(U":export\nMix\n");
     CHECK(std::filesystem::exists(p.temporary / "Mix.mid"));
+}
+
+namespace
+{
+
+// A song of three tracks at 100 BPM, Track 1, Kick with a drum map, and Bass, a note on each,
+// written to Groove.modal.
+void writeGroove(Pickers& p)
+{
+    auto song = newSong();
+    song.title = "Groove";
+    song.updateTempo([](core::TempoMap& tempo) { tempo.set(0, core::Tempo::fromBpm(100)); });
+    const auto kick = song.addTrack("Kick");
+    song.updateTrack(kick,
+                     [](core::Track& track)
+                     {
+                         track.channel = 10;
+                         track.drumMap = core::DrumMap{.name = "Studio kit"};
+                     });
+    const auto bass = song.addTrack("Bass");
+    for (const auto& track : song.tracks())
+    {
+        song.updateEvents(track->id(), [&](core::EventList& events)
+                          { events.insert({0, core::Note{36, 100, song.ppqn().quarter()}}); });
+    }
+    (void)bass;
+    REQUIRE(core::writeSongFile(song, p.temporary / "Groove.modal").empty());
+}
+
+std::vector<std::string> trackNames(const core::Song& song)
+{
+    std::vector<std::string> names;
+    for (const auto& track : song.tracks())
+        names.push_back(track->name);
+    return names;
+}
+
+} // namespace
+
+TEST_CASE("track-import reads chosen tracks from a song file after the cursor's track")
+{
+    Pickers p;
+    writeGroove(p);
+    p.type(U":r Groove 2-3\n");
+    CHECK(trackNames(p.document.song()) == std::vector<std::string>{"Track 1", "Kick", "Bass"});
+    CHECK(p.workspace.message() ==
+          "Read 2 tracks from Groove.modal: Kick, Bass; its tempo was 100, this song plays at 120");
+    const auto& kick = *p.document.song().tracks()[1];
+    CHECK(kick.channel == 10);
+    REQUIRE(kick.drumMap);
+    CHECK(kick.drumMap->name == "Studio kit");
+    CHECK(p.document.song().events(kick.id()).all().size() == 1);
+    p.type(U"u");
+    CHECK(p.document.song().tracks().size() == 1);
+
+    // Mistakes say what's wrong and change nothing.
+    p.type(U":track-import Groove 9\n");
+    CHECK(p.workspace.message() == "No track 9: the file has 3");
+    p.type(U":track-import Missing\n");
+    CHECK(p.workspace.message().starts_with("Can't find "));
+    CHECK(p.document.song().tracks().size() == 1);
+}
+
+TEST_CASE("the track-import chooser ticks tracks with Space or by numbers typed")
+{
+    Pickers p;
+    writeGroove(p);
+    p.type(U",fiGroove\n");
+    CHECK(p.shows(U"[ ] 1  Track 1"));
+    CHECK(p.shows(U"Studio kit"));
+    CHECK(p.shows(U"Space ticks · type 1,3-5,7 or all or none"));
+
+    // Typing ticks exactly what's typed; a mistake shows and changes nothing until it's put right.
+    p.type(U"2-3");
+    CHECK(p.shows(U"[x] 2  Kick"));
+    CHECK(p.shows(U"[x] 3  Bass"));
+    CHECK(p.shows(U"2 ticked: 2-3"));
+    p.type(U"9");
+    CHECK(p.shows(U"No track 39: the file has 3"));
+    p.type(U"\n");
+    CHECK(p.document.song().tracks().size() == 1);
+    p.press(NamedKey::Backspace);
+    CHECK_FALSE(p.shows(U"No track"));
+
+    // Space ticks the highlighted track too, and Enter imports what's ticked.
+    p.type(U" \n");
+    CHECK(trackNames(p.document.song()) ==
+          std::vector<std::string>{"Track 1", "Track 1 (2)", "Kick", "Bass"});
+    CHECK(p.workspace.message().starts_with("Read 3 tracks from Groove.modal"));
+
+    // Escape leaves without importing; Enter with nothing ticked takes the highlighted track.
+    p.type(U",fiGroove\n");
+    p.press(NamedKey::Escape);
+    CHECK(p.document.song().tracks().size() == 4);
+    p.type(U",fiGroove\nj\n");
+    CHECK(p.document.song().tracks().size() == 5);
+    CHECK(p.workspace.message().starts_with("Read 1 track from Groove.modal: Kick (2)"));
+}
+
+TEST_CASE("track-import reads tracks from a MIDI file")
+{
+    Pickers p;
+    auto song = newSong();
+    const auto lead = song.tracks().front()->id();
+    song.updateTrack(lead, [](core::Track& track) { track.name = "Lead"; });
+    song.updateEvents(lead, [&](core::EventList& events)
+                      { events.insert({0, core::Note{72, 100, song.ppqn().quarter()}}); });
+    REQUIRE(core::exportSmfFile(song, p.temporary / "Tune.mid").error.empty());
+    p.type(U":read Tune.mid all\n");
+    REQUIRE(p.document.song().tracks().size() == 2);
+    CHECK(p.workspace.message().starts_with("Read 1 track from Tune.mid"));
+    CHECK(p.document.song().events(p.document.song().tracks()[1]->id()).all().size() == 1);
 }
 
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")

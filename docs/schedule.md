@@ -171,7 +171,10 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Whole tracks: lay along time, re-cut at the destination's sections, adding a section for anything past the end, keeping their bars. Accepted on trial.
     - [x] **Done** — Whole bars (`yy`, `ab`, the arrangement's bars) carry their meter; other material lands in the destination's bars. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trials for all three steps. See [status.md](status.md).
-- [ ] **To do** — `:read FILE` to bring tracks into the current song.
+- [ ] **Doing** — Importing tracks from a file (`:track-import`, `:read`, `, f i`), agreed 20 November 2026. See [design.md](design.md#importing-tracks).
+    - [x] **Done** — Read a `.modal` or `.mid` file from disk and import the tracks named by typed numbers and ranges.
+    - [x] **Done** — The tick chooser with typed ranges, and `, f i`.
+    - [ ] **Doing** — Regressions and manual updates done; functional trial pending. See [status.md](status.md).
 - [ ] **To do** — Default song folder and picker Places. See [song-handling design questions](design.md#to-decide).
     - [ ] **To do** — Add a `modalrc` setting for the default Songs folder.
     - [ ] **To do** — Give Alt-Down Places entries for Songs and the active song's folder.

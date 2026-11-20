@@ -558,6 +558,13 @@ constexpr std::array kSharedCommands{
                 .bang = true,
                 .keys = false,
                 .choices = {Choices::DrumMapFile}},
+    CommandInfo{.name = "track-import",
+                .description = "Import tracks from a song or MIDI file, after this track; "
+                               "without TRACKS (1,3-5,7 or all), choose them",
+                .aliases = "read r",
+                .usage = "[FILE [TRACKS]]",
+                .modes = modeBit(Mode::Normal),
+                .choices = {Choices::File}},
     CommandInfo{.name = "track-reorder",
                 .description = "Move this track or the selected tracks through the others: j and "
                                "k move, Enter accepts, Escape puts them back"},
@@ -709,7 +716,8 @@ std::span<const CommandInfo> Workspace::commands()
         // Where the views' commands do something, kept here beside each other, since a view
         // runs commands others describe; a test runs each binding offered in each place.
         using enum Where;
-        const std::array<std::pair<std::string_view, std::uint8_t>, 137> where{{
+        const std::array<std::pair<std::string_view, std::uint8_t>, 138> where{{
+            {"track-import", onlyIn({Tracks, Strip, PianoRoll, EventList, TrackList, Lane})},
             {"ports-refresh", onlyIn({PortList})},
             {"tracks-mute-toggle", onlyIn({Tracks, TrackList})},
             {"tracks-solo-toggle", onlyIn({Tracks, TrackList})},

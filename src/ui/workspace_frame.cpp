@@ -108,6 +108,8 @@ Frame Workspace::frame() const
         frame.push_back(drumMapChoiceRegion());
     if (songChoice_)
         frame.push_back(songChoiceRegion());
+    if (trackImportChoice_)
+        frame.push_back(trackImportRegion());
     if (eventInsertChoice_)
     {
         const auto row = messageRow();
@@ -312,6 +314,19 @@ Bar Workspace::messageBar(bool withMessage) const
         row.left.push_back({"Insert event: " + encodeUtf8(eventInsertChoice_->typed()), text});
         row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
     }
+    else if (trackImportChoice_)
+    {
+        const auto& choice = *trackImportChoice_;
+        const auto ticked = std::ranges::count(choice.ticked, true);
+        row.left.push_back({"Import from " + choice.file + ", " + std::to_string(ticked) +
+                                " ticked: " + encodeUtf8(choice.typed),
+                            text});
+        if (choice.error.empty())
+            row.right.push_back(
+                {"Space ticks · type 1,3-5,7 or all or none · Enter imports · Esc cancels", dim});
+        else
+            row.right.push_back({choice.error, {Role::Warning, Role::MessageLine, kPlain}});
+    }
     else if (songChoice_)
     {
         row.left.push_back({"Open songs: " + encodeUtf8(songChoice_->list.typed()), text});
@@ -374,7 +389,8 @@ Bar Workspace::statusBar() const
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
     state.mode =
-        drumMapChoice_ || filePicker_ || eventInsertChoice_ || songChoice_    ? StatusMode::Edit
+        drumMapChoice_ || filePicker_ || eventInsertChoice_ || songChoice_ || trackImportChoice_
+            ? StatusMode::Edit
         : freezeChoice_                                                       ? StatusMode::Freeze
         : trackMove_                                                          ? StatusMode::Move
         : view().typing()                                                     ? StatusMode::Edit

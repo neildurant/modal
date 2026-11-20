@@ -39,6 +39,7 @@ The everyday file commands have keys in the leader's **Files** group,
 | `, f S` | Save as another file (a capital for the bigger save) | `:song-save-as` |
 | `, f c` | **C**lose this song | `:song-close` |
 | `, f x` | E**x**port a Standard MIDI File | `:export` |
+| `, f i` | **I**mport tracks from a song or MIDI file | `:track-import` |
 
 The keys run the plain forms of the commands, so none of them discards unsaved
 edits: closing a song with edits is refused until it is saved, or closed with
@@ -139,6 +140,45 @@ one of the track's bars cuts that bar there.
 
 Each put is a single undo step, including any tracks or sections it added.
 
+## Importing tracks from a file
+
+Sometimes you want a part from another file without opening the whole song:
+a drum pattern from a MIDI file, or a bass line from an older version of a
+song. `, f i` (`:track-import`, or `:read` for short) brings tracks from a
+`.modal` or `.mid` file straight into the song you're working on. It always
+reads the file as saved on disk, which also makes it a way to recover a track
+you have since spoiled.
+
+After choosing the file in the picker, a list shows the file's tracks by
+their numbers in that file, with each one's channel, how many notes it has
+and its drum map, if any, to help tell the parts apart. Nothing is ticked at
+first. Tick tracks in either of two ways:
+
+- Move with Up and Down (or `j` and `k`) and press Space to tick or untick
+  the highlighted track.
+- Type the numbers you want: `1,3-5,7` ticks tracks 1, 3, 4, 5 and 7, `all`
+  ticks every track and `none` clears the ticks. What you type replaces the
+  ticks as you go, and the message row says how many are ticked. A number the
+  file doesn't have is shown in the warning colour, as in
+  `No track 9: the file has 5`, and nothing changes until you correct it.
+
+Enter imports the ticked tracks, or the highlighted one if none are ticked,
+so bringing in a single part is just moving to it and pressing Enter. Escape
+leaves without importing.
+
+The tracks go in after the cursor's track, in their order in the file, with
+their settings, exactly as whole tracks copied from another song do: laid
+along time, keeping their own bars, and with a section added if they run past
+the end of the song. Only tracks come in. Your song keeps its own sections,
+labels and tempo; if the file's tempo differs, the message says so, as in
+`its tempo was 100, this song plays at 120`. To take more of a file, open it
+as a song with `:e` and copy what you need across.
+
+The command line takes the same choice after the filename, so
+`:read Groove.mid 1,3-5` imports those tracks without the list. Like the
+other file commands, importing is refused while recording, and the whole
+import is one undo step.
+
 The native `.modal` file format is still under development. Compatibility
 between files written by different development versions is not yet guaranteed.
 Keep separate copies of important work before trying a newer build.
@@ -225,6 +265,7 @@ ending `.modal`, each saying which command writes that kind.
 | `:song-close[!]` | Close the current song, with `!` to discard its unsaved edits |
 | `:w` / `:w FILE` | Save the native song, or save to a chosen path |
 | `:song-save-as[!] [FILE]` | Save as another file, choosing it in the picker without FILE |
+| `:track-import [FILE [TRACKS]]` | Import tracks from a song or MIDI file, choosing which (also `:read`) |
 | `:export` / `:export FILE.mid` | Write a MIDI interchange copy |
 | `:q` | Quit, protecting unsaved changes |
 | `:wq` | Save and quit |

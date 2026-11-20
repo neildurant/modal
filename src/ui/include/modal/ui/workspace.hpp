@@ -743,7 +743,17 @@ private:
     // track disarmed. The tracks chosen are the cursor's, or those V or Ctrl-v selected.
     std::optional<std::vector<core::TrackId>> chosenTracks(std::string_view verb);
     CommandResult yankTracks(bool duplicate, int count);
-    CommandResult putTracks(std::vector<core::TrackCopy> copies, bool before, int count);
+    // Puts whole tracks after or before the cursor's, count times, as one undo step under a
+    // title of its own if given.
+    CommandResult putTracks(std::vector<core::TrackCopy> copies, bool before, int count,
+                            std::string title = {});
+    // Importing tracks from a file (see design.md, Importing tracks): the command, a file read,
+    // which opens the chooser without a selection, and the tracks chosen put in.
+    CommandResult importTracks(const CommandCall& call);
+    CommandResult importTracksFrom(const std::filesystem::path& file,
+                                   std::optional<std::string> selection);
+    CommandResult importChosenTracks(const core::Song& from, const std::string& name,
+                                     std::span<const std::size_t> chosen);
     CommandResult disarmTracks();
     CommandResult renameTrack(std::string_view name);
     // In the arrangement, a button for the tracks a V or Ctrl-v selection takes, as the
@@ -1216,6 +1226,21 @@ private:
         std::function<void(std::size_t)> chosen;
     };
     std::optional<SongChoice> songChoice_;
+    // The tracks of a file being imported, ticked with Space or by numbers typed.
+    struct TrackImportChoice
+    {
+        ChoiceList list;
+        std::vector<std::u32string> rows;
+        std::vector<bool> ticked;
+        std::u32string typed;
+        std::string error; // what's wrong with what's typed, if anything
+        core::Song song;
+        std::string file;
+    };
+    std::optional<TrackImportChoice> trackImportChoice_;
+    bool trackImportKey(const Key& key);
+    void tickTypedTracks();
+    Region trackImportRegion() const;
     bool songChoiceKey(const Key& key);
     Region songChoiceRegion() const;
     void enterPickerFolder(std::filesystem::path folder);

@@ -7,6 +7,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/drum_map_file.hpp>
 #include <modal/core/player.hpp>
+#include <modal/core/song_file.hpp>
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
@@ -843,6 +844,44 @@ TEST_CASE("a sample of the Metronome page and the Ports and Tracks views", "[.sa
         save("ports-gone");
         type(U"gt");
         save("tracks");
+    }
+}
+
+TEST_CASE("a sample of the track-import chooser", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::test::TempDirectory folder{"modal-import-sample"};
+    const auto file = folder / "Groove.modal";
+    REQUIRE(modal::core::writeSongFile(demoSong(), file).empty());
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+            view.handle(Key::typed(key), 0);
+    };
+    for (const auto& theme : {"dark", "light"})
+    {
+        auto window = offscreen(1200, 600);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        const auto save = [&](const std::string& name)
+        {
+            window->draw(view.frame(), *builtInTheme(theme));
+            CHECK(window->saveFrame(base + "-import-" + name + "-" + theme + ".bmp"));
+        };
+        view.report(registry.runLine("track-import " + utf8Text(file)));
+        save("open");
+        type(U"1,3-4");
+        view.handle(Key::of(NamedKey::Down), 0);
+        type(U" ");
+        save("ticked");
+        type(U"9");
+        save("mistake");
+        view.handle(Key::of(NamedKey::Escape), 0);
     }
 }
 

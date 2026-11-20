@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file awaits its trial.*
 
 ## Current handoff
+
+### Importing tracks from a file, 20 November 2026
+
+`, f i` (`:track-import`, aliases `read` and `r`) reads a `.modal` or `.mid` file from disk without opening it and imports chosen tracks after the cursor's, through the whole-track put: settings kept, laid along time, own bars kept, a section added past the end, one undo step. The chooser lists the file's tracks by number with channel, note count and drum map; Space ticks the highlighted track, typing `1,3-5,7`, `all` or `none` ticks exactly those, a mistake shows in the warning colour and blocks Enter, Enter imports the ticked tracks or the highlighted one, Escape cancels. `:track-import FILE TRACKS` skips the chooser. Only tracks come; a differing tempo is mentioned. `putTracks` takes an undo title. See [design.md](design.md#importing-tracks).
+
+**Validation.** Parser tests cover numbers, ranges, spaces, repeats, `all`, `none` and each error. Workspace tests import by `:r FILE 2-3` (names, channel, drum map, events, tempo message, undo), refuse a missing track and file, and drive the chooser by typing, a mistake blocking Enter, Backspace, Space, Escape and Enter with nothing ticked; another imports from a `.mid` file. A `[.sample]` render of the chooser (open, ticked, mistake) was checked in dark and light. MSVC Debug passes all 1,243 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,244 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial.
+
+**To try.** Save a copy of the demo somewhere, then in a new song (`, f n`) press `, f i` and choose it. Tick tracks with Space, then type `1,3-5`, try a number that's too big, Backspace, and Enter. Undo, and try Enter with nothing ticked. Try `:read FILE all`, and importing from a `.mid` file exported with `, f x`.
 
 ### Export through the Folder panel, 20 November 2026
 
