@@ -2,7 +2,6 @@
 
 #include "font.hpp"
 
-#include <modal/ui/config.hpp>
 #include <modal/ui/sdl/window.hpp>
 
 #include <SDL3/SDL.h>
@@ -30,9 +29,8 @@ struct Window::Impl
     std::unique_ptr<Font> font;
     int minimumColumns = 0;
     int minimumRows = 0;
-    bool closing = false;   // asked to close, so run returns
-    Uint32 dialogEvent = 0; // a file dialog's answer, back on run's thread
-    Uint32 wakeEvent = 0;   // another thread waking run's (see waker)
+    bool closing = false; // asked to close, so run returns
+    Uint32 wakeEvent = 0; // another thread waking run's (see waker)
     // Whether a wake event is on its way, so a stream of wakes sends one at a time.
     std::shared_ptr<std::atomic<bool>> wakePending = std::make_shared<std::atomic<bool>>(false);
 
@@ -555,12 +553,6 @@ void Window::run(const WindowHandlers& handlers)
                 needsFrame = true;
                 break;
             default:
-                if (event.type == impl_->dialogEvent && impl_->dialogEvent != 0)
-                {
-                    answerDialog(event);
-                    needsFrame = true;
-                    break;
-                }
                 if (event.type == impl_->wakeEvent && impl_->wakeEvent != 0)
                 {
                     impl_->wakePending->store(false); // before handling, so no wake is missed
@@ -602,92 +594,6 @@ std::function<void()> Window::waker()
             pending->store(false);
         }
     };
-}
-
-namespace
-{
-
-// A file dialog waiting for its answer, which SDL may give on another thread: kept with what
-// it was asked, which SDL reads until then, and sent back to run's thread as an event.
-struct PendingDialog
-{
-    Window::FileChosen done;
-    std::vector<FileFilter> filters;
-    std::vector<SDL_DialogFileFilter> sdlFilters;
-    std::string suggested;
-    Uint32 event = 0;
-    std::optional<std::filesystem::path> chosen;
-    std::string error;
-};
-
-void SDLCALL dialogAnswered(void* userdata, const char* const* files, int)
-{
-    auto* pending = static_cast<PendingDialog*>(userdata);
-    if (files == nullptr)
-    {
-        // SDL keeps errors on the callback thread, so copy this before queuing the answer.
-        pending->error = SDL_GetError();
-        if (pending->error.empty())
-            pending->error = "The system did not provide a reason";
-    }
-    else if (files[0] != nullptr && files[0][0] != '\0')
-    {
-        pending->chosen = utf8Path(files[0]);
-    }
-    SDL_Event event{};
-    event.user.type = pending->event;
-    event.user.data1 = pending;
-    if (!SDL_PushEvent(&event))
-    {
-        delete pending; // never answered, rather than answered on the wrong thread
-    }
-}
-
-} // namespace
-
-void Window::chooseFile(bool save, std::vector<FileFilter> filters,
-                        const std::filesystem::path& suggested, FileChosen done)
-{
-    if (impl_->dialogEvent == 0)
-    {
-        impl_->dialogEvent = SDL_RegisterEvents(1);
-        if (impl_->dialogEvent == 0)
-        {
-            done(std::nullopt, "Could not register the file dialog event");
-            return;
-        }
-    }
-    auto pending = std::make_unique<PendingDialog>();
-    pending->done = std::move(done);
-    pending->filters = std::move(filters);
-    for (const auto& filter : pending->filters)
-    {
-        pending->sdlFilters.push_back({filter.name.c_str(), filter.extensions.c_str()});
-    }
-    pending->suggested = utf8Text(suggested);
-    pending->event = impl_->dialogEvent;
-    auto* raw = pending.release(); // until dialogAnswered's event comes back
-    const auto count = static_cast<int>(raw->sdlFilters.size());
-    const char* location = raw->suggested.empty() ? nullptr : raw->suggested.c_str();
-    if (save)
-    {
-        SDL_ShowSaveFileDialog(&dialogAnswered, raw, impl_->window, raw->sdlFilters.data(), count,
-                               location);
-    }
-    else
-    {
-        SDL_ShowOpenFileDialog(&dialogAnswered, raw, impl_->window, raw->sdlFilters.data(), count,
-                               location, false);
-    }
-}
-
-void Window::answerDialog(const SDL_Event& event)
-{
-    const std::unique_ptr<PendingDialog> pending{static_cast<PendingDialog*>(event.user.data1)};
-    if (pending->done)
-    {
-        pending->done(std::move(pending->chosen), std::move(pending->error));
-    }
 }
 
 void Window::setTitle(const std::string& title)

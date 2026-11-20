@@ -7,7 +7,6 @@
 #include <modal/ui/style.hpp>
 
 #include <cstdint>
-#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -52,14 +51,6 @@ struct WindowOptions
 };
 
 class Window;
-
-// A kind of file a file dialog offers: its name, and its extensions separated by semicolons,
-// such as {"Songs and MIDI files", "modal;mid;midi"}.
-struct FileFilter
-{
-    std::string name;
-    std::string extensions;
-};
 
 // What a window's event loop calls. Times are in milliseconds, on the clock of Window::now().
 struct WindowHandlers
@@ -127,14 +118,6 @@ public:
     // called once the window has gone.
     std::function<void()> waker();
 
-    // Shows the system's dialog for a file to open, or to save to (which asks about writing
-    // over a file itself), offering the filters' kinds of file and starting from a suggested
-    // file. done gets the file chosen, or nothing if the dialog was cancelled or couldn't be
-    // shown, later, from run's event loop.
-    using FileChosen = std::function<void(std::optional<std::filesystem::path>, std::string error)>;
-    void chooseFile(bool save, std::vector<FileFilter> filters,
-                    const std::filesystem::path& suggested, FileChosen done);
-
     void setTitle(const std::string& title);
     std::string title() const;
 
@@ -164,7 +147,6 @@ private:
     void resizeToCells(int columns, int rows);
     void applyMinimumSize();
     void drawRegion(const Region& region, const Theme& theme);
-    void answerDialog(const SDL_Event& event);
 
     std::unique_ptr<Impl> impl_;
 };

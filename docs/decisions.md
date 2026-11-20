@@ -833,6 +833,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Whole tracks into other sections (built 20 November 2026).** A track copy keeps each source section's conductor meter, so a track that followed the conductor keeps those bars too. The track gets its own meter only over parts whose bars differ, so a copy into the same bars follows the song's meter as before. The added section uses whole bars of the meter at the song's end, like any new section. Ramps may not cross sections, so one that would becomes its events, as converting it does, rather than refusing the whole put.
 
+**No system file dialogs (decided 20 November 2026).** With `:export` moved to the Folder panel, no command used the system's dialogs, so the window's file-dialog support and SDL's D-Bus feature, enabled on 19 November 2026 only for the desktop file portal, were removed. Bringing system dialogs back would mean adding both again.
+
 **Stepping between open songs (decided 20 November 2026).** Use `]f` and `[f`, following the `]` and `[` pairs that step through bars, sections and labels, with `f` matching the Files group, and add Ctrl-Tab and Ctrl-Shift-Tab, familiar from browser tabs. Some Linux desktops take Ctrl-Tab before a program sees it, so the bracket keys are the main ones. Unlike motions, which stop at the song's end, the keys go round at either end: there are usually only a few songs open, and going round reaches any of them in one direction.
 
 ## Work order (19 November 2026)

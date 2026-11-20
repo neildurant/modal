@@ -25,5 +25,5 @@ FreeType asks for this credit, under the FreeType License:
 > rights reserved.
 
 The tests also use [Catch2](https://github.com/catchorg/Catch2) (Boost Software License 1.0),
-which isn't part of the programs. On Linux, ALSA, D-Bus, X11 and Wayland are drawn from
-the system libraries at runtime. SDL loads the system D-Bus library for desktop portals.
+which isn't part of the programs. On Linux, ALSA, X11 and Wayland are drawn from the system
+libraries at runtime.

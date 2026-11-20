@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support is being removed.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed.*
 
 ## Current handoff
 
@@ -14,7 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
-**Question.** The SDL window's own file-dialog code (`Window::chooseFile`) is now unused, as is the D-Bus support enabled for the desktop portal. Both are left in place until it's decided whether to remove them.
+**System dialogs removed.** As agreed after the trial, the window's file-dialog support (`Window::chooseFile` and its pending-dialog event), its test, and SDL's D-Bus feature with the `dbus` dependency in `vcpkg.json` are removed; the licence notes no longer mention D-Bus. Linux builds reinstall SDL without D-Bus on their next configure, as the WSL configure did. MSVC Debug passes all 1,237 tests with two MIDI-dependent skips, one fewer as the dialog test is gone; the reconfigured Clang Debug in WSL builds without warnings and passes 1,238 with three skips. Whole-tree formatting and `git diff --check` pass.
 
 **To try.** Run `:export` or `, f x` in the demo: check the panel's title and suggestion, export with Enter, then try again choosing the same file and decline the replacement. On the Linux laptop this is the case that previously showed no dialog.
 
