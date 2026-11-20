@@ -355,6 +355,21 @@ TEST_CASE("a ramp keeps to its section")
     }
 }
 
+TEST_CASE("a copied track's ramp across another song's section becomes its events")
+{
+    Fixture f;
+    REQUIRE(f.song.addRamp(f.id, ramp(f.q, 4 * f.q, 0, 100)).done());
+    const auto copy = f.song.copyTrack(f.id);
+    REQUIRE(copy);
+    Song other{f.ppqn};
+    REQUIRE(other.end() >= f.song.end());
+    REQUIRE(other.splitSection(f.ppqn.whole(), "B"));
+    const auto pasted = other.insertTrack(0, *copy);
+    REQUIRE(pasted);
+    CHECK(other.ramps(*pasted).empty());
+    CHECK(other.events(*pasted) == f.song.events(f.id));
+}
+
 TEST_CASE("a song file keeps ramps and the events they hide")
 {
     Fixture f;

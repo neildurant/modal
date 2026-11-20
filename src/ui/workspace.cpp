@@ -4696,8 +4696,7 @@ CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool bef
     {
         if (!song.canInsertTrack(copy))
         {
-            return CommandResult::error(
-                "The copied tracks need the same PPQN, section names and lengths");
+            return CommandResult::error("The copied tracks were taken at another PPQN");
         }
     }
     const auto cursor = view().cursor();
@@ -4713,6 +4712,7 @@ CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool bef
     endVisual();
     std::optional<core::TrackId> first;
     std::size_t made = 0;
+    const auto sections = song.sections().size();
     document_.edit(copies.size() == 1 ? "Put a whole track" : "Put whole tracks", view().place(),
                    [&](core::Song& edited)
                    {
@@ -4734,7 +4734,9 @@ CommandResult Workspace::putTracks(std::vector<core::TrackCopy> copies, bool bef
     {
         view().setCursor({*first, cursor.tick, cursor.pitch});
     }
-    return {true, "Put " + std::to_string(made) + (made == 1 ? " whole track" : " whole tracks"),
+    return {true,
+            "Put " + std::to_string(made) + (made == 1 ? " whole track" : " whole tracks") +
+                sectionsAddedText(document_.song(), sections),
             false};
 }
 

@@ -462,6 +462,37 @@ TEST_CASE("a section put in another song keeps its notes on the tracks of the sa
     CHECK(p.workspace.message().find("added track Cello") != std::string::npos);
 }
 
+TEST_CASE("a whole track put in a song with other sections is laid along time")
+{
+    Pickers p;
+    auto source = newSong();
+    source.title = "Source";
+    const auto lead = source.tracks().front()->id();
+    source.updateTrack(lead, [](core::Track& track) { track.name = "Lead"; });
+    REQUIRE(source.insertEmptySection(1, "Coda", 2));
+    const auto last = source.end() - source.ppqn().quarter();
+    source.updateEvents(lead, [&](core::EventList& events)
+                        { events.insert({last, core::Note{72, 100, source.ppqn().quarter()}}); });
+    REQUIRE(core::writeSongFile(source, p.temporary / "Source.modal").empty());
+    auto destination = newSong();
+    destination.title = "Destination";
+    destination.renameSection(0, "Verse");
+    REQUIRE(core::writeSongFile(destination, p.temporary / "Destination.modal").empty());
+
+    p.type(U":e Source\n,ty:e Destination\n,tp");
+    const auto& song = p.document.song();
+    REQUIRE(song.title == "Destination");
+    REQUIRE(song.tracks().size() == 2);
+    CHECK(song.tracks()[1]->name == "Lead");
+    CHECK(song.end() >= last);
+    const auto& put = song.events(song.tracks()[1]->id()).all();
+    REQUIRE(put.size() == 1);
+    CHECK(put.front().tick == last);
+    CHECK(p.workspace.message().starts_with("Put 1 whole track; added section "));
+    p.type(U"u");
+    CHECK(p.document.song().sections().size() == 1);
+}
+
 TEST_CASE("save as suggests the song's own name and moves the song to the file chosen")
 {
     Pickers p;

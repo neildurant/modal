@@ -316,24 +316,56 @@ std::optional<TrackCopy> Song::copyTrack(TrackId id) const
     for (const auto& section : sections_)
     {
         const auto* content = section->content(id);
-        copy.parts.push_back(
-            {section->name(), section->length(), content ? *content : TrackContent{}});
+        copy.parts.push_back({section->name(), section->length(),
+                              content ? *content : TrackContent{}, section->meter()});
     }
     return copy;
 }
 
 bool Song::canInsertTrack(const TrackCopy& copy) const
 {
-    if (copy.ppqn != ppqn() || copy.parts.size() != sections_.size())
+    return copy.ppqn == ppqn();
+}
+
+namespace
+{
+
+// Whether a copy's parts match a song's sections by name and length.
+bool sameSections(const TrackCopy& copy, std::span<const std::shared_ptr<const Section>> sections)
+{
+    if (copy.parts.size() != sections.size())
         return false;
-    for (std::size_t i = 0; i < sections_.size(); ++i)
+    for (std::size_t i = 0; i < sections.size(); ++i)
     {
-        if (copy.parts[i].length != sections_[i]->length() ||
-            copy.parts[i].section != sections_[i]->name())
+        if (copy.parts[i].length != sections[i]->length() ||
+            copy.parts[i].section != sections[i]->name())
             return false;
     }
     return true;
 }
+
+// Whether a meter has the same bars over a span as another has from its start.
+bool sameBars(const MeterMap& meter, Tick from, Tick length, const MeterMap& other)
+{
+    const auto at = meter.toBarBeatTick(from);
+    if (at.beat != 1 || at.tick != 0 || meter.signatureAt(from) != other.signatureAt(0))
+        return false;
+    std::vector<MeterChange> here;
+    std::vector<MeterChange> there;
+    for (const auto& change : meter.changes())
+    {
+        if (change.tick > from && change.tick < from + length)
+            here.push_back({change.tick - from, change.signature});
+    }
+    for (const auto& change : other.changes())
+    {
+        if (change.tick > 0 && change.tick < length)
+            there.push_back(change);
+    }
+    return here == there;
+}
+
+} // namespace
 
 std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& copy)
 {
@@ -344,6 +376,33 @@ std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& 
     for (int n = 2; std::ranges::any_of(tracks_, [&](const auto& t) { return t->name == name; });
          ++n)
         name = numbered(base, n);
+    if (sameSections(copy, sections_))
+    {
+        const auto id = addTrack(position, name);
+        updateTrack(id,
+                    [&](Track& track)
+                    {
+                        track = copy.settings.withId(id);
+                        track.name = name;
+                    });
+        for (std::size_t i = 0; i < sections_.size(); ++i)
+            updateContent(i, id, [&](TrackContent& content) { content = copy.parts[i].content; });
+        rebuildMeters();
+        rebuildEvents(position);
+        return id;
+    }
+
+    // Along time: room for all of it first, in whole bars of the meter at the song's end.
+    Tick length = 0;
+    for (const auto& part : copy.parts)
+        length += part.length;
+    if (length > end())
+    {
+        const auto& last = *sections_.back();
+        const MeterMap bars{ppqn(), last.meter_.signatureAt(last.length_ - 1)};
+        const auto bar = *bars.toTick({2, 1, 0});
+        insertEmptySection(sections_.size(), newSectionName(), (length - end() + bar - 1) / bar);
+    }
     const auto id = addTrack(position, name);
     updateTrack(id,
                 [&](Track& track)
@@ -351,10 +410,67 @@ std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& 
                     track = copy.settings.withId(id);
                     track.name = name;
                 });
-    for (std::size_t i = 0; i < sections_.size(); ++i)
-        updateContent(i, id, [&](TrackContent& content) { content = copy.parts[i].content; });
-    rebuildMeters();
-    rebuildEvents(position);
+    EventList events;
+    std::vector<ControllerRamp> ramps;
+    Tick offset = 0;
+    for (const auto& part : copy.parts)
+    {
+        for (auto event : part.content.events.all())
+        {
+            event.tick += offset;
+            events.insert(std::move(event));
+        }
+        for (auto ramp : part.content.ramps)
+        {
+            ramp.start += offset;
+            ramps.push_back(ramp);
+        }
+        offset += part.length;
+    }
+    // A ramp the song's sections won't allow becomes the events it makes, in place of those
+    // it hid, as converting it would.
+    const auto put = [&]
+    {
+        return updateTrackContent(id,
+                                  [&](EventList& source, std::vector<ControllerRamp>& kept)
+                                  {
+                                      source = events;
+                                      kept = ramps;
+                                  });
+    };
+    for (auto edit = put(); !edit.done() && edit.index < ramps.size(); edit = put())
+    {
+        const auto ramp = ramps[edit.index];
+        ramps.erase(ramps.begin() + static_cast<std::ptrdiff_t>(edit.index));
+        EventList made;
+        for (const auto& event : events.all())
+        {
+            if (!ownedByRamp(event, std::span{&ramp, 1}))
+                made.insert(event);
+        }
+        for (auto event : rampEvents(ramp, ppqn()))
+            made.insert(std::move(event));
+        events = std::move(made);
+    }
+    // The copy's bars, where they differ from the song's.
+    offset = 0;
+    for (const auto& part : copy.parts)
+    {
+        const auto& bars = part.content.meter ? *part.content.meter : part.conductor;
+        if (!sameBars(meter_, offset, part.length, bars))
+        {
+            const auto changes = bars.changes();
+            for (std::size_t i = 0; i < changes.size(); ++i)
+            {
+                const auto from = offset + changes[i].tick;
+                const auto to =
+                    offset + (i + 1 < changes.size() ? changes[i + 1].tick : part.length);
+                if (from < to)
+                    setMeter(id, from, to, changes[i].signature);
+            }
+        }
+        offset += part.length;
+    }
     return id;
 }
 

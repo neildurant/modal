@@ -165,10 +165,72 @@ TEST_CASE("whole tracks keep settings and per-section own or inherited meters")
     song.removeTrack(original.id());
     CHECK(song.insertTrack(0, *copy));
 
-    song.moveSection(0, 1);
+    // Only a copy at another PPQN is refused.
+    auto other = *copy;
+    other.ppqn = Ppqn{ppqn.value * 2};
     const auto before = song;
-    CHECK_FALSE(song.insertTrack(0, *copy));
+    CHECK_FALSE(song.insertTrack(0, other));
     CHECK(song == before);
+}
+
+TEST_CASE("a whole track put into other sections is laid along time, keeping its own bars")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto eighth = q / 2;
+    const auto ticksOf = [](const Song& song, TrackId id)
+    {
+        std::vector<Tick> ticks;
+        for (const auto& event : song.events(id).all())
+            ticks.push_back(event.tick);
+        return ticks;
+    };
+    Track bass{TrackId{1}};
+    bass.name = "Bass";
+
+    // Two bars of 7/8 in the conductor, which the bass follows, a note on each downbeat.
+    Section riff{"Riff", 14 * eighth, MeterMap{ppqn, TimeSignature{7, 8}}, Tempo{500000}};
+    TrackContent content;
+    content.events.insert({0, Note{40, 100, q}});
+    content.events.insert({7 * eighth, Note{43, 100, q}});
+    riff.setContent(bass.id(), content);
+    const Song source{ppqn, {bass}, {riff}};
+    const auto copy = source.copyTrack(bass.id());
+    REQUIRE(copy);
+
+    // Into two bars of 4/4: the same times, in the bass's own 7/8, the song's meter untouched,
+    // and a remainder bar bringing the bass back onto the song's bar lines.
+    Song song{ppqn, {}, {Section{"Verse", 8 * q, MeterMap{ppqn}, Tempo{500000}}}};
+    const auto id = song.insertTrack(0, *copy);
+    REQUIRE(id);
+    CHECK(song.sections().size() == 1);
+    CHECK(ticksOf(song, *id) == std::vector<Tick>{0, 7 * eighth});
+    const auto& bars = song.meter(*id);
+    CHECK(bars.signatureAt(0) == TimeSignature{7, 8});
+    CHECK(bars.toBarBeatTick(7 * eighth) == BarBeatTick{2, 1, 0});
+    CHECK(bars.toBarBeatTick(7 * q).beat == 1);
+    CHECK(bars.toBarBeatTick(7 * q).tick == 0);
+    CHECK(song.meter().signatureAt(0) == TimeSignature{4, 4});
+
+    // Longer than the song: a section of whole bars is added to hold it.
+    Song shorter{ppqn, {}, {Section{"Intro", 4 * q, MeterMap{ppqn}, Tempo{500000}}}};
+    const auto longer = shorter.insertTrack(0, *copy);
+    REQUIRE(longer);
+    REQUIRE(shorter.sections().size() == 2);
+    CHECK(shorter.end() == 8 * q);
+    CHECK(ticksOf(shorter, *longer) == std::vector<Tick>{0, 7 * eighth});
+
+    // In the same bars, it follows the song's meter rather than having one of its own.
+    Section same{"Chorus", 14 * eighth, MeterMap{ppqn, TimeSignature{7, 8}}, Tempo{500000}};
+    Section rest{"Outro", 7 * eighth, MeterMap{ppqn, TimeSignature{7, 8}}, Tempo{500000}};
+    Song alike{ppqn, {}, {same, rest}};
+    const auto follows = alike.insertTrack(0, *copy);
+    REQUIRE(follows);
+    for (const auto& section : alike.sections())
+    {
+        const auto* held = section->content(*follows);
+        CHECK((held == nullptr || !held->meter));
+    }
 }
 
 TEST_CASE("an empty track's musical advance has enough lead-in at slower tempos")

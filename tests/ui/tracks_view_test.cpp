@@ -320,16 +320,25 @@ TEST_CASE("refusing a whole-track replacement preserves song and register")
 {
     Tracking t;
     t.type(U"Vy");
+    // Only a copy at another PPQN is refused (other sections are laid along time, decided
+    // 20 November 2026); no song Modal opens is at another, so make the song so.
     const auto reg = t.ws.registerArea();
-    t.document.edit("Rename section", {},
-                    [](core::Song& song) { song.renameSection(0, "Changed"); });
+    t.document.edit("Another resolution", {},
+                    [](core::Song& song)
+                    {
+                        core::Song other{core::Ppqn{song.ppqn().value * 2}};
+                        other.addTrack("One");
+                        other.addTrack("Two");
+                        song = other;
+                    });
+    t.ws.refresh();
     const auto before = t.document.song();
     const auto version = t.document.version();
     t.type(U"Vjp");
     CHECK(t.document.song() == before);
     CHECK(t.document.version() == version);
     CHECK(t.ws.registerArea() == reg);
-    CHECK(t.ws.message().find("section names") != std::string::npos);
+    CHECK(t.ws.message().find("another PPQN") != std::string::npos);
 }
 
 TEST_CASE("track columns start visible and keep the active field visible after resizing")

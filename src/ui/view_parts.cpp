@@ -1059,6 +1059,17 @@ std::string rampCutText(const core::Song& song, const RampCut& cut)
            ": move it, or , c R makes it events";
 }
 
+std::string sectionsAddedText(const core::Song& song, std::size_t before)
+{
+    const auto sections = song.sections();
+    std::string names;
+    for (auto i = before; i < sections.size(); ++i)
+        names += (names.empty() ? "" : ", ") + sections[i]->name();
+    if (names.empty())
+        return {};
+    return (sections.size() - before == 1 ? "; added section " : "; added sections ") + names;
+}
+
 core::Tick sectionEndAt(const core::Song& song, core::Tick tick)
 {
     return song.sectionStart(song.sectionAt(tick) + 1);

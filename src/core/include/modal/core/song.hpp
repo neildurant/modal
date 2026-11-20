@@ -119,8 +119,9 @@ private:
     std::map<TrackId, std::shared_ptr<const TrackContent>> content_;
 };
 
-// A whole track in a register, independent of later edits to its source. Section lengths
-// let a paste reject a changed layout instead of silently moving or losing material.
+// A whole track in a register, independent of later edits to its source. Each part keeps its
+// section's name, length and conductor's meter, so a put can tell whether the destination's
+// sections are the same, and keep the track's bars where they aren't.
 struct TrackCopy
 {
     Track settings;
@@ -130,6 +131,7 @@ struct TrackCopy
         std::string section;
         Tick length;
         TrackContent content;
+        MeterMap conductor; // the section's, which the track followed where it had no meter
         friend bool operator==(const Part&, const Part&) = default;
     };
     std::vector<Part> parts;
@@ -194,9 +196,15 @@ public:
     bool moveTracks(std::size_t first, std::size_t count, std::size_t to);
 
     std::optional<TrackCopy> copyTrack(TrackId id) const;
+    // Whether a copy can go in: one at the song's PPQN.
     bool canInsertTrack(const TrackCopy& copy) const;
-    // New ID and a unique name; settings and each section's own/following meter survive.
-    // Refuses a different PPQN or section layout, leaving the song unchanged.
+    // New ID and a unique name; settings survive. Into the same sections (names and lengths),
+    // each part goes to its section with its own or following meter. Into different ones
+    // (decided 20 November 2026), the parts are laid along time from the song's start and cut
+    // at its sections, a section of whole bars being added at the end for anything past it;
+    // where the copy's bars differ from the song's, the track keeps them as its own meter, and
+    // a ramp that would cross a section becomes its events. Refuses a different PPQN, leaving
+    // the song unchanged.
     std::optional<TrackId> insertTrack(std::size_t position, const TrackCopy& copy);
 
     // Sections in order.

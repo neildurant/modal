@@ -919,7 +919,7 @@ bool TracksView::put(bool before, bool replace, int count)
     {
         if (!document_.song().canInsertTrack(copy))
         {
-            host_.refuse("The copied tracks need the same PPQN, section names and lengths");
+            host_.refuse("The copied tracks were taken at another PPQN");
             return true;
         }
     }
@@ -933,6 +933,7 @@ bool TracksView::put(bool before, bool replace, int count)
         at = static_cast<std::size_t>(it - tracks.begin());
     }
     std::optional<core::TrackId> first;
+    const auto sections = document_.song().sections().size();
     document_.edit(replace ? "Replace whole tracks" : "Insert whole tracks", place(),
                    [&](core::Song& song)
                    {
@@ -957,7 +958,8 @@ bool TracksView::put(bool before, bool replace, int count)
                    });
     cursor_.track = first;
     refresh();
-    host_.setMessage("Put whole tracks", MessageKind::Information);
+    host_.setMessage("Put whole tracks" + sectionsAddedText(document_.song(), sections),
+                     MessageKind::Information);
     return true;
 }
 

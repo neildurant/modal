@@ -240,6 +240,10 @@ Put putRegister(core::Song& song, const EventRegister& reg, std::size_t firstTra
 // the section holding a time.
 core::Tick sectionEndAt(const core::Song& song, core::Tick tick);
 
+// What a put added at the song's end to hold what it put, after a song had a number of
+// sections: "; added section Section 3", or nothing.
+std::string sectionsAddedText(const core::Song& song, std::size_t before);
+
 // The sections is and as take: the one holding a time and as many after it as the count says
 // less one, as far as the last; their span of time, and their names as words ("Verse", "3
 // sections from Verse").
