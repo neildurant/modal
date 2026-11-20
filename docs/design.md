@@ -714,6 +714,10 @@ Registers are shared between open songs, so material yanked in one is put in ano
 
 Within one song the same rules apply, so copying whole bars from a 7/8 section into a 4/4 one keeps them in 7/8.
 
+### Recent songs
+
+Modal remembers the song files opened or saved, newest first, in the state directory's `remembered` file, up to the `recentsongs` setting's number (12; 0 keeps none). Opening a song by `:e`, the picker or at startup, and saving one, including save as, counts as using it; an imported MIDI file is listed until its song is saved, when the `.modal` file takes its place. New songs without a file, and files only read by importing tracks, aren't listed. `, f r` (`:song-recent`) opens **Recent songs**: each file's name, its folder and when it was last used, in aligned columns, the time at the right (`today 17:42`, `yesterday 09:10`, `Mon 18 Nov`, `2 Mar 2025`), or `not found` for a file that's gone. Typing narrows by name or folder, Up and Down choose, Enter opens the song, or switches to it if it's open, and Escape leaves. Delete removes the highlighted entry from the list, never the file. Enter on a file that's gone asks whether to remove it from the list. Song titles aren't shown: only filenames, until titles are designed.
+
 ### Importing tracks
 
 `:track-import [FILE [TRACKS]]` (aliases `read` and `r`; `, f i`) brings tracks from a `.modal` or `.mid` file on disk into the current song, without opening the file as a song. Without FILE the file picker chooses one, listing songs and MIDI files. Without TRACKS a chooser lists the file's tracks by number, with name, channel, note count and drum map where there is one, each with a tick box, none ticked at first; the message row says how many of how many are ticked. Up and Down (or `j` and `k`) move, Space ticks or unticks, and `a` ticks every track, or none once every one is. Enter runs the `:read FILE TRACKS` line naming the ticked tracks, or with none ticked the highlighted one, and keeps it in the `:` prompt's history; Escape cancels. TRACKS on the command line are numbers from 1 and ranges, separated by commas or spaces (`1, 3-5, 7`), `all` or `none`; a number the file doesn't have is refused (`No track 9: the file has 5`).
@@ -971,6 +975,10 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 - Outline entry key and whether J joins or moves down.
 - Controls for column ordering and per-view visibility.
 - Song-tempo control/fallback: relationship to the conductor and explicit section starting tempos.
+
+**Song titles**
+
+- A song has a title in the model and the file, taken from an imported MIDI file or written by hand, and shown by the open-song chooser, but nothing sets it in Modal (scheduled 20 November 2026). Decide a command to set it, perhaps `:song-title`, and where else it shows or is used: the window's title, the choosers, the recent list and MIDI export.
 
 **Later feature design**
 

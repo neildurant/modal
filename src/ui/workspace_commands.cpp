@@ -558,6 +558,9 @@ constexpr std::array kSharedCommands{
                 .bang = true,
                 .keys = false,
                 .choices = {Choices::DrumMapFile}},
+    CommandInfo{.name = "song-recent",
+                .description = "List the song files opened or saved lately, to open one",
+                .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "track-import",
                 .description = "Import tracks from a song or MIDI file, after this track; "
                                "without TRACKS (1,3-5,7 or all), choose them",

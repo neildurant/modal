@@ -154,6 +154,7 @@ after counts multiply.
 | `, f f`, `, f o`, `, f n` | Open a file, switch open songs, new song |
 | `, f s`, `, f S`, `, f c`, `, f x` | Save, save as, close the song, export MIDI |
 | `, f i` | Import tracks from a file, ticking which |
+| `, f r` | Recent songs: open one, Delete takes it off the list |
 | `]f` / `[f`, Ctrl-Tab / Ctrl-Shift-Tab | Next / previous open song, going round |
 | Ctrl-. | Panic |
 

@@ -69,6 +69,11 @@ struct Pickers final : FileHost
     {
         return workspace.songsFolder();
     }
+    void songUsed(const std::filesystem::path& file,
+                  const std::optional<std::filesystem::path>& replacing) override
+    {
+        workspace.songUsed(file, replacing);
+    }
     void returnToSong(std::shared_ptr<void> kept) override
     {
         workspace.returnToSong(std::move(kept));
@@ -219,6 +224,60 @@ TEST_CASE("the songfolder setting is where a new song's files start, and a Place
     CHECK(p.shows(U"Folder not found: "));
     p.press(NamedKey::Escape);
     p.press(NamedKey::Escape);
+}
+
+TEST_CASE("recent songs list the files opened and saved, to open one again")
+{
+    Pickers p;
+    Settings settings;
+    p.workspace.setSettings(&settings);
+    p.makeSong("Ballad.modal", "Ballad");
+    p.makeSong("Groove.modal", "Groove");
+    p.makeSong("Gone.modal", "Gone");
+    p.type(U":e Ballad\n:e Gone\n:e Groove\n");
+    std::filesystem::remove(p.temporary / "Gone.modal");
+
+    // Newest first, the gone one marked; typing narrows; Enter opens.
+    p.type(U",fr");
+    CHECK(p.shows(U"Recent songs: "));
+    CHECK(p.shows(U"Del removes from the list"));
+    CHECK(p.shows(U"not found"));
+    CHECK(p.shows(U"today "));
+    p.type(U"ball\n");
+    CHECK(p.document.song().title == "Ballad");
+    CHECK(p.workspace.remembered().songs().front().path ==
+          utf8Text((p.temporary / "Ballad.modal").lexically_normal()));
+
+    // Delete takes an entry off the list, never the file.
+    p.type(U",frgroove");
+    p.press(NamedKey::Delete);
+    CHECK(p.workspace.message() ==
+          "Removed Groove.modal from the recent list; the file is untouched");
+    CHECK(std::filesystem::exists(p.temporary / "Groove.modal"));
+    CHECK(p.workspace.remembered().songs().size() == 2);
+    p.press(NamedKey::Escape);
+
+    // A file that's gone is offered for removal.
+    p.type(U",frgone\n");
+    CHECK(p.workspace.message() == "Gone.modal no longer exists. Remove it from the list? (y/n)");
+    p.type(U"y");
+    CHECK(p.workspace.remembered().songs().size() == 1);
+
+    // An imported MIDI file gives its place to the song saved from it.
+    auto song = newSong();
+    REQUIRE(core::exportSmfFile(song, p.temporary / "Sketch.mid").error.empty());
+    p.type(U":e Sketch.mid\n");
+    CHECK(p.workspace.remembered().songs().front().path.ends_with("Sketch.mid"));
+    p.type(U":w Sketch\n");
+    CHECK(p.workspace.remembered().songs().front().path.ends_with("Sketch.modal"));
+    CHECK(std::ranges::none_of(p.workspace.remembered().songs(), [](const auto& recent)
+                               { return recent.path.ends_with("Sketch.mid"); }));
+
+    // None kept with recentsongs at 0.
+    REQUIRE(settings.set("recentsongs", "0").empty());
+    const auto before = p.workspace.remembered().songs().size();
+    p.type(U":e Groove\n");
+    CHECK(p.workspace.remembered().songs().size() == before);
 }
 
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")
@@ -386,7 +445,7 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     std::vector<std::string> keys;
     for (const auto& hint : *shown)
         keys.push_back(hint.keys);
-    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "s", "S", "x"});
+    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "r", "s", "S", "x"});
     p.press(NamedKey::Escape);
     p.workspace.setHints(false, 0);
     p.type(U",ff");

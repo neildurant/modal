@@ -130,6 +130,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return togglePitchAlwaysShow();
                 if (name == "track-import")
                     return importTracks(call);
+                if (name == "song-recent")
+                    return showRecentSongs();
                 if (name == "drum-map-load" || name == "drum-map-save")
                     return drumMapFile(call, name == "drum-map-save");
                 if (name == "go-pitch")
@@ -1162,6 +1164,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
         return songChoiceKey(key);
     if (trackImportChoice_)
         return trackImportKey(key);
+    if (recentChoice_)
+        return recentKey(key);
     if (filePicker_ && question_ && mode_ == Mode::Normal)
     {
         const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});

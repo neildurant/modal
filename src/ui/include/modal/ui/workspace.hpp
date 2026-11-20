@@ -296,6 +296,11 @@ public:
     {
         stateFolder_ = std::move(state);
     }
+    // A song file opened or saved, for the recent list, in place of an imported file it was
+    // made from, if any.
+    void songUsed(const std::filesystem::path& file,
+                  const std::optional<std::filesystem::path>& replacing = std::nullopt);
+
     // The songfolder setting's folder, if it's set (decided 20 November 2026).
     std::optional<std::filesystem::path> songsFolder() const;
     // Where a song's files are looked for: its own folder, or else the Songs folder or home.
@@ -1248,6 +1253,19 @@ private:
         std::filesystem::path file;
     };
     std::optional<TrackImportChoice> trackImportChoice_;
+    // Recent songs (, f r): each file, whether it's gone, and when it was used.
+    struct RecentChoice
+    {
+        std::optional<ChoiceList> list;
+        std::vector<std::filesystem::path> paths;
+        std::vector<bool> missing;
+        std::vector<std::int64_t> used;
+    };
+    std::optional<RecentChoice> recentChoice_;
+    CommandResult showRecentSongs();
+    void listRecentSongs(std::size_t highlighted);
+    bool recentKey(const Key& key);
+    Region recentRegion() const;
     bool trackImportKey(const Key& key);
     Region trackImportRegion() const;
     bool songChoiceKey(const Key& key);

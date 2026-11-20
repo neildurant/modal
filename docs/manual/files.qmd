@@ -40,6 +40,7 @@ The everyday file commands have keys in the leader's **Files** group,
 | `, f c` | **C**lose this song | `:song-close` |
 | `, f x` | E**x**port a Standard MIDI File | `:export` |
 | `, f i` | **I**mport tracks from a song or MIDI file | `:track-import` |
+| `, f r` | Open a **r**ecently used song | `:song-recent` |
 
 The keys run the plain forms of the commands, so none of them discards unsaved
 edits: closing a song with edits is refused until it is saved, or closed with
@@ -92,6 +93,25 @@ reports unsaved edits in other songs, use `:song-select` to reach them.
 
 `:e! FILE` and `:new!` replace the current song and can discard its unsaved
 edits. Use the plain forms to keep it open.
+
+## Going back to recent songs
+
+Modal keeps a list of the song files you have opened or saved lately, so
+yesterday's work is a couple of keys away. `, f r` (`:song-recent`) shows it,
+newest first, in three columns: the file's name, the folder it's in, and when
+you last used it, such as `today 17:42`, `yesterday 09:10`, `Mon 18 Nov` or,
+from an earlier year, `2 Mar 2025`.
+
+Type part of a name or folder to narrow the list, use Up and Down to choose,
+and press Enter to open the song, or to switch to it if it's already open.
+Escape leaves the list. Delete takes the highlighted entry off the list; it
+never touches the file itself. A file that has been moved or deleted shows
+`not found`, and choosing it offers to take it off the list.
+
+Opening a song by any route counts, as does saving one. A MIDI file you
+imported is listed until you save it as a song, when the song takes its
+place. New songs that haven't been saved yet aren't listed. The list keeps 12
+songs; `set recentsongs=20` in `modalrc` keeps more, and `0` keeps none.
 
 ## Copying between songs
 

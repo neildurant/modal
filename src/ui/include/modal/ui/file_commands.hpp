@@ -64,6 +64,12 @@ public:
     // The document has a new song, opened or new, to show from the start.
     virtual void songReplaced() = 0;
 
+    // A song file opened or saved, for the recent list, and an imported file it took the
+    // place of, if any (decided 20 November 2026).
+    virtual void songUsed(const std::filesystem::path&, const std::optional<std::filesystem::path>&)
+    {
+    }
+
     // The songfolder setting's folder, if set: where a song without a file starts.
     virtual std::optional<std::filesystem::path> songsFolder() const { return std::nullopt; }
 

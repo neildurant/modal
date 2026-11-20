@@ -455,6 +455,12 @@ public:
         return view_.songsFolder();
     }
 
+    void songUsed(const std::filesystem::path& file,
+                  const std::optional<std::filesystem::path>& replacing) override
+    {
+        view_.songUsed(file, replacing);
+    }
+
     void returnToSong(std::shared_ptr<void> kept) override
     {
         view_.returnToSong(std::move(kept));
@@ -741,9 +747,12 @@ int main(int argc, char* argv[])
             message = message.empty() ? *recovered : *recovered + "; " + message;
         }
     }
+    bool songOpened = false;
     if (songFile)
     {
-        if (auto loaded = ui::openFile(document, *songFile); !loaded.message.empty())
+        auto loaded = ui::openFile(document, *songFile);
+        songOpened = loaded.opened;
+        if (!loaded.message.empty())
         {
             std::fprintf(stderr, "%s\n", loaded.message.c_str());
             message = message.empty() ? loaded.message : message + "; " + loaded.message;
@@ -767,6 +776,8 @@ int main(int argc, char* argv[])
         view.setRemembered(ui::Remembered::read(text), [file](const ui::Remembered& remembered)
                            { writeState(file, remembered.text()); });
     }
+    if (songOpened)
+        view.songUsed(*songFile);         // opened at startup, for the recent list
     view.show(ui::ViewKind::Arrangement); // the home view
     // The Ports view's table, and what changing it or looking again does: listen to the
     // enabled inputs, look the tracks' ports up again, and say what can't be used.

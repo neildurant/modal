@@ -124,6 +124,19 @@ const std::vector<Key>* Remembered::macro(char32_t name) const
     return it != macros_.end() ? &it->second : nullptr;
 }
 
+void Remembered::usedSong(std::string path, std::int64_t now, std::size_t most)
+{
+    std::erase_if(songs_, [&](const RecentSong& song) { return song.path == path; });
+    songs_.insert(songs_.begin(), RecentSong{std::move(path), now});
+    if (songs_.size() > most)
+        songs_.resize(most);
+}
+
+bool Remembered::forgetSong(std::string_view path)
+{
+    return std::erase_if(songs_, [&](const RecentSong& song) { return song.path == path; }) > 0;
+}
+
 std::string Remembered::text() const
 {
     std::string text =
@@ -147,6 +160,9 @@ std::string Remembered::text() const
     {
         text += "macro " + std::string(1, static_cast<char>(name)) + " " + formatKeys(keys) + "\n";
     }
+    // The path last, as the rest of the line, as it may have spaces: "song 1763650000 /a b".
+    for (const auto& song : songs_)
+        text += "song " + std::to_string(song.used) + " " + song.path + "\n";
     return text;
 }
 
@@ -162,6 +178,21 @@ Remembered Remembered::read(std::string_view text)
         if (line.ends_with('\r'))
         {
             line.remove_suffix(1);
+        }
+        if (line.starts_with("song "))
+        {
+            auto rest = line.substr(5);
+            const auto space = rest.find(' ');
+            const auto used = number(rest.substr(0, space));
+            if (used && space != std::string_view::npos && space + 1 < rest.size() &&
+                remembered.songs_.size() < kMaxSongs)
+            {
+                const auto path = rest.substr(space + 1);
+                if (std::ranges::none_of(remembered.songs_,
+                                         [&](const RecentSong& song) { return song.path == path; }))
+                    remembered.songs_.push_back({std::string{path}, *used});
+            }
+            continue;
         }
         const auto parts = words(line);
         if (parts.size() == 4 && parts[0] == "ran")

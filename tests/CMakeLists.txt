@@ -90,6 +90,7 @@ add_executable(modal_tests
     ui/velocity_lane_test.cpp
     ui/controller_lane_test.cpp
     ui/controller_ramp_test.cpp
+    ui/recent_songs_test.cpp
     ui/track_import_test.cpp
     ui/tracks_view_test.cpp
     ui/transport_test.cpp

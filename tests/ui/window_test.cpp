@@ -16,6 +16,7 @@
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
 #include <modal/ui/ports.hpp>
+#include <modal/ui/remembered.hpp>
 #include <modal/ui/sdl/window.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
@@ -877,6 +878,43 @@ TEST_CASE("a sample of the file picker and its Places", "[.sample]")
         view.handle(Key::of(NamedKey::Down, kAlt), 0);
         save("places");
         view.handle(Key::of(NamedKey::Escape), 0);
+        view.handle(Key::of(NamedKey::Escape), 0);
+    }
+}
+
+TEST_CASE("a sample of the recent songs", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    const std::int64_t now = 1'763'662'000; // 20 November 2025, in the evening
+    view.setClock([=] { return now; });
+    modal::test::TempDirectory folder{"modal-recent-sample"};
+    for (const auto* name :
+         {"Songs/Groove.modal", "Songs/Ballad.modal", "Archive/Groove 2024.modal"})
+    {
+        std::filesystem::create_directories((folder / name).parent_path());
+        REQUIRE(modal::core::writeSongFile(demoSong(), folder / name).empty());
+    }
+    Remembered remembered;
+    const auto day = std::int64_t{24 * 60 * 60};
+    const auto at = [&](const char* name) { return utf8Text(folder / name); };
+    remembered.usedSong(at("Archive/Groove 2024.modal"), now - 400 * day, 20);
+    remembered.usedSong(at("Desktop/Demo ideas.modal"), now - 5 * day, 20); // gone
+    remembered.usedSong(at("Songs/Ballad.modal"), now - day, 20);
+    remembered.usedSong(at("Songs/Groove.modal"), now - 600, 20);
+    view.setRemembered(remembered, {});
+    for (const auto& theme : {"dark", "light"})
+    {
+        auto window = offscreen(1200, 600);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        view.report(registry.runLine("song-recent"));
+        window->draw(view.frame(), *builtInTheme(theme));
+        CHECK(window->saveFrame(base + "-recent-" + theme + ".bmp"));
         view.handle(Key::of(NamedKey::Escape), 0);
     }
 }

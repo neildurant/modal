@@ -435,6 +435,7 @@ private:
             const auto switched = activate(*existing, force);
             if (switched.refused)
                 return switched;
+            host_.songUsed(at(active_).file() ? *at(active_).file() : file, std::nullopt);
             return {true, "Opened " + named(file), false};
         }
         auto song = std::make_unique<core::Document>();
@@ -448,6 +449,7 @@ private:
                            document_.underlying() == ui::newSong();
         if (const auto switched = activateNew(std::move(song), force || empty); switched.refused)
             return switched;
+        host_.songUsed(file, std::nullopt);
         if (!result.message.empty())
         {
             return {true, std::move(result.message), true}; // opened, with a warning
@@ -471,7 +473,12 @@ private:
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
         }
+        // A MIDI file imported and now saved as a song gives the song its place in the list.
+        std::optional<std::filesystem::path> imported;
+        if (!document_.file())
+            imported = document_.importedFrom();
         document_.markSaved(file);
+        host_.songUsed(file, imported);
         if (thenQuit)
         {
             if (otherModified())

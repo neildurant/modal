@@ -45,6 +45,21 @@ public:
     void usedLane(std::string lane);
     std::span<const std::string> lanes() const { return lanes_; }
 
+    // Song files opened or saved, the latest first, each with when it was last, in seconds
+    // since 1970 (decided 20 November 2026): kept to a number given, a file used again moving
+    // to the top.
+    struct RecentSong
+    {
+        std::string path; // as UTF-8
+        std::int64_t used = 0;
+
+        friend bool operator==(const RecentSong&, const RecentSong&) = default;
+    };
+    static constexpr std::size_t kMaxSongs = 100; // the most a setting can ask for
+    void usedSong(std::string path, std::int64_t now, std::size_t most);
+    bool forgetSong(std::string_view path);
+    std::span<const RecentSong> songs() const { return songs_; }
+
     // The macros, a to z, as their keys; setting one to no keys forgets it.
     void setMacro(char32_t name, std::vector<Key> keys);
     const std::vector<Key>* macro(char32_t name) const;
@@ -70,6 +85,7 @@ private:
     std::vector<core::TimeSignature> meters_;
     std::vector<std::string> lanes_;
     std::map<char32_t, std::vector<Key>> macros_;
+    std::vector<RecentSong> songs_;
 };
 
 } // namespace modal::ui

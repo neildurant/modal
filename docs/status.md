@@ -2,9 +2,21 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Next is recently used songs.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs await their trial.*
 
 ## Current handoff
+
+### Recent songs, 20 November 2026
+
+Song files opened (by `:e`, the picker, the recent list or at startup) or saved are remembered newest first in the state directory's `remembered` file, up to the `recentsongs` setting (12; 0 keeps none). An imported MIDI file is listed until its song is saved, when the `.modal` file replaces it. `, f r` (`:song-recent`) shows Recent songs in three aligned columns: filename, folder and the last-used time at the right (`today 17:42`, `yesterday 09:10`, `Mon 18 Nov`, `2 Mar 2025`), or `not found`. Typing narrows, Enter opens or switches, Delete takes the entry off the list without touching the file, and Enter on a missing file offers its removal. Song titles are scheduled separately. See [design.md](design.md#recent-songs).
+
+**Validation.** Tests cover the time wording at fixed local times, the list's order, limit, repeats, spaces in paths and reading back, and, by keys, the chooser's narrowing and opening, Delete leaving the file, removing a missing file, a MIDI import replaced on saving, and `recentsongs=0`. A `[.sample]` render with real and missing files was checked in dark and light. The generated settings reference includes `recentsongs`. MSVC Debug passes all 1,248 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,249 tests with three MIDI-dependent skips, after removing an explicit lambda capture Clang flagged as unneeded in the sample test. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
+
+**Pending.** The desktop trial.
+
+**Note.** As in the Open songs chooser, the line where typing narrows the list shows no cursor; a change for both, if wanted, is a separate step.
+
+**To try.** Open a few songs and save one, then `, f r`: check the order, the three columns and times, narrowing by typing, Enter, and Delete on an entry (the file stays). Move or rename a song file outside Modal and choose it from the list. Restart Modal and check the list is still there.
 
 ### Songs folder and a clearer file picker, 20 November 2026
 

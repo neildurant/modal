@@ -21,6 +21,8 @@ add_library(modal_ui STATIC
     workspace_event_insert.cpp
     workspace_file_picker.cpp
     workspace_track_import.cpp
+    workspace_recent.cpp
+    recent_songs.cpp
     track_import.cpp
     demo_song.cpp
     event_list.cpp
