@@ -1197,9 +1197,13 @@ private:
     std::optional<FilePicker> filePicker_;
     struct SongChoice
     {
+        struct Row
+        {
+            std::u32string name;
+            std::u32string location;
+        };
         ChoiceList list;
-        std::vector<std::u32string> locations;
-        std::vector<std::size_t> rowWidths;
+        std::vector<Row> rows;
         std::function<void(std::size_t)> chosen;
     };
     std::optional<SongChoice> songChoice_;

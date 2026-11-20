@@ -27,9 +27,10 @@ selects its existing copy. Opening a file from a sole, untouched new song
 uses that song's place in the list.
 
 Use `:song-select` to see the open songs. The list shows the song name and
-its path, or **Unsaved** for a new song and **Imported from** for a MIDI
-source. The active song starts highlighted and has a `›` mark. A `+` marks
-unsaved edits. Type part of a name or path to narrow the list, use Up and
+its path in a separate column. That column shows **Unsaved** for a new song
+or labels an imported path as a **MIDI import**. The active song starts
+highlighted and has a `›` mark. A `+` marks unsaved edits. Type part of a name
+or path to narrow the list, use Up and
 Down to choose, and press Enter to switch. Escape cancels. Long paths can
 wrap under the highlighted row's list. Switching stops playback and
 starts the new song's play position at the beginning. Stop recording and

@@ -697,7 +697,7 @@ section "Verse 1" bars=16 colour=blue
 
 A window edits one active song and can keep others open. Each song owns its contents, file, modified state and undo history. `:e FILE` opens or selects a song by file identity. Opening from a sole untouched untitled song uses that slot. `:new` adds an untitled song. The forced forms `:e!` and `:new!` replace the current song and may discard its edits. Reopening the current file with `:e!` reloads it from disk.
 
-`:song-select` shows **Open songs**, with the active song selected, a marker for unsaved edits, and each song's path, import source or Unsaved status. Type part of a name or path to narrow the list. Up and Down choose, Enter switches and Escape cancels. A clipped location for the highlighted song is shown beneath the list. Untitled titles include an opening number to distinguish copies.
+`:song-select` shows **Open songs**, with the active song selected, a marker for unsaved edits, and an aligned location column for each song's path, import source or Unsaved status. Type part of a name or path to narrow the list, including text shortened on screen. Up and Down choose, Enter switches and Escape cancels. A clipped location for the highlighted song is shown beneath the list. Untitled titles include an opening number to distinguish copies.
 
 `:song-close` closes the current song, requiring `!` to discard its edits. It selects an adjacent open song or leaves a blank song if none remain. `:q` checks all open songs, `:wq` saves the active one before checking the others, and `:q!` discards outstanding edits. A window close with other unsaved songs stays open and points to the chooser. When just the active song has edits, the window offers Save, Don't save and Cancel.
 

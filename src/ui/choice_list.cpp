@@ -4,6 +4,7 @@
 #include <modal/ui/style.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <utility>
 
@@ -143,14 +144,19 @@ bool ChoiceList::run(std::string_view command)
     return true;
 }
 
-Region ChoiceList::region(Rect field, Rect within, CellSize cell) const
+Region ChoiceList::region(Rect field, Rect within, CellSize cell,
+                          std::span<const std::u32string> labels) const
 {
+    assert(labels.empty() || labels.size() == choices_.size());
     const auto all = matches();
     const auto rows = std::clamp<std::size_t>(all.size(), 1, kShown);
     const auto label = [&](std::size_t match)
     {
         const auto i = all[match];
-        return decodeUtf8(i == warned_ ? choices_[i] + " " + reason_ : choices_[i]);
+        auto text = labels.empty() ? decodeUtf8(choices_[i]) : labels[i];
+        if (i == warned_)
+            text += U" " + decodeUtf8(reason_);
+        return text;
     };
 
     // As wide as the longest choice, or the field if that's wider.

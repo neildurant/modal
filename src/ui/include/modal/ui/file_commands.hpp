@@ -23,6 +23,7 @@ struct OpenSong
     std::string name;
     std::string location;
     bool modified;
+    bool imported = false;
 };
 
 // What the file commands need from the program: the system's file dialogs, quitting, and

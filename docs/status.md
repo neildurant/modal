@@ -12,7 +12,11 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** Workspace and file-command tests cover path filtering, wrapped locations, undo after switching, saving and quitting with other songs open, and recording and playback guards. All six Linux configurations pass with 1,226 tests registered and three MIDI-dependent skips. Whole-tree formatting and patch whitespace checks pass. The chooser was checked in dark and light SDL offscreen renders. Both manual formats build and their references pass. The desktop trial was accepted on 20 November 2026.
 
+Published through `0526677`. The [hosted Linux and Windows checks](https://github.com/neildurant/modal/actions/runs/44648503833) and the [manual workflow](https://github.com/neildurant/modal/actions/runs/44648504065) passed.
+
 **To try.** Start `build/linux-gcc/apps/Debug/modal --demo`. Make an edit, run `:new`, then open `:song-select`. Choose Test arrangement, check that the edit is still there and undo it with `u`. Open two files and filter by part of the path. Try `:q` with unsaved edits in the other song, then save it or explicitly discard it with `:song-close!`.
+
+**Chooser follow-up.** Paths, MIDI import sources and Unsaved begin in the same column. The name column leaves room for locations, and filtering uses full names and paths. The regression compares column positions and finds a song by a part of its name that is shortened on screen. GCC and Clang Debug pass, the HTML and PDF manuals build, and the offscreen chooser shows the aligned paths. Desktop trial is pending.
 
 **Next.** Restore each song's cursor and view settings when switching. Crash recovery still covers the active song. See [schedule.md](schedule.md).
 

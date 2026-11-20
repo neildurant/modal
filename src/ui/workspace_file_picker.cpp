@@ -423,18 +423,18 @@ void Workspace::chooseSong(std::vector<OpenSong> songs, std::size_t active,
                            std::function<void(std::size_t)> chosen)
 {
     std::vector<std::string> labels;
-    std::vector<std::u32string> locations;
-    std::vector<std::size_t> rowWidths;
+    std::vector<SongChoice::Row> rows;
     for (std::size_t i = 0; i < songs.size(); ++i)
     {
         const auto& song = songs[i];
-        labels.push_back((i == active ? "› " : "  ") + std::string{song.modified ? "+ " : "  "} +
-                         song.name + "  ·  " + song.location);
-        locations.push_back(decodeUtf8(song.location));
-        rowWidths.push_back(decodeUtf8(labels.back()).size() + 2);
+        const auto location = song.location + (song.imported ? " (MIDI import)" : "");
+        labels.push_back(song.name + " " + location);
+        rows.push_back({decodeUtf8((i == active ? "› " : "  ") +
+                                   std::string{song.modified ? "+ " : "  "} + song.name),
+                        decodeUtf8(location)});
     }
-    songChoice_.emplace(SongChoice{ChoiceList{std::move(labels), active, true},
-                                   std::move(locations), std::move(rowWidths), std::move(chosen)});
+    songChoice_.emplace(SongChoice{ChoiceList{std::move(labels), active, true}, std::move(rows),
+                                   std::move(chosen)});
     songChoice_->list.name("song");
 }
 
@@ -470,9 +470,23 @@ Region Workspace::songChoiceRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto columns =
         static_cast<std::size_t>(std::max((bar.width - 2 * margin) / cell_.width, 1));
+    std::size_t nameWidth = 0;
+    for (const auto& row : choice.rows)
+        nameWidth = std::max(nameWidth, row.name.size());
+    // Leave most of the row for paths, even when a song title is long.
+    nameWidth = std::min(nameWidth, std::max(columns / 3, std::size_t{1}));
+    std::vector<std::u32string> labels;
+    for (const auto& row : choice.rows)
+    {
+        auto name = row.name;
+        name.resize(nameWidth, U' ');
+        if (row.name.size() > nameWidth)
+            name.back() = U'…';
+        labels.push_back(std::move(name) + U"  " + row.location);
+    }
     std::u32string detail;
-    if (const auto chosen = choice.list.chosen(); chosen && choice.rowWidths[*chosen] > columns)
-        detail = choice.locations[*chosen];
+    if (const auto chosen = choice.list.chosen(); chosen && labels[*chosen].size() + 1 > columns)
+        detail = choice.rows[*chosen].location;
     const auto maxRows = static_cast<std::size_t>(std::max(bar.y / cell_.height - 8, 1));
     const auto rows = std::min((detail.size() + columns - 1) / columns, maxRows);
     if (detail.size() > rows * columns)
@@ -482,7 +496,7 @@ Region Workspace::songChoiceRegion() const
     }
     const int detailHeight = static_cast<int>(rows) * cell_.height;
     const Rect field{0, bar.y - detailHeight, bar.width, cell_.height};
-    auto region = choice.list.region(field, {0, 0, bar.width, field.y}, cell_);
+    auto region = choice.list.region(field, {0, 0, bar.width, field.y}, cell_, labels);
     for (std::size_t i = 0; i < rows; ++i)
         region.text.push_back({margin,
                                region.bounds.height + static_cast<int>(i) * cell_.height,

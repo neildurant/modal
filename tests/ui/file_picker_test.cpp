@@ -320,3 +320,28 @@ TEST_CASE("song select shows the rest of a long location beneath the list")
     CHECK(p.shows(U"Long location"));
     CHECK(p.shows(U"test-ending.modal"));
 }
+
+TEST_CASE("open song paths align even when names are shortened")
+{
+    Pickers p;
+    std::optional<std::size_t> chosen;
+    p.workspace.chooseSong(
+        {{"Short", "/songs/first.modal", true},
+         {std::string(60, 'L') + " Secret ending", "/imports/second.mid", false, true}},
+        0, [&](std::size_t index) { chosen = index; });
+    const auto column = [&](std::u32string_view path) -> std::optional<std::size_t>
+    {
+        for (const auto& region : p.workspace.frame())
+            for (const auto& run : region.text)
+                if (const auto offset = run.text.find(path); offset != std::u32string::npos)
+                    return static_cast<std::size_t>(run.x / 10) + offset;
+        return std::nullopt;
+    };
+    const auto saved = column(U"/songs/first.modal");
+    REQUIRE(saved);
+    CHECK(column(U"/imports/second.mid") == saved);
+    CHECK(p.shows(U"(MIDI import)"));
+    CHECK_FALSE(p.shows(U"Secret ending"));
+    p.type(U"Secret ending\n");
+    CHECK(chosen == 1);
+}

@@ -301,8 +301,7 @@ private:
         if (!file)
             return {name + " " + std::to_string(songs_[index].number), "Unsaved", song.modified()};
         const auto location = utf8Text(absolutePath(*file).lexically_normal());
-        return {std::move(name), song.file() ? location : "Imported from " + location,
-                song.modified()};
+        return {std::move(name), location, song.modified(), !song.file().has_value()};
     }
 
     std::optional<std::size_t> openedFile(const std::filesystem::path& file,

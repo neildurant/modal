@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,7 +47,9 @@ public:
 
     // The list, below the field, or above it where there's no room below, as wide as the
     // longest choice; field and within are where the field is and where the list must fit.
-    Region region(Rect field, Rect within, CellSize cell) const;
+    // Optional display labels are in choice order. Filtering still uses the original names.
+    Region region(Rect field, Rect within, CellSize cell,
+                  std::span<const std::u32string> labels = {}) const;
 
     // The arrow a field with a list shows at its right.
     static constexpr char32_t kArrow = U'▾';

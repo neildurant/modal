@@ -155,6 +155,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [x] **Done** — Open, select and close songs. See [design.md](design.md#open-songs).
     - [x] **Done** — Independent documents and undo, with open, select, close and save protection.
     - [x] **Done** — Playback on switch, chooser, regressions, manual and accepted functional trial. See [status.md](status.md).
+- [ ] **Doing** — Align locations in the open-song chooser. See [status.md](status.md).
 - [ ] **To do** — Restore each song's cursor and view state on switching.
 - [ ] **To do** — Shared registers for events, bars, tracks and sections copied between songs.
 - [ ] **To do** — Cross-song mapping for different section layouts, meters, tempos and PPQN.
