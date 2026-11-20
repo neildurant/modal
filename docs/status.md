@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file awaits its trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial.*
 
 ## Current handoff
 
@@ -14,7 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** Parser tests cover numbers, ranges, spaces, repeats, `all`, `none` and each error. Workspace tests import by `:r FILE 2-3` (names, channel, drum map, events, tempo message, undo), refuse a missing track and file, and drive the chooser by Space, `a` both ways, typing having no effect, the `:read` line recalled from history, Escape and Enter with nothing ticked; another imports from a `.mid` file. A `[.sample]` render of the chooser (open and ticked) was checked in dark and light. After the trial changes, MSVC Debug passes all 1,244 tests with two MIDI-dependent skips and Clang Debug in WSL builds without warnings and passes 1,245 with three. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
 
-**Pending.** The follow-up desktop trial.
+The follow-up desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing.
 
 **To try.** Save a copy of the demo somewhere, then in a new song (`, f n`) press `, f i` and choose it. Tick tracks with Space, try `a` twice, and Enter; then `:` and Up shows the `:read` line it ran. Undo, and try Enter with nothing ticked. Try `:read FILE all`, and importing from a `.mid` file exported with `, f x`.
 
