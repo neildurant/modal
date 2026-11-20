@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` await their desktop trial. Next is keys for the next and previous open song, then restoring each song's cursor and view settings.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Next is keys for the next and previous open song, then restoring each song's cursor and view settings.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** Two new Workspace tests drive the group by keys: the hint menu's keys after `, f`, opening through the picker, switching, a new song, closing refused with edits, save as leaving the old file as it was, saving on to the new file and the typed form refusing an existing file. The config and built-in-keymap tests now include the file commands. MSVC Debug passes all 1,228 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,229 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Both manual formats build.
 
-**Pending.** The desktop trial, then pushing and the hosted checks. Export without a filename still uses the system dialog; moving it to the Folder panel is scheduled.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing. Export without a filename still uses the system dialog; moving it to the Folder panel is scheduled.
 
 **To try.** Start `modal --demo`. Press `,` and pause, then `f` and pause, to see the Files menu. Try `, f n`, then `, f o` to switch back. Use `, f S` to save as a new file in a folder of your choice, then edit and `, f s` to check it saves there. Use `, f c` with unsaved edits to see the refusal, and `, f f` to open a song.
 
