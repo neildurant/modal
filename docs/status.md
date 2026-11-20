@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: sections, step 1 of 3, awaits its trial.*
+*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is under way: step 1 of 3, sections, was accepted on trial. Next is step 2, whole tracks.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ The agreed rules for copying between songs are in [design.md](design.md#copying-
 
 **Validation.** A core test puts a section into a song whose first track has the source Bass's number, checking the Piano stays empty, the Bass gets the notes, an unmatched Drums track is added with its channel, and tracks without content aren't added. A Workspace test yanks a section on the strip with `Y`, switches song with `:e` and puts it with `p`, then renames the source track to check an added track is named in the message. MSVC Debug passes all 1,233 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,234 tests with three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial. The manual's account of copying between songs is written once all three steps are in. Steps 2 (whole tracks) and 3 (whole bars carrying their meter) follow.
+The desktop trial was accepted on 20 November 2026. **Pending.** The hosted checks after pushing. The manual's account of copying between songs is written once all three steps are in. Steps 2 (whole tracks) and 3 (whole bars carrying their meter) follow.
 
 **To try.** Open two songs that share some track names but in a different order, for example the demo and a new song where you add tracks with `, t a` named as some of the demo's. In one, go to the section strip with `gs`, yank a section with `Y`, switch with `]f`, go to the strip and put it with `p`. Notes should land on the tracks of the same names, and any track without a match is added and named in the message. Undo removes it all in one step.
 
