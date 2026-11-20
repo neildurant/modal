@@ -318,14 +318,12 @@ Bar Workspace::messageBar(bool withMessage) const
     {
         const auto& choice = *trackImportChoice_;
         const auto ticked = std::ranges::count(choice.ticked, true);
-        row.left.push_back({"Import from " + choice.file + ", " + std::to_string(ticked) +
-                                " ticked: " + encodeUtf8(choice.typed),
+        row.left.push_back({"Import from " + utf8Text(choice.file.filename()) + ": " +
+                                std::to_string(ticked) + " of " +
+                                std::to_string(choice.ticked.size()) + " ticked",
                             text});
-        if (choice.error.empty())
-            row.right.push_back(
-                {"Space ticks · type 1,3-5,7 or all or none · Enter imports · Esc cancels", dim});
-        else
-            row.right.push_back({choice.error, {Role::Warning, Role::MessageLine, kPlain}});
+        row.right.push_back(
+            {"↑↓ move · Space ticks · a all or none · Enter imports · Esc cancels", dim});
     }
     else if (songChoice_)
     {

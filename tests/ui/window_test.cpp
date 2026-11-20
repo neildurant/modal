@@ -875,12 +875,8 @@ TEST_CASE("a sample of the track-import chooser", "[.sample]")
         };
         view.report(registry.runLine("track-import " + utf8Text(file)));
         save("open");
-        type(U"1,3-4");
-        view.handle(Key::of(NamedKey::Down), 0);
-        type(U" ");
+        type(U" jj jj ");
         save("ticked");
-        type(U"9");
-        save("mistake");
         view.handle(Key::of(NamedKey::Escape), 0);
     }
 }

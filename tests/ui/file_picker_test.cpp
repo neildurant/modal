@@ -630,40 +630,44 @@ TEST_CASE("track-import reads chosen tracks from a song file after the cursor's 
     CHECK(p.document.song().tracks().size() == 1);
 }
 
-TEST_CASE("the track-import chooser ticks tracks with Space or by numbers typed")
+TEST_CASE("the track-import chooser ticks tracks and runs the line that imports them")
 {
     Pickers p;
     writeGroove(p);
     p.type(U",fiGroove\n");
     CHECK(p.shows(U"[ ] 1  Track 1"));
     CHECK(p.shows(U"Studio kit"));
-    CHECK(p.shows(U"Space ticks · type 1,3-5,7 or all or none"));
+    CHECK(p.shows(U"Import from Groove.modal: 0 of 3 ticked"));
+    CHECK(p.shows(U"↑↓ move · Space ticks · a all or none"));
 
-    // Typing ticks exactly what's typed; a mistake shows and changes nothing until it's put right.
+    // Typing isn't a selection here: other keys do nothing.
     p.type(U"2-3");
-    CHECK(p.shows(U"[x] 2  Kick"));
-    CHECK(p.shows(U"[x] 3  Bass"));
-    CHECK(p.shows(U"2 ticked: 2-3"));
-    p.type(U"9");
-    CHECK(p.shows(U"No track 39: the file has 3"));
-    p.type(U"\n");
-    CHECK(p.document.song().tracks().size() == 1);
-    p.press(NamedKey::Backspace);
-    CHECK_FALSE(p.shows(U"No track"));
+    CHECK(p.shows(U"0 of 3 ticked"));
 
-    // Space ticks the highlighted track too, and Enter imports what's ticked.
-    p.type(U" \n");
-    CHECK(trackNames(p.document.song()) ==
-          std::vector<std::string>{"Track 1", "Track 1 (2)", "Kick", "Bass"});
-    CHECK(p.workspace.message().starts_with("Read 3 tracks from Groove.modal"));
+    // Space ticks the highlighted track; a ticks every one, or none once every one is.
+    p.type(U"j ");
+    CHECK(p.shows(U"[x] 2  Kick"));
+    p.type(U"a");
+    CHECK(p.shows(U"3 of 3 ticked"));
+    p.type(U"a");
+    CHECK(p.shows(U"0 of 3 ticked"));
+    p.type(U" j \n");
+    CHECK(trackNames(p.document.song()) == std::vector<std::string>{"Track 1", "Kick", "Bass"});
+    CHECK(p.workspace.message().starts_with("Read 2 tracks from Groove.modal"));
+
+    // What Enter ran is on the : prompt's history, to recall and change.
+    p.type(U":");
+    p.press(NamedKey::Up);
+    CHECK(p.shows(U"read " + decodeUtf8(utf8Text(p.temporary / "Groove.modal")) + U" 2-3"));
+    p.press(NamedKey::Escape);
 
     // Escape leaves without importing; Enter with nothing ticked takes the highlighted track.
     p.type(U",fiGroove\n");
     p.press(NamedKey::Escape);
+    CHECK(p.document.song().tracks().size() == 3);
+    p.type(U",fiGroove\n\n");
     CHECK(p.document.song().tracks().size() == 4);
-    p.type(U",fiGroove\nj\n");
-    CHECK(p.document.song().tracks().size() == 5);
-    CHECK(p.workspace.message().starts_with("Read 1 track from Groove.modal: Kick (2)"));
+    CHECK(p.workspace.message().starts_with("Read 1 track from Groove.modal: Track 1 (2)"));
 }
 
 TEST_CASE("track-import reads tracks from a MIDI file")

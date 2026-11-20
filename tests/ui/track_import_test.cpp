@@ -52,6 +52,16 @@ TEST_CASE("a track selection says what's wrong with it")
     CHECK(error("1-", 5) == "Not a track number or range: 1-");
 }
 
+TEST_CASE("ticked tracks are written as the command line's selection")
+{
+    using List = std::vector<std::size_t>;
+    CHECK(trackSelectionText(List{0, 2, 3, 4, 6}, 8) == "1,3-5,7");
+    CHECK(trackSelectionText(List{1}, 8) == "2");
+    CHECK(trackSelectionText(List{0, 1}, 8) == "1-2");
+    CHECK(trackSelectionText(List{0, 1, 2}, 3) == "all");
+    CHECK(tracks(trackSelectionText(List{0, 2, 3, 4, 6}, 8), 8) == List{0, 2, 3, 4, 6});
+}
+
 TEST_CASE("a selection is told from the end of a filename")
 {
     CHECK(looksLikeTrackSelection("1, 3-5"));

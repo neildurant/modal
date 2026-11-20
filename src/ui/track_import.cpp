@@ -85,6 +85,24 @@ std::variant<std::vector<std::size_t>, std::string> parseTrackSelection(std::str
     return chosen;
 }
 
+std::string trackSelectionText(std::span<const std::size_t> chosen, std::size_t count)
+{
+    if (count > 0 && chosen.size() == count)
+        return "all";
+    std::string text;
+    for (std::size_t i = 0; i < chosen.size();)
+    {
+        auto last = i;
+        while (last + 1 < chosen.size() && chosen[last + 1] == chosen[last] + 1)
+            ++last;
+        text += (text.empty() ? "" : ",") + std::to_string(chosen[i] + 1);
+        if (last > i)
+            text += "-" + std::to_string(chosen[last] + 1);
+        i = last + 1;
+    }
+    return text;
+}
+
 bool looksLikeTrackSelection(std::string_view text)
 {
     const auto words = lower(trimmed(text));

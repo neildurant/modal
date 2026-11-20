@@ -1226,20 +1226,17 @@ private:
         std::function<void(std::size_t)> chosen;
     };
     std::optional<SongChoice> songChoice_;
-    // The tracks of a file being imported, ticked with Space or by numbers typed.
+    // The tracks of a file being imported, ticked with Space, which Enter imports by running the
+    // line that names them.
     struct TrackImportChoice
     {
         ChoiceList list;
         std::vector<std::u32string> rows;
         std::vector<bool> ticked;
-        std::u32string typed;
-        std::string error; // what's wrong with what's typed, if anything
-        core::Song song;
-        std::string file;
+        std::filesystem::path file;
     };
     std::optional<TrackImportChoice> trackImportChoice_;
     bool trackImportKey(const Key& key);
-    void tickTypedTracks();
     Region trackImportRegion() const;
     bool songChoiceKey(const Key& key);
     Region songChoiceRegion() const;

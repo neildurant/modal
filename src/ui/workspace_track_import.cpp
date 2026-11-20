@@ -37,18 +37,6 @@ std::size_t noteCount(const core::Song& song, core::TrackId id)
                               { return std::holds_alternative<core::Note>(event.data); }));
 }
 
-// A selection still being typed, which shouldn't count as a mistake yet: part of all or none,
-// or a range waiting for its end.
-bool unfinished(std::u32string_view typed)
-{
-    std::string text;
-    for (const auto c : typed)
-        text += static_cast<char>(c < 128 ? std::tolower(static_cast<int>(c)) : '?');
-    const auto starts = [&](std::string_view word)
-    { return !text.empty() && text.size() < word.size() && word.starts_with(text); };
-    return starts("all") || starts("none") || text.ends_with('-');
-}
-
 } // namespace
 
 CommandResult Workspace::importTracks(const CommandCall& call)
@@ -161,11 +149,7 @@ CommandResult Workspace::importTracksFrom(const std::filesystem::path& file,
     }
     trackImportChoice_.emplace(TrackImportChoice{ChoiceList{std::move(names), 0, false},
                                                  std::move(rows),
-                                                 std::vector<bool>(tracks.size(), false),
-                                                 {},
-                                                 {},
-                                                 std::move(from),
-                                                 name});
+                                                 std::vector<bool>(tracks.size(), false), file});
     trackImportChoice_->list.name("track");
     return {true};
 }
@@ -211,23 +195,6 @@ CommandResult Workspace::importChosenTracks(const core::Song& from, const std::s
     return {true, std::move(message), false};
 }
 
-void Workspace::tickTypedTracks()
-{
-    auto& choice = *trackImportChoice_;
-    choice.error.clear();
-    if (unfinished(choice.typed))
-        return;
-    const auto parsed = parseTrackSelection(encodeUtf8(choice.typed), choice.ticked.size());
-    if (const auto* why = std::get_if<std::string>(&parsed))
-    {
-        choice.error = *why;
-        return;
-    }
-    std::fill(choice.ticked.begin(), choice.ticked.end(), false);
-    for (const auto i : std::get<std::vector<std::size_t>>(parsed))
-        choice.ticked[i] = true;
-}
-
 bool Workspace::trackImportKey(const Key& key)
 {
     message_.clear();
@@ -244,8 +211,6 @@ bool Workspace::trackImportKey(const Key& key)
     }
     if (command == "command-line-run")
     {
-        if (!choice.error.empty())
-            return true; // shown already, and changing nothing until it's put right
         std::vector<std::size_t> chosen;
         for (std::size_t i = 0; i < choice.ticked.size(); ++i)
         {
@@ -257,19 +222,14 @@ bool Workspace::trackImportKey(const Key& key)
             if (const auto highlighted = choice.list.chosen())
                 chosen.push_back(*highlighted);
         }
-        const auto from = std::move(choice.song);
-        const auto name = std::move(choice.file);
+        // As the line that does the same (decided 20 November 2026, after use): run, and kept
+        // in the : prompt's history to recall and change.
+        const auto selection = trackSelectionText(chosen, choice.ticked.size());
+        const auto file = std::move(choice.file);
         trackImportChoice_.reset();
-        report(importChosenTracks(from, name, chosen));
-        return true;
-    }
-    if (command == "command-line-backspace" || command == "command-line-clear")
-    {
-        if (command == "command-line-clear")
-            choice.typed.clear();
-        else if (!choice.typed.empty())
-            choice.typed.pop_back();
-        tickTypedTracks();
+        prompt_.line.open(decodeUtf8("read " + utf8Text(file) + " " + selection));
+        prompt_.line.take();
+        report(importTracksFrom(file, selection));
         return true;
     }
     if (key.named == NamedKey::None && (key.modifiers & (kCtrl | kAlt)) == 0)
@@ -279,13 +239,14 @@ bool Workspace::trackImportKey(const Key& key)
             if (const auto highlighted = choice.list.chosen())
                 choice.ticked[*highlighted] = !choice.ticked[*highlighted];
         }
+        else if (key.character == U'a')
+        {
+            // Every track, or none once every one is ticked.
+            const bool every = std::ranges::all_of(choice.ticked, [](bool on) { return on; });
+            std::fill(choice.ticked.begin(), choice.ticked.end(), !every);
+        }
         else if (key.character == U'j' || key.character == U'k')
             choice.list.run(key.character == U'j' ? "command-line-newer" : "command-line-older");
-        else
-        {
-            choice.typed += key.character;
-            tickTypedTracks();
-        }
         return true;
     }
     choice.list.run(command);

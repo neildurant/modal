@@ -152,19 +152,16 @@ you have since spoiled.
 After choosing the file in the picker, a list shows the file's tracks by
 their numbers in that file, with each one's channel, how many notes it has
 and its drum map, if any, to help tell the parts apart. Nothing is ticked at
-first. Tick tracks in either of two ways:
-
-- Move with Up and Down (or `j` and `k`) and press Space to tick or untick
-  the highlighted track.
-- Type the numbers you want: `1,3-5,7` ticks tracks 1, 3, 4, 5 and 7, `all`
-  ticks every track and `none` clears the ticks. What you type replaces the
-  ticks as you go, and the message row says how many are ticked. A number the
-  file doesn't have is shown in the warning colour, as in
-  `No track 9: the file has 5`, and nothing changes until you correct it.
+first. Move with Up and Down (or `j` and `k`) and press Space to tick or
+untick the highlighted track; `a` ticks every track, or clears the ticks
+once every one is ticked. The message row says how many are ticked.
 
 Enter imports the ticked tracks, or the highlighted one if none are ticked,
 so bringing in a single part is just moving to it and pressing Enter. Escape
-leaves without importing.
+leaves without importing. Enter works by running the `:read` line that names
+the same tracks, such as `:read ~/Songs/Groove.modal 1,3-5`, and that line
+goes into the command line's history: press `:` and Up to repeat the import
+or change which tracks it takes.
 
 The tracks go in after the cursor's track, in their order in the file, with
 their settings, exactly as whole tracks copied from another song do: laid
@@ -174,8 +171,10 @@ labels and tempo; if the file's tempo differs, the message says so, as in
 `its tempo was 100, this song plays at 120`. To take more of a file, open it
 as a song with `:e` and copy what you need across.
 
-The command line takes the same choice after the filename, so
-`:read Groove.mid 1,3-5` imports those tracks without the list. Like the
+On the command line, name the tracks after the filename to import without
+the list: `:read Groove.mid 1,3-5,7` takes tracks 1, 3, 4, 5 and 7, and
+`:read Groove.mid all` every track. A number the file doesn't have is
+refused with the reason, as in `No track 9: the file has 5`. Like the
 other file commands, importing is refused while recording, and the whole
 import is one undo step.
 
