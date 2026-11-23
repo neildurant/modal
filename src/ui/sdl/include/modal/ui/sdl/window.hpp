@@ -154,4 +154,8 @@ private:
 // Shows an error in a message box, for when there's no console to print it to.
 void showError(const std::string& title, const std::string& message);
 
+// The system clipboard's text, none if it holds none or can't be read; and setting it.
+std::optional<std::string> clipboardText();
+void setClipboardText(const std::string& text);
+
 } // namespace modal::ui::sdl

@@ -356,6 +356,14 @@ public:
     void setRemembered(Remembered remembered, std::function<void(const Remembered&)> changed);
     const Remembered& remembered() const { return remembered_; }
     void setClock(std::function<std::int64_t()> clock) { clock_ = std::move(clock); }
+    // The system clipboard, which "+ and "* name (decided 23 November 2026): the program gives
+    // its own; without one, as in tests, the workspace keeps one of its own.
+    struct Clipboard
+    {
+        std::function<void(const std::string&)> write;
+        std::function<std::optional<std::string>()> read;
+    };
+    void setClipboard(Clipboard clipboard) { clipboard_ = std::move(clipboard); }
     void setTimeout(std::int64_t timeout) { keys_.setTimeout(timeout); }
     void setLeader(const Key& leader) { keys_.setLeader(leader); }
 
@@ -1030,6 +1038,10 @@ private:
     // deletes leave alone, told from them as the song is unchanged; version is the song's
     // before the key.
     EventRegister yanked_;
+    std::optional<Clipboard> clipboard_;
+    std::string ownClipboard_;
+    void writeClipboard(const std::string& text);
+    std::optional<std::string> heldClipboard() const;
     void notePasteHistory(std::uint64_t version);
     // The last put, for [p and ]p to put another copy in its place: the command and count,
     // the mode and selection it was put in, which copy in the history it put (none for one

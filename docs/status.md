@@ -6,6 +6,16 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Vim's other registers, step 2: the clipboard, 23 November 2026
+
+`"+` and `"*` name the system clipboard. A yank or delete with it goes to the unnamed register, the paste history and `"0` as ever, and onto the clipboard as text, the message ending ", onto the clipboard". `"+p` and the other puts read the clipboard and put a copy from Modal as a named register's; anything else is refused ("The clipboard doesn't hold a copy from Modal"), and a broken copy says why. `:registers` lists `"+` last when the clipboard holds a copy from Modal, and the `"` hint menu offers `+ *`. The text (new `src/ui/clipboard.cpp`, without SDL) is a `modal-clip 1` header line naming the kind of copy, and for events their resolution, span, bars and pitch, then a small song in the native format: events and ramps as one section of their tracks, each with its bars as its own meter; sections with the tracks they came from; whole tracks with every part. Reading it back uses the song reader, rescaling a copy made at another resolution. The Workspace reads and writes the clipboard through `setClipboard`, which the program gives SDL's clipboard text (`ui::sdl::clipboardText` and `setClipboardText`); without it, as in tests, it keeps one of its own. See [design.md](design.md#editing-grammar).
+
+**Validation.** Unit tests, at two PPQNs, take each kind of copy (events with notes, controllers, a ramp and a track's own 3/4; sections with a label and their tracks; whole tracks with their settings) to text and back, checking it unchanged and the text the same again; a copy made at 960 read at 96 is rescaled; foreign and broken text is told apart and says why. A Workspace test with two songs at different resolutions sharing a clipboard checks the refusal of foreign text, `"+yy` and `p` still putting it, `"+p` in the other song putting the note at its resolution, `"+dd`, `"+` last in `:registers`, `"+, t y` copying whole tracks, `"*p`, and a broken copy's message. The hint-menu test gains `+ *`. MSVC Debug passes all 1,273 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,274; formatting and `git diff --check` pass.
+
+**Pending.** The desktop trial; pushing and the hosted checks; then the manual.
+
+**To try.** `"+yy` on a bar, then `"+p` somewhere else, and in another song (`:new`). Open a text editor and paste: the copy is readable song text. Copy some ordinary text in another program, and `"+p` says the clipboard doesn't hold a copy from Modal. If you can, run two Modals and copy between them. Try a section on the strip and a whole track with `, t y` too.
+
 ### Fix: `dd` in the arrangement leaving a bar's ramps, 23 November 2026
 
 Found on trial: `yy` on a bar with a controller ramp took the ramp, and `p` put it, but `dd` on that bar in the arrangement left the ramp behind. Its delete, when not closing the gap, erased the events alone; it now takes the ramps starting in the area and the events they hid, as yanking, the rippling delete and the piano roll's delete already did, and a bar holding only a ramp counts as something to delete. A ramp the area cuts through is refused first, as before.

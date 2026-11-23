@@ -781,6 +781,9 @@ int main(int argc, char* argv[])
         view.setRemembered(ui::Remembered::read(text), [file](const ui::Remembered& remembered)
                            { writeState(file, remembered.text()); });
     }
+    // "+ and "*, the system clipboard.
+    view.setClipboard({.write = [](const std::string& text) { ui::sdl::setClipboardText(text); },
+                       .read = [] { return ui::sdl::clipboardText(); }});
     if (songOpened)
         view.songUsed(*songFile);         // opened at startup, for the recent list
     view.show(ui::ViewKind::Arrangement); // the home view

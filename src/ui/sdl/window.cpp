@@ -688,4 +688,24 @@ void showError(const std::string& title, const std::string& message)
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title.c_str(), message.c_str(), nullptr);
 }
 
+std::optional<std::string> clipboardText()
+{
+    if (!SDL_HasClipboardText())
+    {
+        return std::nullopt;
+    }
+    // SDL's copy, which is ours to free; an empty one if it couldn't be read.
+    const std::unique_ptr<char, decltype(&SDL_free)> text{SDL_GetClipboardText(), &SDL_free};
+    if (!text || text.get()[0] == 0)
+    {
+        return std::nullopt;
+    }
+    return std::string{text.get()};
+}
+
+void setClipboardText(const std::string& text)
+{
+    SDL_SetClipboardText(text.c_str());
+}
+
 } // namespace modal::ui::sdl

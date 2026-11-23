@@ -4,6 +4,7 @@
 
 #include <modal/core/pitch.hpp>
 #include <modal/ui/bar.hpp>
+#include <modal/ui/clipboard.hpp>
 #include <modal/ui/completion.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/event_edit.hpp>
@@ -667,6 +668,21 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     return changed;
 }
 
+void Workspace::writeClipboard(const std::string& text)
+{
+    if (clipboard_ && clipboard_->write)
+        clipboard_->write(text);
+    else
+        ownClipboard_ = text;
+}
+
+std::optional<std::string> Workspace::heldClipboard() const
+{
+    if (clipboard_ && clipboard_->read)
+        return clipboard_->read();
+    return ownClipboard_;
+}
+
 void Workspace::notePasteHistory(std::uint64_t version)
 {
     // Whatever filled the register, a yank or delete in any view, by key or at the prompt,
@@ -826,10 +842,12 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
     {
         if (!((character >= U'a' && character <= U'z') ||
               (character >= U'A' && character <= U'Z') ||
-              (character >= U'0' && character <= U'9') || character == U'_'))
+              (character >= U'0' && character <= U'9') || character == U'_' || character == U'+' ||
+              character == U'*'))
         {
             refuse("Registers are named by letters, \"a to \"z, a capital adding to one; \"1 to "
-                   "\"9 are the paste history, \"0 the last yank and \"_ the black hole",
+                   "\"9 are the paste history, \"0 the last yank, \"_ the black hole and \"+ the "
+                   "clipboard",
                    MessageKind::Information);
             return true;
         }
@@ -945,6 +963,14 @@ bool Workspace::sayRegisters()
     {
         lines.emplace_back((inHistory == i ? ">\"" : "\"") + std::to_string(i + 1),
                            registerAbout(pasteHistory_[i]));
+    }
+    // The clipboard, when it holds a copy from Modal.
+    if (const auto text = heldClipboard(); text && isClipboardCopy(*text))
+    {
+        if (const auto read = readClipboard(*text, document_.song().ppqn()); read.reg)
+        {
+            lines.emplace_back("\"+", registerAbout(*read.reg));
+        }
     }
     if (lines.empty())
     {
@@ -1635,13 +1661,34 @@ CommandResult Workspace::run(std::string_view command, int count)
     std::optional<EventRegister> unnamed;
     const bool numbered = named >= U'0' && named <= U'9';
     const bool blackHole = named == U'_';
+    const bool clip = named == U'+' || named == U'*';
     if (blackHole && put)
     {
         registerName_.reset();
         refuse("\"_ is the black hole, which keeps nothing to put", MessageKind::Information);
         return {true};
     }
-    if (named == U'0' && put)
+    if (clip && put)
+    {
+        // A copy from Modal, in this program or another (decided 23 November 2026).
+        const auto text = heldClipboard();
+        if (!text || !isClipboardCopy(*text))
+        {
+            registerName_.reset();
+            refuse("The clipboard doesn't hold a copy from Modal", MessageKind::Warning);
+            return {true};
+        }
+        auto read = readClipboard(*text, document_.song().ppqn());
+        if (!read.reg)
+        {
+            registerName_.reset();
+            refuse("The clipboard's copy from Modal can't be read: " + read.error,
+                   MessageKind::Warning);
+            return {true};
+        }
+        unnamed = std::exchange(register_, std::move(*read.reg));
+    }
+    else if (named == U'0' && put)
     {
         if (yanked_.empty())
         {
@@ -1725,6 +1772,21 @@ CommandResult Workspace::run(std::string_view command, int count)
              !prompt_.answer)
     {
         registerName_.reset(); // for nothing but a put, or for the delete or yank done
+    }
+    else if (clip && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
+    {
+        // What was taken, onto the clipboard too, the unnamed register having it as ever.
+        if (!(register_ == registerBefore_) || (taking && !refused_))
+        {
+            if (const auto text = clipboardText(register_, document_.song().ppqn()))
+            {
+                writeClipboard(*text);
+                setMessage((message_.empty() ? std::string{"Taken"} : message_) +
+                               ", onto the clipboard",
+                           messageKind_);
+            }
+        }
+        registerName_.reset();
     }
     else if (named != 0 && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
     {

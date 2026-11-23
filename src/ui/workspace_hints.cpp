@@ -150,7 +150,8 @@ std::vector<Workspace::Hint> Workspace::characterHints(std::string_view command)
                 {.keys = "A–Z", .title = "the register to add to"},
                 {.keys = "1–9", .title = "the paste history to put from, 1 the newest"},
                 {.keys = "0", .title = "the last yank, which deletes leave alone"},
-                {.keys = "_", .title = "the black hole, for a delete that keeps nothing"}};
+                {.keys = "_", .title = "the black hole, for a delete that keeps nothing"},
+                {.keys = "+ *", .title = "the system clipboard"}};
     }
     if (command == "mark-set")
     {

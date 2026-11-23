@@ -1089,6 +1089,66 @@ TEST_CASE("Register 0 keeps the last yank through deletes, and _ deletes keeping
     CHECK(lines[1].first == "\"0");
 }
 
+TEST_CASE("Register + is the system clipboard, carrying a copy between songs at any resolution")
+{
+    // Two songs in two windows, perhaps two programs, at different resolutions.
+    Selecting s;
+    Selecting other{core::Ppqn{96}};
+    std::string clipboard = "some text from elsewhere";
+    for (auto* each : {&s, &other})
+    {
+        each->ws.setClipboard({.write = [&](const std::string& text) { clipboard = text; },
+                               .read = [&] { return std::optional{clipboard}; }});
+    }
+    const auto count = [](Selecting& in, int pitch)
+    { return std::ranges::count(pitches(in.document, 0), pitch); };
+
+    s.type(U"\"+p");
+    CHECK(s.ws.message() == "The clipboard doesn't hold a copy from Modal");
+    CHECK(s.ws.mode() == Mode::Normal);
+
+    // A yank onto the clipboard goes to the unnamed register as ever.
+    s.type(U"l\"+yy"); // bar 2: 41
+    CHECK(s.ws.message().ends_with(", onto the clipboard"));
+    CHECK(clipboard.starts_with("modal-clip 1 events"));
+    s.type(U"lp");
+    CHECK(count(s, 41) == 2);
+    s.type(U"u");
+
+    // Put in the other song, its notes at its own resolution.
+    other.type(U"3l\"+p");
+    CHECK(count(other, 41) == 2);
+    const auto& song = other.document.song();
+    CHECK(std::ranges::any_of(song.events(song.tracks()[0]->id()).all(),
+                              [](const core::Event& event)
+                              {
+                                  const auto* note = std::get_if<core::Note>(&event.data);
+                                  return event.tick == 3 * 4 * 96 && note && note->pitch == 41;
+                              }));
+
+    // A delete onto it, and :registers showing what it holds.
+    s.type(U"l\"+dd");
+    CHECK(s.ws.message().ends_with(", onto the clipboard"));
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    s.type(U":registers");
+    s.press(NamedKey::Enter);
+    const auto lines = s.ws.listing();
+    s.press(NamedKey::Escape);
+    REQUIRE_FALSE(lines.empty());
+    CHECK(lines.back().first == "\"+");
+
+    // Whole tracks too.
+    s.type(U"\"+,ty");
+    CHECK(clipboard.starts_with("modal-clip 1 tracks\n"));
+
+    // "* is the same; a broken copy says why.
+    s.type(U"\"*p");
+    CHECK(count(s, 42) == 1);
+    clipboard = "modal-clip 1 events ppqn=960 span=0\nnot a song\n";
+    s.type(U"\"+p");
+    CHECK(s.ws.message().starts_with("The clipboard's copy from Modal can't be read: "));
+}
+
 TEST_CASE("[p and ]p swap what was just put for an older or newer copy, as one undo step")
 {
     Selecting s;
@@ -1571,7 +1631,8 @@ TEST_CASE("The hint menu says what a key waiting for a letter wants")
                                 {"A–Z", "the register to add to", false},
                                 {"1–9", "the paste history to put from, 1 the newest", false},
                                 {"0", "the last yank, which deletes leave alone", false},
-                                {"_", "the black hole, for a delete that keeps nothing", false}});
+                                {"_", "the black hole, for a delete that keeps nothing", false},
+                                {"+ *", "the system clipboard", false}});
     // m starts m Space too, so both.
     CHECK(after(U"m") ==
           Hints{{"a–z", "the mark to set here", false}, {"<Space>", "Play from here", false}});

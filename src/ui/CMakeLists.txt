@@ -16,6 +16,7 @@ add_library(modal_ui STATIC
     metronome_view.cpp
     remembered.cpp
     backups.cpp
+    clipboard.cpp
     workspace_backups.cpp
     workspace_jumps.cpp
     workspace_paste.cpp
