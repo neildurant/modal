@@ -178,7 +178,8 @@ contextual meanings.
 | `, S B/S/T/V` | Select only matches in that scope |
 | `, S m`, `, S c` | Keep matches in selection, clear search |
 | `ma`, `'a`, `''` | Set mark a, visit it, return before last jump |
-| `:marks`, `:registers`, `:macros` | Inspect remembered places/material/actions |
+| `Ctrl-o`, `Ctrl-i` | Back and forward through the jump list, across views and songs |
+| `:marks`, `:jumps`, `:registers`, `:macros` | Inspect remembered places/jumps/material/actions |
 
 Slashes between letters in this table describe alternatives, not literal
 slashes to type. For example, `, S b/s/t/v` means choose one of those four

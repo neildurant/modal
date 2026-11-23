@@ -104,6 +104,38 @@ A label has a full name and can describe the piece to a reader; a mark is
 a compact working bookmark. Neither has to create a new section. The
 palette's apostrophe prefix finds labels and marks by name.
 
+## Going back: the jump list
+
+Checking something elsewhere is common: the bass line in the chorus, the
+tempo at the bridge, a phrase in another song. Getting back to where you were
+working shouldn't need a mark set in advance. Modal keeps a **jump list**,
+like a web browser's history: `Ctrl-o` goes back to where the last jump came
+from, and again to the one before, and `Ctrl-i` goes forward again. Think of
+**o** as *out*, back the way you came, and **i** as *in*, as Vim has them.
+
+A jump is a move that leaves the neighbourhood rather than stepping through
+it: `gg` and `G`, the section and label motions, going to a mark, a search,
+the palette's go-to, and stopping playback in place. Changing view counts
+too, as does Backspace, and so does switching to another open song. Moving
+a note, a beat or a bar at a time doesn't, so the list keeps the places that
+matter rather than every step.
+
+For example, editing a fill in bar 23 of the piano roll, you jump with `ga`
+to the arrangement and `G` to the end to see how the song closes, then
+switch to another song with `]f` to compare it. Three presses of `Ctrl-o`
+bring you back: into the first song at the arrangement's end, to bar 23 where
+the arrangement opened, and to the fill in the piano roll. `Ctrl-i` retraces
+them. A count goes several places at once: `3 Ctrl-o`.
+
+As in a browser, going back and then jumping somewhere new forgets the places
+you had stepped back over. The list holds the last hundred places for the
+session; a place in a song that has been closed is dropped. `:jumps` lists
+the places, oldest first, with `>` beside the one you last went to.
+
+`''` is still the quickest way to swap between two places: it goes to where
+the last jump came from, and again straight back. Use `''` to compare two
+places and `Ctrl-o` to retrace a longer path.
+
 ## Registers keep material
 
 The unnamed register holds recently yanked or deleted material. A **named
@@ -120,9 +152,10 @@ Another delete can use the unnamed register without losing that named copy.
 Registers can retain different kinds of material, including events, sections
 and whole tracks, but a put must still use a context appropriate to its kind.
 
-These registers are internal to Modal. System clipboard exchange and
-multiple open songs are not part of this edition. Named copies should not
-be treated as substitutes for saving a song.
+These registers are internal to Modal and shared by every open song, so
+material yanked in one song can be put in another (see @sec-files). System
+clipboard exchange is not part of this edition. Named copies should not be
+treated as substitutes for saving a song.
 
 ## Repeating an edit
 
