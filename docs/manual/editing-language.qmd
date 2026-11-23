@@ -254,7 +254,8 @@ another target. Pressing `o` in Visual mode swaps which end you are moving.
 Modal calls copying **yanking**, because `y` is its operator. The copied
 music is held in a **register**. Deleted music also goes into a register.
 This is Modal's internal storage for copied material, separate from your
-operating system's clipboard.
+operating system's clipboard, which `"+` reaches when you ask for it (see
+@sec-efficient-work).
 
 For example, `yib` on Melody's first bar copies its C4, E4 and G4. A `p`
 at bar 2 **puts** that copy over the music already there. A copied bar goes

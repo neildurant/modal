@@ -93,6 +93,8 @@ after counts multiply.
 | `"a`, `"A` | Use register a, append to a |
 | `"1` … `"9` | Put from the paste history, newest first |
 | `[p`, `]p` straight after a put | Swap it for an older/newer copy from the history |
+| `"0`, `"_` | The last yank; the black hole, keeping nothing |
+| `"+`, `"*` | The system clipboard |
 | `u`, Ctrl-R, `.` | Undo, redo, repeat last change |
 | `Qa` … `Q`, `@a`, `@@` | Record macro a, play it, replay last macro |
 

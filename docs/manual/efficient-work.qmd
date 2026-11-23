@@ -183,10 +183,38 @@ next yank or delete puts the newest copy back in front.
 The history only holds material; it cannot be yanked into directly. To keep
 something safe from the coming deletes, name a letter.
 
-These registers are internal to Modal and shared by every open song, so
-material yanked in one song can be put in another (see @sec-files). System
-clipboard exchange is not part of this edition. Named copies should not be
-treated as substitutes for saving a song.
+### The last yank and the black hole
+
+Two more registers protect a copy from deletes without any planning. `"0`
+always holds the last **yank**, and deletes leave it alone. Yank a riff, clear
+out a few bars with `dd`, and `p` would put the last bar you deleted; `"0p`
+still puts the riff.
+
+Sometimes you want to delete without disturbing anything. `"_` is the **black
+hole**: whatever goes into it vanishes. `"_dd` deletes a bar while the unnamed
+register, the paste history and `"0` stay exactly as they were, so the next
+`p` puts what you had before. It works with any delete, such as `"_dib`.
+There is nothing in the black hole to put, so `"_p` says so.
+
+### The system clipboard
+
+The registers so far live inside Modal and are shared by every open song, so
+material yanked in one song can be put in another (see @sec-files). To reach
+beyond Modal, name `"+`, the **system clipboard**; `"*` is the same. `"+yy`
+yanks a bar as usual and also places it on the clipboard. `"+p` puts from the
+clipboard, whether the copy came from this song, another one, or another
+running Modal.
+
+Ordinary yanks never touch the clipboard, so copying in Modal does not
+replace text you copied in another program. Copying with `"+` stores Modal's
+own song text, beginning with a `modal-clip 1` line, so events, ramps,
+sections and whole tracks all survive the trip, and a copy made at another
+resolution is converted on the way in. You can paste it into a text editor
+to read it. Other music programs will not understand it, and when the
+clipboard holds anything other than a copy from Modal, `"+p` says so instead
+of guessing. `:registers` lists `"+` last when it holds a copy from Modal.
+
+None of these registers is a substitute for saving a song.
 
 ## Repeating an edit
 

@@ -6,6 +6,10 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Vim's other registers, step 3: the manual, 23 November 2026
+
+The efficient-work chapter's Registers section gains "The last yank and the black hole" (`"0` surviving deletes, `"_dd` leaving everything as it was, `"_p` refused) and "The system clipboard" (`"+` and `"*`, ordinary yanks leaving the clipboard alone, Modal's own song text so every kind of copy survives and is rescaled, readable in a text editor but not by other music programs, the refusal, `"+` in `:registers`), replacing the note that clipboard exchange wasn't part of this edition. The editing-language chapter says `"+` reaches the system clipboard; the key reference lists `"0`, `"_`, `"+` and `"*`. Both formats build with `tools/build-manual.cmake`; `git diff --check` passes. Vim's other registers are complete.
+
 ### Vim's other registers, step 2: the clipboard, 23 November 2026
 
 `"+` and `"*` name the system clipboard. A yank or delete with it goes to the unnamed register, the paste history and `"0` as ever, and onto the clipboard as text, the message ending ", onto the clipboard". `"+p` and the other puts read the clipboard and put a copy from Modal as a named register's; anything else is refused ("The clipboard doesn't hold a copy from Modal"), and a broken copy says why. `:registers` lists `"+` last when the clipboard holds a copy from Modal, and the `"` hint menu offers `+ *`. The text (new `src/ui/clipboard.cpp`, without SDL) is a `modal-clip 1` header line naming the kind of copy, and for events their resolution, span, bars and pitch, then a small song in the native format: events and ramps as one section of their tracks, each with its bars as its own meter; sections with the tracks they came from; whole tracks with every part. Reading it back uses the song reader, rescaling a copy made at another resolution. The Workspace reads and writes the clipboard through `setClipboard`, which the program gives SDL's clipboard text (`ui::sdl::clipboardText` and `setClipboardText`); without it, as in tests, it keeps one of its own. See [design.md](design.md#editing-grammar).
@@ -14,7 +18,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Accepted.** Accepted on trial.
 
-**Pending.** The manual, for `"0`, `"_` and `"+`.
+**Pending.** None: the manual followed in step 3.
 
 ### Fix: `dd` in the arrangement leaving a bar's ramps, 23 November 2026
 
@@ -32,7 +36,7 @@ The design for `"0`, `"_` and the clipboard was agreed: the clipboard only with 
 
 **Accepted.** Accepted on trial.
 
-**Pending.** The manual, with the clipboard's step.
+**Pending.** None: the manual followed in step 3.
 
 ### Paste history, step 3: the manual, 23 November 2026
 
