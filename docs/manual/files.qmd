@@ -25,6 +25,40 @@ name suggested, so changing a word or adding a number is quick. From then on
 the song belongs to the new file, and `:w` saves there; the old file stays as
 it was last saved.
 
+## Backups: the versions a save replaces
+
+Saving is quick, so it's easy to save over something you wanted to keep: a
+take you liked before a transform, or the arrangement before you moved the
+chorus. So each time a save replaces a song file, Modal first keeps the file
+as it was. The newest of these backups is backup 1; at the next save it
+becomes backup 2, and so on, the oldest dropping off after five. Think of them
+as the last few saves, newest at the top of the pile.
+
+`, f b` (`:song-backups`, mnemonic **b**ackup) lists the current song's
+backups, with when each version was saved, such as `saved today 14:02` or
+`saved yesterday 18:30`. Choose one with Up and Down and press Enter: it opens
+as a new song alongside the others, without a file, and the song you were in
+stays exactly as it was. So you can listen to the old version, copy a phrase or
+a track back from it (see Copying between songs below), or switch between the
+two with `]f` and `[f` to compare. To go back to it altogether, save it over
+the song with `:w! FILE`; saving it plainly asks where, so it never replaces
+the song by accident. Escape leaves the list.
+
+The backups are kept in Modal's state directory (the file picker's **State**
+place), away from the song's folder so they don't clutter it or its version
+control. They belong to the song's file by its full path: a song moved or
+renamed starts a new set, and its old backups stay under the old path.
+`set backups=10` in `modalrc` keeps more, and `0` keeps none. If a backup
+can't be made, as when the disk is full, the song is still saved and the
+message says that no backup was made and why.
+
+Nothing is backed up the first time a new song is saved, as there is nothing
+yet to replace, and exporting a MIDI file makes no backups.
+
+`:song-open-copy FILE`, which `, f b` uses, opens a copy of any song file in
+the same way, as a new song without a file: a convenient way to start a song
+from another one used as a template.
+
 ## A song's title
 
 A filename has to suit the computer: short, unique in its folder, often with a
@@ -71,6 +105,7 @@ The everyday file commands have keys in the leader's **Files** group,
 | `, f i` | **I**mport tracks from a song or MIDI file | `:track-import` |
 | `, f r` | Open a **r**ecently used song | `:song-recent` |
 | `, f t` | Set the song's **t**itle | `:song-title` |
+| `, f b` | Open a **b**ackup of this song as a new song | `:song-backups` |
 
 The keys run the plain forms of the commands, so none of them discards unsaved
 edits: closing a song with edits is refused until it is saved, or closed with
@@ -119,11 +154,24 @@ song reached and its place, such as `Song 2 of 3: Morning`, by its
 title where it has one and otherwise by its file.
 
 `:song-close` closes the current song and requires `!` if it has unsaved
-edits. The last close leaves a new untitled song. `:q` quits only when all
-open songs have been saved or are unchanged. `:wq` saves the current song
-and checks the other open songs before quitting. If closing the window
-reports unsaved edits in other songs, use `:song-select` to reach them.
-`:q!` explicitly discards all remaining unsaved edits.
+edits. The last close leaves a new untitled song. `:q` (or `:qa`) quits only
+when all open songs have been saved or are unchanged. `:wq` saves the current
+song and checks the other open songs before quitting. `:q!` explicitly
+discards all remaining unsaved edits.
+
+With several songs changed, save them all at once with `:wa` (**w**rite
+**a**ll). Songs that already have files are saved straight away; then Modal
+shows each new song in turn while the picker asks where to keep it, so you
+always know which song you're naming. The message says how many were saved,
+such as `Saved 3 songs`. Cancelling a picker stops there, saying what was
+saved so far. `:wqa` (or `:xa`) does the same and then quits, which makes it
+the quickest way to end a session safely.
+
+Closing the window asks first if any song has unsaved changes, whichever song
+is showing. It names them, by title or else by file, such as
+`3 songs have changes not saved: plain.modal, Morning and Untitled 3`. **Save
+all** saves them as `:wqa` does and closes; **Don't save** closes without
+saving; **Cancel** goes back to work.
 
 `:e! FILE` and `:new!` replace the current song and can discard its unsaved
 edits. Use the plain forms to keep it open.
@@ -336,8 +384,12 @@ ending `.modal`, each saying which command writes that kind.
 | `:song-save-as[!] [FILE]` | Save as another file, choosing it in the picker without FILE |
 | `:track-import [FILE [TRACKS]]` | Import tracks from a song or MIDI file, choosing which (also `:read`) |
 | `:export` / `:export FILE.mid` | Write a MIDI interchange copy |
-| `:q` | Quit, protecting unsaved changes |
+| `:q` / `:qa` | Quit, protecting unsaved changes in every open song |
 | `:wq` | Save and quit |
+| `:wa` | Save every song with unsaved changes, asking where to keep each new one |
+| `:wqa` / `:xa` | Save every song with unsaved changes, then quit |
+| `:song-backups` | List the song's backups, to open one as a new song |
+| `:song-open-copy FILE` | Open a copy of a song file as a new song without a file |
 | `:source` | Re-read application configuration; it does not open a song |
 | `:write-config` | Write application preferences; it does not save the song |
 | `:drum-map-load [FILE]` | Load a drum map into the current track, or choose a file |
@@ -375,6 +427,9 @@ saves the song as it was into the state directory, named `recovered-` and the
 time, and says where when it next starts. Open that file with `:e`, save it
 under the name it should have with `:w FILE`, then delete the recovered copy.
 It is a last resort rather than a substitute for saving.
+
+If a save replaced something you wanted, `, f b` lists the versions it
+replaced; see Backups above.
 
 ## Companion command-line tools
 
