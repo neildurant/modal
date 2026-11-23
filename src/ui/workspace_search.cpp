@@ -172,7 +172,7 @@ void Workspace::goToPitch(std::uint8_t pitch, bool selecting)
     if (before != to)
     {
         if (!selection_)
-            jumpedFrom_ = before;
+            jumped(before);
         if (wasPlaying_)
             following_ = false;
     }
@@ -260,7 +260,7 @@ bool Workspace::goToMatch(bool next, int count)
     }
     if (mode_ != Mode::Visual)
     {
-        jumpedFrom_ = before;
+        jumped(before);
     }
     if (searching_.gnRun)
     {

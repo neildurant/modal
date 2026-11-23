@@ -604,6 +604,100 @@ TEST_CASE("ma marks the cursor's place, as an undo step, and 'a goes back to it"
     CHECK(o.ws.message() == "Mark z isn't set");
 }
 
+TEST_CASE("Ctrl-o and Ctrl-i go back and forward through the jumps, across views")
+{
+    Operating o;
+    const auto q = o.q;
+    const auto ctrl = [&](char32_t key) { o.ws.handle(Key::typed(key, kCtrl), 0); };
+    const auto at = [&](ViewKind view, core::Tick tick)
+    {
+        return o.ws.shown() == view &&
+               (view == ViewKind::PianoRoll ? o.ws.pianoRoll().cursor().tick
+                                            : o.ws.arrangement().cursor().tick) == tick;
+    };
+
+    ctrl(U'o');
+    CHECK(o.ws.message() == "No earlier place in the jump list");
+
+    o.type(U"4}"); // bar 5: steps, not jumps
+    o.type(U"G");  // a jump
+    const auto end = o.ws.arrangement().cursor().tick;
+    REQUIRE(end > 16 * q);
+    o.type(U"gr"); // changing view is a jump
+    const auto opened = o.ws.pianoRoll().cursor().tick;
+    o.type(U"gg");
+    REQUIRE(o.ws.pianoRoll().cursor().tick == 0);
+
+    // Back through each, across views, to the oldest.
+    ctrl(U'o');
+    CHECK(at(ViewKind::PianoRoll, opened));
+    ctrl(U'o');
+    CHECK(at(ViewKind::Arrangement, end));
+    ctrl(U'o');
+    CHECK(at(ViewKind::Arrangement, 16 * q));
+    ctrl(U'o');
+    CHECK(o.ws.message() == "No earlier place in the jump list");
+
+    // Forward again, a count going further, back to where the first Ctrl-o started.
+    ctrl(U'i');
+    CHECK(at(ViewKind::Arrangement, end));
+    o.type(U"2");
+    ctrl(U'i');
+    CHECK(at(ViewKind::PianoRoll, 0));
+    ctrl(U'i');
+    CHECK(o.ws.message() == "No later place in the jump list");
+
+    // :jumps lists them, oldest first, the place last gone to marked.
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U":jumps");
+    o.press(NamedKey::Enter);
+    REQUIRE(o.ws.listing().size() == 4);
+    CHECK(o.ws.listing()[0] ==
+          std::pair<std::string, std::string>{"1", "Arrangement, 5:1:000, Bass"});
+    CHECK(o.ws.listing()[3].first == ">4");
+    CHECK(o.ws.listing()[3].second.starts_with("Piano roll, 1:1:000, Bass, "));
+    o.press(NamedKey::Escape);
+
+    // '' after Ctrl-o goes back to where it left.
+    ctrl(U'o');
+    CHECK(at(ViewKind::PianoRoll, opened));
+    o.type(U"''");
+    CHECK(o.ws.pianoRoll().cursor().tick == 0);
+
+    // After going back, a new jump drops the places stepped back over: '' was one, so the
+    // piano roll's start is now the newest place, and two steps back the arrangement's end.
+    ctrl(U'o');
+    ctrl(U'o');
+    CHECK(at(ViewKind::Arrangement, end));
+    o.type(U"gg");
+    ctrl(U'i');
+    CHECK(o.ws.message() == "No later place in the jump list");
+    ctrl(U'o');
+    CHECK(at(ViewKind::Arrangement, end));
+}
+
+TEST_CASE("the jump list passes over a deleted track's places and keeps its size")
+{
+    Operating o;
+    const auto ctrl = [&](char32_t key) { o.ws.handle(Key::typed(key, kCtrl), 0); };
+    o.type(U"jG"); // the lead's end, from its start
+    o.type(U"gg");
+    // The lead goes; its places are passed over.
+    const auto lead = o.document.song().tracks()[1]->id();
+    o.document.edit("Delete the lead", {}, [&](core::Song& song) { song.removeTrack(lead); });
+    o.type(U"k");
+    ctrl(U'o');
+    CHECK(o.ws.message() == "No earlier place in the jump list");
+
+    // A hundred places at most, the oldest going.
+    for (int i = 0; i < 120; ++i)
+        o.type(i % 2 == 0 ? U"G" : U"gg");
+    o.ws.setLineHandler([&](const std::string& line) { o.registry.runLine(line); });
+    o.type(U":jumps");
+    o.press(NamedKey::Enter);
+    CHECK(o.ws.listing().size() == 101); // and here
+}
+
 TEST_CASE("a mark is a range after an operator, to its time")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

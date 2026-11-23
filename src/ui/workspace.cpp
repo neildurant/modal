@@ -481,6 +481,8 @@ void Workspace::resetForSong()
 void Workspace::showSong()
 {
     resetForSong();
+    // Another song, or this one afresh, whose places aren't those jumped from before.
+    songNumber_ = ++songsShown_;
     eventList_->showSong();
     arrange_->showSong();
     pianoRoll_->showSong();
@@ -506,6 +508,7 @@ struct Workspace::SongPlace
     std::optional<SavedSelection> lastSelection;
     std::optional<SongCursor> jumpedFrom;
     core::Tick marker = 0;
+    std::uint64_t song = 0;
 };
 
 std::shared_ptr<void> Workspace::leaveSong()
@@ -518,6 +521,7 @@ std::shared_ptr<void> Workspace::leaveSong()
     place->history = std::exchange(history_, {});
     place->lastSelection = std::exchange(lastSelection_, std::nullopt);
     place->jumpedFrom = jumpedFrom_;
+    place->song = songNumber_;
     place->marker = player_ != nullptr ? player_->marker() : 0;
     auto& host = static_cast<ViewHost&>(*this);
     place->eventList = std::exchange(eventList_, std::make_unique<EventListView>(document_, host));
@@ -551,6 +555,7 @@ void Workspace::returnToSong(std::shared_ptr<void> kept)
     history_ = std::move(place->history);
     lastSelection_ = std::move(place->lastSelection);
     jumpedFrom_ = place->jumpedFrom;
+    songNumber_ = place->song;
     if (player_ != nullptr)
         player_->resetMarkerForSong(place->marker);
     refresh();
@@ -618,6 +623,7 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
         return;
     }
     const auto cursor = current_->cursor();
+    recordJump(here()); // changing view is a jump, for Ctrl-o
     if (selection_)
         endVisual();
     current_->stopPlayhead(std::nullopt);
@@ -646,6 +652,7 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
 
 bool Workspace::handle(const Key& key, std::int64_t now)
 {
+    keyHandled_ = true; // from now on views changed are places the user was
     // Keys typed while a macro records go into it as typed (decided October 2026, as Vim's
     // q), but for those of the binding that ends it, which it takes off: those since nothing
     // was waiting.
@@ -1004,7 +1011,7 @@ bool Workspace::goToMark(char32_t character, int count)
     view().setCursor(to);
     if (mode_ != Mode::Visual)
     {
-        jumpedFrom_ = from;
+        jumped(from);
     }
     return true;
 }
@@ -1691,7 +1698,7 @@ bool Workspace::runViewCommand(std::string_view command, int count)
         if (std::ranges::find(kJumps, command) != kJumps.end() && view().cursor() != cursor &&
             mode_ != Mode::Visual)
         {
-            jumpedFrom_ = cursor;
+            jumped(cursor);
         }
         // Moving the cursor or scrolling while playing lets go of the playhead (decided
         // October 2026, as in most sequencers): the view stays with the cursor, until
@@ -1941,6 +1948,14 @@ std::optional<bool> Workspace::runEditCommand(std::string_view command, int coun
     if (command == "marks")
     {
         return sayMarks();
+    }
+    if (command == "jump-back" || command == "jump-forward")
+    {
+        return walkJumps(count, command == "jump-back");
+    }
+    if (command == "jumps")
+    {
+        return sayJumps();
     }
     if (command == "undo" || command == "redo")
     {
@@ -3364,7 +3379,7 @@ void Workspace::showPlayhead()
             // Stopping in place is a jump, so '' goes back as Shift-Space does.
             if (following_ && playedFrom_ && view().cursor() != *playedFrom_)
             {
-                jumpedFrom_ = playedFrom_;
+                jumped(*playedFrom_);
             }
         }
         if (!player_->stopping())

@@ -1023,7 +1023,7 @@ bool Workspace::runPrefixItem(char prefix, const PaletteItem& item)
     auto cursor = view().cursor();
     if (!selection_)
     {
-        jumpedFrom_ = cursor;
+        jumped(cursor);
     }
     if (prefix == '@' && index < song.sections().size())
     {

@@ -90,6 +90,8 @@ If several drum pitches match, choose by name, MIDI number and the number of not
 
 `ma` marks the cursor's place with a letter, saved with the song; `'a` (or `` `a ``) goes there, and after an operator is the range to it (`d'a`). `''` goes back to before the last jump. `:marks` lists them, `:mark-delete a` deletes one. The leader group `, l`, labels and marks, has `, l l` a label at the cursor (asking its name, or renaming the one there, `:label`), `, l d` delete it, or in Visual mode every label selected (`:label-delete`), `, l s` start a section at it (as `, s l`), `, l m` list the marks and `, l x` delete marks, asking which letters.
 
+`Ctrl-o` goes back through the jump list, to where each jump came from, across views, and `Ctrl-i` forward again; a count goes that many places. Jumps are those `''` goes back from, and changing view (including Backspace). After going back, a new jump drops the places stepped back over. `:jumps` lists the places, oldest first, the one last gone to marked `>`.
+
 ### Views and scrolling
 
 `zi` `zo` `z0` zoom in, out and back; `zf` follows the playhead again after moving away from it while playing. `Ctrl` with `h` `j` `k` `l` or the arrows moves the cursor and scrolls with it; `Ctrl-Shift-h` / `l` a page; `Ctrl-d` `Ctrl-u` half a page; `Ctrl-f` `Ctrl-b` a page; `zz` centres the cursor.

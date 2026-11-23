@@ -194,7 +194,10 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — `:wa`, `:qa`, `:wqa` and `:xa`. Accepted on trial.
     - [x] **Done** — The window's close question for several unsaved songs. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Jump history across positions, views and buffers.
+- [ ] **Doing** — Jump history across positions, views and buffers (design agreed 23 November 2026). See [design.md](design.md#editing-grammar).
+    - [ ] **Doing** — Within a song: jumps and view changes recorded, `Ctrl-o` / `Ctrl-i`, `:jumps`. Built; awaiting trial.
+    - [ ] **To do** — Across songs: switching recorded, `Ctrl-o` switching back, closed songs passed over.
+    - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Paste history, including cycling the material just put.
 - [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
 - [ ] **To do** — Song-format compatibility policy between versions.

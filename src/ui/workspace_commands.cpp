@@ -121,6 +121,16 @@ constexpr std::array kSharedCommands{
                                "before the last jump; after an operator, the range to it (d'a)",
                 .motion = true},
     CommandInfo{.name = "marks", .description = "Say where the marks are"},
+    CommandInfo{.name = "jump-back",
+                .description = "Go back to the place jumped from, through the jump list, across "
+                               "views (Ctrl-o)",
+                .modes = modeBit(Mode::Normal),
+                .count = true},
+    CommandInfo{.name = "jump-forward",
+                .description = "Go forward again through the jump list (Ctrl-i)",
+                .modes = modeBit(Mode::Normal),
+                .count = true},
+    CommandInfo{.name = "jumps", .description = "List the places in the jump list"},
     CommandInfo{.name = "mark-delete",
                 .description = "Delete marks by their letters: a, abc, or a-d (a-z for all); "
                                "from keys, asking which",

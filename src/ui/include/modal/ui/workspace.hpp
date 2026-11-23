@@ -927,6 +927,34 @@ private:
     CommandResult deleteLabels();
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;
+    // The jump list (decided 23 November 2026): the places jumped from, across views and
+    // songs, for Ctrl-o and Ctrl-i, oldest first, up to kMostJumps. jumpAt_ is the place in it
+    // the cursor was last sent to, or its size when it's at none of them; each song shown has
+    // a number of its own, so places in one closed or reloaded are passed over.
+    struct JumpPlace
+    {
+        std::uint64_t song = 0;
+        ViewKind view = ViewKind::Arrangement;
+        SongCursor cursor;
+
+        friend bool operator==(const JumpPlace&, const JumpPlace&) = default;
+    };
+    static constexpr std::size_t kMostJumps = 100;
+    std::vector<JumpPlace> jumps_;
+    std::size_t jumpAt_ = 0;
+    bool walkingJumps_ = false;
+    bool keyHandled_ = false;
+    std::uint64_t songNumber_ = 1;
+    std::uint64_t songsShown_ = 1;
+    JumpPlace here() const { return {songNumber_, shown(), current_->cursor()}; }
+    // A jump from a place in the view shown: for '' and the jump list.
+    void jumped(const SongCursor& from);
+    void recordJump(const JumpPlace& from);
+    bool walkJumps(int count, bool back);
+    bool usableJump(const JumpPlace& place) const;
+    void goToJump(const JumpPlace& place);
+    std::string jumpAbout(const JumpPlace& place) const;
+    bool sayJumps();
     // Finds (fE): the pitch class of the last, its name as typed, and whether f
     // and F repeat it, while it's the last thing done, and whether the key being handled kept
     // that. A find whose name may yet take a sharp or flat (b or #) after its letter: where it

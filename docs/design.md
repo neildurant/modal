@@ -141,7 +141,12 @@ Editing follows Vim's model: `[count] operator [count] range-or-object`, with `.
 - **Search:** across tracks in the arrangement, matching controllers highlighted in the lane, interval and rhythm patterns.
 - **Ripple to the end of a track** (`:ripple track`), for rare cases.
 - **Undo:** an undo tree; Vim's other registers (`"0`, `"_`, `"+`).
-- **A jump list (requested November 2026):** `Ctrl-o` and `Ctrl-i` go back and forward through the places jumped from and to, as in Vim, across views: jump to the bridge to check something, and `Ctrl-o` goes straight back to where editing was. Which moves count as jumps (marks, `gg`/`G`, sections, search, opening another view) is to decide, as is how it sits with `` ` `` / `'`, which already go back to before the last jump.
+- **A jump list (requested November 2026, agreed 23 November 2026):** `Ctrl-o` and `Ctrl-i` go back and forward through the places jumped from and to, as in Vim, across views and songs: jump to the bridge to check something, and `Ctrl-o` goes straight back to where editing was.
+  - **What's a jump:** what `''` counts already (`gg` and `G`, the section and label motions, going to a mark, the palette's go-to, search, stopping playback in place), and also changing view (`gr`, `ga` and the rest, Enter from the arrangement into the piano roll, Backspace) and switching songs. A place is the song, the view, and the cursor's track, time and pitch.
+  - **The list:** one for the session, across songs, up to 100 places, not kept between sessions. A jump records where it went from; the first `Ctrl-o` from the newest place records that place too, so `Ctrl-i` can come back to it. After going back, a new jump drops the places stepped back over, as a browser's history does, rather than Vim's keeping them. The same place twice in a row is kept once. A place on a track since deleted, or in a song since closed, is passed over; a time beyond the song's end goes to its end. A count goes that many places.
+  - **`''` and Backspace** stay as they are: `''` swaps with the place before the last jump, and Backspace goes to the view before; moving with them is itself recorded as a jump.
+  - **`:jumps`** lists the song's places, oldest first, as `:marks` lists marks (`3 : Piano roll, 12:1:000, Bass, C3`), the one last gone to marked `>`, or after them `> : here: …` when the cursor is at none of them.
+  - **As built:** views shown as Modal starts, before any key, aren't recorded, being no places the user was. A `Ctrl-o` or `Ctrl-i` with nowhere to go says so and leaves the list as it was.
 - **Paste history (requested November 2026):** as Emacs's kill ring and yank-pop: straight after a put, one key replaces what was put with the copy before, and again with the one before that, so a phrase copied a few moves ago isn't lost. Vim's numbered registers (`"1` to `"9`) are the same history by name; the key, how far back it goes, and whether deletes go into it as well as yanks are to decide.
 - **Visual mode:** A section-limited form such as `:select pitch C1 in section`, and hand-picked notes alongside row selections.
 
@@ -976,7 +981,6 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 
 **Songs, copying and histories**
 
-- Which moves enter jump history, and how does it relate to marks and buffer lifetimes?
 - Paste-history keys, capacity, whether deletes enter it, and numbered-register/clipboard representation.
 - Song-format compatibility between versions; the format remains experimental until this policy is agreed.
 
