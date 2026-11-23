@@ -25,6 +25,35 @@ name suggested, so changing a word or adding a number is quick. From then on
 the song belongs to the new file, and `:w` saves there; the old file stays as
 it was last saved.
 
+## A song's title
+
+A filename has to suit the computer: short, unique in its folder, often with a
+date or a version number. A song's title is what you call it, such as
+*Morning*, and it travels with the song whatever the file is called. So
+`morning-v3.modal` and `morning-v4.modal` can both be *Morning*, told apart by
+their files.
+
+`, f t` (`:song-title`, mnemonic **t**itle) sets it. Modal asks for the title
+with the current one ready to edit; Enter keeps the answer, an empty answer
+clears the title, and Escape leaves it as it was. `:song-title Morning` sets it
+directly. Setting the title is one undo step, and the song counts as changed
+until it's saved, because the title is saved with it. A new song has no title,
+and saving never invents one from the filename.
+
+Where a song has a title, Modal shows it first and the file after it:
+
+- the window's title bar reads `Morning (morning-v3.modal) – Modal`, with
+  `[+]` before the dash while there are unsaved edits, `(unsaved)` for a song
+  without a file, and `(demo.mid, imported)` for an imported MIDI file;
+  without a title it shows the filename alone;
+- the open-songs and recent-songs lists give the title a column of its own
+  before the filename;
+- the arrangement shows it at the top left of the track headers.
+
+An imported MIDI file takes its title from the name of its first track, when
+that track is a conductor track holding the tempo and meter, and `:export`
+writes the title back there, as other sequencers expect.
+
 ## The Files keys
 
 The everyday file commands have keys in the leader's **Files** group,
@@ -41,6 +70,7 @@ The everyday file commands have keys in the leader's **Files** group,
 | `, f x` | E**x**port a Standard MIDI File | `:export` |
 | `, f i` | **I**mport tracks from a song or MIDI file | `:track-import` |
 | `, f r` | Open a **r**ecently used song | `:song-recent` |
+| `, f t` | Set the song's **t**itle | `:song-title` |
 
 The keys run the plain forms of the commands, so none of them discards unsaved
 edits: closing a song with edits is refused until it is saved, or closed with
@@ -53,11 +83,14 @@ keeps its own unsaved edits and undo history. Opening the same file again
 selects its existing copy. Opening a file from a sole, untouched new song
 uses that song's place in the list.
 
-Use `:song-select` (`, f o`) to see the open songs. The list shows the song name and
-its path in a separate column. That column shows **Unsaved** for a new song
-or labels an imported path as a **MIDI import**. The active song starts
-highlighted and has a `›` mark. A `+` marks unsaved edits. Type part of a name
-or path to narrow the list, use Up and
+Use `:song-select` (`, f o`) to see the open songs. The list shows each
+song's title, its file name, and the folder it's in, each in a column of its
+own. A song without a title leaves that column blank, and when no open song
+has a title the column is left out. A new song is named **Untitled 2** or
+similar, with **Unsaved** for its folder, and an imported file's folder is
+labelled **MIDI import**. The active song starts
+highlighted and has a `›` mark. A `+` marks unsaved edits. Type part of a
+title, name or folder to narrow the list, use Up and
 Down to choose, and press Enter to switch. Escape cancels. Long paths can
 wrap under the highlighted row's list. Switching stops playback. Stop
 recording and let the take finish before changing songs.
@@ -82,7 +115,8 @@ chooser's order, as `]s` and `[s` step through sections. They go round at
 either end, so with three songs open, `]f` from the last returns to the first.
 A count steps further: `2]f` skips a song. Ctrl-Tab and Ctrl-Shift-Tab do the
 same, as they move between tabs in a web browser. The message row names the
-song reached and its place, such as `Song 2 of 3: Morning`.
+song reached and its place, such as `Song 2 of 3: Morning`, by its
+title where it has one and otherwise by its file.
 
 `:song-close` closes the current song and requires `!` if it has unsaved
 edits. The last close leaves a new untitled song. `:q` quits only when all
@@ -98,11 +132,14 @@ edits. Use the plain forms to keep it open.
 
 Modal keeps a list of the song files you have opened or saved lately, so
 yesterday's work is a couple of keys away. `, f r` (`:song-recent`) shows it,
-newest first, in three columns: the file's name, the folder it's in, and when
-you last used it, such as `today 17:42`, `yesterday 09:10`, `Mon 18 Nov` or,
-from an earlier year, `2 Mar 2025`.
+newest first, in columns: the song's title, the file's name, the folder it's
+in, and when you last used it, such as `today 17:42`, `yesterday 09:10`,
+`Mon 18 Nov` or, from an earlier year, `2 Mar 2025`. The title is the one the
+song had when you last opened or saved it, so a title just changed shows here
+once the song is saved. When no listed song has a title, the title column is
+left out.
 
-Type part of a name or folder to narrow the list, use Up and Down to choose,
+Type part of a title, name or folder to narrow the list, use Up and Down to choose,
 and press Enter to open the song, or to switch to it if it's already open.
 Escape leaves the list. Delete takes the highlighted entry off the list; it
 never touches the file itself. A file that has been moved or deleted shows
@@ -293,6 +330,7 @@ ending `.modal`, each saying which command writes that kind.
 | `:e` / `:e FILE` | Choose or name a song or MIDI file to open |
 | `:new` | Open a new untitled song |
 | `:song-select` | List and switch between open songs |
+| `:song-title [TITLE]` | Set the song's title, asking with it ready to edit without TITLE |
 | `:song-close[!]` | Close the current song, with `!` to discard its unsaved edits |
 | `:w` / `:w FILE` | Save the native song, or save to a chosen path |
 | `:song-save-as[!] [FILE]` | Save as another file, choosing it in the picker without FILE |
