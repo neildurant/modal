@@ -1042,6 +1042,53 @@ TEST_CASE("Yanks and deletes fill the paste history, \"1 the newest, to put from
     CHECK(numbered() == 9);
 }
 
+TEST_CASE("Register 0 keeps the last yank through deletes, and _ deletes keeping nothing")
+{
+    Selecting s;
+    const auto count = [&](int pitch) { return std::ranges::count(pitches(s.document, 0), pitch); };
+    s.type(U"\"0p");
+    CHECK(s.ws.message() == "Register 0 is empty: it holds the last yank");
+    s.type(U"yy");  // bar 1: 40
+    s.type(U"ldd"); // bar 2, deleted: 41
+    REQUIRE(count(41) == 0);
+    // p puts the delete; "0p the yank before it.
+    s.type(U"\"0p");
+    CHECK(count(40) == 2);
+    s.type(U"u");
+    s.type(U"p");
+    CHECK(count(41) == 1);
+    s.type(U"u");
+    s.type(U"\"0y");
+    CHECK(s.ws.message().starts_with("\"0 holds the last yank"));
+    CHECK(s.ws.mode() == Mode::Normal);
+
+    // "_ deletes without the unnamed register, the history or "0 knowing.
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    const auto registers = [&]
+    {
+        s.type(U":registers");
+        s.press(NamedKey::Enter);
+        auto lines = s.ws.listing();
+        s.press(NamedKey::Escape);
+        return lines;
+    };
+    const auto before = registers();
+    s.type(U"l\"_dd"); // bar 3: 42
+    CHECK(count(42) == 0);
+    CHECK(registers() == before);
+    s.type(U"\"_dib"); // an operator and its object
+    CHECK(registers() == before);
+    s.type(U"p");
+    CHECK(count(41) == 1); // still the delete before
+    s.type(U"u");
+    s.type(U"\"_p");
+    CHECK(s.ws.message() == "\"_ is the black hole, which keeps nothing to put");
+    // :registers shows "0 after the unnamed register.
+    const auto lines = registers();
+    REQUIRE(lines.size() >= 2);
+    CHECK(lines[1].first == "\"0");
+}
+
 TEST_CASE("[p and ]p swap what was just put for an older or newer copy, as one undo step")
 {
     Selecting s;
@@ -1109,6 +1156,7 @@ TEST_CASE(":registers says what each holds")
     s.ws.handle(Key::of(NamedKey::Enter), 0);
     using Lines = std::vector<std::pair<std::string, std::string>>;
     CHECK(s.ws.listing() == Lines{{"\"\"", "4 events on 2 tracks, as \"1"},
+                                  {"\"0", "4 events on 2 tracks"},
                                   {"\"a", "1 event on 1 track"},
                                   {"\"b", "4 events on 2 tracks"},
                                   {">\"1", "4 events on 2 tracks"},
@@ -1117,7 +1165,7 @@ TEST_CASE(":registers says what each holds")
     const auto frame = s.ws.frame();
     CHECK(std::ranges::any_of(
         frame, [](const Region& region)
-        { return region.background == Role::Panel && region.text.size() == 15; }));
+        { return region.background == Role::Panel && region.text.size() == 18; }));
     const auto bar = s.ws.arrangement().page().bar();
     s.type(U"l");
     CHECK(s.ws.listing().empty());
@@ -1521,7 +1569,9 @@ TEST_CASE("The hint menu says what a key waiting for a letter wants")
           Hints{{"a–z", "the macro to play", false}, {"@", "the last again", false}});
     CHECK(after(U"\"") == Hints{{"a–z", "the register for the next yank, delete or put", false},
                                 {"A–Z", "the register to add to", false},
-                                {"1–9", "the paste history to put from, 1 the newest", false}});
+                                {"1–9", "the paste history to put from, 1 the newest", false},
+                                {"0", "the last yank, which deletes leave alone", false},
+                                {"_", "the black hole, for a delete that keeps nothing", false}});
     // m starts m Space too, so both.
     CHECK(after(U"m") ==
           Hints{{"a–z", "the mark to set here", false}, {"<Space>", "Play from here", false}});

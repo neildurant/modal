@@ -140,7 +140,11 @@ Editing follows Vim's model: `[count] operator [count] range-or-object`, with `.
 - **Track command grouping:** `, t` groups track management; actual commands and bindings are listed in grammar.md.
 - **Search:** across tracks in the arrangement, matching controllers highlighted in the lane, interval and rhythm patterns.
 - **Ripple to the end of a track** (`:ripple track`), for rare cases.
-- **Undo:** an undo tree; Vim's other registers (`"0`, `"_`, `"+`).
+- **Undo:** an undo tree.
+- **Vim's other registers (agreed 23 November 2026):**
+  - **`"0`, the yank register:** what the last yank took, which deletes leave alone, so `"0p` puts what was yanked after a delete has filled the unnamed register. Every yank fills it, named or not; it can't be named for a yank or delete. `:registers` lists it after the unnamed register.
+  - **`"_`, the black hole:** `"_dd` and the like delete without touching the unnamed register, the paste history or `"0`; there's nothing in it to put.
+  - **`"+`, the system clipboard:** `"+y` copies to the clipboard and `"+p` puts from it, `"*` the same; ordinary yanks and puts leave the clipboard alone, as in Vim by default, so yanking in Modal doesn't replace what another program copied. What's copied is a piece of song text in the song file's own format, under a header line of its own, so events, sections, whole tracks and ramps go between Modal's windows and songs whole and can be read or edited as text; other music programs won't take it.
 - **A jump list (requested November 2026, agreed 23 November 2026):** `Ctrl-o` and `Ctrl-i` go back and forward through the places jumped from and to, as in Vim, across views and songs: jump to the bridge to check something, and `Ctrl-o` goes straight back to where editing was.
   - **What's a jump:** what `''` counts already (`gg` and `G`, the section and label motions, going to a mark, the palette's go-to, search, stopping playback in place), and also changing view (`gr`, `ga` and the rest, Enter from the arrangement into the piano roll, Backspace) and switching songs. A place is the song, the view, and the cursor's track, time and pitch.
   - **The list:** one for the session, across songs, up to 100 places, not kept between sessions. A jump records where it went from; the first `Ctrl-o` from the newest place records that place too, so `Ctrl-i` can come back to it. After going back, a new jump drops the places stepped back over, as a browser's history does, rather than Vim's keeping them. The same place twice in a row is kept once. A place on a track since deleted, or in a song since closed, is passed over; a time beyond the song's end goes to its end. A count goes that many places.
@@ -984,7 +988,6 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 
 **Songs, copying and histories**
 
-- Paste-history keys, capacity, whether deletes enter it, and numbered-register/clipboard representation.
 - Song-format compatibility between versions; the format remains experimental until this policy is agreed.
 
 **Step entry**

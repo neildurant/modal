@@ -663,17 +663,19 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     const auto version = document_.version();
     const bool changed = recordChange(key, now);
     auditionHere(version);
-    notePasteHistory();
+    notePasteHistory(version);
     return changed;
 }
 
-void Workspace::notePasteHistory()
+void Workspace::notePasteHistory(std::uint64_t version)
 {
     // Whatever filled the register, a yank or delete in any view, by key or at the prompt,
     // seen once the key's done; a named put has put it back as it was by then.
     if (register_ == registerSeen_)
         return;
     registerSeen_ = register_;
+    if (!register_.empty() && document_.version() == version)
+        yanked_ = register_; // a yank, as the song's unchanged
     if (register_.empty() || (!pasteHistory_.empty() && pasteHistory_.front() == register_))
         return;
     pasteHistory_.push_front(register_);
@@ -823,10 +825,11 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
     if (command == "register-use")
     {
         if (!((character >= U'a' && character <= U'z') ||
-              (character >= U'A' && character <= U'Z') || (character >= U'1' && character <= U'9')))
+              (character >= U'A' && character <= U'Z') ||
+              (character >= U'0' && character <= U'9') || character == U'_'))
         {
-            refuse("Registers are named by letters, \"a to \"z, a capital adding to one, or "
-                   "\"1 to \"9 for the paste history",
+            refuse("Registers are named by letters, \"a to \"z, a capital adding to one; \"1 to "
+                   "\"9 are the paste history, \"0 the last yank and \"_ the black hole",
                    MessageKind::Information);
             return true;
         }
@@ -926,6 +929,10 @@ bool Workspace::sayRegisters()
         lines.emplace_back(
             "\"\"", registerAbout(register_) +
                         (inHistory ? ", as \"" + std::to_string(*inHistory + 1) : std::string{}));
+    }
+    if (!yanked_.empty())
+    {
+        lines.emplace_back("\"0", registerAbout(yanked_));
     }
     for (const auto& [name, reg] : registers_)
     {
@@ -1626,8 +1633,25 @@ CommandResult Workspace::run(std::string_view command, int count)
     const bool put =
         command.starts_with("put-") && command != "put-older" && command != "put-newer";
     std::optional<EventRegister> unnamed;
-    const bool numbered = named >= U'1' && named <= U'9';
-    if (numbered && put)
+    const bool numbered = named >= U'0' && named <= U'9';
+    const bool blackHole = named == U'_';
+    if (blackHole && put)
+    {
+        registerName_.reset();
+        refuse("\"_ is the black hole, which keeps nothing to put", MessageKind::Information);
+        return {true};
+    }
+    if (named == U'0' && put)
+    {
+        if (yanked_.empty())
+        {
+            registerName_.reset();
+            refuse("Register 0 is empty: it holds the last yank", MessageKind::Warning);
+            return {true};
+        }
+        unnamed = std::exchange(register_, yanked_);
+    }
+    else if (numbered && put)
     {
         // The paste history, newest first.
         const auto index = static_cast<std::size_t>(named - U'1');
@@ -1659,12 +1683,14 @@ CommandResult Workspace::run(std::string_view command, int count)
         (operator_ && (operator_->name == "operator-yank" || operator_->name == "operator-delete"));
     if (taking && numbered)
     {
-        refuse("\"1 to \"9 are the paste history, which every yank and delete fills: name a "
-               "letter to keep a copy");
+        refuse(named == U'0' ? "\"0 holds the last yank, which every yank fills: name a letter "
+                               "to keep a copy"
+                             : "\"1 to \"9 are the paste history, which every yank and delete "
+                               "fills: name a letter to keep a copy");
         registerName_.reset();
         return {true};
     }
-    if (taking && named != 0 && named != letter)
+    if (taking && !blackHole && named != 0 && named != letter)
     {
         const auto& into = registers_[letter];
         const bool whole = where() == Where::TrackList || command == "track-yank";
@@ -1679,8 +1705,13 @@ CommandResult Workspace::run(std::string_view command, int count)
     const auto modeBefore = mode_;
     const auto selectionBefore = put ? selection_ : std::nullopt;
     const auto versionBefore = document_.version();
+    // "_ (decided 23 November 2026): a delete or yank that takes nothing, the unnamed register
+    // and so the paste history and "0 as they were.
+    auto keep = blackHole ? std::optional{register_} : std::nullopt;
     auto result = commands_.run(command, count, mode_);
     report(result);
+    if (keep)
+        register_ = std::move(*keep);
     if (put && document_.version() != versionBefore)
     {
         notePut(command, count, modeBefore, selectionBefore, register_);
@@ -1690,9 +1721,10 @@ CommandResult Workspace::run(std::string_view command, int count)
         register_ = std::move(*unnamed);
         registerName_.reset();
     }
-    else if (numbered && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
+    else if ((numbered || blackHole) && mode_ != Mode::OperatorPending && !awaiting_ &&
+             !prompt_.answer)
     {
-        registerName_.reset(); // for nothing but a put
+        registerName_.reset(); // for nothing but a put, or for the delete or yank done
     }
     else if (named != 0 && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
     {

@@ -6,6 +6,16 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Vim's other registers, step 1: `"0` and `"_`, 23 November 2026
+
+The design for `"0`, `"_` and the clipboard was agreed: the clipboard only with `"+` (or `"*`) named, holding Modal's own song text under a header line. See [design.md](design.md#editing-grammar). `"0` holds what the last yank took, deletes leaving it alone: a register change in a key that left the song unchanged is a yank, seen where the paste history notices changes. `"0p` puts it; `"0y` is refused, as `"1y` is; `:registers` lists it after the unnamed register. `"_` makes a delete or yank keep nothing: the unnamed register is put back after the command, so the paste history and `"0` don't see it, and with an operator it holds until the operator's done; `"_p` is refused. The `"` hint menu offers `0` and `_`.
+
+**Validation.** A Workspace test checks `"0p` empty, then putting the yank after a delete, `p` still putting the delete, `"0y` refused, `"_dd` and `"_dib` deleting with `:registers` unchanged, `p` afterwards putting the earlier delete, `"_p` refused, and `"0` second in `:registers`. The `:registers` and hint-menu tests gain the new lines. MSVC Debug passes all 1,266 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+
+**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks.
+
+**To try.** Yank a bar with `yy`, delete another with `dd`: `p` puts the deleted bar, `"0p` the yanked one. `"_dd` deletes a bar without changing what `p` puts; `:registers` stays as it was. `"` shows `0` and `_` in its hint menu.
+
 ### Paste history, step 3: the manual, 23 November 2026
 
 The efficient-work chapter gains "The paste history" under Registers: why it exists (the phrase pushed out of the unnamed register by later deletes), `"1` to `"9` newest first, putting first and swapping with `[p` and `]p` (brackets stepping back and forward as elsewhere), one undo step, the message naming the copy, the unnamed register keeping what was settled on and `:registers`' marker, and naming a letter to keep something safe. The key reference lists `"1` … `"9` and `[p`/`]p`. Both formats build with `tools/build-manual.cmake`; `git diff --check` passes. The paste history is complete.

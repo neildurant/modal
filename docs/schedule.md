@@ -202,7 +202,10 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — The history: yanks and deletes fill `"1` to `"9`; `"3p`; `:registers` lists them. Accepted on trial.
     - [x] **Done** — `[p` and `]p` swapping straight after a put, one undo step with it; puts name the copy's place. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — The yank register `"0` (the last yank alone) and the black-hole register `"_`; system clipboard support after settling its representation. The numbered registers are the paste history's `"1` to `"9` (decided 23 November 2026).
+- [ ] **Doing** — Vim's other registers (design agreed 23 November 2026; the numbered registers are the paste history's). See [design.md](design.md#editing-grammar).
+    - [ ] **Doing** — The yank register `"0` and the black-hole register `"_`.
+    - [ ] **To do** — The system clipboard, `"+` and `"*`, as Modal's song text.
+    - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Song-format compatibility policy between versions.
 - [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
 

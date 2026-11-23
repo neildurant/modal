@@ -1026,7 +1026,11 @@ private:
     static constexpr std::size_t kPasteHistory = 9;
     std::deque<EventRegister> pasteHistory_;
     EventRegister registerSeen_;
-    void notePasteHistory();
+    // The yank register, "0 (decided 23 November 2026): what the last yank took, which
+    // deletes leave alone, told from them as the song is unchanged; version is the song's
+    // before the key.
+    EventRegister yanked_;
+    void notePasteHistory(std::uint64_t version);
     // The last put, for [p and ]p to put another copy in its place: the command and count,
     // the mode and selection it was put in, which copy in the history it put (none for one
     // not in it), and the song's version, the view and the cursor it left.
