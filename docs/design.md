@@ -703,6 +703,20 @@ A window edits one active song and can keep others open. Each song owns its cont
 
 Changing song stops playback. Recording and a take awaiting finalisation prevent a switch. Returning to a song brings back where it was left: the view it was shown in; each view's place (the arrangement's cursor, top track, left edge, zoom and strip cursor; the piano roll's track, time, pitch, scroll, page and size, with each track's remembered pitch, page size and fold choice; the event list's track, row and scroll; the Tracks view's row, column and scroll); the Backspace view history, `''` and `gv`; and the song's own play-from marker. Registers, macros, the search pattern, settings, toggles and command-line history are shared between songs. An inspector edit, chooser or prompt open at the switch closes, and Visual mode ends. A newly opened song starts as before. The state lasts for the session: closing a song discards it and `:e!` starts afresh.
 
+### Song titles
+
+A song's title is what it's known by, apart from its file: it's kept in the song file's `song` line, taken from an imported MIDI file's first track name where that is a conductor track, and written back as that name on export. A new song has none, and saving never makes one from the filename.
+
+`:song-title [TEXT]` (alias `title`; `, f t`) sets it. Without TEXT it asks, with the current title ready to edit, as `:label` does; an empty answer clears it, and Escape leaves it as it was. Setting it is one undo step and marks the song modified, as it's saved with the song.
+
+Where a title is set it shows:
+
+- **The window's title bar:** `Morning (morning.modal) [+] – Modal`, the title first and the file after it, so copies of one song can be told apart; without a title, the filename alone as before.
+- **Open songs:** the title and the filename in columns of their own, before the location, the title column blank for a song with none.
+- **Recent songs:** a title column beside the filename, the title remembered in the `remembered` file each time the song is opened or saved, so drawing the list reads no song files. Typing narrows by title as well as by name and folder.
+- **The arrangement:** at the top left of the track headers, as now.
+- **MIDI export:** as the first track's name, as now.
+
 ### Copying between songs
 
 Registers are shared between open songs, so material yanked in one is put in another with the usual keys. Everything Modal opens is at its one PPQN, so material keeps its length in ticks; a put plays at the destination's tempo, which belongs to the song and can't come with it.
@@ -716,7 +730,7 @@ Within one song the same rules apply, so copying whole bars from a 7/8 section i
 
 ### Recent songs
 
-Modal remembers the song files opened or saved, newest first, in the state directory's `remembered` file, up to the `recentsongs` setting's number (12; 0 keeps none). Opening a song by `:e`, the picker or at startup, and saving one, including save as, counts as using it; an imported MIDI file is listed until its song is saved, when the `.modal` file takes its place. New songs without a file, and files only read by importing tracks, aren't listed. `, f r` (`:song-recent`) opens **Recent songs**: each file's name, its folder and when it was last used, in aligned columns, the time at the right (`today 17:42`, `yesterday 09:10`, `Mon 18 Nov`, `2 Mar 2025`), or `not found` for a file that's gone. Typing narrows by name or folder, Up and Down choose, Enter opens the song, or switches to it if it's open, and Escape leaves. Delete removes the highlighted entry from the list, never the file. Enter on a file that's gone asks whether to remove it from the list. Song titles aren't shown: only filenames, until titles are designed.
+Modal remembers the song files opened or saved, newest first, in the state directory's `remembered` file, up to the `recentsongs` setting's number (12; 0 keeps none). Opening a song by `:e`, the picker or at startup, and saving one, including save as, counts as using it; an imported MIDI file is listed until its song is saved, when the `.modal` file takes its place. New songs without a file, and files only read by importing tracks, aren't listed. `, f r` (`:song-recent`) opens **Recent songs**: each file's name, its folder and when it was last used, in aligned columns, the time at the right (`today 17:42`, `yesterday 09:10`, `Mon 18 Nov`, `2 Mar 2025`), or `not found` for a file that's gone. Typing narrows by name or folder, Up and Down choose, Enter opens the song, or switches to it if it's open, and Escape leaves. Delete removes the highlighted entry from the list, never the file. Enter on a file that's gone asks whether to remove it from the list. Each entry's song title shows in a column of its own (see Song titles).
 
 ### Importing tracks
 
@@ -975,10 +989,6 @@ Only unresolved design choices belong here, grouped by feature rather than imple
 - Outline entry key and whether J joins or moves down.
 - Controls for column ordering and per-view visibility.
 - Song-tempo control/fallback: relationship to the conductor and explicit section starting tempos.
-
-**Song titles**
-
-- A song has a title in the model and the file, taken from an imported MIDI file or written by hand, and shown by the open-song chooser, but nothing sets it in Modal (scheduled 20 November 2026). Decide a command to set it, perhaps `:song-title`, and where else it shows or is used: the window's title, the choosers, the recent list and MIDI export.
 
 **Later feature design**
 

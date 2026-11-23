@@ -2,9 +2,13 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is numbered backups and safe save and close.*
+*Last updated 23 November 2026: the song-titles design was agreed. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
 
 ## Current handoff
+
+### Song titles agreed, 23 November 2026
+
+The open questions on song titles are settled: `:song-title` (alias `title`, `, f t`) sets or clears the title as an undo step; the window's title bar shows the title then the file; Open songs and Recent songs show title and filename in columns of their own, Recent songs remembering titles in the `remembered` file. See [design.md](design.md#song-titles) and [decisions.md](decisions.md). Nothing is implemented yet; the steps are in [schedule.md](schedule.md).
 
 ### A cursor in choosers narrowed by typing, 20 November 2026
 
