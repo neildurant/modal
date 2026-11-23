@@ -2,7 +2,7 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 23 November 2026: the song-titles design was agreed, and setting the title was accepted on trial; showing it in the window and Open songs was accepted on trial. Titles in Recent songs are ready to try. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
+*Last updated 23 November 2026: the song-titles design was agreed, and setting the title was accepted on trial; showing it in the window and Open songs was accepted on trial. Titles in Recent songs were accepted on trial. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
 
 ## Current handoff
 
@@ -12,7 +12,7 @@ Each recent song remembers its title as it was when last opened or saved, on a `
 
 **Validation.** A core test checks titles kept and read back, the line written after its song, none written for a song without a title, a title dropped when the song is used again without one, line breaks made spaces, and an older file and a stray `title` line read safely. The recent songs Workspace test checks the title remembered on opening, a title set and saved shown before the filename, and narrowing by title. The Recent songs `[.sample]` render, now with titles, was checked in dark and light. MSVC Debug passes all 1,251 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,252 with three. Whole-tree formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial; then the manual and pushing, and the hosted checks.
+The desktop trial was accepted on 23 November 2026. **Pending.** The hosted checks after pushing; then the manual (step 4).
 
 **To try.** Open a song that has a title, then `, f r`: its title shows before the filename. Give another song a title with `, f t` and save it; it shows in the list with that title. Type part of a title to narrow. Restart Modal and check the titles are still there.
 

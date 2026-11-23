@@ -186,7 +186,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [ ] **Doing** — Song titles (scheduled 20 November 2026, design agreed 23 November 2026). See [design.md](design.md#song-titles).
     - [x] **Done** — `:song-title` and `, f t`, as an undo step. Accepted on trial.
     - [x] **Done** — Title and filename in the window's title bar and in Open songs. Accepted on trial.
-    - [ ] **Doing** — Titles remembered and shown in Recent songs. Built; awaiting trial.
+    - [x] **Done** — Titles remembered and shown in Recent songs. Accepted on trial.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Numbered backups and safe save/close behaviour across modified buffers.
 - [ ] **To do** — Jump history across positions, views and buffers.
