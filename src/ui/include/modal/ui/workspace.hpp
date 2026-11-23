@@ -1264,6 +1264,7 @@ private:
         std::vector<std::filesystem::path> paths;
         std::vector<bool> missing;
         std::vector<std::int64_t> used;
+        std::vector<std::string> titles;
     };
     std::optional<RecentChoice> recentChoice_;
     CommandResult showRecentSongs();

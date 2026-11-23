@@ -47,3 +47,29 @@ TEST_CASE("recent songs are kept newest first, to a limit, and read back with sp
     CHECK_FALSE(remembered.forgetSong("/songs/a.modal"));
     CHECK(remembered.songs().size() == 2);
 }
+
+TEST_CASE("recent songs keep their titles on a line after each, read by Modal before titles too")
+{
+    Remembered remembered;
+    remembered.usedSong("/songs/dawn.modal", 100, 5, "Morning");
+    remembered.usedSong("/songs/plain.modal", 200, 5);
+    remembered.usedSong("/songs/odd.modal", 300, 5, "Two\nlines\r");
+    REQUIRE(remembered.songs().size() == 3);
+    CHECK(remembered.songs()[0].title == "Two lines ");
+    const auto text = remembered.text();
+    CHECK(text.find("song 100 /songs/dawn.modal\ntitle Morning\n") != std::string::npos);
+    CHECK(text.find("song 200 /songs/plain.modal\nsong 100") != std::string::npos);
+    CHECK(Remembered::read(text) == remembered);
+
+    // Using a song again takes its title then, none if it has none now.
+    remembered.usedSong("/songs/dawn.modal", 400, 5);
+    CHECK(remembered.songs()[0].title.empty());
+
+    // A file from before titles reads as songs without them; a title line not straight after
+    // a song is passed over.
+    const auto old = Remembered::read("song 100 /a.modal\nlane cc1\ntitle Stray\n"
+                                      "song 50 /b.modal\r\ntitle Bee\r\ntitle Again\n");
+    REQUIRE(old.songs().size() == 2);
+    CHECK(old.songs()[0].title.empty());
+    CHECK(old.songs()[1].title == "Bee");
+}

@@ -26,8 +26,9 @@ void Workspace::songUsed(const std::filesystem::path& file,
     const auto absolute = std::filesystem::absolute(file, error);
     if (replacing)
         remembered_.forgetSong(utf8Text(std::filesystem::absolute(*replacing, error)));
+    // The song just opened or saved is the one shown, so its title is the document's.
     remembered_.usedSong(utf8Text((error ? file : absolute).lexically_normal()), clock_(),
-                         static_cast<std::size_t>(most));
+                         static_cast<std::size_t>(most), document_.song().title);
     rememberedChanged();
 }
 
@@ -47,15 +48,18 @@ void Workspace::listRecentSongs(std::size_t highlighted)
     choice.paths.clear();
     choice.missing.clear();
     choice.used.clear();
+    choice.titles.clear();
     std::vector<std::string> names;
     for (const auto& song : remembered_.songs())
     {
         const std::filesystem::path path = utf8Path(song.path);
         std::error_code error;
         choice.paths.push_back(path);
+        choice.titles.push_back(song.title);
         choice.missing.push_back(!std::filesystem::is_regular_file(path, error));
         choice.used.push_back(song.used);
-        names.push_back(utf8Text(path.filename()) + " " + utf8Text(path.parent_path()));
+        names.push_back(song.title + " " + utf8Text(path.filename()) + " " +
+                        utf8Text(path.parent_path()));
     }
     choice.list.emplace(std::move(names), std::min(highlighted, choice.paths.size() - 1), true);
     choice.list->name("recent song");
@@ -134,15 +138,20 @@ Region Workspace::recentRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto columns =
         static_cast<std::size_t>(std::max((bar.width - 2 * margin) / cell_.width, 1));
-    // Three columns: the file's name, its folder, and when it was used, at the right.
+    // The song's title, the file's name, its folder, and when it was used, at the right; no
+    // title column where no song has a title.
+    std::vector<std::u32string> titles;
     std::vector<std::u32string> names;
     std::vector<std::u32string> folders;
     std::vector<std::u32string> times;
+    std::size_t titleWidth = 0;
     std::size_t nameWidth = 0;
     std::size_t timeWidth = 0;
     const auto now = clock_();
     for (std::size_t i = 0; i < choice.paths.size(); ++i)
     {
+        titles.push_back(decodeUtf8(choice.titles[i]));
+        titleWidth = std::max(titleWidth, titles.back().size());
         names.push_back(decodeUtf8(utf8Text(choice.paths[i].filename())));
         folders.push_back(decodeUtf8(utf8Text(choice.paths[i].parent_path())));
         times.push_back(decodeUtf8(choice.missing[i] ? std::string{"not found"}
@@ -150,9 +159,11 @@ Region Workspace::recentRegion() const
         nameWidth = std::max(nameWidth, names.back().size());
         timeWidth = std::max(timeWidth, times.back().size());
     }
-    nameWidth = std::min(nameWidth, std::max(columns / 3, std::size_t{1}));
-    const auto folderWidth =
-        columns > nameWidth + timeWidth + 6 ? columns - nameWidth - timeWidth - 6 : std::size_t{1};
+    const auto most = std::max(columns / (titleWidth > 0 ? 4 : 3), std::size_t{1});
+    titleWidth = std::min(titleWidth, most);
+    nameWidth = std::min(nameWidth, most);
+    const auto used = (titleWidth > 0 ? titleWidth + 2 : 0) + nameWidth + timeWidth + 6;
+    const auto folderWidth = columns > used ? columns - used : std::size_t{1};
     const auto fit = [](std::u32string text, std::size_t width, bool keepEnd)
     {
         if (text.size() > width)
@@ -169,8 +180,10 @@ Region Workspace::recentRegion() const
     {
         auto time = times[i];
         time.insert(0, timeWidth - time.size(), U' ');
-        labels.push_back(fit(names[i], nameWidth, false) + U"  " +
-                         fit(folders[i], folderWidth, true) + U"  " + time);
+        labels.push_back(
+            (titleWidth > 0 ? fit(titles[i], titleWidth, false) + U"  " : std::u32string{}) +
+            fit(names[i], nameWidth, false) + U"  " + fit(folders[i], folderWidth, true) + U"  " +
+            time);
     }
     const Rect field{0, bar.y, bar.width, cell_.height};
     return choice.list->region(field, {0, 0, bar.width, field.y}, cell_, labels);

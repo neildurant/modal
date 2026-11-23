@@ -906,8 +906,8 @@ TEST_CASE("a sample of the recent songs", "[.sample]")
     const auto at = [&](const char* name) { return utf8Text(folder / name); };
     remembered.usedSong(at("Archive/Groove 2024.modal"), now - 400 * day, 20);
     remembered.usedSong(at("Desktop/Demo ideas.modal"), now - 5 * day, 20); // gone
-    remembered.usedSong(at("Songs/Ballad.modal"), now - day, 20);
-    remembered.usedSong(at("Songs/Groove.modal"), now - 600, 20);
+    remembered.usedSong(at("Songs/Ballad.modal"), now - day, 20, "Slow one");
+    remembered.usedSong(at("Songs/Groove.modal"), now - 600, 20, "Groove in D");
     view.setRemembered(remembered, {});
     for (const auto& theme : {"dark", "light"})
     {

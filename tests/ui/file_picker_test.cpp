@@ -255,6 +255,20 @@ TEST_CASE("recent songs list the files opened and saved, to open one again")
     CHECK(p.document.song().title == "Ballad");
     CHECK(p.workspace.remembered().songs().front().path ==
           utf8Text((p.temporary / "Ballad.modal").lexically_normal()));
+    CHECK(p.workspace.remembered().songs().front().title == "Ballad");
+
+    // Titles in a column of their own before the file's name; typing narrows by title too, and
+    // a title set and saved is the one listed.
+    p.type(U":title Slow one\n:w\n,fr");
+    CHECK(p.shows(U"Slow one"));
+    bool titleFirst = false;
+    for (const auto& region : p.workspace.frame())
+        for (const auto& run : region.text)
+            if (const auto title = run.text.find(U"Slow one"); title != std::u32string::npos)
+                titleFirst = titleFirst || title < run.text.find(U"Ballad.modal");
+    CHECK(titleFirst);
+    p.type(U"slow\n");
+    CHECK(p.document.song().title == "Slow one");
 
     // Delete takes an entry off the list, never the file.
     p.type(U",frgroove");

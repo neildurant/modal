@@ -124,10 +124,12 @@ const std::vector<Key>* Remembered::macro(char32_t name) const
     return it != macros_.end() ? &it->second : nullptr;
 }
 
-void Remembered::usedSong(std::string path, std::int64_t now, std::size_t most)
+void Remembered::usedSong(std::string path, std::int64_t now, std::size_t most, std::string title)
 {
+    // A title is one line in the file, so anything that would end it becomes a space.
+    std::ranges::replace_if(title, [](char c) { return c == '\n' || c == '\r'; }, ' ');
     std::erase_if(songs_, [&](const RecentSong& song) { return song.path == path; });
-    songs_.insert(songs_.begin(), RecentSong{std::move(path), now});
+    songs_.insert(songs_.begin(), RecentSong{std::move(path), now, std::move(title)});
     if (songs_.size() > most)
         songs_.resize(most);
 }
@@ -161,8 +163,13 @@ std::string Remembered::text() const
         text += "macro " + std::string(1, static_cast<char>(name)) + " " + formatKeys(keys) + "\n";
     }
     // The path last, as the rest of the line, as it may have spaces: "song 1763650000 /a b".
+    // A title follows on a line of its own, which Modal before titles passes over.
     for (const auto& song : songs_)
+    {
         text += "song " + std::to_string(song.used) + " " + song.path + "\n";
+        if (!song.title.empty())
+            text += "title " + song.title + "\n";
+    }
     return text;
 }
 
@@ -170,6 +177,7 @@ Remembered Remembered::read(std::string_view text)
 {
     Remembered remembered;
     std::size_t at = 0;
+    bool afterSong = false; // a title belongs to the song on the line before
     while (at < text.size())
     {
         const auto end = std::min(text.find('\n', at), text.size());
@@ -179,6 +187,14 @@ Remembered Remembered::read(std::string_view text)
         {
             line.remove_suffix(1);
         }
+        if (line.starts_with("title "))
+        {
+            if (afterSong)
+                remembered.songs_.back().title = line.substr(6);
+            afterSong = false;
+            continue;
+        }
+        afterSong = false;
         if (line.starts_with("song "))
         {
             auto rest = line.substr(5);
@@ -190,7 +206,10 @@ Remembered Remembered::read(std::string_view text)
                 const auto path = rest.substr(space + 1);
                 if (std::ranges::none_of(remembered.songs_,
                                          [&](const RecentSong& song) { return song.path == path; }))
-                    remembered.songs_.push_back({std::string{path}, *used});
+                {
+                    remembered.songs_.push_back({std::string{path}, *used, {}});
+                    afterSong = true;
+                }
             }
             continue;
         }
