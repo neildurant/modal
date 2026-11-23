@@ -87,6 +87,8 @@ struct Pickers final : FileHost
     {
         return workspace.backUp(file);
     }
+    void songShown(std::uint64_t id) override { workspace.songShown(id); }
+    void songClosed(std::uint64_t id) override { workspace.songClosed(id); }
     void report(const CommandResult& result) override { workspace.report(result); }
 
     void type(std::u32string_view keys)
@@ -422,6 +424,54 @@ TEST_CASE(":wa asks for each new song's file in the picker in turn")
     CHECK(p.workspace.remembered().songs().front().title == "Idea");
     CHECK(std::ranges::any_of(p.workspace.remembered().songs(),
                               [](const auto& recent) { return recent.title == "Kept changed"; }));
+}
+
+TEST_CASE("Ctrl-o goes back across songs, and a closed song's places are dropped")
+{
+    Pickers p;
+    p.makeSong("A.modal", "Song A");
+    p.makeSong("B.modal", "Song B");
+    const auto ctrl = [&](char32_t key) { p.workspace.handle(Key::typed(key, kCtrl), 0); };
+    const auto tick = [&] { return p.workspace.arrangement().cursor().tick; };
+    p.type(U":e A\n");
+    p.type(U"G");
+    const auto endA = tick();
+    REQUIRE(endA > 0);
+    p.type(U":e B\n"); // switching songs is a jump
+    p.type(U"G");
+
+    ctrl(U'o');
+    CHECK(p.document.song().title == "Song B");
+    CHECK(tick() == 0);
+    ctrl(U'o'); // into the song before, where it was left
+    CHECK(p.document.song().title == "Song A");
+    CHECK(tick() == endA);
+    ctrl(U'o');
+    CHECK(tick() == 0);
+    ctrl(U'i');
+    ctrl(U'i');
+    CHECK(p.document.song().title == "Song B");
+    CHECK(tick() == 0);
+
+    // :jumps names each place's song.
+    p.type(U":jumps\n");
+    using Line = std::pair<std::string, std::string>;
+    REQUIRE(p.workspace.listing().size() == 4);
+    CHECK(p.workspace.listing()[0] == Line{"1", "Song A, Arrangement, 1:1:000, Track 1"});
+    CHECK(p.workspace.listing()[1].second.starts_with("Song A, Arrangement, "));
+    CHECK(p.workspace.listing()[2] == Line{">3", "Song B, Arrangement, 1:1:000, Track 1"});
+    p.press(NamedKey::Escape);
+
+    // Closing B drops its places; Ctrl-o goes back within A.
+    p.type(U":song-close\n");
+    CHECK(p.document.song().title == "Song A");
+    p.type(U":jumps\n");
+    CHECK(p.workspace.listing().size() == 3); // A's two, and here
+    p.press(NamedKey::Escape);
+    ctrl(U'o');
+    CHECK(tick() == 0);
+    ctrl(U'o');
+    CHECK(p.workspace.message() == "No earlier place in the jump list");
 }
 
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")

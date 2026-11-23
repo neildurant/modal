@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
+#include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -22,7 +24,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 14> kFileCommands{{
+constexpr std::array<CommandInfo, 15> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
@@ -68,6 +70,11 @@ constexpr std::array<CommandInfo, 14> kFileCommands{{
      .description = "Save every song with unsaved changes, then quit",
      .aliases = "xa",
      .keys = false},
+    {.name = "song-go",
+     .description = "Switch to the open song the jump list knows by ID",
+     .usage = "ID",
+     .keys = false,
+     .palette = false},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -178,7 +185,7 @@ public:
         , host_(host)
         , home_(std::move(home))
     {
-        songs_.push_back({nullptr, 1});
+        songs_.push_back({nullptr, 1, nullptr, nextId_++});
     }
 
     CommandResult edit(const CommandCall& call)
@@ -398,6 +405,21 @@ public:
         return {true, "Opened a copy of " + named(*file) + " as a new song", false};
     }
 
+    // Switches to the song with an id, as the jump list asks (decided 23 November 2026).
+    CommandResult goToSong(std::string_view text)
+    {
+        std::uint64_t id = 0;
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), id);
+        if (error != std::errc{} || end != text.data() + text.size())
+            return CommandResult::error("song-go takes the number of an open song");
+        for (std::size_t i = 0; i < songs_.size(); ++i)
+        {
+            if (songs_[i].id == id)
+                return activate(i, false);
+        }
+        return CommandResult::error("That song isn't open now");
+    }
+
     // Only one song, new and never touched, whose place a song opened can take.
     bool soleUntouched() const
     {
@@ -487,6 +509,8 @@ private:
         std::unique_ptr<core::Document> document;
         std::size_t number;
         std::shared_ptr<void> place = nullptr; // the window's views of it while inactive
+        // Which song it is for the jump list, new when another song takes its place.
+        std::uint64_t id = 0;
     };
 
     const core::Document& at(std::size_t index) const
@@ -560,12 +584,14 @@ private:
         active_ = index;
         if (closeCurrent)
         {
+            host_.songClosed(songs_[previous].id);
             songs_.erase(songs_.begin() + static_cast<std::ptrdiff_t>(previous));
             if (previous < index)
                 --active_;
         }
         ++activation_;
         host_.returnToSong(std::move(returning));
+        host_.songShown(songs_[active_].id);
         return {true};
     }
 
@@ -582,9 +608,16 @@ private:
             songs_[active_].document = std::move(song);
             songs_[active_].place = std::move(leaving);
             active_ = songs_.size();
-            songs_.push_back({nullptr, nextNumber_++});
+            songs_.push_back({nullptr, nextNumber_++, nullptr, nextId_++});
+        }
+        else
+        {
+            // Another song in its place: the places in the one replaced go with it.
+            host_.songClosed(songs_[active_].id);
+            songs_[active_].id = nextId_++;
         }
         changedSong();
+        host_.songShown(songs_[active_].id);
         return {true};
     }
 
@@ -698,6 +731,7 @@ private:
     std::vector<SongSlot> songs_;
     std::size_t active_ = 0;
     std::size_t nextNumber_ = 2;
+    std::uint64_t nextId_ = 1;
     std::uint64_t activation_ = 0;
 };
 
@@ -794,6 +828,8 @@ std::function<std::vector<std::string>()> addFileCommands(CommandRegistry& regis
         [commands](const CommandCall& call) { return commands->openCopy(call); });
     add(kFileCommands[12], [commands](const CommandCall&) { return commands->saveAll(false); });
     add(kFileCommands[13], [commands](const CommandCall&) { return commands->saveAll(true); });
+    add(kFileCommands[14],
+        [commands](const CommandCall& call) { return commands->goToSong(call.arguments); });
     return [commands] { return commands->unsavedSongs(); };
 }
 

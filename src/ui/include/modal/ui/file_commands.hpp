@@ -7,6 +7,7 @@
 #include <modal/core/song.hpp>
 #include <modal/ui/commands.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -93,6 +94,11 @@ public:
         if (!kept)
             songReplaced();
     }
+
+    // Which open song is shown, and that one has closed or been replaced, each by an id kept
+    // for as long as it's open, for the jump list (decided 23 November 2026).
+    virtual void songShown(std::uint64_t /*id*/) {}
+    virtual void songClosed(std::uint64_t /*id*/) {}
 
     // Shows the outcome of a command finished after a dialog, as a command's result would be.
     virtual void report(const CommandResult& result) = 0;

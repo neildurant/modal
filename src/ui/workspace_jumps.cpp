@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/pitch.hpp>
+#include <modal/ui/config.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/workspace.hpp>
 
@@ -40,7 +41,40 @@ std::string viewName(ViewKind kind)
 void Workspace::jumped(const SongCursor& from)
 {
     jumpedFrom_ = from;
-    recordJump({songNumber_, shown(), from});
+    recordJump(place(shown(), from));
+}
+
+std::string Workspace::songName() const
+{
+    // As Open songs names it: by its title, or else its file.
+    const auto& title = document_.song().title;
+    if (!title.empty())
+        return title;
+    const auto& file = document_.file() ? document_.file() : document_.importedFrom();
+    return file ? utf8Text(file->filename()) : std::string{"Untitled"};
+}
+
+Workspace::JumpPlace Workspace::place(ViewKind view, const SongCursor& cursor) const
+{
+    JumpPlace place{songNumber_, view, cursor, {}, songName()};
+    place.about = jumpAbout(place);
+    return place;
+}
+
+void Workspace::songClosed(std::uint64_t id)
+{
+    // Its places go, the one last gone to staying where it is among the rest.
+    std::size_t at = 0;
+    std::vector<JumpPlace> kept;
+    for (std::size_t i = 0; i < jumps_.size(); ++i)
+    {
+        if (i == jumpAt_)
+            at = kept.size();
+        if (jumps_[i].song != id)
+            kept.push_back(std::move(jumps_[i]));
+    }
+    jumpAt_ = jumpAt_ >= jumps_.size() ? kept.size() : std::min(at, kept.size());
+    jumps_ = std::move(kept);
 }
 
 void Workspace::recordJump(const JumpPlace& from)
@@ -62,20 +96,32 @@ void Workspace::recordJump(const JumpPlace& from)
 
 bool Workspace::usableJump(const JumpPlace& place) const
 {
-    // In the song shown, and on a track it still has.
-    return place.song == songNumber_ &&
-           (!place.cursor.track || document_.song().track(*place.cursor.track) != nullptr);
+    // On a track the song still has; another song's tracks are seen once it's shown.
+    return place.song != songNumber_ || !place.cursor.track ||
+           document_.song().track(*place.cursor.track) != nullptr;
 }
 
-void Workspace::goToJump(const JumpPlace& place)
+bool Workspace::goToJump(const JumpPlace& place)
 {
+    if (place.song != songNumber_)
+    {
+        // Through the file commands, which keep the songs (decided 23 November 2026).
+        if (!lineHandler_)
+            return false;
+        lineHandler_("song-go " + std::to_string(place.song));
+        if (place.song != songNumber_)
+            return false; // refused, as while recording, and saying why
+    }
     if (shown() != place.view)
         show(place.view);
     auto to = place.cursor;
+    if (to.track && document_.song().track(*to.track) == nullptr)
+        to.track = view().cursor().track; // gone while the song wasn't shown
     const auto end = document_.song().end();
     if (to.tick >= end)
         to.tick = std::max<core::Tick>(end - 1, 0); // the song's shorter now
     view().setCursor(to);
+    return true;
 }
 
 bool Workspace::walkJumps(int count, bool back)
@@ -119,8 +165,13 @@ bool Workspace::walkJumps(int count, bool back)
         return true;
     }
     walkingJumps_ = true;
-    goToJump(jumps_[*found]);
+    const bool went = goToJump(jumps_[*found]);
     walkingJumps_ = false;
+    if (!went)
+    {
+        std::tie(jumps_, jumpAt_) = before;
+        return true;
+    }
     jumpAt_ = *found;
     jumpedFrom_ = here.cursor; // so '' goes back, as after any jump
     return true;
@@ -147,14 +198,20 @@ std::string Workspace::jumpAbout(const JumpPlace& place) const
 
 bool Workspace::sayJumps()
 {
-    // This song's places, oldest first, numbered in the list,
-    // the one the cursor was last sent to marked with >.
+    // Each place's song named where they're in more than one.
+    const bool songs = std::ranges::any_of(jumps_, [&](const auto& place)
+                                           { return place.song != jumps_.front().song; }) ||
+                       (!jumps_.empty() && jumps_.front().song != songNumber_);
+    // The places, oldest first, numbered in the list, the one the cursor was last sent to
+    // marked with >; as they were when recorded, as another song's can't be looked at.
+    const auto about = [&](const JumpPlace& place)
+    { return songs ? place.songName + ", " + place.about : place.about; };
     std::vector<std::pair<std::string, std::string>> lines;
     for (std::size_t i = 0; i < jumps_.size(); ++i)
     {
         if (!usableJump(jumps_[i]))
             continue;
-        lines.emplace_back((i == jumpAt_ ? ">" : "") + std::to_string(i + 1), jumpAbout(jumps_[i]));
+        lines.emplace_back((i == jumpAt_ ? ">" : "") + std::to_string(i + 1), about(jumps_[i]));
     }
     if (lines.empty())
     {
@@ -163,7 +220,7 @@ bool Workspace::sayJumps()
         return true;
     }
     if (jumpAt_ >= jumps_.size())
-        lines.emplace_back(">", "here: " + jumpAbout(here()));
+        lines.emplace_back(">", "here: " + about(here()));
     listing_ = std::move(lines);
     return true;
 }

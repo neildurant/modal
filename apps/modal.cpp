@@ -456,6 +456,8 @@ public:
     }
 
     std::string backUp(const std::filesystem::path& file) override { return view_.backUp(file); }
+    void songShown(std::uint64_t id) override { view_.songShown(id); }
+    void songClosed(std::uint64_t id) override { view_.songClosed(id); }
 
     void songUsed(const std::filesystem::path& file,
                   const std::optional<std::filesystem::path>& replacing,

@@ -481,8 +481,6 @@ void Workspace::resetForSong()
 void Workspace::showSong()
 {
     resetForSong();
-    // Another song, or this one afresh, whose places aren't those jumped from before.
-    songNumber_ = ++songsShown_;
     eventList_->showSong();
     arrange_->showSong();
     pianoRoll_->showSong();
@@ -508,11 +506,11 @@ struct Workspace::SongPlace
     std::optional<SavedSelection> lastSelection;
     std::optional<SongCursor> jumpedFrom;
     core::Tick marker = 0;
-    std::uint64_t song = 0;
 };
 
 std::shared_ptr<void> Workspace::leaveSong()
 {
+    recordJump(here()); // switching songs is a jump, for Ctrl-o
     if (selection_)
         endVisual();
     current_->stopPlayhead(std::nullopt);
@@ -521,7 +519,6 @@ std::shared_ptr<void> Workspace::leaveSong()
     place->history = std::exchange(history_, {});
     place->lastSelection = std::exchange(lastSelection_, std::nullopt);
     place->jumpedFrom = jumpedFrom_;
-    place->song = songNumber_;
     place->marker = player_ != nullptr ? player_->marker() : 0;
     auto& host = static_cast<ViewHost&>(*this);
     place->eventList = std::exchange(eventList_, std::make_unique<EventListView>(document_, host));
@@ -555,7 +552,6 @@ void Workspace::returnToSong(std::shared_ptr<void> kept)
     history_ = std::move(place->history);
     lastSelection_ = std::move(place->lastSelection);
     jumpedFrom_ = place->jumpedFrom;
-    songNumber_ = place->song;
     if (player_ != nullptr)
         player_->resetMarkerForSong(place->marker);
     refresh();

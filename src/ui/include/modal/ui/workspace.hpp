@@ -303,6 +303,11 @@ public:
                   const std::optional<std::filesystem::path>& replacing = std::nullopt,
                   const std::optional<std::string>& title = std::nullopt);
 
+    // Which open song is shown, and that one has closed or been replaced, by the file
+    // commands' ids, for the jump list.
+    void songShown(std::uint64_t id) { songNumber_ = id; }
+    void songClosed(std::uint64_t id);
+
     // Before a save replaces a song file: keeps a backup of it in the state folder, up to the
     // backups setting's number, returning why none could be made, or nothing.
     std::string backUp(const std::filesystem::path& file) const;
@@ -936,8 +941,15 @@ private:
         std::uint64_t song = 0;
         ViewKind view = ViewKind::Arrangement;
         SongCursor cursor;
+        // What :jumps says of it, and its song's name, as they were when it was recorded,
+        // its song not being shown later.
+        std::string about;
+        std::string songName;
 
-        friend bool operator==(const JumpPlace&, const JumpPlace&) = default;
+        friend bool operator==(const JumpPlace& a, const JumpPlace& b)
+        {
+            return a.song == b.song && a.view == b.view && a.cursor == b.cursor;
+        }
     };
     static constexpr std::size_t kMostJumps = 100;
     std::vector<JumpPlace> jumps_;
@@ -945,14 +957,15 @@ private:
     bool walkingJumps_ = false;
     bool keyHandled_ = false;
     std::uint64_t songNumber_ = 1;
-    std::uint64_t songsShown_ = 1;
-    JumpPlace here() const { return {songNumber_, shown(), current_->cursor()}; }
+    JumpPlace here() const { return place(shown(), current_->cursor()); }
+    JumpPlace place(ViewKind view, const SongCursor& cursor) const;
+    std::string songName() const;
     // A jump from a place in the view shown: for '' and the jump list.
     void jumped(const SongCursor& from);
     void recordJump(const JumpPlace& from);
     bool walkJumps(int count, bool back);
     bool usableJump(const JumpPlace& place) const;
-    void goToJump(const JumpPlace& place);
+    bool goToJump(const JumpPlace& place);
     std::string jumpAbout(const JumpPlace& place) const;
     bool sayJumps();
     // Finds (fE): the pitch class of the last, its name as typed, and whether f
