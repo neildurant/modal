@@ -307,7 +307,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | --- | --- |
 | `, b` | Bars on every track: `d` delete, `i` insert |
 | `, e` | Insert an event at the cursor, asking which |
-| `, f` | Files: `f` open a file (`:e`), `o` switch to an open song (`:song-select`), `n` new song, `s` save, `S` save as, `c` close this song, `x` export MIDI, `i` import tracks from a file (`:track-import`), `r` recent songs (`:song-recent`) |
+| `, f` | Files: `f` open a file (`:e`), `o` switch to an open song (`:song-select`), `n` new song, `s` save, `S` save as, `c` close this song, `x` export MIDI, `i` import tracks from a file (`:track-import`), `r` recent songs (`:song-recent`), `t` the song's title (`:song-title`) |
 | `, s` | Sections, on the cursor's section |
 | `, t` | Tracks: `a` add after, `i` add before, `d` delete, `r` rename, `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
 | `, v m` `gm` | The Ports view: this machine's MIDI ports, to enable, alias and choose the default input and output |

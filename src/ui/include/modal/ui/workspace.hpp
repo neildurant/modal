@@ -916,6 +916,8 @@ private:
     bool sayMarks();
     CommandResult deleteMarks(std::string_view letters);
     CommandResult label(std::string_view name);
+    CommandResult songTitle(std::string_view title);
+    CommandResult setSongTitle(std::string title);
     CommandResult deleteLabels();
     std::optional<SongCursor> jumpedFrom_;
     core::Tick jumpTime_ = -1;

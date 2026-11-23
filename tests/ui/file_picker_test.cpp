@@ -452,7 +452,7 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     std::vector<std::string> keys;
     for (const auto& hint : *shown)
         keys.push_back(hint.keys);
-    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "r", "s", "S", "x"});
+    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "r", "s", "S", "t", "x"});
     p.press(NamedKey::Escape);
     p.workspace.setHints(false, 0);
     p.type(U",ff");
@@ -476,6 +476,45 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     p.type(U",fo");
     CHECK_FALSE(p.shows(U"First.modal"));
     p.press(NamedKey::Escape);
+}
+
+TEST_CASE("song-title sets the title as an undo step, or asks with it to edit and can clear it")
+{
+    Pickers p;
+    REQUIRE(p.document.song().title.empty());
+    REQUIRE_FALSE(p.document.modified());
+
+    // Typed in full, then as the alias.
+    p.type(U":song-title Morning\n");
+    CHECK(p.document.song().title == "Morning");
+    CHECK(p.document.modified());
+    CHECK(p.workspace.message() == "Titled the song Morning");
+    p.type(U":title Morning\n");
+    CHECK(p.workspace.message() == "The song's title is already Morning");
+    p.type(U"u");
+    CHECK(p.document.song().title.empty());
+    p.type(U":redo\n");
+    CHECK(p.document.song().title == "Morning");
+
+    // , f t asks with the title there to edit; Escape leaves it.
+    p.type(U",ft");
+    CHECK(p.workspace.mode() == Mode::CommandLine);
+    CHECK(p.shows(U"Song title: "));
+    CHECK(p.shows(U"Morning"));
+    p.press(NamedKey::Escape);
+    CHECK(p.document.song().title == "Morning");
+
+    // Editing it, then an empty answer clears it.
+    p.type(U",ft Song\n");
+    CHECK(p.document.song().title == "Morning Song");
+    p.type(U",ft");
+    for (int i = 0; i < 12; ++i)
+        p.press(NamedKey::Backspace);
+    p.press(NamedKey::Enter);
+    CHECK(p.document.song().title.empty());
+    CHECK(p.workspace.message() == "The song has no title now");
+    p.type(U"u");
+    CHECK(p.document.song().title == "Morning Song");
 }
 
 TEST_CASE("]f and [f step through the open songs, going round at either end")

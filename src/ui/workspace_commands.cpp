@@ -558,6 +558,12 @@ constexpr std::array kSharedCommands{
                 .bang = true,
                 .keys = false,
                 .choices = {Choices::DrumMapFile}},
+    CommandInfo{.name = "song-title",
+                .description = "Set the song's title to TITLE; with none, asking for it, with the "
+                               "title to edit, an empty answer clearing it",
+                .aliases = "title",
+                .usage = "[TITLE]",
+                .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "song-recent",
                 .description = "List the song files opened or saved lately, to open one",
                 .modes = modeBit(Mode::Normal)},

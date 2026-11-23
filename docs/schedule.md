@@ -183,8 +183,8 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
 - [x] **Done** — Recent songs: a list kept between sessions, reached with `, f r` (asked for 13 November 2026, agreed 20 November 2026). See [design.md](design.md#recent-songs).
     - [x] **Done** — Remember songs opened and saved, up to `recentsongs`; the chooser with three aligned columns, Delete to remove, missing files offered for removal.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Song titles (scheduled 20 November 2026, design agreed 23 November 2026). See [design.md](design.md#song-titles).
-    - [ ] **To do** — `:song-title` and `, f t`, as an undo step.
+- [ ] **Doing** — Song titles (scheduled 20 November 2026, design agreed 23 November 2026). See [design.md](design.md#song-titles).
+    - [ ] **Doing** — `:song-title` and `, f t`, as an undo step. Built; awaiting trial.
     - [ ] **To do** — Title and filename in the window's title bar and in Open songs.
     - [ ] **To do** — Titles remembered and shown in Recent songs.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).

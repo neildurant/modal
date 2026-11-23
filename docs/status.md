@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 23 November 2026: the song-titles design was agreed. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
+*Last updated 23 November 2026: the song-titles design was agreed, and setting the title is ready to try. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
 
 ## Current handoff
+
+### Song titles, step 1: setting the title, 23 November 2026
+
+`:song-title TITLE` (alias `title`) sets the song's title as one undo step, marking the song modified. Without TITLE, and from `, f t`, it asks `Song title:` with the title there to edit; an empty answer clears it and Escape leaves it. Setting the title it already has changes nothing and says so. See [design.md](design.md#song-titles).
+
+**Validation.** A Workspace test sets the title by the command and its alias, undoes and redoes it, opens the question by `, f t` with the title to edit, leaves it with Escape, edits it, clears it with an empty answer and undoes the clearing; the Files group test now expects `t`. MSVC Debug passes all 1,249 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,250 with three. Whole-tree formatting and `git diff --check` pass. The manual is updated with the last step.
+
+**Pending.** The desktop trial; then pushing and the hosted checks.
+
+**To try.** In `modal --demo`, press `, f` and pause to see `t` Song title. `, f t` shows `Song title:` with `Test arrangement` to edit: change it and Enter, and check the arrangement's top left and `u`. `, f t` again, clear the line and Enter to remove the title; Escape instead leaves it. Try `:title Morning` and saving, then reopening the song.
 
 ### Song titles agreed, 23 November 2026
 

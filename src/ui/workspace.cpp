@@ -132,6 +132,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return importTracks(call);
                 if (name == "song-recent")
                     return showRecentSongs();
+                if (name == "song-title")
+                    return songTitle(call.arguments);
                 if (name == "drum-map-load" || name == "drum-map-save")
                     return drumMapFile(call, name == "drum-map-save");
                 if (name == "go-pitch")
@@ -3754,6 +3756,48 @@ CommandResult Workspace::label(std::string_view name)
     document_.edit(title, view().place(), [&](core::Song& song) { song.setLabel(tick, text); });
     refresh();
     return {true, (it == labels.end() ? "Labelled " : "Renamed it ") + text, false};
+}
+
+CommandResult Workspace::songTitle(std::string_view title)
+{
+    // :song-title TITLE sets it; alone, it asks, with the title to edit, and an empty answer
+    // clears it, which the command line can't say.
+    while (!title.empty() && title.front() == ' ')
+        title.remove_prefix(1);
+    while (!title.empty() && title.back() == ' ')
+        title.remove_suffix(1);
+    if (title.empty())
+    {
+        askFor(
+            "Song title: ", [this](const std::string& answer) { report(setSongTitle(answer)); }, {},
+            true);
+        prompt_.line.open(decodeUtf8(document_.song().title));
+        return {true};
+    }
+    return setSongTitle(std::string{title});
+}
+
+CommandResult Workspace::setSongTitle(std::string title)
+{
+    while (!title.empty() && title.front() == ' ')
+        title.erase(title.begin());
+    while (!title.empty() && title.back() == ' ')
+        title.pop_back();
+    const auto& now = document_.song().title;
+    if (title == now)
+    {
+        return {true,
+                title.empty() ? std::string{"The song has no title"}
+                              : "The song's title is already " + title,
+                false};
+    }
+    const auto step =
+        title.empty() ? std::string{"Clear the song's title"} : "Title the song " + title;
+    document_.edit(step, view().place(), [&](core::Song& song) { song.title = title; });
+    refresh();
+    return {true,
+            title.empty() ? std::string{"The song has no title now"} : "Titled the song " + title,
+            false};
 }
 
 CommandResult Workspace::deleteLabels()
