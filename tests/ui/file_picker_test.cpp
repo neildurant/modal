@@ -13,6 +13,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -453,6 +454,9 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     for (const auto& hint : *shown)
         keys.push_back(hint.keys);
     CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "r", "s", "S", "t", "x"});
+    const auto title = std::ranges::find(*shown, std::string{"t"}, &Workspace::Hint::keys);
+    REQUIRE(title != shown->end());
+    CHECK(title->title == "Set song title");
     p.press(NamedKey::Escape);
     p.workspace.setHints(false, 0);
     p.type(U",ff");

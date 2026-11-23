@@ -575,7 +575,7 @@ nmap <leader>fc song-close        "Close this song"
 nmap <leader>fx export            "Export as MIDI"
 nmap <leader>fi track-import      "Import tracks from a file"
 nmap <leader>fr song-recent       "Recent songs"
-nmap <leader>ft song-title        "Song title"
+nmap <leader>ft song-title        "Set song title"
 nmap ]f          song-next         "Next open song"
 nmap [f          song-previous     "Open song before"
 nmap <C-Tab>     song-next

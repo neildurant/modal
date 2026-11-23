@@ -14,7 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Pending.** The desktop trial; then pushing and the hosted checks.
 
-**To try.** In `modal --demo`, press `, f` and pause to see `t` Song title. `, f t` shows `Song title:` with `Test arrangement` to edit: change it and Enter, and check the arrangement's top left and `u`. `, f t` again, clear the line and Enter to remove the title; Escape instead leaves it. Try `:title Morning` and saving, then reopening the song.
+**To try.** In `modal --demo`, press `, f` and pause to see `t` Set song title. `, f t` shows `Song title:` with `Test arrangement` to edit: change it and Enter, and check the arrangement's top left and `u`. `, f t` again, clear the line and Enter to remove the title; Escape instead leaves it. Try `:title Morning` and saving, then reopening the song.
 
 ### Song titles agreed, 23 November 2026
 
