@@ -697,7 +697,7 @@ section "Verse 1" bars=16 colour=blue
 
 A window edits one active song and can keep others open. Each song owns its contents, file, modified state and undo history. `:e FILE` opens or selects a song by file identity. Opening from a sole untouched untitled song uses that slot. `:new` adds an untitled song. The forced forms `:e!` and `:new!` replace the current song and may discard its edits. Reopening the current file with `:e!` reloads it from disk.
 
-`:song-select` shows **Open songs**, with the active song selected, a marker for unsaved edits, and an aligned location column for each song's path, import source or Unsaved status. Type part of a name or path to narrow the list, including text shortened on screen. Up and Down choose, Enter switches and Escape cancels. A clipped location for the highlighted song is shown beneath the list. Untitled titles include an opening number to distinguish copies.
+`:song-select` shows **Open songs**, with the active song selected, a marker for unsaved edits, and aligned columns for each song's title, its file's name (`Untitled` and a number for a song without a file) and its folder, an import marked `(MIDI import)`, or Unsaved (see Song titles). Type part of a title, name or folder to narrow the list, including text shortened on screen. Up and Down choose, Enter switches and Escape cancels. A clipped location for the highlighted song is shown beneath the list. Untitled titles include an opening number to distinguish copies.
 
 `:song-close` closes the current song, requiring `!` to discard its edits. It selects an adjacent open song or leaves a blank song if none remain. `:q` checks all open songs, `:wq` saves the active one before checking the others, and `:q!` discards outstanding edits. A window close with other unsaved songs stays open and points to the chooser. When just the active song has edits, the window offers Save, Don't save and Cancel.
 
@@ -711,8 +711,8 @@ A song's title is what it's known by, apart from its file: it's kept in the song
 
 Where a title is set it shows:
 
-- **The window's title bar:** `Morning (morning.modal) [+] – Modal`, the title first and the file after it, so copies of one song can be told apart; without a title, the filename alone as before.
-- **Open songs:** the title and the filename in columns of their own, before the location, the title column blank for a song with none.
+- **The window's title bar:** `Morning (morning.modal) [+] – Modal`, the title first and the file after it, so copies of one song can be told apart; `Morning (demo.mid, imported)` for an imported file and `Morning (unsaved)` for a song without a file. Without a title, the filename alone as before.
+- **Open songs:** the title and the filename in columns of their own, then the folder, as Recent songs shows them; the title column blank for a song with none, and left out where no open song has a title. Stepping with `]f` and `[f` names the song reached by its title where it has one.
 - **Recent songs:** a title column beside the filename, the title remembered in the `remembered` file each time the song is opened or saved, so drawing the list reads no song files. Typing narrows by title as well as by name and folder.
 - **The arrangement:** at the top left of the track headers, as now.
 - **MIDI export:** as the first track's name, as now.

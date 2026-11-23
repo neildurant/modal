@@ -296,9 +296,10 @@ public:
         const auto index = forward ? (active_ + steps) % open : (active_ + open - steps) % open;
         if (auto switched = activate(index, false); switched.refused)
             return switched;
+        const auto reached = describe(active_);
         return {true,
                 "Song " + std::to_string(active_ + 1) + " of " + std::to_string(open) + ": " +
-                    describe(active_).name,
+                    (reached.title.empty() ? reached.name : reached.title),
                 false};
     }
 
@@ -329,11 +330,13 @@ private:
         const auto& song = at(index);
         const auto& file = song.file() ? song.file() : song.importedFrom();
         const auto& title = song.underlying().title;
-        auto name = !title.empty() ? title : file ? named(*file) : std::string{"Untitled"};
         if (!file)
-            return {name + " " + std::to_string(songs_[index].number), "Unsaved", song.modified()};
-        const auto location = utf8Text(absolutePath(*file).lexically_normal());
-        return {std::move(name), location, song.modified(), !song.file().has_value()};
+        {
+            return {title, "Untitled " + std::to_string(songs_[index].number), "Unsaved",
+                    song.modified()};
+        }
+        const auto location = utf8Text(absolutePath(*file).lexically_normal().parent_path());
+        return {title, named(*file), location, song.modified(), !song.file().has_value()};
     }
 
     std::optional<std::size_t> openedFile(const std::filesystem::path& file,
@@ -524,6 +527,30 @@ private:
 std::span<const CommandInfo> fileCommands()
 {
     return kFileCommands;
+}
+
+std::string windowTitle(const core::Document& song)
+{
+    // The title is what the song is known by, and the file tells copies apart.
+    const auto& file = song.file();
+    const auto& imported = song.importedFrom();
+    const auto& title = song.underlying().title;
+    std::string name;
+    if (title.empty())
+    {
+        name = file       ? named(*file)
+               : imported ? named(*imported) + " (imported)"
+                          : std::string{"Untitled"};
+    }
+    else
+    {
+        name = title + " (" +
+               (file       ? named(*file)
+                : imported ? named(*imported) + ", imported"
+                           : std::string{"unsaved"}) +
+               ")";
+    }
+    return name + (song.modified() ? " [+]" : "") + " – Modal";
 }
 
 std::function<bool()> addFileCommands(CommandRegistry& registry, core::RecordingSession& recording,

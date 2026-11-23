@@ -1237,6 +1237,8 @@ private:
     {
         struct Row
         {
+            std::u32string marks; // the active song and unsaved changes
+            std::u32string title;
             std::u32string name;
             std::u32string location;
         };

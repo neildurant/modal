@@ -488,10 +488,10 @@ void Workspace::chooseSong(std::vector<OpenSong> songs, std::size_t active,
     {
         const auto& song = songs[i];
         const auto location = song.location + (song.imported ? " (MIDI import)" : "");
-        labels.push_back(song.name + " " + location);
-        rows.push_back({decodeUtf8((i == active ? "› " : "  ") +
-                                   std::string{song.modified ? "+ " : "  "} + song.name),
-                        decodeUtf8(location)});
+        labels.push_back(song.title + " " + song.name + " " + location);
+        rows.push_back(
+            {decodeUtf8((i == active ? "› " : "  ") + std::string{song.modified ? "+ " : "  "}),
+             decodeUtf8(song.title), decodeUtf8(song.name), decodeUtf8(location)});
     }
     songChoice_.emplace(SongChoice{ChoiceList{std::move(labels), active, true}, std::move(rows),
                                    std::move(chosen)});
@@ -530,19 +530,33 @@ Region Workspace::songChoiceRegion() const
     const int margin = BarSpacing::forCell(cell_).margin;
     const auto columns =
         static_cast<std::size_t>(std::max((bar.width - 2 * margin) / cell_.width, 1));
+    // The title and the file's name in columns of their own, then the folder, as Recent songs
+    // shows them; no title column where no song has a title.
+    std::size_t titleWidth = 0;
     std::size_t nameWidth = 0;
     for (const auto& row : choice.rows)
+    {
+        titleWidth = std::max(titleWidth, row.title.size());
         nameWidth = std::max(nameWidth, row.name.size());
-    // Leave most of the row for paths, even when a song title is long.
-    nameWidth = std::min(nameWidth, std::max(columns / 3, std::size_t{1}));
+    }
+    // Leave most of the row for folders, even when titles or names are long.
+    const auto most = std::max(columns / (titleWidth > 0 ? 4 : 3), std::size_t{1});
+    titleWidth = std::min(titleWidth, most);
+    nameWidth = std::min(nameWidth, most);
+    const auto fit = [](std::u32string text, std::size_t width)
+    {
+        const bool cut = text.size() > width;
+        text.resize(width, U' ');
+        if (cut)
+            text.back() = U'…';
+        return text;
+    };
     std::vector<std::u32string> labels;
     for (const auto& row : choice.rows)
     {
-        auto name = row.name;
-        name.resize(nameWidth, U' ');
-        if (row.name.size() > nameWidth)
-            name.back() = U'…';
-        labels.push_back(std::move(name) + U"  " + row.location);
+        labels.push_back(row.marks +
+                         (titleWidth > 0 ? fit(row.title, titleWidth) + U"  " : std::u32string{}) +
+                         fit(row.name, nameWidth) + U"  " + row.location);
     }
     std::u32string detail;
     if (const auto chosen = choice.list.chosen(); chosen && labels[*chosen].size() + 1 > columns)

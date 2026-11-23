@@ -13,6 +13,7 @@
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/demo_song.hpp>
+#include <modal/ui/file_commands.hpp>
 #include <modal/ui/frame.hpp>
 #include <modal/ui/layout.hpp>
 #include <modal/ui/ports.hpp>
@@ -915,6 +916,30 @@ TEST_CASE("a sample of the recent songs", "[.sample]")
         view.report(registry.runLine("song-recent"));
         window->draw(view.frame(), *builtInTheme(theme));
         CHECK(window->saveFrame(base + "-recent-" + theme + ".bmp"));
+        view.handle(Key::of(NamedKey::Escape), 0);
+    }
+}
+
+TEST_CASE("a sample of the open songs", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    for (const auto& theme : {"dark", "light"})
+    {
+        auto window = offscreen(1200, 600);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        view.chooseSong({{"Morning", "Dawn.modal", "/home/me/Music/Songs", true},
+                         {"", "Groove.modal", "/home/me/Music/Songs", false},
+                         {"Test arrangement", "demo.mid", "/home/me/Downloads", false, true},
+                         {"Sketch", "Untitled 4", "Unsaved", true}},
+                        0, [](std::size_t) {});
+        window->draw(view.frame(), *builtInTheme(theme));
+        CHECK(window->saveFrame(base + "-open-songs-" + theme + ".bmp"));
         view.handle(Key::of(NamedKey::Escape), 0);
     }
 }

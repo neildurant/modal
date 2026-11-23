@@ -967,15 +967,7 @@ int main(int argc, char* argv[])
     };
 
     // The window's title names the song, as the status line does.
-    const auto title = [&]
-    {
-        const auto& file = document.file();
-        const auto& imported = document.importedFrom();
-        const auto name = file       ? ui::utf8Text(file->filename())
-                          : imported ? ui::utf8Text(imported->filename()) + " (imported)"
-                                     : std::string{"Untitled"};
-        return name + (document.modified() ? " [+]" : "") + " – Modal";
-    };
+    const auto title = [&] { return ui::windowTitle(document); };
 
     const auto& theme = config.theme;
     window.run({.redraw =

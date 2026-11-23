@@ -886,16 +886,17 @@ TEST_CASE("song select shows the rest of a long location beneath the list")
     p.type(decodeUtf8(":e " + folder + "/test-ending\n:song-select\n"));
     CHECK(p.shows(U"Long location"));
     CHECK(p.shows(U"test-ending.modal"));
+    CHECK(p.shows(decodeUtf8(std::string(20, 'b'))));
 }
 
-TEST_CASE("open song paths align even when names are shortened")
+TEST_CASE("open song folders align even when titles and names are shortened")
 {
     Pickers p;
     std::optional<std::size_t> chosen;
-    p.workspace.chooseSong(
-        {{"Short", "/songs/first.modal", true},
-         {std::string(60, 'L') + " Secret ending", "/imports/second.mid", false, true}},
-        0, [&](std::size_t index) { chosen = index; });
+    p.workspace.chooseSong({{"Short", "first.modal", "/songs", true},
+                            {std::string(60, 'L') + " Secret ending",
+                             std::string(60, 'N') + " Hidden name", "/imports", false, true}},
+                           0, [&](std::size_t index) { chosen = index; });
     const auto column = [&](std::u32string_view path) -> std::optional<std::size_t>
     {
         for (const auto& region : p.workspace.frame())
@@ -904,11 +905,55 @@ TEST_CASE("open song paths align even when names are shortened")
                     return static_cast<std::size_t>(run.x / 10) + offset;
         return std::nullopt;
     };
-    const auto saved = column(U"/songs/first.modal");
+    const auto saved = column(U"/songs");
     REQUIRE(saved);
-    CHECK(column(U"/imports/second.mid") == saved);
+    CHECK(column(U"/imports") == saved);
+    const auto name = column(U"first.modal");
+    REQUIRE(name);
+    CHECK(column(U"NNN") == name);
+    CHECK(column(U"Short") < name);
     CHECK(p.shows(U"(MIDI import)"));
     CHECK_FALSE(p.shows(U"Secret ending"));
-    p.type(U"Secret ending\n");
+    CHECK_FALSE(p.shows(U"Hidden name"));
+    p.type(U"Hidden name\n");
     CHECK(chosen == 1);
+}
+
+TEST_CASE("open songs show titles and file names apart, and the window's title names both")
+{
+    Pickers p;
+    p.makeSong("Dawn.modal", "Morning");
+    p.makeSong("Plain.modal", "");
+    p.type(U":e Plain\n");
+    CHECK(windowTitle(p.document) == "Plain.modal – Modal");
+    p.type(U":e Dawn\n");
+    CHECK(windowTitle(p.document) == "Morning (Dawn.modal) – Modal");
+    p.type(U":title Evening\n");
+    CHECK(windowTitle(p.document) == "Evening (Dawn.modal) [+] – Modal");
+
+    // The chooser: title, then file name, then folder; no title, a blank title column.
+    p.type(U":song-select\n");
+    const auto line = [&](std::u32string_view part) -> std::u32string
+    {
+        for (const auto& region : p.workspace.frame())
+            for (const auto& run : region.text)
+                if (run.text.find(part) != std::u32string::npos)
+                    return run.text;
+        return {};
+    };
+    const auto titled = line(U"Dawn.modal");
+    const auto plain = line(U"Plain.modal");
+    REQUIRE(titled.find(U"Evening") != std::u32string::npos);
+    CHECK(titled.find(U"Evening") < titled.find(U"Dawn.modal"));
+    CHECK(titled.find(U"Dawn.modal") == plain.find(U"Plain.modal"));
+    CHECK(plain.find(U"Evening") == std::u32string::npos);
+    // Typing narrows by title too.
+    p.type(U"Even\n");
+    CHECK(p.document.song().title == "Evening");
+
+    // A new song with a title, not yet saved.
+    p.type(U":new\n:title Sketch\n");
+    CHECK(windowTitle(p.document) == "Sketch (unsaved) [+] – Modal");
+    p.type(U"[f");
+    CHECK(p.workspace.message() == "Song 2 of 3: Evening");
 }

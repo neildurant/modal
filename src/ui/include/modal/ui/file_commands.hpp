@@ -21,11 +21,16 @@ namespace modal::ui
 
 struct OpenSong
 {
-    std::string name;
-    std::string location;
+    std::string title;    // empty for a song without one
+    std::string name;     // the file's name, or Untitled and a number for a song without a file
+    std::string location; // the file's folder, or Unsaved
     bool modified;
     bool imported = false;
 };
+
+// The window's title for a song: its title and then its file, or the file alone where the song
+// has no title, and [+] where it has unsaved changes.
+std::string windowTitle(const core::Document& song);
 
 // What the file commands need from the program: the system's file dialogs, quitting, and
 // somewhere to show what happened.
