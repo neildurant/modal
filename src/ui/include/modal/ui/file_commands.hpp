@@ -75,6 +75,10 @@ public:
     {
     }
 
+    // Before a save replaces a song file: keeps a backup of it (decided 23 November 2026),
+    // returning why none could be made, or nothing.
+    virtual std::string backUp(const std::filesystem::path&) { return {}; }
+
     // The songfolder setting's folder, if set: where a song without a file starts.
     virtual std::optional<std::filesystem::path> songsFolder() const { return std::nullopt; }
 

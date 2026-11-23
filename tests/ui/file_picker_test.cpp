@@ -5,6 +5,7 @@
 #include <modal/core/drum_map_file.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/ui/backups.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/prompt.hpp>
@@ -14,6 +15,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -78,6 +81,10 @@ struct Pickers final : FileHost
     void returnToSong(std::shared_ptr<void> kept) override
     {
         workspace.returnToSong(std::move(kept));
+    }
+    std::string backUp(const std::filesystem::path& file) override
+    {
+        return workspace.backUp(file);
     }
     void report(const CommandResult& result) override { workspace.report(result); }
 
@@ -300,6 +307,47 @@ TEST_CASE("recent songs list the files opened and saved, to open one again")
     const auto before = p.workspace.remembered().songs().size();
     p.type(U":e Groove\n");
     CHECK(p.workspace.remembered().songs().size() == before);
+}
+
+TEST_CASE("saving over a song keeps the version it replaces as a backup")
+{
+    Pickers p;
+    Settings settings;
+    p.workspace.setSettings(&settings);
+    const auto file = p.temporary.path() / "Backed.modal";
+    const auto backups = [&] { return songBackups(p.temporary / "State", file); };
+    const auto contents = [](const std::filesystem::path& path)
+    {
+        std::ifstream stream{path, std::ios::binary};
+        return std::string{std::istreambuf_iterator<char>{stream}, {}};
+    };
+
+    // A new file replaces nothing.
+    p.type(U":w Backed\n");
+    CHECK(p.workspace.message() == "Saved Backed.modal");
+    CHECK(backups().empty());
+
+    p.type(U":song-title First\n:w\n");
+    p.type(U":song-title Second\n:w\n");
+    REQUIRE(backups().size() == 2);
+    CHECK(contents(backups()[0].file).find("\"First\"") != std::string::npos);
+    CHECK(contents(backups()[1].file).find("\"First\"") == std::string::npos);
+    CHECK(contents(file).find("\"Second\"") != std::string::npos);
+
+    // None kept with backups at 0.
+    REQUIRE(settings.set("backups", "0").empty());
+    p.type(U":song-title Third\n:w\n");
+    CHECK(backups().size() == 2);
+    REQUIRE(settings.set("backups", "5").empty());
+
+    // A backup that can't be made doesn't stop the save, and says so.
+    p.temporary.write("Blocked", "in the way");
+    p.workspace.setStateFolder(p.temporary / "Blocked");
+    p.type(U":song-title Fourth\n:w\n");
+    CHECK(p.workspace.message().starts_with(
+        "Saved Backed.modal, but no backup was made: can't make "));
+    CHECK_FALSE(p.document.modified());
+    CHECK(contents(file).find("\"Fourth\"") != std::string::npos);
 }
 
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")

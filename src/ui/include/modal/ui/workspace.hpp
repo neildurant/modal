@@ -301,6 +301,10 @@ public:
     void songUsed(const std::filesystem::path& file,
                   const std::optional<std::filesystem::path>& replacing = std::nullopt);
 
+    // Before a save replaces a song file: keeps a backup of it in the state folder, up to the
+    // backups setting's number, returning why none could be made, or nothing.
+    std::string backUp(const std::filesystem::path& file) const;
+
     // The songfolder setting's folder, if it's set (decided 20 November 2026).
     std::optional<std::filesystem::path> songsFolder() const;
     // Where a song's files are looked for: its own folder, or else the Songs folder or home.

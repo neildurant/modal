@@ -472,6 +472,11 @@ private:
         }
         if (const auto existing = openedFile(file, false); existing && *existing != active_)
             return CommandResult::error(named(file) + " is already open in another song");
+        // The file as it was, kept before it's replaced; the save goes ahead without one, so a
+        // full state directory can't stop work being kept.
+        std::string noBackup;
+        if (std::error_code error; std::filesystem::is_regular_file(file, error))
+            noBackup = host_.backUp(file);
         if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
         {
             return CommandResult::error("Can't save " + named(file) + ": " + error);
@@ -490,6 +495,8 @@ private:
                     ". Other open songs have unsaved changes. Use :song-select");
             host_.quit();
         }
+        if (!noBackup.empty())
+            return {true, "Saved " + named(file) + ", but no backup was made: " + noBackup, true};
         return {true, "Saved " + named(file), false};
     }
 

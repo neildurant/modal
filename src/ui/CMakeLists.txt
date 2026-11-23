@@ -15,6 +15,8 @@ add_library(modal_ui STATIC
     ports_view.cpp
     metronome_view.cpp
     remembered.cpp
+    backups.cpp
+    workspace_backups.cpp
     config.cpp
     drum_maps.cpp
     workspace_drum_maps.cpp

@@ -5,6 +5,7 @@
 | `` theme `` | `` dark `` | The colour theme: themes/NAME in the config directory, or a built-in theme, dark or light |
 | `` font `` | (empty) | A TrueType or OpenType font file for the grid, or empty for the built-in JetBrains Mono |
 | `` fontsize `` | `` 12 `` | The font's size in points, before the display's scaling. Range: 4 to 72 |
+| `` backups `` | `` 5 `` | How many earlier versions of each song file saving keeps, in the state directory; 0 keeps none. Range: 0 to 100 |
 | `` recentsongs `` | `` 12 `` | How many song files opened or saved the recent list (, f r) keeps; 0 keeps none. Range: 0 to 100 |
 | `` songfolder `` | (empty) | The folder songs are usually kept in, where the file picker starts for a new song and which Places offers as Songs; empty for the home folder |
 | `` minsize `` | `` 120x30 `` | The smallest the window can be made, in cells. Range: 20 to 1000 |
