@@ -10,11 +10,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 Found on trial: `yy` on a bar with a controller ramp took the ramp, and `p` put it, but `dd` on that bar in the arrangement left the ramp behind. Its delete, when not closing the gap, erased the events alone; it now takes the ramps starting in the area and the events they hid, as yanking, the rippling delete and the piano roll's delete already did, and a bar holding only a ramp counts as something to delete. A ramp the area cuts through is refused first, as before.
 
-**Validation.** A Workspace test, at two PPQNs, makes a ramp in bar 1, yanks the bar in the arrangement and puts it in bar 2, and checks that `dd` there leaves only the first ramp and no events in bar 2, and that `u` restores the put; it fails without the fix. MSVC Debug passes all 1,267 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+**Validation.** A Workspace test, at two PPQNs, makes a ramp in bar 1, yanks the bar in the arrangement and puts it in bar 2, and checks that `dd` there leaves only the first ramp and no events in bar 2, and that `u` restores the put; it fails without the fix. MSVC Debug passes all 1,267 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,268; formatting and `git diff --check` pass.
 
-**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks.
-
-**To try.** In the arrangement, on a bar with a ramp, `yy`, move a bar on and `p`, then `dd`: the put ramp goes with the bar. `u` brings it back.
+**Accepted.** Confirmed fixed on trial.
 
 ### Vim's other registers, step 1: `"0` and `"_`, 23 November 2026
 
