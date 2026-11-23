@@ -1043,6 +1043,10 @@ private:
         SongCursor after;
     };
     std::optional<LastPut> lastPut_;
+    std::optional<std::size_t> swapTo_; // the copy a swap is putting, for notePut
+    // Which copy in the history the unnamed register holds, if any: the one last put, if
+    // it's that, or else the newest that's the same.
+    std::optional<std::size_t> unnamedInHistory() const;
     void notePut(std::string_view command, int count, Mode mode,
                  const std::optional<Selection>& selection, const EventRegister& put);
     bool swapPut(int count, bool older);

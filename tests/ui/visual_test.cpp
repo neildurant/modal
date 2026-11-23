@@ -1026,9 +1026,13 @@ TEST_CASE("Yanks and deletes fill the paste history, \"1 the newest, to put from
     {
         s.type(U":registers");
         s.press(NamedKey::Enter);
-        const auto lines = std::ranges::count_if(
-            s.ws.listing(), [](const auto& line)
-            { return line.first.size() == 2 && line.first[1] >= '1' && line.first[1] <= '9'; });
+        const auto lines = std::ranges::count_if(s.ws.listing(),
+                                                 [](const auto& line)
+                                                 {
+                                                     return line.first.size() >= 2 &&
+                                                            line.first.back() >= '1' &&
+                                                            line.first.back() <= '9';
+                                                 });
         s.press(NamedKey::Escape);
         return lines;
     };
@@ -1050,7 +1054,7 @@ TEST_CASE("[p and ]p swap what was just put for an older or newer copy, as one u
     s.type(U"[p");
     CHECK(count(42) == 1);
     CHECK(count(41) == 2);
-    CHECK(s.ws.message().starts_with("Put \"2, 1 event on 1 track"));
+    CHECK(s.ws.message().ends_with(" · \"2 of 3 ([p older, ]p newer)"));
     s.type(U"[p");
     CHECK(count(41) == 1);
     CHECK(count(40) == 2);
@@ -1078,6 +1082,15 @@ TEST_CASE("[p and ]p swap what was just put for an older or newer copy, as one u
     CHECK(count(40) == 2);
     s.type(U"u");
 
+    // :registers says which copy p puts, and marks it among the history.
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    s.type(U":registers");
+    s.press(NamedKey::Enter);
+    using Line = std::pair<std::string, std::string>;
+    CHECK(s.ws.listing()[0] == Line{"\"\"", "1 event on 1 track, as \"3"});
+    CHECK(std::ranges::count(s.ws.listing(), Line{">\"3", "1 event on 1 track"}) == 1);
+    s.press(NamedKey::Escape);
+
     // Only straight after a put.
     s.type(U"p");
     s.type(U"l[p");
@@ -1095,10 +1108,10 @@ TEST_CASE(":registers says what each holds")
     s.type(U":registers");
     s.ws.handle(Key::of(NamedKey::Enter), 0);
     using Lines = std::vector<std::pair<std::string, std::string>>;
-    CHECK(s.ws.listing() == Lines{{"\"\"", "4 events on 2 tracks"},
+    CHECK(s.ws.listing() == Lines{{"\"\"", "4 events on 2 tracks, as \"1"},
                                   {"\"a", "1 event on 1 track"},
                                   {"\"b", "4 events on 2 tracks"},
-                                  {"\"1", "4 events on 2 tracks"},
+                                  {">\"1", "4 events on 2 tracks"},
                                   {"\"2", "1 event on 1 track"}});
     // One a line, over the view; the next key closes it and does nothing else.
     const auto frame = s.ws.frame();
@@ -1375,19 +1388,20 @@ TEST_CASE("Each put is a command named for what it does, and says what it put an
 
     // In the piano roll, at the cursor's bar, as taken.
     s.type(U"gggryy]bp");
-    CHECK(s.ws.message() == "Put 1 event in Bass at bar 2, over what's there");
+    // Where the copy is in the paste history follows; see the [p test.
+    CHECK(s.ws.message().starts_with("Put 1 event in Bass at bar 2, over what's there · \""));
     s.type(U"u");
 
     // In Visual mode, in place of what's selected.
     s.type(U"gaggyylvp");
-    CHECK(s.ws.message() == "Put 1 event in place of bar 2 on every track");
+    CHECK(s.ws.message().starts_with("Put 1 event in place of bar 2 on every track"));
     s.type(U"u");
 
     // On the strip, sections after or before this one.
     s.type(U"gsYlp");
-    CHECK(s.ws.message() == "Put A after B");
+    CHECK(s.ws.message().starts_with("Put A after B"));
     s.type(U"uP");
-    CHECK(s.ws.message() == "Put A before B");
+    CHECK(s.ws.message().starts_with("Put A before B"));
 }
 
 TEST_CASE("put-ending puts the register so it ends at the cursor, or its bar line when bars")

@@ -202,7 +202,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — The history: yanks and deletes fill `"1` to `"9`; `"3p`; `:registers` lists them. Accepted on trial.
     - [ ] **Doing** — `[p` and `]p` swapping straight after a put, one undo step with it. Built; awaiting trial.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
+- [ ] **To do** — The yank register `"0` (the last yank alone) and the black-hole register `"_`; system clipboard support after settling its representation. The numbered registers are the paste history's `"1` to `"9` (decided 23 November 2026).
 - [ ] **To do** — Song-format compatibility policy between versions.
 - [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
 
@@ -335,6 +335,7 @@ No milestone or implementation commitment. Keep these unchecked unless they are 
 
 - [ ] **Unscheduled** — Saved sessions (suggested 20 November 2026): reopen a set of songs together, each at the view and place it was left, across program runs.
 - [ ] **Unscheduled** — View snapshots (suggested 20 November 2026): save how a song is being looked at (view, places, zoom, folds) and restore it later, without changing the music. Shares a value-type capture of each view's place with saved sessions; song switching could then use the same capture.
+- [ ] **Unscheduled** — A paste-history panel while swapping (suggested 23 November 2026): straight after a put, a few lines above the message row list the paste history, newest first, the copy in the song highlighted; `[p` and `]p` move the highlight, and the next other key closes it. A new kind of panel, as `:registers`' listing closes on the next key.
 - [ ] **Unscheduled** — Playback drum-map translation (kept unscheduled 19 November 2026): suggest source-to-destination drum pitches from names and aliases, review ambiguous/unmatched guesses, and apply an accepted mapping at playback while preserving written notes. Playback/audition/export details need a separate design before implementation.
 - [ ] **Unscheduled** — Musical search/replace by interval or rhythm pattern.
 - [ ] **Unscheduled** — Linked variations and linked sections.

@@ -918,9 +918,14 @@ bool Workspace::sayRegisters()
 {
     // Each holding something, the unnamed first, one a line: "a : 12 events on 2 tracks.
     std::vector<std::pair<std::string, std::string>> lines;
+    // The unnamed register, what p puts, saying which copy in the paste history it is, that
+    // marked with > among them (decided 23 November 2026).
+    const auto inHistory = unnamedInHistory();
     if (!register_.empty())
     {
-        lines.emplace_back("\"\"", registerAbout(register_));
+        lines.emplace_back(
+            "\"\"", registerAbout(register_) +
+                        (inHistory ? ", as \"" + std::to_string(*inHistory + 1) : std::string{}));
     }
     for (const auto& [name, reg] : registers_)
     {
@@ -931,7 +936,8 @@ bool Workspace::sayRegisters()
     }
     for (std::size_t i = 0; i < pasteHistory_.size(); ++i)
     {
-        lines.emplace_back("\"" + std::to_string(i + 1), registerAbout(pasteHistory_[i]));
+        lines.emplace_back((inHistory == i ? ">\"" : "\"") + std::to_string(i + 1),
+                           registerAbout(pasteHistory_[i]));
     }
     if (lines.empty())
     {

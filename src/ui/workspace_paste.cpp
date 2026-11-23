@@ -14,18 +14,39 @@ void Workspace::notePut(std::string_view command, int count, Mode mode,
     // What [p and ]p need to put another copy in its place: the put, as it was asked for, and
     // where the song and cursor were left, which tell that nothing's happened since.
     const auto at = std::ranges::find(pasteHistory_, put);
-    lastPut_ =
-        LastPut{.command = std::string{command},
-                .count = count,
-                .mode = mode,
-                .selection = selection,
-                .index = at == pasteHistory_.end()
-                             ? std::nullopt
-                             : std::optional{static_cast<std::size_t>(at - pasteHistory_.begin())},
-                .version = document_.version(),
-                .song = songNumber_,
-                .view = shown(),
-                .after = view().cursor()};
+    const auto index = swapTo_ ? swapTo_
+                       : at == pasteHistory_.end()
+                           ? std::nullopt
+                           : std::optional{static_cast<std::size_t>(at - pasteHistory_.begin())};
+    lastPut_ = LastPut{.command = std::string{command},
+                       .count = count,
+                       .mode = mode,
+                       .selection = selection,
+                       .index = index,
+                       .version = document_.version(),
+                       .song = songNumber_,
+                       .view = shown(),
+                       .after = view().cursor()};
+    // Where the copy put is in the history, while there's another to swap it for (decided
+    // 23 November 2026, as what [p, ]p and p would put was hard to picture).
+    if (index && pasteHistory_.size() > 1)
+    {
+        setMessage(message_ + " · \"" + std::to_string(*index + 1) + " of " +
+                       std::to_string(pasteHistory_.size()) + " (" + keysOf("put-older") +
+                       " older, " + keysOf("put-newer") + " newer)",
+                   messageKind_);
+    }
+}
+
+std::optional<std::size_t> Workspace::unnamedInHistory() const
+{
+    if (lastPut_ && lastPut_->index && *lastPut_->index < pasteHistory_.size() &&
+        pasteHistory_[*lastPut_->index] == register_)
+        return lastPut_->index;
+    const auto at = std::ranges::find(pasteHistory_, register_);
+    if (at == pasteHistory_.end())
+        return std::nullopt;
+    return static_cast<std::size_t>(at - pasteHistory_.begin());
 }
 
 bool Workspace::swapPut(int count, bool older)
@@ -80,15 +101,9 @@ bool Workspace::swapPut(int count, bool older)
     selection_ = put.selection;
     register_ = pasteHistory_[*target];
     registerSeen_ = register_;
-    run(put.command, put.count);
-    if (lastPut_ && lastPut_->version == document_.version())
-    {
-        lastPut_->index = target;
-        setMessage("Put \"" + std::to_string(*target + 1) + ", " +
-                       registerAbout(pasteHistory_[*target]) + ": " + keysOf("put-older") +
-                       " and " + keysOf("put-newer") + " for others",
-                   MessageKind::Information);
-    }
+    swapTo_ = target;
+    run(put.command, put.count); // saying what it put, and where that is in the history
+    swapTo_.reset();
     return true;
 }
 
