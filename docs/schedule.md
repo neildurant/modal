@@ -198,7 +198,10 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Within a song: jumps and view changes recorded, `Ctrl-o` / `Ctrl-i`, `:jumps`. Accepted on trial.
     - [x] **Done** — Across songs: switching recorded, `Ctrl-o` switching back, closed songs passed over. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Paste history, including cycling the material just put.
+- [ ] **Doing** — Paste history, including cycling the material just put (design agreed 23 November 2026). See [design.md](design.md#editing-grammar).
+    - [ ] **Doing** — The history: yanks and deletes fill `"1` to `"9`; `"3p`; `:registers` lists them. Built; awaiting trial.
+    - [ ] **To do** — `[p` and `]p` swapping straight after a put, one undo step with it.
+    - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
 - [ ] **To do** — Song-format compatibility policy between versions.
 - [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).

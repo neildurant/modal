@@ -170,7 +170,7 @@ With `gn`, an operator changes the next match and moves on to the one after; `.`
 - **At the cursor's pitch,** the notes keep their intervals to the pitch the cursor was on when they were taken (in Visual mode, the pitch the selection was started on; taken outside the piano roll, their lowest), so a riff or chord shape moves to another pitch.
 - **`:put-ending`** (no key) puts the register over what's there so it ends at the cursor, or at its bar line for bars: a sweep ending on a downbeat.
 - After a put the message row says what, how and where ("Put 4 events in Bass at bar 3, over what's there").
-- **Registers:** `"a` before a yank, delete or put uses register a; `"A` adds to it. `:registers` lists them.
+- **Registers:** `"a` before a yank, delete or put uses register a; `"A` adds to it. Every yank and delete also goes into the paste history, `"1` the newest to `"9`, for the session: `"3p` puts the third newest; they can't be named for a yank or delete. `:registers` lists them.
 
 ## Whole tracks and their settings
 

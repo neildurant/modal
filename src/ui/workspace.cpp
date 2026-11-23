@@ -663,7 +663,22 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     const auto version = document_.version();
     const bool changed = recordChange(key, now);
     auditionHere(version);
+    notePasteHistory();
     return changed;
+}
+
+void Workspace::notePasteHistory()
+{
+    // Whatever filled the register, a yank or delete in any view, by key or at the prompt,
+    // seen once the key's done; a named put has put it back as it was by then.
+    if (register_ == registerSeen_)
+        return;
+    registerSeen_ = register_;
+    if (register_.empty() || (!pasteHistory_.empty() && pasteHistory_.front() == register_))
+        return;
+    pasteHistory_.push_front(register_);
+    if (pasteHistory_.size() > kPasteHistory)
+        pasteHistory_.pop_back();
 }
 
 std::optional<Workspace::Heard> Workspace::noteHeardHere() const
@@ -807,9 +822,11 @@ bool Workspace::withCharacter(std::string_view command, char32_t character, int 
     }
     if (command == "register-use")
     {
-        if (!((character >= U'a' && character <= U'z') || (character >= U'A' && character <= U'Z')))
+        if (!((character >= U'a' && character <= U'z') ||
+              (character >= U'A' && character <= U'Z') || (character >= U'1' && character <= U'9')))
         {
-            refuse("Registers are named by letters, \"a to \"z, a capital adding to one",
+            refuse("Registers are named by letters, \"a to \"z, a capital adding to one, or "
+                   "\"1 to \"9 for the paste history",
                    MessageKind::Information);
             return true;
         }
@@ -911,6 +928,10 @@ bool Workspace::sayRegisters()
         {
             lines.emplace_back("\"" + encodeUtf8(std::u32string(1, name)), registerAbout(reg));
         }
+    }
+    for (std::size_t i = 0; i < pasteHistory_.size(); ++i)
+    {
+        lines.emplace_back("\"" + std::to_string(i + 1), registerAbout(pasteHistory_[i]));
     }
     if (lines.empty())
     {
@@ -1597,7 +1618,22 @@ CommandResult Workspace::run(std::string_view command, int count)
     const auto letterText = encodeUtf8(std::u32string(1, letter));
     const bool put = command.starts_with("put-");
     std::optional<EventRegister> unnamed;
-    if (named != 0 && put)
+    const bool numbered = named >= U'1' && named <= U'9';
+    if (numbered && put)
+    {
+        // The paste history, newest first.
+        const auto index = static_cast<std::size_t>(named - U'1');
+        if (index >= pasteHistory_.size())
+        {
+            registerName_.reset();
+            refuse("Register " + letterText + " is empty: the paste history holds " +
+                       std::to_string(pasteHistory_.size()),
+                   MessageKind::Warning);
+            return {true};
+        }
+        unnamed = std::exchange(register_, pasteHistory_[index]);
+    }
+    else if (named != 0 && put)
     {
         const auto& from = registers_[letter];
         if (from.empty())
@@ -1613,6 +1649,13 @@ CommandResult Workspace::run(std::string_view command, int count)
         command == "operator-yank" || command == "operator-delete" ||
         command == "visual-delete-time" || command == "bar-delete" ||
         (operator_ && (operator_->name == "operator-yank" || operator_->name == "operator-delete"));
+    if (taking && numbered)
+    {
+        refuse("\"1 to \"9 are the paste history, which every yank and delete fills: name a "
+               "letter to keep a copy");
+        registerName_.reset();
+        return {true};
+    }
     if (taking && named != 0 && named != letter)
     {
         const auto& into = registers_[letter];
@@ -1631,6 +1674,10 @@ CommandResult Workspace::run(std::string_view command, int count)
     {
         register_ = std::move(*unnamed);
         registerName_.reset();
+    }
+    else if (numbered && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
+    {
+        registerName_.reset(); // for nothing but a put
     }
     else if (named != 0 && mode_ != Mode::OperatorPending && !awaiting_ && !prompt_.answer)
     {

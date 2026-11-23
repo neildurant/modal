@@ -982,11 +982,60 @@ TEST_CASE("Named registers: \"a for a yank, a delete or a put, \"A adding to it"
     s.type(U":registers");
     s.ws.handle(Key::of(NamedKey::Enter), 0);
 
-    // An empty one says so; one not a letter is refused.
+    // An empty one says so; one not a letter or a digit is refused.
     s.type(U"\"zp");
     CHECK(s.ws.message() == "Register z is empty");
-    s.type(U"\"1");
+    s.type(U"\"!");
     CHECK(s.ws.message().starts_with("Registers are named by letters"));
+}
+
+TEST_CASE("Yanks and deletes fill the paste history, \"1 the newest, to put from")
+{
+    Selecting s;
+    const auto count = [&](int pitch) { return std::ranges::count(pitches(s.document, 0), pitch); };
+    // In the arrangement, on the bass, each bar a pitch of its own: 40, 41, 42 and so on.
+    s.type(U"yy");     // bar 1: 40
+    s.type(U"lyy");    // bar 2: 41
+    s.type(U"l\"ayy"); // bar 3, into a as well: 42
+    s.type(U"ldd");    // bar 4, deleted: 43
+    REQUIRE(count(43) == 0);
+
+    // "1 is the newest, the delete; "3 two before it.
+    s.type(U"\"1p");
+    CHECK(count(43) == 1);
+    s.type(U"u");
+    s.type(U"\"3p");
+    CHECK(count(41) == 2);
+    s.type(U"u");
+    // A put puts from the history without adding to it, and the unnamed register is as it was.
+    s.type(U"p");
+    CHECK(count(43) == 1);
+    s.type(U"u");
+
+    // Only as far as it goes; yanks and deletes can't be named into it.
+    s.type(U"\"9p");
+    CHECK(s.ws.message() == "Register 9 is empty: the paste history holds 4");
+    s.type(U"\"1y");
+    CHECK(s.ws.message().starts_with("\"1 to \"9 are the paste history"));
+    CHECK(s.ws.mode() == Mode::Normal);
+
+    // The same taken twice running is kept once; nine at most, the oldest going.
+    s.type(U"ggyyyy");
+    s.ws.setLineHandler([&](const std::string& line) { s.registry.runLine(line); });
+    const auto numbered = [&]
+    {
+        s.type(U":registers");
+        s.press(NamedKey::Enter);
+        const auto lines = std::ranges::count_if(
+            s.ws.listing(), [](const auto& line)
+            { return line.first.size() == 2 && line.first[1] >= '1' && line.first[1] <= '9'; });
+        s.press(NamedKey::Escape);
+        return lines;
+    };
+    CHECK(numbered() == 5);
+    for (int i = 0; i < 6; ++i)
+        s.type(U"lyy");
+    CHECK(numbered() == 9);
 }
 
 TEST_CASE(":registers says what each holds")
@@ -1002,12 +1051,14 @@ TEST_CASE(":registers says what each holds")
     using Lines = std::vector<std::pair<std::string, std::string>>;
     CHECK(s.ws.listing() == Lines{{"\"\"", "4 events on 2 tracks"},
                                   {"\"a", "1 event on 1 track"},
-                                  {"\"b", "4 events on 2 tracks"}});
+                                  {"\"b", "4 events on 2 tracks"},
+                                  {"\"1", "4 events on 2 tracks"},
+                                  {"\"2", "1 event on 1 track"}});
     // One a line, over the view; the next key closes it and does nothing else.
     const auto frame = s.ws.frame();
     CHECK(std::ranges::any_of(
         frame, [](const Region& region)
-        { return region.background == Role::Panel && region.text.size() == 9; }));
+        { return region.background == Role::Panel && region.text.size() == 15; }));
     const auto bar = s.ws.arrangement().page().bar();
     s.type(U"l");
     CHECK(s.ws.listing().empty());
@@ -1409,7 +1460,8 @@ TEST_CASE("The hint menu says what a key waiting for a letter wants")
     CHECK(after(U"@") ==
           Hints{{"a–z", "the macro to play", false}, {"@", "the last again", false}});
     CHECK(after(U"\"") == Hints{{"a–z", "the register for the next yank, delete or put", false},
-                                {"A–Z", "the register to add to", false}});
+                                {"A–Z", "the register to add to", false},
+                                {"1–9", "the paste history to put from, 1 the newest", false}});
     // m starts m Space too, so both.
     CHECK(after(U"m") ==
           Hints{{"a–z", "the mark to set here", false}, {"<Space>", "Play from here", false}});

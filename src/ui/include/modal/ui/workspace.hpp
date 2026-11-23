@@ -29,6 +29,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -1020,6 +1021,12 @@ private:
     // The named registers, a to z: the one named for the next command, the unnamed register
     // as it was then, adding to a register, and saying what they hold.
     std::map<char32_t, EventRegister> registers_;
+    // The paste history (decided 23 November 2026): what yanks and deletes took, newest first,
+    // as "1 to "9, and the unnamed register as last seen, to tell when one has taken something.
+    static constexpr std::size_t kPasteHistory = 9;
+    std::deque<EventRegister> pasteHistory_;
+    EventRegister registerSeen_;
+    void notePasteHistory();
     std::optional<char32_t> registerName_;
     EventRegister registerBefore_;
     static EventRegister appended(EventRegister to, const EventRegister& more);

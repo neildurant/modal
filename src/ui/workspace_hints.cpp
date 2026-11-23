@@ -147,7 +147,8 @@ std::vector<Workspace::Hint> Workspace::characterHints(std::string_view command)
     if (command == "register-use")
     {
         return {{.keys = "a–z", .title = "the register for the next yank, delete or put"},
-                {.keys = "A–Z", .title = "the register to add to"}};
+                {.keys = "A–Z", .title = "the register to add to"},
+                {.keys = "1–9", .title = "the paste history to put from, 1 the newest"}};
     }
     if (command == "mark-set")
     {

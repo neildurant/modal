@@ -851,6 +851,8 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 **Jump list (decided 23 November 2026).** `Ctrl-o` and `Ctrl-i` as in Vim, over what `''` counts as a jump and also changes of view and of song, since going to look at something in another view and coming back is the case asked for. One list across songs, as Vim's crosses files, places in a closed song passed over. `''` and Backspace kept as they are, so habits stay, rather than folding them into the list. For the session only, with `:jumps` to see it. After going back, a new jump drops the places stepped back over, as a browser does, since Vim's keeping them makes the order hard to follow.
 
+**Paste history (decided 23 November 2026).** Yanks and deletes both enter it, as Emacs's kill ring and Vim's numbered registers do, since a phrase deleted by mistake is as worth getting back as one copied. Nine entries, by name as `"1` to `"9`, for the session. `[p` and `]p` swap straight after a put, chosen over `[y` / `]y` and `Alt-y` as the put being changed. The swap is one undo step with the put, so undo takes the song back to before it, and is done by undoing and putting again, so it holds for every kind of put.
+
 ## Work order (19 November 2026)
 
 **Open songs (agreed after milestone 9).** Use `:song-select` and `:song-close` so the commands identify the song and describe the action. The chooser shows the name, location, active song and modified state. Keep each song's undo and edits in memory, stop playback on a switch and disallow switching while a take is pending. Close checks prevent an inactive song's edits being lost. Restore the inactive song's cursor and views in the next step. See design.md, Open songs.
