@@ -1038,6 +1038,52 @@ TEST_CASE("Yanks and deletes fill the paste history, \"1 the newest, to put from
     CHECK(numbered() == 9);
 }
 
+TEST_CASE("[p and ]p swap what was just put for an older or newer copy, as one undo step")
+{
+    Selecting s;
+    const auto count = [&](int pitch) { return std::ranges::count(pitches(s.document, 0), pitch); };
+    // Bars 1, 2 and 3 yanked: 40, 41 and 42, "1 the newest.
+    s.type(U"yylyylyy");
+    s.type(U"3lp"); // bar 6: 42
+    REQUIRE(count(42) == 2);
+
+    s.type(U"[p");
+    CHECK(count(42) == 1);
+    CHECK(count(41) == 2);
+    CHECK(s.ws.message().starts_with("Put \"2, 1 event on 1 track"));
+    s.type(U"[p");
+    CHECK(count(41) == 1);
+    CHECK(count(40) == 2);
+    s.type(U"[p");
+    CHECK(s.ws.message() == "No older copy in the paste history, which holds 3");
+    CHECK(count(40) == 2);
+    s.type(U"]p");
+    CHECK(count(41) == 2);
+    CHECK(count(40) == 1);
+    s.type(U"2]p");
+    CHECK(s.ws.message() == "No newer copy in the paste history");
+    s.type(U"2[p"); // a count goes further
+    CHECK(count(40) == 1);
+    CHECK(s.ws.message() == "No older copy in the paste history, which holds 3");
+    s.type(U"[p");
+    CHECK(count(40) == 2);
+
+    // One undo step with the put: the song as before it.
+    s.type(U"u");
+    CHECK(count(40) == 1);
+    CHECK(count(41) == 1);
+    CHECK(count(42) == 1);
+    // The history as it was; the unnamed register holding what ended up there, for . and p.
+    s.type(U"p");
+    CHECK(count(40) == 2);
+    s.type(U"u");
+
+    // Only straight after a put.
+    s.type(U"p");
+    s.type(U"l[p");
+    CHECK(s.ws.message().starts_with("[p and ]p swap what was just put"));
+}
+
 TEST_CASE(":registers says what each holds")
 {
     Selecting s;

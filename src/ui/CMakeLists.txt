@@ -18,6 +18,7 @@ add_library(modal_ui STATIC
     backups.cpp
     workspace_backups.cpp
     workspace_jumps.cpp
+    workspace_paste.cpp
     config.cpp
     drum_maps.cpp
     workspace_drum_maps.cpp

@@ -1616,7 +1616,9 @@ CommandResult Workspace::run(std::string_view command, int count)
     const char32_t named = command != "register-use" ? registerName_.value_or(0) : 0;
     const char32_t letter = lowerLetter(named);
     const auto letterText = encodeUtf8(std::u32string(1, letter));
-    const bool put = command.starts_with("put-");
+    // [p and ]p aren't puts of their own, but put again in a put's place.
+    const bool put =
+        command.starts_with("put-") && command != "put-older" && command != "put-newer";
     std::optional<EventRegister> unnamed;
     const bool numbered = named >= U'1' && named <= U'9';
     if (numbered && put)
@@ -1668,8 +1670,15 @@ CommandResult Workspace::run(std::string_view command, int count)
             return {true};
         }
     }
+    const auto modeBefore = mode_;
+    const auto selectionBefore = put ? selection_ : std::nullopt;
+    const auto versionBefore = document_.version();
     auto result = commands_.run(command, count, mode_);
     report(result);
+    if (put && document_.version() != versionBefore)
+    {
+        notePut(command, count, modeBefore, selectionBefore, register_);
+    }
     if (named != 0 && put)
     {
         register_ = std::move(*unnamed);
@@ -1991,6 +2000,10 @@ std::optional<bool> Workspace::runEditCommand(std::string_view command, int coun
     if (command == "marks")
     {
         return sayMarks();
+    }
+    if (command == "put-older" || command == "put-newer")
+    {
+        return swapPut(count, command == "put-older");
     }
     if (command == "jump-back" || command == "jump-forward")
     {
@@ -2734,7 +2747,7 @@ std::optional<bool> Workspace::runVisual(std::string_view command, int count)
     {
         return operateOnSelection(command, count);
     }
-    if (command.starts_with("put-"))
+    if (command.starts_with("put-") && command != "put-older" && command != "put-newer")
     {
         return putOverSelection();
     }

@@ -200,7 +200,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — Paste history, including cycling the material just put (design agreed 23 November 2026). See [design.md](design.md#editing-grammar).
     - [x] **Done** — The history: yanks and deletes fill `"1` to `"9`; `"3p`; `:registers` lists them. Accepted on trial.
-    - [ ] **Doing** — `[p` and `]p` swapping straight after a put, one undo step with it.
+    - [ ] **Doing** — `[p` and `]p` swapping straight after a put, one undo step with it. Built; awaiting trial.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Related numbered, yank and black-hole registers; system clipboard support after settling its representation.
 - [ ] **To do** — Song-format compatibility policy between versions.

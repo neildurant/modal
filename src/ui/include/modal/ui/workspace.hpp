@@ -1027,6 +1027,25 @@ private:
     std::deque<EventRegister> pasteHistory_;
     EventRegister registerSeen_;
     void notePasteHistory();
+    // The last put, for [p and ]p to put another copy in its place: the command and count,
+    // the mode and selection it was put in, which copy in the history it put (none for one
+    // not in it), and the song's version, the view and the cursor it left.
+    struct LastPut
+    {
+        std::string command;
+        int count = 0;
+        Mode mode = Mode::Normal;
+        std::optional<Selection> selection;
+        std::optional<std::size_t> index;
+        std::uint64_t version = 0;
+        std::uint64_t song = 0;
+        ViewKind view = ViewKind::Arrangement;
+        SongCursor after;
+    };
+    std::optional<LastPut> lastPut_;
+    void notePut(std::string_view command, int count, Mode mode,
+                 const std::optional<Selection>& selection, const EventRegister& put);
+    bool swapPut(int count, bool older);
     std::optional<char32_t> registerName_;
     EventRegister registerBefore_;
     static EventRegister appended(EventRegister to, const EventRegister& more);

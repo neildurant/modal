@@ -121,6 +121,16 @@ constexpr std::array kSharedCommands{
                                "before the last jump; after an operator, the range to it (d'a)",
                 .motion = true},
     CommandInfo{.name = "marks", .description = "Say where the marks are"},
+    CommandInfo{.name = "put-older",
+                .description = "Straight after a put, put the copy before it in the paste history "
+                               "in its place ([p)",
+                .modes = modeBit(Mode::Normal),
+                .count = true},
+    CommandInfo{.name = "put-newer",
+                .description = "Straight after a put, put the copy after it in the paste history "
+                               "in its place (]p)",
+                .modes = modeBit(Mode::Normal),
+                .count = true},
     CommandInfo{.name = "jump-back",
                 .description = "Go back to the place jumped from, through the jump list, across "
                                "views (Ctrl-o)",
