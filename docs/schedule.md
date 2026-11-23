@@ -189,8 +189,8 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Titles remembered and shown in Recent songs. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — Numbered backups and safe save/close behaviour across modified buffers (design agreed 23 November 2026). See [design.md](design.md#backups-and-saving-every-song).
-    - [ ] **Doing** — Backups on save, and the `backups` setting.
-    - [ ] **To do** — `:song-backups` and `, f b`.
+    - [x] **Done** — Backups on save, and the `backups` setting. Accepted on trial.
+    - [ ] **Doing** — `:song-backups` and `, f b`.
     - [ ] **To do** — `:wa`, `:qa`, `:wqa` and `:xa`.
     - [ ] **To do** — The window's close question for several unsaved songs.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
