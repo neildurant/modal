@@ -91,6 +91,8 @@ after counts multiply.
 | `p`, `P` | Merge/insert events; replace a Visual target; after/before on strip |
 | Alt-p / Alt-P | Piano-roll put at cursor pitch too |
 | `"a`, `"A` | Use register a, append to a |
+| `"1` … `"9` | Put from the paste history, newest first |
+| `[p`, `]p` straight after a put | Swap it for an older/newer copy from the history |
 | `u`, Ctrl-R, `.` | Undo, redo, repeat last change |
 | `Qa` … `Q`, `@a`, `@@` | Record macro a, play it, replay last macro |
 

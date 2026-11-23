@@ -152,6 +152,37 @@ Another delete can use the unnamed register without losing that named copy.
 Registers can retain different kinds of material, including events, sections
 and whole tracks, but a put must still use a context appropriate to its kind.
 
+### The paste history
+
+Naming a register takes forethought. Often the phrase you want was yanked a
+few edits ago and has since been pushed out of the unnamed register by a
+later delete. The **paste history** keeps it anyway: every yank and delete
+also goes to the front of a list of the last nine, `"1` being the newest and
+`"9` the oldest. Nothing has to be planned; `"3p` puts the third most recent,
+and `:registers` lists them all.
+
+When you cannot remember which number holds what, put first and look
+afterwards. Straight after any put, `[p` swaps what was just put for the next
+older copy in the history, and `]p` swaps it back for a newer one; think of
+the square brackets as stepping back and forward, as `[` and `]` do
+elsewhere. Pressing `[p` repeatedly walks back through the history, trying
+each copy in place, and a count jumps further. The put and all its swaps are
+a single undo step, so one `u` takes the song back to before the put.
+
+While the history holds more than one copy, the message after a put says
+which copy went in, for example `"2 of 4 ([p older, ]p newer)`. Swapping only
+works straight after a put: moving or editing first ends the chance, and `[p`
+then says so.
+
+Whatever you settle on stays in the unnamed register, so a later `p`
+elsewhere puts the same copy again, which is usually what you want after
+hunting for it. The message names it, and `:registers` shows which copy the
+unnamed register holds (`as "2`) and marks it `>"2` among the history. The
+next yank or delete puts the newest copy back in front.
+
+The history only holds material; it cannot be yanked into directly. To keep
+something safe from the coming deletes, name a letter.
+
 These registers are internal to Modal and shared by every open song, so
 material yanked in one song can be put in another (see @sec-files). System
 clipboard exchange is not part of this edition. Named copies should not be
