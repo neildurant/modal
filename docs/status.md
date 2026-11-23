@@ -12,9 +12,9 @@ The design for `"0`, `"_` and the clipboard was agreed: the clipboard only with 
 
 **Validation.** A Workspace test checks `"0p` empty, then putting the yank after a delete, `p` still putting the delete, `"0y` refused, `"_dd` and `"_dib` deleting with `:registers` unchanged, `p` afterwards putting the earlier delete, `"_p` refused, and `"0` second in `:registers`. The `:registers` and hint-menu tests gain the new lines. MSVC Debug passes all 1,266 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,267; formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial; pushing and the hosted checks.
+**Accepted.** Accepted on trial.
 
-**To try.** Yank a bar with `yy`, delete another with `dd`: `p` puts the deleted bar, `"0p` the yanked one. `"_dd` deletes a bar without changing what `p` puts; `:registers` stays as it was. `"` shows `0` and `_` in its hint menu.
+**Pending.** The manual, with the clipboard's step.
 
 ### Paste history, step 3: the manual, 23 November 2026
 

@@ -203,7 +203,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — `[p` and `]p` swapping straight after a put, one undo step with it; puts name the copy's place. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — Vim's other registers (design agreed 23 November 2026; the numbered registers are the paste history's). See [design.md](design.md#editing-grammar).
-    - [ ] **Doing** — The yank register `"0` and the black-hole register `"_`.
+    - [x] **Done** — The yank register `"0` and the black-hole register `"_`. Accepted on trial.
     - [ ] **To do** — The system clipboard, `"+` and `"*`, as Modal's song text.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **To do** — Song-format compatibility policy between versions.
