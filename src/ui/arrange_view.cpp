@@ -886,7 +886,9 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, s
         host_.setMessage(what + " yanked (" + eventCount(total) + ")", MessageKind::Information);
         return true;
     }
-    if (total == 0)
+    const auto ramps =
+        std::ranges::any_of(taken.ramps, [](const auto& each) { return !each.empty(); });
+    if (total == 0 && !ramps)
     {
         host_.refuse("Nothing to delete in " + what, MessageKind::Information);
         return true;
@@ -896,17 +898,22 @@ bool ArrangeView::operateOn(std::string_view op, const Area& given, bool time, s
          {
              for (auto i = area.top; i <= area.bottom; ++i)
              {
-                 s.updateEvents(tracks[i]->id(),
-                                [&](core::EventList& events)
-                                {
-                                    const auto inside = events.startingIn(area.from, area.to);
-                                    const auto first = static_cast<std::size_t>(
-                                        inside.data() - events.all().data());
-                                    for (auto k = inside.size(); k > 0; --k)
-                                    {
-                                        events.erase(first + k - 1);
-                                    }
-                                });
+                 // The ramps starting there go with the events, and the events they hid, as
+                 // yanking takes them; one cut through by the area was refused above.
+                 s.updateTrackContent(
+                     tracks[i]->id(),
+                     [&](core::EventList& events, std::vector<core::ControllerRamp>& kept)
+                     {
+                         const auto inside = events.startingIn(area.from, area.to);
+                         const auto first =
+                             static_cast<std::size_t>(inside.data() - events.all().data());
+                         for (auto k = inside.size(); k > 0; --k)
+                         {
+                             events.erase(first + k - 1);
+                         }
+                         std::erase_if(kept, [&](const core::ControllerRamp& ramp)
+                                       { return ramp.start >= area.from && ramp.start < area.to; });
+                     });
              }
          });
     // The cursor at the area's start, on its top track.

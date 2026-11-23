@@ -1532,3 +1532,24 @@ TEST_CASE("controller retrograde follows bend and aftertouch lanes and refuses s
     CHECK(r.ws.message().find("continuous controller lane") != std::string::npos);
     CHECK(r.document.song() == switched);
 }
+
+TEST_CASE("dd in the arrangement takes a bar's ramps with its events, as yy does")
+{
+    Ramps r{GENERATE(core::kPpqn, core::Ppqn{96})};
+    r.type(U",cr");
+    r.keep();
+    REQUIRE(r.ramps().size() == 1);
+    const auto made = r.ramps()[0];
+    r.type(U"ga");
+    r.type(U"yylp");
+    REQUIRE(r.ramps().size() == 2);
+    const auto put = r.document.song();
+    r.type(U"dd");
+    REQUIRE(r.ramps().size() == 1);
+    CHECK(r.ramps()[0] == made);
+    // The events the ramp hid went with it: bar 2 is as it was before the put.
+    CHECK(std::ranges::none_of(r.document.song().sourceEvents(r.id()).all(),
+                               [&](const core::Event& event) { return event.tick >= 4 * r.q(); }));
+    r.type(U"u");
+    CHECK(r.document.song() == put);
+}

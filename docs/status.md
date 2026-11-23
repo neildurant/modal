@@ -6,6 +6,16 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Fix: `dd` in the arrangement leaving a bar's ramps, 23 November 2026
+
+Found on trial: `yy` on a bar with a controller ramp took the ramp, and `p` put it, but `dd` on that bar in the arrangement left the ramp behind. Its delete, when not closing the gap, erased the events alone; it now takes the ramps starting in the area and the events they hid, as yanking, the rippling delete and the piano roll's delete already did, and a bar holding only a ramp counts as something to delete. A ramp the area cuts through is refused first, as before.
+
+**Validation.** A Workspace test, at two PPQNs, makes a ramp in bar 1, yanks the bar in the arrangement and puts it in bar 2, and checks that `dd` there leaves only the first ramp and no events in bar 2, and that `u` restores the put; it fails without the fix. MSVC Debug passes all 1,267 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+
+**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks.
+
+**To try.** In the arrangement, on a bar with a ramp, `yy`, move a bar on and `p`, then `dd`: the put ramp goes with the bar. `u` brings it back.
+
 ### Vim's other registers, step 1: `"0` and `"_`, 23 November 2026
 
 The design for `"0`, `"_` and the clipboard was agreed: the clipboard only with `"+` (or `"*`) named, holding Modal's own song text under a header line. See [design.md](design.md#editing-grammar). `"0` holds what the last yank took, deletes leaving it alone: a register change in a key that left the song unchanged is a yank, seen where the paste history notices changes. `"0p` puts it; `"0y` is refused, as `"1y` is; `:registers` lists it after the unnamed register. `"_` makes a delete or yank keep nothing: the unnamed register is put back after the command, so the paste history and `"0` don't see it, and with an operator it holds until the operator's done; `"_p` is refused. The `"` hint menu offers `0` and `_`.
