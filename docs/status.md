@@ -10,9 +10,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 The design for `"0`, `"_` and the clipboard was agreed: the clipboard only with `"+` (or `"*`) named, holding Modal's own song text under a header line. See [design.md](design.md#editing-grammar). `"0` holds what the last yank took, deletes leaving it alone: a register change in a key that left the song unchanged is a yank, seen where the paste history notices changes. `"0p` puts it; `"0y` is refused, as `"1y` is; `:registers` lists it after the unnamed register. `"_` makes a delete or yank keep nothing: the unnamed register is put back after the command, so the paste history and `"0` don't see it, and with an operator it holds until the operator's done; `"_p` is refused. The `"` hint menu offers `0` and `_`.
 
-**Validation.** A Workspace test checks `"0p` empty, then putting the yank after a delete, `p` still putting the delete, `"0y` refused, `"_dd` and `"_dib` deleting with `:registers` unchanged, `p` afterwards putting the earlier delete, `"_p` refused, and `"0` second in `:registers`. The `:registers` and hint-menu tests gain the new lines. MSVC Debug passes all 1,266 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+**Validation.** A Workspace test checks `"0p` empty, then putting the yank after a delete, `p` still putting the delete, `"0y` refused, `"_dd` and `"_dib` deleting with `:registers` unchanged, `p` afterwards putting the earlier delete, `"_p` refused, and `"0` second in `:registers`. The `:registers` and hint-menu tests gain the new lines. MSVC Debug passes all 1,266 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,267; formatting and `git diff --check` pass.
 
-**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks.
+**Pending.** The desktop trial; pushing and the hosted checks.
 
 **To try.** Yank a bar with `yy`, delete another with `dd`: `p` puts the deleted bar, `"0p` the yanked one. `"_dd` deletes a bar without changing what `p` puts; `:registers` stays as it was. `"` shows `0` and `_` in its hint menu.
 
