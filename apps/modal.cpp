@@ -919,8 +919,7 @@ int main(int argc, char* argv[])
     FileHost files{window, view, document, playback};
     view.setFileHost(&files);
     ui::addPromptCommands(commands, reader, config, configDirectory, &files, home);
-    const auto otherSongsModified =
-        ui::addFileCommands(commands, view.recordingSession(), files, home);
+    const auto unsavedSongs = ui::addFileCommands(commands, view.recordingSession(), files, home);
     view.setLineHandler(
         [&](const std::string& line)
         {
@@ -936,8 +935,9 @@ int main(int argc, char* argv[])
             files.report(result);
         });
 
-    // Closing with unsaved changes asks first (decided in milestone 4). Saving goes through
-    // :wq, which closes the window once it has saved, after the save dialog if it needs one.
+    // Closing with unsaved changes asks first (decided in milestone 4), naming every song with
+    // them (decided 23 November 2026). Saving goes through :wqa, which closes the window once
+    // they're saved, after the picker for each new song.
     const auto closing = [&]
     {
         view.cancelDrafts();
@@ -946,26 +946,17 @@ int main(int argc, char* argv[])
             view.report(ui::CommandResult::error(std::move(*refusal)));
             return false;
         }
-        if (otherSongsModified())
-        {
-            view.report(ui::CommandResult::error(
-                "Other open songs have unsaved changes: :wqa saves them all and quits, or "
-                ":song-select reaches them"));
-            return false;
-        }
-        if (!document.modified())
+        const auto unsaved = unsavedSongs();
+        if (unsaved.empty())
         {
             return true;
         }
-        const std::array<std::string, 3> buttons{"Save", "Don't save", "Cancel"};
-        const auto name = document.file()           ? ui::utf8Text(document.file()->filename())
-                          : document.importedFrom() ? std::string{"The imported song"}
-                                                    : std::string{"The new song"};
-        const auto choice = window.ask(
-            "Modal", name + " has changes not saved. Save them before closing?", buttons);
+        const std::array<std::string, 3> buttons{unsaved.size() == 1 ? "Save" : "Save all",
+                                                 "Don't save", "Cancel"};
+        const auto choice = window.ask("Modal", ui::closingQuestion(unsaved), buttons);
         if (choice == 0)
         {
-            files.report(commands.runLine("wq"));
+            files.report(commands.runLine("wqa"));
         }
         return choice == 1;
     };

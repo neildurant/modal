@@ -2,9 +2,19 @@
 
 Where Modal stands, for whoever picks up the work next. Keep it current: update it as work lands, and when a session ends.
 
-*Last updated 23 November 2026: the song-titles design was agreed, and setting the title was accepted on trial; showing it in the window and Open songs was accepted on trial. Titles in Recent songs were accepted on trial, and the manual describes song titles, so they are complete. The design for numbered backups and saving every open song was agreed, and backups at each save were accepted on trial. `:song-backups` was accepted on trial. `:wa`, `:qa`, `:wqa` and `:xa` were accepted on trial. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
+*Last updated 23 November 2026: the song-titles design was agreed, and setting the title was accepted on trial; showing it in the window and Open songs was accepted on trial. Titles in Recent songs were accepted on trial, and the manual describes song titles, so they are complete. The design for numbered backups and saving every open song was agreed, and backups at each save were accepted on trial. `:song-backups` was accepted on trial. `:wa`, `:qa`, `:wqa` and `:xa` were accepted on trial. The window's close question for several unsaved songs is ready to try. Before that, 20 November 2026: the `, f` Files leader group and `:song-save-as` were accepted on trial. Keys for the next and previous open song were accepted on trial. Returning to a song with its view and places was accepted on trial. Copying between songs is complete: sections, whole tracks and whole bars carrying their meter were each accepted on trial. `:export` through the Folder panel was accepted on trial; the unused system file-dialog support has been removed. Importing tracks from a file was accepted on trial. The Songs folder and the clearer file picker were accepted on trial. Recent songs were accepted on trial, and the choosers narrowed by typing now show a cursor. Next is implementing song titles, then numbered backups and safe save and close.*
 
 ## Current handoff
+
+### Saving every song, step 4: the window's close question, 23 November 2026
+
+Closing the window with unsaved songs now asks whichever song is shown, instead of refusing and pointing to Open songs when the unsaved ones aren't shown. One song is named by its title, or else its file (`Untitled 2` for a new one), with Save, Don't save and Cancel; several are counted and named, up to four and then how many more (`3 songs have changes not saved: plain.modal, Morning and Untitled 3. Save them all before closing?`), with Save all, Don't save and Cancel. Saving goes through `:wqa`, so the window closes once they're all saved, after the picker for each new song; Don't save closes, discarding them. `addFileCommands` now returns the unsaved songs' names rather than whether other songs are unsaved, and `closingQuestion` words the question. See [design.md](design.md#backups-and-saving-every-song).
+
+**Validation.** A file-command test checks the names (by file without a title, by title, by number for a new song, unchanged songs left out, in the chooser's order) and the question for one song, three, four and six. The dialog itself is the system's and was not driven. MSVC Debug passes all 1,260 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,261. Whole-tree formatting and `git diff --check` pass. CI and Manual passed for `9c1cda7` (backups at each save and `:song-backups`).
+
+**Pending.** The desktop trial; pushing and the hosted checks; then the manual for the whole item.
+
+**To try.** With one song changed, close the window: the question names it, with Save, Don't save and Cancel. Change a second song, switch to an unchanged third, and close: the question counts and names both, with Save all. Save all saves them (asking for a file for any new one) and closes; Cancel keeps Modal open; Don't save closes without saving.
 
 ### Saving every song, step 3: `:wa`, `:qa`, `:wqa` and `:xa`, 23 November 2026
 
@@ -22,7 +32,7 @@ The desktop trial was accepted on 23 November 2026. **Pending.** The hosted chec
 
 **Validation.** A Workspace test checks the messages for a song without a file and one without backups, the list's rows and hints, Escape, backup 1 opened as a new, unmodified song without a file beside the song with its unsaved edits kept, Down choosing an older one, and saving the copy asking for a file. The Files group test now expects `b`. The new `[.sample]` render of the list was checked. The manual's settings reference was regenerated. MSVC Debug passes all 1,256 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,257 with three. Whole-tree formatting passes.
 
-The desktop trial was accepted on 23 November 2026. **Pending.** The hosted checks after pushing. The manual follows at the end of the item.
+The desktop trial was accepted on 23 November 2026. CI and Manual passed for its push. The manual follows at the end of the item.
 
 **To try.** Open a song that you saved a few times while trying step 1, and press `, f b`: its backups are listed, newest first, with when each was saved. Enter opens one as a new song: the title bar says `(unsaved)`, `, f o` shows it beside the original, and `[f` goes back to the original, unchanged. `, f s` on the copy asks where to save. In a new song, `, f b` says it has no file yet.
 
@@ -32,7 +42,7 @@ The design for numbered backups and saving every open song was agreed: see [desi
 
 **Validation.** Backup tests check versions kept newest first to the limit, a lower limit dropping the oldest, 0 keeping no more, nothing for a file not yet there, the folder's name and `song` file, the save time kept, stray files passed over, and a failure explained. A Workspace test saves a song four times, checking no backup for a new file, the replaced versions' contents, `backups=0`, and the warning with the save still made when the state folder can't be used. The manual's settings reference was regenerated; `configuration.md` names the setting. MSVC Debug passes all 1,255 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes with three. Whole-tree formatting and `git diff --check` pass.
 
-The desktop trial was accepted on 23 November 2026, lowering `backups` too. **Pending.** The hosted checks after pushing. The manual follows at the end of the item.
+The desktop trial was accepted on 23 November 2026, lowering `backups` too. CI and Manual passed for its push. The manual follows at the end of the item.
 
 **To try.** Open one of your songs, change something and save with `, f s` a few times. The backups are in `%LOCALAPPDATA%\Modal\backups\` (the State place in the file picker shows the state directory), in a folder named after the song, as `1.modal` (the newest) and up. `:set backups=2` and two more saves leave only two. Nothing yet lists them inside Modal: that's step 2, `:song-backups`.
 

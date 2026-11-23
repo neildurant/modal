@@ -63,7 +63,7 @@ public:
 // The commands on a document, in a fresh directory of their own, which is home too.
 struct Files
 {
-    Files() { addFileCommands(registry, recording, host, directory); }
+    Files() { unsaved = addFileCommands(registry, recording, host, directory); }
 
     CommandResult run(const std::string& line) { return registry.runLine(line); }
     std::string path(const std::string& name) const { return utf8Text(directory / name); }
@@ -84,6 +84,7 @@ struct Files
     core::RecordingSession recording{document};
     Host host;
     CommandRegistry registry;
+    std::function<std::vector<std::string>()> unsaved;
 };
 
 } // namespace
@@ -407,6 +408,41 @@ TEST_CASE(":wqa saves every changed song and quits, :qa quits as :q does")
     g.change();
     CHECK(g.run("qa!") == CommandResult{true});
     CHECK(g.host.quitted);
+}
+
+TEST_CASE("closing the window names every unsaved song, by title or else by file")
+{
+    Files f;
+    const auto addTrack = [&]
+    { f.document.edit("Add a track", {}, [](core::Song& song) { song.addTrack(); }); };
+    CHECK(f.unsaved().empty());
+
+    // A song with a file and no title, by its file; one with a title, by that; a new one by
+    // its number; an unchanged one not at all.
+    addTrack();
+    REQUIRE(f.run("w plain").changed);
+    addTrack();
+    REQUIRE(f.run("new").changed);
+    f.change("Morning");
+    REQUIRE(f.run("new").changed);
+    addTrack();
+    REQUIRE(f.run("new").changed);
+    CHECK(f.unsaved() == std::vector<std::string>{"plain.modal", "Morning", "Untitled 3"});
+    CHECK(closingQuestion(f.unsaved()) ==
+          "3 songs have changes not saved: plain.modal, Morning and Untitled 3. Save them all "
+          "before closing?");
+
+    REQUIRE(f.run("song-close!").changed);
+    REQUIRE(f.run("song-close!").changed);
+    REQUIRE(f.run("song-close!").changed);
+    CHECK(f.unsaved() == std::vector<std::string>{"plain.modal"});
+    CHECK(closingQuestion(f.unsaved()) ==
+          "plain.modal has changes not saved. Save them before closing?");
+
+    CHECK(closingQuestion({"A", "B", "C", "D"}) ==
+          "4 songs have changes not saved: A, B, C and D. Save them all before closing?");
+    CHECK(closingQuestion({"A", "B", "C", "D", "E", "F"}) ==
+          "6 songs have changes not saved: A, B, C, D and 2 more. Save them all before closing?");
 }
 
 TEST_CASE(":wq saves and quits, once the song has a file")

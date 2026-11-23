@@ -121,11 +121,16 @@ public:
 std::span<const CommandInfo> fileCommands();
 
 // Gives the registry file commands for the session's document. The session, its document
-// and the host outlive the commands' use of them. Returns a check for unsaved changes in
-// other songs, used by the window's close action. home is what ~ stands for.
-std::function<bool()> addFileCommands(CommandRegistry& registry, core::RecordingSession& recording,
-                                      FileHost& host,
-                                      std::optional<std::filesystem::path> home = std::nullopt);
+// and the host outlive the commands' use of them. Returns what names the open songs with
+// unsaved changes, in the chooser's order, each by its title or else its file (or Untitled and
+// a number), for the window's close question. home is what ~ stands for.
+std::function<std::vector<std::string>()>
+addFileCommands(CommandRegistry& registry, core::RecordingSession& recording, FileHost& host,
+                std::optional<std::filesystem::path> home = std::nullopt);
+
+// The window's question on closing with unsaved songs, named as addFileCommands' check names
+// them (decided 23 November 2026): one song by name, several counted and named, up to a few.
+std::string closingQuestion(const std::vector<std::string>& unsaved);
 
 // Where a song's files typed with a relative path are (decided November 2026, rather than the
 // program's current directory, which means little when it's started from a menu): the folder

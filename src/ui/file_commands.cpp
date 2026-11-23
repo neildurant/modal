@@ -327,6 +327,19 @@ public:
         return activate(active_ == 0 ? 1 : active_ - 1, true);
     }
 
+    std::vector<std::string> unsavedSongs() const
+    {
+        std::vector<std::string> names;
+        for (std::size_t i = 0; i < songs_.size(); ++i)
+        {
+            if (!at(i).modified())
+                continue;
+            auto song = describe(i);
+            names.push_back(song.title.empty() ? std::move(song.name) : std::move(song.title));
+        }
+        return names;
+    }
+
     // Saves every song with unsaved changes (decided 23 November 2026, following Vim's :wa):
     // those with files where they are, then each new one in turn, switching to it and asking
     // for a file, as :w does. Quits after, with thenQuit, once every song is saved.
@@ -719,8 +732,29 @@ std::string windowTitle(const core::Document& song)
     return name + (song.modified() ? " [+]" : "") + " – Modal";
 }
 
-std::function<bool()> addFileCommands(CommandRegistry& registry, core::RecordingSession& recording,
-                                      FileHost& host, std::optional<std::filesystem::path> home)
+std::string closingQuestion(const std::vector<std::string>& unsaved)
+{
+    if (unsaved.size() == 1)
+        return unsaved.front() + " has changes not saved. Save them before closing?";
+    constexpr std::size_t kNamed = 4;
+    const auto named = std::min(unsaved.size(), kNamed);
+    std::string list;
+    for (std::size_t i = 0; i < named; ++i)
+    {
+        if (i > 0)
+            list += i + 1 == named && named == unsaved.size() ? " and " : ", ";
+        list += unsaved[i];
+    }
+    if (named < unsaved.size())
+        list += " and " + std::to_string(unsaved.size() - named) + " more";
+    return std::to_string(unsaved.size()) + " songs have changes not saved: " + list +
+           ". Save them all before closing?";
+}
+
+std::function<std::vector<std::string>()> addFileCommands(CommandRegistry& registry,
+                                                          core::RecordingSession& recording,
+                                                          FileHost& host,
+                                                          std::optional<std::filesystem::path> home)
 {
     // Kept as long as the registry runs them.
     auto commands = std::make_shared<FileCommands>(recording, host, std::move(home));
@@ -760,7 +794,7 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
         [commands](const CommandCall& call) { return commands->openCopy(call); });
     add(kFileCommands[12], [commands](const CommandCall&) { return commands->saveAll(false); });
     add(kFileCommands[13], [commands](const CommandCall&) { return commands->saveAll(true); });
-    return [commands] { return commands->otherModified(); };
+    return [commands] { return commands->unsavedSongs(); };
 }
 
 std::filesystem::path songFolder(const core::Document& document,
