@@ -350,6 +350,58 @@ TEST_CASE("saving over a song keeps the version it replaces as a backup")
     CHECK(contents(file).find("\"Fourth\"") != std::string::npos);
 }
 
+TEST_CASE("song-backups lists the song's backups, to open one as a new song")
+{
+    Pickers p;
+    Settings settings;
+    p.workspace.setSettings(&settings);
+    std::int64_t now = 1'800'000'000;
+    p.workspace.setClock([&] { return now; });
+
+    // Nothing to list for a song without a file, or with no backups yet.
+    p.type(U",fb");
+    CHECK(p.workspace.message().starts_with("This song has no file yet, so no backups"));
+    p.type(U":w Kept\n");
+    p.type(U",fb");
+    CHECK(p.workspace.message() ==
+          "No backups of Kept.modal yet: each save keeps the version it replaces");
+
+    p.type(U":song-title First\n:w\n");
+    p.type(U":song-title Second\n:w\n");
+    p.type(U":song-title Third\n");
+    p.type(U",fb");
+    CHECK(p.shows(U"Backups of Kept.modal"));
+    CHECK(p.shows(U"Backup 1"));
+    CHECK(p.shows(U"(newest)"));
+    CHECK(p.shows(U"Backup 2"));
+    CHECK(p.shows(U"Enter opens it as a new song"));
+    p.press(NamedKey::Escape);
+    CHECK_FALSE(p.shows(U"Backup 1"));
+    CHECK(p.document.song().title == "Third");
+
+    // Backup 1 is the version the last save replaced, opened beside the song, which is kept
+    // as it was, unsaved edits and all.
+    p.type(U",fb");
+    p.type(U"\n");
+    CHECK(p.workspace.message().starts_with("Opened backup 1 of Kept.modal, saved "));
+    CHECK(p.document.song().title == "First");
+    CHECK_FALSE(p.document.file());
+    CHECK_FALSE(p.document.modified());
+    p.type(U"[f");
+    CHECK(p.document.song().title == "Third");
+    CHECK(p.document.modified());
+
+    // Down chooses an older one; a save of the copy asks where, never writing over the song.
+    p.type(U",fb");
+    p.press(NamedKey::Down);
+    p.type(U"\n");
+    CHECK(p.workspace.message().starts_with("Opened backup 2 of Kept.modal"));
+    CHECK(p.document.song().title.empty());
+    p.type(U":w\n");
+    CHECK(p.workspace.mode() == Mode::CommandLine);
+    CHECK(p.shows(U"Enter for Untitled.modal"));
+}
+
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")
 {
     Pickers p;
@@ -515,7 +567,7 @@ TEST_CASE("the Files leader group opens, switches to, adds and closes songs")
     std::vector<std::string> keys;
     for (const auto& hint : *shown)
         keys.push_back(hint.keys);
-    CHECK(keys == std::vector<std::string>{"c", "f", "i", "n", "o", "r", "s", "S", "t", "x"});
+    CHECK(keys == std::vector<std::string>{"b", "c", "f", "i", "n", "o", "r", "s", "S", "t", "x"});
     const auto title = std::ranges::find(*shown, std::string{"t"}, &Workspace::Hint::keys);
     REQUIRE(title != shown->end());
     CHECK(title->title == "Set song title");

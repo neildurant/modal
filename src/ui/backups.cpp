@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <optional>
@@ -126,6 +127,17 @@ std::string backUpSong(const std::filesystem::path& state, const std::filesystem
     std::ofstream{folder / "song", std::ios::binary | std::ios::trunc}
         << utf8Text(song.lexically_normal()) << '\n';
     return {};
+}
+
+std::int64_t secondsSince1970(std::filesystem::file_time_type time)
+{
+    // Through the two clocks' times now, as converting between them directly isn't yet in
+    // every standard library Modal is built with.
+    using namespace std::chrono;
+    const auto system =
+        system_clock::now() -
+        duration_cast<system_clock::duration>(std::filesystem::file_time_type::clock::now() - time);
+    return duration_cast<seconds>(system.time_since_epoch()).count();
 }
 
 std::vector<SongBackup> songBackups(const std::filesystem::path& state,

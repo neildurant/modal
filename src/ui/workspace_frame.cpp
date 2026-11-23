@@ -112,6 +112,8 @@ Frame Workspace::frame() const
         frame.push_back(trackImportRegion());
     if (recentChoice_)
         frame.push_back(recentRegion());
+    if (backupChoice_)
+        frame.push_back(backupRegion());
     if (eventInsertChoice_)
     {
         const auto row = messageRow();
@@ -334,6 +336,12 @@ Bar Workspace::messageBar(bool withMessage) const
         row.right.push_back(
             {"Type to narrow · ↑↓ choose · Enter opens · Del removes from the list", dim});
     }
+    else if (backupChoice_)
+    {
+        // Nothing to type: a list this short needs no narrowing.
+        row.left.push_back({"Backups of " + utf8Text(backupChoice_->song.filename()), text});
+        row.right.push_back({"↑↓ choose · Enter opens it as a new song · Esc leaves", dim});
+    }
     else if (trackImportChoice_)
     {
         const auto& choice = *trackImportChoice_;
@@ -407,7 +415,7 @@ Bar Workspace::statusBar() const
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
     state.mode = drumMapChoice_ || filePicker_ || eventInsertChoice_ || songChoice_ ||
-                         trackImportChoice_ || recentChoice_
+                         trackImportChoice_ || recentChoice_ || backupChoice_
                      ? StatusMode::Edit
                  : freezeChoice_   ? StatusMode::Freeze
                  : trackMove_      ? StatusMode::Move

@@ -1271,6 +1271,19 @@ private:
         std::vector<std::string> titles;
     };
     std::optional<RecentChoice> recentChoice_;
+    // The current song's backups, to open one as a new song (decided 23 November 2026).
+    struct BackupChoice
+    {
+        std::optional<ChoiceList> list;
+        std::filesystem::path song;
+        std::vector<std::filesystem::path> files;
+        std::vector<std::size_t> numbers;
+        std::vector<std::int64_t> saved;
+    };
+    std::optional<BackupChoice> backupChoice_;
+    CommandResult showBackups();
+    bool backupKey(const Key& key);
+    Region backupRegion() const;
     CommandResult showRecentSongs();
     void listRecentSongs(std::size_t highlighted);
     bool recentKey(const Key& key);

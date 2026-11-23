@@ -81,7 +81,7 @@ Settings::Settings()
                   72),
           setting("backups",
                   "How many earlier versions of each song file saving keeps, in the state "
-                  "directory; 0 keeps none",
+                  "directory (, f b lists them); 0 keeps none",
                   std::int64_t{5}, 0, 100),
           setting("recentsongs",
                   "How many song files opened or saved the recent list (, f r) keeps; 0 keeps none",

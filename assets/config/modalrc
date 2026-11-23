@@ -560,8 +560,9 @@ vmap <leader>ld label-delete      "Delete the labels selected"
 " new song (:new); , f s saves (:w) and , f S saves as another file (:song-save-as); , f c
 " closes this song (:song-close); , f x exports it as a Standard MIDI File (:export); and
 " , f i imports tracks from a song or MIDI file, ticking which (:track-import, or :read);
-" , f r lists the songs opened or saved lately, to open one (:song-recent); and , f t sets the
-" song's title, or clears it (:song-title).
+" , f r lists the songs opened or saved lately, to open one (:song-recent); , f t sets the
+" song's title, or clears it (:song-title); and , f b lists the backups of the song's file kept
+" at each save, to open one as a new song (:song-backups).
 " ]f and [f (or Ctrl-Tab and Ctrl-Shift-Tab) switch to the next and previous open song, in the
 " chooser's order, going round at either end; a count steps that many songs.
 keysection "Files"
@@ -576,6 +577,7 @@ nmap <leader>fx export            "Export as MIDI"
 nmap <leader>fi track-import      "Import tracks from a file"
 nmap <leader>fr song-recent       "Recent songs"
 nmap <leader>ft song-title        "Set song title"
+nmap <leader>fb song-backups      "Open a backup"
 nmap ]f          song-next         "Next open song"
 nmap [f          song-previous     "Open song before"
 nmap <C-Tab>     song-next

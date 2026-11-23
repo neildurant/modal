@@ -132,6 +132,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return importTracks(call);
                 if (name == "song-recent")
                     return showRecentSongs();
+                if (name == "song-backups")
+                    return showBackups();
                 if (name == "song-title")
                     return songTitle(call.arguments);
                 if (name == "drum-map-load" || name == "drum-map-save")
@@ -1168,6 +1170,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
         return trackImportKey(key);
     if (recentChoice_)
         return recentKey(key);
+    if (backupChoice_)
+        return backupKey(key);
     if (filePicker_ && question_ && mode_ == Mode::Normal)
     {
         const auto match = keymap_.match(Mode::CommandLine, std::vector<Key>{key});

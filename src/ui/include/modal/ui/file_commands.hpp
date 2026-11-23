@@ -110,6 +110,7 @@ public:
 //   song-close[!]      closes the current song, with ! to discard changes
 //   quit, q            quits; refused with unsaved changes, unless quit!
 //   wq                 saves, then quits
+//   song-open-copy FILE  opens a copy of FILE as a new song without a file
 //
 // A FILE without an extension is given .modal (or .mid for export). A relative FILE is in the
 // song's folder (see songFolder), and ~ is the home folder.

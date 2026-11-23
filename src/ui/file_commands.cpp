@@ -22,7 +22,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 11> kFileCommands{{
+constexpr std::array<CommandInfo, 12> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
@@ -57,6 +57,10 @@ constexpr std::array<CommandInfo, 11> kFileCommands{{
     {.name = "song-previous",
      .description = "Switch to the open song before, round to the last before the first",
      .count = true},
+    {.name = "song-open-copy",
+     .description = "Open a copy of FILE as a new song without a file, leaving FILE as it is",
+     .usage = "FILE",
+     .choices = {Choices::File}},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -312,6 +316,36 @@ public:
         return activate(active_ == 0 ? 1 : active_ - 1, true);
     }
 
+    // A copy of a file as a new song, without the file, as a backup is opened: saving asks
+    // where, so the file is never written over by chance (decided 23 November 2026).
+    CommandResult openCopy(const CommandCall& call)
+    {
+        if (auto refusal = recording_.fileOperationRefusal())
+            return CommandResult::error(std::move(*refusal));
+        const auto file = argument(call, ".modal");
+        if (!file)
+            return CommandResult::error("Name the file to open a copy of");
+        auto song = std::make_unique<core::Document>();
+        auto result = openFile(*song, *file);
+        if (!result.opened)
+            return CommandResult::error(std::move(result.message));
+        auto copy = song->underlying();
+        song->replace(std::move(copy), std::nullopt);
+        if (const auto switched = activateNew(std::move(song), soleUntouched()); switched.refused)
+            return switched;
+        if (!result.message.empty())
+            return {true, std::move(result.message), true};
+        return {true, "Opened a copy of " + named(*file) + " as a new song", false};
+    }
+
+    // Only one song, new and never touched, whose place a song opened can take.
+    bool soleUntouched() const
+    {
+        return songs_.size() == 1 && !document_.file() && !document_.importedFrom() &&
+               !document_.modified() && !document_.canUndo() && !document_.canRedo() &&
+               document_.underlying() == ui::newSong();
+    }
+
 private:
     struct SongSlot
     {
@@ -447,10 +481,8 @@ private:
         {
             return CommandResult::error(std::move(result.message));
         }
-        const bool empty = songs_.size() == 1 && !document_.file() && !document_.importedFrom() &&
-                           !document_.modified() && !document_.canUndo() && !document_.canRedo() &&
-                           document_.underlying() == ui::newSong();
-        if (const auto switched = activateNew(std::move(song), force || empty); switched.refused)
+        if (const auto switched = activateNew(std::move(song), force || soleUntouched());
+            switched.refused)
             return switched;
         host_.songUsed(file, std::nullopt);
         if (!result.message.empty())
@@ -597,6 +629,8 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
         [commands](const CommandCall& call) { return commands->stepSong(call.count, true); });
     add(kFileCommands[10],
         [commands](const CommandCall& call) { return commands->stepSong(call.count, false); });
+    add(kFileCommands[11],
+        [commands](const CommandCall& call) { return commands->openCopy(call); });
     return [commands] { return commands->otherModified(); };
 }
 

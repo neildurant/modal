@@ -9,6 +9,7 @@
 #include <modal/core/player.hpp>
 #include <modal/core/song_file.hpp>
 #include <modal/ui/arrange_page.hpp>
+#include <modal/ui/backups.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
@@ -27,6 +28,7 @@
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -916,6 +918,41 @@ TEST_CASE("a sample of the recent songs", "[.sample]")
         view.report(registry.runLine("song-recent"));
         window->draw(view.frame(), *builtInTheme(theme));
         CHECK(window->saveFrame(base + "-recent-" + theme + ".bmp"));
+        view.handle(Key::of(NamedKey::Escape), 0);
+    }
+}
+
+TEST_CASE("a sample of the backups", "[.sample]")
+{
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+    modal::test::TempDirectory folder{"modal-backups-sample"};
+    const auto song = folder.path() / "Songs" / "Groove.modal";
+    std::filesystem::create_directories(song.parent_path());
+    REQUIRE(modal::core::writeSongFile(demoSong(), song).empty());
+    // Three saves: an hour ago, yesterday and last week, newest last.
+    using namespace std::chrono;
+    const auto now = std::filesystem::file_time_type::clock::now();
+    for (const auto ago : {hours{24 * 6}, hours{26}, hours{1}})
+    {
+        std::filesystem::last_write_time(song, now - ago);
+        REQUIRE(backUpSong(folder / "State", song, 5).empty());
+    }
+    modal::core::Document document{demoSong()};
+    document.replace(demoSong(), song);
+    CommandRegistry registry;
+    registry.add(windowCommands());
+    Workspace view{registry, document};
+    view.setStateFolder(folder / "State");
+    view.setClock([=] { return secondsSince1970(now); });
+    for (const auto& theme : {"dark", "light"})
+    {
+        auto window = offscreen(1200, 600);
+        view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+        view.report(registry.runLine("song-backups"));
+        window->draw(view.frame(), *builtInTheme(theme));
+        CHECK(window->saveFrame(base + "-backups-" + theme + ".bmp"));
         view.handle(Key::of(NamedKey::Escape), 0);
     }
 }

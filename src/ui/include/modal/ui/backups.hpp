@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -32,6 +33,9 @@ struct SongBackup
     std::size_t number = 0; // 1 for the newest
     std::filesystem::file_time_type saved;
 };
+
+// A file time as seconds since 1970, as the recent list keeps times.
+std::int64_t secondsSince1970(std::filesystem::file_time_type time);
 
 // A song's backups, newest first.
 std::vector<SongBackup> songBackups(const std::filesystem::path& state,

@@ -564,6 +564,10 @@ constexpr std::array kSharedCommands{
                 .aliases = "title",
                 .usage = "[TITLE]",
                 .modes = modeBit(Mode::Normal)},
+    CommandInfo{.name = "song-backups",
+                .description = "List the backups of the song's file, kept at each save, to open "
+                               "one as a new song",
+                .modes = modeBit(Mode::Normal)},
     CommandInfo{.name = "song-recent",
                 .description = "List the song files opened or saved lately, to open one",
                 .modes = modeBit(Mode::Normal)},
