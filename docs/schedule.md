@@ -184,7 +184,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — Remember songs opened and saved, up to `recentsongs`; the chooser with three aligned columns, Delete to remove, missing files offered for removal.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — Song titles (scheduled 20 November 2026, design agreed 23 November 2026). See [design.md](design.md#song-titles).
-    - [ ] **Doing** — `:song-title` and `, f t`, as an undo step. Built; awaiting trial.
+    - [x] **Done** — `:song-title` and `, f t`, as an undo step. Accepted on trial.
     - [ ] **To do** — Title and filename in the window's title bar and in Open songs.
     - [ ] **To do** — Titles remembered and shown in Recent songs.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
