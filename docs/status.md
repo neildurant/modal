@@ -12,9 +12,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** Unit tests, at two PPQNs, take each kind of copy (events with notes, controllers, a ramp and a track's own 3/4; sections with a label and their tracks; whole tracks with their settings) to text and back, checking it unchanged and the text the same again; a copy made at 960 read at 96 is rescaled; foreign and broken text is told apart and says why. A Workspace test with two songs at different resolutions sharing a clipboard checks the refusal of foreign text, `"+yy` and `p` still putting it, `"+p` in the other song putting the note at its resolution, `"+dd`, `"+` last in `:registers`, `"+, t y` copying whole tracks, `"*p`, and a broken copy's message. The hint-menu test gains `+ *`. MSVC Debug passes all 1,273 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,274; formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial; pushing and the hosted checks; then the manual.
+**Accepted.** Accepted on trial.
 
-**To try.** `"+yy` on a bar, then `"+p` somewhere else, and in another song (`:new`). Open a text editor and paste: the copy is readable song text. Copy some ordinary text in another program, and `"+p` says the clipboard doesn't hold a copy from Modal. If you can, run two Modals and copy between them. Try a section on the strip and a whole track with `, t y` too.
+**Pending.** The manual, for `"0`, `"_` and `"+`.
 
 ### Fix: `dd` in the arrangement leaving a bar's ramps, 23 November 2026
 
