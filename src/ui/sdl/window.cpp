@@ -62,6 +62,10 @@ std::variant<std::unique_ptr<Window>, std::string> Window::open(const WindowOpti
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
         SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0"); // no GPU driver at all
     }
+    // Closing the window sends a close request alone, not a quit too, which would ask about
+    // unsaved songs a second time after Cancel (found on trial, 23 November 2026). A quit
+    // from the system, as at logging out, still comes, and asks once.
+    SDL_SetHint(SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0");
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
     {
         return std::string{"can't start SDL's video: "} + SDL_GetError();

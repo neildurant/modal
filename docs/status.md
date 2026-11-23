@@ -12,7 +12,9 @@ Closing the window with unsaved songs now asks whichever song is shown, instead 
 
 **Validation.** A file-command test checks the names (by file without a title, by title, by number for a new song, unchanged songs left out, in the chooser's order) and the question for one song, three, four and six. The dialog itself is the system's and was not driven. MSVC Debug passes all 1,260 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,261. Whole-tree formatting and `git diff --check` pass. CI and Manual passed for `9c1cda7` (backups at each save and `:song-backups`).
 
-**Pending.** The desktop trial; pushing and the hosted checks; then the manual for the whole item.
+**Found on trial.** Cancel brought the question up a second time. SDL3 turns the closing of the last window into a quit as well as a close request, and each asked; this had been so since the one-song question of milestone 4. SDL's `SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE` is now off, so the close button sends the request alone, while a quit from the system still asks once. The offscreen driver can't close a window as a desktop does, so the trial checks it. MSVC and WSL Clang pass all tests again after the change.
+
+**Pending.** The desktop trial of Cancel; pushing and the hosted checks; then the manual for the whole item.
 
 **To try.** With one song changed, close the window: the question names it, with Save, Don't save and Cancel. Change a second song, switch to an unchanged third, and close: the question counts and names both, with Save all. Save all saves them (asking for a file for any new one) and closes; Cancel keeps Modal open; Don't save closes without saving.
 
@@ -22,7 +24,7 @@ Closing the window with unsaved songs now asks whichever song is shown, instead 
 
 **Validation.** File-command tests check `:wa` saving a changed song with a file at once, leaving a saved one alone, switching to and asking for each new song in turn, the message, each song's title reaching the recent list, nothing to save, one song named, and a cancelled picker stopping with what was saved; and `:qa` refusing and pointing to `:wqa`, `:xa` quitting only after the new song's file is chosen, and `:qa!` quitting. A Workspace test runs `:wa` through the in-window picker for two new songs and a changed one, checking the files and the recent list's titles. MSVC Debug passes all 1,259 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,260. Whole-tree formatting and `git diff --check` pass.
 
-The desktop trial was accepted on 23 November 2026. **Pending.** The hosted checks after pushing. The manual follows at the end of the item.
+The desktop trial was accepted on 23 November 2026. CI and Manual passed for its push. The manual follows at the end of the item.
 
 **To try.** Open a song and change it, then `:new` twice, giving each new song a title (`, f t`) or an edit. `:wa`: the changed song is saved, then Modal shows each new song in turn with the picker asking for its file; the message says `Saved 3 songs`. Change two songs again and try `:qa`: it refuses, pointing to `:wqa`. `:xa` (or `:wqa`) then saves both and quits. Cancelling a picker during `:wa` stops there and says what was saved.
 
