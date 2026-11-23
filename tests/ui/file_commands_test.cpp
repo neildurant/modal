@@ -42,6 +42,11 @@ public:
     void quit() override { quitted = true; }
     void songReplaced() override { ++replaced; }
     void report(const CommandResult& result) override { reported = result; }
+    void songUsed(const std::filesystem::path& file, const std::optional<std::filesystem::path>&,
+                  const std::string& title) override
+    {
+        used.emplace_back(utf8Text(file.filename()), title);
+    }
 
     // Answers the dialog, as the user would.
     void answer(std::optional<std::filesystem::path> file) { std::exchange(pending, {})(file); }
@@ -52,6 +57,7 @@ public:
     bool quitted = false;
     int replaced = 0;
     std::optional<CommandResult> reported;
+    std::vector<std::pair<std::string, std::string>> used; // file names and titles
 };
 
 // The commands on a document, in a fresh directory of their own, which is home too.
@@ -63,9 +69,13 @@ struct Files
     std::string path(const std::string& name) const { return utf8Text(directory / name); }
 
     // A change, so there's something unsaved.
-    void change()
+    void change(std::string title = "Changed")
     {
-        document.edit("Rename", {}, [](core::Song& song) { song.title = "Changed"; });
+        document.edit("Rename", {}, [&](core::Song& song) { song.title = title; });
+    }
+    std::string titleIn(const std::string& name) const
+    {
+        return core::readSongFile(directory / name).song->title;
     }
 
     test::TempDirectory temporary{"modal-file-commands-test"};
@@ -317,6 +327,86 @@ TEST_CASE("saving and quitting guard other open songs and reject stale picker re
     CHECK_FALSE(f.host.quitted);
     CHECK(f.run("q!") == CommandResult{true});
     CHECK(f.host.quitted);
+}
+
+TEST_CASE(":wa saves every changed song, asking for a file for each new one in turn")
+{
+    Files f;
+    f.change("One");
+    REQUIRE(f.run("w one").changed);
+    f.change("One changed");
+    REQUIRE(f.run("new").changed);
+    f.change("Two");
+    REQUIRE(f.run("w two").changed); // saved, so left alone
+    REQUIRE(f.run("new").changed);
+    f.change("Three");
+    REQUIRE(f.run("new").changed);
+    f.change("Four");
+    f.host.used.clear();
+
+    // Songs with files are saved at once, then each new one is shown and asked about.
+    CHECK(f.run("wa") == CommandResult{});
+    CHECK(f.titleIn("one.modal") == "One changed");
+    CHECK(f.host.asked == "save");
+    CHECK(f.host.suggested == "Untitled.modal");
+    CHECK(f.document.song().title == "Three");
+    f.host.answer(f.directory / "three.modal");
+    CHECK(f.document.song().title == "Four");
+    CHECK(f.host.pending);
+    f.host.answer(f.directory / "four.modal");
+    REQUIRE(f.host.reported);
+    CHECK(*f.host.reported == CommandResult{true, "Saved 3 songs", false});
+    CHECK(f.titleIn("three.modal") == "Three");
+    CHECK(f.titleIn("four.modal") == "Four");
+    CHECK_FALSE(f.document.modified());
+    // The recent list hears of each by its own title, not the shown song's.
+    CHECK(f.host.used ==
+          std::vector<std::pair<std::string, std::string>>{
+              {"one.modal", "One changed"}, {"three.modal", "Three"}, {"four.modal", "Four"}});
+
+    CHECK(f.run("wa") == CommandResult{false, "No songs have unsaved changes", false});
+    f.change("Four again");
+    CHECK(f.run("wa") == CommandResult{true, "Saved four.modal", false});
+
+    // Cancelling the dialog stops there, saying what was saved.
+    f.change("Four once more");
+    REQUIRE(f.run("new").changed);
+    f.change("Five");
+    CHECK(f.run("wa") == CommandResult{});
+    f.host.answer(std::nullopt);
+    CHECK(*f.host.reported ==
+          CommandResult{false, "Saved four.modal. This song isn't saved: :wa asks again", true});
+    CHECK(f.document.modified());
+    CHECK_FALSE(f.host.quitted);
+}
+
+TEST_CASE(":wqa saves every changed song and quits, :qa quits as :q does")
+{
+    Files f;
+    f.change("One");
+    REQUIRE(f.run("w one").changed);
+    f.change("One changed");
+    REQUIRE(f.run("new").changed);
+    f.change("Two");
+
+    // :qa refuses while songs are unsaved, pointing to :wqa; :qa! quits anyway.
+    const auto refused = f.run("qa");
+    CHECK(refused.refused);
+    CHECK(refused.message.find(":wqa saves them all") != std::string::npos);
+    CHECK_FALSE(f.host.quitted);
+
+    // :xa is :wqa; quitting waits for the new song's file.
+    CHECK(f.run("xa") == CommandResult{});
+    CHECK_FALSE(f.host.quitted);
+    f.host.answer(f.directory / "two.modal");
+    CHECK(f.host.quitted);
+    CHECK(f.titleIn("one.modal") == "One changed");
+    CHECK(f.titleIn("two.modal") == "Two");
+
+    Files g;
+    g.change();
+    CHECK(g.run("qa!") == CommandResult{true});
+    CHECK(g.host.quitted);
 }
 
 TEST_CASE(":wq saves and quits, once the song has a file")

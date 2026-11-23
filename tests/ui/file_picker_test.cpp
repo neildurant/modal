@@ -74,9 +74,10 @@ struct Pickers final : FileHost
         return workspace.songsFolder();
     }
     void songUsed(const std::filesystem::path& file,
-                  const std::optional<std::filesystem::path>& replacing) override
+                  const std::optional<std::filesystem::path>& replacing,
+                  const std::string& title) override
     {
-        workspace.songUsed(file, replacing);
+        workspace.songUsed(file, replacing, title);
     }
     void returnToSong(std::shared_ptr<void> kept) override
     {
@@ -400,6 +401,27 @@ TEST_CASE("song-backups lists the song's backups, to open one as a new song")
     p.type(U":w\n");
     CHECK(p.workspace.mode() == Mode::CommandLine);
     CHECK(p.shows(U"Enter for Untitled.modal"));
+}
+
+TEST_CASE(":wa asks for each new song's file in the picker in turn")
+{
+    Pickers p;
+    p.makeSong("Kept.modal", "Kept");
+    p.type(U":e Kept\n:song-title Kept changed\n");
+    p.type(U":new\n:song-title Sketch\n:new\n:song-title Idea\n");
+    p.type(U":wa\n");
+    CHECK(p.document.song().title == "Sketch");
+    CHECK(p.shows(U"Enter for Untitled.modal"));
+    p.type(U"Sketch\n");
+    CHECK(p.document.song().title == "Idea");
+    CHECK(p.shows(U"Enter for Untitled.modal"));
+    p.type(U"Idea\n");
+    CHECK(p.workspace.message() == "Saved 3 songs");
+    CHECK(std::filesystem::exists(p.temporary / "Sketch.modal"));
+    CHECK(std::filesystem::exists(p.temporary / "Idea.modal"));
+    CHECK(p.workspace.remembered().songs().front().title == "Idea");
+    CHECK(std::ranges::any_of(p.workspace.remembered().songs(),
+                              [](const auto& recent) { return recent.title == "Kept changed"; }));
 }
 
 TEST_CASE("saving an unnamed song offers a filename and confirms overwriting")

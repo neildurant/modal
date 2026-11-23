@@ -69,9 +69,11 @@ public:
     // The document has a new song, opened or new, to show from the start.
     virtual void songReplaced() = 0;
 
-    // A song file opened or saved, for the recent list, and an imported file it took the
-    // place of, if any (decided 20 November 2026).
-    virtual void songUsed(const std::filesystem::path&, const std::optional<std::filesystem::path>&)
+    // A song file opened or saved, for the recent list, an imported file it took the place
+    // of, if any (decided 20 November 2026), and the song's title, which needn't be the
+    // active song's when every song is saved.
+    virtual void songUsed(const std::filesystem::path&, const std::optional<std::filesystem::path>&,
+                          const std::string& /*title*/)
     {
     }
 
@@ -110,6 +112,8 @@ public:
 //   song-close[!]      closes the current song, with ! to discard changes
 //   quit, q            quits; refused with unsaved changes, unless quit!
 //   wq                 saves, then quits
+//   write-all, wa      saves every song with changes, asking for a file for each new one
+//   wqa, xa            saves every song with changes, then quits; qa quits as q does
 //   song-open-copy FILE  opens a copy of FILE as a new song without a file
 //
 // A FILE without an extension is given .modal (or .mid for export). A relative FILE is in the

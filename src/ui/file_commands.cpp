@@ -22,7 +22,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 12> kFileCommands{{
+constexpr std::array<CommandInfo, 14> kFileCommands{{
     {.name = "edit",
      .description = "Open a song, or import a MIDI file; with no file, choose one",
      .aliases = "e",
@@ -41,7 +41,7 @@ constexpr std::array<CommandInfo, 12> kFileCommands{{
      .bang = true,
      .choices = {Choices::File}},
     {.name = "new", .description = "Start a new song", .bang = true},
-    {.name = "quit", .description = "Quit", .aliases = "q", .bang = true},
+    {.name = "quit", .description = "Quit", .aliases = "q qa", .bang = true},
     {.name = "wq", .description = "Save the song, then quit", .keys = false},
     {.name = "song-select", .description = "Select an open song"},
     {.name = "song-close", .description = "Close the current song", .bang = true},
@@ -61,6 +61,13 @@ constexpr std::array<CommandInfo, 12> kFileCommands{{
      .description = "Open a copy of FILE as a new song without a file, leaving FILE as it is",
      .usage = "FILE",
      .choices = {Choices::File}},
+    {.name = "write-all",
+     .description = "Save every song with unsaved changes, asking for a file for each new one",
+     .aliases = "wa"},
+    {.name = "wqa",
+     .description = "Save every song with unsaved changes, then quit",
+     .aliases = "xa",
+     .keys = false},
 }};
 
 // The argument as a path: the rest of the line, without quotes around it, from a folder,
@@ -156,6 +163,10 @@ bool sameFile(const std::filesystem::path& left, const std::filesystem::path& ri
     const auto rightPath = std::filesystem::weakly_canonical(absolutePath(right), error);
     return error ? left == right : leftPath == rightPath;
 }
+
+constexpr const char* kOthersUnsaved =
+    "Other open songs have unsaved changes: :wqa saves them all and quits, or :song-select "
+    "reaches them";
 
 class FileCommands
 {
@@ -263,7 +274,7 @@ public:
     CommandResult quit(const CommandCall& call)
     {
         if (!call.bang && otherModified())
-            return CommandResult::error("Other open songs have unsaved changes. Use :song-select");
+            return CommandResult::error(std::string{kOthersUnsaved});
         if (document_.modified() && !call.bang)
         {
             return unsaved("q");
@@ -316,6 +327,42 @@ public:
         return activate(active_ == 0 ? 1 : active_ - 1, true);
     }
 
+    // Saves every song with unsaved changes (decided 23 November 2026, following Vim's :wa):
+    // those with files where they are, then each new one in turn, switching to it and asking
+    // for a file, as :w does. Quits after, with thenQuit, once every song is saved.
+    CommandResult saveAll(bool thenQuit)
+    {
+        if (auto refusal = recording_.fileOperationRefusal())
+            return CommandResult::error(std::move(*refusal));
+        std::size_t count = 0;
+        std::string last;
+        std::string warning;
+        std::vector<std::size_t> unnamed;
+        for (std::size_t i = 0; i < songs_.size(); ++i)
+        {
+            auto& song = at(i);
+            if (!song.modified())
+                continue;
+            if (!song.file())
+            {
+                unnamed.push_back(i);
+                continue;
+            }
+            const auto file = *song.file();
+            std::string noBackup;
+            if (auto error = keep(song, file, noBackup); !error.empty())
+                return CommandResult::error(savedSoFar(count, last) + "Can't save " + named(file) +
+                                            ": " + error);
+            ++count;
+            last = named(file);
+            if (!noBackup.empty() && warning.empty())
+                warning = "no backup was made of " + named(file) + ": " + noBackup;
+        }
+        if (unnamed.empty())
+            return allSaved(count, last, warning, thenQuit);
+        return nameNext(std::move(unnamed), count, last, warning, thenQuit);
+    }
+
     // A copy of a file as a new song, without the file, as a backup is opened: saving asks
     // where, so the file is never written over by chance (decided 23 November 2026).
     CommandResult openCopy(const CommandCall& call)
@@ -347,6 +394,81 @@ public:
     }
 
 private:
+    // Asks for a file for the first new song with changes, shown while it's asked, and goes on
+    // to the next once it's saved; stopping where a dialog is cancelled or a save fails.
+    CommandResult nameNext(std::vector<std::size_t> unnamed, std::size_t count, std::string last,
+                           std::string warning, bool thenQuit)
+    {
+        const auto index = unnamed.front();
+        unnamed.erase(unnamed.begin());
+        if (auto switched = activate(index, false); switched.refused)
+            return CommandResult::error(savedSoFar(count, last) + switched.message);
+        const auto& imported = document_.importedFrom();
+        auto suggested = imported ? std::filesystem::path{*imported}.replace_extension(".modal")
+                                  : std::filesystem::path{"Untitled.modal"};
+        host_.chooseSave(
+            FileHost::FileKind::Song, suggested,
+            [this, unnamed = std::move(unnamed), count, last, warning, thenQuit,
+             activation = activation_](auto file) mutable
+            {
+                if (activation != activation_)
+                {
+                    host_.report(songChanged());
+                    return;
+                }
+                if (!file)
+                {
+                    host_.report({false,
+                                  savedSoFar(count, last) + "This song isn't saved: :wa asks again",
+                                  true});
+                    return;
+                }
+                auto result = saved(*file, false);
+                if (result.refused)
+                {
+                    result.message = savedSoFar(count, last) + result.message;
+                    host_.report(result);
+                    return;
+                }
+                ++count;
+                last = named(*file);
+                if (result.warning && warning.empty())
+                    warning = result.message;
+                host_.report(unnamed.empty()
+                                 ? allSaved(count, last, warning, thenQuit)
+                                 : nameNext(std::move(unnamed), count, last, warning, thenQuit));
+            });
+        return {};
+    }
+
+    CommandResult allSaved(std::size_t count, const std::string& last, const std::string& warning,
+                           bool thenQuit)
+    {
+        if (thenQuit)
+        {
+            host_.quit();
+            return {true};
+        }
+        if (count == 0)
+            return {false, "No songs have unsaved changes", false};
+        auto message = count == 1 ? "Saved " + last : "Saved " + std::to_string(count) + " songs";
+        if (!warning.empty())
+            return {true, message + ", but " + warning, true};
+        return {true, std::move(message), false};
+    }
+
+    static std::string savedSoFar(std::size_t count, const std::string& last)
+    {
+        return count == 0   ? std::string{}
+               : count == 1 ? "Saved " + last + ". "
+                            : "Saved " + std::to_string(count) + " songs. ";
+    }
+
+    core::Document& at(std::size_t index)
+    {
+        return index == active_ ? document_ : *songs_[index].document;
+    }
+
     struct SongSlot
     {
         std::unique_ptr<core::Document> document;
@@ -472,7 +594,8 @@ private:
             const auto switched = activate(*existing, force);
             if (switched.refused)
                 return switched;
-            host_.songUsed(at(active_).file() ? *at(active_).file() : file, std::nullopt);
+            host_.songUsed(document_.file() ? *document_.file() : file, std::nullopt,
+                           document_.underlying().title);
             return {true, "Opened " + named(file), false};
         }
         auto song = std::make_unique<core::Document>();
@@ -484,7 +607,7 @@ private:
         if (const auto switched = activateNew(std::move(song), force || soleUntouched());
             switched.refused)
             return switched;
-        host_.songUsed(file, std::nullopt);
+        host_.songUsed(file, std::nullopt, document_.underlying().title);
         if (!result.message.empty())
         {
             return {true, std::move(result.message), true}; // opened, with a warning
@@ -504,32 +627,36 @@ private:
         }
         if (const auto existing = openedFile(file, false); existing && *existing != active_)
             return CommandResult::error(named(file) + " is already open in another song");
-        // The file as it was, kept before it's replaced; the save goes ahead without one, so a
-        // full state directory can't stop work being kept.
         std::string noBackup;
-        if (std::error_code error; std::filesystem::is_regular_file(file, error))
-            noBackup = host_.backUp(file);
-        if (auto error = core::writeSongFile(document_.underlying(), file); !error.empty())
-        {
+        if (auto error = keep(document_, file, noBackup); !error.empty())
             return CommandResult::error("Can't save " + named(file) + ": " + error);
-        }
-        // A MIDI file imported and now saved as a song gives the song its place in the list.
-        std::optional<std::filesystem::path> imported;
-        if (!document_.file())
-            imported = document_.importedFrom();
-        document_.markSaved(file);
-        host_.songUsed(file, imported);
         if (thenQuit)
         {
             if (otherModified())
-                return CommandResult::error(
-                    "Saved " + named(file) +
-                    ". Other open songs have unsaved changes. Use :song-select");
+                return CommandResult::error("Saved " + named(file) + ". " + kOthersUnsaved);
             host_.quit();
         }
         if (!noBackup.empty())
             return {true, "Saved " + named(file) + ", but no backup was made: " + noBackup, true};
         return {true, "Saved " + named(file), false};
+    }
+
+    // Saves a song, open or not, to a file: the file as it was kept as a backup first, the
+    // save going ahead without one so a full state directory can't stop work being kept.
+    // Returns why it couldn't be saved, or nothing, and sets noBackup to why no backup was made.
+    std::string keep(core::Document& song, const std::filesystem::path& file, std::string& noBackup)
+    {
+        if (std::error_code error; std::filesystem::is_regular_file(file, error))
+            noBackup = host_.backUp(file);
+        if (auto error = core::writeSongFile(song.underlying(), file); !error.empty())
+            return error;
+        // A MIDI file imported and now saved as a song gives the song its place in the list.
+        std::optional<std::filesystem::path> imported;
+        if (!song.file())
+            imported = song.importedFrom();
+        song.markSaved(file);
+        host_.songUsed(file, imported, song.underlying().title);
+        return {};
     }
 
     CommandResult exported(const std::filesystem::path& file)
@@ -631,6 +758,8 @@ std::function<bool()> addFileCommands(CommandRegistry& registry, core::Recording
         [commands](const CommandCall& call) { return commands->stepSong(call.count, false); });
     add(kFileCommands[11],
         [commands](const CommandCall& call) { return commands->openCopy(call); });
+    add(kFileCommands[12], [commands](const CommandCall&) { return commands->saveAll(false); });
+    add(kFileCommands[13], [commands](const CommandCall&) { return commands->saveAll(true); });
     return [commands] { return commands->otherModified(); };
 }
 

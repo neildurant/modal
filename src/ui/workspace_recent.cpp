@@ -17,7 +17,8 @@ namespace modal::ui
 {
 
 void Workspace::songUsed(const std::filesystem::path& file,
-                         const std::optional<std::filesystem::path>& replacing)
+                         const std::optional<std::filesystem::path>& replacing,
+                         const std::optional<std::string>& title)
 {
     const auto most = settings_ != nullptr ? settings_->integer("recentsongs") : 12;
     if (most <= 0)
@@ -26,9 +27,8 @@ void Workspace::songUsed(const std::filesystem::path& file,
     const auto absolute = std::filesystem::absolute(file, error);
     if (replacing)
         remembered_.forgetSong(utf8Text(std::filesystem::absolute(*replacing, error)));
-    // The song just opened or saved is the one shown, so its title is the document's.
     remembered_.usedSong(utf8Text((error ? file : absolute).lexically_normal()), clock_(),
-                         static_cast<std::size_t>(most), document_.song().title);
+                         static_cast<std::size_t>(most), title.value_or(document_.song().title));
     rememberedChanged();
 }
 

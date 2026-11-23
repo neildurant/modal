@@ -458,9 +458,10 @@ public:
     std::string backUp(const std::filesystem::path& file) override { return view_.backUp(file); }
 
     void songUsed(const std::filesystem::path& file,
-                  const std::optional<std::filesystem::path>& replacing) override
+                  const std::optional<std::filesystem::path>& replacing,
+                  const std::string& title) override
     {
-        view_.songUsed(file, replacing);
+        view_.songUsed(file, replacing, title);
     }
 
     void returnToSong(std::shared_ptr<void> kept) override
@@ -948,7 +949,8 @@ int main(int argc, char* argv[])
         if (otherSongsModified())
         {
             view.report(ui::CommandResult::error(
-                "Other open songs have unsaved changes. Use :song-select"));
+                "Other open songs have unsaved changes: :wqa saves them all and quits, or "
+                ":song-select reaches them"));
             return false;
         }
         if (!document.modified())

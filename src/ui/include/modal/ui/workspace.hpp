@@ -298,8 +298,10 @@ public:
     }
     // A song file opened or saved, for the recent list, in place of an imported file it was
     // made from, if any.
+    // The title is the song's, the shown song's if not given.
     void songUsed(const std::filesystem::path& file,
-                  const std::optional<std::filesystem::path>& replacing = std::nullopt);
+                  const std::optional<std::filesystem::path>& replacing = std::nullopt,
+                  const std::optional<std::string>& title = std::nullopt);
 
     // Before a save replaces a song file: keeps a backup of it in the state folder, up to the
     // backups setting's number, returning why none could be made, or nothing.
