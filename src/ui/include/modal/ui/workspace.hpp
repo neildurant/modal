@@ -463,6 +463,8 @@ public:
     // Whether the last key's command was refused or given up, rather than done.
     bool refused() const { return refused_; }
     const std::string& message() const { return message_; }
+    // Where the song's armed punch range is now, if one is armed.
+    std::optional<core::ArmedSpan> punchSpan() const override;
     MessageKind messageKind() const { return messageKind_; }
 
 private:
@@ -1340,19 +1342,54 @@ private:
         std::function<void(std::size_t)> chosen;
     };
     std::optional<SongChoice> songChoice_;
+    // Choosing two labels, to loop between them or arm a punch range between them.
+    enum class LabelPurpose : std::uint8_t
+    {
+        Loop,
+        Punch,
+    };
     struct LoopLabelChoice
     {
         ChoiceList list;
         std::vector<std::size_t> labels;
         std::optional<std::size_t> from;
+        LabelPurpose purpose = LabelPurpose::Loop;
     };
     std::optional<LoopLabelChoice> loopLabelChoice_;
-    std::map<std::uint64_t, std::pair<std::string, std::string>> lastLoopLabels_;
+    // The last two labels chosen in each song, by its identity, to choose again.
+    using LabelPairs = std::map<std::uint64_t, std::pair<std::string, std::string>>;
+    LabelPairs lastLoopLabels_;
+    LabelPairs lastPunchLabels_;
     std::vector<std::string> loopLabelNames() const;
+    // The two labels named in :loop's or :punch's arguments, as indices in the song's labels,
+    // their names noted; or why not.
+    struct NamedLabels
+    {
+        std::size_t from = 0;
+        std::size_t to = 0;
+        std::pair<std::string, std::string> names;
+    };
+    std::variant<NamedLabels, CommandResult> namedLabels(std::string_view arguments,
+                                                         std::string_view command,
+                                                         std::string_view chooser) const;
     CommandResult loop(std::string_view arguments);
     CommandResult startLoop(core::Tick from, core::Tick to);
-    CommandResult chooseLoopLabel(std::optional<std::size_t> from = std::nullopt);
+    CommandResult chooseLoopLabel(std::optional<std::size_t> from = std::nullopt,
+                                  LabelPurpose purpose = LabelPurpose::Loop);
     bool loopLabelKey(const Key& key);
+    // Two labels chosen, or named, for the purpose.
+    CommandResult labelsChosen(LabelPurpose purpose, std::size_t from, std::size_t to,
+                               std::pair<std::string, std::string> names);
+
+    // The punch range armed in each open song, by its identity (decided 24 November 2026): for
+    // the session, not saved and not an undo step.
+    std::map<std::uint64_t, core::ArmedRange> punchRanges_;
+    CommandResult punch(std::string_view arguments);
+    CommandResult armPunch(core::ArmedRange range);
+    CommandResult clearPunch();
+    std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
+    // Clears the song's punch range once an edit has left it nowhere, saying why.
+    void notePunchRange();
     // The tracks of a file being imported, ticked with Space, which Enter imports by running the
     // line that names them.
     struct TrackImportChoice

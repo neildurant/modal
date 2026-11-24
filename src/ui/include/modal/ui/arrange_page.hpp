@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/armed_range.hpp>
 #include <modal/core/note_fraction.hpp>
 #include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
@@ -130,7 +131,8 @@ public:
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
                     std::optional<Selected> selected = std::nullopt,
                     const std::vector<core::TrackId>& moving = {}, bool ownMeters = true,
-                    bool recording = false) const;
+                    bool recording = false,
+                    std::optional<core::ArmedSpan> punch = std::nullopt) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

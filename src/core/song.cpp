@@ -178,6 +178,12 @@ bool operator==(const Section& a, const Section& b)
            a.marks_ == b.marks_ && std::ranges::equal(a.content_, b.content_, sameContent);
 }
 
+std::uint64_t Section::newId()
+{
+    static std::atomic<std::uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
 std::uint64_t Song::newIdentity()
 {
     static std::atomic<std::uint64_t> next{1};
@@ -652,6 +658,7 @@ bool Song::insertSections(std::size_t index,
     for (const auto& section : sections)
     {
         auto copy = std::make_shared<Section>(*section);
+        copy->id_ = Section::newId(); // a section of its own, however alike
         copy->name_ = uniqueSectionName(copy->name_);
         copy->marks_.clear();
         std::erase_if(copy->content_,
@@ -987,6 +994,7 @@ Song::BarsEdit Song::removeBars(Tick from, std::int64_t count)
     {
         // What's left of the last section, under its own name again.
         auto rest = std::make_shared<Section>(*edited.sections_[firstCut]);
+        rest->id_ = sections_[last]->id_;
         rest->name_ = sections_[last]->name_;
         rest->colour_ = sections_[last]->colour_;
         edited.replaceSection(firstCut, std::move(rest));
@@ -1047,8 +1055,9 @@ Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeS
     {
         edited.joinSections(index);
     }
-    // Under the section's own name and colour, which the bars went into.
+    // The section the bars went into, under its own name and colour.
     auto joined = std::make_shared<Section>(*edited.sections_[index]);
+    joined->id_ = old.id_;
     joined->name_ = old.name_;
     joined->colour_ = old.colour_;
     edited.replaceSection(index, std::move(joined));
@@ -1652,7 +1661,7 @@ void Song::growTo(Tick end)
 
 void Song::replaceSection(std::size_t index, std::shared_ptr<Section> section)
 {
-    if (*section != *sections_[index])
+    if (section->id_ != sections_[index]->id_ || *section != *sections_[index])
     {
         sections_[index] = std::move(section);
     }

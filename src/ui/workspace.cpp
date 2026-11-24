@@ -125,6 +125,12 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return loop(call.arguments);
                 if (name == "loop-labels")
                     return chooseLoopLabel();
+                if (name == "punch")
+                    return punch(call.arguments);
+                if (name == "punch-labels")
+                    return chooseLoopLabel(std::nullopt, LabelPurpose::Punch);
+                if (name == "punch-clear")
+                    return clearPunch();
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);
@@ -670,6 +676,7 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     const bool changed = recordChange(key, now);
     auditionHere(version);
     notePasteHistory(version);
+    notePunchRange();
     return changed;
 }
 

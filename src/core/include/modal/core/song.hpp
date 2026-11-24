@@ -79,6 +79,12 @@ public:
 
     const std::string& name() const { return name_; }
     const std::optional<std::string>& colour() const { return colour_; }
+
+    // Which section this is, for the session: kept as it's edited, moved, renamed or resized and
+    // through undo, and new for a section made, split off or copied in, so something can follow
+    // a section through edits (decided 24 November 2026, for armed ranges). Not saved, and not
+    // compared: two sections alike are equal whatever their ids.
+    std::uint64_t id() const { return id_; }
     Tick length() const { return length_; }
 
     // The conductor's tempo changes, in tick order, the first at 0.
@@ -109,6 +115,9 @@ public:
 private:
     friend class Song;
 
+    static std::uint64_t newId();
+
+    std::uint64_t id_ = newId();
     std::string name_;
     std::optional<std::string> colour_;
     Tick length_;

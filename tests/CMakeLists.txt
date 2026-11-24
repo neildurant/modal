@@ -6,6 +6,7 @@ include(Catch)
 add_executable(modal_tests
     support/no_crt_dialogs.cpp
     core/drum_map_test.cpp
+    core/armed_range_test.cpp
     core/controllers_test.cpp
     core/count_in_test.cpp
     core/document_test.cpp

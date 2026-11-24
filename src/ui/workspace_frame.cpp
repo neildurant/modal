@@ -339,7 +339,9 @@ Bar Workspace::messageBar(bool withMessage) const
     }
     else if (loopLabelChoice_)
     {
-        typing(loopLabelChoice_->from ? "Loop end: " : "Loop start: ",
+        const bool punch = loopLabelChoice_->purpose == LabelPurpose::Punch;
+        typing(loopLabelChoice_->from ? (punch ? "Punch out: " : "Loop end: ")
+                                      : (punch ? "Punch in: " : "Loop start: "),
                loopLabelChoice_->list.typed());
         row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
     }
@@ -438,6 +440,7 @@ Bar Workspace::statusBar() const
                      : StatusMode::Normal;
     const auto& song = document_.song();
     state.overdub = song.recordMode == core::RecordMode::Overdub;
+    state.punch = punchSpan().has_value();
     if (player_)
     {
         const auto playing = player_->position();

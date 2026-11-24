@@ -34,11 +34,38 @@ std::vector<std::string> Workspace::loopLabelNames() const
     return names;
 }
 
+std::variant<Workspace::NamedLabels, CommandResult>
+Workspace::namedLabels(std::string_view arguments, std::string_view command,
+                       std::string_view chooser) const
+{
+    std::istringstream input{std::string{arguments}};
+    std::string fromName;
+    std::string toName;
+    if (!(input >> std::quoted(fromName) >> std::quoted(toName)) || !(input >> std::ws).eof())
+        return CommandResult::error("Give two labels to :" + std::string{command} +
+                                    ", quoting names with spaces");
+
+    const auto names = loopLabelNames();
+    const auto labels = document_.song().labels();
+    for (const auto& name : {fromName, toName})
+    {
+        if (std::ranges::count(names, name) != 1)
+        {
+            const auto count = std::ranges::count(labels, name, &core::Label::name);
+            return CommandResult::error(count > 1 ? "Several labels are named " + name +
+                                                        ": choose one with " + keysOf(chooser)
+                                                  : "No label named " + name);
+        }
+    }
+    const auto index = [&](const std::string& name)
+    { return static_cast<std::size_t>(std::ranges::find(names, name) - names.begin()); };
+    return NamedLabels{index(fromName), index(toName), {fromName, toName}};
+}
+
 CommandResult Workspace::loop(std::string_view arguments)
 {
     const auto& song = document_.song();
-    std::istringstream input{std::string{arguments}};
-    if ((input >> std::ws).eof())
+    if (arguments.find_first_not_of(" 	") == std::string_view::npos)
     {
         if (selection_)
         {
@@ -49,30 +76,25 @@ CommandResult Workspace::loop(std::string_view arguments)
         const auto section = song.sectionAt(view().cursor().tick);
         return startLoop(song.sectionStart(section), song.sectionStart(section + 1));
     }
+    auto named = namedLabels(arguments, "loop", "loop-labels");
+    if (auto* refused = std::get_if<CommandResult>(&named))
+        return *refused;
+    auto& labels = std::get<NamedLabels>(named);
+    return labelsChosen(LabelPurpose::Loop, labels.from, labels.to, std::move(labels.names));
+}
 
-    std::string fromName;
-    std::string toName;
-    if (!(input >> std::quoted(fromName) >> std::quoted(toName)) || !(input >> std::ws).eof())
-        return CommandResult::error("Give two labels to :loop, quoting names with spaces");
-
-    const auto names = loopLabelNames();
+CommandResult Workspace::labelsChosen(LabelPurpose purpose, std::size_t from, std::size_t to,
+                                      std::pair<std::string, std::string> names)
+{
+    const auto& song = document_.song();
     const auto labels = song.labels();
-    const auto from = std::ranges::find(names, fromName);
-    const auto to = std::ranges::find(names, toName);
-    for (const auto& name : {fromName, toName})
-    {
-        if (std::ranges::count(names, name) != 1)
-        {
-            const auto count = std::ranges::count(labels, name, &core::Label::name);
-            return CommandResult::error(count > 1 ? "Several labels are named " + name +
-                                                        ": choose one with , l L"
-                                                  : "No label named " + name);
-        }
-    }
-    auto result = startLoop(labels[static_cast<std::size_t>(from - names.begin())].tick,
-                            labels[static_cast<std::size_t>(to - names.begin())].tick);
+    auto result = purpose == LabelPurpose::Loop ? startLoop(labels[from].tick, labels[to].tick)
+                  : labels[from].tick >= labels[to].tick
+                      ? CommandResult::error("The end of a punch range must be after its start")
+                      : armPunch(core::ArmedRange::labels(song, from, to));
     if (!result.refused)
-        lastLoopLabels_[song.identity()] = {std::move(fromName), std::move(toName)};
+        (purpose == LabelPurpose::Loop ? lastLoopLabels_ : lastPunchLabels_)[song.identity()] =
+            std::move(names);
     return result;
 }
 
@@ -97,17 +119,21 @@ CommandResult Workspace::startLoop(core::Tick from, core::Tick to)
     return {true, "Looping " + positionText(meter, from) + " to " + positionText(meter, to)};
 }
 
-CommandResult Workspace::chooseLoopLabel(std::optional<std::size_t> from)
+CommandResult Workspace::chooseLoopLabel(std::optional<std::size_t> from, LabelPurpose purpose)
 {
     if (recording_.pending())
         return CommandResult::error("Recording: Space stops it first");
     const auto& song = document_.song();
     const auto labels = song.labels();
     if (labels.size() < 2 || labels.front().tick == labels.back().tick)
-        return CommandResult::error("Put labels at two different times to loop between them");
+        return CommandResult::error(purpose == LabelPurpose::Loop
+                                        ? "Put labels at two different times to loop between them"
+                                        : "Put labels at two different times to punch between "
+                                          "them");
 
     const auto names = loopLabelNames();
-    const auto previous = lastLoopLabels_.find(song.identity());
+    const auto& last = purpose == LabelPurpose::Loop ? lastLoopLabels_ : lastPunchLabels_;
+    const auto previous = last.find(song.identity());
     std::vector<std::string> choices;
     std::vector<std::size_t> indices;
     std::size_t highlighted = 0;
@@ -115,14 +141,14 @@ CommandResult Workspace::chooseLoopLabel(std::optional<std::size_t> from)
     {
         if (from ? labels[i].tick <= labels[*from].tick : labels[i].tick >= labels.back().tick)
             continue;
-        if (previous != lastLoopLabels_.end() &&
+        if (previous != last.end() &&
             names[i] == (from ? previous->second.second : previous->second.first))
             highlighted = choices.size();
         choices.push_back(names[i] + "  " + positionText(song.meter(), labels[i].tick));
         indices.push_back(i);
     }
     loopLabelChoice_.emplace(LoopLabelChoice{ChoiceList{std::move(choices), highlighted, true},
-                                             std::move(indices), from});
+                                             std::move(indices), from, purpose});
     loopLabelChoice_->list.name("label");
     return {true};
 }
@@ -144,20 +170,14 @@ bool Workspace::loopLabelKey(const Key& key)
         {
             const auto label = choice.labels[*selected];
             const auto from = choice.from;
+            const auto purpose = choice.purpose;
             loopLabelChoice_.reset();
             if (!from)
-                report(chooseLoopLabel(label));
+                report(chooseLoopLabel(label, purpose));
             else
             {
-                const auto& song = document_.song();
-                const auto labels = song.labels();
-                const auto result = startLoop(labels[*from].tick, labels[label].tick);
-                if (!result.refused)
-                {
-                    const auto names = loopLabelNames();
-                    lastLoopLabels_[song.identity()] = {names[*from], names[label]};
-                }
-                report(result);
+                const auto names = loopLabelNames();
+                report(labelsChosen(purpose, *from, label, {names[*from], names[label]}));
             }
         }
     }

@@ -342,7 +342,7 @@ void ArrangePage::follow()
 void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
                              const std::vector<core::TrackId>& moving, bool ownMeters,
-                             bool recording) const
+                             bool recording, std::optional<core::ArmedSpan> punch) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -805,6 +805,15 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         timeline.under.push_back({{scale.toX(end_), tracksTop, lineWidth, tracksBottom - tracksTop},
                                   Role::BarLine,
                                   255});
+    }
+    // The punch range armed, along the ruler's foot.
+    if (punch && punch->to > leftTick_ && punch->from < right)
+    {
+        addRangeBracket(timeline,
+                        {punch->from >= leftTick_ ? scale.toX(punch->from) : 0,
+                         punch->to <= right ? scale.toX(punch->to) : timeline.bounds.width,
+                         punch->from >= leftTick_, punch->to <= right},
+                        tracksTop, cell_);
     }
     // In a row of their own (decided November 2026, as they and the labels' names ran into each
     // other in one): the play-from marker, and the marks (ma), each its letter at its time. A

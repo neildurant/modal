@@ -13,6 +13,7 @@ add_library(modal_core STATIC
     meter_map.cpp
     note_fraction.cpp
     pedalling.cpp
+    armed_range.cpp
     controllers.cpp
     count_in.cpp
     document.cpp

@@ -313,7 +313,7 @@ The leader is `,` (the `leader` setting). Its groups:
 | `, s` | Sections, on the cursor's section |
 | `, t` | Tracks: `a` add after, `i` add before, `d` delete, `r` rename, `m` mute, `s` solo, `c` chase, `q` quantise as it plays, `o` reorder, `f` freeze playback transforms |
 | `, v m` `gm` | The Ports view: this machine's MIDI ports, to enable, alias and choose the default input and output |
-| `, r` | Recording: `a` arm this track, `t` its Thru, `m` replace or overdub |
+| `, r` | Recording: `a` arm this track, `t` its Thru, `m` replace or overdub, `A` disarm every track, `p` arm a punch range, `l` a punch range between labels, `P` clear it |
 | `, m` | Metronome: `m` off, while recording or always; `c` count-in, pre-roll or neither; `s` the Metronome page |
 | `, S` | Select |
 | `, x` | Transforms |
@@ -328,6 +328,8 @@ The leader is `,` (the `leader` setting). Its groups:
 While recording or waiting for its take to finish after stopping, save, export, open, new and quit (including `!` and the window's close button) are refused, with `Stop recording first` while recording and `Finishing the take: try again in a moment` in the moment after stopping, as `R` is then.
 
 `Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it. `:countin 2`, `:countin 3 beats`, `:countin off`, `:preroll 2` and `:preroll 3 beats` set what comes before recording.
+
+`, r p` arms a punch range: the cursor's section, or in Visual mode the selection's time span. `, r l` chooses its two labels, with the last pair offered again, and `:punch IN OUT` names them. `, r P` clears it. The range stays armed in the song, shown by a dashed bracket along the foot of the ruler and `PUNCH` in the status line; a section range follows its section through edits, a label range its labels, and a selection's stays in time. Recording into it comes with the next step.
 
 `, L` loops the cursor's section or the Visual selection's time span. `, l L` chooses a start and end from the song's labels, with the previous pair preselected when available. `:loop START END` takes names directly, with double quotes around names containing spaces. Playback wraps before the end label, and Space stops the loop.
 

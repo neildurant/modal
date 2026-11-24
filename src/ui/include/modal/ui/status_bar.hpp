@@ -55,6 +55,7 @@ struct StatusBarState
     std::optional<Transport> transport;
     std::size_t armed = 0;
     bool overdub = false;
+    bool punch = false; // a punch range armed
     core::CountInSettings countIn;
     core::MetronomeSettings::When clickWhen = core::MetronomeSettings::When::Recording;
     bool clickAvailable = true;

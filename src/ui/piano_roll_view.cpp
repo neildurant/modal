@@ -5064,6 +5064,16 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
         next = x + static_cast<int>(text.size() + 1) * cell_.width;
         ruler.text.push_back({x, 2 * h, std::move(text), {Role::Dim, Role::Background, kPlain}});
     }
+
+    // The punch range armed, along the ruler's foot.
+    if (const auto punch = host_.punchSpan(); punch && punch->to > p.start && punch->from < p.end)
+    {
+        addRangeBracket(ruler,
+                        {punch->from >= p.start ? scale.toX(punch->from) : 0,
+                         punch->to <= p.end ? scale.toX(punch->to) : width, punch->from >= p.start,
+                         punch->to <= p.end},
+                        ruler.bounds.height, cell_);
+    }
 }
 
 void PianoRollView::addRegions(Frame& frame) const

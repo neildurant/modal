@@ -549,6 +549,30 @@ void addMarkDot(Region& region, int x, int y, CellSize cell)
     region.under.push_back({{x + ring, top, side, side}, Role::Text, 255});
 }
 
+void addRangeBracket(Region& region, const RangeBracket& bracket, int bottom, CellSize cell)
+{
+    if (bracket.x1 <= bracket.x0)
+        return;
+    const int thick = std::max(hairline(cell), 2);
+    const int y = bottom - thick;
+    if (bracket.dashed)
+    {
+        // Dashes from its start, half a cell long with a quarter between.
+        const int dash = std::max(cell.width / 2, 2);
+        const int gap = std::max(cell.width / 4, 1);
+        for (int x = bracket.x0; x < bracket.x1; x += dash + gap)
+            region.over.push_back(
+                {{x, y, std::min(dash, bracket.x1 - x), thick}, bracket.role, 255});
+    }
+    else
+        region.over.push_back({{bracket.x0, y, bracket.x1 - bracket.x0, thick}, bracket.role, 255});
+    const int cap = std::max(cell.height / 3, thick);
+    if (bracket.startShown)
+        region.over.push_back({{bracket.x0, bottom - cap, thick, cap}, bracket.role, 255});
+    if (bracket.endShown)
+        region.over.push_back({{bracket.x1 - thick, bottom - cap, thick, cap}, bracket.role, 255});
+}
+
 std::string padText(std::string text, std::size_t width, bool alignRight)
 {
     const auto length = decodeUtf8(text).size();

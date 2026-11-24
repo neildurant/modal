@@ -9,6 +9,7 @@
 #include <modal/core/song_file.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
+#include <modal/ui/event_text.hpp>
 #include <modal/ui/file_commands.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -2113,9 +2114,9 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
     p.document.edit("Rename section", {},
                     [](core::Song& song) { song.renameSection(0, "Introduction"); });
     // What gives way, in the order it goes.
-    const std::array<std::u32string_view, 9> parts{U"No file", U"input", U"Introduction",
-                                                   U"REPLACE", U"THR",   U"Intro",
-                                                   U" IN ",    U" 4/4 ", U" BPM"};
+    const std::array<std::u32string_view, 10> parts{
+        U"No file", U"input", U"Introduction", U"REPLACE", U"THR",
+        U"Intro",   U" IN ",  U" 4/4 ",        U" BPM",    U"PUNCH"};
     const auto shown = [&](int columns)
     {
         p.ws.resize(columns * kCell.width, 24 * kCell.height, kCell);
@@ -2138,7 +2139,7 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
             CAPTURE(columns, encodeUtf8(kept));
             CHECK(has(kept));
         }
-        std::array<bool, 9> present{};
+        std::array<bool, 10> present{};
         for (std::size_t i = 0; i < parts.size(); ++i)
             present[i] = has(parts[i]);
         return present;
@@ -2314,4 +2315,146 @@ TEST_CASE("R while a stopped take is being finished says so, rather than asking 
     REQUIRE(p.ws.recordingSession().state() == core::RecordingSession::State::Finishing);
     p.type(U"R");
     CHECK(p.ws.message() == "Finishing the take: try again in a moment");
+}
+
+namespace
+{
+
+// Eight bars of 4/4 in three sections, A (bars 1-2), B (3-5) and C (6-8), with a track, a
+// label "in" at bar 2 and "out" at bar 7.
+core::Song punchSong(core::Ppqn ppqn)
+{
+    core::Song song{ppqn};
+    const core::Tick bar = ppqn.whole();
+    song.addTrack("Keys");
+    song.renameSection(0, "A");
+    song.splitSection(2 * bar, "B");
+    song.splitSection(5 * bar, "C");
+    song.setLabel(bar, "in");
+    song.setLabel(6 * bar, "out");
+    return song;
+}
+
+} // namespace
+
+TEST_CASE("a punch range is armed from a section, a selection or two labels, until cleared")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)};
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+    const auto armed = [&] { return p.ws.punchSpan(); };
+    const auto shows = [&](std::u32string_view text)
+    {
+        return std::ranges::any_of(p.ws.frame(),
+                                   [&](const Region& region)
+                                   {
+                                       return std::ranges::any_of(
+                                           region.text, [&](const TextRun& run)
+                                           { return contains(run.text, text); });
+                                   });
+    };
+
+    CHECK(indicator(p, U"PUNCH") == Shown::Off);
+    p.type(U"ga,rp");
+    CHECK(p.ws.message() == "Punch range: A, " + at(0) + " to " + at(2 * bar));
+    CHECK(armed() == core::ArmedSpan{0, 2 * bar});
+    CHECK(indicator(p, U"PUNCH") == Shown::Lit);
+
+    // Another section replaces it, saying what it replaced.
+    p.type(U"]s,rp");
+    CHECK(p.ws.message() == "Punch range: B, " + at(2 * bar) + " to " + at(5 * bar) +
+                                ", replacing A, " + at(0) + " to " + at(2 * bar));
+    CHECK(armed() == core::ArmedSpan{2 * bar, 5 * bar});
+
+    // A Visual selection's time, ending the selection.
+    p.type(U"ggvl,rp");
+    CHECK(p.ws.mode() == Mode::Normal);
+    CHECK(armed() == core::ArmedSpan{0, 2 * bar});
+    CHECK(p.ws.message().starts_with("Punch range: " + at(0) + " to " + at(2 * bar) +
+                                     ", replacing B, "));
+
+    // Two labels, chosen, across a section join; the pair is offered again.
+    p.type(U",rl");
+    CHECK(shows(U"Punch in: "));
+    p.type(U"in");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(shows(U"Punch out: "));
+    p.type(U"out");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(armed() == core::ArmedSpan{bar, 6 * bar});
+    CHECK(p.ws.message().starts_with("Punch range: in to out, " + at(bar) + " to " + at(6 * bar) +
+                                     ", replacing "));
+    p.type(U",rl");
+    p.press(Key::of(NamedKey::Enter));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "Punch range: in to out, " + at(bar) + " to " + at(6 * bar));
+
+    // By name at the prompt; the same range again replaces nothing.
+    p.type(U":punch out in");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "The end of a punch range must be after its start");
+    p.type(U":punch nowhere out");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "No label named nowhere");
+    CHECK(armed() == core::ArmedSpan{bar, 6 * bar});
+
+    // Arming plays nothing; clearing.
+    CHECK_FALSE(p.player.playing());
+    p.type(U",rP");
+    CHECK(p.ws.message() == "Punch range cleared: in to out, " + at(bar) + " to " + at(6 * bar));
+    CHECK_FALSE(armed());
+    CHECK(indicator(p, U"PUNCH") == Shown::Off);
+    p.type(U",rP");
+    CHECK(p.ws.message() == "No punch range is armed");
+    CHECK_FALSE(p.ws.refused()); // nothing to do, as disarming with no track armed
+}
+
+TEST_CASE("an armed punch range follows its section or labels through edits, and goes with them")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)};
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    const core::Tick bar = ppqn.whole();
+    const auto edit = [&](const std::function<void(core::Song&)>& change)
+    {
+        p.document.edit("Edit", {}, change);
+        p.press(Key::of(NamedKey::Escape)); // a key, after which the range is looked at
+    };
+
+    p.type(U"ga]s,rp");                                       // B
+    edit([](core::Song& song) { song.resizeSection(0, 1); }); // A a bar longer
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{3 * bar, 6 * bar});
+    edit([](core::Song& song) { song.renameSection(1, "Verse"); });
+    edit([](core::Song& song) { song.moveSection(1, 1); });
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{6 * bar, 9 * bar});
+    CHECK(p.ws.message().empty());
+
+    // Joined into the section before, it's gone, and says so after what the key did.
+    p.type(U"gg]s");
+    p.type(U":section-join");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK(p.ws.message().ends_with("Punch range cleared: its section is gone"));
+    CHECK(p.ws.messageKind() == MessageKind::Warning);
+
+    // Labels: followed as they move with their section, and gone with one.
+    p.type(U":punch in out");
+    p.press(Key::of(NamedKey::Enter));
+    const auto before = p.ws.punchSpan();
+    REQUIRE(before);
+    edit([](core::Song& song) { song.resizeSection(0, 1); });
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{before->from, before->to + bar});
+    edit([&](core::Song& song) { song.removeLabel(before->from); });
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK(p.ws.message() == "Punch range cleared: the label in is gone");
+
+    // A selection's time stays where it is, cut short at the end.
+    p.type(U"gg");
+    p.type(U"Gv,rp");
+    const auto span = p.ws.punchSpan();
+    REQUIRE(span);
+    edit([](core::Song& song) { song.insertBars(0, 1); });
+    CHECK(p.ws.punchSpan() == span);
 }

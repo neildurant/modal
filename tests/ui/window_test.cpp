@@ -1067,6 +1067,39 @@ TEST_CASE("a sample of marks in each view", "[.sample]")
     CHECK(window->saveFrame(base + "-marks-piano.bmp"));
 }
 
+TEST_CASE("a sample of an armed punch range", "[.sample]")
+{
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+
+    modal::core::Document document{demoSong()};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+            view.handle(Key::typed(key), 0);
+    };
+    view.run("view-arrangement", 0);
+    type(U"]s,rp"); // the second section
+    REQUIRE(view.punchSpan());
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-punch-arrangement.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-punch-arrangement-light.bmp"));
+    type(U"gg3}v2},rp"); // three bars, within the section
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-punch-arrangement-bars.bmp"));
+    view.run("view-piano-roll", 0);
+    window->draw(view.frame(), *builtInTheme("dark"));
+    CHECK(window->saveFrame(base + "-punch-piano.bmp"));
+    window->draw(view.frame(), *builtInTheme("light"));
+    CHECK(window->saveFrame(base + "-punch-piano-light.bmp"));
+}
+
 TEST_CASE("a sample of search matches", "[.sample]")
 {
     auto window = offscreen(1000, 600);

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/armed_range.hpp>
 #include <modal/core/document.hpp>
 #include <modal/core/event.hpp>
 #include <modal/core/event_query.hpp>
@@ -271,6 +272,8 @@ public:
 
     // Whether to tint the bars where a track has a meter of its own (ownmeter).
     virtual bool ownMeter() const = 0;
+    // Where the punch range armed in the song is, to show it in the ruler.
+    virtual std::optional<core::ArmedSpan> punchSpan() const { return std::nullopt; }
     // Whether the piano roll shows where the sustain pedal holds notes: tails after them to
     // where it lifts (sustaintails), and a faint tint where it's down (sustaintint).
     virtual bool sustainTails() const { return true; }

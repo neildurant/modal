@@ -1143,3 +1143,25 @@ TEST_CASE("open songs show titles and file names apart, and the window's title n
     p.type(U"[f");
     CHECK(p.workspace.message() == "Song 2 of 3: Evening");
 }
+
+TEST_CASE("each open song keeps its own punch range")
+{
+    Pickers p;
+    p.makeSong("A.modal", "Song A");
+    p.makeSong("B.modal", "Song B");
+    p.type(U":e A\n");
+    p.type(U",rp");
+    const auto armedA = p.workspace.punchSpan();
+    REQUIRE(armedA);
+    p.type(U":e B\n");
+    CHECK_FALSE(p.workspace.punchSpan());
+    p.type(U"Gv,rp"); // its last bar
+    const auto armedB = p.workspace.punchSpan();
+    REQUIRE(armedB);
+    CHECK(armedB != armedA);
+    p.type(U"]f");
+    CHECK(p.document.song().title == "Song A");
+    CHECK(p.workspace.punchSpan() == armedA);
+    p.type(U"]f");
+    CHECK(p.workspace.punchSpan() == armedB);
+}

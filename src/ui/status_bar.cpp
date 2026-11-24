@@ -42,7 +42,9 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
     // Where the window's too narrow for everything, what's least needed gives way first, in
     // steps (decided 12 November 2026): the file's name, the input's last message, the section
     // cut short, short words for the indicators, the settings, the section, the input light,
-    // the meter and last the tempo. The mode, the transport and the recording group stay.
+    // the meter and the tempo; and last the punch range's indicator (decided 24 November 2026,
+    // so the narrowest window keeps what it kept before it). The mode, the transport and the
+    // rest of the recording group stay.
     enum class Stage
     {
         Full,
@@ -55,12 +57,13 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         HideInput,
         HideMeter,
         HideTempo,
+        HidePunch,
     };
     constexpr std::array kStages{
         Stage::Full,         Stage::HideFile,        Stage::HideInputMessage,
         Stage::ShortSection, Stage::ShortIndicators, Stage::HideSettings,
         Stage::HideSection,  Stage::HideInput,       Stage::HideMeter,
-        Stage::HideTempo};
+        Stage::HideTempo,    Stage::HidePunch};
     const auto transport = [&](Stage stage)
     {
         std::vector<Segment> segments;
@@ -159,6 +162,9 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         const bool overdub = state.overdub;
         indicator(overdub ? "OVERDUB" : "REPLACE", overdub ? "ODUB" : "REPL", 7, 4, lit(armed > 0),
                   Role::IndicatorRecordMode);
+        // A punch range armed (decided 24 November 2026), shown stopped too, as R records it.
+        if (stage < Stage::HidePunch)
+            indicator("PUNCH", "PUNCH", 5, 5, lit(state.punch), Role::IndicatorArm);
         {
             using enum core::CountInSettings::Mode;
             const auto& countIn = state.countIn;

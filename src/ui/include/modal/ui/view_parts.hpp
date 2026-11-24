@@ -221,6 +221,21 @@ void addTempoSigns(std::vector<RowSign>& signs, const core::TempoMap& tempo, cor
 
 void addMarkDot(Region& region, int x, int y, CellSize cell);
 
+// An armed range in a ruler (decided 24 November 2026): a thin line along the bottom of the
+// ruler from x0 to x1, with a cap rising at each end that's in view, so its boundaries show
+// whatever the selection. The punch range's is dashed, in the recording colour. A range
+// running out of view on a side has no cap there, reaching the edge.
+struct RangeBracket
+{
+    int x0 = 0;
+    int x1 = 0;
+    bool startShown = true; // a cap at x0
+    bool endShown = true;   // a cap at x1
+    Role role = Role::IndicatorArm;
+    bool dashed = true;
+};
+void addRangeBracket(Region& region, const RangeBracket& bracket, int bottom, CellSize cell);
+
 // Puts the register's events into the song at a time, its first track's onto a track (counting
 // from 0) and the others onto those after it, as far as there are tracks, merging with what's
 // there (see core::merged). Returns how many it put, and onto how many tracks.
