@@ -14,9 +14,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **After trial.** Dim text was too dim in every scheme, and Solarized's text hardly read on its panel. Dim text now goes from `base03` towards the text's colour until it stands 3:1 apart from the background and the panel, at most three-quarters of the way; the panel goes from `base02` towards the background only as far as text needs to read 4.5:1 on it, which changes Solarized's alone. The built-in schemes' test checks those contrasts in each. MSVC Debug passes all 1,279 tests; Clang Debug in WSL passes 1,280; formatting passes.
 
-**Pending.** The desktop trial again; pushing and the hosted checks.
-
-**To try.** `:set theme=nord`, then `gruvbox-dark-medium`, `gruvbox-light-medium`, `dracula`, `solarized-dark`, `solarized-light`, `catppuccin-mocha` and `catppuccin-latte` (Tab completes them), looking at the arrangement, piano roll, event list, Tracks view, the inspector, the hint menu and the status line's indicators. Download a scheme of your own from github.com/tinted-theming/schemes (base16 or base24) into the config directory's `themes/` and `set theme=` its name. Say which roles look wrong in which schemes, and the mapping can be adjusted.
+**Accepted.** Accepted on trial, with the readable dim text and panel.
 
 ### Vim's other registers, step 3: the manual, 23 November 2026
 

@@ -207,8 +207,8 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — The system clipboard, `"+` and `"*`, as Modal's song text. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 - [ ] **Doing** — base16 theme import: support the base16 or base24 scheme format, and hundreds of established colour schemes (Gruvbox, Nord, Solarized, Catppuccin, Tokyo Night and more) become available cheaply, alongside your own themes (design agreed 24 November 2026). See [design.md](design.md#customisation).
-    - [ ] **Doing** — Schemes as themes: `themes/NAME.yaml` and eight built in. Built; awaiting trial.
-    - [ ] **To do** — `:theme-import FILE [NAME]`, writing a scheme as an ordinary theme.
+    - [x] **Done** — Schemes as themes: `themes/NAME.yaml` and eight built in; dim text and the panel found by contrast. Accepted on trial.
+    - [ ] **Doing** — `:theme-import FILE [NAME]`, writing a scheme as an ordinary theme.
     - [ ] **To do** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
 
 Resolve the related [design questions](design.md#to-decide) before implementation. Large-song measurements support this milestone; see Engineering work as needed.
