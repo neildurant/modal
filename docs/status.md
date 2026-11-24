@@ -10,9 +10,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 `:theme-import FILE [NAME]` reads a base16 or base24 scheme and writes it as `themes/NAME` in the config directory, the same `highlight` lines `set theme` makes of a scheme, to change by hand, then makes it the theme. NAME is the file's name without `.yaml`, spaces made hyphens, unless given; it must be one word without slashes or quotes. A relative FILE is in the config directory, as `:write-config`'s and `:source`'s are, and completes from there; one with spaces goes in quotes. A theme already there is refused unless `:theme-import!`. A scheme that can't be read says why, naming its file.
 
-**Validation.** A prompt test imports a scheme from a quoted path with a space, checking the name made from it, the theme in use, the file's first line and a role's line; refuses importing over it, then overwrites with `!` and imports under another name; refuses a broken scheme with its reason, a name with a slash, and no FILE; and imports a relative FILE from the config directory. MSVC Debug passes all 1,280 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+**Validation.** A prompt test imports a scheme from a quoted path with a space, checking the name made from it, the theme in use, the file's first line and a role's line; refuses importing over it, then overwrites with `!` and imports under another name; refuses a broken scheme with its reason, a name with a slash, and no FILE; and imports a relative FILE from the config directory. MSVC Debug passes all 1,280 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,281; formatting and `git diff --check` pass.
 
-**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks; then the manual.
+**Pending.** The desktop trial; pushing and the hosted checks; then the manual.
 
 **To try.** Download a scheme (github.com/tinted-theming/schemes, base16 or base24), then `:theme-import ~/Downloads/NAME.yaml` (Tab completes the path); the theme changes, and `themes/NAME` in the config directory holds its colours to edit. Change a line there and `:set theme=NAME` again. `:theme-import` the same file again is refused; `:theme-import!` overwrites; a second word names the theme.
 
