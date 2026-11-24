@@ -221,11 +221,11 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Schedule repeated playback and MIDI state at the join.
     - [x] **Done** — Section, selection and label controls. Accepted on trial.
     - [x] **Done** — Manual and automated validation. See [status.md](status.md).
-- [ ] **Doing** — Playback count-in and pre-roll. See [design.md](design.md#metronome-and-count-in).
+- [x] **Done** — Playback count-in and pre-roll. See [design.md](design.md#metronome-and-count-in).
     - [x] **Done** — Save independent song settings and use the lead-in once at playback start.
     - [x] **Done** — Aligned Before playback controls and first-pass lead-in. Accepted on trial.
     - [x] **Done** — Manual and automated validation for first-pass lead-in. See [status.md](status.md).
-    - [ ] **Doing** — Optional lead-in on every playback loop pass. Pending desktop trial.
+    - [x] **Done** — Optional lead-in on every playback loop pass. Accepted on trial.
 - [ ] **To do** — Punch recording using labels or selection boundaries.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.

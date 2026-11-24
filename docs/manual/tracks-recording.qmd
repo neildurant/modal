@@ -278,7 +278,8 @@ a different instrument may need different click pitches or a different channel.
 The **Metronome page**, `, m s` or `:metronome`, groups its destination,
 downbeat and beat sounds, velocities, note length and lead-in settings.
 Its Test buttons audition the click through the selected route. Fields are
-edited in place like track settings.
+edited in place like track settings. Use `gg` to go to the first setting and
+`G` to go to the last, **Loop lead-in**.
 
 ![The Metronome page shows independent playback and recording lead-ins side by side.](images/metronome.png){#fig-metronome fig-alt="Modal's Metronome page with the click settings above two aligned groups, Before playback on the left and Before recording on the right."}
 

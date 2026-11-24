@@ -337,6 +337,8 @@ While recording or waiting for its take to finish after stopping, save, export, 
 
 **Before playback** is to the left of **Before recording**. `h` and `l` cross between the groups on the same row. Playback has its own Before, Count-in and Pre-roll fields. **Loop lead-in** chooses **First pass** or **Every pass** for the selected playback lead-in. With Before set to None, loops repeat seamlessly.
 
+`gg` goes to the first setting and `G` to the last, **Loop lead-in**.
+
 ## Questions and lines typed into
 
 - **A yes-or-no question** takes `y`, `n` or Escape; any other key shows it again.
