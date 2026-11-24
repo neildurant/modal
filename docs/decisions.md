@@ -865,6 +865,8 @@ Schemes are both read directly, `themes/NAME.yaml` working as a theme with no st
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).
 
+After trial, the immediate commands were kept for checking a passage quickly. Once stopped, Space resumes its usual job of playing from the play-from marker. A persistent range would help when repeatedly stopping, editing and replaying the same passage. Revisit it with punch and loop recording, when an armed range would need to stay visible while stopped and be easy to clear.
+
 ## Work order (24 November 2026)
 
 The schedule gained milestones for miscellaneous features and composition tools before step entry. Several composition tools need the key or the chords (changing mode, negative harmony, voice-leading, the chord-name lane, phrase entry in the current key), so the chord/key track moved forward from the timing and harmony milestone to the start of the composition tools, rather than each tool asking for the key. Scale lock stays later, still after the chord/key track.
