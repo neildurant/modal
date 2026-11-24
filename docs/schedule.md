@@ -221,7 +221,10 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Schedule repeated playback and MIDI state at the join.
     - [x] **Done** — Section, selection and label controls. Accepted on trial.
     - [x] **Done** — Manual and automated validation. See [status.md](status.md).
-- [ ] **To do** — Adjust transforms by ear while a selection loops, with transform presets and palette support where needed.
+- [ ] **To do** — Playback count-in and pre-roll. See [design.md](design.md#metronome-and-count-in).
+    - [ ] **To do** — Save independent song settings and use the lead-in once at playback start.
+    - [ ] **To do** — Add the aligned Before playback controls to the Metronome page.
+    - [ ] **To do** — Update the manual, validate and trial.
 - [ ] **To do** — Punch recording using labels or selection boundaries.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
@@ -367,6 +370,7 @@ These support the milestones rather than forming a separate feature milestone. S
 
 No milestone or implementation commitment. Keep these unchecked unless they are explicitly promoted into the schedule.
 
+- [ ] **Unscheduled** — Adjust transforms by ear while a selection loops, with transform presets and palette support where needed (deferred 24 November 2026). See [design.md](design.md#midi-transforms).
 - [ ] **Unscheduled** — Saved sessions (suggested 20 November 2026): reopen a set of songs together, each at the view and place it was left, across program runs.
 - [ ] **Unscheduled** — View snapshots (suggested 20 November 2026): save how a song is being looked at (view, places, zoom, folds) and restore it later, without changing the music. Shares a value-type capture of each view's place with saved sessions; song switching could then use the same capture.
 - [ ] **Unscheduled** — A paste-history panel while swapping (suggested 23 November 2026): straight after a put, a few lines above the message row list the paste history, newest first, the copy in the song highlighted; `[p` and `]p` move the highlight, and the next other key closes it. A new kind of panel, as `:registers`' listing closes on the next key.

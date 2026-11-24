@@ -867,7 +867,13 @@ Use `, L` for the current section or selection's time, and `, l L` under Labels 
 
 After trial, the immediate commands were kept for checking a passage quickly. Once stopped, Space resumes its usual job of playing from the play-from marker. A persistent range would help when repeatedly stopping, editing and replaying the same passage. Revisit it with punch and loop recording, when an armed range would need to stay visible while stopped and be easy to clear.
 
+## Playback count-in and pre-roll (24 November 2026)
+
+Give playback its own values, so a song can use a musical lead-in for practice and a click before recording. Put **Before playback** to the left of **Before recording**, with matching controls lined up so both setups can be read together. Playback defaults to None. A lead-in is heard on starting playback, including starting a loop, so the player gets a cue for the first entry and can then practise continuously. Schedule this before punch recording to build on the completed loop transport. See [design.md](design.md#metronome-and-count-in).
+
 ## Work order (24 November 2026)
+
+Adjusting transforms by ear was moved to the unscheduled list. With rewind on and the play-from marker set, applying a transform and replaying the passage is a short workflow. Revisit live adjustment if restarting regularly gets in the way of comparing settings. Punch recording follows loop playback on the schedule.
 
 The schedule gained milestones for miscellaneous features and composition tools before step entry. Several composition tools need the key or the chords (changing mode, negative harmony, voice-leading, the chord-name lane, phrase entry in the current key), so the chord/key track moved forward from the timing and harmony milestone to the start of the composition tools, rather than each tool asking for the key. Scale lock stays later, still after the chord/key track.
 
