@@ -131,6 +131,8 @@ A theme is a command file of `highlight` lines, one for each role. `set theme=NA
 
 A base16 or base24 colour scheme, as YAML in tinted-theming's form or the older one, is a theme too: put it in `themes/` as `NAME.yaml` and `set theme=NAME` gives each role one of its colours (a plain `themes/NAME` comes first if there's both). Eight schemes are built in: `gruvbox-dark-medium`, `gruvbox-light-medium`, `nord`, `dracula`, `solarized-dark`, `solarized-light`, `catppuccin-mocha` and `catppuccin-latte`, from [Tinted Theming](https://github.com/tinted-theming/schemes).
 
+To adjust a scheme in Modal, use [`:theme-import FILE [NAME]`](#the--prompt) to write and select an editable `themes/NAME` file. For example, `:theme-import themes/my-scheme.yaml my-edit` writes `themes/my-edit` with a `highlight` line for every role. After editing that file, run `:set theme=my-edit` to reload it. Tab after `:set theme=` completes theme names without the `.yaml` suffix.
+
 The roles are:
 
 | Role | For |

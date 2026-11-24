@@ -107,9 +107,40 @@ A theme assigns colours to **roles**, such as note, cursor, selection and
 warning. It does not paint individual notes by arbitrary colour commands.
 This keeps the same meaning recognisable across views.
 
-`:set theme=dark` and `:set theme=light` choose the built-in themes. A personal
-theme is a command file in `themes/NAME`, containing only the roles it changes.
-It starts from the dark theme before applying its overrides. For example:
+`:set theme=dark` and `:set theme=light` choose Modal's original themes. The
+eight built-in colour schemes are `gruvbox-dark-medium`,
+`gruvbox-light-medium`, `nord`, `dracula`, `solarized-dark`, `solarized-light`,
+`catppuccin-mocha` and `catppuccin-latte`. Try `:set theme=nord` at the prompt.
+To start with Nord each time, put `set theme=nord` in `modalrc`.
+
+### Using a colour scheme
+
+Base16 and base24 are formats for sharing colour palettes across applications.
+Modal uses the palette to colour its own roles, so one scheme can give the
+piano roll, arrangement and event list a consistent look. To use a downloaded
+scheme such as `my-scheme.yaml`, put it in the `themes` folder inside your
+configuration directory and enter `:set theme=my-scheme`. Press Tab after
+`:set theme=` to see the theme names available to you.
+
+### Adjusting individual roles
+
+To make the cursor stand out more in a scheme you like, import the scheme as
+an editable theme. The following example uses the scheme in your
+configuration's `themes` folder.
+
+```text
+:theme-import themes/my-scheme.yaml my-edit
+```
+
+This writes `themes/my-edit`, with one `highlight` command per role, and
+selects it immediately. Edit that file and run `:set theme=my-edit` again to
+see your changes. Relative paths start in the configuration directory. Put
+paths containing spaces in double quotes. If you omit the theme name, Modal
+uses the filename without `.yaml`, replacing spaces with hyphens. Use
+`:theme-import!` when you want to replace an existing editable theme.
+
+You can also write a theme from scratch in `themes/NAME`. It starts with the
+dark theme's colours, so it only needs lines for the roles you want to change.
 
 ```text
 highlight cursor #e0af68
