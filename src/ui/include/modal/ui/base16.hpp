@@ -33,6 +33,10 @@ struct Base16Read
 };
 Base16Read readBase16(std::string_view text);
 
+// How far apart two colours look, as the web's accessibility guidelines measure it: from 1, the
+// same, to 21, black on white.
+double contrast(Colour a, Colour b);
+
 // The scheme as a Modal theme: a command file of highlight lines, one for every role, the
 // roles given the scheme's colours by what each is for, a few blended between two.
 std::string base16ThemeText(const Base16Scheme& scheme);

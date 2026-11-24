@@ -12,7 +12,9 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Validation.** Unit tests read a scheme in each form, with comments, a `#` in a comment and upper-case hex, and a base24 scheme's 24 colours; refuse a scheme without all sixteen, a malformed colour and a line without a colon, saying why; check a scheme's theme text names it and its author and sets every role; and check every built-in scheme is a theme of its own. The existing test that every built-in theme sets every role and reads back the same through ConfigReader now covers the schemes. A ConfigReader test checks `set theme=mine` from `themes/mine.yaml`, a plain `themes/mine` coming first, a broken scheme refused with its reason and the theme kept, and `set theme=nord`. MSVC Debug passes all 1,279 tests with two MIDI-dependent skips; Clang Debug in WSL builds without warnings and passes 1,280; formatting and `git diff --check` pass.
 
-**Pending.** The desktop trial; pushing and the hosted checks.
+**After trial.** Dim text was too dim in every scheme, and Solarized's text hardly read on its panel. Dim text now goes from `base03` towards the text's colour until it stands 3:1 apart from the background and the panel, at most three-quarters of the way; the panel goes from `base02` towards the background only as far as text needs to read 4.5:1 on it, which changes Solarized's alone. The built-in schemes' test checks those contrasts in each. MSVC Debug passes all 1,279 tests; Clang Debug in WSL passes 1,280; formatting passes.
+
+**Pending.** The desktop trial again; pushing and the hosted checks.
 
 **To try.** `:set theme=nord`, then `gruvbox-dark-medium`, `gruvbox-light-medium`, `dracula`, `solarized-dark`, `solarized-light`, `catppuccin-mocha` and `catppuccin-latte` (Tab completes them), looking at the arrangement, piano roll, event list, Tracks view, the inspector, the hint menu and the status line's indicators. Download a scheme of your own from github.com/tinted-theming/schemes (base16 or base24) into the config directory's `themes/` and `set theme=` its name. Say which roles look wrong in which schemes, and the mapping can be adjusted.
 

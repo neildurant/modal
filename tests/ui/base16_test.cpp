@@ -109,5 +109,11 @@ TEST_CASE("The built-in schemes are themes, each its own")
         REQUIRE(theme);
         CHECK_FALSE(*theme == dark);
         CHECK(builtInThemeText(name)->find(", by ") != std::string::npos);
+        // Text reads on the panel, and dim text on it and the background (decided after trial).
+        const auto& t = *theme;
+        CHECK(contrast(t[Role::Text], t[Role::Panel]) >= 4.5);
+        CHECK(contrast(t[Role::Dim], t[Role::Panel]) >= 3.0);
+        CHECK(contrast(t[Role::Dim], t[Role::Background]) >= 3.0);
+        CHECK(contrast(t[Role::Dim], t[Role::Text]) > 1.2); // still dimmer than text
     }
 }

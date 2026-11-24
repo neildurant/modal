@@ -2,9 +2,12 @@
 
 #include <modal/ui/base16.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <utility>
 
 namespace modal::ui
@@ -100,7 +103,41 @@ Colour blend(Colour from, Colour to, double part)
     return {.r = mix(from.r, to.r), .g = mix(from.g, to.g), .b = mix(from.b, to.b)};
 }
 
+double luminance(Colour colour)
+{
+    const auto linear = [](std::uint8_t part)
+    {
+        const auto c = part / 255.0;
+        return c <= 0.03928 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linear(colour.r) + 0.7152 * linear(colour.g) + 0.0722 * linear(colour.b);
+}
+
+// The first colour on the way from one to another, in twentieths, that stands apart from
+// each of some backgrounds by at least so much; at most so far along.
+Colour standingApart(Colour from, Colour to, std::initializer_list<Colour> backgrounds,
+                     double least, double furthest)
+{
+    for (int step = 0;; ++step)
+    {
+        const auto part = std::min(step / 20.0, furthest);
+        const auto colour = blend(from, to, part);
+        if (part >= furthest ||
+            std::ranges::all_of(backgrounds, [&](Colour background)
+                                { return contrast(colour, background) >= least; }))
+        {
+            return colour;
+        }
+    }
+}
+
 } // namespace
+
+double contrast(Colour a, Colour b)
+{
+    const auto [dark, light] = std::minmax(luminance(a), luminance(b));
+    return (light + 0.05) / (dark + 0.05);
+}
 
 Base16Read readBase16(std::string_view text)
 {
@@ -189,11 +226,18 @@ std::string base16ThemeText(const Base16Scheme& scheme)
     const auto magenta = base(0x0E);
     const auto brightRed = base24 ? base(0x12) : red;
     const auto brightCyan = base24 ? base(0x15) : cyan;
+    // Readable whatever the scheme (decided 24 November 2026, after trial, the comment colour
+    // being too dim as secondary text): the panel, base02, only as far towards the background
+    // as text needs to read on it; dim text from the comment colour towards the text's as far
+    // as it needs to read on the background and the panel, staying dimmer than text.
+    const auto foreground = base(0x05);
+    const auto panel = standingApart(base(0x02), background, {foreground}, 4.5, 1.0);
+    const auto dim = standingApart(base(0x03), foreground, {background, panel}, 3.0, 0.75);
 
     const std::array<std::pair<Role, Colour>, kRoleCount> roles{{
         {Role::Background, background},
-        {Role::Text, base(0x05)},
-        {Role::Dim, base(0x03)},
+        {Role::Text, foreground},
+        {Role::Dim, dim},
         {Role::Accent, blue},
         {Role::Warning, red},
         {Role::Message, yellow},
@@ -203,7 +247,7 @@ std::string base16ThemeText(const Base16Scheme& scheme)
         {Role::Playhead, blend(background, green, 0.2)},
         {Role::Bar, base(0x01)},
         {Role::BarText, base(0x04)},
-        {Role::Panel, base(0x02)},
+        {Role::Panel, panel},
         {Role::Chrome, base(0x01)},
         {Role::Mode, blue},
         {Role::ModeText, background},
