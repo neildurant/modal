@@ -227,7 +227,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Manual and automated validation for first-pass lead-in. See [status.md](status.md).
     - [x] **Done** — Optional lead-in on every playback loop pass. Accepted on trial.
 - [ ] **Doing** — Punch recording using an armed range. See [design.md](design.md#input-and-recording).
-    - [ ] **Doing** — Arm and clear a range from a section, Visual selection or two labels, with ruler and status indicators. Built; awaiting trial. See [status.md](status.md).
+    - [x] **Done** — Arm and clear a range from a section, Visual selection or two labels, with ruler and status indicators. Accepted on trial. See [status.md](status.md).
     - [ ] **To do** — Record the armed span with `R`, then validate and trial.
 - [ ] **To do** — Arm playback loops separately from starting playback. See [design.md](design.md#input-and-recording).
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
