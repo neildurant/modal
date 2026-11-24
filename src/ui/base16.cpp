@@ -135,8 +135,10 @@ Colour standingApart(Colour from, Colour to, std::initializer_list<Colour> backg
 
 double contrast(Colour a, Colour b)
 {
-    const auto [dark, light] = std::minmax(luminance(a), luminance(b));
-    return (light + 0.05) / (dark + 0.05);
+    // As values: std::minmax of temporaries would give references to them, gone at once.
+    const auto first = luminance(a);
+    const auto second = luminance(b);
+    return (std::max(first, second) + 0.05) / (std::min(first, second) + 0.05);
 }
 
 Base16Read readBase16(std::string_view text)
