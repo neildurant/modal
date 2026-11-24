@@ -14,6 +14,8 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Accepted.** Every-pass playback lead-in was accepted on desktop trial. The manual and grammar now mention `gg` and `G` on the Metronome page, where `G` is a quick way to reach Loop lead-in. Punch recording is next on the schedule.
 
+**CI fix.** The [Windows build at `98dfaea`](https://github.com/neildurant/modal/actions/runs/45445973416/job/138629729266) reported MSVC C4456 for two locals called `phase` in the transport display. The playback lead-in local now has its own name.
+
 ### Playback count-in and pre-roll, 24 November 2026
 
 The Metronome page aligns **Before playback** on the left with **Before recording** on the right. Left and Right move across the lead-in groups. A narrow custom window shows the group with focus. Playback saves its own settings with the song, and older files default to None. The transport uses the playback lead-in once on starting. A pre-roll can start before a loop's start point, but later passes wrap directly to the loop. The transport uses `▶ COUNT` or `▶ PRE` during the playback lead-in. See [design.md](design.md#metronome-and-count-in).

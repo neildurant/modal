@@ -455,9 +455,9 @@ Bar Workspace::statusBar() const
                              : state.overdub     ? TransportState::Overdubbing
                                                  : TransportState::Recording;
         }
-        else if (const auto phase = player_->leadInPhase())
+        else if (const auto leadIn = player_->leadInPhase())
         {
-            transportState = *phase == core::Player::LeadInPhase::CountIn
+            transportState = *leadIn == core::Player::LeadInPhase::CountIn
                                  ? TransportState::PlaybackCountIn
                                  : TransportState::PlaybackPreRoll;
         }
