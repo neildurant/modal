@@ -158,6 +158,54 @@ TEST_CASE("write-config writes the config, relative to the config directory")
     std::filesystem::remove_all(directory);
 }
 
+TEST_CASE("theme-import makes a base16 scheme a theme of your own, and uses it")
+{
+    const modal::test::TempDirectory temporary{"modal-theme-import-test"};
+    std::string scheme = "scheme: \"My Scheme\"\nauthor: \"Me\"\n";
+    const std::string digits = "0123456789abcdef";
+    for (std::size_t i = 0; i < 16; ++i)
+    {
+        scheme += std::string{"base0"} + digits[i] + ": \"1020" + digits[i] + digits[i] + "\"\n";
+    }
+    temporary.write("downloads/my scheme.yaml", scheme);
+    temporary.write("downloads/broken.yaml", "name: \"Broken\"\n");
+    const auto directory = temporary / "config";
+    Prompt prompt{directory};
+    const auto quoted = "\"" + utf8Text(temporary / "downloads" / "my scheme.yaml") + "\"";
+
+    // Named after its file, a space made a hyphen; then the theme, as highlight lines.
+    CHECK(prompt.run("theme-import " + quoted) ==
+          shows("imported My Scheme as themes/my-scheme, the theme now"));
+    CHECK(prompt.config.settings.text("theme") == "my-scheme");
+    CHECK(prompt.config.theme[Role::Background] == Colour{0x10, 0x20, 0x00});
+    std::ifstream in{directory / "themes" / "my-scheme"};
+    const std::string text{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    in.close();
+    CHECK(text.starts_with("\" My Scheme, by Me, as a Modal theme.\n"));
+    CHECK(text.find("\nhighlight note #1020bb\n") != std::string::npos);
+
+    // Not over a theme already there, unless with !; by a name given.
+    const auto refused = prompt.run("theme-import " + quoted + " my-scheme");
+    CHECK(refused.warning);
+    CHECK(refused.message.ends_with("; theme-import! overwrites it"));
+    CHECK(prompt.run("theme-import! " + quoted + " my-scheme").message ==
+          "imported My Scheme as themes/my-scheme, the theme now");
+    CHECK(prompt.run("theme-import " + quoted + " other").message ==
+          "imported My Scheme as themes/other, the theme now");
+
+    const auto broken =
+        prompt.run("theme-import " + utf8Text(temporary / "downloads" / "broken.yaml"));
+    CHECK(broken.message == "broken.yaml: it has no base00, so it isn't a base16 scheme");
+    CHECK(prompt.run("theme-import " + quoted + " a/b").message ==
+          "a theme's name is one word, without slashes or quotes");
+    CHECK(prompt.run("theme-import").message == "theme-import needs FILE, and a NAME if you like");
+    // A relative FILE is in the config directory.
+    temporary.write("config/relative.yaml", scheme);
+    CHECK(prompt.run("theme-import relative.yaml").message ==
+          "imported My Scheme as themes/relative, the theme now");
+    CHECK(prompt.config.settings.text("theme") == "relative");
+}
+
 TEST_CASE("write-config takes a path with spaces in quotes, or from ~, and with no file asks "
           "for one in the config directory")
 {

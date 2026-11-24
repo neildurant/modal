@@ -6,6 +6,16 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### base16 schemes, step 2: `:theme-import`, 24 November 2026
+
+`:theme-import FILE [NAME]` reads a base16 or base24 scheme and writes it as `themes/NAME` in the config directory, the same `highlight` lines `set theme` makes of a scheme, to change by hand, then makes it the theme. NAME is the file's name without `.yaml`, spaces made hyphens, unless given; it must be one word without slashes or quotes. A relative FILE is in the config directory, as `:write-config`'s and `:source`'s are, and completes from there; one with spaces goes in quotes. A theme already there is refused unless `:theme-import!`. A scheme that can't be read says why, naming its file.
+
+**Validation.** A prompt test imports a scheme from a quoted path with a space, checking the name made from it, the theme in use, the file's first line and a role's line; refuses importing over it, then overwrites with `!` and imports under another name; refuses a broken scheme with its reason, a name with a slash, and no FILE; and imports a relative FILE from the config directory. MSVC Debug passes all 1,280 tests with two MIDI-dependent skips; formatting and `git diff --check` pass.
+
+**Pending.** Clang Debug in WSL; the desktop trial; pushing and the hosted checks; then the manual.
+
+**To try.** Download a scheme (github.com/tinted-theming/schemes, base16 or base24), then `:theme-import ~/Downloads/NAME.yaml` (Tab completes the path); the theme changes, and `themes/NAME` in the config directory holds its colours to edit. Change a line there and `:set theme=NAME` again. `:theme-import` the same file again is refused; `:theme-import!` overwrites; a second word names the theme.
+
 ### base16 schemes, step 1: schemes as themes, 24 November 2026
 
 `set theme=NAME` finds `themes/NAME.yaml` in the config directory, after a plain `themes/NAME`, and reads it as a base16 or base24 scheme (new `src/ui/base16.cpp`: tinted-theming's form with its `palette` block, or the older form at the top level without `#`; comments, either case, and a missing or malformed colour reported with its line). The scheme becomes ordinary theme text, a `highlight` line for every role, by the base16 styling guide (see [design.md](design.md#customisation)), and runs as a theme does. Eight schemes are built in from Tinted Theming's collection, unchanged in `assets/themes/base16`, embedded as the dark and light themes are and named among the built-in themes: `gruvbox-dark-medium`, `gruvbox-light-medium`, `nord`, `dracula`, `solarized-dark`, `solarized-light`, `catppuccin-mocha`, `catppuccin-latte`. Their MIT licence is `licenses/tinted-theming-schemes.txt`, listed in `licenses/README.md`. Tab completion after `set theme=` offers the config directory's schemes without `.yaml`. The `theme` setting's description says so; the manual's generated settings table was regenerated.

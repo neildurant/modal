@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/ui/base16.hpp>
 #include <modal/ui/prompt.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,7 +19,7 @@ namespace modal::ui
 namespace
 {
 
-constexpr std::array<CommandInfo, 1> kPromptCommands{{
+constexpr std::array<CommandInfo, 2> kPromptCommands{{
     {.name = "write-config",
      .description = "Write the config to a file, to start a modalrc from; ! overwrites it; "
                     "with no file, choose one",
@@ -23,7 +27,23 @@ constexpr std::array<CommandInfo, 1> kPromptCommands{{
      .bang = true,
      .keys = false,
      .choices = {Choices::ConfigFile}},
+    {.name = "theme-import",
+     .description = "Make a base16 or base24 scheme a theme of your own, themes/NAME in the "
+                    "config directory, to change as you like, and use it; ! overwrites one",
+     .usage = "FILE [NAME]",
+     .bang = true,
+     .keys = false,
+     .choices = {Choices::ConfigFile, Choices::None}},
 }};
+
+// A theme's name from a scheme's file: its name without .yaml, spaces made hyphens, so set
+// theme= takes it as one word.
+std::string themeNameOf(const std::filesystem::path& file)
+{
+    auto name = utf8Text(file.stem());
+    std::ranges::replace(name, ' ', '-');
+    return name;
+}
 
 std::vector<std::string_view> words(std::string_view line)
 {
@@ -180,6 +200,75 @@ void addPromptCommands(CommandRegistry& registry, ConfigReader& reader, const Co
                      }
                      return write(typedPath(text, directory, home), call.bang);
                  });
+
+    // theme-import FILE [NAME] (decided 24 November 2026): a scheme written out as a theme,
+    // a highlight line for each role, which is then the theme.
+    registry.add(
+        kPromptCommands[1],
+        [&reader, configDirectory, directory, home](const CommandCall& call) -> CommandResult
+        {
+            // FILE in quotes if it has spaces, then perhaps NAME.
+            std::vector<std::string_view> arguments;
+            std::string_view rest = call.arguments;
+            rest.remove_prefix(std::min(rest.find_first_not_of(" \t"), rest.size()));
+            if (rest.starts_with('"'))
+            {
+                const auto close = rest.find('"', 1);
+                const auto end = close == std::string_view::npos ? rest.size() : close + 1;
+                arguments.push_back(rest.substr(0, end));
+                for (const auto word : words(rest.substr(end)))
+                {
+                    arguments.push_back(word);
+                }
+            }
+            else
+            {
+                arguments = words(rest);
+            }
+            if (arguments.empty() || arguments.size() > 2)
+            {
+                return CommandResult::error("theme-import needs FILE, and a NAME if you like");
+            }
+            if (!configDirectory)
+            {
+                return CommandResult::error("there's no config directory to keep themes in");
+            }
+            // A relative FILE from the config directory, as write-config's and source's.
+            const auto file = typedPath(arguments[0], directory, home);
+            std::ifstream in{file, std::ios::binary};
+            if (!in)
+            {
+                return CommandResult::error("can't read " + utf8Text(file));
+            }
+            const std::string text{std::istreambuf_iterator<char>{in},
+                                   std::istreambuf_iterator<char>{}};
+            const auto read = readBase16(text);
+            if (!read.scheme)
+            {
+                return CommandResult::error(utf8Text(file.filename()) + ": " + read.error);
+            }
+            const auto name = arguments.size() > 1 ? std::string{arguments[1]} : themeNameOf(file);
+            if (name.empty() || name.find_first_of("/\\ \"") != std::string::npos)
+            {
+                return CommandResult::error(
+                    "a theme's name is one word, without slashes or quotes");
+            }
+            const auto theme = *configDirectory / "themes" / utf8Path(name);
+            if (auto error = writeConfigFile(theme, base16ThemeText(*read.scheme), call.bang);
+                !error.empty())
+            {
+                return CommandResult::error(error +
+                                            (call.bang ? "" : "; theme-import! overwrites it"));
+            }
+            if (auto error = reader.runCommand("set theme=" + name, directory); !error.empty())
+            {
+                return CommandResult::error(std::move(error));
+            }
+            return {true,
+                    "imported " + (read.scheme->name.empty() ? name : read.scheme->name) +
+                        " as themes/" + name + ", the theme now",
+                    false};
+        });
 }
 
 } // namespace modal::ui
