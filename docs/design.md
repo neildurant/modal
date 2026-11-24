@@ -915,7 +915,7 @@ These notes preserve feature descriptions. Their scheduled or someday maybe stat
 - **Recording and import:** flicker around the threshold merged into one region, after a debounce time; the threshold configurable; the same on import.
 - **A region as the unit:** regions on a controller never overlapping, an edit that would make them merged; a region belonging to the section it starts in; operators and Visual selections taking regions as they take notes (`y` and `p` copying pedalling).
 - **Square off,** a further pedalling tool, making half-pedal regions plain down and up (the others proposed, re-pedal, each bar or beat, clean up, clear, offset and bake, are built); all those with an amount adjustable by ear while looping, as the design already plans for the offset (milestone 11).
-- **Pedal capture in step entry** (milestone 12): holding the real pedal while stepping notes records regions over them, a lift and press between steps a change; able to be turned off.
+- **Pedal capture in step entry** (milestone 14): holding the real pedal while stepping notes records regions over them, a lift and press between steps a change; able to be turned off.
 - **Playback:** the pedal sent down before notes when playback starts inside a region, as part of chasing controllers; up on stop on every channel where it's down, as panic does.
 - **Questions with them:** the re-pedal gap's default (the built tools take 10 ms and 60 ms); the debounce time; which controller the toggle acts on where a track uses several; whether tails show for every pedalled track or piano tracks only; how half-pedal values are shown and edited beyond squaring off.
 

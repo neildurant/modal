@@ -206,8 +206,7 @@ Drum maps precede folding by named rows. Settle map storage, lane navigation and
     - [x] **Done** — The yank register `"0` and the black-hole register `"_`. Accepted on trial.
     - [x] **Done** — The system clipboard, `"+` and `"*`, as Modal's song text. Accepted on trial.
     - [x] **Done** — Regressions, manual updates and accepted functional trial. See [status.md](status.md).
-- [ ] **To do** — Song-format compatibility policy between versions.
-- [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
+- [ ] **To do** — base16 theme import: support the base16 or base24 scheme format, and hundreds of established colour schemes (Gruvbox, Nord, Solarized, Catppuccin, Tokyo Night and more) become available cheaply, alongside your own themes.
 
 Resolve the related [design questions](design.md#to-decide) before implementation. Large-song measurements support this milestone; see Engineering work as needed.
 
@@ -225,17 +224,43 @@ Deliver in this order, building on linear recording:
 
 Resolve the related [design questions](design.md#to-decide) before implementation.
 
-## 12. Step entry and remaining input features
+## 12. Miscellaneous features
+
+- [ ] **To do** — Zen mode, like Doom's zen or Vim's Goyo: hide everything except the piano roll or arrangement and a minimal status line, for focused writing.
+- [ ] **To do** — A song tabline: an optional one-row strip showing open songs, like Vim's tabline, with the current one highlighted and modified songs marked.
+- [ ] **To do** — Note names in notes: when a note bar is wide enough, show its name inside it.
+- [ ] **To do** — Expand-region: grow the selection note → chord → beat → bar → page → section → track, and shrink back. It's the friendliest selection tool you could offer newcomers, and cheap now that the text objects exist.
+- [ ] **To do** — Magit-style transient menus for transforms with several options (window, threshold, amount, toggles), as a richer form of the hint menu.
+- [ ] **To do** — Convenient default-note length and velocity controls, including the proposed length menu.
+- [ ] **To do** — Mute selection - arrangement view. User can mute selections of bars from playing
+- [ ] **To do** — Mute selection/note - piano roll view. User can mute selections of notes from playing
+- [ ] **To do** — Mute selection/note - event list. User can mute selections of notes from playing
+- [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
+- [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
+
+## 13. Composition tools
+
+- [ ] **To do** — Text phrase entry: type a phrase in a compact, ABC-like syntax at the command line or in a prompt, e.g. `c4 d e f | g2 g`, and have it inserted at the cursor in the current grid and key.
+- [ ] **To do** — Chords by name: type Em9 or G/B to insert a voicing at the cursor, with the voicing style configurable (close, open, drop-2).
+- [ ] **To do** — Voicing transforms: invert a chord up or down, drop-2, drop-3, spread or close the voicing, and move the top voice. These are bread and butter for a keyboard player, and they compose naturally with `ic` and `.`.
+- [ ] **To do** — Change mode: move a phrase between modes by scale degree, e.g. major to Dorian, or minor to Phrygian. A quick way to recolour a theme.
+- [ ] **To do** — Negative harmony: mirror a passage around the key's axis, turning major-sounding harmony into its minor mirror image. Related to the existing invert, but harmonically aware.
+- [ ] **To do** — Voice-leading: take a sequence of chords, or chord-track symbols, and re-voice them so each moves as little as possible to the next, within a range you set.
+- [ ] **To do** — A chord-name lane: a row showing the detected chord on each beat or bar across the page, e.g. Em9 · · · Cmaj7 · · · D/F# ·, so you can read the harmony of a dense piano part at a glance.
+- [ ] **To do** — Chord substitutions: on a chord, offer common substitutes (relative minor, tritone sub, sus or add9 colours) to try in place, auditioned while looping.
+- [ ] **To do** — Polyrhythm spans: fill a range with n evenly spaced notes against the bar, e.g. 5 against 4 or 7 over two bars, as a starting rhythm.
+- [ ] **To do** — Transpose by relative intervals: (+m3, +5, −M2) in place of chromatic intervals.
+
+## 14. Step entry and remaining input features
 
 - [ ] **To do** — Detailed per-input channel, message-type and range filtering.
 - [ ] **To do** — MIDI keyboard step entry: notes, chords, rests, ties and cursor advancement.
 - [ ] **To do** — Computer-keyboard step entry and Insert mode, including `c` as change followed by entry.
-- [ ] **To do** — Convenient default-note length and velocity controls, including the proposed length menu.
 - [ ] **To do** — Playable computer keyboard, with note-off on key release.
 
 Build on milestone 8's input and monitoring. Settle the Insert-mode palette/step-entry keys before binding them.
 
-## 13. Views and section navigation
+## 15. Views and section navigation
 
 - [ ] **To do** — Ghost notes, with remembered per-track choices.
 - [ ] **To do** — Open selected arrangement tracks as one editable track plus ghosts.
@@ -250,7 +275,7 @@ Build on milestone 8's input and monitoring. Settle the Insert-mode palette/step
 
 Resolve the related [design questions](design.md#to-decide) before implementation. Cueing follows the transport work and can be delivered independently of the outline.
 
-## 14. Daily-use polish and version-1 completion
+## 16. Daily-use polish and version-1 completion
 
 - [ ] **To do** — Configurable status bar and inspector.
 - [ ] **To do** — Per-view column visibility and ordering.
@@ -261,12 +286,13 @@ Resolve the related [design questions](design.md#to-decide) before implementatio
 - [ ] **To do** — Hideable conventional menu bar, using registry commands and their current bindings.
 - [ ] **To do** — MIDI-export marker options, including labels as markers for programs that ignore cue points.
 - [ ] **To do** — Remaining settings, performance review and necessary improvements.
+- [ ] **To do** — Song-format compatibility policy between versions.
 - [ ] **To do** — Documentation, command reference and configuration examples.
 - [ ] **To do** — Complete outstanding desktop and hardware validation.
 
 The version-1 completion point is here. Backups are earlier, in milestone 10. Reliability fixes land when needed. Review command-line polling and separation of specification from historical notes during polish.
 
-## 15. Timing, harmony and musical tools
+## 17. Timing, harmony and musical tools
 
 - [ ] **To do** — Arbitrary and nested tuplets.
 - [ ] **To do** — Euclidean rhythm generation.
@@ -274,14 +300,13 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 - [ ] **To do** — Extend time stretching/compression with a target length in beats or bars; settle range and ripple semantics before implementation.
 - [ ] **To do** — Half-speed recording, independently usable before free-time tempo fitting.
 - [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines. One way to fit it, Sequencer Plus Gold's Tap-Tempo: play the track back and tap a note on each beat, the tempo map following the taps; it also locks onto music recorded without a click.
-- [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
 - [ ] **To do** — Release velocity tools: setting and adjusting note-off velocities over a range, as `^` does note-on velocities (Sequencer Plus Gold's Set-NoteOff and Adjust-NoteOff).
 - [ ] **To do** — Splitting by more than pitch: by velocity, duration, whether on or off the grid, and every nth note (Sequencer Plus Gold's Modulus); and, going beyond it (its Pitch Map does one note at a time, as remap does), a pitch map remapping many pitches at once as a table. How it does these is in design.md, Feature notes.
 - [ ] **To do** — Chord/key track, including changes over time.
 - [ ] **To do** — Scale lock and a semitone motion that ignores it, after the chord/key track.
 - [ ] **To do** — Track-wide ripple editing.
 
-## 16. Takes, alternatives and reusable material
+## 18. Takes, alternatives and reusable material
 
 - [ ] **To do** — Section alternatives, auditionable in place.
 - [ ] **To do** — Persistent musical notebook: named/tagged fragments with source date, song, section, key, tempo and meter.
@@ -292,7 +317,7 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 
 Notebook design details and open questions are in [design.md](design.md#feature-notes). It does not require retrospective capture.
 
-## 17. Alternative song structures and views
+## 19. Alternative song structures and views
 
 Each is a substantial, separately reviewed step:
 
@@ -301,7 +326,7 @@ Each is a substantial, separately reviewed step:
 - [ ] **To do** — Tracker view, beginning with the existing linear song model; settle off-grid notes, lengths and chords before implementation.
 - [ ] **To do** — MusicXML export, using the meter and harmonic metadata established earlier.
 
-## 18. Sound hosting and configuration tools
+## 20. Sound hosting and configuration tools
 
 - [ ] **To do** — In-process VST3/CLAP hosting, with a separate design review for audio and real-time architecture.
 - [ ] **To do** — Theme editor.
