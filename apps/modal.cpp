@@ -861,6 +861,10 @@ int main(int argc, char* argv[])
                         {
                             for (auto& file : ui::fileChoices(*configDirectory / "themes", ""))
                             {
+                                if (file.ends_with(".yaml"))
+                                {
+                                    file.resize(file.size() - 5); // a base16 scheme, by name
+                                }
                                 if (!file.ends_with('/'))
                                 {
                                     themes.push_back(std::move(file));

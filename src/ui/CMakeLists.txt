@@ -16,6 +16,7 @@ add_library(modal_ui STATIC
     metronome_view.cpp
     remembered.cpp
     backups.cpp
+    base16.cpp
     clipboard.cpp
     workspace_backups.cpp
     workspace_jumps.cpp
@@ -75,6 +76,17 @@ modal_embed_file(TARGET modal_ui
 modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/themes/light"
     FUNCTION modal::ui::builtInLightTheme)
+# The base16 schemes built in (decided 24 November 2026), in the order themes.cpp names them.
+set(MODAL_BASE16_SCHEMES
+    gruvbox-dark-medium gruvbox-light-medium nord dracula solarized-dark solarized-light
+    catppuccin-mocha catppuccin-latte)
+set(scheme_index 0)
+foreach(scheme IN LISTS MODAL_BASE16_SCHEMES)
+    modal_embed_file(TARGET modal_ui
+        FILE "${PROJECT_SOURCE_DIR}/assets/themes/base16/${scheme}.yaml"
+        FUNCTION modal::ui::builtInScheme${scheme_index})
+    math(EXPR scheme_index "${scheme_index} + 1")
+endforeach()
 add_library(modal::ui ALIAS modal_ui)
 
 target_include_directories(modal_ui PUBLIC include)

@@ -93,7 +93,7 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 
 | Setting      | Default | Meaning |
 |--------------|---------|---------|
-| `theme`      | `dark`  | The colour theme: `themes/NAME` in the config directory, or a built-in theme, `dark` or `light` |
+| `theme`      | `dark`  | The colour theme: `themes/NAME`, or a base16 scheme `themes/NAME.yaml`, in the config directory, or a built-in theme: `dark`, `light` or a base16 scheme |
 | `font`       | (empty) | A TrueType or OpenType font file, or empty for the built-in JetBrains Mono |
 | `fontsize`   | `12`    | The font size in points (4 to 72), before the display's own scaling |
 | `minsize`    | `120x30` | The smallest the window can be made, in cells |
@@ -127,6 +127,8 @@ After keys that start longer bindings, such as `g`, `z`, `]` or the leader, and 
 ## Themes
 
 A theme is a command file of `highlight` lines, one for each role. `set theme=NAME` starts again from the dark theme, then runs `themes/NAME` from the config directory, or else the built-in theme of that name. So a theme of your own only needs the colours it changes, and `highlight` lines after `set theme` change single colours on top of a theme.
+
+A base16 or base24 colour scheme, as YAML in tinted-theming's form or the older one, is a theme too: put it in `themes/` as `NAME.yaml` and `set theme=NAME` gives each role one of its colours (a plain `themes/NAME` comes first if there's both). Eight schemes are built in: `gruvbox-dark-medium`, `gruvbox-light-medium`, `nord`, `dracula`, `solarized-dark`, `solarized-light`, `catppuccin-mocha` and `catppuccin-latte`, from [Tinted Theming](https://github.com/tinted-theming/schemes).
 
 The roles are:
 

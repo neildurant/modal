@@ -220,6 +220,41 @@ TEST_CASE("a theme in the config directory comes before a built-in one, from dar
     CHECK(config.theme == before);
 }
 
+TEST_CASE("a base16 scheme in the config directory is a theme, by its name without .yaml")
+{
+    const TempDirectory directory{"modal-base16-theme-test"};
+    std::string scheme = "scheme: \"Mine\"\nauthor: \"Me\"\n";
+    for (int i = 0; i < 16; ++i)
+    {
+        const char* digits = "0123456789abcdef";
+        scheme += std::string{"base0"} + digits[i] + ": \"0000" + digits[i] + digits[i] + "\"\n";
+    }
+    directory.write("themes/mine.yaml", scheme);
+    directory.write("themes/broken.yaml", "name: \"Broken\"\nbase00: \"#000000\"\n");
+    Config config;
+    ConfigReader reader{config, kRegistry, directory.path()};
+
+    CHECK(reader.runCommand("set theme=mine", {}).empty());
+    CHECK(reader.errors().empty());
+    CHECK(config.theme[Role::Background] == Colour{0, 0, 0});
+    CHECK(config.theme[Role::Text] == Colour{0, 0, 0x55}); // base05
+    CHECK(config.theme[Role::Note] == Colour{0, 0, 0xbb}); // base0B, green
+
+    // A plain theme of the same name comes first.
+    directory.write("themes/mine", "highlight text #000002\n");
+    CHECK(reader.runCommand("set theme=mine", {}).empty());
+    CHECK(config.theme[Role::Text] == Colour{0, 0, 2});
+
+    const auto error = reader.runCommand("set theme=broken", {});
+    CAPTURE(error);
+    CHECK(error.ends_with("broken.yaml: it has no base01, so it isn't a base16 scheme"));
+    CHECK(config.settings.text("theme") == "mine");
+
+    // A built-in scheme by name.
+    CHECK(reader.runCommand("set theme=nord", {}).empty());
+    CHECK(config.theme[Role::Background] == Colour{0x2e, 0x34, 0x40});
+}
+
 TEST_CASE("the built-in themes give every role a colour of its own reading")
 {
     for (const auto name : builtInThemeNames())

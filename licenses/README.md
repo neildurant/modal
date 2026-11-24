@@ -3,7 +3,7 @@
 Modal itself is licensed under the GNU General Public License, version 3 or later (see
 [`LICENSE`](../LICENSE) at the top of the repository).
 
-The programs Modal builds include the libraries and font below, each under its own licence, all
+The programs Modal builds include the libraries, font and colour schemes below, each under its own licence, all
 compatible with the GPL. The files here are those licences, as vcpkg installs them alongside each
 library; they go with any copy of Modal's programs that's passed on.
 
@@ -18,6 +18,7 @@ library; they go with any copy of Modal's programs that's passed on.
 | [Brotli](https://github.com/google/brotli) | Used by FreeType | MIT | [`brotli.txt`](brotli.txt) |
 | [libremidi](https://github.com/celtera/libremidi) | MIDI input and output | BSD-2-Clause, and the MIT-style licences of the code it derives from | [`libremidi.txt`](libremidi.txt) |
 | [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | The built-in font | SIL Open Font License 1.1 | [`jetbrains-mono.txt`](jetbrains-mono.txt) |
+| [Tinted Theming schemes](https://github.com/tinted-theming/schemes) | The built-in base16 colour schemes in `assets/themes/base16`, each crediting its author | MIT | [`tinted-theming-schemes.txt`](tinted-theming-schemes.txt) |
 
 FreeType asks for this credit, under the FreeType License:
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <modal/ui/base16.hpp>
 #include <modal/ui/config.hpp>
 #include <modal/ui/key_notation.hpp>
 
@@ -424,6 +425,22 @@ std::string ConfigReader::useTheme(std::string name, const std::string& previous
         {
             config_.theme = *builtInTheme("dark");
             runFile(file);
+            return {};
+        }
+        // A base16 or base24 scheme, made a theme as it's read (decided 24 November 2026).
+        const auto scheme = *configDirectory_ / "themes" / utf8Path(name + ".yaml");
+        if (std::filesystem::is_regular_file(scheme))
+        {
+            const auto text = readFile(scheme);
+            const auto read = text ? readBase16(*text)
+                                   : Base16Read{.scheme = std::nullopt, .error = "can't read it"};
+            if (!read.scheme)
+            {
+                config_.settings.set("theme", previous);
+                return utf8Text(scheme) + ": " + read.error;
+            }
+            config_.theme = *builtInTheme("dark");
+            runText(base16ThemeText(*read.scheme), utf8Text(scheme), scheme.parent_path());
             return {};
         }
     }

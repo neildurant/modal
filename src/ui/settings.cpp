@@ -70,8 +70,8 @@ std::string formatValue(const SettingValue& value)
 Settings::Settings()
     : settings_{
           setting("theme",
-                  "The colour theme: themes/NAME in the config directory, or a built-in "
-                  "theme, dark or light",
+                  "The colour theme: themes/NAME, or a base16 scheme themes/NAME.yaml, in the "
+                  "config directory, or a built-in theme: dark, light or a base16 scheme",
                   std::string{"dark"}),
           setting("font",
                   "A TrueType or OpenType font file for the grid, or empty for the "
