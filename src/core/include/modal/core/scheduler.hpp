@@ -41,6 +41,9 @@ struct PlaybackLoop
 {
     Tick from;
     Tick to; // exclusive
+    bool repeatLeadIn = false;
+
+    Tick restartFrom(Tick initialStart) const { return repeatLeadIn ? initialStart : from; }
 };
 
 // Plays a playback plan: sends each event at its time, and the note-offs from its own table
@@ -207,8 +210,10 @@ private:
     // any count-in, all at one time. Empty once all are sent.
     std::span<const PlannedEvent> chased_;
     std::optional<PlaybackLoop> loop_;
+    Tick loopStartTick_ = 0; // includes musical pre-roll when repeated
     std::span<const PlannedEvent> loopChase_;
     std::optional<std::chrono::nanoseconds> loopFloor_; // earliest send time after a wrap
+    const PlannedCountIn* loopCountIn_ = nullptr;
     bool chasedValuesSent_ = true;
     std::chrono::nanoseconds played_{0}; // when the last play began, on the caller's clock
 

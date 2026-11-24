@@ -871,6 +871,8 @@ After trial, the immediate commands were kept for checking a passage quickly. On
 
 Give playback its own values, so a song can use a musical lead-in for practice and a click before recording. Put **Before playback** to the left of **Before recording**, with matching controls lined up so both setups can be read together. Playback defaults to None. A lead-in is heard on starting playback, including starting a loop, so the player gets a cue for the first entry and can then practise continuously. Schedule this before punch recording to build on the completed loop transport. See [design.md](design.md#metronome-and-count-in).
 
+After trial, add **Loop lead-in** as a follow-up. **First pass** keeps continuous repeats by default. **Every pass** lets the player practise an entrance repeatedly with the same count-in or musical context.
+
 ## Work order (24 November 2026)
 
 Adjusting transforms by ear was moved to the unscheduled list. With rewind on and the play-from marker set, applying a transform and replaying the passage is a short workflow. Revisit live adjustment if restarting regularly gets in the way of comparing settings. Punch recording follows loop playback on the schedule.

@@ -146,6 +146,25 @@ TEST_CASE("the aligned playback lead-in controls edit independently of recording
     CHECK_FALSE(c.player.playing());
 }
 
+TEST_CASE("the playback group offers first-pass and every-pass lead-in")
+{
+    Clicking c;
+    const auto recordSettings = c.countIn();
+    CHECK(contains(c.text(), U"Loop lead-in|"));
+    CHECK(contains(c.text(), U"First pass"));
+    c.type(U"G");
+    REQUIRE(c.ws.metronomeView().setting() == Setting::LoopLeadIn);
+    c.press(NamedKey::Enter);
+    CHECK(contains(c.text(), U"Every pass"));
+    c.type(U"e");
+    c.press(NamedKey::Enter);
+    CHECK(c.document.song().repeatPlaybackLeadIn);
+    CHECK(c.document.song().playbackLeadIn == core::kDefaultPlaybackLeadIn);
+    CHECK(c.countIn() == recordSettings);
+    c.type(U"u");
+    CHECK_FALSE(c.document.song().repeatPlaybackLeadIn);
+}
+
 TEST_CASE("on the metronome page, Enter edits a setting, Up and Down step it, each an undo step")
 {
     Clicking c;
@@ -166,7 +185,7 @@ TEST_CASE("on the metronome page, Enter edits a setting, Up and Down step it, ea
     CHECK(c.metronome().channel == 9);
 
     // What comes before recording: a number, then bars or beats.
-    c.type(U"G");
+    c.type(U"jjjjjj");
     REQUIRE(c.ws.metronomeView().setting() == Setting::PreRoll);
     c.enter(U"2");
     CHECK(c.countIn().preRollBars == 2);

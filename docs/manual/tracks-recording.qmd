@@ -293,8 +293,13 @@ Use Left (`h`) and Right (`l`) to cross between the groups on the same row.
 
 **Before playback** starts at **None**. For practice, choose a one-bar
 pre-roll and start at the chorus. You hear the last bar of the verse before
-entering. If you loop the chorus, you hear the lead-in once and the chorus
-repeats continuously. The recording settings can keep a different lead-in.
+entering. If you loop the chorus with **Loop lead-in** set to **First pass**,
+you hear the lead-in once and the chorus repeats continuously. Choose
+**Every pass** to practise the entrance again with the last bar of the verse
+before each repeat. With a count-in, **Every pass** gives you a fresh click
+before each repeat. With **Before** set to **None**, the loop stays seamless.
+Start the loop again after changing its lead-in settings. The recording
+settings can keep a different lead-in.
 
 For recording, `, m c` cycles the three choices. Set exact lengths with
 `:countin 2`, `:countin 3 beats`, `:preroll 2` or `:preroll 3 beats`. Use

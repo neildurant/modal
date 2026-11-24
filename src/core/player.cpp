@@ -274,7 +274,7 @@ bool Player::play(const Song& song)
 
 bool Player::playLoop(const Song& song, Tick from, Tick to)
 {
-    return !recorder_ && playAt(song, from, PlaybackLoop{from, to});
+    return !recorder_ && playAt(song, from, PlaybackLoop{from, to, song.repeatPlaybackLeadIn});
 }
 
 bool Player::playAt(const Song& song, Tick entry, std::optional<PlaybackLoop> loop)

@@ -197,7 +197,7 @@ private:
     bool readVersion(std::span<const Token> tokens);
     bool readSong(std::span<const Token> tokens);
     bool readMetronome(std::span<const Token> tokens);
-    bool readCountIn(std::span<const Token> tokens, CountInSettings& settings);
+    bool readCountIn(std::span<const Token> tokens, bool playback);
     bool readRecord(std::span<const Token> tokens);
     bool readTrack(std::span<const Token> tokens);
     bool readDrumMap(std::span<const Token> tokens);
@@ -268,6 +268,7 @@ private:
     MetronomeSettings metronome_;
     CountInSettings countIn_;
     CountInSettings playbackLeadIn_ = kDefaultPlaybackLeadIn;
+    bool repeatPlaybackLeadIn_ = false;
     RecordMode recordMode_ = RecordMode::Replace;
     std::vector<Track> tracks_;
     std::vector<Section> sections_;
@@ -326,6 +327,7 @@ SongReadResult Reader::read(std::string_view text)
     result.song->metronome = std::move(metronome_);
     result.song->countIn = countIn_;
     result.song->playbackLeadIn = playbackLeadIn_;
+    result.song->repeatPlaybackLeadIn = repeatPlaybackLeadIn_;
     result.song->recordMode = recordMode_;
     return result;
 }
@@ -371,7 +373,7 @@ bool Reader::readLine(std::span<const Token> tokens)
             return readMetronome(tokens);
         if (word == "record")
             return readRecord(tokens);
-        return readCountIn(tokens, word == "countin" ? countIn_ : playbackLeadIn_);
+        return readCountIn(tokens, word == "playback-lead-in");
     }
     // marker: labels' old name, so songs saved before they were renamed still open.
     if (word == "meter" || word == "tempo" || word == "label" || word == "marker" || word == "mark")
@@ -525,8 +527,9 @@ bool Reader::readRecord(std::span<const Token> tokens)
     return true;
 }
 
-bool Reader::readCountIn(std::span<const Token> tokens, CountInSettings& settings)
+bool Reader::readCountIn(std::span<const Token> tokens, bool playback)
 {
+    auto& settings = playback ? playbackLeadIn_ : countIn_;
     for (const auto& token : tokens.subspan(1))
     {
         const auto [name, value] = settingOf(token);
@@ -542,6 +545,13 @@ bool Reader::readCountIn(std::span<const Token> tokens, CountInSettings& setting
                 return fail("mode should be none, countin or preroll");
             }
             settings.mode = static_cast<CountInSettings::Mode>(it - kModes.begin());
+            continue;
+        }
+        if (playback && name == "loop")
+        {
+            if (*value != "first" && *value != "every")
+                return fail("playback loop lead-in should be first or every");
+            repeatPlaybackLeadIn_ = *value == "every";
             continue;
         }
         int* field = name == "bars"           ? &settings.bars
@@ -1644,6 +1654,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.metronome = song.metronome;
     result.countIn = song.countIn;
     result.playbackLeadIn = song.playbackLeadIn;
+    result.repeatPlaybackLeadIn = song.repeatPlaybackLeadIn;
     result.recordMode = song.recordMode;
     return result;
 }
@@ -1677,7 +1688,8 @@ std::string writeSong(const Song& song)
         metronomeLine += " port=" + quotedText(metronome.port);
     }
     line(0, metronomeLine);
-    const auto writeLeadIn = [&](std::string_view name, const CountInSettings& settings)
+    const auto writeLeadIn =
+        [&](std::string_view name, const CountInSettings& settings, bool everyPass = false)
     {
         const auto mode = kModes[static_cast<std::size_t>(settings.mode)];
         line(0, std::string{name} + " mode=" + std::string{mode} + " bars=" +
@@ -1685,11 +1697,12 @@ std::string writeSong(const Song& song)
                     " preroll=" + std::to_string(settings.preRollBars) +
                     (settings.preRollBeats > 0
                          ? " prerollbeats=" + std::to_string(settings.preRollBeats)
-                         : std::string{}));
+                         : std::string{}) +
+                    (everyPass ? " loop=every" : ""));
     };
     writeLeadIn("countin", song.countIn);
-    if (song.playbackLeadIn != kDefaultPlaybackLeadIn)
-        writeLeadIn("playback-lead-in", song.playbackLeadIn);
+    if (song.playbackLeadIn != kDefaultPlaybackLeadIn || song.repeatPlaybackLeadIn)
+        writeLeadIn("playback-lead-in", song.playbackLeadIn, song.repeatPlaybackLeadIn);
     if (song.recordMode == RecordMode::Overdub)
     {
         line(0, "record mode=overdub");

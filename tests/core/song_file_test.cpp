@@ -281,6 +281,7 @@ TEST_CASE("playback and recording lead-ins round-trip independently")
     INFO(old.error);
     REQUIRE(old.song);
     CHECK(old.song->playbackLeadIn == kDefaultPlaybackLeadIn);
+    CHECK_FALSE(old.song->repeatPlaybackLeadIn);
     CHECK(old.song->countIn.bars == 2);
     CHECK(writeSong(*old.song).find("playback-lead-in") == std::string::npos);
 
@@ -294,6 +295,15 @@ TEST_CASE("playback and recording lead-ins round-trip independently")
     CHECK(back.song->countIn == old.song->countIn);
     CHECK(*back.song == changed);
     CHECK(writeSong(*back.song) == text);
+
+    auto repeat = *old.song;
+    repeat.repeatPlaybackLeadIn = true;
+    const auto repeated = readSong(writeSong(repeat), Ppqn{96});
+    INFO(repeated.error);
+    REQUIRE(repeated.song);
+    CHECK(repeated.song->repeatPlaybackLeadIn);
+    CHECK(repeated.song->playbackLeadIn == kDefaultPlaybackLeadIn);
+    CHECK(*repeated.song == repeat);
 }
 
 TEST_CASE("anything wrong in a song file stops it being read, saying where")

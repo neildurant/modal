@@ -335,7 +335,7 @@ While recording or waiting for its take to finish after stopping, save, export, 
 
 `, m s` or `:metronome`. `j` / `k` move between settings and `h` / `l` between a row's fields: a click's note, velocity and Test button, or a count-in's or pre-roll's number and Bars or Beats. Enter edits a typed value in place, Up and Down step it, Enter sets it and Escape leaves it; a digit on a number field starts typing it straight away. Fields marked `▾` open a drop-down list with Enter: Up and Down or `j` / `k` choose, a letter goes to a choice starting with it (the port's list narrows to what's typed instead), Enter takes it and Escape leaves it. Enter on Test plays the click, as changing its note or velocity does. Each change is an undo step.
 
-**Before playback** is to the left of **Before recording**. `h` and `l` cross between the groups on the same row. Playback has its own Before, Count-in and Pre-roll fields. The lead-in plays once at playback start, including the first pass of a loop.
+**Before playback** is to the left of **Before recording**. `h` and `l` cross between the groups on the same row. Playback has its own Before, Count-in and Pre-roll fields. **Loop lead-in** chooses **First pass** or **Every pass** for the selected playback lead-in. With Before set to None, loops repeat seamlessly.
 
 ## Questions and lines typed into
 

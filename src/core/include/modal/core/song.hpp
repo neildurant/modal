@@ -172,6 +172,7 @@ public:
     MetronomeSettings metronome;
     CountInSettings countIn;
     CountInSettings playbackLeadIn = kDefaultPlaybackLeadIn;
+    bool repeatPlaybackLeadIn = false;
     RecordMode recordMode = RecordMode::Replace;
 
     // Tracks in display order; track 1 is tracks()[0].
@@ -435,6 +436,7 @@ public:
         MetronomeSettings metronome;
         CountInSettings countIn;
         CountInSettings playbackLeadIn;
+        bool repeatPlaybackLeadIn;
         RecordMode recordMode;
         std::vector<std::shared_ptr<const Track>> tracks;
         std::vector<std::shared_ptr<const Section>> sections;

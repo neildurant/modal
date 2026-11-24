@@ -36,7 +36,7 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
     if (next.loop)
     {
         next.loopChase = std::make_shared<const std::vector<PlannedEvent>>(
-            chase(*next.plan, next.loop->from, false));
+            chase(*next.plan, next.loop->restartFrom(next.start), false));
     }
     return publish(std::move(next)) && woken(true);
 }
@@ -60,7 +60,7 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn,
     next.countIn = countIn ? std::make_shared<const PlannedCountIn>(std::move(*countIn)) : nullptr;
     next.loop = loop;
     next.loopChase = loop ? std::make_shared<const std::vector<PlannedEvent>>(
-                                chase(*next.plan, loop->from, false))
+                                chase(*next.plan, loop->restartFrom(start), false))
                           : nullptr;
     PlayData data{playRequests_ + 1, next.chased, next.countIn};
     if (!publish(std::move(next)))

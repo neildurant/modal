@@ -342,6 +342,109 @@ TEST_CASE("a playback loop plays its musical pre-roll once before wrapping to it
                         {60, 0ms}, {62, 500ms}, {64, 1000ms}, {62, 1500ms}, {64, 2000ms}});
 }
 
+TEST_CASE("every loop pass can count in and Space can stop in the repeated count-in")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = fourNotes(ppqn);
+    song.metronome.port = "b";
+    song.metronome.when = MetronomeSettings::When::Off;
+    song.playbackLeadIn = {.mode = CountInSettings::Mode::CountIn, .beats = 2};
+    song.repeatPlaybackLeadIn = true;
+    song.updateEvents(song.tracks().front()->id(),
+                      [&](EventList& events) { events.insert({q / 2, Note{55, 100, q}}); });
+    Playing p{song};
+    const auto beginning = p.clock.time;
+    REQUIRE(p.player.playLoop(song, q, 2 * q));
+    p.runFor(1600ms);
+    REQUIRE(p.player.leadInPhase() == Player::LeadInPhase::CountIn);
+    // The loop's entry chase uses the latest plan, even after earlier snapshots are released.
+    p.player.update(song);
+    p.runFor(100ms);
+    p.player.update(song);
+    p.runFor(2500ms);
+
+    std::vector<std::chrono::nanoseconds> clicks;
+    std::vector<std::pair<int, std::chrono::nanoseconds>> notes;
+    for (const auto& event : p.sink.sent)
+    {
+        if ((event.bytes[0] & 0xF0) != 0x90)
+            continue;
+        if (event.destination == DestinationId{2})
+            clicks.push_back(event.due - beginning);
+        else
+            notes.emplace_back(event.bytes[1], event.due - beginning);
+    }
+    CHECK(clicks ==
+          std::vector<std::chrono::nanoseconds>{0ms, 500ms, 1500ms, 2000ms, 3000ms, 3500ms});
+    CHECK(notes ==
+          std::vector<std::pair<int, std::chrono::nanoseconds>>{
+              {55, 1000ms}, {62, 1000ms}, {55, 2500ms}, {62, 2500ms}, {55, 4000ms}, {62, 4000ms}});
+
+    p.runFor(301ms);
+    REQUIRE(p.player.leadInPhase() == Player::LeadInPhase::CountIn);
+    const auto sent = p.sink.sent.size();
+    REQUIRE(p.player.toggle(song));
+    p.runFor(2s);
+    CHECK_FALSE(p.player.playing());
+    REQUIRE(p.sink.sent.size() == sent + 1);
+    CHECK(p.sink.sent.back().destination == DestinationId{2});
+    CHECK((p.sink.sent.back().bytes[0] & 0xF0) == 0x80);
+}
+
+TEST_CASE("every loop pass can replay musical pre-roll without replaying track setup")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = fourNotes(ppqn);
+    song.updateTrack(song.tracks().front()->id(),
+                     [](Track& track) { track.programSetup.program = 9; });
+    song.playbackLeadIn = {.mode = CountInSettings::Mode::PreRoll, .preRollBeats = 1};
+    song.repeatPlaybackLeadIn = true;
+    Playing p{song};
+    const auto beginning = p.clock.time;
+    REQUIRE(p.player.playLoop(song, q, 2 * q));
+    p.runFor(1100ms);
+    CHECK(p.player.leadInPhase() == Player::LeadInPhase::PreRoll);
+    p.runFor(1401ms);
+    CHECK_FALSE(p.player.leadInPhase());
+
+    std::vector<std::pair<int, std::chrono::nanoseconds>> notes;
+    int programChanges = 0;
+    for (const auto& event : p.sink.sent)
+    {
+        if ((event.bytes[0] & 0xF0) == 0x90)
+            notes.emplace_back(event.bytes[1], event.due - beginning);
+        if ((event.bytes[0] & 0xF0) == 0xC0)
+            ++programChanges;
+    }
+    CHECK(notes ==
+          std::vector<std::pair<int, std::chrono::nanoseconds>>{
+              {60, 0ms}, {62, 500ms}, {60, 1000ms}, {62, 1500ms}, {60, 2000ms}, {62, 2500ms}});
+    CHECK(programChanges == 1);
+}
+
+TEST_CASE("every-pass lead-in keeps loops seamless when Before playback is None")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = fourNotes(ppqn);
+    song.repeatPlaybackLeadIn = true;
+    Playing p{song};
+    const auto beginning = p.clock.time;
+    REQUIRE(p.player.playLoop(song, q, 2 * q));
+    p.runFor(1100ms);
+    std::vector<std::chrono::nanoseconds> times;
+    for (const auto& event : p.sink.sent)
+        if ((event.bytes[0] & 0xF0) == 0x90)
+        {
+            CHECK(event.bytes[1] == 62);
+            times.push_back(event.due - beginning);
+        }
+    CHECK(times == std::vector<std::chrono::nanoseconds>{0ms, 500ms, 1000ms});
+    CHECK_FALSE(p.player.leadInPhase());
+}
+
 TEST_CASE("playing while playing starts again from the marker")
 {
     const auto ppqn = MODAL_ANY_PPQN();

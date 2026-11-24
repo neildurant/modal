@@ -139,16 +139,25 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now,
         nextClick_ = metronome->meter.beatAtOrAfter(std::max(from, startTick_));
     }
 
-    // Everything at or before the position has been sent, from one plan or the other.
-    const auto it = std::ranges::upper_bound(plan.events, position, {}, &PlannedEvent::time);
-    next_ = static_cast<std::size_t>(it - plan.events.begin());
+    // During a repeated count-in, events with an early offset are still due at entry.
+    const bool waitingForLoop = loopFloor_ && position < *loopFloor_;
+    if (waitingForLoop)
+    {
+        next_ = plan.firstAtOrAfter(*loopFloor_ - plan.leadIn);
+    }
+    else
+    {
+        const auto it = std::ranges::upper_bound(plan.events, position, {}, &PlannedEvent::time);
+        next_ = static_cast<std::size_t>(it - plan.events.begin());
+    }
 
     if (old == nullptr)
     {
         alreadySentCount_ = 0;
         return;
     }
-    noteAlreadySent(*old, position);
+    if (!waitingForLoop)
+        noteAlreadySent(*old, position);
     for (const auto& track : plan.tracks)
     {
         const auto* before = old->track(track.id);
@@ -304,7 +313,7 @@ void Scheduler::catchUp(const PlannedTrack& track, nanoseconds position, nanosec
         sink_.send(event.destination, event.message.view(), now);
     }
 
-    if (!track.chaseNotes)
+    if (!track.chaseNotes || (loopFloor_ && position < *loopFloor_))
     {
         return;
     }
@@ -338,6 +347,8 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     playing_ = true;
     startTick_ = start;
     loop_ = loop && start <= loop->from && loop->from < loop->to ? loop : std::nullopt;
+    loopStartTick_ = loop_ ? loop_->restartFrom(start) : start;
+    loopCountIn_ = loop_ && loop_->repeatLeadIn ? countIn : nullptr;
     loopChase_ = loopChase;
     loopFloor_.reset();
     origin_ = now - startTime;
@@ -371,6 +382,7 @@ void Scheduler::stop(nanoseconds now) noexcept
     releasePedals(now);
     playing_ = false;
     loop_.reset();
+    loopCountIn_ = nullptr;
     loopChase_ = {};
     chased_ = {};
     chasedValuesSent_ = true;
@@ -408,6 +420,7 @@ void Scheduler::panic(nanoseconds now) noexcept
     pedals_.clear(); // Reset All Controllers lets them up
     playing_ = false;
     loop_.reset();
+    loopCountIn_ = nullptr;
     loopChase_ = {};
     chased_ = {};
     chasedValuesSent_ = true;
@@ -465,6 +478,7 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             Wrap,
             Click,
             CountInClick,
+            LoopEntry,
             Chased,
             Event,
         };
@@ -500,6 +514,8 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         {
             consider(Due::CountInClick, *countIn);
         }
+        if (countIn_ && loopFloor_)
+            consider(Due::LoopEntry, *loopFloor_);
         if (!chased_.empty())
         {
             consider(Due::Chased, chased_.front().time); // the notes, all at one time
@@ -529,6 +545,14 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             break;
         case Due::CountInClick:
             sendCountInClick();
+            break;
+        case Due::LoopEntry:
+            for (const auto& event : loopChase_)
+            {
+                if (event.isNoteOn() && event.noteOffTime > dueTime)
+                    sendAt(event, origin_ + dueTime);
+            }
+            countIn_ = nullptr;
             break;
         case Due::Chased:
             for (const auto& event : chased_)
@@ -560,13 +584,16 @@ void Scheduler::wrap(nanoseconds boundary, nanoseconds now) noexcept
     endAllNotes(boundary);
     releasePedals(boundary);
 
-    startTick_ = loop_->from;
-    countIn_ = nullptr;
+    startTick_ = loopStartTick_;
+    countIn_ = loopCountIn_;
+    nextCountIn_ = 0;
+    const auto countLength = countIn_ ? countIn_->length : nanoseconds{0};
     const auto start = plan_->tempo.toTime(startTick_);
-    const auto length = plan_->tempo.toTime(loop_->to) - start;
+    const auto length = countLength + (plan_->tempo.toTime(loop_->to) - start);
     // Keep the phase after a late wake, without sending passes that have already ended.
     const auto restart = now - (now - boundary) % length;
-    origin_ = restart - start;
+    recordPoint_ = restart + countLength;
+    origin_ = recordPoint_ - start;
     loopFloor_ = start;
     next_ = plan_->firstAtOrAfter(start - plan_->leadIn);
     alreadySentCount_ = 0;
@@ -576,7 +603,7 @@ void Scheduler::wrap(nanoseconds boundary, nanoseconds now) noexcept
     }
     for (const auto& event : loopChase_)
     {
-        if (!event.isNoteOn() || event.noteOffTime > start)
+        if (!event.isNoteOn() || (!countIn_ && event.noteOffTime > start))
         {
             sendAt(event, restart);
         }

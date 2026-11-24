@@ -60,6 +60,8 @@ std::string_view label(Setting setting)
         return "Count-in";
     case Setting::PreRoll:
         return "Pre-roll";
+    case Setting::LoopLeadIn:
+        return "Loop lead-in";
     }
     return {};
 }
@@ -94,6 +96,8 @@ std::string_view about(Setting setting, Field field, bool playback)
     case Setting::PreRoll:
         return field == Field::Value ? "How much of the song a pre-roll plays, 1 to 99"
                                      : "Whether the pre-roll is counted in bars or beats";
+    case Setting::LoopLeadIn:
+        return "Use the playback lead-in for the first pass of a loop or every pass";
     }
     return {};
 }
@@ -122,7 +126,7 @@ std::vector<Field> fieldsOf(Setting setting)
 bool numeric(Setting setting, Field field)
 {
     return (field == Field::Value && setting != Setting::Plays && setting != Setting::Port &&
-            setting != Setting::Mode) ||
+            setting != Setting::Mode && setting != Setting::LoopLeadIn) ||
            field == Field::Velocity;
 }
 
@@ -162,6 +166,8 @@ std::string modeWord(CountInMode mode, bool playback)
            : mode == CountInMode::CountIn ? "Count-in"
                                           : "Pre-roll";
 }
+
+constexpr std::array<std::string_view, 2> kLoopLeadInChoices{"First pass", "Every pass"};
 
 std::string count(int n, std::string_view one)
 {
@@ -271,6 +277,8 @@ std::string MetronomeView::text(Setting setting, Field field, bool playback) con
             return countIn.preRollBeats > 0 ? "Beats" : "Bars";
         return std::to_string(countIn.preRollBeats > 0 ? countIn.preRollBeats
                                                        : countIn.preRollBars);
+    case Setting::LoopLeadIn:
+        return std::string{kLoopLeadInChoices[song.repeatPlaybackLeadIn]};
     }
     return {};
 }
@@ -293,6 +301,10 @@ InspectorField MetronomeView::editField(Setting setting, Field field, bool playb
     else if (field == Field::Value && setting == Setting::Mode)
     {
         result.choices = {modeWord(CountInMode::None, playback), "Count-in", "Pre-roll"};
+    }
+    else if (setting == Setting::LoopLeadIn)
+    {
+        result.choices.assign(kLoopLeadInChoices.begin(), kLoopLeadInChoices.end());
     }
     else if (field == Field::Value && setting == Setting::Port)
     {
@@ -323,7 +335,8 @@ void MetronomeView::change(const std::string& what, const core::Song& changed)
         setting() >= Setting::Mode && playback_ ? "Before playback: " + what : what;
     const auto& now = document_.song();
     if (changed.metronome == now.metronome && changed.countIn == now.countIn &&
-        changed.playbackLeadIn == now.playbackLeadIn)
+        changed.playbackLeadIn == now.playbackLeadIn &&
+        changed.repeatPlaybackLeadIn == now.repeatPlaybackLeadIn)
     {
         host_.setMessage(message, MessageKind::Information);
         return;
@@ -334,6 +347,7 @@ void MetronomeView::change(const std::string& what, const core::Song& changed)
                        song.metronome = changed.metronome;
                        song.countIn = changed.countIn;
                        song.playbackLeadIn = changed.playbackLeadIn;
+                       song.repeatPlaybackLeadIn = changed.repeatPlaybackLeadIn;
                    });
     host_.setMessage(message, MessageKind::Information);
     // Changing a click's sound plays it, to hear what it's become.
@@ -441,6 +455,15 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
             return "Choose none, a count-in or a pre-roll";
         change(countInText(countIn), song);
         return std::nullopt;
+    case Setting::LoopLeadIn:
+    {
+        const auto choice = std::ranges::find_if(kLoopLeadInChoices, startsWith);
+        if (choice == kLoopLeadInChoices.end())
+            return "Choose First pass or Every pass";
+        song.repeatPlaybackLeadIn = choice != kLoopLeadInChoices.begin();
+        change("Loop lead-in: " + std::string{*choice}, song);
+        return std::nullopt;
+    }
     case Setting::CountIn:
     case Setting::PreRoll:
     {
@@ -536,6 +559,10 @@ std::optional<std::string> MetronomeView::step(int steps)
         countIn.mode = static_cast<CountInMode>(cycle(static_cast<int>(countIn.mode), 3));
         change(countInText(countIn), song);
         break;
+    case Setting::LoopLeadIn:
+        song.repeatPlaybackLeadIn = cycle(song.repeatPlaybackLeadIn, 2) != 0;
+        change("Loop lead-in: " + std::string{kLoopLeadInChoices[song.repeatPlaybackLeadIn]}, song);
+        break;
     case Setting::CountIn:
     case Setting::PreRoll:
     {
@@ -570,6 +597,8 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
     // Keeping the field where the row has it, as from one click to the other.
     const auto settle = [&]
     {
+        if (setting() == Setting::LoopLeadIn)
+            playback_ = true;
         if (const auto all = fieldsOf(setting()); std::ranges::find(all, field_) == all.end())
             field_ = Field::Value;
     };
@@ -587,7 +616,7 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
     }
     else if (command == "cursor-left" || command == "cursor-right")
     {
-        const bool leadIn = setting() >= Setting::Mode;
+        const bool leadIn = setting() >= Setting::Mode && setting() != Setting::LoopLeadIn;
         const auto index = leadIn && !playback_ ? at + fields.size() : at;
         const auto right = (leadIn ? 2 : 1) * fields.size() - 1;
         const auto next =
@@ -828,7 +857,7 @@ void MetronomeView::addRegions(Frame& frame) const
         {
             if (both || playback_)
                 leadInRow(setting, true, 0);
-            if (both || !playback_)
+            if (setting != Setting::LoopLeadIn && (both || !playback_))
                 leadInRow(setting, false, both ? recordingX : 0);
             y += cell_.height + (spread >= 2 ? cell_.height / 2 : 0);
             continue;

@@ -6,13 +6,21 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Lead-in on every playback loop pass, 24 November 2026
+
+**Loop lead-in** under **Before playback** sets **First pass** or **Every pass**. The choice is saved with the song. A repeated count-in gives a fresh click before the loop starts again. A repeated pre-roll plays the lead-in music again. Before set to None gives continuous repeats. See [design.md](design.md#metronome-and-count-in).
+
+**Validation.** All six Linux configurations pass with 1,294 registered tests and three MIDI-dependent skips. GCC Debug, GCC Release and Clang Debug were rerun after the older Metronome navigation test was updated for the new last row. Whole-tree formatting and `git diff --check` pass. The focused tests cover three count-ins and three pre-rolls, restoring held notes at the loop entry, a play-plan update during a repeated count-in, stopping during the count-in, seamless repeats with None, saving the preference and choosing it with the keyboard. Both manual formats build with Quarto 1.11.9 and the Metronome illustration was updated from the SDL offscreen render.
+
+**Trial pending.** On the Metronome page (`, m s`), press `G` to reach Loop lead-in and select Every pass. Try a count-in with a click output and a one-bar pre-roll around a later section. Listen for the lead-in before each repeat, and try Space to stop during a count-in. Restart the loop after changing the lead-in settings. First pass gives seamless repeats after the initial lead-in, and Before set to None gives seamless playback throughout.
+
 ### Playback count-in and pre-roll, 24 November 2026
 
 The Metronome page aligns **Before playback** on the left with **Before recording** on the right. Left and Right move across the lead-in groups. A narrow custom window shows the group with focus. Playback saves its own settings with the song, and older files default to None. The transport uses the playback lead-in once on starting. A pre-roll can start before a loop's start point, but later passes wrap directly to the loop. The transport uses `▶ COUNT` or `▶ PRE` during the playback lead-in. See [design.md](design.md#metronome-and-count-in).
 
 **Validation.** All six configurations in `tools/check-linux.sh` build and pass with 1,290 tests registered and three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Fake-clock tests check ordinary and loop playback with a count-in, and a pre-roll heard once across two passes of a loop. File tests cover older files and independent lengths surviving a save even while playback is set to None. The Workspace test checks the aligned headings, keyboard edits, undo and the playback count-in indicator. Both manual formats build with Quarto 1.11.9. The chapter's Metronome image was refreshed from the SDL offscreen render and checked in the PDF.
 
-**Trial pending.** On the Metronome page (`, m s`), choose a playback lead-in and leave the recording settings alone. Try Space from a point after the first bar, then `, L` on a later section with pre-roll. Listen for the lead-in once and a continuous loop. Try a playback count-in with the click routed, and compare it with the recording setup.
+**Accepted.** The Metronome page and first-pass count-in and pre-roll were accepted on desktop trial. The next follow-up is an **Every pass** option for playback loops. The first-pass implementation is committed locally at `9bcafd6`.
 
 ### Loop playback, 24 November 2026
 

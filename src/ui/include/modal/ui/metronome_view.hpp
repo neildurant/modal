@@ -34,6 +34,7 @@ public:
         Mode,
         CountIn,
         PreRoll,
+        LoopLeadIn,
     };
     // The fields a row may have: its value; for a click its velocity and a button to play it;
     // for a count-in or pre-roll whether it's in bars or beats.
@@ -72,9 +73,9 @@ public:
     Setting setting() const { return kSettings[row_]; }
     Field field() const { return field_; }
 
-    static constexpr std::array<Setting, 9> kSettings{
+    static constexpr std::array<Setting, 10> kSettings{
         Setting::Plays,  Setting::Port, Setting::Channel, Setting::Downbeat, Setting::Beat,
-        Setting::Length, Setting::Mode, Setting::CountIn, Setting::PreRoll};
+        Setting::Length, Setting::Mode, Setting::CountIn, Setting::PreRoll,  Setting::LoopLeadIn};
 
 private:
     // What a field shows, and what editing it starts with.
