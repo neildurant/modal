@@ -37,6 +37,12 @@ struct StopOptions
     bool resetSustain = false; // CC 64 at 0
 };
 
+struct PlaybackLoop
+{
+    Tick from;
+    Tick to; // exclusive
+};
+
 // Plays a playback plan: sends each event at its time, and the note-offs from its own table
 // of sounding notes, and clicks the plan's metronome on each beat from the start tick on,
 // until stopped. It does no timing itself. The engine calls sendDue() at or after
@@ -75,7 +81,8 @@ public:
     // sounding end first, and the pedals held down come up. Does nothing without a plan. The caller
     // keeps the count-in alive while the scheduler uses it.
     void play(Tick start, std::span<const PlannedEvent> chased, std::chrono::nanoseconds now,
-              const PlannedCountIn* countIn = nullptr, std::optional<Tick> loopEnd = std::nullopt,
+              const PlannedCountIn* countIn = nullptr,
+              std::optional<PlaybackLoop> loop = std::nullopt,
               std::span<const PlannedEvent> loopChase = {}) noexcept;
 
     // Ends the notes sounding, lets up each pedal (sustain, sostenuto or soft) playback left
@@ -199,7 +206,7 @@ private:
     // What a play chased: its values are sent at once and its notes when the song starts, after
     // any count-in, all at one time. Empty once all are sent.
     std::span<const PlannedEvent> chased_;
-    std::optional<Tick> loopEnd_; // exclusive, with startTick_ as the inclusive start
+    std::optional<PlaybackLoop> loop_;
     std::span<const PlannedEvent> loopChase_;
     std::optional<std::chrono::nanoseconds> loopFloor_; // earliest send time after a wrap
     bool chasedValuesSent_ = true;

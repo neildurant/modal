@@ -33,22 +33,23 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
     // Input retains the mapping alone, so delayed collection cannot pin whole old plans.
     next.inputTempo = std::make_shared<const TempoMap>(plan->tempo);
     next.plan = std::move(plan);
-    if (next.loopEnd)
+    if (next.loop)
     {
-        next.loopChase =
-            std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, next.start, false));
+        next.loopChase = std::make_shared<const std::vector<PlannedEvent>>(
+            chase(*next.plan, next.loop->from, false));
     }
     return publish(std::move(next)) && woken(true);
 }
 
-bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn, std::optional<Tick> loopEnd)
+bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn,
+                  std::optional<PlaybackLoop> loop)
 {
     if (!latest_)
     {
-        return !loopEnd;
+        return !loop;
     }
-    if (commands_.full() ||
-        (loopEnd && (countIn || start < 0 || start >= *loopEnd || *loopEnd > latest_->plan->end)))
+    if (commands_.full() || (loop && (start < 0 || start > loop->from || loop->from >= loop->to ||
+                                      loop->to > latest_->plan->end)))
     {
         return false;
     }
@@ -57,10 +58,10 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn, std::option
     next.start = start;
     next.chased = std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start));
     next.countIn = countIn ? std::make_shared<const PlannedCountIn>(std::move(*countIn)) : nullptr;
-    next.loopEnd = loopEnd;
-    next.loopChase =
-        loopEnd ? std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start, false))
-                : nullptr;
+    next.loop = loop;
+    next.loopChase = loop ? std::make_shared<const std::vector<PlannedEvent>>(
+                                chase(*next.plan, loop->from, false))
+                          : nullptr;
     PlayData data{playRequests_ + 1, next.chased, next.countIn};
     if (!publish(std::move(next)))
     {
@@ -302,7 +303,7 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
                                        ? std::span<const PlannedEvent>{*snapshot->loopChase}
                                        : std::span<const PlannedEvent>{};
             scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get(),
-                            snapshot->loopEnd, loopChase);
+                            snapshot->loop, loopChase);
             currentPlay_ = command.request;
             // After the scheduler has let go of the play before's chased events and count-in.
             startedPlay_.store(command.request, std::memory_order_release);

@@ -455,6 +455,12 @@ Bar Workspace::statusBar() const
                              : state.overdub     ? TransportState::Overdubbing
                                                  : TransportState::Recording;
         }
+        else if (const auto phase = player_->leadInPhase())
+        {
+            transportState = *phase == core::Player::LeadInPhase::CountIn
+                                 ? TransportState::PlaybackCountIn
+                                 : TransportState::PlaybackPreRoll;
+        }
         state.transport = StatusBarState::Transport{
             transportState, playing.has_value(), place.position,        place.time,
             place.meter,    tempoText(song, at), sectionText(song, at), sectionText(song, at, 6)};

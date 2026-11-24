@@ -84,7 +84,7 @@ CommandResult Workspace::startLoop(core::Tick from, core::Tick to)
         return CommandResult::error("Nothing to play to");
     if (recording_.pending())
         return CommandResult::error("Recording: Space stops it first");
-    if (!player_->playLoop(from, to))
+    if (!player_->playLoop(document_.song(), from, to))
         return CommandResult::error("The engine didn't take that loop: try again");
 
     if (selection_)

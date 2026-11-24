@@ -38,8 +38,8 @@ struct PlannedCountIn
     std::vector<CountInClick> clicks;     // in time order
 };
 
-// Where playback starts to record from a record point, and the count-in before it if any.
-struct RecordStart
+// Where the song starts sounding, and the count-in before it if any.
+struct LeadInStart
 {
     Tick playFrom;
     std::optional<PlannedCountIn> countIn;
@@ -48,7 +48,10 @@ struct RecordStart
 // Plans the start of recording from the song's count-in and metronome settings: a count-in
 // at the tempo and in the conductor's meter at the record point (none without a metronome
 // destination), or a pre-roll from that many bars before it, but not before the song's start.
-RecordStart planRecordStart(const Song& song, Tick recordPoint,
+LeadInStart planRecordStart(const Song& song, Tick recordPoint,
                             std::optional<DestinationId> metronomeDestination);
+
+LeadInStart planPlaybackStart(const Song& song, Tick entry,
+                              std::optional<DestinationId> metronomeDestination);
 
 } // namespace modal::core

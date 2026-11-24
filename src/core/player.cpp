@@ -205,14 +205,27 @@ std::optional<Player::RecordPhase> Player::recordPhase() const
     {
         return std::nullopt;
     }
+    const auto phase = leadInPhase();
+    return phase == LeadInPhase::CountIn   ? RecordPhase::CountIn
+           : phase == LeadInPhase::PreRoll ? RecordPhase::PreRoll
+                                           : RecordPhase::Recording;
+}
+
+std::optional<Player::LeadInPhase> Player::leadInPhase() const
+{
+    if (!playing_)
+        return std::nullopt;
     const auto status = engine_.status();
-    // Until the engine has started, as it will start.
     if (status.countingIn || (!status.playing && countIn_))
     {
-        return RecordPhase::CountIn;
+        return LeadInPhase::CountIn;
     }
     const auto at = status.playing ? status.position : std::optional{started_};
-    return at && *at < recordPoint_ ? RecordPhase::PreRoll : RecordPhase::Recording;
+    const bool recordingNow = recording();
+    const auto entry = recordingNow ? recordPoint_ : playbackEntry_;
+    return (recordingNow || started_ < entry) && at && *at < entry
+               ? std::optional{LeadInPhase::PreRoll}
+               : std::nullopt;
 }
 
 Song Player::previewTake(const Song& song)
@@ -254,23 +267,28 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
     return take;
 }
 
-bool Player::play()
+bool Player::play(const Song& song)
 {
-    return playAt(marker_, std::nullopt);
+    return playAt(song, marker_, std::nullopt);
 }
 
-bool Player::playLoop(Tick from, Tick to)
+bool Player::playLoop(const Song& song, Tick from, Tick to)
 {
-    return !recorder_ && playAt(from, to);
+    return !recorder_ && playAt(song, from, PlaybackLoop{from, to});
 }
 
-bool Player::playAt(Tick from, std::optional<Tick> end)
+bool Player::playAt(const Song& song, Tick entry, std::optional<PlaybackLoop> loop)
 {
     if (waiting_ && engine_.setPlan(waiting_))
     {
         waiting_.reset();
     }
-    if (!engine_.play(from, std::nullopt, end))
+    const auto click = song.playbackLeadIn.mode == CountInSettings::Mode::CountIn
+                           ? lookUp(song.metronome.port)
+                           : std::nullopt;
+    auto start = planPlaybackStart(song, entry, click);
+    const bool countIn = start.countIn.has_value();
+    if (!engine_.play(start.playFrom, std::move(start.countIn), loop))
     {
         return false;
     }
@@ -280,8 +298,10 @@ bool Player::playAt(Tick from, std::optional<Tick> end)
     }
     play_ = engine_.lastPlay();
     playing_ = true;
-    looping_ = end.has_value();
-    started_ = from;
+    looping_ = loop.has_value();
+    started_ = start.playFrom;
+    playbackEntry_ = entry;
+    countIn_ = countIn;
     return true;
 }
 
@@ -299,9 +319,9 @@ bool Player::stop()
     return true;
 }
 
-bool Player::toggle()
+bool Player::toggle(const Song& song)
 {
-    return playing_ ? stop() : play();
+    return playing_ ? stop() : play(song);
 }
 
 void Player::resetMarkerForSong(Tick tick)

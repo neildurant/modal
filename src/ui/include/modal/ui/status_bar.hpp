@@ -30,6 +30,8 @@ struct StatusBarState
         Stopped,
         Playing,
         Looping,
+        PlaybackCountIn,
+        PlaybackPreRoll,
         CountIn,
         PreRoll,
         Recording,

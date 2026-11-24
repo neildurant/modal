@@ -6,9 +6,13 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
-### Playback count-in and pre-roll design, 24 November 2026
+### Playback count-in and pre-roll, 24 November 2026
 
-Agreed a separate **Before playback** group to the left of **Before recording** on the Metronome page, with corresponding fields aligned. The design covers ordinary playback and the first pass of a playback loop. Scheduled as the next step in milestone 11, before punch recording. See [design.md](design.md#metronome-and-count-in).
+The Metronome page aligns **Before playback** on the left with **Before recording** on the right. Left and Right move across the lead-in groups. A narrow custom window shows the group with focus. Playback saves its own settings with the song, and older files default to None. The transport uses the playback lead-in once on starting. A pre-roll can start before a loop's start point, but later passes wrap directly to the loop. The transport uses `▶ COUNT` or `▶ PRE` during the playback lead-in. See [design.md](design.md#metronome-and-count-in).
+
+**Validation.** All six configurations in `tools/check-linux.sh` build and pass with 1,290 tests registered and three MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass. Fake-clock tests check ordinary and loop playback with a count-in, and a pre-roll heard once across two passes of a loop. File tests cover older files and independent lengths surviving a save even while playback is set to None. The Workspace test checks the aligned headings, keyboard edits, undo and the playback count-in indicator. Both manual formats build with Quarto 1.11.9. The chapter's Metronome image was refreshed from the SDL offscreen render and checked in the PDF.
+
+**Trial pending.** On the Metronome page (`, m s`), choose a playback lead-in and leave the recording settings alone. Try Space from a point after the first bar, then `, L` on a later section with pre-roll. Listen for the lead-in once and a continuous loop. Try a playback count-in with the click routed, and compare it with the recording setup.
 
 ### Loop playback, 24 November 2026
 

@@ -87,8 +87,8 @@ public:
 
     // Plays from the marker, starting again there if already playing. Each returns whether the
     // engine took the request; if not, its queue full, nothing changes here either.
-    [[nodiscard]] bool play();
-    [[nodiscard]] bool playLoop(Tick from, Tick to);
+    [[nodiscard]] bool play(const Song& song);
+    [[nodiscard]] bool playLoop(const Song& song, Tick from, Tick to);
     [[nodiscard]] bool stop();
 
     // Records from the marker onto the song's armed tracks (see Recorder), in the song's record
@@ -113,6 +113,13 @@ public:
         Recording,
     };
     std::optional<RecordPhase> recordPhase() const;
+
+    enum class LeadInPhase : std::uint8_t
+    {
+        CountIn,
+        PreRoll,
+    };
+    std::optional<LeadInPhase> leadInPhase() const;
 
     // A pass recorded: the song with its take, and the tracks it went onto.
     struct Take
@@ -155,7 +162,7 @@ public:
     [[nodiscard]] bool sendValue(const Song& song, TrackId track, const EventData& data);
 
     // Space: stops if playing, and otherwise plays.
-    [[nodiscard]] bool toggle();
+    [[nodiscard]] bool toggle(const Song& song);
 
     // Stops, and sends All Notes Off and Reset All Controllers (see Engine::panic).
     [[nodiscard]] bool panic();
@@ -192,7 +199,7 @@ private:
     // A port's destination, looked up once, without noting it missing.
     std::optional<DestinationId> lookUp(const std::string& port);
     std::shared_ptr<const PlaybackPlan> compile(const Song& song);
-    bool playAt(Tick from, std::optional<Tick> end);
+    bool playAt(const Song& song, Tick entry, std::optional<PlaybackLoop> loop);
 
     // Notes that playback stopped: where the engine was last seen, until it says where.
     void noteStopped();
@@ -214,6 +221,7 @@ private:
     bool looping_ = false;
     std::uint64_t play_ = 0;             // the engine's id for the last play
     Tick started_ = 0;                   // where the last play started
+    Tick playbackEntry_ = 0;             // where the lead-in for playback ends
     bool stopExact_ = true;              // whether the engine has said where the last play stopped
     Tick stoppedAt_ = 0;                 // where it said
     std::optional<Recorder> recorder_;   // the pass being recorded, until finished
@@ -221,7 +229,7 @@ private:
     Tick recordPoint_ = 0;               // where the pass records from
     bool replacing_ = false;             // whether it replaces, rather than overdubs
     Tick previewAt_ = 0;                 // where the take was last shown up to
-    bool countIn_ = false;               // whether it counts in
+    bool countIn_ = false;               // whether the current play counts in
 };
 
 } // namespace modal::core

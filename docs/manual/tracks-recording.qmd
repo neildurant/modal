@@ -276,25 +276,33 @@ A General MIDI percussion receiver on channel 10 is one possible destination;
 a different instrument may need different click pitches or a different channel.
 
 The **Metronome page**, `, m s` or `:metronome`, groups its destination,
-downbeat and beat sounds, velocities, note length and recording lead-in.
+downbeat and beat sounds, velocities, note length and lead-in settings.
 Its Test buttons audition the click through the selected route. Fields are
 edited in place like track settings.
 
-![The Metronome page separates the click's sound and destination from what precedes recording.](images/metronome.png){#fig-metronome fig-alt="Modal's Metronome page with playback mode, MIDI port and channel, downbeat and beat notes with velocities and Test buttons, then count-in and pre-roll settings."}
+![The Metronome page shows independent playback and recording lead-ins side by side.](images/metronome.png){#fig-metronome fig-alt="Modal's Metronome page with the click settings above two aligned groups, Before playback on the left and Before recording on the right."}
 
 `, m m` cycles the click between off, during recording and always. A click
 uses the conductor's meter; in 6/8 that currently means six eighth-note beats,
 not two dotted-quarter beats. It is not muted or soloed with the tracks.
 
-A **count-in** gives a metronome-only lead-in with the song silent. A
-**pre-roll** plays existing music before the recording point to supply
-musical context. `, m c` cycles none, count-in and pre-roll. Exact lengths
-can be set with `:countin 2`, `:countin 3 beats`, `:preroll 2` or
-`:preroll 3 beats`; `:countin off` selects no lead-in.
+A **count-in** gives a metronome-only lead-in. A **pre-roll** plays existing
+music before the entry point to supply musical context. Each group has a
+**Before** choice and its own count-in and pre-roll lengths in bars or beats.
+Use Left (`h`) and Right (`l`) to cross between the groups on the same row.
+
+**Before playback** starts at **None**. For practice, choose a one-bar
+pre-roll and start at the chorus. You hear the last bar of the verse before
+entering. If you loop the chorus, you hear the lead-in once and the chorus
+repeats continuously. The recording settings can keep a different lead-in.
+
+For recording, `, m c` cycles the three choices. Set exact lengths with
+`:countin 2`, `:countin 3 beats`, `:preroll 2` or `:preroll 3 beats`. Use
+`:countin off` to start recording immediately.
 
 A count-in always clicks when a click destination is available. Without a
-usable metronome destination, recording can proceed without the click and
-count-in. Stopping during the count-in creates no recorded edit.
+usable metronome destination, the transport starts immediately. Stopping
+during the count-in creates no recorded edit.
 
 ## Completing and keeping a take
 

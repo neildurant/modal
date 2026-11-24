@@ -238,7 +238,7 @@ TEST_CASE("Freeze refuses while playing or stopping and respects quantise bypass
     const auto original = f.document.song();
     SECTION("playing and stopping")
     {
-        REQUIRE(player.play());
+        REQUIRE(player.play(f.document.song()));
         f.type(U",tf");
         CHECK(f.menu().empty());
         CHECK(f.ws.message().find("Stop playback") != std::string::npos);
@@ -514,7 +514,7 @@ TEST_CASE("Freeze availability stays current and confirmation rechecks the opera
     SECTION("playback starts after the list was drawn")
     {
         const auto original = f.document.song();
-        REQUIRE(player.play());
+        REQUIRE(player.play(f.document.song()));
         CHECK(f.menu()[1].style.foreground == Role::Dim);
         f.press(NamedKey::Enter);
         CHECK(f.document.song() == original);

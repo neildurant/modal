@@ -906,7 +906,7 @@ TEST_CASE("changing songs stops playback without carrying the old play position 
     p.document.setListener([&](const auto& song) { p.player.update(song); });
     p.ws.setRewind(false);
     p.player.setMarker(p.document.song().ppqn().quarter());
-    REQUIRE(p.player.play());
+    REQUIRE(p.player.play(p.document.song()));
     p.runFor(100ms);
     REQUIRE(p.player.playing());
 

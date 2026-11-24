@@ -269,6 +269,33 @@ TEST_CASE("a song saved when labels were markers still reads")
     CHECK(std::ranges::equal(back.song->labels(), std::vector<Label>{{4 * 96, "fix this fill"}}));
 }
 
+TEST_CASE("playback and recording lead-ins round-trip independently")
+{
+    const auto old = readSong("modal-song 1\n"
+                              "song \"S\" ppqn=96\n"
+                              "countin mode=countin bars=2 beats=0 preroll=1\n"
+                              "section \"A\" bars=2\n"
+                              "  meter 1:1:0 4/4\n"
+                              "  tempo 1:1:0 120\n",
+                              Ppqn{96});
+    INFO(old.error);
+    REQUIRE(old.song);
+    CHECK(old.song->playbackLeadIn == kDefaultPlaybackLeadIn);
+    CHECK(old.song->countIn.bars == 2);
+    CHECK(writeSong(*old.song).find("playback-lead-in") == std::string::npos);
+
+    auto changed = *old.song;
+    changed.playbackLeadIn = {.mode = CountInSettings::Mode::None, .beats = 3, .preRollBeats = 2};
+    const auto text = writeSong(changed);
+    const auto back = readSong(text, Ppqn{96});
+    INFO(back.error);
+    REQUIRE(back.song);
+    CHECK(back.song->playbackLeadIn == changed.playbackLeadIn);
+    CHECK(back.song->countIn == old.song->countIn);
+    CHECK(*back.song == changed);
+    CHECK(writeSong(*back.song) == text);
+}
+
 TEST_CASE("anything wrong in a song file stops it being read, saying where")
 {
     const std::string header = "modal-song 1\nsong \"S\" ppqn=960\ntrack 1 \"T\" ch=1\n";

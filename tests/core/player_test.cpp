@@ -88,7 +88,7 @@ TEST_CASE("the player plays the song's tracks to their ports, naming those it ca
 
     Playing p{song};
     CHECK(p.player.missingPorts() == std::vector<std::string>{"gone"});
-    CHECK(p.player.play());
+    CHECK(p.player.play(song));
     p.runFor(1ms);
     REQUIRE_FALSE(p.sink.sent.empty());
     CHECK(p.sink.sent.front().destination == DestinationId{2});
@@ -185,13 +185,13 @@ TEST_CASE("the metronome set to always clicks in plain playback, and set to whil
 
     song.metronome.when = MetronomeSettings::When::Always;
     Playing always{song};
-    REQUIRE(always.player.play());
+    REQUIRE(always.player.play(song));
     always.runFor(1100ms); // three beats at 120 BPM
     CHECK(clicks(always) == 3);
 
     song.metronome.when = MetronomeSettings::When::Recording;
     Playing recording{song};
-    REQUIRE(recording.player.play());
+    REQUIRE(recording.player.play(song));
     recording.runFor(1100ms);
     CHECK(clicks(recording) == 0);
 }
@@ -199,23 +199,24 @@ TEST_CASE("the metronome set to always clicks in plain playback, and set to whil
 TEST_CASE("playback starts from the marker, which stays put with rewind")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
     const Tick q = ppqn.quarter();
     CHECK(p.player.marker() == 0);
     CHECK(p.player.rewind());
 
     p.player.setMarker(q);
-    CHECK(p.player.toggle());
+    CHECK(p.player.toggle(song));
     CHECK(p.player.playing());
     p.runFor(750ms); // a quarter and a half on
     CHECK(p.player.position() == q + q + q / 2);
-    CHECK(p.player.toggle());
+    CHECK(p.player.toggle(song));
     CHECK_FALSE(p.player.playing());
     CHECK(p.player.position() == std::nullopt);
     p.runFor(1ms);
     CHECK_FALSE(p.player.stopping());
     CHECK(p.player.marker() == q);
-    CHECK(p.player.toggle());
+    CHECK(p.player.toggle(song));
     p.runFor(1ms);
     CHECK(p.player.position() >= q);
     CHECK(p.player.position() < q + q / 10);
@@ -224,11 +225,12 @@ TEST_CASE("playback starts from the marker, which stays put with rewind")
 TEST_CASE("without rewind, the marker moves to where playback stops")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
     const Tick q = ppqn.quarter();
     p.player.setRewind(false);
     p.player.setMarker(q);
-    CHECK(p.player.play());
+    CHECK(p.player.play(song));
     p.runFor(750ms);
     CHECK(p.player.stop());
     CHECK(p.player.marker() == q + q + q / 2); // where it was last seen, until...
@@ -243,13 +245,14 @@ TEST_CASE("without rewind, the marker moves to where playback stops")
 TEST_CASE("playback stops by itself at the song's end")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
     const Tick q = ppqn.quarter();
     p.player.setMarker(q);
 
     SECTION("with rewind, the marker stays put")
     {
-        CHECK(p.player.play());
+        CHECK(p.player.play(song));
         CHECK_FALSE(p.runFor(1s));
         CHECK(p.player.playing());
         CHECK(p.runFor(2s));
@@ -260,21 +263,94 @@ TEST_CASE("playback stops by itself at the song's end")
     SECTION("without, it goes back to the start, since resuming at the end would play nothing")
     {
         p.player.setRewind(false);
-        CHECK(p.player.play());
+        CHECK(p.player.play(song));
         CHECK(p.runFor(3s));
         CHECK_FALSE(p.runFor(1s));
         CHECK(p.player.marker() == 0);
     }
 }
 
+TEST_CASE("playback uses its own count-in once, including at the start of a loop")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = fourNotes(ppqn);
+    song.metronome.port = "b";
+    song.metronome.when = MetronomeSettings::When::Off;
+    song.countIn.mode = CountInSettings::Mode::PreRoll;
+    song.playbackLeadIn = {.mode = CountInSettings::Mode::CountIn, .beats = 2};
+    Playing p{song};
+    p.player.setMarker(q);
+
+    SECTION("ordinary playback")
+    {
+        REQUIRE(p.player.play(song));
+    }
+    SECTION("loop playback")
+    {
+        REQUIRE(p.player.playLoop(song, q, 2 * q));
+    }
+
+    const auto beginning = p.clock.time;
+    p.runFor(999ms);
+    CHECK(p.player.leadInPhase() == Player::LeadInPhase::CountIn);
+    const auto notes = [&](DestinationId destination)
+    {
+        std::vector<Sent> result;
+        for (const auto& event : p.sink.sent)
+            if (event.destination == destination && (event.bytes[0] & 0xF0) == 0x90)
+                result.push_back(event);
+        return result;
+    };
+    CHECK(notes(DestinationId{1}).empty());
+    const auto clicks = notes(DestinationId{2});
+    REQUIRE(clicks.size() == 2);
+    CHECK(clicks.front().due == beginning);
+    CHECK(clicks.back().due == beginning + 500ms);
+
+    p.runFor(502ms);
+    CHECK_FALSE(p.player.leadInPhase());
+    CHECK(notes(DestinationId{2}) == clicks);
+    const auto played = notes(DestinationId{1});
+    REQUIRE(played.size() == 2);
+    CHECK(played[0].bytes[1] == 62);
+    CHECK(played[0].due == beginning + 1s);
+    CHECK(played[1].bytes[1] == (p.player.looping() ? 62 : 64));
+    CHECK(played[1].due == beginning + 1500ms);
+    CHECK(p.player.marker() == q);
+}
+
+TEST_CASE("a playback loop plays its musical pre-roll once before wrapping to its own start")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = fourNotes(ppqn);
+    song.playbackLeadIn = {.mode = CountInSettings::Mode::PreRoll, .preRollBeats = 1};
+    Playing p{song};
+    const auto beginning = p.clock.time;
+    REQUIRE(p.player.playLoop(song, q, 3 * q));
+    p.runFor(100ms);
+    CHECK(p.player.leadInPhase() == Player::LeadInPhase::PreRoll);
+    p.runFor(1901ms);
+    CHECK_FALSE(p.player.leadInPhase());
+
+    std::vector<std::pair<int, std::chrono::nanoseconds>> played;
+    for (const auto& event : p.sink.sent)
+        if ((event.bytes[0] & 0xF0) == 0x90)
+            played.emplace_back(event.bytes[1], event.due - beginning);
+    CHECK(played == std::vector<std::pair<int, std::chrono::nanoseconds>>{
+                        {60, 0ms}, {62, 500ms}, {64, 1000ms}, {62, 1500ms}, {64, 2000ms}});
+}
+
 TEST_CASE("playing while playing starts again from the marker")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
-    CHECK(p.player.play());
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
+    CHECK(p.player.play(song));
     p.runFor(600ms);
     p.player.setMarker(3 * ppqn.quarter());
-    CHECK(p.player.play());
+    CHECK(p.player.play(song));
     CHECK(p.player.playing());
     p.runFor(1ms);
     const auto position = p.player.position(); // a millisecond or so on
@@ -286,8 +362,9 @@ TEST_CASE("playing while playing starts again from the marker")
 TEST_CASE("panic stops playback and resets every channel")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
-    CHECK(p.player.play());
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
+    CHECK(p.player.play(song));
     p.runFor(100ms);
     CHECK(p.player.panic());
     CHECK_FALSE(p.player.playing());
@@ -301,7 +378,7 @@ TEST_CASE("an edit during playback carries on playing the new song")
     const auto ppqn = MODAL_ANY_PPQN();
     auto song = fourNotes(ppqn);
     Playing p{song};
-    CHECK(p.player.play());
+    CHECK(p.player.play(song));
     p.runFor(100ms);
     song.updateEvents(song.tracks()[0]->id(), [&](EventList& events)
                       { events.insert({2 * ppqn.quarter() + 1, Note{72, 100, 1}}); });
@@ -335,7 +412,7 @@ TEST_CASE("a plan the engine can't take yet is kept and handed over later, the n
     p.player.update(last); // replaces the one waiting
     p.runFor(1ms);
     CHECK_FALSE(p.player.planWaiting());
-    CHECK(p.player.play());
+    CHECK(p.player.play(last));
     p.runFor(1ms);
     bool heard = false;
     for (const auto& sent : p.sink.sent)
@@ -366,7 +443,7 @@ TEST_CASE("a record the engine can't take leaves the song planned for playing")
     // leaves it, but the song as it plays.
     p.runFor(1ms);
     CHECK_FALSE(p.player.planWaiting());
-    CHECK(p.player.play());
+    CHECK(p.player.play(song));
     p.runFor(100ms);
     bool heard = false;
     for (const auto& sent : p.sink.sent)
@@ -379,11 +456,12 @@ TEST_CASE("a record the engine can't take leaves the song planned for playing")
 TEST_CASE("a play or stop the engine can't take changes nothing")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
     for (int i = 0; i < 1000; ++i)
     {
         const bool was = p.player.playing();
-        if (!p.player.toggle())
+        if (!p.player.toggle(song))
         {
             CHECK(p.player.playing() == was);
             return;
@@ -435,7 +513,7 @@ TEST_CASE("player resolves named inputs on each update without affecting playbac
     engine.step();
     REQUIRE(sink.sent.size() == 1); // the original held note still releases
     CHECK(sink.sent[0].bytes == std::vector<std::uint8_t>{0x80, 62, 0});
-    REQUIRE(player.play());
+    REQUIRE(player.play(song));
     engine.step();
     CHECK(sink.sent.size() > 1); // missing input doesn't silence the stored song
     input = InputId{2};
@@ -606,13 +684,14 @@ TEST_CASE("a track's controller, bend or pressure value is sent at once on its p
 TEST_CASE("a finished play cannot cancel its replacement before the engine starts it")
 {
     const auto ppqn = MODAL_ANY_PPQN();
-    Playing p{fourNotes(ppqn)};
-    REQUIRE(p.player.play());
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
+    REQUIRE(p.player.play(song));
     REQUIRE(p.runFor(3s));
     REQUIRE_FALSE(p.player.playing());
     REQUIRE(p.engine.status().finished);
     const auto sent = p.sink.sent.size();
-    REQUIRE(p.player.play());
+    REQUIRE(p.player.play(song));
     // The UI can poll before the engine has taken the replacement request.
     CHECK_FALSE(p.player.poll());
     CHECK(p.player.playing());

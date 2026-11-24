@@ -130,7 +130,7 @@ TEST_CASE("a loop releases held notes and pedals and chases the start without re
     RecordingSink sink;
     Scheduler scheduler{sink};
     scheduler.setPlan(plan, kNow);
-    scheduler.play(q, initial, kNow, nullptr, 2 * q, repeat);
+    scheduler.play(q, initial, kNow, nullptr, PlaybackLoop{q, 2 * q}, repeat);
 
     runUntil(scheduler, kNow + 500ms);
     CHECK(sink.sent == std::vector<Sent>{
@@ -161,7 +161,7 @@ TEST_CASE("a silent loop retains its tempo and phase after a late wake")
     RecordingSink sink;
     Scheduler scheduler{sink};
     scheduler.setPlan(plan, kNow);
-    scheduler.play(0, {}, kNow, nullptr, 2 * q);
+    scheduler.play(0, {}, kNow, nullptr, PlaybackLoop{0, 2 * q});
 
     CHECK_FALSE(scheduler.finished());
     CHECK(scheduler.nextWakeTime() == kNow + 1500ms);
@@ -187,7 +187,7 @@ TEST_CASE("offset events play only within their loop pass")
     RecordingSink sink;
     Scheduler scheduler{sink};
     scheduler.setPlan(plan, kNow);
-    scheduler.play(q, {}, kNow, nullptr, 2 * q);
+    scheduler.play(q, {}, kNow, nullptr, PlaybackLoop{q, 2 * q});
 
     runUntil(scheduler, kNow + 760ms);
     CHECK(sink.sent == std::vector<Sent>{

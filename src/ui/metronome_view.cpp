@@ -36,6 +36,7 @@ constexpr int kVelocityWidth = 5; // a cell more than the digits for the cursor,
 constexpr int kVelocityLabel = 4; // Vel, before it
 constexpr int kNumberWidth = 6;   // a count-in's or pre-roll's, then whether bars or beats
 constexpr int kUnitWidth = 9;
+constexpr int kLeadInColumn = 33;
 
 std::string_view label(Setting setting)
 {
@@ -63,7 +64,7 @@ std::string_view label(Setting setting)
     return {};
 }
 
-std::string_view about(Setting setting, Field field)
+std::string_view about(Setting setting, Field field, bool playback)
 {
     switch (setting)
     {
@@ -84,8 +85,9 @@ std::string_view about(Setting setting, Field field)
     case Setting::Length:
         return "How long each click lasts, cut short where the next comes sooner";
     case Setting::Mode:
-        return "Before recording: nothing, a count-in (clicks, the song silent), or a pre-roll "
-               "(the song)";
+        return playback ? "Before playback: none, a count-in of clicks, or a pre-roll of the song"
+                        : "Before recording: nothing, a count-in (clicks, the song silent), or a "
+                          "pre-roll (the song)";
     case Setting::CountIn:
         return field == Field::Value ? "How long the count-in is, 1 to 99"
                                      : "Whether the count-in is counted in bars or beats";
@@ -154,9 +156,9 @@ std::string whenWord(When when)
     return text;
 }
 
-std::string modeWord(CountInMode mode)
+std::string modeWord(CountInMode mode, bool playback)
 {
-    return mode == CountInMode::None      ? "Nothing"
+    return mode == CountInMode::None      ? (playback ? "None" : "Nothing")
            : mode == CountInMode::CountIn ? "Count-in"
                                           : "Pre-roll";
 }
@@ -235,11 +237,11 @@ std::vector<std::string> MetronomeView::ports() const
     return result;
 }
 
-std::string MetronomeView::text(Setting setting, Field field) const
+std::string MetronomeView::text(Setting setting, Field field, bool playback) const
 {
     const auto& song = document_.song();
     const auto& metronome = song.metronome;
-    const auto& countIn = song.countIn;
+    const auto& countIn = playback ? song.playbackLeadIn : song.countIn;
     switch (setting)
     {
     case Setting::Plays:
@@ -259,7 +261,7 @@ std::string MetronomeView::text(Setting setting, Field field) const
     case Setting::Length:
         return core::toString(metronome.length);
     case Setting::Mode:
-        return modeWord(countIn.mode);
+        return modeWord(countIn.mode, playback);
     case Setting::CountIn:
         if (field == Field::Unit)
             return countIn.beats > 0 ? "Beats" : "Bars";
@@ -273,9 +275,9 @@ std::string MetronomeView::text(Setting setting, Field field) const
     return {};
 }
 
-InspectorField MetronomeView::editField(Setting setting, Field field) const
+InspectorField MetronomeView::editField(Setting setting, Field field, bool playback) const
 {
-    const auto shown = text(setting, field);
+    const auto shown = text(setting, field, playback);
     InspectorField result{.heading = std::string{label(setting)},
                           .value = shown,
                           .editable = true,
@@ -290,7 +292,7 @@ InspectorField MetronomeView::editField(Setting setting, Field field) const
     }
     else if (field == Field::Value && setting == Setting::Mode)
     {
-        result.choices = {"Nothing", "Count-in", "Pre-roll"};
+        result.choices = {modeWord(CountInMode::None, playback), "Count-in", "Pre-roll"};
     }
     else if (field == Field::Value && setting == Setting::Port)
     {
@@ -309,7 +311,7 @@ bool MetronomeView::startEditing()
         host_.auditionClick(setting() == Setting::Downbeat);
         return false;
     }
-    if (!editor_.open({.kind = "Metronome", .fields = {editField(setting(), field_)}}))
+    if (!editor_.open({.kind = "Metronome", .fields = {editField(setting(), field_, playback_)}}))
         return false;
     host_.startTyping();
     return true;
@@ -317,19 +319,23 @@ bool MetronomeView::startEditing()
 
 void MetronomeView::change(const std::string& what, const core::Song& changed)
 {
+    const std::string message =
+        setting() >= Setting::Mode && playback_ ? "Before playback: " + what : what;
     const auto& now = document_.song();
-    if (changed.metronome == now.metronome && changed.countIn == now.countIn)
+    if (changed.metronome == now.metronome && changed.countIn == now.countIn &&
+        changed.playbackLeadIn == now.playbackLeadIn)
     {
-        host_.setMessage(what, MessageKind::Information);
+        host_.setMessage(message, MessageKind::Information);
         return;
     }
-    document_.edit(what, place(),
+    document_.edit(message, place(),
                    [&](core::Song& song)
                    {
                        song.metronome = changed.metronome;
                        song.countIn = changed.countIn;
+                       song.playbackLeadIn = changed.playbackLeadIn;
                    });
-    host_.setMessage(what, MessageKind::Information);
+    host_.setMessage(message, MessageKind::Information);
     // Changing a click's sound plays it, to hear what it's become.
     if (isClick(setting()))
         host_.auditionClick(setting() == Setting::Downbeat);
@@ -339,7 +345,7 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
 {
     auto song = document_.underlying();
     auto& metronome = song.metronome;
-    auto& countIn = song.countIn;
+    auto& countIn = playback_ ? song.playbackLeadIn : song.countIn;
     const auto text = trimmed(typed);
     const auto word = lower(text);
     const auto startsWith = [&](std::string_view whole)
@@ -432,7 +438,7 @@ std::optional<std::string> MetronomeView::set(const std::string& typed)
         else if (startsWith("pre-roll") || startsWith("preroll"))
             countIn.mode = CountInMode::PreRoll;
         else
-            return "Before recording comes nothing, a count-in or a pre-roll";
+            return "Choose none, a count-in or a pre-roll";
         change(countInText(countIn), song);
         return std::nullopt;
     case Setting::CountIn:
@@ -472,7 +478,7 @@ std::optional<std::string> MetronomeView::step(int steps)
 {
     auto song = document_.underlying();
     auto& metronome = song.metronome;
-    auto& countIn = song.countIn;
+    auto& countIn = playback_ ? song.playbackLeadIn : song.countIn;
     const auto cycle = [&](int at, int size) { return ((at + steps) % size + size) % size; };
     const auto clamp = [&](int value, int low, int high)
     { return std::clamp(value + steps, low, high); };
@@ -579,13 +585,16 @@ std::optional<bool> MetronomeView::run(std::string_view command, int count)
         row_ -= std::min(row_, n);
         settle();
     }
-    else if (command == "cursor-left")
+    else if (command == "cursor-left" || command == "cursor-right")
     {
-        field_ = fields[at - std::min(at, n)];
-    }
-    else if (command == "cursor-right")
-    {
-        field_ = fields[std::min(at + n, fields.size() - 1)];
+        const bool leadIn = setting() >= Setting::Mode;
+        const auto index = leadIn && !playback_ ? at + fields.size() : at;
+        const auto right = (leadIn ? 2 : 1) * fields.size() - 1;
+        const auto next =
+            command == "cursor-left" ? index - std::min(index, n) : std::min(index + n, right);
+        field_ = fields[next % fields.size()];
+        if (leadIn)
+            playback_ = next < fields.size();
     }
     else if (command == "cursor-first")
     {
@@ -629,7 +638,8 @@ std::optional<std::string> MetronomeView::typingHint() const
     if (const auto* list = editor_.list())
         return std::string{list->narrowing() ? "Type to narrow the list; " : ""} +
                "Up and Down choose, Enter takes it, Escape leaves it";
-    return std::string{about(setting(), field_)} + "; Up and Down step it, Enter sets it";
+    return std::string{about(setting(), field_, playback_)} +
+           "; Up and Down step it, Enter sets it";
 }
 
 void MetronomeView::type(char32_t character)
@@ -650,8 +660,12 @@ std::optional<bool> MetronomeView::runTyping(std::string_view command)
     return editor_.run(
         command, host_,
         {
-            .inspection = [this]
-            { return Inspection{.kind = "Metronome", .fields = {editField(setting(), field_)}}; },
+            .inspection =
+                [this]
+            {
+                return Inspection{.kind = "Metronome",
+                                  .fields = {editField(setting(), field_, playback_)}};
+            },
             .set = [this](const std::string&, const std::string& typed) { return set(typed); },
             .step = [this](const std::string&, int steps) { return step(steps); },
         });
@@ -659,8 +673,11 @@ std::optional<bool> MetronomeView::runTyping(std::string_view command)
 
 Inspection MetronomeView::inspection() const
 {
-    Inspection result{.kind = setting() >= Setting::Mode ? "Count-in" : "Metronome", .fields = {}};
-    result.fields.push_back({"About", std::string{about(setting(), field_)}});
+    const auto kind = setting() < Setting::Mode ? "Metronome"
+                      : playback_               ? "Before playback"
+                                                : "Before recording";
+    Inspection result{.kind = kind, .fields = {}};
+    result.fields.push_back({"About", std::string{about(setting(), field_, playback_)}});
     if (setting() == Setting::Port)
     {
         const auto* table = host_.portTable();
@@ -688,19 +705,20 @@ void MetronomeView::addRegions(Frame& frame) const
     const Style dim{Role::Dim, Role::Background, kPlain};
     const Style cursor{Role::CursorText, Role::Cursor, kPlain};
     int y = 0;
-    const auto heading = [&](std::u32string text)
+    const auto heading = [&](std::u32string text, int shift = 0)
     {
         page.text.push_back(
-            {cell_.width, y, std::move(text), {Role::Accent, Role::Background, kBold}});
-        y += 2 * cell_.height;
+            {cell_.width + shift, y, std::move(text), {Role::Accent, Role::Background, kBold}});
     };
     // A field, padded to its width, the cursor's highlighted, or being edited in place; one with
     // choices shows an arrow at its right, and the Test button is a button.
     Rect listAt{};
-    const auto field = [&](Setting setting, Field which, int x, int width, bool alignRight)
+    const auto field =
+        [&](Setting setting, Field which, int x, int width, bool alignRight, bool playback = false)
     {
-        const bool here = setting == this->setting() && which == field_;
-        const auto edited = editField(setting, which);
+        const bool here = setting == this->setting() && which == field_ &&
+                          (setting < Setting::Mode || playback == playback_);
+        const auto edited = editField(setting, which, playback);
         if (here && editor_.active())
         {
             inspectorValue(page, edited, {}, x, y, width, cell_, &editor_, alignRight, &listAt);
@@ -743,6 +761,24 @@ void MetronomeView::addRegions(Frame& frame) const
     };
     const auto& song = document_.song();
     const int valueX = (1 + kLabelWidth) * cell_.width;
+    const int recordingX = kLeadInColumn * cell_.width;
+    // At narrow custom window sizes the active group stays fully on the left.
+    const bool both = width_ >= recordingX + valueX + (kNumberWidth + kUnitWidth) * cell_.width;
+    const auto leadInRow = [&](Setting setting, bool playback, int shift)
+    {
+        page.text.push_back({shift + 2 * cell_.width, y, decodeUtf8(label(setting)), dim});
+        if (hasUnit(setting))
+        {
+            field(setting, Field::Value, shift + valueX, kNumberWidth - 1, true, playback);
+            field(setting, Field::Unit, shift + valueX + kNumberWidth * cell_.width, kUnitWidth - 1,
+                  false, playback);
+        }
+        else
+        {
+            field(setting, Field::Value, shift + valueX, kNumberWidth + kUnitWidth - 1, false,
+                  playback);
+        }
+    };
     // Spread out where there's room (decided 12 November 2026, after use): a blank row between
     // the groups of settings, when it plays, where and what, then how recording starts and how
     // long; and half a row between rows. Where there isn't, the half rows go, then the blank ones.
@@ -773,14 +809,30 @@ void MetronomeView::addRegions(Frame& frame) const
     {
         const auto setting = kSettings[i];
         if (setting == Setting::Plays)
+        {
             heading(U"Metronome");
+            y += 2 * cell_.height;
+        }
         if (setting == Setting::Mode)
         {
             y += 2 * cell_.height; // two blank lines between the halves
-            heading(U"Before recording");
+            if (both || playback_)
+                heading(U"Before playback");
+            if (both || !playback_)
+                heading(U"Before recording", both ? recordingX : 0);
+            y += 2 * cell_.height;
         }
         if (spread >= 1 && startsGroup(setting))
             y += cell_.height;
+        if (setting >= Setting::Mode)
+        {
+            if (both || playback_)
+                leadInRow(setting, true, 0);
+            if (both || !playback_)
+                leadInRow(setting, false, both ? recordingX : 0);
+            y += cell_.height + (spread >= 2 ? cell_.height / 2 : 0);
+            continue;
+        }
         page.text.push_back({2 * cell_.width, y, decodeUtf8(label(setting)), dim});
         if (isClick(setting))
         {
@@ -794,11 +846,6 @@ void MetronomeView::addRegions(Frame& frame) const
             const int velocityX = labelX + kVelocityLabel * cell_.width;
             field(setting, Field::Velocity, velocityX, kVelocityWidth - 1, true);
             field(setting, Field::Test, velocityX + kVelocityWidth * cell_.width, 6, false);
-        }
-        else if (hasUnit(setting))
-        {
-            field(setting, Field::Value, valueX, kNumberWidth - 1, true);
-            field(setting, Field::Unit, valueX + kNumberWidth * cell_.width, kUnitWidth - 1, false);
         }
         else
         {
@@ -817,9 +864,10 @@ void MetronomeView::addRegions(Frame& frame) const
     {
         return;
     }
-    // The bar: what plays, and what comes before recording.
+    // What clicks and the lead-in when starting either transport.
     std::vector<BarPair> left{{"Metronome", {}}};
     std::vector<BarPair> right{{"Plays:", whenText(song.metronome.when)},
+                               {"Before playback:", countInText(song.playbackLeadIn)},
                                {"Before recording:", countInText(song.countIn)}};
     frame.push_back(labelledBar(left, right, layout_.top[0], width_, cell_));
     frame.push_back(inspectorRegion(inspection(), layout_.top[1], width_, cell_, 9, nullptr));

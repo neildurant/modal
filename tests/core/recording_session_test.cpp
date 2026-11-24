@@ -152,7 +152,7 @@ TEST_CASE("a recording session refuses a failed start without installing documen
     }
     else
     {
-        REQUIRE(r.player.play());
+        REQUIRE(r.player.play(r.document.underlying()));
     }
     CHECK_FALSE(r.session.start(r.player));
     CHECK_FALSE(r.session.pending());
@@ -330,7 +330,7 @@ TEST_CASE("a failed recording-session start preserves hooks it does not own")
     r.document.setPreview([](const Song& song) { return song; });
     r.document.setGuard([](const Song&, const Song&) -> std::optional<std::string>
                         { return "Existing guard"; });
-    REQUIRE(r.player.play());
+    REQUIRE(r.player.play(r.document.underlying()));
     CHECK_FALSE(r.session.start(r.player));
     CHECK(r.document.hasPreview());
     CHECK_FALSE(r.document.edit("Existing guard still applies", {},

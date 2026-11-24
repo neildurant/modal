@@ -42,8 +42,8 @@ struct MetronomeSettings
     friend bool operator==(const MetronomeSettings&, const MetronomeSettings&) = default;
 };
 
-// What comes before the record point when recording: a count-in of metronome clicks, at the
-// tempo and in the meter there, or a pre-roll of the song itself.
+// A count-in of metronome clicks at the tempo and meter at the entry point, or a pre-roll
+// of the song itself.
 struct CountInSettings
 {
     enum class Mode : std::uint8_t
@@ -66,5 +66,7 @@ struct CountInSettings
 
     friend bool operator==(const CountInSettings&, const CountInSettings&) = default;
 };
+
+inline constexpr CountInSettings kDefaultPlaybackLeadIn{.mode = CountInSettings::Mode::None};
 
 } // namespace modal::core

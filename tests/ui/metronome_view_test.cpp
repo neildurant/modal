@@ -81,11 +81,27 @@ TEST_CASE("the leader then m and s, or :metronome, shows every metronome and cou
     CHECK(c.ws.shown() == ViewKind::Metronome);
     CHECK(c.ws.where() == Where::MetronomePage);
     const auto text = c.text();
-    for (const auto* part : {U"Metronome|", U"Before recording|", U"Plays|",   U"While recording",
-                             U"Port|",      U"Default",           U"Channel|", U"Downbeat|",
-                             U"E5",         U"Hi Wood Block",     U"110",      U"Test",
-                             U"Beat|",      U"Low Wood Block",    U"Length|",  U"1/32",
-                             U"Before|",    U"Count-in",          U"Bars",     U"Pre-roll|"})
+    for (const auto* part : {U"Metronome|",
+                             U"Before playback|",
+                             U"Before recording|",
+                             U"Plays|",
+                             U"While recording",
+                             U"Port|",
+                             U"Default",
+                             U"Channel|",
+                             U"Downbeat|",
+                             U"E5",
+                             U"Hi Wood Block",
+                             U"110",
+                             U"Test",
+                             U"Beat|",
+                             U"Low Wood Block",
+                             U"Length|",
+                             U"1/32",
+                             U"Before|",
+                             U"Count-in",
+                             U"Bars",
+                             U"Pre-roll|"})
     {
         CAPTURE(encodeUtf8(part));
         CHECK(contains(text, part));
@@ -94,6 +110,40 @@ TEST_CASE("the leader then m and s, or :metronome, shows every metronome and cou
     c.type(U"ga");
     c.registry.runLine("metronome");
     CHECK(c.ws.shown() == ViewKind::Metronome);
+}
+
+TEST_CASE("the aligned playback lead-in controls edit independently of recording")
+{
+    Clicking c;
+    const auto frame = c.ws.frame();
+    const auto& text = frame.front().text;
+    const auto playback = std::ranges::find(text, U"Before playback", &TextRun::text);
+    const auto recording = std::ranges::find(text, U"Before recording", &TextRun::text);
+    REQUIRE(playback != text.end());
+    REQUIRE(recording != text.end());
+    CHECK(playback->x < recording->x);
+    CHECK(playback->y == recording->y);
+    CHECK(c.document.song().playbackLeadIn == core::kDefaultPlaybackLeadIn);
+    const auto recordSettings = c.countIn();
+
+    c.type(U"6jh");
+    c.press(NamedKey::Enter);
+    c.type(U"c");
+    c.press(NamedKey::Enter);
+    CHECK(c.document.song().playbackLeadIn.mode == core::CountInSettings::Mode::CountIn);
+    c.type(U"j");
+    c.enter(U"3");
+    CHECK(c.document.song().playbackLeadIn.bars == 3);
+    CHECK(c.countIn() == recordSettings);
+    c.type(U"u");
+    CHECK(c.document.song().playbackLeadIn.bars == 1);
+    CHECK(c.countIn() == recordSettings);
+
+    c.type(U" ");
+    CHECK(c.player.leadInPhase() == core::Player::LeadInPhase::CountIn);
+    CHECK(contains(c.text(), U"▶ COUNT"));
+    c.type(U" ");
+    CHECK_FALSE(c.player.playing());
 }
 
 TEST_CASE("on the metronome page, Enter edits a setting, Up and Down step it, each an undo step")

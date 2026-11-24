@@ -221,10 +221,10 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Schedule repeated playback and MIDI state at the join.
     - [x] **Done** — Section, selection and label controls. Accepted on trial.
     - [x] **Done** — Manual and automated validation. See [status.md](status.md).
-- [ ] **To do** — Playback count-in and pre-roll. See [design.md](design.md#metronome-and-count-in).
-    - [ ] **To do** — Save independent song settings and use the lead-in once at playback start.
-    - [ ] **To do** — Add the aligned Before playback controls to the Metronome page.
-    - [ ] **To do** — Update the manual, validate and trial.
+- [ ] **Doing** — Playback count-in and pre-roll. See [design.md](design.md#metronome-and-count-in).
+    - [x] **Done** — Save independent song settings and use the lead-in once at playback start.
+    - [ ] **Doing** — Aligned Before playback controls. Pending desktop trial.
+    - [x] **Done** — Manual and automated validation. See [status.md](status.md).
 - [ ] **To do** — Punch recording using labels or selection boundaries.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.

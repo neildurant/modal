@@ -197,7 +197,7 @@ private:
     bool readVersion(std::span<const Token> tokens);
     bool readSong(std::span<const Token> tokens);
     bool readMetronome(std::span<const Token> tokens);
-    bool readCountIn(std::span<const Token> tokens);
+    bool readCountIn(std::span<const Token> tokens, CountInSettings& settings);
     bool readRecord(std::span<const Token> tokens);
     bool readTrack(std::span<const Token> tokens);
     bool readDrumMap(std::span<const Token> tokens);
@@ -267,6 +267,7 @@ private:
     std::string title_;
     MetronomeSettings metronome_;
     CountInSettings countIn_;
+    CountInSettings playbackLeadIn_ = kDefaultPlaybackLeadIn;
     RecordMode recordMode_ = RecordMode::Replace;
     std::vector<Track> tracks_;
     std::vector<Section> sections_;
@@ -324,6 +325,7 @@ SongReadResult Reader::read(std::string_view text)
     result.song->title = std::move(title_);
     result.song->metronome = std::move(metronome_);
     result.song->countIn = countIn_;
+    result.song->playbackLeadIn = playbackLeadIn_;
     result.song->recordMode = recordMode_;
     return result;
 }
@@ -359,15 +361,17 @@ bool Reader::readLine(std::span<const Token> tokens)
     {
         return readDrumMap(tokens);
     }
-    if (word == "metronome" || word == "countin" || word == "record")
+    if (word == "metronome" || word == "countin" || word == "playback-lead-in" || word == "record")
     {
         if (stage_ != Stage::Header)
         {
             return fail(word + " comes before the sections");
         }
-        return word == "metronome" ? readMetronome(tokens)
-               : word == "countin" ? readCountIn(tokens)
-                                   : readRecord(tokens);
+        if (word == "metronome")
+            return readMetronome(tokens);
+        if (word == "record")
+            return readRecord(tokens);
+        return readCountIn(tokens, word == "countin" ? countIn_ : playbackLeadIn_);
     }
     // marker: labels' old name, so songs saved before they were renamed still open.
     if (word == "meter" || word == "tempo" || word == "label" || word == "marker" || word == "mark")
@@ -521,7 +525,7 @@ bool Reader::readRecord(std::span<const Token> tokens)
     return true;
 }
 
-bool Reader::readCountIn(std::span<const Token> tokens)
+bool Reader::readCountIn(std::span<const Token> tokens, CountInSettings& settings)
 {
     for (const auto& token : tokens.subspan(1))
     {
@@ -537,13 +541,13 @@ bool Reader::readCountIn(std::span<const Token> tokens)
             {
                 return fail("mode should be none, countin or preroll");
             }
-            countIn_.mode = static_cast<CountInSettings::Mode>(it - kModes.begin());
+            settings.mode = static_cast<CountInSettings::Mode>(it - kModes.begin());
             continue;
         }
-        int* field = name == "bars"           ? &countIn_.bars
-                     : name == "beats"        ? &countIn_.beats
-                     : name == "preroll"      ? &countIn_.preRollBars
-                     : name == "prerollbeats" ? &countIn_.preRollBeats
+        int* field = name == "bars"           ? &settings.bars
+                     : name == "beats"        ? &settings.beats
+                     : name == "preroll"      ? &settings.preRollBars
+                     : name == "prerollbeats" ? &settings.preRollBeats
                                               : nullptr;
         if (field == nullptr)
         {
@@ -1639,6 +1643,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.title = song.title;
     result.metronome = song.metronome;
     result.countIn = song.countIn;
+    result.playbackLeadIn = song.playbackLeadIn;
     result.recordMode = song.recordMode;
     return result;
 }
@@ -1672,14 +1677,19 @@ std::string writeSong(const Song& song)
         metronomeLine += " port=" + quotedText(metronome.port);
     }
     line(0, metronomeLine);
-    const auto& countIn = song.countIn;
-    // A pre-roll in beats only when it is one, so songs without stay readable by earlier
-    // versions.
-    line(0, "countin mode=" + std::string{kModes[static_cast<std::size_t>(countIn.mode)]} +
-                " bars=" + std::to_string(countIn.bars) + " beats=" +
-                std::to_string(countIn.beats) + " preroll=" + std::to_string(countIn.preRollBars) +
-                (countIn.preRollBeats > 0 ? " prerollbeats=" + std::to_string(countIn.preRollBeats)
-                                          : std::string{}));
+    const auto writeLeadIn = [&](std::string_view name, const CountInSettings& settings)
+    {
+        const auto mode = kModes[static_cast<std::size_t>(settings.mode)];
+        line(0, std::string{name} + " mode=" + std::string{mode} + " bars=" +
+                    std::to_string(settings.bars) + " beats=" + std::to_string(settings.beats) +
+                    " preroll=" + std::to_string(settings.preRollBars) +
+                    (settings.preRollBeats > 0
+                         ? " prerollbeats=" + std::to_string(settings.preRollBeats)
+                         : std::string{}));
+    };
+    writeLeadIn("countin", song.countIn);
+    if (song.playbackLeadIn != kDefaultPlaybackLeadIn)
+        writeLeadIn("playback-lead-in", song.playbackLeadIn);
     if (song.recordMode == RecordMode::Overdub)
     {
         line(0, "record mode=overdub");

@@ -13,8 +13,8 @@
 namespace modal::ui
 {
 
-// The Metronome page (, m s, decided November 2026): the song's metronome and what comes before
-// recording, a labelled row for each setting, in two groups as the Ports view has them, so
+// The Metronome page (, m s): the song's metronome and what comes before playback or
+// recording, with a labelled row for each setting so
 // every setting can be seen and found. Enter edits the field under the cursor in place, Up and
 // Down stepping it, or opens a list of choices; a digit starts typing a number field straight
 // away. Changing a click's note or velocity plays it, as its Test button does. Its settings are
@@ -78,9 +78,9 @@ public:
 
 private:
     // What a field shows, and what editing it starts with.
-    std::string text(Setting setting, Field field) const;
+    std::string text(Setting setting, Field field, bool playback) const;
     // A field as the editor has it, with its choices if it has a list of them.
-    InspectorField editField(Setting setting, Field field) const;
+    InspectorField editField(Setting setting, Field field, bool playback) const;
     // Starts editing the field under the cursor; false if it has nothing to edit.
     bool startEditing();
     // Sets a field from what's typed, or steps it; why not, if it can't.
@@ -96,6 +96,7 @@ private:
     SongCursor songCursor_;
     std::size_t row_ = 0;
     Field field_ = Field::Value;
+    bool playback_ = false; // which lead-in group the cursor uses on those rows
     WindowLayout layout_;
     CellSize cell_{1, 1};
     int width_ = 0;

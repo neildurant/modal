@@ -31,9 +31,9 @@ Tick preRollStart(const Song& song, Tick recordPoint, const CountInSettings& set
 }
 
 std::optional<PlannedCountIn> planCountIn(const Song& song, Tick recordPoint,
-                                          DestinationId destination)
+                                          DestinationId destination,
+                                          const CountInSettings& settings)
 {
-    const auto& settings = song.countIn;
     const auto& metronome = song.metronome;
     const auto& meter = song.meter();
     const auto signature = meter.signatureAt(recordPoint);
@@ -71,12 +71,10 @@ std::optional<PlannedCountIn> planCountIn(const Song& song, Tick recordPoint,
     return countIn;
 }
 
-} // namespace
-
-RecordStart planRecordStart(const Song& song, Tick recordPoint,
-                            std::optional<DestinationId> metronomeDestination)
+LeadInStart planStart(const Song& song, Tick recordPoint,
+                      std::optional<DestinationId> metronomeDestination,
+                      const CountInSettings& settings)
 {
-    const auto& settings = song.countIn;
     if (!settings.isValid())
     {
         return {recordPoint, std::nullopt};
@@ -88,13 +86,27 @@ RecordStart planRecordStart(const Song& song, Tick recordPoint,
     case CountInMode::CountIn:
         if (metronomeDestination)
         {
-            return {recordPoint, planCountIn(song, recordPoint, *metronomeDestination)};
+            return {recordPoint, planCountIn(song, recordPoint, *metronomeDestination, settings)};
         }
         break;
     case CountInMode::PreRoll:
         return {preRollStart(song, recordPoint, settings), std::nullopt};
     }
     return {recordPoint, std::nullopt};
+}
+
+} // namespace
+
+LeadInStart planRecordStart(const Song& song, Tick recordPoint,
+                            std::optional<DestinationId> metronomeDestination)
+{
+    return planStart(song, recordPoint, metronomeDestination, song.countIn);
+}
+
+LeadInStart planPlaybackStart(const Song& song, Tick entry,
+                              std::optional<DestinationId> metronomeDestination)
+{
+    return planStart(song, entry, metronomeDestination, song.playbackLeadIn);
 }
 
 } // namespace modal::core

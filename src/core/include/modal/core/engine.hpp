@@ -97,7 +97,7 @@ struct EngineSnapshot
     Tick start = 0;
     std::shared_ptr<const std::vector<PlannedEvent>> chased;
     std::shared_ptr<const PlannedCountIn> countIn;
-    std::optional<Tick> loopEnd;
+    std::optional<PlaybackLoop> loop;
     std::shared_ptr<const std::vector<PlannedEvent>> loopChase;
 };
 
@@ -147,7 +147,7 @@ public:
     // Starts playing the current plan from a tick, chasing what's before it, after the
     // count-in if there is one (see planRecordStart). Does nothing without a plan.
     [[nodiscard]] bool play(Tick start, std::optional<PlannedCountIn> countIn = std::nullopt,
-                            std::optional<Tick> loopEnd = std::nullopt);
+                            std::optional<PlaybackLoop> loop = std::nullopt);
 
     // The id of the last play() request, as StampedInput::play gives it.
     std::uint64_t lastPlay() const noexcept { return playRequests_; }

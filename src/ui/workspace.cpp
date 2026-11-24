@@ -3269,12 +3269,12 @@ bool Workspace::transport(std::string_view command)
     bool taken = true;
     if (command == "play-toggle")
     {
-        taken = recording_.pending() ? recording_.stop() : player_->toggle();
+        taken = recording_.pending() ? recording_.stop() : player_->toggle(document_.song());
     }
     else if (command == "play-stop-back")
     {
         const bool was = player_->playing();
-        taken = recording_.pending() ? recording_.stop() : player_->toggle();
+        taken = recording_.pending() ? recording_.stop() : player_->toggle(document_.song());
         returning_ = taken ? was : returning_;
     }
     else if (command == "play-cursor" && recording_.pending())
@@ -3288,7 +3288,7 @@ bool Workspace::transport(std::string_view command)
         player_->setMarker(view().cursor().tick);
         if (command == "play-cursor")
         {
-            taken = player_->play();
+            taken = player_->play(document_.song());
             following_ = following_ || taken;
         }
     }
@@ -3517,8 +3517,8 @@ void Workspace::showPlayhead()
     if (playing)
     {
         // Until the engine starts, show where this play was asked to start.
-        lastPlayhead_ = player_->position().value_or(player_->looping() ? player_->startPosition()
-                                                                        : player_->marker());
+        lastPlayhead_ = player_->position().value_or(
+            player_->recording() ? player_->marker() : player_->startPosition());
         view().showPlayhead(lastPlayhead_, !following_ ? Follow::None
                                            : rewind_   ? Follow::View
                                                        : Follow::Cursor);
@@ -5081,7 +5081,7 @@ void Workspace::playFrom(core::Tick tick)
         return;
     }
     player_->setMarker(tick);
-    if (!player_->play())
+    if (!player_->play(document_.song()))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return;
