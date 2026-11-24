@@ -6,6 +6,12 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Armed punch and loop ranges, 24 November 2026
+
+Next is punch recording. In Normal mode, `, r p` arms the cursor's whole section. In Visual mode it arms the selection's time span. `, r l` opens the two-label chooser. The range stays armed in the open song for successive attempts with `R`, using the recording lead-in. Use a capped dashed bracket in the recording colour and a `PUNCH` status indicator visible while stopped. The separate loop follow-up makes `, L` and `, l L` arm a range for Space, with a solid accent bracket and a `LOOP` indicator. The brackets stack where they overlap. See [design.md](design.md#input-and-recording) and [schedule.md](schedule.md#11-loops-punch-recording-and-takes).
+
+The clear keys, boundary changes while armed, `R` during playback and the exact punch-out behaviour are still [design questions](design.md#to-decide). The current punch-out proposal leaves playback running and commits one undo step, preserving material outside the span actually recorded. Implementation starts with arming the range and showing it.
+
 ### Lead-in on every playback loop pass, 24 November 2026
 
 **Loop lead-in** under **Before playback** sets **First pass** or **Every pass**. The choice is saved with the song. A repeated count-in gives a fresh click before the loop starts again. A repeated pre-roll plays the lead-in music again. Before set to None gives continuous repeats. See [design.md](design.md#metronome-and-count-in).
@@ -14,7 +20,7 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 **Accepted.** Every-pass playback lead-in was accepted on desktop trial. The manual and grammar now mention `gg` and `G` on the Metronome page, where `G` is a quick way to reach Loop lead-in. Punch recording is next on the schedule.
 
-**CI fix.** The [Windows build at `98dfaea`](https://github.com/neildurant/modal/actions/runs/45445973416/job/138629729266) reported MSVC C4456 for two locals called `phase` in the transport display. The playback lead-in local now has its own name.
+**CI fix.** The [Windows build at `98dfaea`](https://github.com/neildurant/modal/actions/runs/45445973416/job/138629729266) reported MSVC C4456 for two locals called `phase` in the transport display. The playback lead-in local now has its own name. [Application CI](https://github.com/neildurant/modal/actions/runs/45448232372) and the [manual workflow](https://github.com/neildurant/modal/actions/runs/45448232360) passed at `8a3a2a8`.
 
 ### Playback count-in and pre-roll, 24 November 2026
 

@@ -873,6 +873,12 @@ Give playback its own values, so a song can use a musical lead-in for practice a
 
 After trial, add **Loop lead-in** as a follow-up. **First pass** keeps continuous repeats by default. **Every pass** lets the player practise an entrance repeatedly with the same count-in or musical context.
 
+## Armed punch and loop ranges (24 November 2026)
+
+Set the punch range first and use `R` to record it. Use the same interaction for loop playback in a separate follow-up. An armed range makes a second attempt one transport key, including after a Visual selection has ended. Capped ruler brackets show the boundaries independently of the editing selection. A solid accent line identifies the loop and a dashed line in the recording colour identifies the punch. Separate status indicators show what is armed even while stopped. See [design.md](design.md#input-and-recording).
+
+Use `, r p` on the cursor's section in Normal mode and on the selection's time in Visual mode. A whole section is a common range for retaking a verse or chorus. Give labels their own `, r l` chooser for passages whose boundaries are marked in the song, including transitions that span sections.
+
 ## Work order (24 November 2026)
 
 Adjusting transforms by ear was moved to the unscheduled list. With rewind on and the play-from marker set, applying a transform and replaying the passage is a short workflow. Revisit live adjustment if restarting regularly gets in the way of comparing settings. Punch recording follows loop playback on the schedule.
