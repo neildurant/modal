@@ -54,7 +54,8 @@ std::u32string toColumn(TrackField field)
 // moved, every port going to one destination.
 struct Playing
 {
-    Playing()
+    explicit Playing(core::Song song = demoSong())
+        : document(std::move(song))
     {
         registry.add(windowCommands());
         ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
@@ -112,7 +113,7 @@ struct Playing
     test::FakeClock clock;
     core::Engine engine{sink, clock};
     core::Player player{engine, [](std::string_view) { return core::DestinationId{1}; }};
-    core::Document document{demoSong()};
+    core::Document document;
     CommandRegistry registry;
     Workspace ws{registry, document};
     EventListView& view = ws.eventList();
@@ -150,6 +151,60 @@ Shown indicator(Playing& p, std::u32string_view word)
 }
 
 } // namespace
+
+TEST_CASE("the loop key uses the current section or Visual selection")
+{
+    Playing p;
+    p.type(U"ga,L");
+    REQUIRE(p.player.looping());
+    CHECK(p.player.startPosition() == 0);
+    CHECK(p.ws.message().starts_with("Looping 1:1:"));
+    CHECK(contains(p.status(), U"LOOP"));
+
+    p.runFor(50ms);
+    p.press(Key::typed(U' '));
+    CHECK_FALSE(p.player.looping());
+    p.runFor(50ms);
+
+    p.type(U"ggv,L");
+    REQUIRE(p.player.looping());
+    CHECK(p.ws.message() == "Looping 1:1:000 to 2:1:000");
+}
+
+TEST_CASE("choosing loop labels remembers both endpoints and loops across sections")
+{
+    auto song = demoSong();
+    const auto join = song.sectionStart(1);
+    const auto q = song.ppqn().quarter();
+    song.setLabel(join - 2 * q, "Earlier");
+    song.setLabel(join - q, "Before join");
+    song.setLabel(join + q, "After join");
+    Playing p{std::move(song)};
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    p.type(U"ga,lLBefore join");
+    p.press(Key::of(NamedKey::Enter));
+    p.type(U"After join");
+    p.press(Key::of(NamedKey::Enter));
+    REQUIRE(p.player.looping());
+    CHECK(p.player.startPosition() == join - q);
+    const auto range = p.ws.message();
+    REQUIRE(range.starts_with("Looping "));
+    const auto duration =
+        p.document.song().tempo().toTime(join + q) - p.document.song().tempo().toTime(join - q);
+    p.runFor(duration + 50ms);
+    CHECK(p.player.position().value() >= join - q);
+    CHECK(p.player.position().value() < join);
+
+    p.type(U",lL");
+    p.press(Key::of(NamedKey::Enter));
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == range);
+
+    p.type(U":loop \"After join\" \"Before join\"");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK(p.ws.message() == "The end of a loop must be after its start");
+    CHECK(p.player.looping());
+}
 
 TEST_CASE("Space plays from the marker and stops where it is; with rewind, the marker stays")
 {

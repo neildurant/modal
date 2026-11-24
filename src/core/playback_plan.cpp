@@ -209,6 +209,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
                          const PlanOptions& options)
 {
     PlaybackPlan plan{song.tempo()};
+    plan.end = song.end();
     plan.song = song.identity();
 
     const auto& metronome = song.metronome;
@@ -368,7 +369,7 @@ PlaybackPlan compilePlan(const Song& song, const DestinationResolver& resolveDes
     return plan;
 }
 
-std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start)
+std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start, bool includeSetup)
 {
     struct TrackChase
     {
@@ -407,15 +408,18 @@ std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start)
     {
         const auto& track = plan.tracks[t];
         const auto& trackChase = chases[t];
-        for (const auto& setup : track.setup)
+        if (includeSetup)
         {
-            PlannedEvent event{};
-            event.time = startTime;
-            event.tick = start;
-            event.track = track.id;
-            event.destination = track.destination;
-            event.message = setup;
-            result.push_back(std::move(event));
+            for (const auto& setup : track.setup)
+            {
+                PlannedEvent event{};
+                event.time = startTime;
+                event.tick = start;
+                event.track = track.id;
+                event.destination = track.destination;
+                event.message = setup;
+                result.push_back(std::move(event));
+            }
         }
         std::vector<std::size_t> values;
         for (const auto& index : trackChase.last)

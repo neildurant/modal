@@ -1340,6 +1340,19 @@ private:
         std::function<void(std::size_t)> chosen;
     };
     std::optional<SongChoice> songChoice_;
+    struct LoopLabelChoice
+    {
+        ChoiceList list;
+        std::vector<std::size_t> labels;
+        std::optional<std::size_t> from;
+    };
+    std::optional<LoopLabelChoice> loopLabelChoice_;
+    std::map<std::uint64_t, std::pair<std::string, std::string>> lastLoopLabels_;
+    std::vector<std::string> loopLabelNames() const;
+    CommandResult loop(std::string_view arguments);
+    CommandResult startLoop(core::Tick from, core::Tick to);
+    CommandResult chooseLoopLabel(std::optional<std::size_t> from = std::nullopt);
+    bool loopLabelKey(const Key& key);
     // The tracks of a file being imported, ticked with Space, which Enter imports by running the
     // line that names them.
     struct TrackImportChoice

@@ -217,7 +217,10 @@ Large-song measurements remain under [Engineering work as needed](#engineering-w
 
 Deliver in this order, building on linear recording:
 
-- [ ] **To do** — Loop playback over a section, selected sections or a selected range.
+- [ ] **Doing** — Loop playback over a section, selection or range between song labels.
+    - [x] **Done** — Schedule repeated playback and MIDI state at the join.
+    - [ ] **Doing** — Section, selection and label controls. Pending desktop trial.
+    - [x] **Done** — Manual and automated validation. See [status.md](status.md).
 - [ ] **To do** — Adjust transforms by ear while a selection loops, with transform presets and palette support where needed.
 - [ ] **To do** — Punch recording using labels or selection boundaries.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.

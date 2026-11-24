@@ -121,6 +121,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                 {
                     return insertEvent(call.arguments);
                 }
+                if (name == "loop")
+                    return loop(call.arguments);
+                if (name == "loop-labels")
+                    return chooseLoopLabel();
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);
@@ -464,6 +468,7 @@ void Workspace::refresh()
 void Workspace::resetForSong()
 {
     songChoice_.reset();
+    loopLabelChoice_.reset();
     drumMapChoice_.reset();
     eventInsertChoice_.reset();
     ++drumMapDialog_;
@@ -1229,6 +1234,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     refused_ = false;
     if (songChoice_)
         return songChoiceKey(key);
+    if (loopLabelChoice_)
+        return loopLabelKey(key);
     if (trackImportChoice_)
         return trackImportKey(key);
     if (recentChoice_)
@@ -3509,8 +3516,9 @@ void Workspace::showPlayhead()
     }
     if (playing)
     {
-        // Until the engine starts, the playhead is at the play-from marker, where it will start.
-        lastPlayhead_ = player_->position().value_or(player_->marker());
+        // Until the engine starts, show where this play was asked to start.
+        lastPlayhead_ = player_->position().value_or(player_->looping() ? player_->startPosition()
+                                                                        : player_->marker());
         view().showPlayhead(lastPlayhead_, !following_ ? Follow::None
                                            : rewind_   ? Follow::View
                                                        : Follow::Cursor);

@@ -29,6 +29,7 @@ struct StatusBarState
     {
         Stopped,
         Playing,
+        Looping,
         CountIn,
         PreRoll,
         Recording,

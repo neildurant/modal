@@ -149,6 +149,8 @@ after counts multiply.
 | `, s s`, `, s l`, `, s f` | Split at bar, label to section, follow meter |
 | `, b i`, `, b d`, `, b m` | Song-bar insert/delete, meter or Visual rebar |
 | Space, Shift-Space | Play/stop, stop and return |
+| `, L` | Loop the current section or Visual selection's time |
+| `, l L`, `:loop START END` | Loop between two song labels |
 | `m` then Space, Ctrl-Space | Set play-from marker, set it and play |
 | `R`, `, r m`, `, r t` | Record, replace/overdub, track Thru |
 | `, r A` | Disarm every armed track |

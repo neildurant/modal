@@ -221,6 +221,29 @@ held for their remaining lengths. Note chase is useful for sustained parts;
 it may be undesirable for drums whose attack should only occur at the
 original note start. The C setting controls notes, not all state restoration.
 
+## Repeating a passage {#sec-loop-playback}
+
+A loop plays a span of time repeatedly so you can listen to a phrase or a
+transition in context. Use `, L` to hear the cursor's section. To loop a shorter
+passage, select its time in Visual mode first. Selecting a run of sections on
+the section strip loops all of them. The transport shows **LOOP**, and Space
+stops it. Mute and Solo work as they do in ordinary playback.
+
+Song labels give a passage reusable endpoints. For example, put a label one
+bar before a chorus and another one bar into it. Use `, l L` to choose the
+first label and then the second. In each list, type part of the label name to
+narrow the choices or use Up and Down to move through them. Enter accepts the
+highlighted label. Playback returns to the first label as soon as it reaches
+the second. The next time you open the chooser in the same song, Enter can
+accept each previous choice if the labels are still available. Labels are
+saved with the song, so the same passage can be chosen after reopening it.
+You can also enter `:loop "Before chorus" "After chorus"` at the prompt.
+
+At each return, Modal releases notes and pedals held over the end and restores
+the controller and instrument changes it can find before the start. A value
+changed inside the loop with no earlier event keeps its current value. A note
+already sounding at the start is heard again if its track chases notes.
+
 ## Preparing a recording
 
 Recording has three song-level choices: where it starts, what precedes it,

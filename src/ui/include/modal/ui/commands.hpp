@@ -49,8 +49,9 @@ enum class Choices : std::uint8_t
     FreezePart,  // all, or one playback transform to commit to events
     Query,       // a search's terms: keywords, and keys after inside and outside
     Pitch,       // a drum name or note spelling
+    Label,       // a song label, qualified by section when its name repeats
 };
-inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Pitch) + 1;
+inline constexpr std::size_t kChoicesCount = static_cast<std::size_t>(Choices::Label) + 1;
 
 // Where a command does something, for the hint menu and the palette to offer only what works
 // there (decided October 2026): each view, the arrangement's section strip apart from its tracks.

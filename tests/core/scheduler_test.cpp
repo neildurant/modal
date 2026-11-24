@@ -109,6 +109,95 @@ TEST_CASE("events sent late keep their order and their intended times")
                        });
 }
 
+TEST_CASE("a loop releases held notes and pedals and chases the start without repeating setup")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.programSetup.program = 9;
+                 track.events.insert({0, ControlChange{7, 90}});
+                 track.events.insert({q, Note{60, 100, 2 * q}});
+                 track.events.insert({q + q / 2, ControlChange{64, 127}});
+                 track.events.insert({q + q / 2, ControlChange{7, 50}});
+                 track.events.insert({2 * q, Note{62, 100, q}});
+             });
+    const auto plan = compilePlan(song, byPortName);
+    const auto initial = chase(plan, q);
+    const auto repeat = chase(plan, q, false);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(q, initial, kNow, nullptr, 2 * q, repeat);
+
+    runUntil(scheduler, kNow + 500ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0xC0, 9}, kNow},
+                           {{1}, {0xB0, 7, 90}, kNow},
+                           {{1}, {0x90, 60, 100}, kNow},
+                           {{1}, {0xB0, 64, 127}, kNow + 250ms},
+                           {{1}, {0xB0, 7, 50}, kNow + 250ms},
+                           {{1}, {0x80, 60, 64}, kNow + 500ms},
+                           {{1}, {0xB0, 64, 0}, kNow + 500ms},
+                           {{1}, {0xB0, 7, 90}, kNow + 500ms},
+                           {{1}, {0x90, 60, 100}, kNow + 500ms},
+                       });
+    CHECK(scheduler.position(kNow + 500ms) == q);
+    CHECK_FALSE(scheduler.finished());
+    scheduler.stop(kNow + 550ms);
+    CHECK(sink.sent.back() == Sent{{1}, {0x80, 60, 64}, kNow + 550ms});
+    CHECK_FALSE(scheduler.nextWakeTime());
+}
+
+TEST_CASE("a silent loop retains its tempo and phase after a late wake")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    song.updateTempo([&](TempoMap& tempo) { tempo.set(q, Tempo{1'000'000}); });
+    const auto plan = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, {}, kNow, nullptr, 2 * q);
+
+    CHECK_FALSE(scheduler.finished());
+    CHECK(scheduler.nextWakeTime() == kNow + 1500ms);
+    scheduler.sendDue(kNow + 4750ms);
+    CHECK(scheduler.position(kNow + 4750ms) == q / 2);
+    CHECK(scheduler.nextWakeTime() == kNow + 6s);
+    CHECK(sink.sent.empty());
+}
+
+TEST_CASE("offset events play only within their loop pass")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.timeOffset = -40ms;
+                 track.events.insert({q, Note{60, 100, q / 2}});
+                 track.events.insert({2 * q, Note{62, 100, q / 2}});
+             });
+    const auto plan = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(q, {}, kNow, nullptr, 2 * q);
+
+    runUntil(scheduler, kNow + 760ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0x90, 60, 100}, kNow},
+                           {{1}, {0x80, 60, 64}, kNow + 250ms},
+                           {{1}, {0x90, 60, 100}, kNow + 540ms},
+                           {{1}, {0x80, 60, 64}, kNow + 750ms},
+                       });
+}
+
 TEST_CASE("a note ending as the same pitch starts is ended first")
 {
     const auto ppqn = MODAL_ANY_PPQN();

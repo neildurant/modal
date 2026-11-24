@@ -88,6 +88,7 @@ public:
     // Plays from the marker, starting again there if already playing. Each returns whether the
     // engine took the request; if not, its queue full, nothing changes here either.
     [[nodiscard]] bool play();
+    [[nodiscard]] bool playLoop(Tick from, Tick to);
     [[nodiscard]] bool stop();
 
     // Records from the marker onto the song's armed tracks (see Recorder), in the song's record
@@ -164,6 +165,8 @@ public:
     bool poll();
 
     bool playing() const { return playing_; }
+    bool looping() const { return playing_ && looping_; }
+    Tick startPosition() const { return started_; }
 
     // Takes the MIDI input the engine has passed back since last asked, so its queue never
     // fills, and returns how many messages there were. Recording keeps them, in a later step.
@@ -189,6 +192,7 @@ private:
     // A port's destination, looked up once, without noting it missing.
     std::optional<DestinationId> lookUp(const std::string& port);
     std::shared_ptr<const PlaybackPlan> compile(const Song& song);
+    bool playAt(Tick from, std::optional<Tick> end);
 
     // Notes that playback stopped: where the engine was last seen, until it says where.
     void noteStopped();
@@ -207,6 +211,7 @@ private:
     Tick marker_ = 0;
     bool rewind_ = true;
     bool playing_ = false;
+    bool looping_ = false;
     std::uint64_t play_ = 0;             // the engine's id for the last play
     Tick started_ = 0;                   // where the last play started
     bool stopExact_ = true;              // whether the engine has said where the last play stopped

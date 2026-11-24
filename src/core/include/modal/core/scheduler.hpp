@@ -65,7 +65,8 @@ public:
     // force, when the next play sends it. Stopped, a changed setup is sent at once. None of
     // this applies when the plan is of a different song. A track whose quantise changes doesn't
     // send again what it has sent, though the new timing puts it ahead of the playhead.
-    void setPlan(const PlaybackPlan& plan, std::chrono::nanoseconds now) noexcept;
+    void setPlan(const PlaybackPlan& plan, std::chrono::nanoseconds now,
+                 std::span<const PlannedEvent> loopChase = {}) noexcept;
 
     // Starts playing from a tick, after sending the chased events (from chase()). With a
     // lead-in or a count-in, the start tick is reached after the longer of the two; the
@@ -74,7 +75,8 @@ public:
     // sounding end first, and the pedals held down come up. Does nothing without a plan. The caller
     // keeps the count-in alive while the scheduler uses it.
     void play(Tick start, std::span<const PlannedEvent> chased, std::chrono::nanoseconds now,
-              const PlannedCountIn* countIn = nullptr) noexcept;
+              const PlannedCountIn* countIn = nullptr, std::optional<Tick> loopEnd = std::nullopt,
+              std::span<const PlannedEvent> loopChase = {}) noexcept;
 
     // Ends the notes sounding, lets up each pedal (sustain, sostenuto or soft) playback left
     // down, on just the channels where it's down, and stops, with the stop options.
@@ -155,6 +157,8 @@ private:
 
     // Whether every event has been sent and every note ended, clicks aside.
     bool songDone() const noexcept;
+    void wrap(std::chrono::nanoseconds boundary, std::chrono::nanoseconds now) noexcept;
+    std::chrono::nanoseconds eventTime(const PlannedEvent& event) const noexcept;
     // When the next click is due, if the metronome is still to click.
     std::optional<Tick> clickDue() const noexcept;
     // When the next count-in click is due, in plan time, if there's one to come.
@@ -195,6 +199,9 @@ private:
     // What a play chased: its values are sent at once and its notes when the song starts, after
     // any count-in, all at one time. Empty once all are sent.
     std::span<const PlannedEvent> chased_;
+    std::optional<Tick> loopEnd_; // exclusive, with startTick_ as the inclusive start
+    std::span<const PlannedEvent> loopChase_;
+    std::optional<std::chrono::nanoseconds> loopFloor_; // earliest send time after a wrap
     bool chasedValuesSent_ = true;
     std::chrono::nanoseconds played_{0}; // when the last play began, on the caller's clock
 

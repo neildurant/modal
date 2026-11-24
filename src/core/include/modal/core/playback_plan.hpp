@@ -145,6 +145,7 @@ struct PlaybackPlan
     }
 
     TempoMap tempo;
+    Tick end = 0;
     std::uint64_t song = 0;           // which song this came from (see Song::identity)
     std::vector<PlannedEvent> events; // by time; at equal times, in track and stored order
     std::vector<PlannedTrack> tracks; // the tracks in the plan, in song order
@@ -209,6 +210,6 @@ inline constexpr std::size_t kChaseSlots = 123;
 // bend and channel pressure before the start, in the order they were sent; and then (for tracks
 // with note chasing on) the notes still sounding, which end at their usual time. Every event is
 // timed to send at the start of playback.
-std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start);
+std::vector<PlannedEvent> chase(const PlaybackPlan& plan, Tick start, bool includeSetup = true);
 
 } // namespace modal::core

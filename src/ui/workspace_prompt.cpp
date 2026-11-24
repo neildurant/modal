@@ -299,6 +299,10 @@ std::vector<std::string> Workspace::choices(Choices kind, std::string_view word)
             found.push_back(section->name());
         }
         return found;
+    case Choices::Label:
+        for (const auto& label : loopLabelNames())
+            found.push_back(quotedArgument(label));
+        return found;
     case Choices::Role:
         for (std::size_t i = 0; i < kRoleCount; ++i)
         {

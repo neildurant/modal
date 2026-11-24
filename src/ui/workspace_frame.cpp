@@ -108,6 +108,13 @@ Frame Workspace::frame() const
         frame.push_back(drumMapChoiceRegion());
     if (songChoice_)
         frame.push_back(songChoiceRegion());
+    if (loopLabelChoice_)
+    {
+        const auto row = messageRow();
+        const int margin = BarSpacing::forCell(cell_).margin;
+        const Rect field{margin, row.y, 26 * cell_.width, row.height};
+        frame.push_back(loopLabelChoice_->list.region(field, {0, 0, width_, row.y}, cell_));
+    }
     if (trackImportChoice_)
         frame.push_back(trackImportRegion());
     if (recentChoice_)
@@ -330,6 +337,12 @@ Bar Workspace::messageBar(bool withMessage) const
         typing("Insert event: ", eventInsertChoice_->typed());
         row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
     }
+    else if (loopLabelChoice_)
+    {
+        typing(loopLabelChoice_->from ? "Loop end: " : "Loop start: ",
+               loopLabelChoice_->list.typed());
+        row.right.push_back({"Type to narrow · ↑↓ choose · Enter accepts · Esc cancels", dim});
+    }
     else if (recentChoice_)
     {
         typing("Recent songs: ", recentChoice_->list->typed());
@@ -415,7 +428,7 @@ Bar Workspace::statusBar() const
     StatusBarState state;
     using StatusMode = StatusBarState::Mode;
     state.mode = drumMapChoice_ || filePicker_ || eventInsertChoice_ || songChoice_ ||
-                         trackImportChoice_ || recentChoice_ || backupChoice_
+                         trackImportChoice_ || recentChoice_ || backupChoice_ || loopLabelChoice_
                      ? StatusMode::Edit
                  : freezeChoice_   ? StatusMode::Freeze
                  : trackMove_      ? StatusMode::Move
@@ -431,7 +444,9 @@ Bar Workspace::statusBar() const
         const auto at = playing.value_or(player_->marker());
         const auto place = placeParts(song, view().cursorMeter(), at);
         using TransportState = StatusBarState::TransportState;
-        auto transportState = playing ? TransportState::Playing : TransportState::Stopped;
+        auto transportState = player_->looping() ? TransportState::Looping
+                              : playing          ? TransportState::Playing
+                                                 : TransportState::Stopped;
         if (const auto phase = player_->recordPhase())
         {
             using enum core::Player::RecordPhase;

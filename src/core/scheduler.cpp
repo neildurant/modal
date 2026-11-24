@@ -51,7 +51,8 @@ Scheduler::Scheduler(MessageSink& sink, StopOptions options)
     pedals_.reserve(kMaxHeldPedals);
 }
 
-void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
+void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now,
+                        std::span<const PlannedEvent> loopChase) noexcept
 {
     rememberDestinations(plan);
     const PlaybackPlan* const old = plan_ != nullptr && plan_->song == plan.song ? plan_ : nullptr;
@@ -81,6 +82,11 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now) noexcept
                                      : remap(now - origin_, plan_->tempo, plan.tempo);
     origin_ = now - position;
     plan_ = &plan;
+    loopChase_ = loopChase;
+    if (loopFloor_)
+    {
+        loopFloor_ = plan.tempo.toTime(startTick_);
+    }
 
     for (std::size_t i = 0; i < sounding_.size();)
     {
@@ -253,7 +259,8 @@ bool Scheduler::takeAlreadySent(const PlannedEvent& event) noexcept
 bool Scheduler::passed(const PlannedEvent& event, nanoseconds position) const noexcept
 {
     // Those before where playback started were chased, even if a lead-in hasn't reached them.
-    return event.time <= position || event.tick < startTick_;
+    return (!loopEnd_ || event.tick < *loopEnd_) &&
+           (eventTime(event) <= position || event.tick < startTick_);
 }
 
 void Scheduler::sendSetup(const PlannedTrack& track, nanoseconds now) noexcept
@@ -313,7 +320,8 @@ void Scheduler::catchUp(const PlannedTrack& track, nanoseconds position, nanosec
 }
 
 void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanoseconds now,
-                     const PlannedCountIn* countIn) noexcept
+                     const PlannedCountIn* countIn, std::optional<Tick> loopEnd,
+                     std::span<const PlannedEvent> loopChase) noexcept
 {
     if (plan_ == nullptr)
     {
@@ -329,6 +337,9 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     const nanoseconds startTime = plan_->tempo.toTime(start) - lead;
     playing_ = true;
     startTick_ = start;
+    loopEnd_ = loopEnd && *loopEnd > start ? loopEnd : std::nullopt;
+    loopChase_ = loopChase;
+    loopFloor_.reset();
     origin_ = now - startTime;
     countIn_ = countIn;
     nextCountIn_ = 0;
@@ -359,6 +370,8 @@ void Scheduler::stop(nanoseconds now) noexcept
     endAllNotes(now);
     releasePedals(now);
     playing_ = false;
+    loopEnd_.reset();
+    loopChase_ = {};
     chased_ = {};
     chasedValuesSent_ = true;
     nextClick_.reset();
@@ -394,6 +407,8 @@ void Scheduler::panic(nanoseconds now) noexcept
     endAllNotes(now);
     pedals_.clear(); // Reset All Controllers lets them up
     playing_ = false;
+    loopEnd_.reset();
+    loopChase_ = {};
     chased_ = {};
     chasedValuesSent_ = true;
     nextClick_.reset();
@@ -417,10 +432,9 @@ void Scheduler::sendDue(nanoseconds now) noexcept
     // The chased events go at once, track by track, each one's values before its notes. Before
     // a count-in, only the values do: the notes wait for the song to start, as it's silent
     // until then (found in a code review, November 2026).
-    const nanoseconds position = now - origin_;
     if (!chasedValuesSent_)
     {
-        const bool notesToo = chased_.front().time <= position;
+        const bool notesToo = chased_.front().time <= now - origin_;
         for (const auto& event : chased_)
         {
             if (notesToo)
@@ -441,12 +455,14 @@ void Scheduler::sendDue(nanoseconds now) noexcept
     const auto& events = plan_->events;
     for (;;)
     {
+        const nanoseconds position = now - origin_;
         // The earliest thing due; at equal times, the first considered.
         enum class Due : std::uint8_t
         {
             Nothing,
             NoteOff,
             ClickOff,
+            Wrap,
             Click,
             CountInClick,
             Chased,
@@ -471,6 +487,10 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         {
             consider(Due::ClickOff, click_->end - origin_);
         }
+        if (loopEnd_)
+        {
+            consider(Due::Wrap, plan_->tempo.toTime(*loopEnd_));
+        }
         const auto click = clickDue();
         if (click)
         {
@@ -486,7 +506,7 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         }
         if (next_ < events.size())
         {
-            consider(Due::Event, events[next_].time);
+            consider(Due::Event, eventTime(events[next_]));
         }
 
         switch (due)
@@ -498,6 +518,9 @@ void Scheduler::sendDue(nanoseconds now) noexcept
             break;
         case Due::ClickOff:
             endClick(origin_ + dueTime);
+            break;
+        case Due::Wrap:
+            wrap(origin_ + dueTime, now);
             break;
         case Due::Click:
             sendClick(*click);
@@ -518,14 +541,47 @@ void Scheduler::sendDue(nanoseconds now) noexcept
         case Due::Event:
         {
             const auto& event = events[next_++];
-            if (event.tick >= startTick_ && (alreadySentCount_ == 0 || !takeAlreadySent(event)))
+            if (event.tick >= startTick_ && (!loopEnd_ || event.tick < *loopEnd_) &&
+                (!loopFloor_ || !event.isNoteOn() || event.noteOffTime > dueTime) &&
+                (alreadySentCount_ == 0 || !takeAlreadySent(event)))
             {
-                send(event);
+                sendAt(event, origin_ + dueTime);
             }
             break;
         }
         }
     }
+}
+
+void Scheduler::wrap(nanoseconds boundary, nanoseconds now) noexcept
+{
+    endAllNotes(boundary);
+    releasePedals(boundary);
+
+    const auto start = plan_->tempo.toTime(startTick_);
+    const auto length = plan_->tempo.toTime(*loopEnd_) - start;
+    // Keep the phase after a late wake, without sending passes that have already ended.
+    const auto restart = now - (now - boundary) % length;
+    origin_ = restart - start;
+    loopFloor_ = start;
+    next_ = plan_->firstAtOrAfter(start - plan_->leadIn);
+    alreadySentCount_ = 0;
+    if (plan_->metronome)
+    {
+        nextClick_ = plan_->metronome->meter.beatAtOrAfter(startTick_);
+    }
+    for (const auto& event : loopChase_)
+    {
+        if (!event.isNoteOn() || event.noteOffTime > start)
+        {
+            sendAt(event, restart);
+        }
+    }
+}
+
+nanoseconds Scheduler::eventTime(const PlannedEvent& event) const noexcept
+{
+    return loopFloor_ ? std::max(event.time, *loopFloor_) : event.time;
 }
 
 std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
@@ -541,9 +597,13 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
     std::optional<nanoseconds> next;
     if (next_ < plan_->events.size())
     {
-        next = plan_->events[next_].time;
+        next = eventTime(plan_->events[next_]);
     }
     const auto earliest = [&](nanoseconds time) { next = next ? std::min(*next, time) : time; };
+    if (loopEnd_)
+    {
+        earliest(plan_->tempo.toTime(*loopEnd_));
+    }
     if (!chased_.empty())
     {
         earliest(chased_.front().time);
@@ -573,7 +633,7 @@ std::optional<nanoseconds> Scheduler::nextWakeTime() const noexcept
 
 bool Scheduler::finished() const noexcept
 {
-    return playing_ && songDone() && !clickDue() && !click_ && !countInDue();
+    return playing_ && !loopEnd_ && songDone() && !clickDue() && !click_ && !countInDue();
 }
 
 std::optional<nanoseconds> Scheduler::countInDue() const noexcept
@@ -592,7 +652,8 @@ bool Scheduler::songDone() const noexcept
 
 std::optional<Tick> Scheduler::clickDue() const noexcept
 {
-    if (!nextClick_ || (!plan_->metronome->pastEnd && songDone()))
+    if (!nextClick_ ||
+        (loopEnd_ ? *nextClick_ >= *loopEnd_ : (!plan_->metronome->pastEnd && songDone())))
     {
         return std::nullopt;
     }

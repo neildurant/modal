@@ -33,16 +33,22 @@ bool Engine::setPlan(std::shared_ptr<const PlaybackPlan> plan)
     // Input retains the mapping alone, so delayed collection cannot pin whole old plans.
     next.inputTempo = std::make_shared<const TempoMap>(plan->tempo);
     next.plan = std::move(plan);
+    if (next.loopEnd)
+    {
+        next.loopChase =
+            std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, next.start, false));
+    }
     return publish(std::move(next)) && woken(true);
 }
 
-bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
+bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn, std::optional<Tick> loopEnd)
 {
     if (!latest_)
     {
-        return true;
+        return !loopEnd;
     }
-    if (commands_.full())
+    if (commands_.full() ||
+        (loopEnd && (countIn || start < 0 || start >= *loopEnd || *loopEnd > latest_->plan->end)))
     {
         return false;
     }
@@ -51,6 +57,10 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn)
     next.start = start;
     next.chased = std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start));
     next.countIn = countIn ? std::make_shared<const PlannedCountIn>(std::move(*countIn)) : nullptr;
+    next.loopEnd = loopEnd;
+    next.loopChase =
+        loopEnd ? std::make_shared<const std::vector<PlannedEvent>>(chase(*next.plan, start, false))
+                : nullptr;
     PlayData data{playRequests_ + 1, next.chased, next.countIn};
     if (!publish(std::move(next)))
     {
@@ -229,9 +239,12 @@ EngineWake Engine::step() noexcept
         {
             takeInput(input, before, kMaxInputs * InputQueue::kCapacity);
         }
-        const auto& plan = *snapshots_.current()->plan;
-        scheduler_.setPlan(plan, now);
-        thru_.setTargets(plan.thru);
+        const auto& snapshot = *snapshots_.current();
+        const auto loopChase = snapshot.playRequest == currentPlay_ && snapshot.loopChase
+                                   ? std::span<const PlannedEvent>{*snapshot.loopChase}
+                                   : std::span<const PlannedEvent>{};
+        scheduler_.setPlan(*snapshot.plan, now, loopChase);
+        thru_.setTargets(snapshot.plan->thru);
     }
 
     takeInput(input, snapshots_.current());
@@ -285,7 +298,11 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
         if (snapshot->playRequest == command.request) // otherwise a later Play replaced it
         {
             noteStop(now);
-            scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get());
+            const auto loopChase = snapshot->loopChase
+                                       ? std::span<const PlannedEvent>{*snapshot->loopChase}
+                                       : std::span<const PlannedEvent>{};
+            scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get(),
+                            snapshot->loopEnd, loopChase);
             currentPlay_ = command.request;
             // After the scheduler has let go of the play before's chased events and count-in.
             startedPlay_.store(command.request, std::memory_order_release);

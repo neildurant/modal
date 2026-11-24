@@ -329,6 +329,8 @@ While recording or waiting for its take to finish after stopping, save, export, 
 
 `Space` plays from the play-from marker (▶) or stops where it is; `Shift-Space` stops and goes back to where the cursor was; `m Space` puts the marker at the cursor; `Ctrl-Space` puts it there and plays; `, T Space` turns rewind on and off; `Ctrl-.` panics. `R` records onto the armed tracks from the marker, after the song's count-in, and `Space` stops, the take going in as one undo step; `, r m` switches the song between replacing what's there and overdubbing it. `:countin 2`, `:countin 3 beats`, `:countin off`, `:preroll 2` and `:preroll 3 beats` set what comes before recording.
 
+`, L` loops the cursor's section or the Visual selection's time span. `, l L` chooses a start and end from the song's labels, with the previous pair preselected when available. `:loop START END` takes names directly, with double quotes around names containing spaces. Playback wraps before the end label, and Space stops the loop.
+
 ## The Metronome page
 
 `, m s` or `:metronome`. `j` / `k` move between settings and `h` / `l` between a row's fields: a click's note, velocity and Test button, or a count-in's or pre-roll's number and Bars or Beats. Enter edits a typed value in place, Up and Down step it, Enter sets it and Escape leaves it; a digit on a number field starts typing it straight away. Fields marked `▾` open a drop-down list with Enter: Up and Down or `j` / `k` choose, a letter goes to a choice starting with it (the port's list narrows to what's typed instead), Enter takes it and Escape leaves it. Enter on Test plays the click, as changing its note or velocity does. Each change is an undo step.

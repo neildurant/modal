@@ -81,18 +81,18 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         using TransportState = StatusBarState::TransportState;
         std::string word = "■ STOP";
         Style stateStyle{Role::IndicatorText, Role::Indicator, kPlain};
-        if (place.state != TransportState::Stopped && place.state != TransportState::Playing)
+        if (place.state == TransportState::Playing || place.state == TransportState::Looping)
+        {
+            word = place.state == TransportState::Looping ? "↻ LOOP" : "▶ PLAY";
+            stateStyle = {Role::IndicatorLitText, Role::Accent, kBold};
+        }
+        else if (place.state != TransportState::Stopped)
         {
             word = place.state == TransportState::CountIn       ? "● COUNT"
                    : place.state == TransportState::PreRoll     ? "● PRE"
                    : place.state == TransportState::Overdubbing ? "● ODUB"
                                                                 : "● REC";
             stateStyle = {Role::IndicatorLitText, Role::IndicatorArm, kBold};
-        }
-        else if (place.state == TransportState::Playing)
-        {
-            word = "▶ PLAY";
-            stateStyle = {Role::IndicatorLitText, Role::Accent, kBold};
         }
         segments.push_back({" " + padText(word, 7, false) + " ", stateStyle});
         gap();

@@ -256,11 +256,21 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
 
 bool Player::play()
 {
+    return playAt(marker_, std::nullopt);
+}
+
+bool Player::playLoop(Tick from, Tick to)
+{
+    return !recorder_ && playAt(from, to);
+}
+
+bool Player::playAt(Tick from, std::optional<Tick> end)
+{
     if (waiting_ && engine_.setPlan(waiting_))
     {
         waiting_.reset();
     }
-    if (!engine_.play(marker_))
+    if (!engine_.play(from, std::nullopt, end))
     {
         return false;
     }
@@ -270,7 +280,8 @@ bool Player::play()
     }
     play_ = engine_.lastPlay();
     playing_ = true;
-    started_ = marker_;
+    looping_ = end.has_value();
+    started_ = from;
     return true;
 }
 
@@ -317,6 +328,7 @@ void Player::noteStopped()
     stoppedAt(position().value_or(started_));
     stopExact_ = false;
     playing_ = false;
+    looping_ = false;
 }
 
 void Player::stoppedAt(Tick tick)
