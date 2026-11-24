@@ -33,10 +33,10 @@ std::span<const TrackId> RecordingSession::tracks() const
     return take_ ? std::span<const TrackId>{take_->tracks} : std::span<const TrackId>{};
 }
 
-bool RecordingSession::start(Player& player)
+bool RecordingSession::start(Player& player, std::optional<ArmedSpan> punch)
 {
     if (pending() || player.playing() || player.stopping() ||
-        !player.record(document_.underlying()))
+        !player.record(document_.underlying(), punch))
     {
         return false;
     }
@@ -70,7 +70,8 @@ bool RecordingSession::inputLost() const
 std::optional<RecordingSession::Completion> RecordingSession::finish(const EditPlace& place,
                                                                      std::string title)
 {
-    if (!take_ || take_->player->playing())
+    // Stopped, or punched out with playback carrying on.
+    if (!take_ || (take_->player->playing() && !take_->player->punchedOut()))
     {
         return std::nullopt;
     }

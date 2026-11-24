@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <optional>
@@ -63,6 +64,7 @@ struct Recording
     Player player{engine, [](std::string_view) { return DestinationId{1}; }};
     Document document;
     RecordingSession session{document};
+    std::chrono::nanoseconds started{};
 };
 
 } // namespace
@@ -368,4 +370,157 @@ TEST_CASE("recording-session completion preserves other edits and gives the take
     REQUIRE(r.document.undo());
     CHECK(r.document.underlying().events(r.other()).empty());
     CHECK_FALSE(r.document.canUndo());
+}
+
+namespace
+{
+
+// Runs the engine on to a time after recording started, a little at a time, as the window's
+// frames would.
+void runTo(Recording& r, std::chrono::nanoseconds after)
+{
+    const auto time = r.started + after;
+    while (r.clock.time + 20ms <= time)
+        r.advance(20ms);
+    if (r.clock.time < time)
+        r.advance(time - r.clock.time);
+}
+
+Tick noteEnd(const Event& event)
+{
+    return event.tick + std::get<Note>(event.data).duration;
+}
+
+const Event* eventAt(const EventList& events, Tick tick, bool note)
+{
+    for (const auto& event : events.all())
+        if (event.tick == tick && event.isNote() == note)
+            return &event;
+    return nullptr;
+}
+
+} // namespace
+
+TEST_CASE("a punch records only its range, ending there as playback carries on")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto bar = ppqn.whole();
+    Recording r{ppqn};
+    // A bar's pre-roll before punching in at bar 2, out at bar 3. The old part: a note running
+    // into the range, one inside it, one after it, and the sustain pedal down throughout.
+    r.document.edit("Set up", {},
+                    [&](Song& song)
+                    {
+                        song.countIn.mode = CountInSettings::Mode::PreRoll;
+                        song.updateEvents(r.lead(),
+                                          [&](EventList& events)
+                                          {
+                                              events.insert({0, ControlChange{64, 127}});
+                                              events.insert({0, Note{40, 90, 2 * bar}});
+                                              events.insert({bar + q, Note{41, 90, q}});
+                                              events.insert({2 * bar + q, Note{42, 90, q}});
+                                              events.insert({3 * bar, ControlChange{64, 0}});
+                                          });
+                    });
+    REQUIRE(r.session.start(r.player, ArmedSpan{bar, 2 * bar}));
+    r.started = r.clock.time;
+    r.step();
+    CHECK(r.player.recordPhase() == Player::RecordPhase::PreRoll);
+
+    runTo(r, 1000ms);           // the pre-roll's third beat
+    r.receive({0x90, 50, 100}); // held into the range: starts at punch-in
+    runTo(r, 1500ms);
+    r.receive({0x90, 51, 100}); // played and let go in the pre-roll: dropped
+    runTo(r, 1600ms);
+    r.receive({0x80, 51, 0});
+    runTo(r, 2250ms);
+    r.receive({0x80, 50, 0});
+    CHECK(r.player.recordPhase() == Player::RecordPhase::Recording);
+    runTo(r, 3000ms);
+    r.receive({0x90, 60, 100}); // held past punch-out: ends there
+    runTo(r, 3900ms);
+    CHECK(r.session.state() == RecordingSession::State::Recording);
+
+    // Past punch-out: recording ends, playback carries on, and the take goes in as one step.
+    runTo(r, 4100ms);
+    CHECK(r.player.punchedOut());
+    CHECK_FALSE(r.player.recording());
+    CHECK(r.session.state() == RecordingSession::State::Finishing);
+    const auto steps = r.document.version();
+    const auto completed = r.session.finish({}, "Record Lead");
+    REQUIRE(completed);
+    CHECK(completed->changed);
+    CHECK(r.document.version() != steps);
+    CHECK(r.player.playing());
+    CHECK(r.session.state() == RecordingSession::State::Idle);
+
+    const auto& events = r.document.underlying().events(r.lead());
+    const auto* cut = eventAt(events, 0, true);
+    REQUIRE(cut != nullptr);
+    CHECK(noteEnd(*cut) == bar); // the old note cut at punch-in
+    const auto* held = eventAt(events, bar, true);
+    REQUIRE(held != nullptr);
+    CHECK(std::get<Note>(held->data).pitch == 50);
+    CHECK(noteEnd(*held) == bar + q / 2);
+    CHECK_FALSE(eventAt(events, bar + q, true)); // the old note inside it gone
+    const auto* last = eventAt(events, bar + 2 * q, true);
+    REQUIRE(last != nullptr);
+    CHECK(std::get<Note>(last->data).pitch == 60);
+    CHECK(noteEnd(*last) == 2 * bar);
+    CHECK(eventAt(events, 2 * bar + q, true)); // after it, kept
+    // The pedal let up at punch-in and put down again at punch-out, as it was there.
+    const auto* up = eventAt(events, bar, false);
+    REQUIRE(up != nullptr);
+    CHECK(up->data == EventData{ControlChange{64, 0}});
+    const auto* down = eventAt(events, 2 * bar, false);
+    REQUIRE(down != nullptr);
+    CHECK(down->data == EventData{ControlChange{64, 127}});
+    const auto notes = std::ranges::count_if(events.all(), &Event::isNote);
+    CHECK(notes == 4);
+
+    // Played after punch-out: nothing more recorded.
+    r.receive({0x90, 70, 100});
+    runTo(r, 4500ms);
+    CHECK(std::ranges::count_if(r.document.underlying().events(r.lead()).all(), &Event::isNote) ==
+          4);
+    REQUIRE(r.player.stop());
+    REQUIRE(r.document.undo());
+    CHECK(eventAt(r.document.underlying().events(r.lead()), bar + q, true));
+}
+
+TEST_CASE("a punch stopped early records to the stop, and overdubbing keeps what's there")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto bar = ppqn.whole();
+    const bool overdub = GENERATE(false, true);
+    Recording r{ppqn};
+    r.document.edit("Set up", {},
+                    [&](Song& song)
+                    {
+                        song.recordMode = overdub ? RecordMode::Overdub : RecordMode::Replace;
+                        song.updateEvents(r.lead(), [&](EventList& events)
+                                          { events.insert({bar + 3 * q, Note{41, 90, q}}); });
+                    });
+    // No lead-in: playing starts at punch-in.
+    REQUIRE(r.session.start(r.player, ArmedSpan{bar, 3 * bar}));
+    r.started = r.clock.time;
+    r.step();
+    CHECK(r.player.recordPhase() == Player::RecordPhase::Recording);
+    runTo(r, 500ms);
+    r.receive({0x90, 60, 100});
+    runTo(r, 1000ms);
+    REQUIRE(r.session.stop());
+    r.step();
+    runTo(r, 1100ms);
+    const auto completed = r.session.finish({}, "Record Lead");
+    REQUIRE(completed);
+    CHECK_FALSE(r.player.playing());
+    const auto& events = r.document.underlying().events(r.lead());
+    const auto* note = eventAt(events, bar + q, true);
+    REQUIRE(note != nullptr);
+    CHECK(noteEnd(*note) == bar + 2 * q); // held to the stop
+    // Past where it stopped, the old note stays, whichever the mode.
+    CHECK(eventAt(events, bar + 3 * q, true));
 }

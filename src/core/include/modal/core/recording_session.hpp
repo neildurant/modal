@@ -29,7 +29,7 @@ public:
     {
         Idle,
         Recording, // includes count-in and pre-roll
-        Finishing, // stop requested, through acknowledgement and the undo commit
+        Finishing, // stop requested or punched out, through acknowledgement and the undo commit
     };
 
     State state() const;
@@ -38,8 +38,9 @@ public:
     const Document& document() const { return document_; }
     std::span<const TrackId> tracks() const;
 
-    // A failed start installs no hooks and leaves the document and history unchanged.
-    bool start(Player& player);
+    // A failed start installs no hooks and leaves the document and history unchanged. Given a
+    // punch range, the pass records only that, playback carrying on past its end.
+    bool start(Player& player, std::optional<ArmedSpan> punch = std::nullopt);
     bool stop();
 
     // Refreshes the live take only in its recording phase, as the playhead advances.

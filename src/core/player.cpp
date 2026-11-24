@@ -93,17 +93,21 @@ std::shared_ptr<const PlaybackPlan> Player::compile(const Song& song)
     return plan;
 }
 
-bool Player::record(const Song& song)
+bool Player::record(const Song& song, std::optional<ArmedSpan> punch)
 {
-    if (playing_ || recorder_)
+    if (playing_ || recorder_ || (punch && punch->to <= punch->from))
     {
         return false;
     }
+    const auto from = punch ? punch->from : marker_;
     const auto click = lookUp(song.metronome.port);
-    auto start = planRecordStart(song, marker_, click);
-    recorder_.emplace(song, 0, marker_, song.recordMode, resolveInput_);
+    auto start = planRecordStart(song, from, click);
+    recorder_.emplace(song, 0, from, song.recordMode, resolveInput_);
     click_ = click;
-    recordPoint_ = marker_;
+    recordPoint_ = from;
+    playbackEntry_ = from;
+    punchOut_ = punch ? std::optional{punch->to} : std::nullopt;
+    punchedOut_ = false;
     replacing_ = song.recordMode == RecordMode::Replace;
     auto plan = compile(song);
     const bool countIn = start.countIn.has_value();
@@ -120,9 +124,9 @@ bool Player::record(const Song& song)
     }
     waiting_.reset();
     play_ = engine_.lastPlay();
-    previewAt_ = marker_;
+    previewAt_ = from;
     countIn_ = countIn;
-    recorder_.emplace(song, play_, marker_, song.recordMode, resolveInput_);
+    recorder_.emplace(song, play_, from, song.recordMode, resolveInput_);
     playing_ = true;
     stopExact_ = true;
     started_ = start.playFrom;
@@ -243,6 +247,8 @@ Song Player::previewTake(const Song& song)
     {
         previewAt_ = stoppedAt_;
     }
+    if (punchOut_)
+        previewAt_ = std::min(previewAt_, *punchOut_);
     return recorder_->finish(song, previewAt_);
 }
 
@@ -258,9 +264,14 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
         return std::nullopt;
     }
     takeInput();
-    Take take{recorder_->finish(song, stoppedAt_), recorder_->tracks()};
+    // Punched out while playing on, or stopped: at the punch's end if it came first.
+    const auto stop =
+        punchedOut_ ? *punchOut_ : std::min(stoppedAt_, punchOut_.value_or(stoppedAt_));
+    Take take{recorder_->finish(song, stop), recorder_->tracks()};
     recorder_.reset();
     click_.reset();
+    punchOut_.reset();
+    punchedOut_ = false;
     // Planned again for playing, the tracks recorded heard again and the click as it plays
     // then, even if nothing was recorded and the song is as it was.
     update(take.song);
@@ -405,6 +416,16 @@ bool Player::poll()
             stoppedAt(*at);
             stoppedAt_ = *at;
             stopExact_ = true;
+        }
+    }
+    // A punch's end passed while playing: recording ends there, the take to be finished, input
+    // before it having been stamped by the engine before it moved on.
+    if (playing_ && recorder_ && punchOut_ && !punchedOut_)
+    {
+        if (const auto at = engine_.status().position; at && *at >= *punchOut_)
+        {
+            punchedOut_ = true;
+            return true;
         }
     }
     // Recording carries on past the song's end until stopped.

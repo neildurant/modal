@@ -3379,14 +3379,20 @@ bool Workspace::record()
                MessageKind::Warning);
         return true;
     }
-    if (!recording_.start(*player_))
+    // With a punch range armed, R records that (decided 24 November 2026), from its start.
+    const auto punch = punchSpan();
+    if (!recording_.start(*player_, punch))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return true;
     }
+    punching_ = punch;
     const bool overdub = document_.song().recordMode == core::RecordMode::Overdub;
     auto text =
         (overdub ? "Overdubbing onto " : "Recording onto ") + trackNames(document_.song(), armed);
+    if (punch)
+        text += ", punching in " + positionText(song.meter(), punch->from) + " to " +
+                positionText(song.meter(), punch->to);
     text += nothing;
     if (!player_->clicking())
         text += "; no click, with no metronome port or default output";
@@ -3447,9 +3453,12 @@ void Workspace::finishRecording()
     {
         return;
     }
+    const auto punched = std::exchange(punching_, std::nullopt);
     if (!completed->changed)
     {
-        setMessage("Nothing recorded: stopped before the record point", MessageKind::Information);
+        setMessage(punched ? "Nothing recorded: stopped before the punch-in point"
+                           : "Nothing recorded: stopped before the record point",
+                   MessageKind::Information);
         return;
     }
     // Input availability and status wording belong to the UI; the session has committed
@@ -3466,7 +3475,8 @@ void Workspace::finishRecording()
                    (completed->inputLost == 1 ? "" : "s") +
                    " lost during the take, arriving faster than taken";
     refresh();
-    setMessage("Recorded onto " + names + trouble,
+    // Not saying where: stopped early, a punch ends short of its range's end.
+    setMessage("Recorded onto " + names + (punched ? " in the punch range" : "") + trouble,
                trouble.empty() ? MessageKind::Information : MessageKind::Warning);
 }
 

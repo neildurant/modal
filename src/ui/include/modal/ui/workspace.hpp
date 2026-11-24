@@ -1384,6 +1384,7 @@ private:
     // The punch range armed in each open song, by its identity (decided 24 November 2026): for
     // the session, not saved and not an undo step.
     std::map<std::uint64_t, core::ArmedRange> punchRanges_;
+    std::optional<core::ArmedSpan> punching_; // the span the pass being recorded punches
     CommandResult punch(std::string_view arguments);
     CommandResult armPunch(core::ArmedRange range);
     CommandResult clearPunch();

@@ -2458,3 +2458,42 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
     edit([](core::Song& song) { song.insertBars(0, 1); });
     CHECK(p.ws.punchSpan() == span);
 }
+
+TEST_CASE("R records the armed punch range, playing on past its end with the take in")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    song.countIn.mode = core::CountInSettings::Mode::None;
+    const auto keys = song.tracks()[0]->id();
+    song.updateEvents(keys, [&](core::EventList& events)
+                      { events.insert({3 * ppqn.whole(), core::Note{60, 90, ppqn.quarter()}}); });
+    Playing p{std::move(song)};
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+
+    p.type(U"gaA]s,rp"); // B, bars 3 to 5
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.ws.message() ==
+          "Recording onto Keys, punching in " + at(2 * bar) + " to " + at(5 * bar));
+    CHECK(p.player.position().value_or(2 * bar) >= 2 * bar);
+
+    // Three bars at 120 BPM, then a little past punch-out.
+    p.runFor(5900ms);
+    CHECK(p.player.recording());
+    CHECK(contains(p.status(), U"● REC"));
+    p.runFor(200ms);
+    CHECK_FALSE(p.player.recording());
+    CHECK(p.player.playing());
+    CHECK(contains(p.status(), U"▶"));
+    CHECK_FALSE(contains(p.status(), U"● REC"));
+    CHECK(p.ws.message() == "Recorded onto Keys in the punch range");
+    CHECK(p.document.song().events(keys).empty()); // nothing played: the old note replaced
+    CHECK(p.document.canUndo());
+    CHECK(indicator(p, U"PUNCH") == Shown::Lit); // still armed for another take
+
+    p.type(U" ");
+    p.runFor(10ms);
+    p.type(U"u");
+    CHECK(p.document.song().events(keys).size() == 1);
+}

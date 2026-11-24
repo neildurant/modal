@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/armed_range.hpp>
 #include <modal/core/engine.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/recorder.hpp>
@@ -97,11 +98,17 @@ public:
     // decided November 2026). Stopping as playback stops; recording carries on past the song's
     // end until then. Returns whether the engine took it; not while playing, or while the last
     // pass is still to be finished.
-    [[nodiscard]] bool record(const Song& song);
+    //
+    // Given a punch range (decided 24 November 2026), it records that instead: from its start,
+    // after the count-in or pre-roll before it, up to its end, where recording ends while
+    // playback carries on, the take finished there (see punchedOut()).
+    [[nodiscard]] bool record(const Song& song, std::optional<ArmedSpan> punch = std::nullopt);
 
-    // Whether recording, from record() until stopped; and whether the pass has a click, which
-    // it hasn't without a metronome port or default output, nor a count-in then.
-    bool recording() const { return recorder_.has_value() && playing_; }
+    // Whether recording, from record() until stopped or punched out; and whether the pass has
+    // a click, which it hasn't without a metronome port or default output, nor a count-in then.
+    bool recording() const { return recorder_.has_value() && playing_ && !punchedOut_; }
+    // Whether a punch has reached its end while playing on, its take to be finished.
+    bool punchedOut() const { return recorder_.has_value() && punchedOut_; }
     bool clicking() const { return click_.has_value(); }
 
     // Where a pass is: counting in, the song silent; playing the pre-roll, before the record
@@ -135,10 +142,15 @@ public:
     // The tracks the pass is recording onto, until it's finished; none when not recording.
     std::vector<TrackId> recordingTracks() const;
 
-    // Whether a pass has stopped and the engine has said where, so finishRecording() can end it.
-    bool recordingStopped() const { return recorder_.has_value() && !playing_ && stopExact_; }
+    // Whether a pass has stopped and the engine has said where, or punched out, so
+    // finishRecording() can end it.
+    bool recordingStopped() const
+    {
+        return recorder_.has_value() && ((!playing_ && stopExact_) || punchedOut_);
+    }
     // Ends the stopped pass, taking any input still to come: the take, from the record point to
-    // where it stopped, applied to the song as it is now. Nothing until recordingStopped().
+    // where it stopped, or its punch's end if sooner, applied to the song as it is now. Nothing
+    // until recordingStopped(). After a punch, playback carries on, playing the song with it.
     std::optional<Take> finishRecording(const Song& song);
 
     // Plays the song's click once, the downbeat's or the other beats', on its port (the
@@ -227,6 +239,8 @@ private:
     std::optional<Recorder> recorder_;   // the pass being recorded, until finished
     std::optional<DestinationId> click_; // the metronome's while recording
     Tick recordPoint_ = 0;               // where the pass records from
+    std::optional<Tick> punchOut_;       // where it stops recording, punching
+    bool punchedOut_ = false;            // whether the playhead has passed punchOut_
     bool replacing_ = false;             // whether it replaces, rather than overdubs
     Tick previewAt_ = 0;                 // where the take was last shown up to
     bool countIn_ = false;               // whether the current play counts in
