@@ -857,6 +857,10 @@ The current agreed specification is in [design.md, Controller ramps](design.md#c
 
 With the paste history as the numbered registers, the item became `"0`, `"_` and the clipboard. `"0` and `"_` are as Vim has them; `"0` is told from a delete by the song being unchanged, and, unlike Vim, a named yank fills it too, since in Modal a named yank fills the unnamed register as well. The clipboard is only used when `"+` (or `"*`) is named, as Vim's default, so copying in Modal never replaces what another program copied; a setting to make every yank use it, as Vim's `clipboard=unnamedplus`, was considered and left out. What goes on it is Modal's own song text with a header line, rather than a plain list of notes, which would lose sections, whole tracks and ramps, or a Standard MIDI File alongside, which few programs read from the clipboard and which would flatten sections and ramps to events.
 
+## Work order (24 November 2026)
+
+The schedule gained milestones for miscellaneous features and composition tools before step entry. Several composition tools need the key or the chords (changing mode, negative harmony, voice-leading, the chord-name lane, phrase entry in the current key), so the chord/key track moved forward from the timing and harmony milestone to the start of the composition tools, rather than each tool asking for the key. Scale lock stays later, still after the chord/key track.
+
 ## Work order (19 November 2026)
 
 **Open songs (agreed after milestone 9).** Use `:song-select` and `:song-close` so the commands identify the song and describe the action. The chooser shows the name, location, active song and modified state. Keep each song's undo and edits in memory, stop playback on a switch and disallow switching while a take is pending. Close checks prevent an inactive song's edits being lost. Restore the inactive song's cursor and views in the next step. See design.md, Open songs.

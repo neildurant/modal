@@ -240,6 +240,7 @@ Resolve the related [design questions](design.md#to-decide) before implementatio
 
 ## 13. Composition tools
 
+- [ ] **To do** — Chord/key track, including changes over time, first, as the tools after it read the key and chords (moved here 24 November 2026).
 - [ ] **To do** — Text phrase entry: type a phrase in a compact, ABC-like syntax at the command line or in a prompt, e.g. `c4 d e f | g2 g`, and have it inserted at the cursor in the current grid and key.
 - [ ] **To do** — Chords by name: type Em9 or G/B to insert a voicing at the cursor, with the voicing style configurable (close, open, drop-2).
 - [ ] **To do** — Voicing transforms: invert a chord up or down, drop-2, drop-3, spread or close the voicing, and move the top voice. These are bread and butter for a keyboard player, and they compose naturally with `ic` and `.`.
@@ -302,7 +303,6 @@ The version-1 completion point is here. Backups are earlier, in milestone 10. Re
 - [ ] **To do** — Free-time recording, then fitting a tempo map and bar lines. One way to fit it, Sequencer Plus Gold's Tap-Tempo: play the track back and tap a note on each beat, the tempo map following the taps; it also locks onto music recorded without a click.
 - [ ] **To do** — Release velocity tools: setting and adjusting note-off velocities over a range, as `^` does note-on velocities (Sequencer Plus Gold's Set-NoteOff and Adjust-NoteOff).
 - [ ] **To do** — Splitting by more than pitch: by velocity, duration, whether on or off the grid, and every nth note (Sequencer Plus Gold's Modulus); and, going beyond it (its Pitch Map does one note at a time, as remap does), a pitch map remapping many pitches at once as a table. How it does these is in design.md, Feature notes.
-- [ ] **To do** — Chord/key track, including changes over time.
 - [ ] **To do** — Scale lock and a semitone motion that ignores it, after the chord/key track.
 - [ ] **To do** — Track-wide ripple editing.
 
