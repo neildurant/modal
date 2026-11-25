@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "support/fake_clock.hpp"
+#include "support/playback.hpp"
+
+#include <modal/core/player.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/window_commands.hpp>
 #include <modal/ui/workspace.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
+#include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace modal;
@@ -282,4 +290,47 @@ TEST_CASE("the ports view's inspector keeps its fields in place as the cursor mo
         p.type(keys);
         CHECK(headings() == first);
     }
+}
+
+TEST_CASE("the ports view shows each input's last message in, under Last in, as it comes")
+{
+    Porting p;
+    test::RecordingSink sink;
+    test::FakeClock clock;
+    core::Engine engine{sink, clock};
+    core::Player player{engine, [](std::string_view) { return core::DestinationId{1}; },
+                        [](std::string_view name) -> std::optional<core::InputId>
+                        {
+                            if (name == "Xkey 1")
+                                return core::InputId{0};
+                            if (name == "loopMIDI Port 1")
+                                return core::InputId{1};
+                            return std::nullopt;
+                        }};
+    p.ws.setPlayer(&player);
+    const auto in = [&](core::InputId input, std::array<std::uint8_t, 3> bytes)
+    {
+        engine.step();
+        REQUIRE(engine.receive(input, bytes, clock.time));
+        engine.step();
+        p.ws.inputWoken(0);
+    };
+    CHECK(contains(p.text(), U"Last in|"));
+    CHECK_FALSE(contains(p.text(), U"C4"));
+    in(core::InputId{0}, {0x90, 60, 96});
+    in(core::InputId{1}, {0xB9, 64, 127});
+    const auto text = p.text();
+    CHECK(contains(text, U" 1 C4      96"));
+    CHECK(contains(text, U"10 CC64   127"));
+    // Each on its own input's row.
+    const auto row = [&](std::u32string_view part)
+    {
+        for (const auto& region : p.ws.frame())
+            for (const auto& run : region.text)
+                if (run.text.find(part) != std::u32string::npos)
+                    return run.y;
+        return -1;
+    };
+    CHECK(row(U"C4") == row(U"Xkey 1"));
+    CHECK(row(U"CC64") != row(U"C4"));
 }

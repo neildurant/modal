@@ -705,6 +705,45 @@ TEST_CASE("the player keeps the last channel message in, but a note-off or syste
     CHECK(in({0xE0, 0x7F, 0x7F}) == std::vector<std::uint8_t>{0xE0, 0x7F, 0x7F});
 }
 
+TEST_CASE("the player keeps each input's last message, found by the port's name")
+{
+    RecordingSink sink;
+    FakeClock clock;
+    Engine engine{sink, clock};
+    Player player{engine, [](std::string_view) { return DestinationId{1}; },
+                  [](std::string_view name) -> std::optional<InputId>
+                  {
+                      if (name == "Keys")
+                          return InputId{0};
+                      if (name == "Pads")
+                          return InputId{1};
+                      return std::nullopt;
+                  }};
+    const auto in = [&](InputId input, std::vector<std::uint8_t> bytes)
+    {
+        engine.step();
+        REQUIRE(engine.receive(input, bytes, clock.time));
+        engine.step();
+        player.takeInput();
+    };
+    const auto last = [&](std::string_view port) -> std::vector<std::uint8_t>
+    {
+        const auto message = player.lastInput(port);
+        if (!message)
+            return {};
+        return {message->bytes.begin(), message->bytes.begin() + message->size};
+    };
+    CHECK(last("Keys").empty());
+    in(InputId{0}, {0x90, 60, 100});
+    in(InputId{1}, {0x99, 36, 120});
+    in(InputId{0}, {0x80, 60, 0}); // a note-off leaves the note shown
+    CHECK(last("Keys") == std::vector<std::uint8_t>{0x90, 60, 100});
+    CHECK(last("Pads") == std::vector<std::uint8_t>{0x99, 36, 120});
+    CHECK(last("Nowhere").empty());
+    REQUIRE(player.lastInput()); // and the last from any
+    CHECK(player.lastInput()->bytes == std::array<std::uint8_t, 3>{0x99, 36, 120});
+}
+
 TEST_CASE(
     "a track's note is auditioned on its port and channel, as it plays, for 150ms to a second")
 {

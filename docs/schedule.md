@@ -236,7 +236,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — The palette finds a key with any modifiers: `<Space>` and `Space` find `<S-Space>` and `<C-Space>`. Accepted on trial.
     - [x] **Done** — Leader groups: punch on `, P P`, `, P l`, `, P d`; loops on `, L` as a group (`, L L`, `, L l`). Accepted on trial.
     - [x] **Done** — The punch range saved with the song, arming and clearing as undo steps. Accepted on trial.
-    - [ ] **To do** — A shorter status line: the file's name to `Ctrl-g`, `[+]` kept; `IN` as a light, the last message in the Ports view.
+    - [ ] **Doing** — A shorter status line: the file's name to `Ctrl-g`, `[+]` kept; `IN` as a light, the last message in the Ports view.
     - [ ] **To do** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song.
     - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.

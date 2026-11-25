@@ -29,7 +29,8 @@ or edit refers to. In this arrangement it is on Melody's first bar.
 4. **Track rows:** each track's bars, shaded by how busy they are.
 5. **Message row:** feedback, questions, unfinished key sequences and the command line.
 6. **Status line:** the editing mode, transport and whether playback or recording
-   options are enabled.
+   options are enabled, ending with `[+]`, lit while the song has unsaved
+   changes.
 
 The **inspector** changes with the thing being inspected. On an arrangement
 bar it summarises the events there. On a note it shows pitch, velocity and
@@ -334,7 +335,9 @@ while the track's routing choice is saved in the song.
 The Ports view is a table: Down and Up (or `j` and `k`) move through rows,
 Left and Right (or `h` and `l`) through columns, and Enter edits or toggles
 the current cell. The Enabled and Default
-columns control availability and the default choice. The **Tracks view**
+columns control availability and the default choice. For inputs, **Last in**
+shows the last message each one sent, a quick way to check that a keyboard is
+getting through and on which channel. The **Tracks view**
 (`gt`) holds each track's Output and Channel fields. A warning in the
 inspector explains when a chosen port is missing, disabled or unavailable.
 

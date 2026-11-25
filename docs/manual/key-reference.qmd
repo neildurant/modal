@@ -165,6 +165,7 @@ after counts multiply.
 | `, f i` | Import tracks from a file, ticking which |
 | `, f r` | Recent songs: open one, Delete takes it off the list |
 | `, f t` | Set the song's title |
+| `Ctrl-g`, `:file` | Say the song's title, file, whether it's modified and its length |
 | `, f b` | Backups of this song: open one as a new song |
 | `]f` / `[f`, Ctrl-Tab / Ctrl-Shift-Tab | Next / previous open song, going round |
 | Ctrl-. | Panic |

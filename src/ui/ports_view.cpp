@@ -18,7 +18,7 @@ namespace modal::ui
 namespace
 {
 
-std::string_view heading(PortsView::Column column)
+std::string_view heading(PortsView::Column column, PortDirection direction)
 {
     switch (column)
     {
@@ -31,7 +31,8 @@ std::string_view heading(PortsView::Column column)
     case PortsView::Column::Name:
         return "Port";
     case PortsView::Column::Status:
-        return {};
+        // An input's last message in (decided 25 November 2026), or that it isn't connected.
+        return direction == PortDirection::Input ? "Last in" : "";
     }
     return {};
 }
@@ -557,6 +558,18 @@ Inspection PortsView::inspection() const
 
 void PortsView::addRegions(Frame& frame) const
 {
+    // An input's last channel message, as the status line's In light once showed it, so every
+    // input can be watched at once (decided 25 November 2026).
+    const auto lastIn = [&](const KnownPort& port)
+    {
+        const auto* player = host_.player();
+        if (port.direction != PortDirection::Input || player == nullptr)
+            return std::string{};
+        const auto message = player->lastInput(port.name);
+        if (!message)
+            return std::string{};
+        return inputText(std::span{message->bytes}.first(message->size));
+    };
     Region table{.bounds = layout_.main,
                  .background = Role::Background,
                  .text = {},
@@ -587,7 +600,7 @@ void PortsView::addRegions(Frame& frame) const
         case LineKind::Columns:
             for (const auto column : kColumns)
             {
-                if (const auto text = heading(column); !text.empty())
+                if (const auto text = heading(column, entry.direction); !text.empty())
                 {
                     table.text.push_back({x, y, decodeUtf8(text), dim});
                 }
@@ -629,7 +642,7 @@ void PortsView::addRegions(Frame& frame) const
             }
             auto text = decodeUtf8(column == Column::Alias  ? port.alias
                                    : column == Column::Name ? port.name
-                                   : port.present           ? std::string{}
+                                   : port.present           ? lastIn(port)
                                                             : std::string{"not connected"});
             if (text.size() > static_cast<std::size_t>(room))
             {

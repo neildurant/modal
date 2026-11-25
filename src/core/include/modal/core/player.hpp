@@ -64,8 +64,8 @@ public:
 
     void setThru(bool on) { engine_.setThru(on); }
 
-    // The last channel message that came in, for the In light: a note-on, controller, program,
-    // pressure or bend, but not a note-off, so the note played stays shown after it's let go.
+    // The last channel message that came in: a note-on, controller, program, pressure or bend,
+    // but not a note-off, so the note played stays shown after it's let go.
     struct InputMessage
     {
         std::array<std::uint8_t, 3> bytes{};
@@ -74,6 +74,9 @@ public:
         friend bool operator==(const InputMessage&, const InputMessage&) = default;
     };
     const std::optional<InputMessage>& lastInput() const { return lastInput_; }
+    // The last from one input port, named as a track names it, for the Ports view (decided 25
+    // November 2026); nothing if none has come, or the port isn't being listened to.
+    std::optional<InputMessage> lastInput(std::string_view port) const;
 
     // Where playback starts from.
     Tick marker() const { return marker_; }
@@ -229,6 +232,7 @@ private:
     InputResolver resolveInput_;
     std::vector<std::string> missingInputs_;
     std::optional<InputMessage> lastInput_;
+    std::map<InputId, InputMessage> lastInputs_;
     std::map<std::string, std::optional<DestinationId>, std::less<>> ports_;
     std::vector<std::string> missingPorts_;
     std::vector<QuantizeWarning> quantizeWarnings_;

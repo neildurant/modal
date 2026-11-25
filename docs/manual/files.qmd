@@ -79,7 +79,11 @@ Where a song has a title, Modal shows it first and the file after it:
 - the window's title bar reads `Morning (morning-v3.modal) – Modal`, with
   `[+]` before the dash while there are unsaved edits, `(unsaved)` for a song
   without a file, and `(demo.mid, imported)` for an imported MIDI file;
-  without a title it shows the filename alone;
+  without a title it shows the filename alone. The status line shows only
+  `[+]`, so the full name is a key away: `Ctrl-g`, as in Vim, says the title,
+  the file (with `~` for your home folder), whether it is modified and the
+  song's length, such as `"Morning" · ~/Songs/morning-v3.modal · modified ·
+  24 bars, 0:48`;
 - the open-songs and recent-songs lists give the title a column of its own
   before the filename;
 - the arrangement shows it at the top left of the track headers.

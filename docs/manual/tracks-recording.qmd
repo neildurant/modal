@@ -186,10 +186,12 @@ An unarmed track does not receive Thru merely because its T is enabled.
 
 ## Hearing and diagnosing input
 
-The status line's input indicator flashes as MIDI arrives and displays the
-last non-note-off channel message. This establishes that input reached
-Modal; it does not establish that a track is armed, correctly routed or
-audible at its instrument.
+The status line's **IN** light flashes as MIDI arrives. To see what arrived,
+open the Ports view (`gm`): its **Last in** column shows the last channel
+message from each input other than a note-off, such as `10 CC64 127` for the
+sustain pedal on channel 10, so you can check every keyboard and controller
+at once. This establishes that input reached Modal; it does not establish
+that a track is armed, correctly routed or audible at its instrument.
 
 Live input is sent to every matching armed track with Thru enabled. Incoming
 channels are mapped to each destination track's channel, and playback

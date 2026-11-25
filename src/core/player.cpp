@@ -389,6 +389,17 @@ void Player::stoppedAt(Tick tick)
     }
 }
 
+std::optional<Player::InputMessage> Player::lastInput(std::string_view port) const
+{
+    const auto id = resolveInput_ ? resolveInput_(port) : std::nullopt;
+    if (!id)
+        return std::nullopt;
+    const auto found = lastInputs_.find(*id);
+    if (found == lastInputs_.end())
+        return std::nullopt;
+    return found->second;
+}
+
 std::size_t Player::takeInput()
 {
     std::size_t messages = 0;
@@ -411,6 +422,7 @@ std::size_t Player::takeInput()
             std::copy_n(chunk.bytes.begin(), size, message.bytes.begin());
             message.size = static_cast<std::uint8_t>(size);
             lastInput_ = message;
+            lastInputs_[stamped->input] = message;
         }
     }
     return messages;
