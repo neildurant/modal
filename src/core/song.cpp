@@ -88,11 +88,88 @@ std::vector<ControllerRamp> rampsBetween(std::span<const ControllerRamp> ramps, 
     return part;
 }
 
+// The takes recording from one tick until another, each cut to that part of its span with the
+// events starting there, positioned from the first.
+std::vector<Take> takesBetween(std::span<const Take> takes, Tick from, Tick to)
+{
+    std::vector<Take> part;
+    for (const auto& take : takes)
+    {
+        const Tick start = std::max(take.from, from);
+        const Tick end = std::min(take.to, to);
+        if (start >= end)
+        {
+            continue;
+        }
+        Take cut = take;
+        cut.from = start - from;
+        cut.to = end - from;
+        cut.events = {};
+        for (auto event : take.events.startingIn(start, end))
+        {
+            event.tick -= from;
+            cut.events.insert(std::move(event));
+        }
+        part.push_back(std::move(cut));
+    }
+    return part;
+}
+
 // A part of a track's content from one tick until another, positioned from the first.
 TrackContent contentBetween(const TrackContent& content, Tick from, Tick to)
 {
     return {std::nullopt, eventsBetween(content.events, from, to),
-            rampsBetween(content.ramps, from, to)};
+            rampsBetween(content.ramps, from, to), takesBetween(content.takes, from, to)};
+}
+
+// Adds the takes of a part that follows at a tick to those of the part before it. Pieces of one
+// take, by its id, recording time and kind, as splitting it left them, become one again, its
+// span reaching over anything put between them; another take with an id already used gets a
+// new one, as do the events noting it, so the two parts' takes stay apart.
+void joinTakes(TrackContent& content, const TrackContent& after, Tick at)
+{
+    std::map<std::uint32_t, std::uint32_t> ids;
+    std::uint32_t next = std::max(content.nextTakeId(), after.nextTakeId());
+    for (const auto& take : after.takes)
+    {
+        const auto it = std::ranges::find_if(
+            content.takes, [&](const Take& t)
+            { return t.id == take.id && t.recorded == take.recorded && t.before == take.before; });
+        if (it != content.takes.end())
+        {
+            it->to = std::max(it->to, at + take.to);
+            for (auto event : take.events.all())
+            {
+                event.tick += at;
+                it->events.insert(std::move(event));
+            }
+            continue;
+        }
+        Take moved = take;
+        if (content.take(take.id) != nullptr)
+        {
+            moved.id = next++;
+            ids[take.id] = moved.id;
+        }
+        moved.from += at;
+        moved.to += at;
+        moved.events = {};
+        for (auto event : take.events.all())
+        {
+            event.tick += at;
+            moved.events.insert(std::move(event));
+        }
+        content.takes.push_back(std::move(moved));
+    }
+    for (auto event : after.events.all())
+    {
+        event.tick += at;
+        if (const auto it = ids.find(event.take); it != ids.end())
+        {
+            event.take = it->second;
+        }
+        content.events.insert(std::move(event));
+    }
 }
 
 // Where an event ends: a note's end, or just after any other event.
@@ -116,6 +193,33 @@ Tempo tempoAt(std::span<const TempoChange> changes, Tick tick)
 }
 
 } // namespace
+
+const Take* TrackContent::take(std::uint32_t id) const
+{
+    const auto it = std::ranges::find(takes, id, &Take::id);
+    return it == takes.end() ? nullptr : &*it;
+}
+
+std::uint32_t TrackContent::nextTakeId() const
+{
+    std::uint32_t highest = 0;
+    for (const auto& take : takes)
+    {
+        highest = std::max(highest, take.id);
+    }
+    return highest + 1;
+}
+
+void TrackContent::forgetUnknownTakes()
+{
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        if (events[i].take != 0 && take(events[i].take) == nullptr)
+        {
+            events.setTake(i, 0);
+        }
+    }
+}
 
 Section::Section(std::string name, Tick length, MeterMap meter, Tempo tempo)
     : name_(std::move(name))
@@ -915,15 +1019,11 @@ bool Song::joinSections(std::size_t index)
     {
         const auto* before = first.content(id);
         const auto* after = second.content(id);
-        TrackContent content{std::nullopt, before ? before->events : EventList{},
-                             before ? before->ramps : std::vector<ControllerRamp>{}};
+        TrackContent content = before ? *before : TrackContent{};
+        content.meter.reset();
         if (after)
         {
-            for (auto event : after->events.all())
-            {
-                event.tick += at;
-                content.events.insert(std::move(event));
-            }
+            joinTakes(content, *after, at);
             for (auto ramp : after->ramps)
             {
                 ramp.start += at;
@@ -1039,7 +1139,7 @@ Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeS
                 return result;
             }
             added->content_.emplace(
-                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}, {}}));
+                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}, {}, {}}));
         }
     }
     Song edited = *this;
@@ -1430,6 +1530,42 @@ bool Song::updateEvents(TrackId id, const std::function<void(EventList&)>& edit)
     return true;
 }
 
+bool Song::updatePart(std::size_t section, TrackId id,
+                      const std::function<void(TrackContent&)>& edit)
+{
+    const auto index = indexOf(id);
+    if (index == tracks_.size() || section >= sections_.size())
+    {
+        return false;
+    }
+    const auto* old = sections_[section]->content(id);
+    TrackContent content = old ? *old : TrackContent{};
+    edit(content);
+    const Tick length = sections_[section]->length_;
+    const auto outside = [&](const EventList& events)
+    { return !events.empty() && (events[0].tick < 0 || events.all().back().tick >= length); };
+    if (outside(content.events) || std::ranges::any_of(content.takes,
+                                                       [&](const Take& take)
+                                                       {
+                                                           return take.from < 0 ||
+                                                                  take.to > length ||
+                                                                  take.from >= take.to ||
+                                                                  outside(take.events);
+                                                       }))
+    {
+        return false;
+    }
+    updateContent(section, id,
+                  [&](TrackContent& part)
+                  {
+                      const auto meter = std::move(part.meter);
+                      part = std::move(content);
+                      part.meter = meter;
+                  });
+    rebuildEvents(index);
+    return true;
+}
+
 void Song::setSource(std::size_t trackIndex, EventList source)
 {
     const auto id = tracks_[trackIndex]->id();
@@ -1439,6 +1575,18 @@ void Song::setSource(std::size_t trackIndex, EventList source)
         extent = std::max(extent, endOf(event));
     }
     growTo(extent);
+    // An event noting a take its section's part doesn't have, moved there, notes none.
+    for (std::size_t i = 0; i < source.size(); ++i)
+    {
+        if (const auto take = source[i].take; take != 0)
+        {
+            const auto* part = sections_[sectionAt(source[i].tick)]->content(id);
+            if (part == nullptr || part->take(take) == nullptr)
+            {
+                source.setTake(i, 0);
+            }
+        }
+    }
     for (std::size_t i = 0; i < sections_.size(); ++i)
     {
         updateContent(i, id, [&](TrackContent& content)
@@ -1679,6 +1827,7 @@ void Song::updateContent(std::size_t index, TrackId id,
     const auto* old = sections_[index]->content(id);
     TrackContent content = old ? *old : TrackContent{};
     edit(content);
+    content.forgetUnknownTakes();
     const bool empty = content.empty();
     if (old ? content == *old : empty)
     {

@@ -32,6 +32,7 @@ add_executable(modal_tests
     core/song_file_test.cpp
     core/section_ops_test.cpp
     core/song_test.cpp
+    core/take_test.cpp
     core/spsc_queue_test.cpp
     core/tempo_map_test.cpp
     core/thru_test.cpp

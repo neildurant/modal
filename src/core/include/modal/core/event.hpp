@@ -107,6 +107,9 @@ struct Event
 {
     Tick tick;
     EventData data;
+    // The take it came from, by the take's id in its part, or 0 for none (decided 25 November
+    // 2026): kept through edits, so comping can tell where each event came from.
+    std::uint32_t take = 0;
 
     bool isNote() const { return std::holds_alternative<Note>(data); }
 

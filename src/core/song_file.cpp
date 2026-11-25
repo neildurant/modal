@@ -211,6 +211,7 @@ private:
     bool readBlock(std::span<const Token> tokens);
     bool readEvent(std::span<const Token> tokens);
     bool readRamp(std::span<const Token> tokens);
+    bool readTake(std::span<const Token> tokens);
     std::optional<EventData> eventData(std::span<const Token> tokens);
 
     // Ends the conductor's part of the section, ready for the tracks.
@@ -260,6 +261,7 @@ private:
         std::optional<MeterMap> meter;
         EventList events;
         std::vector<ControllerRamp> ramps;
+        std::vector<Take> takes; // once one is open, the events read go into the last
     };
 
     int line_ = 0;
@@ -370,6 +372,10 @@ bool Reader::readLine(std::span<const Token> tokens)
     if (word == "ramp")
     {
         return readRamp(tokens);
+    }
+    if (word == "take")
+    {
+        return readTake(tokens);
     }
     if (word == "track")
     {
@@ -979,7 +985,8 @@ bool Reader::readMeter(std::span<const Token> tokens)
     }
 
     auto& meter = block_ ? block_->meter : section_->meter;
-    if (block_ ? !block_->events.empty() || !block_->ramps.empty() : section_->meterClosed)
+    if (block_ ? !block_->events.empty() || !block_->ramps.empty() || !block_->takes.empty()
+               : section_->meterClosed)
     {
         return fail("meter lines come first");
     }
@@ -1146,7 +1153,7 @@ bool Reader::readBlock(std::span<const Token> tokens)
     {
         return fail("track " + tokens[1].text + " comes twice in this section");
     }
-    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}});
+    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}, {}});
     return true;
 }
 
@@ -1170,17 +1177,100 @@ bool Reader::readEvent(std::span<const Token> tokens)
     {
         return fail("the event is past the end of the section");
     }
-    auto data = eventData(tokens.subspan(1));
+    // take=N last: the take the event came from.
+    auto rest = tokens.subspan(1);
+    std::uint32_t take = 0;
+    if (rest.size() > 1 && !rest.back().quoted && rest.back().text.starts_with("take="))
+    {
+        const auto id = parseInteger(std::string_view{rest.back().text}.substr(5), 1,
+                                     std::numeric_limits<std::uint32_t>::max());
+        if (!id)
+        {
+            return fail("an event's take is a take's number, as take=2");
+        }
+        if (!block_->takes.empty())
+        {
+            return fail("an event in a take doesn't name one");
+        }
+        take = static_cast<std::uint32_t>(*id);
+        rest = rest.first(rest.size() - 1);
+    }
+    auto data = eventData(rest);
     if (!data)
     {
         return false;
     }
-    Event event{*tick, std::move(*data)};
+    Event event{*tick, std::move(*data), take};
     if (!isValid(event))
     {
         return fail("the event has a value out of range");
     }
+    if (!block_->takes.empty())
+    {
+        auto& open = block_->takes.back();
+        if (event.tick < open.from || event.tick >= open.to)
+        {
+            return fail("the event is outside its take");
+        }
+        open.events.insert(std::move(event));
+        return true;
+    }
     block_->events.insert(std::move(event));
+    return true;
+}
+
+bool Reader::readTake(std::span<const Token> tokens)
+{
+    if (!block_)
+    {
+        return fail("a take belongs in a track, in a section");
+    }
+    const bool before = tokens.size() > 2 && !tokens[2].quoted && tokens[2].text == "before";
+    const auto span = tokens.subspan(before ? 3 : 2);
+    if (tokens.size() < 4 || span.size() < 2 || span.size() > 3)
+    {
+        return fail("a take is a number and its span, as take 2 5:1:0 7:1:0 recorded=1764000000");
+    }
+    const auto id = parseInteger(tokens[1].text, 1, std::numeric_limits<std::uint32_t>::max());
+    if (!id)
+    {
+        return fail("a take's number is from 1");
+    }
+    Take take;
+    take.id = static_cast<std::uint32_t>(*id);
+    take.before = before;
+    if (std::ranges::find(block_->takes, take.id, &Take::id) != block_->takes.end())
+    {
+        return fail("take " + tokens[1].text + " comes twice in this track");
+    }
+    const auto& meter = block_->meter ? *block_->meter : section_->section->meter();
+    const auto from = tickAt(meter, span[0].text);
+    const auto to = from ? tickAt(meter, span[1].text) : std::nullopt;
+    if (!from || !to)
+    {
+        return false;
+    }
+    if (*from >= *to || *to > section_->section->length())
+    {
+        return fail("a take's span runs forwards, within its section");
+    }
+    take.from = *from;
+    take.to = *to;
+    if (span.size() == 3)
+    {
+        if (!span[2].text.starts_with("recorded="))
+        {
+            return fail("unknown take setting \"" + span[2].text + "\"");
+        }
+        const auto recorded = parseInteger(std::string_view{span[2].text}.substr(9), 0,
+                                           std::numeric_limits<std::int64_t>::max());
+        if (!recorded)
+        {
+            return fail("a take's recorded= is seconds since 1970");
+        }
+        take.recorded = *recorded;
+    }
+    block_->takes.push_back(std::move(take));
     return true;
 }
 
@@ -1538,9 +1628,17 @@ bool Reader::closeBlock()
     if (block_)
     {
         std::ranges::stable_sort(block_->ramps, {}, &ControllerRamp::start);
-        section_->section->setContent(
-            block_->id,
-            {std::move(block_->meter), std::move(block_->events), std::move(block_->ramps)});
+        TrackContent content{std::move(block_->meter), std::move(block_->events),
+                             std::move(block_->ramps), std::move(block_->takes)};
+        for (const auto& event : content.events.all())
+        {
+            if (event.take != 0 && content.take(event.take) == nullptr)
+            {
+                return fail("an event names take " + std::to_string(event.take) +
+                            ", which the track doesn't have here");
+            }
+        }
+        section_->section->setContent(block_->id, std::move(content));
         block_.reset();
     }
     return true;
@@ -1724,7 +1822,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
                     return std::nullopt;
                 }
             }
-            for (auto event : content->events.all())
+            const auto scaledEvent = [&](Event event)
             {
                 const Tick start = event.tick;
                 event.tick = std::min(scale(start), length - 1);
@@ -1732,7 +1830,23 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
                 {
                     note->duration = scale(start + note->duration) - scale(start);
                 }
-                scaled.events.insert(std::move(event));
+                return event;
+            };
+            for (const auto& event : content->events.all())
+            {
+                scaled.events.insert(scaledEvent(event));
+            }
+            for (const auto& take : content->takes)
+            {
+                Take scaledTake = take;
+                scaledTake.from = scale(take.from);
+                scaledTake.to = std::max(scale(take.to), scaledTake.from + 1);
+                scaledTake.events = {};
+                for (const auto& event : take.events.all())
+                {
+                    scaledTake.events.insert(scaledEvent(event));
+                }
+                scaled.takes.push_back(std::move(scaledTake));
             }
             for (auto ramp : content->ramps)
             {
@@ -2030,7 +2144,25 @@ std::string writeSong(const Song& song)
             for (const auto& event : content->events.all())
             {
                 line(2, positionText(trackMeter, event.tick) + " " +
-                            std::visit(eventText, event.data));
+                            std::visit(eventText, event.data) +
+                            (event.take != 0 ? " take=" + std::to_string(event.take) : ""));
+            }
+            // Each take after the part, its events under it, as played.
+            for (const auto& take : content->takes)
+            {
+                std::string takeText =
+                    "take " + std::to_string(take.id) + (take.before ? " before " : " ") +
+                    positionText(trackMeter, take.from) + " " + positionText(trackMeter, take.to);
+                if (take.recorded != 0)
+                {
+                    takeText += " recorded=" + std::to_string(take.recorded);
+                }
+                line(2, takeText);
+                for (const auto& event : take.events.all())
+                {
+                    line(3, positionText(trackMeter, event.tick) + " " +
+                                std::visit(eventText, event.data));
+                }
             }
         }
     }

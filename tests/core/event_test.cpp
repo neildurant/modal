@@ -62,6 +62,7 @@ TEST_CASE("SysEx and text compare by content and share their data")
 
 TEST_CASE("events are small")
 {
-    // Tracks hold many events; keep them to a tick plus a small variant.
-    CHECK(sizeof(Event) <= 40);
+    // Tracks hold many events; keep them to a tick, a small variant and the take each came from
+    // (40 bytes before takes, 25 November 2026).
+    CHECK(sizeof(Event) <= 48);
 }
