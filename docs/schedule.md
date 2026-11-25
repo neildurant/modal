@@ -240,10 +240,10 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song; changes while playing at the next Space. After trial: `↩ LOOP`, as the font has no `↻`, and `, P t` for punching, as `, L t` (asked for 25 November 2026). Accepted on trial, with the status line's indicators grouped by a dim line.
     - [x] **Done** — Changes to the loop while playing take effect at once, through a new engine command. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
-- [ ] **Doing** — Loop recording, by the song's replace or overdub setting (decided 25 November 2026). See [design.md](design.md#input-and-recording).
+- [x] **Done** — Loop recording, by the song's replace or overdub setting (decided 25 November 2026). See [design.md](design.md#input-and-recording).
     - [x] **Done** — `R` with a loop armed records it, each pass an undo step as the playhead wraps. Accepted on trial.
     - [x] **Done** — `R` while a loop plays, starting at the next pass. Accepted on trial.
-    - [ ] **Doing** — Manual updates and final validation.
+    - [x] **Done** — Manual updates and final validation. Accepted on reading.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
 - [ ] **To do** — Count-in and pre-roll choices between passes.
 - [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
