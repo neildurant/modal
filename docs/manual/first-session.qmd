@@ -160,6 +160,12 @@ descriptions. A query such as `piano` finds the piano-roll view and also
 shows its bindings. This makes it both a way to work and a way to learn
 the keys of actions you use often.
 
+It works the other way round too, for finding out what a key does: type
+the key, such as `gv` or `, b i`, and the palette finds its command. A key
+written in angle brackets also finds the same key held with Shift, Ctrl or
+Alt, so `<Space>`, or just `Space`, lists what Space, Shift-Space and
+Ctrl-Space each do.
+
 ![The command palette finds the piano roll by name and shows its keys.](images/palette.png){#fig-palette fig-alt="Modal's command palette with piano typed and the piano-roll command shown with its key bindings."}
 
 Up and Down choose a match, and Enter runs it. Tab puts the chosen command

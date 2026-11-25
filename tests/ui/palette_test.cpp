@@ -110,6 +110,34 @@ TEST_CASE("the palette matches keys too, as typed: exactly first, then starting 
     CHECK(titles(items, "<D").front() == "Cursor down");
 }
 
+TEST_CASE("the palette finds a key typed without modifiers bound with them, to look a key up")
+{
+    const auto item = [](std::string name, std::vector<std::string> keys)
+    {
+        return PaletteItem{.name = name,
+                           .title = std::move(name),
+                           .description = "",
+                           .aliases = "",
+                           .offered = true,
+                           .keys = std::move(keys)};
+    };
+    const std::vector<PaletteItem> items{
+        item("Play", {"<Space>"}),     item("Back", {"<S-Space>"}), item("Cursor", {"<C-Space>"}),
+        item("Rewind", {",T<Space>"}), item("Delete", {"<C-S-d>"}), item("Down", {"j", "<Down>"}),
+    };
+    using List = std::vector<std::string>;
+    // The exact key first, then the same key with modifiers.
+    CHECK(titles(items, "<Space>") == List{"Play", "Back", "Cursor"});
+    CHECK(titles(items, "<space>") == List{"Back", "Cursor", "Play"});
+    CHECK(titles(items, "<Spa") == List{"Back", "Cursor", "Play"});
+    // Its name alone finds it anywhere in the keys, with or without modifiers.
+    CHECK(titles(items, "Space") == List{"Back", "Cursor", "Play", "Rewind"});
+    CHECK(titles(items, "<d>") == List{"Delete"});
+    // Modifiers typed are kept to.
+    CHECK(titles(items, "<C-Space>") == List{"Cursor"});
+    CHECK(titles(items, "<C-") == List{"Cursor", "Delete"});
+}
+
 namespace
 {
 
@@ -214,6 +242,22 @@ TEST_CASE("Ctrl-p opens the palette at the prompt, and Enter runs the command ch
     p.type(U"zo");
     REQUIRE_FALSE(p.rows().empty());
     CHECK(p.rows().front() == U"Zoom out");
+}
+
+TEST_CASE("typing Space in the palette finds every command on a key with Space")
+{
+    Paletting p;
+    for (const auto* typed : {U"Space", U"<Space>"})
+    {
+        p.open();
+        p.type(typed);
+        const auto rows = p.rows();
+        for (const auto* title : {U"Play toggle", U"Play stop back", U"Play cursor"})
+        {
+            CHECK(std::ranges::find(rows, title) != rows.end());
+        }
+        p.press(Key::of(NamedKey::Escape));
+    }
 }
 
 TEST_CASE("in the palette, Up and Down choose, Tab puts the command on the prompt")

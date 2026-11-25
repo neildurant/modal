@@ -31,7 +31,8 @@ struct PaletteItem
 
 // The items a query matches, by index, best first: a key that's exactly it (zh, J), then the
 // title starting with it, then a word of the title or the name starting with it, then a key
-// starting with it, then its letters in order in the title (vcomp, Velocity compress), then
+// starting with it, or a key typed without modifiers bound with them (<Space> or Space finding
+// <C-Space>), then its letters in order in the title (vcomp, Velocity compress), then
 // found in the description or other names. Keys match as typed, the rest ignoring case. Those
 // that do nothing here come after the rest, and within each, the highest ranked first, then by
 // title; or for items in an order of their own, as sections are in the song, in that order.

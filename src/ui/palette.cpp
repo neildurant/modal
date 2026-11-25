@@ -56,6 +56,54 @@ bool inOrder(std::string_view text, std::string_view query)
     return true;
 }
 
+// Keys as written, lower case, with the modifiers in each <> left out: <C-Space> is <space>.
+std::string withoutModifiers(std::string_view keys)
+{
+    std::string result;
+    for (std::size_t i = 0; i < keys.size(); ++i)
+    {
+        result += static_cast<char>(std::tolower(static_cast<unsigned char>(keys[i])));
+        if (keys[i] != '<')
+        {
+            continue;
+        }
+        // As the key notation reads them: a letter and a hyphen, with more of the key after.
+        const auto close = keys.find('>', i + 1);
+        while (close != std::string_view::npos && close > i + 3 && keys[i + 2] == '-' &&
+               std::string_view{"cCaAmMsS"}.find(keys[i + 1]) != std::string_view::npos)
+        {
+            i += 2;
+        }
+    }
+    return result;
+}
+
+bool hasModifier(std::string_view typed)
+{
+    const auto plain = withoutModifiers(typed);
+    return plain != lowered(typed);
+}
+
+// A key typed without modifiers matching one with them: <Space> (or <Spa) finds <C-Space>, and
+// a key's name alone, Space, finds every key with it in <>.
+bool matchesWithModifiers(const std::vector<std::string>& keys, std::string_view typed,
+                          std::string_view query)
+{
+    if (typed.size() < 2 || hasModifier(typed))
+    {
+        return false;
+    }
+    const bool bracketed = typed.starts_with('<');
+    const auto name = "<" + std::string{query} + ">";
+    return std::ranges::any_of(keys,
+                               [&](const std::string& key)
+                               {
+                                   const auto plain = withoutModifiers(key);
+                                   return bracketed ? plain.starts_with(query)
+                                                    : plain.find(name) != std::string::npos;
+                               });
+}
+
 std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::string_view query)
 {
     // typed as it was, for keys, whose case matters; query lower case, for the rest.
@@ -80,7 +128,8 @@ std::optional<int> tier(const PaletteItem& item, std::string_view typed, std::st
                             {
                                 return keys.starts_with(typed) &&
                                        !(keys.starts_with('<') && keys.size() > 1 && typed == "<");
-                            }))
+                            }) ||
+        matchesWithModifiers(item.keys, typed, query))
     {
         return 3;
     }
