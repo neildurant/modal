@@ -230,7 +230,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Arm and clear a range from a section, Visual selection or two labels, with ruler and status indicators. Accepted on trial. See [status.md](status.md).
     - [ ] **Doing** — Record the armed span with `R` (design agreed 24 November 2026). See [design.md](design.md#input-and-recording).
         - [x] **Done** — From stopped: lead-in, punch-in, punch-out with playback carrying on, one undo step. Accepted on trial.
-        - [ ] **Doing** — `R` while playing, before punch-in. Built; awaiting trial.
+        - [x] **Done** — `R` while playing, before punch-in. Accepted on trial.
         - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Arm playback loops separately from starting playback. See [design.md](design.md#input-and-recording).
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
