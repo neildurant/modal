@@ -468,10 +468,6 @@ Bar Workspace::statusBar() const
             transportState, playing.has_value(), place.position,        place.time,
             place.meter,    tempoText(song, at), sectionText(song, at), sectionText(song, at, 6)};
         state.quantizeBypassed = player_->bypassQuantize();
-        if (const auto& input = player_->lastInput())
-        {
-            state.lastInput.assign(input->bytes.begin(), input->bytes.begin() + input->size);
-        }
     }
     state.armed =
         std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
@@ -483,11 +479,6 @@ Bar Workspace::statusBar() const
     state.rewind = rewind_;
     state.inputActive = inputLitUntil_.has_value();
     state.inputLost = lostWhileRecording();
-    const auto& file = document_.file();
-    const auto& imported = document_.importedFrom();
-    state.fileName = file       ? utf8Text(file->filename())
-                     : imported ? utf8Text(imported->filename()) + " (imported)"
-                                : "No file";
     state.modified = document_.modified();
     return modal::ui::statusBar(state, width_, cell_);
 }

@@ -570,6 +570,10 @@ cmap <C-.>      panic             "Panic"
 " :event-insert EVENT takes the whole event on the command line.
 nmap <leader>e  event-insert      "Insert an event"
 
+" Ctrl-g says the song's title, its file, whether it has unsaved changes and its length, as
+" Vim's does, the file's name being on the window's title bar rather than the status line.
+nmap <C-g>      file-info         "Song title, file and length"
+
 " Labels and marks, from any view: , l l puts a label at the cursor, asking its name (or renames
 " the one there), , l d deletes it, or in Visual mode every label selected, and , l s starts a
 " section there, as , s l does; , l m says where the marks are, and , l x deletes marks, asking

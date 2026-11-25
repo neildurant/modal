@@ -739,7 +739,7 @@ TEST_CASE("an idle workspace collects every bounded input batch before stopping 
     CHECK(p.ws.message().empty());
 }
 
-TEST_CASE("input activity and the last note are visible in every view and the light expires")
+TEST_CASE("input activity lights IN in every view, the light alone, and the light expires")
 {
     Playing p;
     p.ws.resize(220 * kCell.width, 24 * kCell.height, kCell);
@@ -747,7 +747,6 @@ TEST_CASE("input activity and the last note are visible in every view and the li
     REQUIRE(p.engine.receive(core::InputId{0}, on, p.clock.time));
     p.engine.step();
     CHECK(p.ws.inputWoken(p.now));
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     const auto light = [&]
     {
         const auto frame = p.ws.frame();
@@ -757,45 +756,20 @@ TEST_CASE("input activity and the last note are visible in every view and the li
         return Role::Warning;
     };
     CHECK(light() == Role::IndicatorInput);
-    p.ws.show(ViewKind::Tracks);
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
-    p.ws.show(ViewKind::PianoRoll);
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
-    p.ws.show(ViewKind::Arrangement);
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
+    // The last message is the Ports view's, for each input (decided 25 November 2026).
+    CHECK_FALSE(contains(p.status(), U"C4"));
+    for (const auto view : {ViewKind::Tracks, ViewKind::PianoRoll, ViewKind::Arrangement})
+    {
+        p.ws.show(view);
+        CHECK(light() == Role::IndicatorInput);
+    }
     // The short collection deadline precedes the light's deadline.
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
     REQUIRE(p.ws.deadline());
     p.ws.wake(*p.ws.deadline());
     CHECK(light() == Role::Indicator);
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
     CHECK_FALSE(p.ws.deadline());
-
-    // Any channel message but a note-off, with its channel, keeping what follows still.
-    const auto fileX = [&]
-    {
-        const auto frame = p.ws.frame();
-        for (const auto& run : frame.back().text)
-            if (run.text.starts_with(U" No file"))
-                return run.x;
-        return -1;
-    };
-    const auto before = fileX();
-    const auto in = [&](std::vector<std::uint8_t> bytes)
-    {
-        REQUIRE(p.engine.receive(core::InputId{0}, bytes, p.clock.time));
-        p.engine.step();
-        p.ws.inputWoken(p.now);
-    };
-    in({0x80, 60, 0});
-    CHECK(contains(p.status(), U" IN   1 C4      96 "));
-    in({0xB9, 64, 127});
-    CHECK(contains(p.status(), U" IN  10 CC64   127 "));
-    CHECK(fileX() == before);
-    in({0xE0, 0x7F, 0x7F});
-    CHECK(contains(p.status(), U" IN   1 Bend +8191 "));
-    CHECK(fileX() == before);
 }
 
 TEST_CASE("global Thru is a machine control and held notes can end while it is off")
@@ -2164,9 +2138,10 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
     p.document.edit("Rename section", {},
                     [](core::Song& song) { song.renameSection(0, "Introduction"); });
     // What gives way, in the order it goes.
-    const std::array<std::u32string_view, 10> parts{
-        U"No file", U"input", U"Introduction", U"REPLACE", U"THR",
-        U"Intro",   U" IN ",  U" 4/4 ",        U" BPM",    U"PUNCH"};
+    p.document.edit("Change", {}, [](core::Song& song) { song.title = "Changed"; }); // [+] lit
+    const std::array<std::u32string_view, 9> parts{U"[+]",   U"Introduction", U"REPLACE",
+                                                   U"THR",   U"Intro",        U" IN ",
+                                                   U" 4/4 ", U" BPM",         U"PUNCH"};
     const auto shown = [&](int columns)
     {
         p.ws.resize(columns * kCell.width, 24 * kCell.height, kCell);
@@ -2174,13 +2149,6 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
         const auto& runs = frame.back().text;
         const auto has = [&](std::u32string_view part)
         {
-            if (part == U"input") // the last message in, blank as nothing's come
-                return std::ranges::any_of(runs,
-                                           [](const auto& run)
-                                           {
-                                               return run.text == std::u32string(15, U' ') &&
-                                                      run.style.background == Role::Indicator;
-                                           });
             return std::ranges::any_of(runs, [&](const auto& run)
                                        { return run.text.find(part) != std::u32string::npos; });
         };
@@ -2189,7 +2157,7 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
             CAPTURE(columns, encodeUtf8(kept));
             CHECK(has(kept));
         }
-        std::array<bool, 10> present{};
+        std::array<bool, 9> present{};
         for (std::size_t i = 0; i < parts.size(); ++i)
             present[i] = has(parts[i]);
         return present;

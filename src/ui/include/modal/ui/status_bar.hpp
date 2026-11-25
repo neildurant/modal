@@ -65,9 +65,7 @@ struct StatusBarState
     bool quantizeBypassed = false;
     bool inputActive = false;
     bool inputLost = false;
-    std::vector<std::uint8_t> lastInput;
-    std::string fileName = "No file";
-    bool modified = false;
+    bool modified = false; // unsaved changes, the file's name being on the title bar and Ctrl-g
 };
 
 // Builds the permanent bottom line, preserving fixed field widths and the agreed order

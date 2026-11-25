@@ -185,14 +185,23 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(xOf(v.ws.frame()[2], U"Position") == position);
     type(v.ws, U"gg");
 
-    // The status line names the song's file, with [+] once it has changes not saved, where it's
-    // wide enough.
+    // The status line's [+] is lit once the song has changes not saved, where it's wide enough;
+    // the file's name is on the title bar and Ctrl-g.
     v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
-    CHECK(contains(bottomText(v.ws.frame()), U"No file"));
+    CHECK_FALSE(contains(bottomText(v.ws.frame()), U"No file"));
+    const auto plus = [&]
+    {
+        for (const auto& region : v.ws.frame())
+            for (const auto& run : region.text)
+                if (run.text.find(U"[+]") != std::u32string::npos)
+                    return run.style.background;
+        return Role::Bar;
+    };
+    CHECK(plus() == Role::Indicator);
     type(v.ws, U"4jx");
-    CHECK(contains(bottomText(v.ws.frame()), U"No file [+]"));
+    CHECK(plus() == Role::Warning);
     type(v.ws, U"u");
-    CHECK_FALSE(contains(bottomText(v.ws.frame()), U"[+]"));
+    CHECK(plus() == Role::Indicator);
     const auto list = frame[0];
     CHECK(contains(rowText(list, 0), U"Position"));
     CHECK(contains(rowText(list, 0), U"Release"));
@@ -1203,6 +1212,34 @@ TEST_CASE("Tab at the prompt completes as zsh does: as far as the matches agree,
     type(v.ws, U"=l");
     tab();
     CHECK(line() == "set theme=light ");
+}
+
+TEST_CASE("Ctrl-g says the song's title, its file from home, whether it's changed, and its length")
+{
+    const modal::test::TempDirectory temporary{"modal-file-info-test"};
+    const auto& home = temporary.path();
+    Viewing v{core::Song{}}; // eight bars at 120 BPM
+    v.ws.setFolders(std::nullopt, home);
+    const auto info = [&]
+    {
+        v.ws.handle(Key::typed(U'g', kCtrl), 0);
+        return v.ws.message();
+    };
+    CHECK(info() == "No file · 8 bars, 0:16");
+    v.document.edit("Title", {}, [](core::Song& song) { song.title = "Morning"; });
+    CHECK(info() == "\"Morning\" · No file · modified · 8 bars, 0:16");
+    v.document.markSaved(home / "Songs" / "Morning.modal");
+    CHECK(info() == "\"Morning\" · " +
+                        utf8Text(std::filesystem::path{"~"} / "Songs" / "Morning.modal") +
+                        " · 8 bars, 0:16");
+    // Outside home, the whole path.
+    const auto elsewhere = std::filesystem::absolute(home.parent_path() / "Elsewhere.modal");
+    v.document.markSaved(elsewhere);
+    CHECK(info() == "\"Morning\" · " + utf8Text(elsewhere.lexically_normal()) + " · 8 bars, 0:16");
+    // Imported, the file it came from.
+    v.document.replace(core::Song{}, std::nullopt, home / "Groove.mid");
+    CHECK(info() == "imported from Groove.mid · 8 bars, 0:16");
+    CHECK(v.ws.messageKind() == MessageKind::Information);
 }
 
 TEST_CASE("files complete from the song's folder, said above them, and into folders with spaces")

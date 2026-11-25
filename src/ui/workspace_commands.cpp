@@ -121,6 +121,10 @@ constexpr std::array kSharedCommands{
                                "before the last jump; after an operator, the range to it (d'a)",
                 .motion = true},
     CommandInfo{.name = "marks", .description = "Say where the marks are"},
+    CommandInfo{.name = "file-info",
+                .description = "Say the song's title, its file, whether it has unsaved changes "
+                               "and its length",
+                .aliases = "file"},
     CommandInfo{.name = "put-older",
                 .description = "Straight after a put, put the copy before it in the paste history "
                                "in its place ([p)",

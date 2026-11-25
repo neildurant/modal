@@ -10,6 +10,7 @@
 #include <modal/ui/event_edit.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/file_commands.hpp>
+#include <modal/ui/inspector.hpp>
 #include <modal/ui/key_notation.hpp>
 #include <modal/ui/palette.hpp>
 #include <modal/ui/ports.hpp>
@@ -25,10 +26,12 @@
 #include <cassert>
 #include <cctype>
 #include <charconv>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <span>
 #include <string>
+#include <system_error>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -1154,6 +1157,43 @@ std::string Workspace::markAbout(const core::Mark& mark) const
     return text;
 }
 
+std::string Workspace::fileInfo() const
+{
+    const auto shown = [&](const std::filesystem::path& file)
+    {
+        std::error_code error;
+        auto path = std::filesystem::absolute(file, error);
+        path = (error ? file : path).lexically_normal();
+        if (home_)
+        {
+            const auto relative = path.lexically_relative(home_->lexically_normal());
+            if (!relative.empty() && *relative.begin() != "..")
+                return utf8Text(std::filesystem::path{"~"} / relative);
+        }
+        return utf8Text(path);
+    };
+    const auto& song = document_.song();
+    std::vector<std::string> parts;
+    if (!song.title.empty())
+        parts.push_back("\"" + song.title + "\"");
+    if (const auto& file = document_.file())
+        parts.push_back(shown(*file));
+    else if (const auto& imported = document_.importedFrom())
+        parts.push_back("imported from " + utf8Text(imported->filename()));
+    else
+        parts.emplace_back("No file");
+    if (document_.modified())
+        parts.emplace_back("modified");
+    const auto bars = song.meter().toBarBeatTick(song.end()).bar - 1;
+    auto time = songTime(song.tempo().toTime(song.end()));
+    time = time.substr(0, time.find('.'));
+    parts.push_back(std::to_string(bars) + (bars == 1 ? " bar, " : " bars, ") + time);
+    std::string text;
+    for (const auto& part : parts)
+        text += (text.empty() ? "" : " · ") + part;
+    return text;
+}
+
 bool Workspace::sayMarks()
 {
     std::vector<std::pair<std::string, std::string>> lines;
@@ -2116,6 +2156,11 @@ std::optional<bool> Workspace::runEditCommand(std::string_view command, int coun
     if (command == "marks")
     {
         return sayMarks();
+    }
+    if (command == "file-info")
+    {
+        setMessage(fileInfo(), MessageKind::Information);
+        return true;
     }
     if (command == "put-older" || command == "put-newer")
     {

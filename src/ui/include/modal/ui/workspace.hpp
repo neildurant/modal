@@ -936,6 +936,9 @@ private:
     bool goToMark(char32_t character, int count);
     std::string markAbout(const core::Mark& mark) const;
     bool sayMarks();
+    // What Ctrl-g says (decided 25 November 2026): the song's title, its file, with ~ for the
+    // home folder, whether it has unsaved changes, and its length in bars and time.
+    std::string fileInfo() const;
     CommandResult deleteMarks(std::string_view letters);
     CommandResult label(std::string_view name);
     CommandResult songTitle(std::string_view title);

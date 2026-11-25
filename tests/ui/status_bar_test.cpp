@@ -64,7 +64,7 @@ TEST_CASE("status presentation keeps mode panels equally wide without a transpor
     CHECK_FALSE(contains(region, U"STOP"));
     CHECK_FALSE(contains(region, U"BPM"));
     CHECK(contains(region, U"ARM"));
-    CHECK(contains(region, U"No file"));
+    CHECK(contains(region, U"[+]"));
     const auto bar = statusBar(state, 2200, kCell);
     REQUIRE(bar.left.size() == 2);
     CHECK(decodeUtf8(bar.left[0].text + bar.left[1].text).size() == 9);
@@ -195,43 +195,43 @@ TEST_CASE("status presentation shows setting toggles and input loss without owni
     state.thru = state.audition = state.rewind = true;
     state.quantizeBypassed = true;
     state.inputActive = true;
-    state.lastInput = {0xB9, 64, 127};
     const auto on = render(state);
     CHECK(field(on, U"THRU").style.background == Role::IndicatorThru);
     CHECK(field(on, U"AUDITION").style.background == Role::IndicatorAudition);
     CHECK(field(on, U"REWIND").style.background == Role::IndicatorRewind);
     CHECK(field(on, U"Q BYPASS").style.background == Role::Warning);
     CHECK(field(on, U" IN ").style.background == Role::IndicatorInput);
-    CHECK(contains(on, U"10 CC64   127"));
+    CHECK_FALSE(contains(on, U"CC64")); // the light alone: the last message is the Ports view's
     state.inputLost = true;
     CHECK(field(render(state), U" IN ").style.background == Role::Warning);
     state.inputActive = false;
     CHECK(field(render(state), U" IN ").style.background == Role::Warning);
 }
 
-TEST_CASE("status presentation reserves the modified marker and handles Unicode filenames")
+TEST_CASE("status presentation keeps [+] in its place, lit only with unsaved changes, no file")
 {
     StatusBarState state;
-    state.fileName = "Étude.modal";
     const auto saved = render(state);
     state.modified = true;
     const auto modified = render(state);
-    CHECK(contains(modified, U"Étude.modal [+]"));
-    CHECK(field(saved, U"Étude").x == field(modified, U"Étude").x);
+    CHECK(field(saved, U"[+]").style.background == Role::Indicator);
+    CHECK(field(modified, U"[+]").style.background == Role::Warning);
+    CHECK(field(saved, U"[+]").x == field(modified, U"[+]").x);
     CHECK(field(saved, U" IN ").x == field(modified, U" IN ").x);
+    CHECK_FALSE(contains(saved, U"No file"));
 }
 
 TEST_CASE("status presentation preserves the order of width compromises at pixel boundaries")
 {
     auto state = stateWithTransport();
-    const std::array<std::u32string_view, 10> parts{
-        U"No file", U"             ", U"Introduction", U"REPLACE", U"THR",
-        U"Intro",   U" IN ",          U" 4/4 ",        U" BPM",    U"PUNCH"};
-    std::array<bool, 10> disappeared{};
+    const std::array<std::u32string_view, 9> parts{U"[+]",   U"Introduction", U"REPLACE",
+                                                   U"THR",   U"Intro",        U" IN ",
+                                                   U" 4/4 ", U" BPM",         U"PUNCH"};
+    std::array<bool, 9> disappeared{};
     for (int width = 2200; width >= 650; --width)
     {
         const auto region = render(state, width);
-        std::array<bool, 10> present{};
+        std::array<bool, 9> present{};
         for (std::size_t i = 0; i < parts.size(); ++i)
         {
             present[i] = contains(region, parts[i]);

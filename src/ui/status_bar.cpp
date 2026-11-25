@@ -40,16 +40,16 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
     bottom.left.push_back(
         {std::string(std::string_view{" NORMAL "}.size() - mode.size() + 1, ' '), kBarText});
     // Where the window's too narrow for everything, what's least needed gives way first, in
-    // steps (decided 12 November 2026): the file's name, the input's last message, the section
-    // cut short, short words for the indicators, the settings, the section, the input light,
-    // the meter and the tempo; and last the punch range's indicator (decided 24 November 2026,
-    // so the narrowest window keeps what it kept before it). The mode, the transport and the
-    // rest of the recording group stay.
+    // steps (decided 12 November 2026): [+], first as the file's name was (decided 25 November
+    // 2026, the title bar showing it too, so the smallest usual window keeps what it kept); the
+    // section cut short, short words for the indicators, the settings, the section, the input
+    // light, the meter and the tempo; and last the punch range's indicator (decided 24 November
+    // 2026, so the narrowest window keeps what it kept before it). The mode, the transport and
+    // the rest of the recording group stay.
     enum class Stage
     {
         Full,
-        HideFile,
-        HideInputMessage,
+        HideModified,
         ShortSection,
         ShortIndicators,
         HideSettings,
@@ -60,9 +60,8 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         HidePunch,
     };
     constexpr std::array kStages{
-        Stage::Full,         Stage::HideFile,        Stage::HideInputMessage,
-        Stage::ShortSection, Stage::ShortIndicators, Stage::HideSettings,
-        Stage::HideSection,  Stage::HideInput,       Stage::HideMeter,
+        Stage::Full,         Stage::HideModified, Stage::ShortSection, Stage::ShortIndicators,
+        Stage::HideSettings, Stage::HideSection,  Stage::HideInput,    Stage::HideMeter,
         Stage::HideTempo,    Stage::HidePunch};
     const auto transport = [&](Stage stage)
     {
@@ -126,7 +125,7 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
     };
     // The indicators (decided 12 November 2026): each always in its place, as wide whatever it
     // says, dim when off and lit in its own colour when on, or the warning colour when something's
-    // wrong; in groups, recording, then the settings, then the input, then the file.
+    // wrong; in groups, recording, then the settings, then the input, then unsaved changes.
     const auto armed = state.armed;
     const auto indicators = [&](Stage stage)
     {
@@ -214,8 +213,8 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         }
         if (stage < Stage::HideInput)
         {
-            // The input light, and the last message in, fixed in width so nothing after it
-            // moves (decided November 2026).
+            // The input light alone (decided 25 November 2026): each input's last message is in
+            // the Ports view.
             gap();
             segments.push_back(
                 {" IN ",
@@ -223,20 +222,15 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
                  state.inputLost     ? Style{Role::IndicatorLitText, Role::Warning, kBold}
                  : state.inputActive ? Style{Role::IndicatorLitText, Role::IndicatorInput, kBold}
                                      : Style{Role::IndicatorText, Role::Indicator, kPlain}});
-            if (stage < Stage::HideInputMessage)
-            {
-                segments.push_back({" " + inputText(state.lastInput) + " ",
-                                    {Role::BarText, Role::Indicator, kPlain}});
-            }
             segments.push_back({" ", kBarText});
         }
-        if (stage < Stage::HideFile)
+        if (stage < Stage::HideModified)
         {
-            // The song's file, and [+] if it has changes not saved, as in Vim, with room kept
-            // for [+] so nothing moves as it comes and goes.
+            // [+] for changes not saved, as in Vim, dim when there are none, so it's always in
+            // its place (decided 25 November 2026, when the file's name left the line for the
+            // title bar and Ctrl-g).
             gap();
-            segments.push_back({" " + state.fileName + (state.modified ? " [+] " : "     "),
-                                {Role::BarText, Role::Indicator, kPlain}});
+            indicator("[+]", "[+]", 3, 3, state.modified ? Lit::Warning : Lit::Off, Role::Warning);
         }
         // No space after the last.
         if (!segments.empty() && segments.back().text == " ")
