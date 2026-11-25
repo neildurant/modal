@@ -244,7 +244,14 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — `R` with a loop armed records it, each pass an undo step as the playhead wraps. Accepted on trial.
     - [x] **Done** — `R` while a loop plays, starting at the next pass. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
-- [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
+- [ ] **Doing** — Basic take management (agreed 25 November 2026): a take is a performance, and the part notes which take each event came from. See [design.md](design.md#input-and-recording).
+    - [ ] **Doing** — Takes per section and track, the take on each event, saved with the song.
+    - [ ] **To do** — Replace recordings make takes: Before, and each loop pass.
+    - [ ] **To do** — `]t` / `[t` choose a take, stopped or playing.
+    - [ ] **To do** — `, k o` keeps only the take playing; `, k d` discards it.
+    - [ ] **To do** — Showing takes in the arrangement, section strip, piano roll and event list, settled from renders.
+    - [ ] **To do** — Palette support for takes.
+    - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Count-in and pre-roll choices between passes.
 - [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 
