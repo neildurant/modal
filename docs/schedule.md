@@ -240,9 +240,12 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song; changes while playing at the next Space. After trial: `↩ LOOP`, as the font has no `↻`, and `, P t` for punching, as `, L t` (asked for 25 November 2026). Accepted on trial, with the status line's indicators grouped by a dim line.
     - [x] **Done** — Changes to the loop while playing take effect at once, through a new engine command. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
-- [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
+- [ ] **To do** — Loop recording, by the song's replace or overdub setting (decided 25 November 2026). See [design.md](design.md#input-and-recording).
+    - [ ] **To do** — `R` with a loop armed records it, each pass an undo step as the playhead wraps.
+    - [ ] **To do** — `R` while a loop plays, starting at the next pass.
+    - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
-- [ ] **To do** — Count-in and pre-roll choices between passes, with each pass an undo step.
+- [ ] **To do** — Count-in and pre-roll choices between passes.
 - [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 
 Resolve the related [design questions](design.md#to-decide) before implementation.
@@ -385,6 +388,7 @@ These support the milestones rather than forming a separate feature milestone. S
 
 No milestone or implementation commitment. Keep these unchecked unless they are explicitly promoted into the schedule.
 
+- [ ] **Unscheduled** — Punch recording within a loop (suggested 25 November 2026): with a punch range inside an armed loop, `R` records only the punch range on each pass, to retake a fill while hearing the bars around it.
 - [ ] **Unscheduled** — Adjust transforms by ear while a selection loops, with transform presets and palette support where needed (deferred 24 November 2026). See [design.md](design.md#midi-transforms).
 - [ ] **Unscheduled** — Saved sessions (suggested 20 November 2026): reopen a set of songs together, each at the view and place it was left, across program runs.
 - [ ] **Unscheduled** — View snapshots (suggested 20 November 2026): save how a song is being looked at (view, places, zoom, folds) and restore it later, without changing the music. Shares a value-type capture of each view's place with saved sessions; song switching could then use the same capture.
