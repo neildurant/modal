@@ -310,7 +310,10 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
     // The second section armed as a punch range, then cleared so the guides don't show it.
     m.type(U"gagg]s,PP");
     save("punch-range");
-    m.type(U",Pd");
+    // The first section armed as a loop beside the punch range, then both cleared.
+    m.type(U"gg,LL");
+    save("loop-range");
+    m.type(U",Ld,Pd");
     m.type(U"gagg");
     guide("arrangement-guide",
           {{viewWidth, cell.height / 2, U"1 Track / position"},

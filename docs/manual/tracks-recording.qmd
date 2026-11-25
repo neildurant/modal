@@ -226,20 +226,56 @@ original note start. The C setting controls notes, not all state restoration.
 ## Repeating a passage {#sec-loop-playback}
 
 A loop plays a span of time repeatedly so you can listen to a phrase or a
-transition in context. Looping has a group of its own, `, L`. Use `, L L` to hear the cursor's section. To loop a shorter
-passage, select its time in Visual mode first. Selecting a run of sections on
-the section strip loops all of them. The transport shows **LOOP**, and Space
-stops it. Mute and Solo work as they do in ordinary playback.
+transition in context, or practise a part against it. As with a punch range
+(@sec-punch-recording), you choose the span first and play it afterwards:
+arming a loop plays nothing, and Space then plays it as often as you like.
+Looping has a group of its own, `, L`:
 
-Song labels give a passage reusable endpoints. For example, put a label one
-bar before a chorus and another one bar into it. Use `, L l` (**l** for labels) to choose the
-first label and then the second. In each list, type part of the label name to
-narrow the choices or use Up and Down to move through them. Enter accepts the
-highlighted label. Playback returns to the first label as soon as it reaches
-the second. The next time you open the chooser in the same song, Enter can
-accept each previous choice if the labels are still available. Labels are
-saved with the song, so the same passage can be chosen after reopening it.
-You can also enter `:loop "Before chorus" "After chorus"` at the prompt.
+- `, L L` arms the cursor's section. In Visual mode it arms the selection's
+  span of time instead, for a few bars; selecting a run of sections on the
+  section strip arms all of them.
+- `, L l` (**l** for labels) chooses two song labels as its edges, for a
+  passage marked out in the song.
+- `, L t` switches looping off and on again, **t** for toggle, keeping the
+  loop where it is.
+- `, L d` clears it, **d** as in deleting a label with `, l d`.
+
+An armed loop shows as a solid bracket along the foot of the ruler, in the
+accent colour, where a punch range's is dashed and red. Where the two overlap,
+the loop's bracket sits just above the punch range's, so both stay visible.
+**LOOP** lights in the status line. Switched off, the bracket is drawn dim and
+LOOP goes out.
+
+![The Phrase section armed as a loop and the Answer section as a punch range: a solid bracket under bars 1 to 4, a dashed one under bars 5 to 8, and LOOP and PUNCH lit in the status line.](images/loop-range.png){#fig-loop-range fig-alt="Modal's arrangement with two sections, Phrase and Answer. A solid bracket in the accent colour runs under the bar numbers of the Phrase section and a dashed red bracket under those of the Answer section; the status line's LOOP and PUNCH indicators are lit."}
+
+With a loop armed, Space plays the loop from its start, wherever the cursor
+and the play-from marker are. Playback returns to the start as soon as it
+reaches the end, and the transport shows **↩ LOOP**. Space stops it. Mute and
+Solo work as they do in ordinary playback. Shift-Space and Ctrl-Space keep
+their usual meanings: Ctrl-Space plays from the cursor and loops once
+playback reaches the loop, so you can start a few bars before it to hear the
+way in. Started past the loop's end, it plays straight on.
+
+For example, put a label one bar before a chorus and another one bar into it.
+Use `, L l` to choose the first label and then the second. In each list, type
+part of the label name to narrow the choices or use Up and Down to move
+through them. Enter accepts the highlighted label. The next time you open the
+chooser in the same song, Enter can accept each previous choice if the labels
+are still available. You can also enter
+`:loop "Before chorus" "After chorus"` at the prompt. Press Space to hear the
+transition again and again.
+
+The loop is saved with the song, as the punch range is, so opening the song
+tomorrow and pressing Space plays the same passage. Arming, clearing and
+switching the loop are undo steps. A loop follows its section or labels
+through edits in the same way as a punch range, and if an edit removes them,
+Modal clears the loop and says why.
+
+You can change the loop while the song plays. Arm another section ahead of
+the playhead and playback loops there when it arrives; resize the looped
+section and the loop's end moves with it. Switching looping off, or clearing
+the loop, lets playback carry on past the end. A loop armed behind the
+playhead waits for the next Space.
 
 At each return, Modal releases notes and pedals held over the end and restores
 the controller and instrument changes it can find before the start. A value
@@ -301,7 +337,7 @@ you hear the lead-in once and the chorus repeats continuously. Choose
 **Every pass** to practise the entrance again with the last bar of the verse
 before each repeat. With a count-in, **Every pass** gives you a fresh click
 before each repeat. With **Before** set to **None**, the loop stays seamless.
-Start the loop again after changing its lead-in settings. The recording
+Press Space again to hear a change to the loop's lead-in settings. The recording
 settings can keep a different lead-in.
 
 For recording, `, m c` cycles the three choices. Set exact lengths with
@@ -333,6 +369,9 @@ own, `, P` for punch, built as the loop's `, L` is:
   offers the same pair again next time. `:punch "Before fill" "After fill"`
   names them at the prompt.
 - `, P d` clears it, **d** as in deleting a label with `, l d`.
+- `, P t` switches punching off and on again, keeping the range, as `, L t`
+  does for a loop. Switched off, the bracket is drawn dim and `R` records from
+  the play-from marker.
 
 An armed range shows as a dashed red bracket along the foot of the ruler, in
 the arrangement and the piano roll, with a short upright cap at each end. The
@@ -392,7 +431,8 @@ one. The transport shows `● PRE` until punch-in, then `● REC`. Once the play
 is past punch-in, `R` is refused: stop and press `R` again to record the range
 with its lead-in. Recording while a playback loop is running isn't available yet.
 
-To record from the play-from marker again, clear the range with `, P d`.
+To record from the play-from marker again, switch the range off with `, P t`,
+or clear it with `, P d`.
 
 ## Completing and keeping a take
 
