@@ -1506,7 +1506,7 @@ TEST_CASE("a sample of drum names and saved-map comparison", "[.sample][.manual-
         for (const auto c : keys)
             view.handle(c == U'\n' ? Key::of(NamedKey::Enter) : Key::typed(c), 0);
     };
-    const auto save = [&](const std::string& suffix, std::string_view theme = "dark")
+    const auto save = [&](const std::string& suffix, std::string_view theme = kDefaultTheme)
     {
         window->draw(view.frame(), *builtInTheme(theme));
         CHECK(window->saveFrame(base + suffix + ".bmp"));

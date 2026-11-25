@@ -243,7 +243,7 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
     player.update(m.document.song());
     m.ws.setPlayer(&player);
     m.ws.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
-    const auto theme = *builtInTheme("dark");
+    const auto theme = *builtInTheme(kDefaultTheme);
     const auto save = [&](std::string_view name)
     {
         window->draw(m.ws.frame(), theme);
@@ -307,6 +307,10 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
     save("tracks");
     m.type(U",ms");
     save("metronome");
+    // The second section armed as a punch range, then cleared so the guides don't show it.
+    m.type(U"gagg]s,rp");
+    save("punch-range");
+    m.type(U",rP");
     m.type(U"gagg");
     guide("arrangement-guide",
           {{viewWidth, cell.height / 2, U"1 Track / position"},

@@ -339,6 +339,8 @@ red is the recording colour, a reminder that `R` will record there. **PUNCH**
 lights in the status line too, so you can see a range is armed in any view
 and while stopped. Arming plays nothing and changes nothing in the song.
 
+![The Answer section armed as a punch range: a dashed bracket along the foot of the ruler over bars 5 to 8, and PUNCH lit in the status line.](images/punch-range.png){#fig-punch-range fig-alt="Modal's arrangement with two sections, Phrase and Answer. A dashed red bracket runs under the bar numbers of the Answer section, capped at each end, and the status line's PUNCH indicator is lit red."}
+
 The range belongs to how you are working on the song, like the cursor, rather
 than to the music. It isn't saved with the song or recorded as an undo step,
 but each open song keeps its own range while Modal runs. It also keeps track
