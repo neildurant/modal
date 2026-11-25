@@ -125,8 +125,8 @@ vmap <leader>rt tracks-thru-toggle "Thru to the selected tracks, or stop"
 
 " Loop and punch ranges, each a group of its own built the same way (decided 25 November 2026):
 " the letter doubled for the cursor's section, or in Visual mode the selected time; l for
-" between two labels; d to clear it; and for a loop, t to switch looping off and on, keeping
-" it. Arming plays nothing: Space plays the loop while it's on.
+" between two labels; d to clear it; and t to switch it off and on, keeping it. Arming plays
+" nothing: Space plays the loop while it's on, and R records the punch range while it's on.
 keysection "Loop"
 ngroup <leader>L "Loop"
 nmap <leader>LL loop              "Loop this section"
@@ -143,6 +143,7 @@ ngroup <leader>P "Punch"
 nmap <leader>PP punch             "Punch range: this section"
 nmap <leader>Pl punch-labels      "Punch range between labels"
 nmap <leader>Pd punch-clear       "Clear the punch range"
+nmap <leader>Pt punch-toggle      "Punching off or on, keeping the range"
 vgroup <leader>P "Punch"
 vmap <leader>PP punch             "Punch range: the selected time"
 vmap <leader>Pl punch-labels      "Punch range between labels"

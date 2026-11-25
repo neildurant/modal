@@ -345,6 +345,17 @@ TEST_CASE("a song's loop is saved as its punch range is, with off when looping i
     song.setLabel(3 * bar, "out");
     song.punch = ArmedRange::section(song, 1);
     song.loop = ArmedRange::labels(song, 0, 1);
+    {
+        // Punching off, as looping can be.
+        song.punchOn = false;
+        const auto text = writeSong(song);
+        CHECK(text.find("\npunch section=2 off\n") != std::string::npos);
+        const auto back = readSong(text, ppqn);
+        REQUIRE(back.song);
+        CHECK(back.song->punch);
+        CHECK_FALSE(back.song->punchOn);
+        song.punchOn = true;
+    }
     for (const bool on : {true, false})
     {
         CAPTURE(on);
@@ -366,7 +377,7 @@ TEST_CASE("a song's loop is saved as its punch range is, with off when looping i
     for (const auto& [bad, says] : std::vector<std::pair<std::string, std::string_view>>{
              {"loop section=1\nloop section=1\n", "one loop line"},
              {"loop section=1 off off\n", "unknown loop setting"},
-             {"punch section=1 off\n", "unknown punch setting"},
+             {"punch section=1 on\n", "unknown punch setting"},
              {"loop section=3\n", "the loop range names a section the song hasn't"}})
     {
         CAPTURE(bad);

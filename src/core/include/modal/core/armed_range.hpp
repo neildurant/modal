@@ -76,6 +76,7 @@ struct ArmedRangeFound
 struct ArmedSpans
 {
     std::optional<ArmedSpan> punch;
+    bool punchOn = true;
     std::optional<ArmedSpan> loop;
     bool loopOn = true;
 };

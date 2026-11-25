@@ -187,6 +187,9 @@ public:
     // The punch range armed for recording (decided 24 November 2026), saved with the song and
     // armed or cleared as an undo step (decided 25 November 2026).
     std::optional<ArmedRange> punch;
+    // Whether punching is on, so the range can be off without being forgotten (decided 25
+    // November 2026, as the loop's is): off, R records from the play-from marker.
+    bool punchOn = true;
     // The playback loop armed for Space (decided 25 November 2026), saved and undone as the
     // punch range is, and whether looping is on, so it can be off without being forgotten.
     std::optional<ArmedRange> loop;
@@ -456,6 +459,7 @@ public:
         bool repeatPlaybackLeadIn;
         RecordMode recordMode;
         std::optional<ArmedRange> punch;
+        bool punchOn;
         std::optional<ArmedRange> loop;
         bool loopOn;
         std::vector<std::shared_ptr<const Track>> tracks;

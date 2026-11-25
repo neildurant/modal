@@ -2644,6 +2644,40 @@ TEST_CASE("arming and clearing a punch range are undo steps, and the song is cha
     CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
 }
 
+TEST_CASE("punching switches off and on with , P t, keeping the range; off, R records from the "
+          "marker")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)};
+    const core::Tick bar = ppqn.whole();
+    p.type(U"ga,Pt");
+    CHECK(p.ws.message().starts_with("No punch range is armed"));
+    p.type(U"]s,PP"); // B
+    p.type(U",Pt");
+    CHECK(p.ws.message() == "Punching off, the range kept: R records from the marker");
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK(p.ws.armedRanges().punch == core::ArmedSpan{2 * bar, 5 * bar}); // still shown, dim
+    CHECK_FALSE(p.ws.armedRanges().punchOn);
+    CHECK(indicator(p, U"PUNCH") == Shown::Off);
+    p.type(U"u");
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+    p.press(Key::typed(U'r', kCtrl));
+    CHECK_FALSE(p.ws.punchSpan());
+
+    // Off, R records from the marker, as with nothing armed.
+    p.type(U"A");
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.ws.message().find("punching") == std::string::npos);
+    p.type(U" ");
+    p.runFor(10ms);
+
+    // Arming again switches it on.
+    p.type(U"gg]s,PP");
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+    CHECK(indicator(p, U"PUNCH") == Shown::Lit);
+}
+
 TEST_CASE("a punch range saved with a song is armed when it's read, and R records it")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

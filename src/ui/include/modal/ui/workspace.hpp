@@ -1395,6 +1395,7 @@ private:
     CommandResult punch(std::string_view arguments);
     CommandResult armPunch(core::ArmedRange range);
     CommandResult clearPunch();
+    CommandResult togglePunch();
     std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
     // Says why, when a key's edit has cleared the song's punch range, as it left it nowhere: the
     // song it had before the key, and its range then.

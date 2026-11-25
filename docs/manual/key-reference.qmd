@@ -158,6 +158,7 @@ after counts multiply.
 | `, P P` | Arm a punch range: the current section, or the Visual selection's time |
 | `, P l` | Arm a punch range between two labels (also `:punch IN OUT`) |
 | `, P d` | Clear the punch range |
+| `, P t` | Switch punching off or on, keeping the range |
 | `, l l`, `, l d`, `, l s` | Add, delete a label; section from a label |
 | `, l m`, `, l x` | List marks, delete marks by name |
 | `, m m`, `, m c`, `, m s` | Click mode, lead-in mode, Metronome page |

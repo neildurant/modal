@@ -565,7 +565,7 @@ bool Reader::readRange(Song& song, bool loop)
     for (const auto& token : std::span{line.tokens}.subspan(1))
     {
         const auto [name, value] = settingOf(token);
-        if (loop && !value && name == "off" && !off)
+        if (!value && name == "off" && !off)
         {
             off = true;
             continue;
@@ -628,8 +628,7 @@ bool Reader::readRange(Song& song, bool loop)
     if (const auto found = find(song, *armed); !found.span)
         return fail("the " + word + " range is nowhere: " + found.gone);
     (loop ? song.loop : song.punch) = *armed;
-    if (loop)
-        song.loopOn = !off;
+    (loop ? song.loopOn : song.punchOn) = !off;
     return true;
 }
 
@@ -1775,6 +1774,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.punch = rescaledRange(song.punch);
     result.loop = rescaledRange(song.loop);
     result.loopOn = song.loopOn;
+    result.punchOn = song.punchOn;
     return result;
 }
 
@@ -1849,7 +1849,7 @@ std::string writeSong(const Song& song)
         }
         line(0, text + std::string{after});
     };
-    writeRange("punch", song.punch, "");
+    writeRange("punch", song.punch, song.punchOn ? "" : " off");
     writeRange("loop", song.loop, song.loopOn ? "" : " off");
 
     if (!song.tracks().empty())

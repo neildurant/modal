@@ -237,6 +237,11 @@ CellSize Window::cellSize() const
     return impl_->font->cell();
 }
 
+bool Window::hasGlyph(char32_t character, bool bold) const
+{
+    return impl_->font->has(character, bold);
+}
+
 void Window::setMinimumCells(int columns, int rows)
 {
     impl_->minimumColumns = std::max(columns, 0);

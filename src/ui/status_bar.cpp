@@ -87,7 +87,7 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
             place.state == TransportState::PlaybackCountIn ||
             place.state == TransportState::PlaybackPreRoll)
         {
-            word = place.state == TransportState::Looping           ? "↻ LOOP"
+            word = place.state == TransportState::Looping           ? "↩ LOOP"
                    : place.state == TransportState::PlaybackCountIn ? "▶ COUNT"
                    : place.state == TransportState::PlaybackPreRoll ? "▶ PRE"
                                                                     : "▶ PLAY";

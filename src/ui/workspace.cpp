@@ -138,6 +138,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return chooseLoopLabel(std::nullopt, LabelPurpose::Punch);
                 if (name == "punch-clear")
                     return clearPunch();
+                if (name == "punch-toggle")
+                    return togglePunch();
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);

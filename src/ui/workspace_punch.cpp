@@ -18,7 +18,7 @@ namespace modal::ui
 std::optional<core::ArmedSpan> Workspace::punchSpan() const
 {
     const auto& song = document_.song();
-    if (!song.punch)
+    if (!song.punch || !song.punchOn)
         return std::nullopt;
     return core::find(song, *song.punch).span;
 }
@@ -76,8 +76,26 @@ CommandResult Workspace::armPunch(core::ArmedRange range)
     if (selection_)
         endVisual();
     document_.edit("Arm punch range", view().place(),
-                   [&](core::Song& armed) { armed.punch = std::move(range); });
+                   [&](core::Song& armed)
+                   {
+                       armed.punch = std::move(range);
+                       armed.punchOn = true;
+                   });
     return {true, std::move(text)};
+}
+
+CommandResult Workspace::togglePunch()
+{
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
+    const auto& song = document_.song();
+    if (!song.punch)
+        return {false, "No punch range is armed: " + keysOf("punch") + " arms one", false};
+    const bool on = !song.punchOn;
+    document_.edit(on ? "Punching on" : "Punching off", view().place(),
+                   [&](core::Song& switched) { switched.punchOn = on; });
+    return {true, on ? "Punching on: R records the punch range"
+                     : "Punching off, the range kept: R records from the marker"};
 }
 
 CommandResult Workspace::clearPunch()

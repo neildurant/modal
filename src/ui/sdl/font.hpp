@@ -49,6 +49,9 @@ public:
     // Draws a character in the cell whose top left corner is at (x, y), in pixels. A
     // character the font doesn't have is drawn as U+FFFD, or ? if it hasn't that either.
     void draw(char32_t character, bool bold, float x, float y, Colour colour);
+    // Whether a character is drawn as itself: one the font has, or box drawing or a block,
+    // drawn here.
+    bool has(char32_t character, bool bold) const;
 
 private:
     // Where a glyph is in the atlas; no page for a glyph that draws nothing, such as a space.

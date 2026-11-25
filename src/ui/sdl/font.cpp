@@ -112,6 +112,12 @@ void Font::draw(char32_t character, bool bold, float x, float y, Colour colour)
     SDL_RenderTexture(renderer_, found.page, &found.rect, &target);
 }
 
+bool Font::has(char32_t character, bool bold) const
+{
+    return !blockGlyph(character, cell_.width, cell_.height).empty() ||
+           TTF_FontHasGlyph(fonts_[bold ? 1 : 0], character);
+}
+
 const Font::Slot& Font::slot(char32_t character, bool bold)
 {
     const char32_t key = bold ? (character | kBoldBit) : character;

@@ -20,6 +20,7 @@
 #include <modal/ui/ports.hpp>
 #include <modal/ui/remembered.hpp>
 #include <modal/ui/sdl/window.hpp>
+#include <modal/ui/status_bar.hpp>
 #include <modal/ui/style.hpp>
 #include <modal/ui/themes.hpp>
 #include <modal/ui/window_commands.hpp>
@@ -119,6 +120,36 @@ TEST_CASE("the built-in font gives cells taller than they are wide, growing with
     REQUIRE(window->setFont({.file = "", .points = 24.0f}).empty());
     CHECK(window->cellSize().width > cell.width);
     CHECK(window->cellSize().height > cell.height);
+}
+
+TEST_CASE("the built-in font has every character the status line uses, in both weights")
+{
+    // Found after a trial, when ↻ LOOP showed U+FFFD: JetBrains Mono has no circular arrows.
+    auto window = offscreen(320, 200);
+    std::u32string used;
+    using TransportState = StatusBarState::TransportState;
+    for (const auto state :
+         {TransportState::Stopped, TransportState::Playing, TransportState::Looping,
+          TransportState::PlaybackCountIn, TransportState::PlaybackPreRoll, TransportState::CountIn,
+          TransportState::PreRoll, TransportState::Recording, TransportState::Overdubbing})
+    {
+        StatusBarState status;
+        StatusBarState::Transport transport;
+        transport.state = state;
+        status.transport = transport;
+        status.armed = 2;
+        status.punch = status.loop = status.modified = status.quantizeBypassed = true;
+        const auto bar = statusBar(status, 4000, window->cellSize());
+        for (const auto* side : {&bar.left, &bar.right})
+            for (const auto& segment : *side)
+                used += decodeUtf8(segment.text);
+    }
+    for (const auto character : used)
+    {
+        CAPTURE(static_cast<std::uint32_t>(character));
+        CHECK(window->hasGlyph(character));
+        CHECK(window->hasGlyph(character, true));
+    }
 }
 
 TEST_CASE("a font that can't be opened is reported, and the old one kept")

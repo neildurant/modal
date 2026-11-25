@@ -237,7 +237,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Leader groups: punch on `, P P`, `, P l`, `, P d`; loops on `, L` as a group (`, L L`, `, L l`). Accepted on trial.
     - [x] **Done** — The punch range saved with the song, arming and clearing as undo steps. Accepted on trial.
     - [x] **Done** — A shorter status line: the file's name to `Ctrl-g`, `[+]` kept; `IN` as a light, the last message in the Ports view. Accepted on trial, with `+` for `[+]`.
-    - [ ] **Doing** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song; changes while playing at the next Space.
+    - [ ] **Doing** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song; changes while playing at the next Space. After trial: `↩ LOOP`, as the font has no `↻`, and `, P t` for punching, as `, L t` (asked for 25 November 2026).
     - [ ] **To do** — Changes to the loop while playing take effect at once, through a new engine command.
     - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
@@ -259,6 +259,7 @@ Resolve the related [design questions](design.md#to-decide) before implementatio
 - [ ] **To do** — Mute selection/note - piano roll view. User can mute selections of notes from playing
 - [ ] **To do** — Mute selection/note - event list. User can mute selections of notes from playing
 - [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
+- [ ] **To do** — Moving a label to the cursor with `, l v`, choosing which (asked for and agreed 25 November 2026). See [design.md](design.md#data-model).
 - [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
 
 ## 13. Composition tools

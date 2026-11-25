@@ -116,7 +116,8 @@ std::optional<core::ArmedSpan> Workspace::loopSpan() const
 core::ArmedSpans Workspace::armedRanges() const
 {
     const auto& song = document_.song();
-    return {punchSpan(), song.loop ? core::find(song, *song.loop).span : std::nullopt, song.loopOn};
+    return {song.punch ? core::find(song, *song.punch).span : std::nullopt, song.punchOn,
+            song.loop ? core::find(song, *song.loop).span : std::nullopt, song.loopOn};
 }
 
 CommandResult Workspace::armLoop(core::ArmedRange range)

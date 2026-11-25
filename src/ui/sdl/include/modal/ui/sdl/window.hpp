@@ -98,6 +98,8 @@ public:
     std::string setFont(const FontOptions& font);
     const FontOptions& font() const;
     CellSize cellSize() const;
+    // Whether the font draws a character as itself, rather than as U+FFFD.
+    bool hasGlyph(char32_t character, bool bold = false) const;
 
     // Sets the smallest the window can be made, in cells; 0 for no limit. If the window is
     // smaller, it grows to fit, as far as the screen allows.

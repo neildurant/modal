@@ -589,8 +589,11 @@ void addRangeBrackets(Region& region, const core::ArmedSpans& ranges, core::Tick
     };
     if (ranges.punch)
     {
-        if (const auto punch = bracket(*ranges.punch))
+        if (auto punch = bracket(*ranges.punch))
+        {
+            punch->role = ranges.punchOn ? Role::IndicatorArm : Role::Dim;
             addRangeBracket(region, *punch, bottom, cell);
+        }
     }
     if (ranges.loop)
     {

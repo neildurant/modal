@@ -399,6 +399,8 @@ constexpr std::array kSharedCommands{
                 .title = "Punch between labels",
                 .modes = modeBit(Mode::Normal) | modeBit(Mode::Visual)},
     CommandInfo{.name = "punch-clear", .description = "Clear the punch range armed"},
+    CommandInfo{.name = "punch-toggle",
+                .description = "Switch punching off, keeping the range armed, or on again"},
     CommandInfo{.name = "loop-clear", .description = "Clear the loop armed"},
     CommandInfo{.name = "loop-toggle",
                 .description = "Switch looping off, keeping the loop armed, or on again"},
