@@ -153,6 +153,8 @@ CommandResult Workspace::armLoop(core::ArmedRange range)
 
 CommandResult Workspace::clearLoop()
 {
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
     const auto& song = document_.song();
     if (!song.loop)
         return {false, "No loop is armed", false};
@@ -165,6 +167,8 @@ CommandResult Workspace::clearLoop()
 
 CommandResult Workspace::toggleLoop()
 {
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
     const auto& song = document_.song();
     if (!song.loop)
         return {false, "No loop is armed: " + keysOf("loop") + " arms one", false};

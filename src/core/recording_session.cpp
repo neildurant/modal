@@ -33,20 +33,44 @@ std::span<const TrackId> RecordingSession::tracks() const
     return take_ ? std::span<const TrackId>{take_->tracks} : std::span<const TrackId>{};
 }
 
-bool RecordingSession::start(Player& player, std::optional<ArmedSpan> punch)
+bool RecordingSession::start(Player& player, std::optional<ArmedSpan> punch,
+                             std::optional<ArmedSpan> loop)
 {
     // Playing, only a punch can start, on the fly.
-    if (pending() || player.stopping() || (player.playing() && !punch) ||
+    if (pending() || player.stopping() || (player.playing() && (!punch || loop)) ||
         !(player.playing() ? player.punchIn(document_.underlying(), *punch)
-                           : player.record(document_.underlying(), punch)))
+                           : player.record(document_.underlying(), punch, loop)))
     {
         return false;
     }
     take_ = Take{&player, player.recordingTracks(), player.inputLost()};
     document_.setPreview([this](const Song& song) { return take_->player->previewTake(song); });
+    setGuard();
+    return true;
+}
+
+void RecordingSession::setGuard()
+{
     document_.setGuard([this](const Song& before, const Song& after)
                        { return guard(before, after); });
-    return true;
+}
+
+std::optional<RecordingSession::Completion>
+RecordingSession::finishPass(const EditPlace& place,
+                             const std::function<std::string(std::uint32_t)>& title)
+{
+    if (!take_)
+        return std::nullopt;
+    auto pass = take_->player->finishPass(document_.underlying());
+    if (!pass)
+        return std::nullopt;
+    Completion completion{false, std::move(pass->tracks), 0, true, pass->pass};
+    // The guard keeps other edits off the tracks being recorded; the pass is the take itself.
+    document_.setGuard({});
+    completion.changed =
+        document_.edit(title(pass->pass), place, [&](Song& song) { song = std::move(pass->song); });
+    setGuard();
+    return completion;
 }
 
 bool RecordingSession::stop()
@@ -84,7 +108,8 @@ std::optional<RecordingSession::Completion> RecordingSession::finish(const EditP
         return std::nullopt;
     }
     Completion completion{false, std::move(finished->tracks),
-                          take_->player->inputLost() - take_->inputLost, finished->reached};
+                          take_->player->inputLost() - take_->inputLost, finished->reached,
+                          finished->pass};
     clearHooks();
     // Keep the session pending through the commit, including document listener callbacks.
     completion.changed = document_.edit(std::move(title), place,

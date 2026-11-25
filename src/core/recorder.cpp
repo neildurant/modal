@@ -255,6 +255,57 @@ std::vector<TrackId> Recorder::tracks() const
     return ids;
 }
 
+Recorder Recorder::nextPass(Tick start) const
+{
+    Recorder next = *this;
+    next.start_ = start;
+    next.partial_.clear();
+    for (auto& take : next.takes_)
+    {
+        const auto& before = take.events;
+        std::vector<TakeEvent> events;
+        PedalState pedals;
+        for (const auto& taken : before)
+        {
+            if (!taken.removed)
+                pedals.apply(taken.event);
+        }
+        // Before the record point, so held there (see applied()).
+        for (const auto& pedal : pedals.down())
+        {
+            events.push_back({Event{start - 1, pedal}, true, false, true});
+        }
+        take.latestNote = {};
+        for (auto& held : take.held)
+        {
+            const auto& note = std::get<Note>(before[held.index].event.data);
+            held.index = events.size();
+            take.latestNote[note.pitch] = held.index;
+            events.push_back(
+                {Event{start, Note{note.pitch, note.velocity, 0}}, false, false, true});
+        }
+        take.events = std::move(events);
+    }
+    return next;
+}
+
+bool Recorder::played(Tick stop) const
+{
+    return std::ranges::any_of(takes_,
+                               [&](const TrackTake& take)
+                               {
+                                   return std::ranges::any_of(take.events,
+                                                              [&](const TakeEvent& taken)
+                                                              {
+                                                                  return !taken.removed &&
+                                                                         !taken.carried &&
+                                                                         taken.event.tick >=
+                                                                             start_ &&
+                                                                         taken.event.tick < stop;
+                                                              });
+                               });
+}
+
 Song Recorder::finish(Song song, Tick stop) const
 {
     if (stop <= start_)
@@ -291,7 +342,7 @@ EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick
     PedalState takeAtStart;
     PedalState takeAtStop;
     std::vector<Event> recorded;
-    for (const auto& [event, ended, removed] : take.events)
+    for (const auto& [event, ended, removed, carried] : take.events)
     {
         if (removed || event.tick >= stop)
         {

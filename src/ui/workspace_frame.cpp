@@ -465,9 +465,15 @@ Bar Workspace::statusBar() const
                                  ? TransportState::PlaybackCountIn
                                  : TransportState::PlaybackPreRoll;
         }
-        state.transport = StatusBarState::Transport{
-            transportState, playing.has_value(), place.position,        place.time,
-            place.meter,    tempoText(song, at), sectionText(song, at), sectionText(song, at, 6)};
+        state.transport = StatusBarState::Transport{transportState,
+                                                    playing.has_value(),
+                                                    place.position,
+                                                    place.time,
+                                                    place.meter,
+                                                    tempoText(song, at),
+                                                    sectionText(song, at),
+                                                    sectionText(song, at, 6),
+                                                    player_->recordingPass()};
         state.quantizeBypassed = player_->bypassQuantize();
     }
     state.armed =

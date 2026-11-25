@@ -93,13 +93,14 @@ std::shared_ptr<const PlaybackPlan> Player::compile(const Song& song)
     return plan;
 }
 
-bool Player::record(const Song& song, std::optional<ArmedSpan> punch)
+bool Player::record(const Song& song, std::optional<ArmedSpan> punch, std::optional<ArmedSpan> loop)
 {
-    if (playing_ || recorder_ || (punch && punch->to <= punch->from))
+    if (playing_ || recorder_ || (punch && punch->to <= punch->from) ||
+        (loop && (punch || loop->to <= loop->from)))
     {
         return false;
     }
-    const auto from = punch ? punch->from : marker_;
+    const auto from = punch ? punch->from : loop ? loop->from : marker_;
     const auto click = lookUp(song.metronome.port);
     auto start = planRecordStart(song, from, click);
     recorder_.emplace(song, 0, from, song.recordMode, resolveInput_);
@@ -111,7 +112,10 @@ bool Player::record(const Song& song, std::optional<ArmedSpan> punch)
     replacing_ = song.recordMode == RecordMode::Replace;
     auto plan = compile(song);
     const bool countIn = start.countIn.has_value();
-    if (!engine_.setPlan(plan) || !engine_.play(start.playFrom, std::move(start.countIn)))
+    const auto engineLoop =
+        loop ? std::optional{PlaybackLoop{loop->from, loop->to, false}} : std::nullopt;
+    if (!engine_.setPlan(plan) ||
+        !engine_.play(start.playFrom, std::move(start.countIn), engineLoop))
     {
         // The pass's plan, if taken, records nothing without a play, but plays as the pass
         // would: the tracks replaced silent, the click carrying on. So the song is planned
@@ -130,7 +134,50 @@ bool Player::record(const Song& song, std::optional<ArmedSpan> punch)
     playing_ = true;
     stopExact_ = true;
     started_ = start.playFrom;
+    recordLoop_ = loop;
+    pass_ = 0;
+    passes_.clear();
+    passesTaken_ = 0;
+    looping_ = loop.has_value();
+    loopAsked_ = loop ? std::optional{std::pair{loop->from, loop->to}} : std::nullopt;
     return true;
+}
+
+std::optional<std::uint32_t> Player::recordingPass() const
+{
+    if (!recordLoop_ || !recorder_)
+        return std::nullopt;
+    return pass_ + 1;
+}
+
+void Player::nextPass(std::uint32_t pass)
+{
+    while (pass_ < pass)
+    {
+        auto next = recorder_->nextPass(recordLoop_->from);
+        passes_.push_back(std::move(*recorder_));
+        recorder_.emplace(std::move(next));
+        ++pass_;
+    }
+    previewAt_ = recordLoop_->from;
+}
+
+bool Player::keeps(const Recorder& pass, Tick stop) const
+{
+    return !replacing_ || pass.played(stop);
+}
+
+std::optional<Player::Take> Player::finishPass(const Song& song)
+{
+    while (!passes_.empty())
+    {
+        auto pass = std::move(passes_.front());
+        passes_.erase(passes_.begin());
+        ++passesTaken_;
+        if (pass.played(recordLoop_->to))
+            return Take{pass.finish(song, recordLoop_->to), pass.tracks(), true, passesTaken_};
+    }
+    return std::nullopt;
 }
 
 bool Player::punchIn(const Song& song, ArmedSpan punch)
@@ -268,6 +315,19 @@ Song Player::previewTake(const Song& song)
     }
     if (punchOut_)
         previewAt_ = std::min(previewAt_, *punchOut_);
+    if (recordLoop_)
+    {
+        // The passes ended but not yet taken, then this one, if it changes anything yet.
+        previewAt_ = std::min(previewAt_, recordLoop_->to);
+        auto preview = song;
+        for (const auto& pass : passes_)
+        {
+            if (keeps(pass, recordLoop_->to))
+                preview = pass.finish(std::move(preview), recordLoop_->to);
+        }
+        return keeps(*recorder_, previewAt_) ? recorder_->finish(std::move(preview), previewAt_)
+                                             : preview;
+    }
     return recorder_->finish(song, previewAt_);
 }
 
@@ -283,14 +343,20 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
         return std::nullopt;
     }
     takeInput();
+    if (!passes_.empty())
+        return std::nullopt;
     // Punched out while playing on, or stopped: at the punch's end if it came first.
-    const auto stop =
-        punchedOut_ ? *punchOut_ : std::min(stoppedAt_, punchOut_.value_or(stoppedAt_));
-    Take take{recorder_->finish(song, stop), recorder_->tracks(), stop > recordPoint_};
+    auto stop = punchedOut_ ? *punchOut_ : std::min(stoppedAt_, punchOut_.value_or(stoppedAt_));
+    if (recordLoop_)
+        stop = std::min(stop, recordLoop_->to);
+    Take take{!recordLoop_ || keeps(*recorder_, stop) ? recorder_->finish(song, stop) : song,
+              recorder_->tracks(), stop > recordPoint_, recordingPass().value_or(0)};
     recorder_.reset();
     click_.reset();
     punchOut_.reset();
     punchedOut_ = false;
+    recordLoop_.reset();
+    passesTaken_ = 0;
     // Planned again for playing, the tracks recorded heard again and the click as it plays
     // then, even if nothing was recorded and the song is as it was.
     update(take.song);
@@ -309,7 +375,8 @@ bool Player::playLoop(const Song& song, Tick from, Tick to)
 
 bool Player::changeLoop(std::optional<std::pair<Tick, Tick>> loop)
 {
-    if (!playing_)
+    // Recording a loop, its passes keep to the loop they began with.
+    if (!playing_ || recordLoop_)
     {
         return false;
     }
@@ -433,7 +500,12 @@ std::size_t Player::takeInput()
     while (const auto stamped = engine_.nextReceived())
     {
         messages += stamped->first ? 1 : 0;
-        if (recorder_)
+        if (recorder_ && recordLoop_ && stamped->play == play_ && stamped->pass > pass_)
+        {
+            nextPass(stamped->pass);
+        }
+        // Taken in after its pass has ended, it's too late for it.
+        if (recorder_ && !(recordLoop_ && stamped->play == play_ && stamped->pass < pass_))
         {
             recorder_->receive(*stamped);
         }
@@ -474,6 +546,17 @@ bool Player::poll()
             stoppedAt(*at);
             stoppedAt_ = *at;
             stopExact_ = true;
+        }
+    }
+    // A loop's pass ended: its input, stamped before the wrap, is taken first, then it's left
+    // to be applied, and the next pass is recorded.
+    if (playing_ && recorder_ && recordLoop_)
+    {
+        if (const auto pass = engine_.status().pass; pass > pass_)
+        {
+            takeInput();
+            nextPass(pass);
+            return true;
         }
     }
     // A punch's end passed while playing: recording ends there, the take to be finished, input

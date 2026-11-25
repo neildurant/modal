@@ -26,7 +26,8 @@ StatusBarState stateWithTransport()
                                                 "4/4",
                                                 "120 BPM",
                                                 "Introduction",
-                                                "Intro…"};
+                                                "Intro…",
+                                                std::nullopt};
     return state;
 }
 

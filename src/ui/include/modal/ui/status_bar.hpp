@@ -49,6 +49,9 @@ struct StatusBarState
         std::string tempo;
         std::string section;
         std::string shortSection;
+        // Recording a loop, the pass being recorded, shown after REC (decided 25 November
+        // 2026).
+        std::optional<std::uint32_t> pass;
     };
 
     Mode mode = Mode::Normal;

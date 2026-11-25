@@ -3405,6 +3405,9 @@ bool Workspace::record()
     // While playing, only a punch range armed ahead of the playhead can be recorded, on the
     // fly (decided 24 November 2026).
     const auto punch = punchSpan();
+    // With a loop armed, R records it pass after pass (decided 25 November 2026); not with a
+    // punch range too, for now.
+    const auto loop = loopSpan();
     const auto playhead = player_->position();
     if (recording_.pending() || player_->stopping() || (player_->playing() && !punch))
     {
@@ -3417,6 +3420,12 @@ bool Workspace::record()
     if (player_->playing() && player_->looping())
     {
         refuse("Recording while looping comes later: stop first to punch in");
+        return true;
+    }
+    if (loop && punch && !player_->playing())
+    {
+        refuse("A loop and a punch range are both on: " + keysOf("loop-toggle") + " or " +
+               keysOf("punch-toggle") + " switches one off");
         return true;
     }
     if (player_->playing() && playhead && *playhead >= punch->from)
@@ -3459,7 +3468,8 @@ bool Workspace::record()
         return true;
     }
     // With a punch range armed, R records that (decided 24 November 2026), from its start.
-    if (!recording_.start(*player_, punch))
+    const auto recordLoop = player_->playing() ? std::nullopt : loop;
+    if (!recording_.start(*player_, punch, recordLoop))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
         return true;
@@ -3471,6 +3481,9 @@ bool Workspace::record()
     if (punch)
         text += ", punching in " + positionText(song.meter(), punch->from) + " to " +
                 positionText(song.meter(), punch->to);
+    if (recordLoop)
+        text += ", looping " + positionText(song.meter(), recordLoop->from) + " to " +
+                positionText(song.meter(), recordLoop->to);
     text += nothing;
     if (!player_->clicking())
         text += "; no click, with no metronome port or default output";
@@ -3517,21 +3530,40 @@ bool Workspace::clickPort() const
 
 void Workspace::finishRecording()
 {
+    const auto tracks = recording_.tracks();
+    const auto names = trackNames(document_.underlying(), tracks);
+    // "Record onto Bass", or recording a loop, "Record pass 2 onto Bass".
+    const auto title = [&](std::uint32_t pass)
+    {
+        return std::string{"Record "} + (pass > 0 ? "pass " + std::to_string(pass) + " " : "") +
+               "onto " + (tracks.size() == 1 ? names : std::to_string(tracks.size()) + " tracks");
+    };
+    // Each pass of a loop as it ends, while recording carries on.
+    while (const auto pass = recording_.finishPass(view().place(), title))
+    {
+        refresh();
+        setMessage("Recorded pass " + std::to_string(pass->pass) + " onto " + names,
+                   MessageKind::Information);
+    }
     if (recording_.state() != core::RecordingSession::State::Finishing)
     {
         return;
     }
-    const auto tracks = recording_.tracks();
-    const auto names = trackNames(document_.underlying(), tracks);
-    const auto title = tracks.size() == 1
-                           ? "Record onto " + names
-                           : "Record onto " + std::to_string(tracks.size()) + " tracks";
-    auto completed = recording_.finish(view().place(), title);
+    const auto pass = player_ != nullptr ? player_->recordingPass().value_or(0) : 0;
+    auto completed = recording_.finish(view().place(), title(pass));
     if (!completed)
     {
         return;
     }
     const auto punched = std::exchange(punching_, std::nullopt);
+    if (!completed->changed && completed->pass > 1)
+    {
+        // The passes before it are kept, each its own undo step.
+        setMessage("Recording stopped: nothing was played in pass " +
+                       std::to_string(completed->pass),
+                   MessageKind::Information);
+        return;
+    }
     if (!completed->changed)
     {
         // Stopped too soon, or recording nothing over nothing.
@@ -3556,7 +3588,9 @@ void Workspace::finishRecording()
                    " lost during the take, arriving faster than taken";
     refresh();
     // Not saying where: stopped early, a punch ends short of its range's end.
-    setMessage("Recorded onto " + names + (punched ? " in the punch range" : "") + trouble,
+    setMessage("Recorded " +
+                   (completed->pass > 0 ? "pass " + std::to_string(completed->pass) + " " : "") +
+                   "onto " + names + (punched ? " in the punch range" : "") + trouble,
                trouble.empty() ? MessageKind::Information : MessageKind::Warning);
 }
 

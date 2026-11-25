@@ -114,7 +114,12 @@ public:
     // Given a punch range (decided 24 November 2026), it records that instead: from its start,
     // after the count-in or pre-roll before it, up to its end, where recording ends while
     // playback carries on, the take finished there (see punchedOut()).
-    [[nodiscard]] bool record(const Song& song, std::optional<ArmedSpan> punch = std::nullopt);
+    //
+    // Given a loop instead (decided 25 November 2026), it records the loop pass after pass,
+    // from its start, after the lead-in, looping seamlessly. Each pass ends as the loop wraps,
+    // its take to be applied (see finishPass()); the last, when stopped, as far as it got.
+    [[nodiscard]] bool record(const Song& song, std::optional<ArmedSpan> punch = std::nullopt,
+                              std::optional<ArmedSpan> loop = std::nullopt);
 
     // Punches in on the fly (decided 24 November 2026): while playing, not looping, and before
     // the punch's start, recording starts there without a lead-in, the music already playing
@@ -128,6 +133,8 @@ public:
     // Whether a punch has reached its end while playing on, its take to be finished.
     bool punchedOut() const { return recorder_.has_value() && punchedOut_; }
     bool clicking() const { return click_.has_value(); }
+    // Recording a loop, the pass being recorded, the first being 1; none otherwise.
+    std::optional<std::uint32_t> recordingPass() const;
 
     // Where a pass is: counting in, the song silent; playing the pre-roll, before the record
     // point; or recording. Nothing when not recording.
@@ -151,7 +158,8 @@ public:
     {
         Song song;
         std::vector<TrackId> tracks;
-        bool reached = false; // whether it got past the record point, recording anything at all
+        bool reached = false;   // whether it got past the record point, recording anything at all
+        std::uint32_t pass = 0; // recording a loop, which pass, the first being 1
     };
     // While a pass is being recorded, or until it's finished: the song with the take so far,
     // as if recording stopped at the playhead (or where it stopped), to show as it's played.
@@ -170,7 +178,15 @@ public:
     // Ends the stopped pass, taking any input still to come: the take, from the record point to
     // where it stopped, or its punch's end if sooner, applied to the song as it is now. Nothing
     // until recordingStopped(). After a punch, playback carries on, playing the song with it.
+    // Recording a loop, the last pass is finished here, as far as it got; in replace mode, a
+    // pass with nothing played leaves the song as it was. Nothing while ended passes are still
+    // to be taken by finishPass().
     std::optional<Take> finishRecording(const Song& song);
+
+    // Recording a loop, the next pass to have ended at the loop's end, its take applied to the
+    // song as it is now; a pass with nothing played is passed over. Nothing until one has.
+    std::optional<Take> finishPass(const Song& song);
+    bool passEnded() const { return !passes_.empty(); }
 
     // Plays the song's click once, the downbeat's or the other beats', on its port (the
     // default output where it names none), as long as it is at the song's first tempo. Returns
@@ -252,19 +268,27 @@ private:
     bool playing_ = false;
     bool looping_ = false;
     std::optional<std::pair<Tick, Tick>> loopAsked_;
-    std::uint64_t play_ = 0;             // the engine's id for the last play
-    Tick started_ = 0;                   // where the last play started
-    Tick playbackEntry_ = 0;             // where the lead-in for playback ends
-    bool stopExact_ = true;              // whether the engine has said where the last play stopped
-    Tick stoppedAt_ = 0;                 // where it said
-    std::optional<Recorder> recorder_;   // the pass being recorded, until finished
-    std::optional<DestinationId> click_; // the metronome's while recording
-    Tick recordPoint_ = 0;               // where the pass records from
-    std::optional<Tick> punchOut_;       // where it stops recording, punching
-    bool punchedOut_ = false;            // whether the playhead has passed punchOut_
-    bool replacing_ = false;             // whether it replaces, rather than overdubs
-    Tick previewAt_ = 0;                 // where the take was last shown up to
-    bool countIn_ = false;               // whether the current play counts in
+    std::uint64_t play_ = 0;              // the engine's id for the last play
+    Tick started_ = 0;                    // where the last play started
+    Tick playbackEntry_ = 0;              // where the lead-in for playback ends
+    bool stopExact_ = true;               // whether the engine has said where the last play stopped
+    Tick stoppedAt_ = 0;                  // where it said
+    std::optional<Recorder> recorder_;    // the pass being recorded, until finished
+    std::optional<DestinationId> click_;  // the metronome's while recording
+    Tick recordPoint_ = 0;                // where the pass records from
+    std::optional<Tick> punchOut_;        // where it stops recording, punching
+    bool punchedOut_ = false;             // whether the playhead has passed punchOut_
+    bool replacing_ = false;              // whether it replaces, rather than overdubs
+    Tick previewAt_ = 0;                  // where the take was last shown up to
+    bool countIn_ = false;                // whether the current play counts in
+    std::optional<ArmedSpan> recordLoop_; // the loop being recorded, pass after pass
+    std::uint32_t pass_ = 0;              // the engine's count of the pass being recorded
+    std::vector<Recorder> passes_;        // passes ended, their takes still to be applied
+    std::uint32_t passesTaken_ = 0;       // how many ended passes have been taken
+    // Recording a loop, moves on to the given pass, ending the passes before it.
+    void nextPass(std::uint32_t pass);
+    // Whether a pass's take changes the song: in replace mode, only if something was played.
+    bool keeps(const Recorder& pass, Tick stop) const;
 };
 
 } // namespace modal::core

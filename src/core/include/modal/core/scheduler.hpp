@@ -136,6 +136,14 @@ public:
     std::optional<std::chrono::nanoseconds>
     songTimeAt(std::chrono::nanoseconds time) const noexcept;
 
+    // Which pass of the loop a time was in: 0 for the first, with any lead-in, counting each
+    // wrap since the play began. A time before the last wrap, taken in late, was in the pass
+    // before it, and is stamped by tickAt() and songTimeAt() as it was then. For loop
+    // recording (decided 25 November 2026).
+    std::uint32_t passAt(std::chrono::nanoseconds time) const noexcept;
+    // The pass being played now.
+    std::uint32_t pass() const noexcept { return pass_; }
+
     std::size_t soundingNotes() const noexcept { return sounding_.size(); }
 
     // Note-ons not sent because the table of sounding notes was full.
@@ -221,6 +229,15 @@ private:
     Tick loopStartTick_ = 0; // includes musical pre-roll when repeated
     std::span<const PlannedEvent> loopChase_;
     std::optional<std::chrono::nanoseconds> loopFloor_; // earliest send time after a wrap
+    std::uint32_t pass_ = 0;                            // the loop's wraps since the play began
+    // The last wrap and the origin and pass before it, to stamp input taken in after it.
+    std::chrono::nanoseconds lastWrap_ = std::chrono::nanoseconds::min();
+    std::chrono::nanoseconds originBeforeWrap_{0};
+    std::uint32_t passBeforeWrap_ = 0;
+    std::chrono::nanoseconds originAt(std::chrono::nanoseconds time) const noexcept
+    {
+        return time < lastWrap_ ? originBeforeWrap_ : origin_;
+    }
     const PlannedCountIn* loopCountIn_ = nullptr;
     bool chasedValuesSent_ = true;
     std::chrono::nanoseconds played_{0}; // when the last play began, on the caller's clock

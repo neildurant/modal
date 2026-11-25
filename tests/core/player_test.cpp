@@ -8,7 +8,9 @@
 #include <modal/core/player.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -558,6 +560,94 @@ TEST_CASE("a plan the engine can't take yet is kept and handed over later, the n
         heard = heard || (sent.bytes.size() == 3 && sent.bytes[1] == 90);
     }
     CHECK(heard);
+}
+
+TEST_CASE("recording a loop ends each pass as it wraps, a pass with nothing played passed over")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto mode = GENERATE(RecordMode::Replace, RecordMode::Overdub);
+    auto song = songAt(ppqn);
+    const auto id = song.addTrack("Recorded");
+    song.updateTrack(id, [](Track& track) { track.arm = true; });
+    song.countIn.mode = CountInSettings::Mode::None;
+    song.recordMode = mode;
+    Playing p{song};
+    const auto begin = kStart + compilePlan(song, byPortName).leadIn;
+    // A loop of two beats, a second long; the engine woken often, as by the editor.
+    const auto advanceTo = [&](std::chrono::nanoseconds time)
+    {
+        while (p.clock.time < begin + time)
+        {
+            p.clock.time = std::min(begin + time, p.clock.time + 100ms);
+            p.engine.step();
+        }
+        return p.player.poll();
+    };
+    // Plays a message now, returning where in the loop it was.
+    const auto play = [&](std::uint8_t status, std::uint8_t pitch)
+    {
+        REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{status, pitch, 100},
+                                 p.clock.time));
+        p.engine.step();
+        p.player.takeInput();
+        return p.player.position().value_or(-1);
+    };
+    REQUIRE(p.player.record(song, std::nullopt, ArmedSpan{0, 2 * q}));
+    CHECK(p.player.recordingPass() == 1u);
+    CHECK(p.player.looping());
+    CHECK_FALSE(p.player.changeLoop(std::pair{0, q})); // its passes keep to their loop
+
+    // The first pass: a note in the second half of the first beat.
+    advanceTo(250ms);
+    const auto on = play(0x90, 60);
+    advanceTo(500ms);
+    const auto off = play(0x80, 60);
+    CHECK(on > 0);
+    CHECK(off < 2 * q);
+    CHECK_FALSE(p.player.passEnded());
+    CHECK(advanceTo(1100ms));
+    CHECK(p.player.passEnded());
+    CHECK(p.player.recordingPass() == 2u);
+    auto pass = p.player.finishPass(song);
+    REQUIRE(pass);
+    CHECK(pass->pass == 1u);
+    CHECK(pass->tracks == std::vector{id});
+    song = pass->song;
+    CHECK(std::vector<Event>(song.events(id).all().begin(), song.events(id).all().end()) ==
+          std::vector<Event>{{on, Note{60, 100, off - on, 100}}});
+    p.player.update(song);
+
+    // The second: nothing played, so passed over, leaving the first.
+    advanceTo(2100ms);
+    CHECK(p.player.recordingPass() == 3u);
+    CHECK_FALSE(p.player.finishPass(song));
+    CHECK_FALSE(p.player.passEnded());
+    CHECK(p.player.previewTake(song) == song);
+
+    // The third, stopped in its second beat, with a note held: as far as it got.
+    advanceTo(2250ms);
+    const auto again = play(0x90, 64);
+    CHECK(again == on);
+    advanceTo(2500ms);
+    CHECK(p.player.previewTake(song).events(id).size() == (mode == RecordMode::Replace ? 1u : 2u));
+    REQUIRE(p.player.stop());
+    p.engine.step();
+    p.player.poll();
+    REQUIRE(p.player.recordingStopped());
+    const auto last = p.player.finishRecording(song);
+    REQUIRE(last);
+    CHECK(last->pass == 3u);
+    const auto events = last->song.events(id).all();
+    REQUIRE_FALSE(events.empty());
+    const auto stop = again + std::get<Note>(events.back().data).duration;
+    CHECK(stop >= off);
+    CHECK(stop < 2 * q);
+    std::vector<Event> expected{{again, Note{64, 100, stop - again}}};
+    if (mode == RecordMode::Overdub)
+        expected.insert(expected.begin(), {on, Note{60, 100, off - on, 100}});
+    CHECK(std::vector<Event>(events.begin(), events.end()) == expected);
+    CHECK_FALSE(p.player.recordingPass());
 }
 
 TEST_CASE("a record the engine can't take leaves the song planned for playing")

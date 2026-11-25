@@ -52,6 +52,14 @@ public:
     // The tracks being recorded onto, in song order.
     std::vector<TrackId> tracks() const;
 
+    // Loop recording (decided 25 November 2026): a recorder for the loop's next pass, from
+    // `start`, taking the same input onto the same tracks. Notes and pedals still held as
+    // this pass ends start again there, as they would at a record point.
+    Recorder nextPass(Tick start) const;
+    // Whether anything was played from the record point up to `stop`, not counting what was
+    // still held from before it.
+    bool played(Tick stop) const;
+
 private:
     // One event of a take, as it arrived; a note's duration is known once it has ended.
     struct TakeEvent
@@ -59,6 +67,7 @@ private:
         Event event;
         bool ended = true; // false for a note still held
         bool removed = false;
+        bool carried = false; // held over from the pass before
     };
 
     struct HeldNote

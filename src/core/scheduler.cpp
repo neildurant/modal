@@ -80,6 +80,9 @@ void Scheduler::setPlan(const PlaybackPlan& plan, nanoseconds now,
     const nanoseconds position = countingIn(now)
                                      ? now - (recordPoint_ - plan.tempo.toTime(startTick_))
                                      : remap(now - origin_, plan_->tempo, plan.tempo);
+    // Input from before the last wrap, taken in late, is stamped on the new tempo too.
+    if (lastWrap_ != nanoseconds::min())
+        originBeforeWrap_ = now - remap(now - originBeforeWrap_, plan_->tempo, plan.tempo);
     origin_ = now - position;
     plan_ = &plan;
     loopChase_ = loopChase;
@@ -353,6 +356,8 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     loopCountIn_ = loop_ && loop_->repeatLeadIn ? countIn : nullptr;
     loopChase_ = loopChase;
     loopFloor_.reset();
+    pass_ = 0;
+    lastWrap_ = nanoseconds::min();
     origin_ = now - startTime;
     countIn_ = countIn;
     nextCountIn_ = 0;
@@ -619,6 +624,10 @@ void Scheduler::wrap(nanoseconds boundary, nanoseconds now) noexcept
     const auto length = countLength + (plan_->tempo.toTime(loop_->to) - start);
     // Keep the phase after a late wake, without sending passes that have already ended.
     const auto restart = now - (now - boundary) % length;
+    lastWrap_ = boundary;
+    originBeforeWrap_ = origin_;
+    passBeforeWrap_ = pass_;
+    pass_ += 1 + static_cast<std::uint32_t>((now - boundary) / length);
     recordPoint_ = restart + countLength;
     origin_ = recordPoint_ - start;
     loopFloor_ = start;
@@ -737,7 +746,7 @@ std::optional<Tick> Scheduler::tickAt(nanoseconds time) const noexcept
     {
         return std::nullopt;
     }
-    return plan_->tempo.toTickExtended(time - origin_);
+    return plan_->tempo.toTickExtended(time - originAt(time));
 }
 
 std::optional<nanoseconds> Scheduler::songTimeAt(nanoseconds time) const noexcept
@@ -746,7 +755,12 @@ std::optional<nanoseconds> Scheduler::songTimeAt(nanoseconds time) const noexcep
     {
         return std::nullopt;
     }
-    return time - origin_;
+    return time - originAt(time);
+}
+
+std::uint32_t Scheduler::passAt(nanoseconds time) const noexcept
+{
+    return time < lastWrap_ ? passBeforeWrap_ : pass_;
 }
 
 void Scheduler::send(const PlannedEvent& event) noexcept

@@ -101,6 +101,9 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
                    : place.state == TransportState::PreRoll     ? "● PRE"
                    : place.state == TransportState::Overdubbing ? "● ODUB"
                                                                 : "● REC";
+            if (place.pass && (place.state == TransportState::Recording ||
+                               place.state == TransportState::Overdubbing))
+                word += " " + std::to_string(*place.pass);
             stateStyle = {Role::IndicatorLitText, Role::IndicatorArm, kBold};
         }
         segments.push_back({" " + padText(word, 7, false) + " ", stateStyle});

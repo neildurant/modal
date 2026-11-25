@@ -57,6 +57,9 @@ struct StampedInput
     // lead-in. The recorder takes a track's time offset off this.
     std::chrono::nanoseconds songTime{};
 
+    // While playing a loop, which pass it arrived in (see Scheduler::passAt); 0 otherwise.
+    std::uint32_t pass = 0;
+
     // The immutable mapping used for this stamp. Made on the control side and moved back
     // through the queue, so delayed collection never uses a later edit's tempo. A failed
     // push leaves its snapshot owning the map; the engine never frees the last reference.

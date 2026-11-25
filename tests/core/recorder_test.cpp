@@ -210,6 +210,49 @@ TEST_CASE("notes and pedals still held when recording stops end there")
                                               });
 }
 
+TEST_CASE("a loop's next pass starts again what was held as the last ended, and counts only "
+          "what's played in it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+
+    // The first pass, of two beats: a pedal down and a note held over its end.
+    Recorder first{song, kPlay, 0};
+    first.receive(stamped(0ms, {0xB0, 64, 100}));
+    first.receive(stamped(0ms, {0x90, 60, 100}));
+    first.receive(stamped(250ms, {0x80, 60, 64}));
+    first.receive(stamped(750ms, {0x90, 62, 90}));
+    CHECK(first.played(2 * q));
+    CHECK(eventsOf(first.finish(2 * q), id) == std::vector<Event>{
+                                                   cc(0, 64, 100),
+                                                   note(0, 60, q / 2),
+                                                   note(q + q / 2, 62, q / 2, 90),
+                                                   cc(2 * q, 64, 0),
+                                               });
+
+    // The second: the note and pedal held from the start, and let go in it.
+    auto second = first.nextPass(0);
+    CHECK_FALSE(second.played(2 * q));
+    second.receive(stamped(250ms, {0x80, 62, 64}));
+    second.receive(stamped(500ms, {0xB0, 64, 0}));
+    CHECK(second.played(2 * q)); // the pedal let up
+    CHECK(eventsOf(second.finish(2 * q), id) == std::vector<Event>{
+                                                    cc(0, 64, 100),
+                                                    note(0, 62, q / 2, 90),
+                                                    cc(q, 64, 0),
+                                                });
+
+    // Only letting go of what was held is nothing played.
+    auto third = first.nextPass(0);
+    third.receive(stamped(250ms, {0x80, 62, 64}));
+    CHECK_FALSE(third.played(2 * q));
+    third.receive(stamped(500ms, {0x90, 64, 100}));
+    CHECK(third.played(2 * q));
+    CHECK_FALSE(third.played(q));
+}
+
 TEST_CASE("replacing removes what started in the recorded range, cutting notes running in")
 {
     const auto ppqn = MODAL_ANY_PPQN();

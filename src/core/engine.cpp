@@ -170,6 +170,7 @@ EngineStatus Engine::status() const
     status.finishedPlay = finishedPlay_.load(std::memory_order_relaxed);
     status.finished = status.finishedPlay != 0;
     status.countingIn = countingIn_.load(std::memory_order_relaxed);
+    status.pass = pass_.load(std::memory_order_relaxed);
     if (const Tick position = position_.load(std::memory_order_relaxed); position != kNoPosition)
     {
         status.position = position;
@@ -432,6 +433,7 @@ void Engine::takeInput(InputBatch& queued, const Snapshot* snapshot, std::size_t
                         stamped.tick = scheduler_.tickAt(chunk->time).value_or(0);
                         stamped.songTime =
                             scheduler_.songTimeAt(chunk->time).value_or(nanoseconds{0});
+                        stamped.pass = scheduler_.passAt(chunk->time);
                     }
                     if (!stamped_->tryPush(std::move(stamped)))
                     {
@@ -481,6 +483,7 @@ void Engine::publishStatus(nanoseconds now) noexcept
     finishedPlay_.store(scheduler_.finished() ? currentPlay_ : 0, std::memory_order_relaxed);
     countingIn_.store(scheduler_.countingIn(now), std::memory_order_relaxed);
     position_.store(scheduler_.position(now).value_or(kNoPosition), std::memory_order_relaxed);
+    pass_.store(scheduler_.pass(), std::memory_order_relaxed);
     droppedNotes_.store(scheduler_.droppedNotes(), std::memory_order_relaxed);
 }
 

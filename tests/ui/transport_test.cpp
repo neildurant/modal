@@ -2791,6 +2791,79 @@ TEST_CASE("R records the armed punch range, playing on past its end with the tak
     CHECK(p.document.song().events(keys).size() == 1);
 }
 
+TEST_CASE("R records an armed loop pass after pass, each an undo step as it wraps")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    song.countIn.mode = core::CountInSettings::Mode::None;
+    const auto keys = song.tracks()[0]->id();
+    Playing p{std::move(song)};
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+    const auto pitches = [&]
+    {
+        std::vector<int> result;
+        for (const auto& event : p.document.song().events(keys).all())
+            result.push_back(std::get<core::Note>(event.data).pitch);
+        return result;
+    };
+
+    // With a punch range on too, refused for now.
+    p.type(U"gaA,LL]s,PP"); // the loop A, bars 1 and 2; the punch range B
+    p.type(U"R");
+    CHECK(p.ws.message() == "A loop and a punch range are both on: ,Lt or ,Pt switches one off");
+    CHECK_FALSE(p.player.playing());
+    p.type(U",Pt");
+
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.player.looping());
+    CHECK(p.ws.message() == "Recording onto Keys, looping " + at(0) + " to " + at(2 * bar));
+    p.runFor(1s);
+    CHECK(contains(p.status(), U"● REC 1"));
+    playNote(p, 60);
+
+    // Two bars at 120 BPM: the first pass is in as it wraps, recording going on.
+    p.runFor(3s);
+    CHECK(p.player.recording());
+    CHECK(contains(p.status(), U"● REC 2"));
+    CHECK(p.ws.message() == "Recorded pass 1 onto Keys");
+    CHECK(pitches() == std::vector{60});
+    // The loop is kept to while recording it.
+    p.type(U",Lt");
+    CHECK(p.ws.message() == "Recording: Space stops it first");
+
+    // The second pass, with nothing played, leaves the first; the third, stopped early,
+    // replaces it as far as it got.
+    p.runFor(4s);
+    CHECK(contains(p.status(), U"● REC 3"));
+    CHECK(pitches() == std::vector{60});
+    p.runFor(1s);
+    playNote(p, 64);
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK_FALSE(p.player.playing());
+    CHECK(p.ws.message() == "Recorded pass 3 onto Keys");
+    CHECK(pitches() == std::vector{64});
+
+    // Each pass its own undo step.
+    p.type(U"u");
+    CHECK(pitches() == std::vector{60});
+    p.type(U"u");
+    CHECK(pitches().empty());
+
+    // Stopped in a later pass with nothing played in it, the passes before are kept.
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    p.runFor(1s);
+    playNote(p, 67);
+    p.runFor(4s);
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK(p.ws.message() == "Recording stopped: nothing was played in pass 2");
+    CHECK(pitches() == std::vector{67});
+}
+
 TEST_CASE("R while playing punches in ahead of the playhead, and is refused past punch-in")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});

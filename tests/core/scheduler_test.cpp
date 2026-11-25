@@ -241,6 +241,48 @@ TEST_CASE("a silent loop retains its tempo and phase after a late wake")
     CHECK(sink.sent.empty());
 }
 
+TEST_CASE("a loop's passes are counted, input taken in late stamped as in the pass before")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1, [&](EditTrack& track) { track.events.insert({0, Note{60, 100, q}}); });
+    const auto plan = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, chase(plan, 0), kNow, nullptr, PlaybackLoop{0, 2 * q});
+    CHECK(scheduler.pass() == 0);
+    CHECK(scheduler.passAt(kNow + 900ms) == 0);
+    CHECK(scheduler.tickAt(kNow + 500ms) == q);
+
+    // Wrapped at a second: the first pass's input, taken in late, is where it was played.
+    runUntil(scheduler, kNow + 1250ms);
+    CHECK(scheduler.pass() == 1);
+    CHECK(scheduler.passAt(kNow + 900ms) == 0);
+    CHECK(scheduler.songTimeAt(kNow + 900ms) == 900ms);
+    CHECK(scheduler.tickAt(kNow + 750ms) == q + q / 2);
+    CHECK(scheduler.passAt(kNow + 1100ms) == 1);
+    CHECK(scheduler.songTimeAt(kNow + 1100ms) == 100ms);
+    CHECK(scheduler.tickAt(kNow + 1250ms) == q / 2);
+
+    // A new plan, as an edit makes, keeps them so.
+    scheduler.setPlan(plan, kNow + 1250ms);
+    CHECK(scheduler.passAt(kNow + 900ms) == 0);
+    CHECK(scheduler.songTimeAt(kNow + 900ms) == 900ms);
+    CHECK(scheduler.songTimeAt(kNow + 1100ms) == 100ms);
+
+    // Waking late, the passes missed are counted.
+    scheduler.sendDue(kNow + 4250ms);
+    CHECK(scheduler.pass() == 4);
+    CHECK(scheduler.position(kNow + 4250ms) == q / 2);
+
+    // A new play starts counting again.
+    scheduler.play(0, chase(plan, 0), kNow + 5s, nullptr, PlaybackLoop{0, 2 * q});
+    CHECK(scheduler.pass() == 0);
+    CHECK(scheduler.passAt(kNow + 5s) == 0);
+}
+
 TEST_CASE("offset events play only within their loop pass")
 {
     const auto ppqn = MODAL_ANY_PPQN();
