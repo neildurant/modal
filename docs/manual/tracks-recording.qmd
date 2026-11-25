@@ -253,8 +253,8 @@ to be recorded onto several parts deliberately.
 
 `R` starts a take from the play-from marker, after the selected count-in or
 pre-roll. It requires at least one armed track with usable input. Space
-stops the take. Starting recording during existing playback is not supported
-in this edition; that would be a punch-in operation.
+stops the take. To record only part of the song, or to start recording while
+the song is already playing, arm a punch range (@sec-punch-recording).
 
 **Replace** removes existing material in the recorded range. From the record
 point, a track actually being recorded is silent so that the replaced part
@@ -310,6 +310,85 @@ A count-in always clicks when a click destination is available. Without a
 usable metronome destination, the transport starts immediately. Stopping
 during the count-in creates no recorded edit.
 
+## Recording a passage again: punch-in {#sec-punch-recording}
+
+Often most of a part is right and one passage needs another attempt: a fluffed
+fill in the second verse, say, or a chorus you want to play with more energy.
+**Punch recording** replaces just that passage. You choose the span once, then
+record it as many times as you like, and the music on either side is left as
+it was.
+
+The span is called a **punch range**; *punching in* is where recording
+starts and *punching out* is where it stops. The keys are in the Recording
+group, `, r`, with `p` for punch:
+
+- `, r p` arms the cursor's section, the usual unit for retaking a verse or
+  chorus. In Visual mode it arms the selection's span of time instead, for a
+  few bars within a section.
+- `, r l` chooses two song labels as its edges, for a passage marked out in
+  the song, even one crossing from one section into the next. It asks for the
+  punch-in label and then the punch-out label, as `, l L` does for a loop, and
+  offers the same pair again next time. `:punch "Before fill" "After fill"`
+  names them at the prompt.
+- `, r P` clears it. The capital undoes what the small letter did, as `, r A`
+  disarms every track after `, r a` arms one.
+
+An armed range shows as a dashed red bracket along the foot of the ruler, in
+the arrangement and the piano roll, with a short upright cap at each end. The
+red is the recording colour, a reminder that `R` will record there. **PUNCH**
+lights in the status line too, so you can see a range is armed in any view
+and while stopped. Arming plays nothing and changes nothing in the song.
+
+The range belongs to how you are working on the song, like the cursor, rather
+than to the music. It isn't saved with the song or recorded as an undo step,
+but each open song keeps its own range while Modal runs. It also keeps track
+of what it was armed from. A section range follows its section if the section
+is moved, renamed or resized, or if bars are inserted before it. A label range
+follows its two labels. A Visual selection's range stays at the same time. If
+an edit removes what a range was following, such as deleting its section or
+one of its labels, Modal clears the range and says why.
+
+### Recording the range
+
+With a range armed, `R` records the range instead of starting at the
+play-from marker. Playback begins with the recording lead-in from the
+Metronome page, a count-in or a pre-roll ending at punch-in, so you can come
+in on time. Recording runs from punch-in to punch-out. At punch-out, recording
+stops but playback carries on: the recorded track plays its new take
+straight away, and you hear how it joins the music that follows. The take
+becomes one undoable edit as the playhead passes punch-out. Press Space when
+you've heard enough. Stopping before punch-out records only as far as the
+stop.
+
+For example, arm the second verse with `, r p` and set a one-bar pre-roll.
+Press `R`: the last bar of the first verse plays, you play through the
+second verse, and at the chorus playback continues with your new verse in
+place. If it wasn't right, `u` takes the take back and `R` tries again, the
+range still armed.
+
+The edges follow the same rules as any recording:
+
+- In replace mode, old material starting inside the range is removed. An old
+  note that starts before punch-in and runs into the range is shortened to end
+  at punch-in.
+- A note you are still holding at punch-out ends there, so nothing recorded
+  sounds past the range.
+- If the old part had the sustain pedal down at an edge, Modal patches the
+  pedal there, so the music either side sounds as it did before.
+- Notes played during the lead-in are dropped, except a note still held at
+  punch-in, which starts there. Anything played after punch-out isn't
+  recorded.
+- In overdub mode, what is already there stays, and the take is added to it.
+
+You can also punch in while the song is already playing. Play from somewhere
+before the range and press `R` at any point before the playhead reaches
+punch-in. There is no lead-in, since the music already playing serves as
+one. The transport shows `● PRE` until punch-in, then `● REC`. Once the playhead
+is past punch-in, `R` is refused: stop and press `R` again to record the range
+with its lead-in. Recording while a playback loop is running isn't available yet.
+
+To record from the play-from marker again, clear the range with `, r P`.
+
 ## Completing and keeping a take
 
 During recording, the views preview what the song would contain if the take
@@ -328,6 +407,6 @@ Modal reports it, and an overflow stops safely rather than presenting an
 incomplete performance as an ordinary successful take. Check warnings before
 accepting the result.
 
-This edition supports linear recording and overdubbing. Loop recording,
-punch ranges and a library of alternate takes are not available yet. Here
+This edition supports linear recording, overdubbing and punch recording. Loop
+recording and a library of alternate takes are not available yet. Here
 “take” means the performance made between a recording start and stop.

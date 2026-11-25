@@ -6,6 +6,12 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Punch recording, step 2c: the manual, 25 November 2026
+
+The recording chapter has a new section, *Recording a passage again: punch-in* (`sec-punch-recording`): why to punch, the range and its keys with mnemonics (`p` for punch, the capital clearing as `, r A` does), the bracket and **PUNCH**, why the range isn't saved or undone and how it follows edits, then recording it: the lead-in, punch-out with playback carrying on, a worked example retaking a second verse, the rules at the edges, punching in while playing, and clearing to record from the marker again. *Preparing a recording* no longer says starting during playback is unsupported, and the chapter's closing paragraph lists punch recording as available. The key reference lists `, r p`, `, r l` (and `:punch`) and `, r P`. Both formats build with `tools/build-manual.cmake` (Quarto); the section renders in the HTML. No figure yet: ImageMagick, which `tools/manual-images.cmake` needs, isn't installed on this machine; a figure of the bracket could follow.
+
+**Pending.** Reading the section; then punch recording is complete.
+
 ### The `darker` theme, the default, 25 November 2026
 
 Asked for during the punch work: a theme like `dark` but darker, keeping its contrasts, with the teal of Tokyo Night Terminal Dark for notes and bars, whose own shades sat too close together as a scheme. `darker` (`assets/themes/darker`) moves every background shade down with the background (`#16161e`) and back until each stands as far from it as in `dark` by the contrast measure; notes and the arrangement's density are teal (`#41a6b5`), matches yellow and hint keys a lighter teal, to stand apart from the notes. Tried as a theme in the config directory and liked, it was built in and made the default (`kDefaultTheme`): the `theme` setting's default, a Config's theme, and what `set theme=NAME` starts again from. `dark` and `light` stay built in. The configuration guide, the customisation chapter and design.md say so; the manual's settings reference was regenerated. The manual's illustrations keep `dark`, as they're drawn with it by name.
