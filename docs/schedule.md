@@ -226,12 +226,12 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Aligned Before playback controls and first-pass lead-in. Accepted on trial.
     - [x] **Done** — Manual and automated validation for first-pass lead-in. See [status.md](status.md).
     - [x] **Done** — Optional lead-in on every playback loop pass. Accepted on trial.
-- [ ] **Doing** — Punch recording using an armed range. See [design.md](design.md#input-and-recording).
+- [x] **Done** — Punch recording using an armed range. See [design.md](design.md#input-and-recording).
     - [x] **Done** — Arm and clear a range from a section, Visual selection or two labels, with ruler and status indicators. Accepted on trial. See [status.md](status.md).
-    - [ ] **Doing** — Record the armed span with `R` (design agreed 24 November 2026). See [design.md](design.md#input-and-recording).
+    - [x] **Done** — Record the armed span with `R` (design agreed 24 November 2026). See [design.md](design.md#input-and-recording).
         - [x] **Done** — From stopped: lead-in, punch-in, punch-out with playback carrying on, one undo step. Accepted on trial.
         - [x] **Done** — `R` while playing, before punch-in. Accepted on trial.
-        - [ ] **Doing** — Manual updates and final validation.
+        - [x] **Done** — Manual updates and final validation. Accepted on reading.
 - [ ] **To do** — Arm playback loops separately from starting playback. See [design.md](design.md#input-and-recording).
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
