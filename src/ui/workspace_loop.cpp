@@ -69,12 +69,12 @@ CommandResult Workspace::loop(std::string_view arguments)
     {
         if (selection_)
         {
-            if (const auto span = view().selectionSpan())
-                return startLoop(span->first, std::min(span->second, song.end()));
-            return CommandResult::error("Select a span of time to loop");
+            const auto span = view().selectionSpan();
+            if (!span || std::min(span->second, song.end()) <= span->first)
+                return CommandResult::error("Select a span of time to loop");
+            return armLoop(core::ArmedRange::time(span->first, std::min(span->second, song.end())));
         }
-        const auto section = song.sectionAt(view().cursor().tick);
-        return startLoop(song.sectionStart(section), song.sectionStart(section + 1));
+        return armLoop(core::ArmedRange::section(song, song.sectionAt(view().cursor().tick)));
     }
     auto named = namedLabels(arguments, "loop", "loop-labels");
     if (auto* refused = std::get_if<CommandResult>(&named))
@@ -88,35 +88,100 @@ CommandResult Workspace::labelsChosen(LabelPurpose purpose, std::size_t from, st
 {
     const auto& song = document_.song();
     const auto labels = song.labels();
-    auto result = purpose == LabelPurpose::Loop ? startLoop(labels[from].tick, labels[to].tick)
-                  : labels[from].tick >= labels[to].tick
-                      ? CommandResult::error("The end of a punch range must be after its start")
-                      : armPunch(core::ArmedRange::labels(song, from, to));
+    const bool loop = purpose == LabelPurpose::Loop;
+    auto result = labels[from].tick >= labels[to].tick
+                      ? CommandResult::error(loop ? "The end of a loop must be after its start"
+                                                  : "The end of a punch range must be after its "
+                                                    "start")
+                  : loop ? armLoop(core::ArmedRange::labels(song, from, to))
+                         : armPunch(core::ArmedRange::labels(song, from, to));
     if (!result.refused)
         (purpose == LabelPurpose::Loop ? lastLoopLabels_ : lastPunchLabels_)[song.identity()] =
             std::move(names);
     return result;
 }
 
-CommandResult Workspace::startLoop(core::Tick from, core::Tick to)
+// A loop (decided 25 November 2026) is armed as a punch range is, from the cursor's section, a
+// Visual selection's time or two labels, saved with the song, and played by Space while on.
+// Arming, clearing and switching it are undo steps.
+
+std::optional<core::ArmedSpan> Workspace::loopSpan() const
 {
-    if (from >= to)
-        return CommandResult::error("The end of a loop must be after its start");
-    if (player_ == nullptr)
-        return CommandResult::error("Nothing to play to");
+    const auto& song = document_.song();
+    if (!song.loop || !song.loopOn)
+        return std::nullopt;
+    return core::find(song, *song.loop).span;
+}
+
+core::ArmedSpans Workspace::armedRanges() const
+{
+    const auto& song = document_.song();
+    return {punchSpan(), song.loop ? core::find(song, *song.loop).span : std::nullopt, song.loopOn};
+}
+
+CommandResult Workspace::armLoop(core::ArmedRange range)
+{
     if (recording_.pending())
         return CommandResult::error("Recording: Space stops it first");
-    if (!player_->playLoop(document_.song(), from, to))
-        return CommandResult::error("The engine didn't take that loop: try again");
+    const auto& song = document_.song();
+    const auto found = core::find(song, range);
+    if (!found.span)
+        return CommandResult::error("Nothing there to loop");
 
+    std::string replacing;
+    if (song.loop && *song.loop != range)
+    {
+        if (const auto oldSpan = core::find(song, *song.loop).span)
+            replacing = ", replacing " + armedRangeText(*song.loop, *oldSpan);
+    }
+    auto text = "Loop range: " + armedRangeText(range, *found.span) + replacing +
+                (player_ != nullptr && player_->playing() ? "; the next Space plays it"
+                                                          : "; Space plays it");
     if (selection_)
         endVisual();
-    playedFrom_ = view().cursor();
-    following_ = true;
-    returning_ = false;
-    showPlayhead();
-    const auto& meter = document_.song().meter();
-    return {true, "Looping " + positionText(meter, from) + " to " + positionText(meter, to)};
+    document_.edit("Arm loop", view().place(),
+                   [&](core::Song& armed)
+                   {
+                       armed.loop = std::move(range);
+                       armed.loopOn = true;
+                   });
+    return {true, std::move(text)};
+}
+
+CommandResult Workspace::clearLoop()
+{
+    const auto& song = document_.song();
+    if (!song.loop)
+        return {false, "No loop is armed", false};
+    std::string was;
+    if (const auto span = core::find(song, *song.loop).span)
+        was = ": " + armedRangeText(*song.loop, *span);
+    document_.edit("Clear loop", view().place(), [](core::Song& cleared) { cleared.loop.reset(); });
+    return {true, "Loop cleared" + was};
+}
+
+CommandResult Workspace::toggleLoop()
+{
+    const auto& song = document_.song();
+    if (!song.loop)
+        return {false, "No loop is armed: " + keysOf("loop") + " arms one", false};
+    const bool on = !song.loopOn;
+    document_.edit(on ? "Looping on" : "Looping off", view().place(),
+                   [&](core::Song& switched) { switched.loopOn = on; });
+    return {true, on ? "Looping on: Space plays the loop"
+                     : "Looping off, the loop kept: Space plays from the marker"};
+}
+
+bool Workspace::startPlaying()
+{
+    const auto& song = document_.song();
+    const auto loop = loopSpan();
+    if (!loop)
+        return player_->play(song);
+    if (!player_->playLoop(song, loop->from, loop->to))
+        return false;
+    setMessage("Looping " + armedRangeText(*song.loop, *loop), MessageKind::Information);
+    return true;
 }
 
 CommandResult Workspace::chooseLoopLabel(std::optional<std::size_t> from, LabelPurpose purpose)

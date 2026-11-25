@@ -93,6 +93,9 @@ public:
     // engine took the request; if not, its queue full, nothing changes here either.
     [[nodiscard]] bool play(const Song& song);
     [[nodiscard]] bool playLoop(const Song& song, Tick from, Tick to);
+    // From elsewhere: before the loop, playing into it; within it, wrapping at its end. A lead-in
+    // repeated on every pass is played once, as it would repeat from the entry, not the loop.
+    [[nodiscard]] bool playLoop(const Song& song, Tick from, Tick to, Tick entry);
     [[nodiscard]] bool stop();
 
     // Records from the marker onto the song's armed tracks (see Recorder), in the song's record

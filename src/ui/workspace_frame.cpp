@@ -441,6 +441,7 @@ Bar Workspace::statusBar() const
     const auto& song = document_.song();
     state.overdub = song.recordMode == core::RecordMode::Overdub;
     state.punch = punchSpan().has_value();
+    state.loop = loopSpan().has_value();
     if (player_)
     {
         const auto playing = player_->position();

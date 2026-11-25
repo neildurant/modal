@@ -203,23 +203,43 @@ TEST_CASE("loop and punch have leader groups of their own, built alike, in Norma
     }
 }
 
-TEST_CASE("the loop key uses the current section or Visual selection")
+namespace
+{
+core::Song punchSong(core::Ppqn ppqn); // three sections, A, B and C, and labels in and out
+} // namespace
+
+TEST_CASE("the loop keys arm a loop from the section or the selection's time, and Space plays it")
 {
     Playing p;
+    CHECK(indicator(p, U"LOOP") == Shown::Off);
     p.type(U"ga,LL");
+    CHECK_FALSE(p.player.playing()); // arming plays nothing
+    CHECK(p.ws.message().starts_with("Loop range: "));
+    CHECK(p.ws.message().ends_with("; Space plays it"));
+    CHECK(indicator(p, U"LOOP") == Shown::Lit);
+    REQUIRE(p.document.song().loop);
+    CHECK(p.document.modified());
+
+    p.type(U" ");
     REQUIRE(p.player.looping());
     CHECK(p.player.startPosition() == 0);
-    CHECK(p.ws.message().starts_with("Looping 1:1:"));
-    CHECK(contains(p.status(), U"LOOP"));
-
+    CHECK(p.ws.message().starts_with("Looping "));
     p.runFor(50ms);
-    p.press(Key::typed(U' '));
+    p.type(U" ");
     CHECK_FALSE(p.player.looping());
     p.runFor(50ms);
 
+    // A selection's time, replacing it; Space plays the new one.
     p.type(U"ggv,LL");
+    CHECK(p.ws.mode() == Mode::Normal);
+    CHECK(p.ws.message().find("1:1:000 to 2:1:000, replacing") != std::string::npos);
+    p.type(U" ");
     REQUIRE(p.player.looping());
     CHECK(p.ws.message() == "Looping 1:1:000 to 2:1:000");
+
+    // Armed while playing, it's played by the next Space.
+    p.type(U"]s,LL");
+    CHECK(p.ws.message().ends_with("; the next Space plays it"));
 }
 
 TEST_CASE("choosing loop labels remembers both endpoints and loops across sections")
@@ -236,25 +256,133 @@ TEST_CASE("choosing loop labels remembers both endpoints and loops across sectio
     p.press(Key::of(NamedKey::Enter));
     p.type(U"After join");
     p.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(p.player.playing());
+    const auto range = p.ws.message();
+    REQUIRE(range.starts_with("Loop range: Before join to After join, "));
+    p.type(U" ");
     REQUIRE(p.player.looping());
     CHECK(p.player.startPosition() == join - q);
-    const auto range = p.ws.message();
-    REQUIRE(range.starts_with("Looping "));
     const auto duration =
         p.document.song().tempo().toTime(join + q) - p.document.song().tempo().toTime(join - q);
     p.runFor(duration + 50ms);
     CHECK(p.player.position().value() >= join - q);
     CHECK(p.player.position().value() < join);
 
+    // The same pair offered again.
     p.type(U",Ll");
     p.press(Key::of(NamedKey::Enter));
     p.press(Key::of(NamedKey::Enter));
-    CHECK(p.ws.message() == range);
+    CHECK(p.ws.message().starts_with(range.substr(0, range.find(';'))));
 
     p.type(U":loop \"After join\" \"Before join\"");
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.message() == "The end of a loop must be after its start");
     CHECK(p.player.looping());
+}
+
+TEST_CASE("Ctrl-Space plays from the cursor into an armed loop, within it, or past it straight on")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)}; // sections A (bars 1-2), B (3-5) and C (6-)
+    const core::Tick bar = ppqn.whole();
+    p.type(U"ga]s,LL"); // B
+    REQUIRE(p.ws.loopSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+
+    const auto from = [&](std::u32string_view keys)
+    {
+        p.type(keys);
+        p.press(Key::typed(U' ', kCtrl));
+        REQUIRE(p.player.playing());
+        const auto start = p.player.startPosition();
+        const bool looping = p.player.looping();
+        p.runFor(10ms);
+        p.type(U" ");
+        p.runFor(10ms);
+        return std::pair{start, looping};
+    };
+    CHECK(from(U"gg") == std::pair{core::Tick{0}, true}); // before it, playing into it
+    CHECK(from(U"gg]s") == std::pair{2 * bar, true});     // its start
+    CHECK(from(U"gg]sl") == std::pair{3 * bar, true});    // within it
+    CHECK(from(U"gg]s]s") == std::pair{5 * bar, false});  // past it, straight on
+
+    // From within it, on to its end, then from its start.
+    p.type(U"gg]sl");
+    p.press(Key::typed(U' ', kCtrl));
+    const auto& tempo = p.document.song().tempo();
+    p.runFor(tempo.toTime(5 * bar) - tempo.toTime(3 * bar) + 100ms);
+    CHECK(p.player.position().value() >= 2 * bar);
+    CHECK(p.player.position().value() < 3 * bar);
+    p.type(U" ");
+    p.runFor(10ms);
+
+    // From before it, it wraps at its end to its start.
+    p.type(U"gg");
+    p.press(Key::typed(U' ', kCtrl));
+    p.runFor(tempo.toTime(5 * bar) + 100ms);
+    CHECK(p.player.position().value() >= 2 * bar);
+    CHECK(p.player.position().value() < 3 * bar);
+}
+
+TEST_CASE("looping switches off and on with , L t, keeping the loop; , L d clears it; each undone")
+{
+    Playing p{punchSong(core::kPpqn)};
+    const core::Tick bar = core::kPpqn.whole();
+    p.type(U"ga,Lt");
+    CHECK(p.ws.message().starts_with("No loop is armed"));
+    p.type(U"]s,LL");
+    p.type(U",Lt");
+    CHECK(p.ws.message() == "Looping off, the loop kept: Space plays from the marker");
+    CHECK_FALSE(p.ws.loopSpan());
+    CHECK(p.ws.armedRanges().loop == core::ArmedSpan{2 * bar, 5 * bar}); // still shown, dim
+    CHECK_FALSE(p.ws.armedRanges().loopOn);
+    CHECK(indicator(p, U"LOOP") == Shown::Off);
+    p.type(U" ");
+    CHECK(p.player.playing());
+    CHECK_FALSE(p.player.looping());
+    p.runFor(10ms);
+    p.type(U" ");
+    p.runFor(10ms);
+
+    p.type(U",Lt");
+    CHECK(p.ws.message() == "Looping on: Space plays the loop");
+    CHECK(indicator(p, U"LOOP") == Shown::Lit);
+    p.type(U"u");
+    CHECK_FALSE(p.ws.loopSpan());
+    p.press(Key::typed(U'r', kCtrl));
+    CHECK(p.ws.loopSpan());
+
+    p.type(U",Ld");
+    CHECK(p.ws.message().starts_with("Loop cleared: B, "));
+    CHECK_FALSE(p.document.song().loop);
+    CHECK_FALSE(p.ws.armedRanges().loop);
+    p.type(U",Ld");
+    CHECK(p.ws.message() == "No loop is armed");
+    p.type(U"u");
+    CHECK(p.ws.loopSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+}
+
+TEST_CASE("an armed loop follows its section, goes with it, and is saved with the song, off too")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)};
+    const core::Tick bar = ppqn.whole();
+    p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
+    p.type(U"ga]s,LL,Lt"); // B, off
+    const auto read = core::readSong(core::writeSong(p.document.song()), ppqn);
+    REQUIRE(read.song);
+    CHECK(read.song->loop);
+    CHECK_FALSE(read.song->loopOn);
+    CHECK(core::writeSong(*read.song).find("\nloop section=2 off\n") != std::string::npos);
+
+    // Joined into A, it goes, saying so; undoing the join brings it back.
+    p.type(U",Lt");
+    p.type(U"gg"); // A, joined with B after it
+    p.type(U":section-join");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(p.document.song().loop);
+    CHECK(p.ws.message().ends_with("Loop cleared: its section is gone"));
+    p.type(U"u");
+    CHECK(p.ws.loopSpan() == core::ArmedSpan{2 * bar, 5 * bar});
 }
 
 TEST_CASE("Space plays from the marker and stops where it is; with rewind, the marker stays")
@@ -2139,9 +2267,9 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
                     [](core::Song& song) { song.renameSection(0, "Introduction"); });
     // What gives way, in the order it goes.
     p.document.edit("Change", {}, [](core::Song& song) { song.title = "Changed"; }); // + lit
-    const std::array<std::u32string_view, 9> parts{U" + ",   U"Introduction", U"REPLACE",
-                                                   U"THR",   U"Intro",        U" IN ",
-                                                   U" 4/4 ", U" BPM",         U"PUNCH"};
+    const std::array<std::u32string_view, 10> parts{U" + ",   U"Introduction", U"REPLACE", U"THR",
+                                                    U"Intro", U" IN ",         U" 4/4 ",   U" BPM",
+                                                    U"PUNCH", U"LOOP"};
     const auto shown = [&](int columns)
     {
         p.ws.resize(columns * kCell.width, 24 * kCell.height, kCell);
@@ -2157,7 +2285,7 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
             CAPTURE(columns, encodeUtf8(kept));
             CHECK(has(kept));
         }
-        std::array<bool, 9> present{};
+        std::array<bool, 10> present{};
         for (std::size_t i = 0; i < parts.size(); ++i)
             present[i] = has(parts[i]);
         return present;

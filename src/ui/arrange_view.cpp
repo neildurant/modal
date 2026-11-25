@@ -1632,7 +1632,7 @@ void ArrangeView::addRegions(Frame& frame) const
     }
     page_.addRegions(frame, player != nullptr ? std::optional{player->marker()} : std::nullopt,
                      selected, host_.movingTracks(), host_.ownMeter(),
-                     player != nullptr && player->recording(), host_.punchSpan());
+                     player != nullptr && player->recording(), host_.armedRanges());
     const auto track = trackId() ? page_.track() + 1 : 0;
     // Where the cursor is: its bar's start, or on the strip its section's.
     const auto strip = page_.stripCursor();

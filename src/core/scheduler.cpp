@@ -346,7 +346,9 @@ void Scheduler::play(Tick start, std::span<const PlannedEvent> chased, nanosecon
     const nanoseconds startTime = plan_->tempo.toTime(start) - lead;
     playing_ = true;
     startTick_ = start;
-    loop_ = loop && start <= loop->from && loop->from < loop->to ? loop : std::nullopt;
+    // A start inside the loop, from the cursor (decided 25 November 2026), plays on to its end
+    // and wraps to its start.
+    loop_ = loop && start < loop->to && loop->from < loop->to ? loop : std::nullopt;
     loopStartTick_ = loop_ ? loop_->restartFrom(start) : start;
     loopCountIn_ = loop_ && loop_->repeatLeadIn ? countIn : nullptr;
     loopChase_ = loopChase;

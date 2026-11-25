@@ -108,11 +108,14 @@ bool Document::edit(std::string title, const EditPlace& place,
 {
     Song edited = song_;
     change(edited);
-    // A punch range the edit leaves nowhere goes with it, in the same undo step, so undoing the
-    // edit brings it back (decided 25 November 2026).
-    if (edited.punch && !find(edited, *edited.punch).span)
+    // A punch or loop range the edit leaves nowhere goes with it, in the same undo step, so
+    // undoing the edit brings it back (decided 25 November 2026).
+    for (auto* range : {&edited.punch, &edited.loop})
     {
-        edited.punch.reset();
+        if (*range && !find(edited, **range).span)
+        {
+            range->reset();
+        }
     }
     if (edited == song_ || !allowed(edited))
     {

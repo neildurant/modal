@@ -131,8 +131,7 @@ public:
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
                     std::optional<Selected> selected = std::nullopt,
                     const std::vector<core::TrackId>& moving = {}, bool ownMeters = true,
-                    bool recording = false,
-                    std::optional<core::ArmedSpan> punch = std::nullopt) const;
+                    bool recording = false, const core::ArmedSpans& ranges = {}) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

@@ -223,8 +223,10 @@ void addMarkDot(Region& region, int x, int y, CellSize cell);
 
 // An armed range in a ruler (decided 24 November 2026): a thin line along the bottom of the
 // ruler from x0 to x1, with a cap rising at each end that's in view, so its boundaries show
-// whatever the selection. The punch range's is dashed, in the recording colour. A range
-// running out of view on a side has no cap there, reaching the edge.
+// whatever the selection. The punch range's is dashed, in the recording colour; the loop's
+// solid, in the accent colour, dim while looping is off, and lifted above the punch range's
+// where the two overlap (decided 25 November 2026). A range running out of view on a side has
+// no cap there, reaching the edge.
 struct RangeBracket
 {
     int x0 = 0;
@@ -233,8 +235,15 @@ struct RangeBracket
     bool endShown = true;   // a cap at x1
     Role role = Role::IndicatorArm;
     bool dashed = true;
+    bool lifted = false; // above another bracket's line
 };
 void addRangeBracket(Region& region, const RangeBracket& bracket, int bottom, CellSize cell);
+
+// The punch and loop ranges' brackets in a ruler showing left to right (end exclusive), at
+// toX, the edges of a range out of view at 0 and width.
+void addRangeBrackets(Region& region, const core::ArmedSpans& ranges, core::Tick left,
+                      core::Tick right, const std::function<int(core::Tick)>& toX, int width,
+                      int bottom, CellSize cell);
 
 // Puts the register's events into the song at a time, its first track's onto a track (counting
 // from 0) and the others onto those after it, as far as there are tracks, merging with what's

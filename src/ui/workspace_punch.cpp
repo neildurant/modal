@@ -95,18 +95,29 @@ CommandResult Workspace::clearPunch()
     return {true, "Punch range cleared" + was};
 }
 
-void Workspace::notePunchRange(std::uint64_t identity,
-                               const std::optional<core::ArmedRange>& before)
+void Workspace::noteRanges(std::uint64_t identity, const std::optional<core::ArmedRange>& punch,
+                           const std::optional<core::ArmedRange>& loop)
 {
-    // The edit itself cleared it, in its undo step: say why, as cleared or undone deliberately
+    // The edit itself cleared one, in its undo step: say why, as cleared or undone deliberately
     // the range would still be somewhere.
     const auto& song = document_.song();
-    if (!before || song.punch || song.identity() != identity)
+    if (song.identity() != identity)
         return;
-    const auto found = core::find(song, *before);
-    if (found.span)
+    std::string message;
+    const auto note = [&](const std::optional<core::ArmedRange>& before,
+                          const std::optional<core::ArmedRange>& now, std::string_view name)
+    {
+        if (!before || now)
+            return;
+        const auto found = core::find(song, *before);
+        if (!found.span)
+            message +=
+                (message.empty() ? "" : " · ") + std::string{name} + " cleared: " + found.gone;
+    };
+    note(punch, song.punch, "Punch range");
+    note(loop, song.loop, "Loop");
+    if (message.empty())
         return;
-    auto message = "Punch range cleared: " + found.gone;
     setMessage(message_.empty() ? std::move(message) : message_ + " · " + message,
                MessageKind::Warning);
 }

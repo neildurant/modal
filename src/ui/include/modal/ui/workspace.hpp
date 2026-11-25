@@ -465,6 +465,9 @@ public:
     const std::string& message() const { return message_; }
     // Where the song's armed punch range is now, if one is armed.
     std::optional<core::ArmedSpan> punchSpan() const override;
+    core::ArmedSpans armedRanges() const override;
+    // The loop armed and on, where it is now: what Space plays.
+    std::optional<core::ArmedSpan> loopSpan() const;
     MessageKind messageKind() const { return messageKind_; }
 
 private:
@@ -1376,7 +1379,11 @@ private:
                                                          std::string_view command,
                                                          std::string_view chooser) const;
     CommandResult loop(std::string_view arguments);
-    CommandResult startLoop(core::Tick from, core::Tick to);
+    CommandResult armLoop(core::ArmedRange range);
+    CommandResult clearLoop();
+    CommandResult toggleLoop();
+    // Starts playing as Space does: the loop armed and on, or else from the play-from marker.
+    bool startPlaying();
     CommandResult chooseLoopLabel(std::optional<std::size_t> from = std::nullopt,
                                   LabelPurpose purpose = LabelPurpose::Loop);
     bool loopLabelKey(const Key& key);
@@ -1391,7 +1398,8 @@ private:
     std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
     // Says why, when a key's edit has cleared the song's punch range, as it left it nowhere: the
     // song it had before the key, and its range then.
-    void notePunchRange(std::uint64_t identity, const std::optional<core::ArmedRange>& before);
+    void noteRanges(std::uint64_t identity, const std::optional<core::ArmedRange>& punch,
+                    const std::optional<core::ArmedRange>& loop);
     // The tracks of a file being imported, ticked with Space, which Enter imports by running the
     // line that names them.
     struct TrackImportChoice

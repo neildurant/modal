@@ -224,14 +224,14 @@ TEST_CASE("status presentation keeps + in its place, lit only with unsaved chang
 TEST_CASE("status presentation preserves the order of width compromises at pixel boundaries")
 {
     auto state = stateWithTransport();
-    const std::array<std::u32string_view, 9> parts{U" + ",   U"Introduction", U"REPLACE",
-                                                   U"THR",   U"Intro",        U" IN ",
-                                                   U" 4/4 ", U" BPM",         U"PUNCH"};
-    std::array<bool, 9> disappeared{};
+    const std::array<std::u32string_view, 10> parts{U" + ",   U"Introduction", U"REPLACE", U"THR",
+                                                    U"Intro", U" IN ",         U" 4/4 ",   U" BPM",
+                                                    U"PUNCH", U"LOOP"};
+    std::array<bool, 10> disappeared{};
     for (int width = 2200; width >= 650; --width)
     {
         const auto region = render(state, width);
-        std::array<bool, 9> present{};
+        std::array<bool, 10> present{};
         for (std::size_t i = 0; i < parts.size(); ++i)
         {
             present[i] = contains(region, parts[i]);

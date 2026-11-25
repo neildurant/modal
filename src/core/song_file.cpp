@@ -200,7 +200,7 @@ private:
     bool readMetronome(std::span<const Token> tokens);
     bool readCountIn(std::span<const Token> tokens, bool playback);
     bool readRecord(std::span<const Token> tokens);
-    bool readPunch(Song& song);
+    bool readRange(Song& song, bool loop);
     bool readTrack(std::span<const Token> tokens);
     bool readDrumMap(std::span<const Token> tokens);
     bool readSection(std::span<const Token> tokens);
@@ -272,9 +272,14 @@ private:
     CountInSettings playbackLeadIn_ = kDefaultPlaybackLeadIn;
     bool repeatPlaybackLeadIn_ = false;
     RecordMode recordMode_ = RecordMode::Replace;
-    // The punch line, read once the song's sections are known, as it names them.
-    int punchLine_ = 0;
-    std::vector<Token> punchTokens_;
+    // The punch and loop lines, read once the song's sections are known, as they name them.
+    struct RangeLine
+    {
+        int line = 0;
+        std::vector<Token> tokens;
+    };
+    RangeLine punchLine_;
+    RangeLine loopLine_;
     std::vector<Track> tracks_;
     std::vector<Section> sections_;
     std::optional<OpenSection> section_;
@@ -334,7 +339,8 @@ SongReadResult Reader::read(std::string_view text)
     result.song->playbackLeadIn = playbackLeadIn_;
     result.song->repeatPlaybackLeadIn = repeatPlaybackLeadIn_;
     result.song->recordMode = recordMode_;
-    if (punchLine_ != 0 && !readPunch(*result.song))
+    if ((punchLine_.line != 0 && !readRange(*result.song, false)) ||
+        (loopLine_.line != 0 && !readRange(*result.song, true)))
     {
         result.song.reset();
         result.error = error_;
@@ -374,7 +380,7 @@ bool Reader::readLine(std::span<const Token> tokens)
         return readDrumMap(tokens);
     }
     if (word == "metronome" || word == "countin" || word == "playback-lead-in" ||
-        word == "record" || word == "punch")
+        word == "record" || word == "punch" || word == "loop")
     {
         if (stage_ != Stage::Header)
         {
@@ -384,12 +390,12 @@ bool Reader::readLine(std::span<const Token> tokens)
             return readMetronome(tokens);
         if (word == "record")
             return readRecord(tokens);
-        if (word == "punch")
+        if (word == "punch" || word == "loop")
         {
-            if (punchLine_ != 0)
-                return fail("the song has one punch line");
-            punchLine_ = line_;
-            punchTokens_.assign(tokens.begin(), tokens.end());
+            auto& range = word == "punch" ? punchLine_ : loopLine_;
+            if (range.line != 0)
+                return fail("the song has one " + word + " line");
+            range = {line_, {tokens.begin(), tokens.end()}};
             return true;
         }
         return readCountIn(tokens, word == "playback-lead-in");
@@ -546,21 +552,30 @@ bool Reader::readRecord(std::span<const Token> tokens)
     return true;
 }
 
-bool Reader::readPunch(Song& song)
+bool Reader::readRange(Song& song, bool loop)
 {
     // punch section=N, punch from="Label" from-section=N to="Label" to-section=N, or punch
-    // from=POSITION to=POSITION, sections numbered from 1 and positions in the song's bars.
-    line_ = punchLine_;
+    // from=POSITION to=POSITION, sections numbered from 1 and positions in the song's bars; a
+    // loop line the same, and off if looping is switched off.
+    const auto& line = loop ? loopLine_ : punchLine_;
+    const std::string word = loop ? "loop" : "punch";
+    line_ = line.line;
     std::map<std::string, std::string, std::less<>> settings;
-    for (const auto& token : std::span{punchTokens_}.subspan(1))
+    bool off = false;
+    for (const auto& token : std::span{line.tokens}.subspan(1))
     {
         const auto [name, value] = settingOf(token);
+        if (loop && !value && name == "off" && !off)
+        {
+            off = true;
+            continue;
+        }
         if (!value ||
             (name != "section" && name != "from" && name != "to" && name != "from-section" &&
              name != "to-section") ||
             !settings.emplace(std::string{name}, std::string{*value}).second)
         {
-            return fail("unknown punch setting \"" + token.text + "\"");
+            return fail("unknown " + word + " setting \"" + token.text + "\"");
         }
     }
     const auto has = [&](std::string_view name) { return settings.contains(name); };
@@ -570,7 +585,7 @@ bool Reader::readPunch(Song& song)
             parseInteger(settings.find(name)->second, 1, std::numeric_limits<int>::max());
         if (!number)
         {
-            fail("a punch line's section is a number from 1");
+            fail("a " + word + " line's section is a number from 1");
             return std::nullopt;
         }
         return static_cast<std::size_t>(*number - 1);
@@ -600,19 +615,21 @@ bool Reader::readPunch(Song& song)
         if (!to)
             return false;
         if (*to <= *from)
-            return fail("a punch range needs its end after its start");
+            return fail("a " + word + " range needs its end after its start");
         range = SavedRange{ArmedRange::OfTime{*from, *to}};
     }
     else
     {
-        return fail("a punch line is a section, two labels or two positions");
+        return fail("a " + word + " line is a section, two labels or two positions");
     }
     const auto armed = restored(song, *range);
     if (!armed)
-        return fail("the punch range names a section the song hasn't");
+        return fail("the " + word + " range names a section the song hasn't");
     if (const auto found = find(song, *armed); !found.span)
-        return fail("the punch range is nowhere: " + found.gone);
-    song.punch = *armed;
+        return fail("the " + word + " range is nowhere: " + found.gone);
+    (loop ? song.loop : song.punch) = *armed;
+    if (loop)
+        song.loopOn = !off;
     return true;
 }
 
@@ -1745,13 +1762,19 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.playbackLeadIn = song.playbackLeadIn;
     result.repeatPlaybackLeadIn = song.repeatPlaybackLeadIn;
     result.recordMode = song.recordMode;
-    if (auto punch = song.punch ? saved(song, *song.punch) : std::nullopt)
+    // Sections are made again, so ranges are found again by their places.
+    const auto rescaledRange = [&](const std::optional<ArmedRange>& armed)
     {
-        // Sections are made again, so found again by their places.
-        if (auto* time = std::get_if<ArmedRange::OfTime>(&punch->source))
+        auto range = armed ? saved(song, *armed) : std::nullopt;
+        if (!range)
+            return std::optional<ArmedRange>{};
+        if (auto* time = std::get_if<ArmedRange::OfTime>(&range->source))
             *time = {scale(time->from), scale(time->to)};
-        result.punch = restored(result, *punch);
-    }
+        return restored(result, *range);
+    };
+    result.punch = rescaledRange(song.punch);
+    result.loop = rescaledRange(song.loop);
+    result.loopOn = song.loopOn;
     return result;
 }
 
@@ -1803,22 +1826,31 @@ std::string writeSong(const Song& song)
     {
         line(0, "record mode=overdub");
     }
-    if (const auto punch = song.punch ? saved(song, *song.punch) : std::nullopt)
+    const auto writeRange =
+        [&](std::string_view word, const std::optional<ArmedRange>& armed, std::string_view after)
     {
+        const auto range = armed ? saved(song, *armed) : std::nullopt;
+        if (!range)
+            return;
         const auto number = [](std::size_t section) { return std::to_string(section + 1); };
-        if (const auto* of = std::get_if<SavedRange::OfSection>(&punch->source))
-            line(0, "punch section=" + number(of->section));
-        else if (const auto* labels = std::get_if<SavedRange::OfLabels>(&punch->source))
-            line(0, "punch from=" + quotedText(labels->from.name) + " from-section=" +
-                        number(labels->from.section) + " to=" + quotedText(labels->to.name) +
-                        " to-section=" + number(labels->to.section));
+        std::string text{word};
+        if (const auto* of = std::get_if<SavedRange::OfSection>(&range->source))
+            text += " section=" + number(of->section);
+        else if (const auto* labels = std::get_if<SavedRange::OfLabels>(&range->source))
+            text += " from=" + quotedText(labels->from.name) +
+                    " from-section=" + number(labels->from.section) +
+                    " to=" + quotedText(labels->to.name) +
+                    " to-section=" + number(labels->to.section);
         else
         {
-            const auto& time = std::get<ArmedRange::OfTime>(punch->source);
-            line(0, "punch from=" + positionText(song.meter(), time.from) +
-                        " to=" + positionText(song.meter(), time.to));
+            const auto& time = std::get<ArmedRange::OfTime>(range->source);
+            text += " from=" + positionText(song.meter(), time.from) +
+                    " to=" + positionText(song.meter(), time.to);
         }
-    }
+        line(0, text + std::string{after});
+    };
+    writeRange("punch", song.punch, "");
+    writeRange("loop", song.loop, song.loopOn ? "" : " off");
 
     if (!song.tracks().empty())
     {

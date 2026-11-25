@@ -72,6 +72,14 @@ struct ArmedRangeFound
     friend bool operator==(const ArmedRangeFound&, const ArmedRangeFound&) = default;
 };
 
+// The punch and loop ranges where they are now, and whether looping is on, for showing them.
+struct ArmedSpans
+{
+    std::optional<ArmedSpan> punch;
+    std::optional<ArmedSpan> loop;
+    bool loopOn = true;
+};
+
 // A span of time is cut short at the song's end.
 ArmedRangeFound find(const Song& song, const ArmedRange& range);
 

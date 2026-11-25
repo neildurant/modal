@@ -128,6 +128,10 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return loop(call.arguments);
                 if (name == "loop-labels")
                     return chooseLoopLabel();
+                if (name == "loop-clear")
+                    return clearLoop();
+                if (name == "loop-toggle")
+                    return toggleLoop();
                 if (name == "punch")
                     return punch(call.arguments);
                 if (name == "punch-labels")
@@ -678,10 +682,11 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     const auto version = document_.version();
     const auto identity = document_.song().identity();
     const auto punch = document_.song().punch;
+    const auto loop = document_.song().loop;
     const bool changed = recordChange(key, now);
     auditionHere(version);
     notePasteHistory(version);
-    notePunchRange(identity, punch);
+    noteRanges(identity, punch, loop);
     return changed;
 }
 
@@ -3323,12 +3328,16 @@ bool Workspace::transport(std::string_view command)
     bool taken = true;
     if (command == "play-toggle")
     {
-        taken = recording_.pending() ? recording_.stop() : player_->toggle(document_.song());
+        taken = recording_.pending() ? recording_.stop()
+                : player_->playing() ? player_->stop()
+                                     : startPlaying();
     }
     else if (command == "play-stop-back")
     {
         const bool was = player_->playing();
-        taken = recording_.pending() ? recording_.stop() : player_->toggle(document_.song());
+        taken = recording_.pending() ? recording_.stop()
+                : player_->playing() ? player_->stop()
+                                     : startPlaying();
         returning_ = taken ? was : returning_;
     }
     else if (command == "play-cursor" && recording_.pending())
@@ -3339,10 +3348,16 @@ bool Workspace::transport(std::string_view command)
     }
     else if (command == "play-cursor" || command == "play-from-set")
     {
-        player_->setMarker(view().cursor().tick);
+        const auto cursor = view().cursor().tick;
+        player_->setMarker(cursor);
         if (command == "play-cursor")
         {
-            taken = player_->play(document_.song());
+            // With a loop armed, from the cursor into it, or within it, wrapping at its end; past
+            // its end, straight on (decided 25 November 2026).
+            const auto loop = loopSpan();
+            taken = loop && cursor < loop->to
+                        ? player_->playLoop(document_.song(), loop->from, loop->to, cursor)
+                        : player_->play(document_.song());
             following_ = following_ || taken;
         }
     }

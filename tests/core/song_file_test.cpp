@@ -334,6 +334,48 @@ TEST_CASE("a punch line naming what a song hasn't stops it being read, saying wh
     CHECK(late.error.find("comes before the sections") != std::string::npos);
 }
 
+TEST_CASE("a song's loop is saved as its punch range is, with off when looping is off")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick bar = ppqn.whole();
+    Song song{ppqn};
+    song.addTrack("Keys");
+    song.splitSection(2 * bar, "Verse");
+    song.setLabel(bar, "in");
+    song.setLabel(3 * bar, "out");
+    song.punch = ArmedRange::section(song, 1);
+    song.loop = ArmedRange::labels(song, 0, 1);
+    for (const bool on : {true, false})
+    {
+        CAPTURE(on);
+        song.loopOn = on;
+        const auto text = writeSong(song);
+        const std::string line = R"(loop from="in" from-section=1 to="out" to-section=2)";
+        CHECK(text.find("\npunch section=2\n" + line + (on ? "\n" : " off\n")) !=
+              std::string::npos);
+        const auto back = readSong(text, ppqn);
+        REQUIRE(back.song);
+        REQUIRE(back.song->loop);
+        CHECK(find(*back.song, *back.song->loop).span == ArmedSpan{bar, 3 * bar});
+        CHECK(back.song->loopOn == on);
+        CHECK(writeSong(*back.song) == text);
+    }
+
+    const std::string header = "modal-song 1\nsong \"S\" ppqn=960\n";
+    const std::string sections = "section \"A\" bars=2\n  meter 1:1:0 4/4\n  tempo 1:1:0 120\n";
+    for (const auto& [bad, says] : std::vector<std::pair<std::string, std::string_view>>{
+             {"loop section=1\nloop section=1\n", "one loop line"},
+             {"loop section=1 off off\n", "unknown loop setting"},
+             {"punch section=1 off\n", "unknown punch setting"},
+             {"loop section=3\n", "the loop range names a section the song hasn't"}})
+    {
+        CAPTURE(bad);
+        const auto result = readSong(header + bad + sections, kPpqn);
+        CHECK_FALSE(result.song);
+        CHECK(result.error.find(says) != std::string::npos);
+    }
+}
+
 TEST_CASE("comments, blank lines, indentation and Windows line ends are allowed")
 {
     const auto back = readSong("\" A comment\r\n"

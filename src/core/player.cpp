@@ -307,6 +307,13 @@ bool Player::playLoop(const Song& song, Tick from, Tick to)
     return !recorder_ && playAt(song, from, PlaybackLoop{from, to, song.repeatPlaybackLeadIn});
 }
 
+bool Player::playLoop(const Song& song, Tick from, Tick to, Tick entry)
+{
+    if (entry == from)
+        return playLoop(song, from, to);
+    return !recorder_ && playAt(song, entry, PlaybackLoop{from, to, false});
+}
+
 bool Player::playAt(const Song& song, Tick entry, std::optional<PlaybackLoop> loop)
 {
     if (waiting_ && engine_.setPlan(waiting_))

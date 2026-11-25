@@ -163,7 +163,12 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
                   Role::IndicatorRecordMode);
         // A punch range armed (decided 24 November 2026), shown stopped too, as R records it.
         if (stage < Stage::HidePunch)
+        {
             indicator("PUNCH", "PUNCH", 5, 5, lit(state.punch), Role::IndicatorArm);
+            // A loop armed and on (decided 25 November 2026), beside the punch range, as Space
+            // plays it.
+            indicator("LOOP", "LOOP", 4, 4, lit(state.loop), Role::Accent);
+        }
         {
             using enum core::CountInSettings::Mode;
             const auto& countIn = state.countIn;

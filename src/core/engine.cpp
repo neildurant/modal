@@ -48,7 +48,7 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn,
     {
         return !loop;
     }
-    if (commands_.full() || (loop && (start < 0 || start > loop->from || loop->from >= loop->to ||
+    if (commands_.full() || (loop && (start < 0 || start >= loop->to || loop->from >= loop->to ||
                                       loop->to > latest_->plan->end)))
     {
         return false;

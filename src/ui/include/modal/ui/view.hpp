@@ -274,6 +274,8 @@ public:
     virtual bool ownMeter() const = 0;
     // Where the punch range armed in the song is, to show it in the ruler.
     virtual std::optional<core::ArmedSpan> punchSpan() const { return std::nullopt; }
+    // The punch and loop ranges armed, where they are now, for the rulers' brackets.
+    virtual core::ArmedSpans armedRanges() const { return {}; }
     // Whether the piano roll shows where the sustain pedal holds notes: tails after them to
     // where it lifts (sustaintails), and a faint tint where it's down (sustaintint).
     virtual bool sustainTails() const { return true; }

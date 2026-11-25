@@ -554,6 +554,8 @@ void addRangeBracket(Region& region, const RangeBracket& bracket, int bottom, Ce
     if (bracket.x1 <= bracket.x0)
         return;
     const int thick = std::max(hairline(cell), 2);
+    if (bracket.lifted)
+        bottom -= 2 * thick;
     const int y = bottom - thick;
     if (bracket.dashed)
     {
@@ -571,6 +573,36 @@ void addRangeBracket(Region& region, const RangeBracket& bracket, int bottom, Ce
         region.over.push_back({{bracket.x0, bottom - cap, thick, cap}, bracket.role, 255});
     if (bracket.endShown)
         region.over.push_back({{bracket.x1 - thick, bottom - cap, thick, cap}, bracket.role, 255});
+}
+
+void addRangeBrackets(Region& region, const core::ArmedSpans& ranges, core::Tick left,
+                      core::Tick right, const std::function<int(core::Tick)>& toX, int width,
+                      int bottom, CellSize cell)
+{
+    const auto bracket = [&](core::ArmedSpan span) -> std::optional<RangeBracket>
+    {
+        if (span.to <= left || span.from >= right)
+            return std::nullopt;
+        return RangeBracket{span.from >= left ? toX(span.from) : 0,
+                            span.to <= right ? toX(span.to) : width, span.from >= left,
+                            span.to <= right};
+    };
+    if (ranges.punch)
+    {
+        if (const auto punch = bracket(*ranges.punch))
+            addRangeBracket(region, *punch, bottom, cell);
+    }
+    if (ranges.loop)
+    {
+        if (auto loop = bracket(*ranges.loop))
+        {
+            loop->role = ranges.loopOn ? Role::Accent : Role::Dim;
+            loop->dashed = false;
+            loop->lifted = ranges.punch && ranges.punch->from < ranges.loop->to &&
+                           ranges.loop->from < ranges.punch->to;
+            addRangeBracket(region, *loop, bottom, cell);
+        }
+    }
 }
 
 std::string padText(std::string text, std::size_t width, bool alignRight)

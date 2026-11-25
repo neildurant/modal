@@ -342,7 +342,7 @@ void ArrangePage::follow()
 void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
                              const std::vector<core::TrackId>& moving, bool ownMeters,
-                             bool recording, std::optional<core::ArmedSpan> punch) const
+                             bool recording, const core::ArmedSpans& ranges) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
@@ -806,15 +806,10 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                   Role::BarLine,
                                   255});
     }
-    // The punch range armed, along the ruler's foot.
-    if (punch && punch->to > leftTick_ && punch->from < right)
-    {
-        addRangeBracket(timeline,
-                        {punch->from >= leftTick_ ? scale.toX(punch->from) : 0,
-                         punch->to <= right ? scale.toX(punch->to) : timeline.bounds.width,
-                         punch->from >= leftTick_, punch->to <= right},
-                        tracksTop, cell_);
-    }
+    // The punch and loop ranges armed, along the ruler's foot.
+    addRangeBrackets(
+        timeline, ranges, leftTick_, right, [&](core::Tick tick) { return scale.toX(tick); },
+        timeline.bounds.width, tracksTop, cell_);
     // In a row of their own (decided November 2026, as they and the labels' names ran into each
     // other in one): the play-from marker, and the marks (ma), each its letter at its time. A
     // track's mark is a dot in the track's row too, if it's shown. Marks at one time go in the
