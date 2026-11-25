@@ -2060,7 +2060,8 @@ TEST_CASE("with tracks armed, the status line says what comes before recording, 
     Playing p;
     p.ws.resize(140 * kCell.width, 24 * kCell.height, kCell);
     CHECK(indicator(p, U"ARM") == Shown::Off);
-    CHECK(indicator(p, U"COUNT 1 BAR") == Shown::Off);
+    // With nothing armed, the playback lead-in, here none (decided 25 November 2026).
+    CHECK(indicator(p, U"NO COUNT") == Shown::Off);
     p.type(U",ra");
     CHECK(indicator(p, U"ARM 1") == Shown::Lit);
     CHECK(indicator(p, U"COUNT 1 BAR") == Shown::Lit);

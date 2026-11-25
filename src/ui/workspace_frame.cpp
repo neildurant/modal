@@ -473,6 +473,7 @@ Bar Workspace::statusBar() const
     state.armed =
         std::ranges::count_if(song.tracks(), [](const auto& track) { return track->arm; });
     state.countIn = song.countIn;
+    state.playbackLeadIn = song.playbackLeadIn;
     state.clickWhen = song.metronome.when;
     state.clickAvailable = clickPort();
     state.thru = thru_;

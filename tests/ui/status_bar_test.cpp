@@ -107,7 +107,11 @@ TEST_CASE("status presentation distinguishes armed recording settings from trans
     state.countIn.preRollBeats = 3;
     const auto before = render(state);
     CHECK(field(before, U"OVERDUB").style.background == Role::Indicator);
-    CHECK(field(before, U"PRE 3 BEATS").style.background == Role::Indicator);
+    // Nothing armed, the lead-in is playback's, none here (decided 25 November 2026).
+    CHECK(field(before, U"NO COUNT").style.background == Role::Indicator);
+    state.playbackLeadIn.mode = modal::core::CountInSettings::Mode::CountIn;
+    state.playbackLeadIn.bars = 2;
+    CHECK(field(render(state), U"COUNT 2 BARS").style.background == Role::IndicatorCount);
     state.armed = 2;
     const auto after = render(state);
     CHECK(field(after, U"ARM 2").style.background == Role::IndicatorArm);
@@ -116,6 +120,12 @@ TEST_CASE("status presentation distinguishes armed recording settings from trans
     CHECK(contains(after, U"■ STOP"));
     for (const auto word : {U"CLICK", U"THRU", U"AUDITION", U"REWIND", U" IN "})
         CHECK(field(before, word).x == field(after, word).x);
+    // The groups apart: what recording will do, then how the playhead will move, a dim line
+    // between them.
+    CHECK(field(after, U"PUNCH").x < field(after, U"OVERDUB").x);
+    CHECK(field(after, U"OVERDUB").x < field(after, U"│").x);
+    CHECK(field(after, U"│").x < field(after, U"LOOP").x);
+    CHECK(field(after, U"│").style.foreground == Role::Dim);
 }
 
 TEST_CASE("status presentation formats count-in and pre-roll units and the disabled count")

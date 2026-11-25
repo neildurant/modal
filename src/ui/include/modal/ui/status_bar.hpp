@@ -55,9 +55,10 @@ struct StatusBarState
     std::optional<Transport> transport;
     std::size_t armed = 0;
     bool overdub = false;
-    bool punch = false; // a punch range armed
-    bool loop = false;  // a loop armed and on, for Space
-    core::CountInSettings countIn;
+    bool punch = false;            // a punch range armed
+    bool loop = false;             // a loop armed and on, for Space
+    core::CountInSettings countIn; // before recording
+    core::CountInSettings playbackLeadIn = core::kDefaultPlaybackLeadIn; // shown when not armed
     core::MetronomeSettings::When clickWhen = core::MetronomeSettings::When::Recording;
     bool clickAvailable = true;
     bool thru = true;
