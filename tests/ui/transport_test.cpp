@@ -237,9 +237,62 @@ TEST_CASE("the loop keys arm a loop from the section or the selection's time, an
     REQUIRE(p.player.looping());
     CHECK(p.ws.message() == "Looping 1:1:000 to 2:1:000");
 
-    // Armed while playing, it's played by the next Space.
+    // Armed while playing, ahead of the playhead, it loops at once.
     p.type(U"]s,LL");
+    CHECK(p.ws.message().ends_with("; looping now"));
+    REQUIRE(p.ws.loopSpan());
+    CHECK(p.player.loopAsked() == std::pair{p.ws.loopSpan()->from, p.ws.loopSpan()->to});
+}
+
+TEST_CASE("a loop changed while playing takes effect at once: armed, switched, cleared and undone")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn); // sections A (bars 1-2), B (3-5) and C (6-)
+    // Something at the end, so playback goes on that far.
+    song.updateEvents(song.tracks()[0]->id(), [&](core::EventList& events)
+                      { events.insert({7 * ppqn.whole(), core::Note{60, 90, ppqn.quarter()}}); });
+    Playing p{std::move(song)};
+    const core::Tick bar = ppqn.whole();
+    const auto& tempo = p.document.song().tempo();
+    p.type(U"ga ");
+    REQUIRE(p.player.playing());
+    CHECK_FALSE(p.player.looping());
+
+    // Armed ahead of the playhead: on into it, then round it.
+    p.type(U"]s,LL");
+    CHECK(p.ws.message().ends_with("; looping now"));
+    CHECK(p.player.looping());
+    CHECK(contains(p.status(), U"↩ LOOP"));
+    p.runFor(tempo.toTime(5 * bar) + 200ms);
+    CHECK(p.player.position().value() >= 2 * bar);
+    CHECK(p.player.position().value() < 3 * bar);
+
+    // Switched off: playing on from where it is; on again, looping again.
+    p.type(U",Lt");
+    CHECK(p.ws.message() == "Looping off, the loop kept: playing on");
+    CHECK_FALSE(p.player.looping());
+    CHECK(p.player.playing());
+    p.type(U",Lt");
+    CHECK(p.ws.message() == "Looping on: looping now");
+    CHECK(p.player.looping());
+
+    // Undone and redone, and cleared.
+    p.type(U"u");
+    CHECK_FALSE(p.player.looping());
+    p.press(Key::typed(U'r', kCtrl));
+    CHECK(p.player.looping());
+    p.type(U",Ld");
+    CHECK_FALSE(p.player.looping());
+    CHECK(p.player.playing());
+
+    // Behind the playhead: the next Space plays it.
+    p.runFor(tempo.toTime(6 * bar) - tempo.toTime(3 * bar));
+    REQUIRE(p.player.position().value() >= 5 * bar);
+    p.type(U"gg]s,LL"); // B, behind
     CHECK(p.ws.message().ends_with("; the next Space plays it"));
+    CHECK_FALSE(p.player.looping());
+    p.type(U" ");
+    p.runFor(10ms);
 }
 
 TEST_CASE("choosing loop labels remembers both endpoints and loops across sections")

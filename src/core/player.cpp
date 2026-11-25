@@ -307,6 +307,25 @@ bool Player::playLoop(const Song& song, Tick from, Tick to)
     return !recorder_ && playAt(song, from, PlaybackLoop{from, to, song.repeatPlaybackLeadIn});
 }
 
+bool Player::changeLoop(std::optional<std::pair<Tick, Tick>> loop)
+{
+    if (!playing_)
+    {
+        return false;
+    }
+    const auto engineLoop =
+        loop ? std::optional{PlaybackLoop{loop->first, loop->second, false}} : std::nullopt;
+    if (!engine_.setLoop(engineLoop))
+    {
+        return false;
+    }
+    loopAsked_ = loop;
+    // Just started, the engine may not have said where it is: still where it was started.
+    const auto at = position().value_or(playbackEntry_);
+    looping_ = loop && at < loop->second;
+    return true;
+}
+
 bool Player::playLoop(const Song& song, Tick from, Tick to, Tick entry)
 {
     if (entry == from)
@@ -336,6 +355,7 @@ bool Player::playAt(const Song& song, Tick entry, std::optional<PlaybackLoop> lo
     play_ = engine_.lastPlay();
     playing_ = true;
     looping_ = loop.has_value();
+    loopAsked_ = loop ? std::optional{std::pair{loop->from, loop->to}} : std::nullopt;
     started_ = start.playFrom;
     playbackEntry_ = entry;
     countIn_ = countIn;

@@ -151,6 +151,76 @@ TEST_CASE("a loop releases held notes and pedals and chases the start without re
     CHECK_FALSE(scheduler.nextWakeTime());
 }
 
+TEST_CASE("a loop set while playing wraps at its end from then on, chasing its start")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 Tick tick = 0;
+                 for (const int pitch : {60, 62, 64, 65})
+                 {
+                     track.events.insert({tick, Note{static_cast<std::uint8_t>(pitch), 100, q}});
+                     tick += q;
+                 }
+             });
+    const auto plan = compilePlan(song, byPortName);
+    const auto repeat = chase(plan, q, false);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, chase(plan, 0), kNow);
+    runUntil(scheduler, kNow + 250ms);
+
+    // Looping the second beat from within the first: on into it, then round it.
+    scheduler.setLoop(PlaybackLoop{q, 2 * q}, kNow + 250ms, repeat);
+    runUntil(scheduler, kNow + 1250ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0x90, 60, 100}, kNow},
+                           {{1}, {0x80, 60, 64}, kNow + 500ms},
+                           {{1}, {0x90, 62, 100}, kNow + 500ms},
+                           {{1}, {0x80, 62, 64}, kNow + 1000ms}, // released at the join
+                           {{1}, {0x90, 62, 100}, kNow + 1000ms},
+                       });
+    CHECK(scheduler.position(kNow + 1250ms) == q + q / 2);
+
+    // Cleared, it plays straight on from where it is.
+    sink.sent.clear();
+    scheduler.setLoop(std::nullopt, kNow + 1250ms);
+    runUntil(scheduler, kNow + 2000ms);
+    CHECK(sink.sent == std::vector<Sent>{
+                           {{1}, {0x80, 62, 64}, kNow + 1500ms},
+                           {{1}, {0x90, 64, 100}, kNow + 1500ms},
+                           {{1}, {0x80, 64, 64}, kNow + 2000ms},
+                           {{1}, {0x90, 65, 100}, kNow + 2000ms},
+                       });
+}
+
+TEST_CASE("a loop set while playing past its end leaves playback going straight on")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    addTrack(song, 1,
+             [&](EditTrack& track)
+             {
+                 track.events.insert({0, Note{60, 100, q}});
+                 track.events.insert({3 * q, Note{65, 100, q}});
+             });
+    const auto plan = compilePlan(song, byPortName);
+    RecordingSink sink;
+    Scheduler scheduler{sink};
+    scheduler.setPlan(plan, kNow);
+    scheduler.play(0, chase(plan, 0), kNow);
+    runUntil(scheduler, kNow + 1250ms);
+    scheduler.setLoop(PlaybackLoop{0, 2 * q}, kNow + 1250ms, chase(plan, 0, false));
+    runUntil(scheduler, kNow + 1600ms);
+    CHECK(scheduler.position(kNow + 1600ms) > 3 * q);
+    CHECK(sink.sent.back() == Sent{{1}, {0x90, 65, 100}, kNow + 1500ms});
+}
+
 TEST_CASE("a silent loop retains its tempo and phase after a late wake")
 {
     const auto ppqn = MODAL_ANY_PPQN();

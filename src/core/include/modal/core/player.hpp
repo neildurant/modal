@@ -96,6 +96,12 @@ public:
     // From elsewhere: before the loop, playing into it; within it, wrapping at its end. A lead-in
     // repeated on every pass is played once, as it would repeat from the entry, not the loop.
     [[nodiscard]] bool playLoop(const Song& song, Tick from, Tick to, Tick entry);
+    // Changes the loop of the play going on, or ends it (decided 25 November 2026): looping
+    // from now if the playhead is before its end, and otherwise playing straight on. Returns
+    // false if the engine didn't take it.
+    [[nodiscard]] bool changeLoop(std::optional<std::pair<Tick, Tick>> loop);
+    // The loop last asked for in this play, whether or not it took effect.
+    const std::optional<std::pair<Tick, Tick>>& loopAsked() const { return loopAsked_; }
     [[nodiscard]] bool stop();
 
     // Records from the marker onto the song's armed tracks (see Recorder), in the song's record
@@ -245,6 +251,7 @@ private:
     bool rewind_ = true;
     bool playing_ = false;
     bool looping_ = false;
+    std::optional<std::pair<Tick, Tick>> loopAsked_;
     std::uint64_t play_ = 0;             // the engine's id for the last play
     Tick started_ = 0;                   // where the last play started
     Tick playbackEntry_ = 0;             // where the lead-in for playback ends

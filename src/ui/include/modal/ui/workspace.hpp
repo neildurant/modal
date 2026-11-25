@@ -1384,6 +1384,12 @@ private:
     CommandResult toggleLoop();
     // Starts playing as Space does: the loop armed and on, or else from the play-from marker.
     bool startPlaying();
+    // While playing, gives the player the loop armed and on, once it differs from what the play
+    // was last given (decided 25 November 2026): arming, switching, clearing, undoing and edits
+    // the loop follows change the loop at once.
+    void followLoop();
+    // Whether a loop over the span changed now would loop at once: playing, before its end.
+    bool loopsNow(core::ArmedSpan span) const;
     CommandResult chooseLoopLabel(std::optional<std::size_t> from = std::nullopt,
                                   LabelPurpose purpose = LabelPurpose::Loop);
     bool loopLabelKey(const Key& key);

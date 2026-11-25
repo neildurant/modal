@@ -689,6 +689,7 @@ bool Workspace::handle(const Key& key, std::int64_t now)
     auditionHere(version);
     notePasteHistory(version);
     noteRanges(identity, punch, loop);
+    followLoop();
     return changed;
 }
 

@@ -135,9 +135,11 @@ CommandResult Workspace::armLoop(core::ArmedRange range)
         if (const auto oldSpan = core::find(song, *song.loop).span)
             replacing = ", replacing " + armedRangeText(*song.loop, *oldSpan);
     }
+    const bool playing = player_ != nullptr && player_->playing();
     auto text = "Loop range: " + armedRangeText(range, *found.span) + replacing +
-                (player_ != nullptr && player_->playing() ? "; the next Space plays it"
-                                                          : "; Space plays it");
+                (!playing                ? "; Space plays it"
+                 : loopsNow(*found.span) ? "; looping now"
+                                         : "; the next Space plays it");
     if (selection_)
         endVisual();
     document_.edit("Arm loop", view().place(),
@@ -169,8 +171,34 @@ CommandResult Workspace::toggleLoop()
     const bool on = !song.loopOn;
     document_.edit(on ? "Looping on" : "Looping off", view().place(),
                    [&](core::Song& switched) { switched.loopOn = on; });
-    return {true, on ? "Looping on: Space plays the loop"
-                     : "Looping off, the loop kept: Space plays from the marker"};
+    const bool playing = player_ != nullptr && player_->playing();
+    if (!on)
+        return {true, playing ? "Looping off, the loop kept: playing on"
+                              : "Looping off, the loop kept: Space plays from the marker"};
+    const auto span = core::find(song, *song.loop).span;
+    return {true, !playing                  ? "Looping on: Space plays the loop"
+                  : span && loopsNow(*span) ? "Looping on: looping now"
+                                            : "Looping on: the next Space plays it"};
+}
+
+bool Workspace::loopsNow(core::ArmedSpan span) const
+{
+    if (player_ == nullptr || !player_->playing())
+        return false;
+    const auto at = player_->position();
+    return !at || *at < span.to;
+}
+
+void Workspace::followLoop()
+{
+    if (player_ == nullptr || !player_->playing() || player_->recording() || recording_.pending())
+        return;
+    const auto span = loopSpan();
+    const auto wanted = span ? std::optional{std::pair{span->from, span->to}} : std::nullopt;
+    if (wanted == player_->loopAsked())
+        return;
+    if (!player_->changeLoop(wanted))
+        refuse("The engine is busy and didn't take the loop: try again", MessageKind::Warning);
 }
 
 bool Workspace::startPlaying()

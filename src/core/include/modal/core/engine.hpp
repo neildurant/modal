@@ -99,6 +99,7 @@ struct EngineSnapshot
     std::shared_ptr<const PlannedCountIn> countIn;
     std::optional<PlaybackLoop> loop;
     std::shared_ptr<const std::vector<PlannedEvent>> loopChase;
+    std::uint64_t loopChange = 0; // counts setLoop requests, so one isn't lost among others
 };
 
 struct EngineCommand
@@ -155,6 +156,11 @@ public:
     // Input the engine has taken in, stamped with when and where in the song it arrived, in
     // the order taken in (each input in arrival order). Only one thread may call this.
     std::optional<StampedInput> nextReceived() noexcept { return stamped_->tryPop(); }
+
+    // Changes the loop of the play going on, at once, or ends it (see Scheduler::setLoop);
+    // nothing while stopped. Returns false where the engine hasn't kept up, or the loop
+    // reaches past the plan's end.
+    [[nodiscard]] bool setLoop(std::optional<PlaybackLoop> loop);
 
     [[nodiscard]] bool stop();
 
@@ -308,6 +314,7 @@ private:
     std::optional<Auditioned> auditioned_;
     void endAudition(std::chrono::nanoseconds now) noexcept;
     std::uint64_t currentPlay_ = 0; // 0 while stopped
+    std::uint64_t loopChange_ = 0;  // the last setLoop request carried out
     std::size_t nextInput_ = 0;     // rotating input service, shared by normal and transport drains
     bool quit_ = false;
 

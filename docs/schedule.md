@@ -238,7 +238,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — The punch range saved with the song, arming and clearing as undo steps. Accepted on trial.
     - [x] **Done** — A shorter status line: the file's name to `Ctrl-g`, `[+]` kept; `IN` as a light, the last message in the Ports view. Accepted on trial, with `+` for `[+]`.
     - [x] **Done** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song; changes while playing at the next Space. After trial: `↩ LOOP`, as the font has no `↻`, and `, P t` for punching, as `, L t` (asked for 25 November 2026). Accepted on trial, with the status line's indicators grouped by a dim line.
-    - [ ] **To do** — Changes to the loop while playing take effect at once, through a new engine command.
+    - [ ] **Doing** — Changes to the loop while playing take effect at once, through a new engine command.
     - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Loop recording: accumulating overdubs or separate takes, including erase-while-looping.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.

@@ -78,6 +78,26 @@ bool Engine::play(Tick start, std::optional<PlannedCountIn> countIn,
     return woken(commands_.tryPush({Command::Kind::Play, playRequests_}));
 }
 
+bool Engine::setLoop(std::optional<PlaybackLoop> loop)
+{
+    if (!latest_ ||
+        (loop && (loop->from < 0 || loop->from >= loop->to || loop->to > latest_->plan->end)))
+    {
+        return false;
+    }
+    Snapshot next = *latest_;
+    if (loop)
+    {
+        loop->repeatLeadIn = false;
+    }
+    next.loop = loop;
+    next.loopChase = loop ? std::make_shared<const std::vector<PlannedEvent>>(
+                                chase(*next.plan, loop->from, false))
+                          : nullptr;
+    ++next.loopChange;
+    return publish(std::move(next)) && woken(true);
+}
+
 bool Engine::stop()
 {
     return woken(commands_.tryPush({Command::Kind::Stop}));
@@ -245,6 +265,11 @@ EngineWake Engine::step() noexcept
                                    ? std::span<const PlannedEvent>{*snapshot.loopChase}
                                    : std::span<const PlannedEvent>{};
         scheduler_.setPlan(*snapshot.plan, now, loopChase);
+        if (snapshot.playRequest == currentPlay_ && snapshot.loopChange != loopChange_)
+        {
+            scheduler_.setLoop(snapshot.loop, now, loopChase);
+        }
+        loopChange_ = snapshot.loopChange;
         thru_.setTargets(snapshot.plan->thru);
     }
 
@@ -305,6 +330,7 @@ bool Engine::carryOut(const Command& command, nanoseconds now) noexcept
             scheduler_.play(snapshot->start, *snapshot->chased, now, snapshot->countIn.get(),
                             snapshot->loop, loopChase);
             currentPlay_ = command.request;
+            loopChange_ = snapshot->loopChange; // the play carries its loop
             // After the scheduler has let go of the play before's chased events and count-in.
             startedPlay_.store(command.request, std::memory_order_release);
         }

@@ -88,6 +88,14 @@ public:
               std::optional<PlaybackLoop> loop = std::nullopt,
               std::span<const PlannedEvent> loopChase = {}) noexcept;
 
+    // Changes the loop while playing (decided 25 November 2026): with the playhead before its
+    // end, playback wraps there to its start from now on, chasing loopChase (from chase() at its
+    // start) at each join; past its end, or with no loop, playback carries straight on. Repeats
+    // are seamless, a lead-in having been planned only for a play started as a loop. The caller
+    // keeps loopChase alive while the scheduler uses it. Does nothing while stopped.
+    void setLoop(std::optional<PlaybackLoop> loop, std::chrono::nanoseconds now,
+                 std::span<const PlannedEvent> loopChase = {}) noexcept;
+
     // Ends the notes sounding, lets up each pedal (sustain, sostenuto or soft) playback left
     // down, on just the channels where it's down, and stops, with the stop options.
     void stop(std::chrono::nanoseconds now) noexcept;

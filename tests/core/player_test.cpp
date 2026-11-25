@@ -320,6 +320,41 @@ TEST_CASE("playback uses its own count-in once, including at the start of a loop
     CHECK(p.player.marker() == q);
 }
 
+TEST_CASE("the player changes the loop of the play going on, through the engine, at once")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto song = fourNotes(ppqn);
+    Playing p{song};
+    REQUIRE(p.player.play(song));
+    p.runFor(250ms);
+    CHECK_FALSE(p.player.looping());
+
+    // A loop over the second beat, asked for in the first: looping from now.
+    REQUIRE(p.player.changeLoop(std::pair{q, 2 * q}));
+    CHECK(p.player.looping());
+    CHECK(p.player.loopAsked() == std::pair{q, 2 * q});
+    // An edit's new plan keeps it.
+    p.player.update(song);
+    p.runFor(1000ms);
+    REQUIRE(p.player.position());
+    CHECK(*p.player.position() >= q);
+    CHECK(*p.player.position() < 2 * q);
+
+    // Ended, it plays on.
+    REQUIRE(p.player.changeLoop(std::nullopt));
+    CHECK_FALSE(p.player.looping());
+    p.runFor(600ms);
+    CHECK(*p.player.position() >= 2 * q);
+
+    // Past its end, a loop leaves it playing on, not looping.
+    REQUIRE(p.player.changeLoop(std::pair{0, q}));
+    CHECK_FALSE(p.player.looping());
+    CHECK(p.player.loopAsked() == std::pair{Tick{0}, q});
+    REQUIRE(p.player.stop());
+    CHECK_FALSE(p.player.changeLoop(std::pair{0, q})); // stopped, nothing to change
+}
+
 TEST_CASE("a playback loop plays its musical pre-roll once before wrapping to its own start")
 {
     const auto ppqn = MODAL_ANY_PPQN();

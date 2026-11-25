@@ -581,6 +581,31 @@ void Scheduler::sendDue(nanoseconds now) noexcept
     }
 }
 
+void Scheduler::setLoop(std::optional<PlaybackLoop> loop, nanoseconds now,
+                        std::span<const PlannedEvent> loopChase) noexcept
+{
+    if (!playing_)
+    {
+        return;
+    }
+    sendDue(now);
+    // Where playback has reached; in a count-in, its start.
+    const nanoseconds position = countingIn(now) ? plan_->tempo.toTime(startTick_) : now - origin_;
+    if (loop && loop->from < loop->to && position < plan_->tempo.toTime(loop->to))
+    {
+        loop_ = PlaybackLoop{loop->from, loop->to, false};
+        loopStartTick_ = loop->from;
+        loopCountIn_ = nullptr;
+        loopChase_ = loopChase;
+    }
+    else
+    {
+        loop_.reset();
+        loopChase_ = {};
+        loopCountIn_ = nullptr;
+    }
+}
+
 void Scheduler::wrap(nanoseconds boundary, nanoseconds now) noexcept
 {
     endAllNotes(boundary);
