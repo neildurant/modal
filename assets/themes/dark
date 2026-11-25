@@ -1,6 +1,6 @@
-" Modal's dark theme, after Tokyo Night. A theme is a command file of highlight lines, a
-" colour for each role; set theme=NAME runs themes/NAME from the config directory, or a
-" built-in theme, after starting again from this one.
+" Modal's dark theme, after Tokyo Night, its default until darker (25 November 2026). A theme
+" is a command file of highlight lines, a colour for each role; set theme=NAME runs themes/NAME
+" from the config directory, or a built-in theme, after starting again from the default.
 
 highlight background   #1a1b26
 highlight text         #c0caf5

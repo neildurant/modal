@@ -180,7 +180,7 @@ TEST_CASE("highlight sets a role's colour, and themes are command files of highl
 {
     Config config;
     ConfigReader reader{config, kRegistry};
-    CHECK(config.theme[Role::Background] == Colour{0x1a, 0x1b, 0x26}); // dark, to begin with
+    CHECK(config.theme[Role::Background] == Colour{0x16, 0x16, 0x1e}); // darker, to begin with
     CHECK(reader.runCommand("highlight cursor-text #FFEEDD", {}).empty());
     CHECK(config.theme[Role::CursorText] == Colour{0xff, 0xee, 0xdd});
     CHECK(reader.runCommand("highlight cursor", {}) == "highlight needs ROLE #RRGGBB");
@@ -193,7 +193,7 @@ TEST_CASE("highlight sets a role's colour, and themes are command files of highl
     CHECK(config.theme[Role::CursorText] == Colour{0xe1, 0xe2, 0xe7}); // the override's gone
 }
 
-TEST_CASE("a theme in the config directory comes before a built-in one, from dark")
+TEST_CASE("a theme in the config directory comes before a built-in one, from the default")
 {
     const TempDirectory directory{"modal-theme-test"};
     directory.write("themes/light", "highlight background #000001\n");
@@ -203,12 +203,12 @@ TEST_CASE("a theme in the config directory comes before a built-in one, from dar
 
     CHECK(reader.runCommand("set theme=light", {}).empty());
     CHECK(config.theme[Role::Background] == Colour{0, 0, 1});
-    CHECK(config.theme[Role::Text] == builtInTheme("dark")->operator[](Role::Text));
+    CHECK(config.theme[Role::Text] == builtInTheme("darker")->operator[](Role::Text));
 
     CHECK(reader.runCommand("set theme=mine", {}).empty());
     CHECK(config.theme[Role::Text] == Colour{0, 0, 2});
-    CHECK(config.theme[Role::Background] == Colour{0x1a, 0x1b, 0x26});
-    REQUIRE(reader.errors().size() == 1); // from the theme's own file
+    CHECK(config.theme[Role::Background] == Colour{0x16, 0x16, 0x1e}); // darker's
+    REQUIRE(reader.errors().size() == 1);                              // from the theme's own file
     CHECK(reader.errors()[0].line == 2);
     CHECK(reader.errors()[0].source.ends_with("mine"));
 

@@ -11,6 +11,7 @@ namespace modal::ui
 {
 
 // Built in from assets/themes by modal_embed_file.
+std::span<const unsigned char> builtInDarkerTheme();
 std::span<const unsigned char> builtInDarkTheme();
 std::span<const unsigned char> builtInLightTheme();
 // And the base16 schemes, as src/ui/CMakeLists.txt lists them.
@@ -26,13 +27,23 @@ std::span<const unsigned char> builtInScheme7();
 namespace
 {
 
-constexpr std::array<std::string_view, 10> kThemeNames{
-    "dark",    "light",          "gruvbox-dark-medium", "gruvbox-light-medium", "nord",
-    "dracula", "solarized-dark", "solarized-light",     "catppuccin-mocha",     "catppuccin-latte"};
+// darker first, the default (decided 25 November 2026).
+constexpr std::array<std::string_view, 11> kThemeNames{"darker",
+                                                       "dark",
+                                                       "light",
+                                                       "gruvbox-dark-medium",
+                                                       "gruvbox-light-medium",
+                                                       "nord",
+                                                       "dracula",
+                                                       "solarized-dark",
+                                                       "solarized-light",
+                                                       "catppuccin-mocha",
+                                                       "catppuccin-latte"};
+constexpr std::size_t kOwnThemes = 3; // before the schemes
 
 constexpr std::array kSchemes{&builtInScheme0, &builtInScheme1, &builtInScheme2, &builtInScheme3,
                               &builtInScheme4, &builtInScheme5, &builtInScheme6, &builtInScheme7};
-static_assert(kSchemes.size() + 2 == kThemeNames.size());
+static_assert(kSchemes.size() + kOwnThemes == kThemeNames.size());
 
 std::string_view text(std::span<const unsigned char> bytes)
 {
@@ -53,6 +64,10 @@ std::span<const std::string_view> builtInThemeNames()
 
 std::optional<std::string> builtInThemeText(std::string_view name)
 {
+    if (name == "darker")
+    {
+        return std::string{text(builtInDarkerTheme())};
+    }
     if (name == "dark")
     {
         return std::string{text(builtInDarkTheme())};
@@ -63,7 +78,7 @@ std::optional<std::string> builtInThemeText(std::string_view name)
     }
     for (std::size_t i = 0; i < kSchemes.size(); ++i)
     {
-        if (name == kThemeNames[i + 2])
+        if (name == kThemeNames[i + kOwnThemes])
         {
             const auto read = readBase16(text(kSchemes[i]()));
             assert(read.scheme); // the tests read every built-in scheme

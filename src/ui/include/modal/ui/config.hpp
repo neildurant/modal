@@ -40,7 +40,7 @@ struct Config
 {
     Settings settings;
     Keymap keymap;
-    Theme theme = *builtInTheme("dark");
+    Theme theme = *builtInTheme(kDefaultTheme);
     std::vector<core::Scale> scales; // the modalrc's own, by scale NAME DEGREES
 };
 

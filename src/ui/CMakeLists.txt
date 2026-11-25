@@ -73,6 +73,9 @@ modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/config/modalrc"
     FUNCTION modal::ui::builtInModalrcBytes)
 modal_embed_file(TARGET modal_ui
+    FILE "${PROJECT_SOURCE_DIR}/assets/themes/darker"
+    FUNCTION modal::ui::builtInDarkerTheme)
+modal_embed_file(TARGET modal_ui
     FILE "${PROJECT_SOURCE_DIR}/assets/themes/dark"
     FUNCTION modal::ui::builtInDarkTheme)
 modal_embed_file(TARGET modal_ui

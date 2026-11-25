@@ -26,7 +26,7 @@ TEST_CASE("every setting has a unique name, a description and its default to beg
     CHECK(settings.integer("timeoutlen") == 500);
     CHECK(settings.number("fontsize") == 12.0);
     CHECK(settings.text("font").empty());
-    CHECK(settings.text("theme") == "dark");
+    CHECK(settings.text("theme") == "darker");
     CHECK(settings.cells("minsize") == CellCount{120, 30});
     CHECK(settings.find("nope") == nullptr);
 }

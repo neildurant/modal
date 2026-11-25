@@ -13,9 +13,10 @@
 namespace modal::ui
 {
 
-// The themes built into the program: dark, the default, and light, each a command file of
-// highlight lines, assets/themes/NAME, built in as text; and a few base16 schemes,
-// assets/themes/base16/NAME.yaml, as themes (decided 24 November 2026).
+// The themes built into the program: darker, the default (decided 25 November 2026), dark and
+// light, each a command file of highlight lines, assets/themes/NAME, built in as text; and a few
+// base16 schemes, assets/themes/base16/NAME.yaml, as themes (decided 24 November 2026).
+inline constexpr std::string_view kDefaultTheme = "darker";
 std::span<const std::string_view> builtInThemeNames();
 std::optional<std::string> builtInThemeText(std::string_view name);
 

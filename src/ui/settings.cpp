@@ -4,6 +4,7 @@
 #include <modal/core/note_fraction.hpp>
 #include <modal/ui/keymap.hpp>
 #include <modal/ui/settings.hpp>
+#include <modal/ui/themes.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -71,8 +72,8 @@ Settings::Settings()
     : settings_{
           setting("theme",
                   "The colour theme: themes/NAME, or a base16 scheme themes/NAME.yaml, in the "
-                  "config directory, or a built-in theme: dark, light or a base16 scheme",
-                  std::string{"dark"}),
+                  "config directory, or a built-in theme: darker, dark, light or a base16 scheme",
+                  std::string{kDefaultTheme}),
           setting("font",
                   "A TrueType or OpenType font file for the grid, or empty for the "
                   "built-in JetBrains Mono",

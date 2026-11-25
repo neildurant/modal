@@ -107,8 +107,9 @@ A theme assigns colours to **roles**, such as note, cursor, selection and
 warning. It does not paint individual notes by arbitrary colour commands.
 This keeps the same meaning recognisable across views.
 
-`:set theme=dark` and `:set theme=light` choose Modal's original themes. The
-eight built-in colour schemes are `gruvbox-dark-medium`,
+Modal starts with `darker`, a deep background with teal notes and bars.
+`:set theme=dark` chooses its slightly lighter original, with green notes, and
+`:set theme=light` a light theme. The eight built-in colour schemes are `gruvbox-dark-medium`,
 `gruvbox-light-medium`, `nord`, `dracula`, `solarized-dark`, `solarized-light`,
 `catppuccin-mocha` and `catppuccin-latte`. Try `:set theme=nord` at the prompt.
 To start with Nord each time, put `set theme=nord` in `modalrc`.
@@ -140,7 +141,7 @@ uses the filename without `.yaml`, replacing spaces with hyphens. Use
 `:theme-import!` when you want to replace an existing editable theme.
 
 You can also write a theme from scratch in `themes/NAME`. It starts with the
-dark theme's colours, so it only needs lines for the roles you want to change.
+default theme's colours, so it only needs lines for the roles you want to change.
 
 ```text
 highlight cursor #e0af68

@@ -80,7 +80,7 @@ TEST_CASE("the prompt runs config commands, and shows settings with set NAME?")
     CHECK(prompt.run("nmap J cursor-down") == CommandResult{true});
 
     CHECK(prompt.run("set fontsize?") == shows("fontsize=14"));
-    CHECK(prompt.run("  set fontsize? theme?") == shows("fontsize=14  theme=dark"));
+    CHECK(prompt.run("  set fontsize? theme?") == shows("fontsize=14  theme=darker"));
     CHECK(prompt.run("set fontsiz?") == CommandResult::error("unknown setting \"fontsiz\""));
     CHECK(prompt.run("set fontsize=huge") ==
           CommandResult::error("fontsize must be a number from 4 to 72"));

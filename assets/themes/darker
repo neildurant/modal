@@ -1,0 +1,66 @@
+" Modal's default theme, darker (decided 25 November 2026): the dark theme taken darker, with the
+" teal of Tokyo Night Terminal Dark for notes and bars. Each background shade moves down with the
+" background and is brought back until it stands as far from it as in dark, keeping dark's
+" contrasts. A theme is a command file of highlight lines, a colour for each role; set theme=NAME
+" runs themes/NAME from the config directory, or a built-in theme, after starting again from this one.
+
+highlight background   #16161e
+highlight text         #c0caf5
+highlight dim          #565f89
+highlight accent       #7aa2f7
+highlight warning      #f7768e
+highlight message      #e0af68
+highlight cursor       #e0af68
+highlight cursor-text  #16161e
+highlight selection    #2c3a60
+highlight playhead     #213d40
+highlight bar          #222538
+highlight bar-text     #a9b1d6
+highlight panel        #323850
+highlight chrome       #222538
+highlight mode         #7aa2f7
+highlight mode-text    #16161e
+highlight grid-line    #222538
+highlight beat-line    #323856
+highlight bar-line     #565f89
+highlight note         #41a6b5
+highlight note-selected #ff9e64
+highlight label        #ff9e64
+highlight density-1    #24494f
+highlight density-2    #2f6c76
+highlight density-3    #3c93a0
+highlight density-4    #6fd0dc
+highlight own-meter    #bb9af7
+highlight track-rows   #222538
+highlight hint-key     #73daca
+highlight hint-group   #bb9af7
+highlight match        #e0af68
+
+" Active track toggles, with contrasting text.
+highlight track-mute     #f7a1b4
+highlight track-solo     #9ece6a
+highlight track-chase    #7aa2f7
+highlight track-quantize #73daca
+highlight track-arm      #ff2a2a
+highlight track-thru     #e0af68
+highlight toggle-text    #16161e
+highlight event-sign     #bb9af7
+
+" A field typed into or chosen from a list, between the background and the panel.
+highlight field #272a3c
+
+" The status line's indicators.
+highlight indicator             #2d3046
+highlight indicator-text        #6b7399
+highlight indicator-lit-text    #16161e
+highlight indicator-arm         #ff2a2a
+highlight indicator-record-mode #ff9e64
+highlight indicator-count       #e0af68
+highlight indicator-click       #7aa2f7
+highlight indicator-thru        #7aa2f7
+highlight indicator-audition    #7aa2f7
+highlight indicator-rewind      #7aa2f7
+highlight indicator-input       #41a6b5
+
+" The row above the status line, in the bar's colour.
+highlight message-line #222538

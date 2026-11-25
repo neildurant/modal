@@ -423,7 +423,7 @@ std::string ConfigReader::useTheme(std::string name, const std::string& previous
         const auto file = *configDirectory_ / "themes" / utf8Path(name);
         if (std::filesystem::is_regular_file(file))
         {
-            config_.theme = *builtInTheme("dark");
+            config_.theme = *builtInTheme(kDefaultTheme);
             runFile(file);
             return {};
         }
@@ -439,7 +439,7 @@ std::string ConfigReader::useTheme(std::string name, const std::string& previous
                 config_.settings.set("theme", previous);
                 return utf8Text(scheme) + ": " + read.error;
             }
-            config_.theme = *builtInTheme("dark");
+            config_.theme = *builtInTheme(kDefaultTheme);
             runText(base16ThemeText(*read.scheme), utf8Text(scheme), scheme.parent_path());
             return {};
         }

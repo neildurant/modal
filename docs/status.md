@@ -6,6 +6,14 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### The `darker` theme, the default, 25 November 2026
+
+Asked for during the punch work: a theme like `dark` but darker, keeping its contrasts, with the teal of Tokyo Night Terminal Dark for notes and bars, whose own shades sat too close together as a scheme. `darker` (`assets/themes/darker`) moves every background shade down with the background (`#16161e`) and back until each stands as far from it as in `dark` by the contrast measure; notes and the arrangement's density are teal (`#41a6b5`), matches yellow and hint keys a lighter teal, to stand apart from the notes. Tried as a theme in the config directory and liked, it was built in and made the default (`kDefaultTheme`): the `theme` setting's default, a Config's theme, and what `set theme=NAME` starts again from. `dark` and `light` stay built in. The configuration guide, the customisation chapter and design.md say so; the manual's settings reference was regenerated. The manual's illustrations keep `dark`, as they're drawn with it by name.
+
+**Validation.** The built-in themes' test checks `darker` sets every role and reads back the same; the setting, config and prompt tests now expect `darker` as the default and starting point. MSVC Debug passes all 1,306 tests with two MIDI-dependent skips. Whole-tree formatting and `git diff --check` pass.
+
+**Pending.** The desktop trial with step 2b. A copy in the config directory's `themes/darker` would be used before the built-in one, so the one written there for trying it can go.
+
 ### Punch recording, step 2b: punching in while playing, 25 November 2026
 
 `R` while playing, with a punch range armed ahead of the playhead, punches in on the fly: `Player::punchIn` makes a recorder for the play already going, from punch-in to punch-out, and swaps in the pass's plan, so the tracks replaced fall silent from punch-in and the click comes in as the metronome says, with no lead-in; punch-out then works as in step 2a. `RecordingSession::start` takes this path while playing, and only with a punch. `R` past punch-in is refused (`Past the punch-in point: stop first, then R`), as it is during a playback loop (`Recording while looping comes later: stop first to punch in`); playing without a range, as before (`Stop first to record`). Found while testing: a pass that reached its record point but changed nothing said it had stopped before the record point; the take now says whether it got past it (`Player::Take::reached`, `RecordingSession::Completion::reached`), and such a pass says `Nothing recorded: nothing was played`.

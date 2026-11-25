@@ -2,7 +2,7 @@
 
 | Setting | Default | Meaning |
 | :--- | :--- | :--- |
-| `` theme `` | `` dark `` | The colour theme: themes/NAME, or a base16 scheme themes/NAME.yaml, in the config directory, or a built-in theme: dark, light or a base16 scheme |
+| `` theme `` | `` darker `` | The colour theme: themes/NAME, or a base16 scheme themes/NAME.yaml, in the config directory, or a built-in theme: darker, dark, light or a base16 scheme |
 | `` font `` | (empty) | A TrueType or OpenType font file for the grid, or empty for the built-in JetBrains Mono |
 | `` fontsize `` | `` 12 `` | The font's size in points, before the display's scaling. Range: 4 to 72 |
 | `` backups `` | `` 5 `` | How many earlier versions of each song file saving keeps, in the state directory (, f b lists them); 0 keeps none. Range: 0 to 100 |
