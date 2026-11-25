@@ -225,6 +225,7 @@ Song::Song(Parts parts)
     , playbackLeadIn(parts.playbackLeadIn)
     , repeatPlaybackLeadIn(parts.repeatPlaybackLeadIn)
     , recordMode(parts.recordMode)
+    , punch(std::move(parts.punch))
     , tracks_(std::move(parts.tracks))
     , sections_(std::move(parts.sections))
     , nextTrackId_(parts.nextTrackId)
@@ -238,8 +239,8 @@ Song::Song(Parts parts)
 
 Song::Parts Song::parts() const
 {
-    return {ppqn(),     title,   metronome, countIn,      playbackLeadIn, repeatPlaybackLeadIn,
-            recordMode, tracks_, sections_, nextTrackId_, identity_};
+    return {ppqn(),     title, metronome, countIn,   playbackLeadIn, repeatPlaybackLeadIn,
+            recordMode, punch, tracks_,   sections_, nextTrackId_,   identity_};
 }
 
 bool operator==(const Song& a, const Song& b)
@@ -248,7 +249,7 @@ bool operator==(const Song& a, const Song& b)
     return a.ppqn() == b.ppqn() && a.title == b.title && a.metronome == b.metronome &&
            a.countIn == b.countIn && a.playbackLeadIn == b.playbackLeadIn &&
            a.repeatPlaybackLeadIn == b.repeatPlaybackLeadIn && a.recordMode == b.recordMode &&
-           std::ranges::equal(a.tracks_, b.tracks_, same) &&
+           a.punch == b.punch && std::ranges::equal(a.tracks_, b.tracks_, same) &&
            std::ranges::equal(a.sections_, b.sections_, same);
 }
 

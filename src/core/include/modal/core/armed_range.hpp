@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include <modal/core/song.hpp>
 #include <modal/core/tick.hpp>
 
 #include <cstddef>
@@ -13,6 +12,8 @@
 
 namespace modal::core
 {
+
+class Song;
 
 // A span of a song armed for punch recording (decided 24 November 2026), and later for looping.
 // It's kept as what it was armed from, so it follows that through edits: a section follows the
@@ -73,5 +74,37 @@ struct ArmedRangeFound
 
 // A span of time is cut short at the song's end.
 ArmedRangeFound find(const Song& song, const ArmedRange& range);
+
+// An armed range as a song file keeps it (decided 25 November 2026): sections by their index in
+// the song, as their ids are the session's alone.
+struct SavedRange
+{
+    struct OfSection
+    {
+        std::size_t section;
+        friend bool operator==(const OfSection&, const OfSection&) = default;
+    };
+    struct LabelAt
+    {
+        std::size_t section;
+        std::string name;
+        friend bool operator==(const LabelAt&, const LabelAt&) = default;
+    };
+    struct OfLabels
+    {
+        LabelAt from;
+        LabelAt to;
+        friend bool operator==(const OfLabels&, const OfLabels&) = default;
+    };
+
+    std::variant<OfSection, OfLabels, ArmedRange::OfTime> source;
+
+    friend bool operator==(const SavedRange&, const SavedRange&) = default;
+};
+
+// The range as the song would save it, or nothing where its section is gone.
+std::optional<SavedRange> saved(const Song& song, const ArmedRange& range);
+// The range again in a song, or nothing where it names a section the song hasn't.
+std::optional<ArmedRange> restored(const Song& song, const SavedRange& range);
 
 } // namespace modal::core

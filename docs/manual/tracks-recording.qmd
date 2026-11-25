@@ -336,18 +336,20 @@ An armed range shows as a dashed red bracket along the foot of the ruler, in
 the arrangement and the piano roll, with a short upright cap at each end. The
 red is the recording colour, a reminder that `R` will record there. **PUNCH**
 lights in the status line too, so you can see a range is armed in any view
-and while stopped. Arming plays nothing and changes nothing in the song.
+and while stopped. Arming plays nothing.
 
 ![The Answer section armed as a punch range: a dashed bracket along the foot of the ruler over bars 5 to 8, and PUNCH lit in the status line.](images/punch-range.png){#fig-punch-range fig-alt="Modal's arrangement with two sections, Phrase and Answer. A dashed red bracket runs under the bar numbers of the Answer section, capped at each end, and the status line's PUNCH indicator is lit red."}
 
-The range belongs to how you are working on the song, like the cursor, rather
-than to the music. It isn't saved with the song or recorded as an undo step,
-but each open song keeps its own range while Modal runs. It also keeps track
+The range is part of the song's recording setup, like the armed tracks and
+the count-in, so it is saved with the song: open the song tomorrow and `R`
+retakes the same passage. Arming or clearing it is an undo step, and marks the
+song as changed. Each open song has its own range. The range also keeps track
 of what it was armed from. A section range follows its section if the section
 is moved, renamed or resized, or if bars are inserted before it. A label range
 follows its two labels. A Visual selection's range stays at the same time. If
 an edit removes what a range was following, such as deleting its section or
-one of its labels, Modal clears the range and says why.
+one of its labels, Modal clears the range and says why. Undoing that edit
+brings the range back.
 
 ### Recording the range
 

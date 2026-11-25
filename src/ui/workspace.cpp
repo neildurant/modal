@@ -673,10 +673,12 @@ bool Workspace::handle(const Key& key, std::int64_t now)
         macros_.recorded.push_back(key);
     }
     const auto version = document_.version();
+    const auto identity = document_.song().identity();
+    const auto punch = document_.song().punch;
     const bool changed = recordChange(key, now);
     auditionHere(version);
     notePasteHistory(version);
-    notePunchRange();
+    notePunchRange(identity, punch);
     return changed;
 }
 

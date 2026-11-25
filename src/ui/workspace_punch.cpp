@@ -12,15 +12,15 @@ namespace modal::ui
 // A punch range (decided 24 November 2026) is armed from the cursor's section, a Visual
 // selection's time or two labels, and stays armed in its song until cleared, so R records
 // another take of it. It follows what it was armed from through edits, and goes, saying why,
-// where an edit leaves it nowhere.
+// where an edit leaves it nowhere. It's part of the song, saved with it, and arming or clearing
+// it is an undo step (decided 25 November 2026).
 
 std::optional<core::ArmedSpan> Workspace::punchSpan() const
 {
     const auto& song = document_.song();
-    const auto range = punchRanges_.find(song.identity());
-    if (range == punchRanges_.end())
+    if (!song.punch)
         return std::nullopt;
-    return core::find(song, range->second).span;
+    return core::find(song, *song.punch).span;
 }
 
 std::string Workspace::armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const
@@ -67,41 +67,45 @@ CommandResult Workspace::armPunch(core::ArmedRange range)
         return CommandResult::error("Nothing there to punch in");
 
     std::string replacing;
-    if (const auto old = punchRanges_.find(song.identity()); old != punchRanges_.end())
+    if (song.punch && *song.punch != range)
     {
-        if (const auto oldSpan = core::find(song, old->second).span;
-            oldSpan && old->second != range)
-            replacing = ", replacing " + armedRangeText(old->second, *oldSpan);
+        if (const auto oldSpan = core::find(song, *song.punch).span)
+            replacing = ", replacing " + armedRangeText(*song.punch, *oldSpan);
     }
+    auto text = "Punch range: " + armedRangeText(range, *found.span) + replacing;
     if (selection_)
         endVisual();
-    punchRanges_.insert_or_assign(song.identity(), range);
-    return {true, "Punch range: " + armedRangeText(range, *found.span) + replacing};
+    document_.edit("Arm punch range", view().place(),
+                   [&](core::Song& armed) { armed.punch = std::move(range); });
+    return {true, std::move(text)};
 }
 
 CommandResult Workspace::clearPunch()
 {
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
     const auto& song = document_.song();
-    const auto range = punchRanges_.find(song.identity());
-    if (range == punchRanges_.end())
+    if (!song.punch)
         return {false, "No punch range is armed", false};
     std::string was;
-    if (const auto span = core::find(song, range->second).span)
-        was = ": " + armedRangeText(range->second, *span);
-    punchRanges_.erase(range);
+    if (const auto span = core::find(song, *song.punch).span)
+        was = ": " + armedRangeText(*song.punch, *span);
+    document_.edit("Clear punch range", view().place(),
+                   [](core::Song& cleared) { cleared.punch.reset(); });
     return {true, "Punch range cleared" + was};
 }
 
-void Workspace::notePunchRange()
+void Workspace::notePunchRange(std::uint64_t identity,
+                               const std::optional<core::ArmedRange>& before)
 {
+    // The edit itself cleared it, in its undo step: say why, as cleared or undone deliberately
+    // the range would still be somewhere.
     const auto& song = document_.song();
-    const auto range = punchRanges_.find(song.identity());
-    if (range == punchRanges_.end())
+    if (!before || song.punch || song.identity() != identity)
         return;
-    const auto found = core::find(song, range->second);
+    const auto found = core::find(song, *before);
     if (found.span)
         return;
-    punchRanges_.erase(range);
     auto message = "Punch range cleared: " + found.gone;
     setMessage(message_.empty() ? std::move(message) : message_ + " · " + message,
                MessageKind::Warning);

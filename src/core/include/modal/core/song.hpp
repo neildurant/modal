@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <modal/core/armed_range.hpp>
 #include <modal/core/meter_map.hpp>
 #include <modal/core/metronome.hpp>
 #include <modal/core/ramp.hpp>
@@ -183,6 +184,9 @@ public:
     CountInSettings playbackLeadIn = kDefaultPlaybackLeadIn;
     bool repeatPlaybackLeadIn = false;
     RecordMode recordMode = RecordMode::Replace;
+    // The punch range armed for recording (decided 24 November 2026), saved with the song and
+    // armed or cleared as an undo step (decided 25 November 2026).
+    std::optional<ArmedRange> punch;
 
     // Tracks in display order; track 1 is tracks()[0].
     std::span<const std::shared_ptr<const Track>> tracks() const { return tracks_; }
@@ -447,6 +451,7 @@ public:
         CountInSettings playbackLeadIn;
         bool repeatPlaybackLeadIn;
         RecordMode recordMode;
+        std::optional<ArmedRange> punch;
         std::vector<std::shared_ptr<const Track>> tracks;
         std::vector<std::shared_ptr<const Section>> sections;
         std::uint64_t nextTrackId;

@@ -1381,16 +1381,14 @@ private:
     CommandResult labelsChosen(LabelPurpose purpose, std::size_t from, std::size_t to,
                                std::pair<std::string, std::string> names);
 
-    // The punch range armed in each open song, by its identity (decided 24 November 2026): for
-    // the session, not saved and not an undo step.
-    std::map<std::uint64_t, core::ArmedRange> punchRanges_;
     std::optional<core::ArmedSpan> punching_; // the span the pass being recorded punches
     CommandResult punch(std::string_view arguments);
     CommandResult armPunch(core::ArmedRange range);
     CommandResult clearPunch();
     std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
-    // Clears the song's punch range once an edit has left it nowhere, saying why.
-    void notePunchRange();
+    // Says why, when a key's edit has cleared the song's punch range, as it left it nowhere: the
+    // song it had before the key, and its range then.
+    void notePunchRange(std::uint64_t identity, const std::optional<core::ArmedRange>& before);
     // The tracks of a file being imported, ticked with Space, which Enter imports by running the
     // line that names them.
     struct TrackImportChoice

@@ -13,6 +13,7 @@
 #include <charconv>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <set>
 #include <span>
 #include <system_error>
@@ -199,6 +200,7 @@ private:
     bool readMetronome(std::span<const Token> tokens);
     bool readCountIn(std::span<const Token> tokens, bool playback);
     bool readRecord(std::span<const Token> tokens);
+    bool readPunch(Song& song);
     bool readTrack(std::span<const Token> tokens);
     bool readDrumMap(std::span<const Token> tokens);
     bool readSection(std::span<const Token> tokens);
@@ -270,6 +272,9 @@ private:
     CountInSettings playbackLeadIn_ = kDefaultPlaybackLeadIn;
     bool repeatPlaybackLeadIn_ = false;
     RecordMode recordMode_ = RecordMode::Replace;
+    // The punch line, read once the song's sections are known, as it names them.
+    int punchLine_ = 0;
+    std::vector<Token> punchTokens_;
     std::vector<Track> tracks_;
     std::vector<Section> sections_;
     std::optional<OpenSection> section_;
@@ -329,6 +334,11 @@ SongReadResult Reader::read(std::string_view text)
     result.song->playbackLeadIn = playbackLeadIn_;
     result.song->repeatPlaybackLeadIn = repeatPlaybackLeadIn_;
     result.song->recordMode = recordMode_;
+    if (punchLine_ != 0 && !readPunch(*result.song))
+    {
+        result.song.reset();
+        result.error = error_;
+    }
     return result;
 }
 
@@ -363,7 +373,8 @@ bool Reader::readLine(std::span<const Token> tokens)
     {
         return readDrumMap(tokens);
     }
-    if (word == "metronome" || word == "countin" || word == "playback-lead-in" || word == "record")
+    if (word == "metronome" || word == "countin" || word == "playback-lead-in" ||
+        word == "record" || word == "punch")
     {
         if (stage_ != Stage::Header)
         {
@@ -373,6 +384,14 @@ bool Reader::readLine(std::span<const Token> tokens)
             return readMetronome(tokens);
         if (word == "record")
             return readRecord(tokens);
+        if (word == "punch")
+        {
+            if (punchLine_ != 0)
+                return fail("the song has one punch line");
+            punchLine_ = line_;
+            punchTokens_.assign(tokens.begin(), tokens.end());
+            return true;
+        }
         return readCountIn(tokens, word == "playback-lead-in");
     }
     // marker: labels' old name, so songs saved before they were renamed still open.
@@ -524,6 +543,76 @@ bool Reader::readRecord(std::span<const Token> tokens)
         }
         recordMode_ = *value == "overdub" ? RecordMode::Overdub : RecordMode::Replace;
     }
+    return true;
+}
+
+bool Reader::readPunch(Song& song)
+{
+    // punch section=N, punch from="Label" from-section=N to="Label" to-section=N, or punch
+    // from=POSITION to=POSITION, sections numbered from 1 and positions in the song's bars.
+    line_ = punchLine_;
+    std::map<std::string, std::string, std::less<>> settings;
+    for (const auto& token : std::span{punchTokens_}.subspan(1))
+    {
+        const auto [name, value] = settingOf(token);
+        if (!value ||
+            (name != "section" && name != "from" && name != "to" && name != "from-section" &&
+             name != "to-section") ||
+            !settings.emplace(std::string{name}, std::string{*value}).second)
+        {
+            return fail("unknown punch setting \"" + token.text + "\"");
+        }
+    }
+    const auto has = [&](std::string_view name) { return settings.contains(name); };
+    const auto sectionNumber = [&](std::string_view name) -> std::optional<std::size_t>
+    {
+        const auto number =
+            parseInteger(settings.find(name)->second, 1, std::numeric_limits<int>::max());
+        if (!number)
+        {
+            fail("a punch line's section is a number from 1");
+            return std::nullopt;
+        }
+        return static_cast<std::size_t>(*number - 1);
+    };
+    std::optional<SavedRange> range;
+    if (has("section") && settings.size() == 1)
+    {
+        const auto section = sectionNumber("section");
+        if (!section)
+            return false;
+        range = SavedRange{SavedRange::OfSection{*section}};
+    }
+    else if (has("from") && has("to") && has("from-section") && has("to-section") &&
+             settings.size() == 4)
+    {
+        const auto fromSection = sectionNumber("from-section");
+        const auto toSection = sectionNumber("to-section");
+        if (!fromSection || !toSection)
+            return false;
+        range = SavedRange{SavedRange::OfLabels{{*fromSection, settings.find("from")->second},
+                                                {*toSection, settings.find("to")->second}}};
+    }
+    else if (has("from") && has("to") && settings.size() == 2)
+    {
+        const auto from = tickAt(song.meter(), settings.find("from")->second);
+        const auto to = from ? tickAt(song.meter(), settings.find("to")->second) : std::nullopt;
+        if (!to)
+            return false;
+        if (*to <= *from)
+            return fail("a punch range needs its end after its start");
+        range = SavedRange{ArmedRange::OfTime{*from, *to}};
+    }
+    else
+    {
+        return fail("a punch line is a section, two labels or two positions");
+    }
+    const auto armed = restored(song, *range);
+    if (!armed)
+        return fail("the punch range names a section the song hasn't");
+    if (const auto found = find(song, *armed); !found.span)
+        return fail("the punch range is nowhere: " + found.gone);
+    song.punch = *armed;
     return true;
 }
 
@@ -1656,6 +1745,13 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     result.playbackLeadIn = song.playbackLeadIn;
     result.repeatPlaybackLeadIn = song.repeatPlaybackLeadIn;
     result.recordMode = song.recordMode;
+    if (auto punch = song.punch ? saved(song, *song.punch) : std::nullopt)
+    {
+        // Sections are made again, so found again by their places.
+        if (auto* time = std::get_if<ArmedRange::OfTime>(&punch->source))
+            *time = {scale(time->from), scale(time->to)};
+        result.punch = restored(result, *punch);
+    }
     return result;
 }
 
@@ -1706,6 +1802,22 @@ std::string writeSong(const Song& song)
     if (song.recordMode == RecordMode::Overdub)
     {
         line(0, "record mode=overdub");
+    }
+    if (const auto punch = song.punch ? saved(song, *song.punch) : std::nullopt)
+    {
+        const auto number = [](std::size_t section) { return std::to_string(section + 1); };
+        if (const auto* of = std::get_if<SavedRange::OfSection>(&punch->source))
+            line(0, "punch section=" + number(of->section));
+        else if (const auto* labels = std::get_if<SavedRange::OfLabels>(&punch->source))
+            line(0, "punch from=" + quotedText(labels->from.name) + " from-section=" +
+                        number(labels->from.section) + " to=" + quotedText(labels->to.name) +
+                        " to-section=" + number(labels->to.section));
+        else
+        {
+            const auto& time = std::get<ArmedRange::OfTime>(punch->source);
+            line(0, "punch from=" + positionText(song.meter(), time.from) +
+                        " to=" + positionText(song.meter(), time.to));
+        }
     }
 
     if (!song.tracks().empty())

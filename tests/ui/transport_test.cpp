@@ -2461,7 +2461,8 @@ TEST_CASE("a punch range is armed from a section, a selection or two labels, unt
     CHECK_FALSE(p.ws.refused()); // nothing to do, as disarming with no track armed
 }
 
-TEST_CASE("an armed punch range follows its section or labels through edits, and goes with them")
+TEST_CASE("an armed punch range follows its section or labels through edits, and goes with them, "
+          "undo bringing it back")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     Playing p{punchSong(ppqn)};
@@ -2488,6 +2489,12 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
     CHECK_FALSE(p.ws.punchSpan());
     CHECK(p.ws.message().ends_with("Punch range cleared: its section is gone"));
     CHECK(p.ws.messageKind() == MessageKind::Warning);
+    // Cleared in the join's own undo step, so undoing the join arms it again.
+    p.type(U"u");
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{6 * bar, 9 * bar});
+    p.press(Key::typed(U'r', kCtrl));
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK_FALSE(p.document.song().punch);
 
     // Labels: followed as they move with their section, and gone with one.
     p.type(U":punch in out");
@@ -2498,7 +2505,9 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
     CHECK(p.ws.punchSpan() == core::ArmedSpan{before->from, before->to + bar});
     edit([&](core::Song& song) { song.removeLabel(before->from); });
     CHECK_FALSE(p.ws.punchSpan());
-    CHECK(p.ws.message() == "Punch range cleared: the label in is gone");
+    CHECK_FALSE(p.document.song().punch); // gone from the song, in the edit's step
+    p.type(U"u");
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{before->from, before->to + bar});
 
     // A selection's time stays where it is, cut short at the end.
     p.type(U"gg");
@@ -2507,6 +2516,56 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
     REQUIRE(span);
     edit([](core::Song& song) { song.insertBars(0, 1); });
     CHECK(p.ws.punchSpan() == span);
+}
+
+TEST_CASE("arming and clearing a punch range are undo steps, and the song is changed by them")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    Playing p{punchSong(ppqn)};
+    const core::Tick bar = ppqn.whole();
+    REQUIRE_FALSE(p.document.modified());
+
+    p.type(U"ga]s,PP"); // B
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+    CHECK(p.document.modified());
+    p.type(U"u");
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK_FALSE(p.document.modified());
+    CHECK(indicator(p, U"PUNCH") == Shown::Off);
+    p.press(Key::typed(U'r', kCtrl));
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+    CHECK(indicator(p, U"PUNCH") == Shown::Lit);
+
+    // Arming the same range again is no step; clearing is one.
+    p.document.markSaved();
+    p.type(U",PP");
+    CHECK(p.ws.message().starts_with("Punch range: B"));
+    CHECK_FALSE(p.document.modified());
+    p.type(U",Pd");
+    CHECK_FALSE(p.ws.punchSpan());
+    CHECK(p.document.modified());
+    p.type(U"u");
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+}
+
+TEST_CASE("a punch range saved with a song is armed when it's read, and R records it")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    song.punch = core::ArmedRange::section(song, 1); // B
+    const auto read = core::readSong(core::writeSong(song), ppqn);
+    REQUIRE(read.song);
+    Playing p{*read.song};
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+
+    CHECK(indicator(p, U"PUNCH") == Shown::Lit);
+    CHECK(p.ws.punchSpan() == core::ArmedSpan{2 * bar, 5 * bar});
+    p.type(U"gaA");
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.ws.message() ==
+          "Recording onto Keys, punching in " + at(2 * bar) + " to " + at(5 * bar));
 }
 
 TEST_CASE("R records the armed punch range, playing on past its end with the take in")

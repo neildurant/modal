@@ -233,6 +233,107 @@ TEST_CASE("a song at another resolution is rescaled")
     }
 }
 
+TEST_CASE("a song's punch range is saved as a section, two labels or a span of time")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick bar = ppqn.whole();
+    Song song{ppqn};
+    song.addTrack("Keys");
+    song.splitSection(2 * bar, "Verse");
+    song.splitSection(5 * bar, "Chorus");
+    song.setLabel(3 * bar, "in");
+    song.setLabel(6 * bar + ppqn.quarter(), "out \"late\"");
+
+    struct Case
+    {
+        ArmedRange range;
+        std::string line;
+        ArmedSpan span;
+    };
+    const auto at = [&](Tick tick)
+    {
+        const auto position = song.meter().toBarBeatTick(tick);
+        return std::to_string(position.bar) + ":" + std::to_string(position.beat) + ":" +
+               std::to_string(position.tick);
+    };
+    const std::vector<Case> cases{
+        {ArmedRange::section(song, 1), "punch section=2", {2 * bar, 5 * bar}},
+        {ArmedRange::labels(song, 0, 1),
+         R"(punch from="in" from-section=2 to="out \"late\"" to-section=3)",
+         {3 * bar, 6 * bar + ppqn.quarter()}},
+        {ArmedRange::time(bar + 1, 4 * bar),
+         "punch from=" + at(bar + 1) + " to=" + at(4 * bar),
+         {bar + 1, 4 * bar}},
+    };
+    for (const auto& c : cases)
+    {
+        CAPTURE(c.line);
+        song.punch = c.range;
+        const auto text = writeSong(song);
+        CHECK(text.find("\n" + c.line + "\n") != std::string::npos);
+        const auto back = readSong(text, ppqn);
+        REQUIRE(back.song);
+        REQUIRE(back.song->punch);
+        CHECK(find(*back.song, *back.song->punch).span == c.span);
+        CHECK(writeSong(*back.song) == text);
+
+        // At another resolution, the same place, where the times fall on its ticks.
+        const Ppqn other{ppqn == Ppqn{96} ? 960 : 96};
+        const auto rescaled = readSong(text, other);
+        REQUIRE(rescaled.song);
+        REQUIRE(rescaled.song->punch);
+        const auto scale = [&](Tick tick) { return tick * other.value / ppqn.value; };
+        if ((c.span.from * other.value) % ppqn.value == 0)
+        {
+            CHECK(find(*rescaled.song, *rescaled.song->punch).span ==
+                  ArmedSpan{scale(c.span.from), scale(c.span.to)});
+        }
+    }
+
+    // Without one, no line, and none read.
+    song.punch.reset();
+    const auto text = writeSong(song);
+    CHECK(text.find("punch") == std::string::npos);
+    const auto back = readSong(text, ppqn);
+    REQUIRE(back.song);
+    CHECK_FALSE(back.song->punch);
+}
+
+TEST_CASE("a punch line naming what a song hasn't stops it being read, saying where")
+{
+    const std::string header = "modal-song 1\nsong \"S\" ppqn=960\ntrack 1 \"T\" ch=1\n";
+    const std::string sections = "section \"A\" bars=2\n  meter 1:1:0 4/4\n  tempo 1:1:0 120\n"
+                                 "  label 2:1:0 \"in\"\n";
+    struct Bad
+    {
+        std::string text;
+        std::string line;
+        std::string_view says;
+    };
+    const std::vector<Bad> cases{
+        {"punch section=2\n", "line 4", "section the song hasn't"},
+        {"punch section=0\n", "line 4", "a number from 1"},
+        {"punch section=1 to=2:1:0\n", "line 4", "a section, two labels or two positions"},
+        {"punch from=\"in\" from-section=1 to=\"gone\" to-section=1\n", "line 4",
+         "the label gone is gone"},
+        {"punch from=2:1:0 to=1:1:0\n", "line 4", "end after its start"},
+        {"punch from=3:1:0 to=4:1:0\n", "line 4", "nowhere"},
+        {"punch from=1:1:0 to=2:1:0 colour=red\n", "line 4", "unknown punch setting"},
+        {"punch section=1\npunch section=1\n", "line 5", "one punch line"},
+    };
+    for (const auto& bad : cases)
+    {
+        CAPTURE(bad.text);
+        const auto result = readSong(header + bad.text + sections, kPpqn);
+        CHECK_FALSE(result.song);
+        CHECK(lineOf(result.error) == bad.line);
+        CHECK(result.error.find(bad.says) != std::string::npos);
+    }
+    // After the sections, it's out of place.
+    const auto late = readSong(header + sections + "punch section=1\n", kPpqn);
+    CHECK(late.error.find("comes before the sections") != std::string::npos);
+}
+
 TEST_CASE("comments, blank lines, indentation and Windows line ends are allowed")
 {
     const auto back = readSong("\" A comment\r\n"

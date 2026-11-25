@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/armed_range.hpp>
+#include <modal/core/song.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -43,6 +44,21 @@ ArmedRangeFound gone(std::string why)
     return {std::nullopt, std::move(why)};
 }
 
+std::optional<SavedRange::LabelAt> savedLabel(const Song& song, const ArmedRange::LabelAt& at)
+{
+    const auto index = sectionIndex(song, at.section);
+    if (!index)
+        return std::nullopt;
+    return SavedRange::LabelAt{*index, at.name};
+}
+
+std::optional<ArmedRange::LabelAt> restoredLabel(const Song& song, const SavedRange::LabelAt& at)
+{
+    if (at.section >= song.sections().size())
+        return std::nullopt;
+    return ArmedRange::LabelAt{song.sections()[at.section]->id(), at.name};
+}
+
 } // namespace
 
 ArmedRange ArmedRange::section(const Song& song, std::size_t index)
@@ -80,6 +96,45 @@ ArmedRangeFound find(const Song& song, const ArmedRange& range)
     if (of.from >= song.end())
         return gone("the song now ends before it");
     return {ArmedSpan{of.from, std::min(of.to, song.end())}, {}};
+}
+
+std::optional<SavedRange> saved(const Song& song, const ArmedRange& range)
+{
+    if (const auto* of = std::get_if<ArmedRange::OfSection>(&range.source))
+    {
+        const auto index = sectionIndex(song, of->section);
+        if (!index)
+            return std::nullopt;
+        return SavedRange{SavedRange::OfSection{*index}};
+    }
+    if (const auto* of = std::get_if<ArmedRange::OfLabels>(&range.source))
+    {
+        auto from = savedLabel(song, of->from);
+        auto to = savedLabel(song, of->to);
+        if (!from || !to)
+            return std::nullopt;
+        return SavedRange{SavedRange::OfLabels{std::move(*from), std::move(*to)}};
+    }
+    return SavedRange{std::get<ArmedRange::OfTime>(range.source)};
+}
+
+std::optional<ArmedRange> restored(const Song& song, const SavedRange& range)
+{
+    if (const auto* of = std::get_if<SavedRange::OfSection>(&range.source))
+    {
+        if (of->section >= song.sections().size())
+            return std::nullopt;
+        return ArmedRange::section(song, of->section);
+    }
+    if (const auto* of = std::get_if<SavedRange::OfLabels>(&range.source))
+    {
+        auto from = restoredLabel(song, of->from);
+        auto to = restoredLabel(song, of->to);
+        if (!from || !to)
+            return std::nullopt;
+        return ArmedRange{ArmedRange::OfLabels{std::move(*from), std::move(*to)}};
+    }
+    return ArmedRange{std::get<ArmedRange::OfTime>(range.source)};
 }
 
 } // namespace modal::core
