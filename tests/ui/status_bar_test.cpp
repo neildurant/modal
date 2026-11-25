@@ -64,7 +64,7 @@ TEST_CASE("status presentation keeps mode panels equally wide without a transpor
     CHECK_FALSE(contains(region, U"STOP"));
     CHECK_FALSE(contains(region, U"BPM"));
     CHECK(contains(region, U"ARM"));
-    CHECK(contains(region, U"[+]"));
+    CHECK(contains(region, U" + "));
     const auto bar = statusBar(state, 2200, kCell);
     REQUIRE(bar.left.size() == 2);
     CHECK(decodeUtf8(bar.left[0].text + bar.left[1].text).size() == 9);
@@ -208,15 +208,15 @@ TEST_CASE("status presentation shows setting toggles and input loss without owni
     CHECK(field(render(state), U" IN ").style.background == Role::Warning);
 }
 
-TEST_CASE("status presentation keeps [+] in its place, lit only with unsaved changes, no file")
+TEST_CASE("status presentation keeps + in its place, lit only with unsaved changes, no file")
 {
     StatusBarState state;
     const auto saved = render(state);
     state.modified = true;
     const auto modified = render(state);
-    CHECK(field(saved, U"[+]").style.background == Role::Indicator);
-    CHECK(field(modified, U"[+]").style.background == Role::Warning);
-    CHECK(field(saved, U"[+]").x == field(modified, U"[+]").x);
+    CHECK(field(saved, U" + ").style.background == Role::Indicator);
+    CHECK(field(modified, U" + ").style.background == Role::Warning);
+    CHECK(field(saved, U" + ").x == field(modified, U" + ").x);
     CHECK(field(saved, U" IN ").x == field(modified, U" IN ").x);
     CHECK_FALSE(contains(saved, U"No file"));
 }
@@ -224,7 +224,7 @@ TEST_CASE("status presentation keeps [+] in its place, lit only with unsaved cha
 TEST_CASE("status presentation preserves the order of width compromises at pixel boundaries")
 {
     auto state = stateWithTransport();
-    const std::array<std::u32string_view, 9> parts{U"[+]",   U"Introduction", U"REPLACE",
+    const std::array<std::u32string_view, 9> parts{U" + ",   U"Introduction", U"REPLACE",
                                                    U"THR",   U"Intro",        U" IN ",
                                                    U" 4/4 ", U" BPM",         U"PUNCH"};
     std::array<bool, 9> disappeared{};

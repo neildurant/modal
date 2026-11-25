@@ -40,7 +40,7 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
     bottom.left.push_back(
         {std::string(std::string_view{" NORMAL "}.size() - mode.size() + 1, ' '), kBarText});
     // Where the window's too narrow for everything, what's least needed gives way first, in
-    // steps (decided 12 November 2026): [+], first as the file's name was (decided 25 November
+    // steps (decided 12 November 2026): +, first as the file's name was (decided 25 November
     // 2026, the title bar showing it too, so the smallest usual window keeps what it kept); the
     // section cut short, short words for the indicators, the settings, the section, the input
     // light, the meter and the tempo; and last the punch range's indicator (decided 24 November
@@ -226,11 +226,11 @@ Bar statusBar(const StatusBarState& state, int width, CellSize cell)
         }
         if (stage < Stage::HideModified)
         {
-            // [+] for changes not saved, as in Vim, dim when there are none, so it's always in
-            // its place (decided 25 November 2026, when the file's name left the line for the
-            // title bar and Ctrl-g).
+            // + for changes not saved, as Vim's [+], the chip doing the brackets' work; dim when
+            // there are none, so it's always in its place (decided 25 November 2026, when the
+            // file's name left the line for the title bar and Ctrl-g, and + after use).
             gap();
-            indicator("[+]", "[+]", 3, 3, state.modified ? Lit::Warning : Lit::Off, Role::Warning);
+            indicator("+", "+", 1, 1, state.modified ? Lit::Warning : Lit::Off, Role::Warning);
         }
         // No space after the last.
         if (!segments.empty() && segments.back().text == " ")

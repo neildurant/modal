@@ -80,7 +80,7 @@ Where a song has a title, Modal shows it first and the file after it:
   `[+]` before the dash while there are unsaved edits, `(unsaved)` for a song
   without a file, and `(demo.mid, imported)` for an imported MIDI file;
   without a title it shows the filename alone. The status line shows only
-  `[+]`, so the full name is a key away: `Ctrl-g`, as in Vim, says the title,
+  `+`, so the full name is a key away: `Ctrl-g`, as in Vim, says the title,
   the file (with `~` for your home folder), whether it is modified and the
   song's length, such as `"Morning" · ~/Songs/morning-v3.modal · modified ·
   24 bars, 0:48`;

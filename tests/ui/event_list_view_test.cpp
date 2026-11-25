@@ -185,7 +185,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     CHECK(xOf(v.ws.frame()[2], U"Position") == position);
     type(v.ws, U"gg");
 
-    // The status line's [+] is lit once the song has changes not saved, where it's wide enough;
+    // The status line's + is lit once the song has changes not saved, where it's wide enough;
     // the file's name is on the title bar and Ctrl-g.
     v.ws.resize(200 * kCell.width, 24 * kCell.height, kCell);
     CHECK_FALSE(contains(bottomText(v.ws.frame()), U"No file"));
@@ -193,7 +193,7 @@ TEST_CASE("the event list opens on track 1, at its first row")
     {
         for (const auto& region : v.ws.frame())
             for (const auto& run : region.text)
-                if (run.text.find(U"[+]") != std::u32string::npos)
+                if (run.text == U" + ")
                     return run.style.background;
         return Role::Bar;
     };

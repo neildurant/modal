@@ -2138,8 +2138,8 @@ TEST_CASE("the status line gives way in a narrow window, the least needed first,
     p.document.edit("Rename section", {},
                     [](core::Song& song) { song.renameSection(0, "Introduction"); });
     // What gives way, in the order it goes.
-    p.document.edit("Change", {}, [](core::Song& song) { song.title = "Changed"; }); // [+] lit
-    const std::array<std::u32string_view, 9> parts{U"[+]",   U"Introduction", U"REPLACE",
+    p.document.edit("Change", {}, [](core::Song& song) { song.title = "Changed"; }); // + lit
+    const std::array<std::u32string_view, 9> parts{U" + ",   U"Introduction", U"REPLACE",
                                                    U"THR",   U"Intro",        U" IN ",
                                                    U" 4/4 ", U" BPM",         U"PUNCH"};
     const auto shown = [&](int columns)

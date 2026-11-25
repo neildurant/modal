@@ -29,7 +29,7 @@ or edit refers to. In this arrangement it is on Melody's first bar.
 4. **Track rows:** each track's bars, shaded by how busy they are.
 5. **Message row:** feedback, questions, unfinished key sequences and the command line.
 6. **Status line:** the editing mode, transport and whether playback or recording
-   options are enabled, ending with `[+]`, lit while the song has unsaved
+   options are enabled, ending with `+`, lit while the song has unsaved
    changes.
 
 The **inspector** changes with the thing being inspected. On an arrangement

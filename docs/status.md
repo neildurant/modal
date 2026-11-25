@@ -18,7 +18,9 @@ Manual: the first-session chapter's status-line and Ports view descriptions, the
 
 **Validation.** Status bar tests: `[+]` dim and lit in one place, no file name, no input message, and the order things give way (`[+]` first) at every width in both the presentation and the Workspace narrow-window tests. Workspace tests: `Ctrl-g` for a new song, a titled modified one, one saved under home (`~`), one outside it, and an import; the input light alone in every view, expiring; the event list's `[+]`. A Player test keeps two inputs' last messages apart, found by name, a note-off leaving the note shown. A Ports view test shows each input's message on its own row under Last in. MSVC Debug passes all 1,316 tests with two MIDI-dependent skips. Clang Debug in WSL builds without warnings and passes 1,317 with three. Whole-tree formatting and `git diff --check` pass. Both manual formats build with `tools/build-manual.cmake`.
 
-**Pending.** Desktop trial; then the hosted checks after pushing.
+**After trial.** The status line, `Ctrl-g`, the `IN` light and Last in were liked on trial. `[+]` became a single `+`, the chip's background doing the brackets' work and taking two cells less; the window title keeps `[+]`. The status bar and Workspace tests now look for ` + `; of the figures, only the two drum-map pictures, drawn wider, show it, and were redrawn. MSVC Debug passes all 1,316 tests with two MIDI-dependent skips. Formatting passes and both manual formats build.
+
+**Pending.** Trying the `+`; then the hosted checks after pushing.
 
 **To try.** In a window around 120 columns, the status line ends `IN` then nothing: widen it and `[+]` appears at the right, lit after an edit, dim after `u`. `Ctrl-g` in a saved song, after an edit, and in a new one. `gm` for the Ports view: play on each keyboard or controller and watch **Last in** on its row; the status line's `IN` flashes alone.
 
