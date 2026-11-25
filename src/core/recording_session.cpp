@@ -35,8 +35,10 @@ std::span<const TrackId> RecordingSession::tracks() const
 
 bool RecordingSession::start(Player& player, std::optional<ArmedSpan> punch)
 {
-    if (pending() || player.playing() || player.stopping() ||
-        !player.record(document_.underlying(), punch))
+    // Playing, only a punch can start, on the fly.
+    if (pending() || player.stopping() || (player.playing() && !punch) ||
+        !(player.playing() ? player.punchIn(document_.underlying(), *punch)
+                           : player.record(document_.underlying(), punch)))
     {
         return false;
     }
@@ -82,7 +84,7 @@ std::optional<RecordingSession::Completion> RecordingSession::finish(const EditP
         return std::nullopt;
     }
     Completion completion{false, std::move(finished->tracks),
-                          take_->player->inputLost() - take_->inputLost};
+                          take_->player->inputLost() - take_->inputLost, finished->reached};
     clearHooks();
     // Keep the session pending through the commit, including document listener callbacks.
     completion.changed = document_.edit(std::move(title), place,

@@ -39,7 +39,8 @@ public:
     std::span<const TrackId> tracks() const;
 
     // A failed start installs no hooks and leaves the document and history unchanged. Given a
-    // punch range, the pass records only that, playback carrying on past its end.
+    // punch range, the pass records only that, playback carrying on past its end; and while
+    // playing, it punches in on the fly (see Player::punchIn).
     bool start(Player& player, std::optional<ArmedSpan> punch = std::nullopt);
     bool stop();
 
@@ -52,6 +53,7 @@ public:
         bool changed;
         std::vector<TrackId> tracks;
         std::size_t inputLost;
+        bool reached = false; // past the record point, whether or not anything changed
     };
 
     // Never waits for the engine. Once stopped, polls for its acknowledgement, collects the

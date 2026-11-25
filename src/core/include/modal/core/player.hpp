@@ -104,6 +104,12 @@ public:
     // playback carries on, the take finished there (see punchedOut()).
     [[nodiscard]] bool record(const Song& song, std::optional<ArmedSpan> punch = std::nullopt);
 
+    // Punches in on the fly (decided 24 November 2026): while playing, not looping, and before
+    // the punch's start, recording starts there without a lead-in, the music already playing
+    // being one, and ends at its end as record() does. The plan is swapped for the pass's, the
+    // tracks replaced falling silent from punch-in and the click as the metronome says.
+    [[nodiscard]] bool punchIn(const Song& song, ArmedSpan punch);
+
     // Whether recording, from record() until stopped or punched out; and whether the pass has
     // a click, which it hasn't without a metronome port or default output, nor a count-in then.
     bool recording() const { return recorder_.has_value() && playing_ && !punchedOut_; }
@@ -133,6 +139,7 @@ public:
     {
         Song song;
         std::vector<TrackId> tracks;
+        bool reached = false; // whether it got past the record point, recording anything at all
     };
     // While a pass is being recorded, or until it's finished: the song with the take so far,
     // as if recording stopped at the playhead (or where it stopped), to show as it's played.

@@ -133,6 +133,25 @@ bool Player::record(const Song& song, std::optional<ArmedSpan> punch)
     return true;
 }
 
+bool Player::punchIn(const Song& song, ArmedSpan punch)
+{
+    if (!playing_ || looping_ || recorder_ || punch.to <= punch.from)
+        return false;
+    if (const auto at = position(); at && *at >= punch.from)
+        return false;
+    // Input this play has brought so far was before punch-in, and isn't held for a recorder;
+    // what follows is, as it arrives.
+    recorder_.emplace(song, play_, punch.from, song.recordMode, resolveInput_);
+    click_ = lookUp(song.metronome.port);
+    recordPoint_ = punch.from;
+    punchOut_ = punch.to;
+    punchedOut_ = false;
+    replacing_ = song.recordMode == RecordMode::Replace;
+    previewAt_ = punch.from;
+    update(song);
+    return true;
+}
+
 bool Player::auditionClick(const Song& song, bool downbeat)
 {
     const auto& metronome = song.metronome;
@@ -267,7 +286,7 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
     // Punched out while playing on, or stopped: at the punch's end if it came first.
     const auto stop =
         punchedOut_ ? *punchOut_ : std::min(stoppedAt_, punchOut_.value_or(stoppedAt_));
-    Take take{recorder_->finish(song, stop), recorder_->tracks()};
+    Take take{recorder_->finish(song, stop), recorder_->tracks(), stop > recordPoint_};
     recorder_.reset();
     click_.reset();
     punchOut_.reset();

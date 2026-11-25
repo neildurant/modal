@@ -2497,3 +2497,48 @@ TEST_CASE("R records the armed punch range, playing on past its end with the tak
     p.type(U"u");
     CHECK(p.document.song().events(keys).size() == 1);
 }
+
+TEST_CASE("R while playing punches in ahead of the playhead, and is refused past punch-in")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    // Something at the end, so playback goes on that far.
+    song.updateEvents(song.tracks()[0]->id(), [&](core::EventList& events)
+                      { events.insert({7 * ppqn.whole(), core::Note{60, 90, ppqn.quarter()}}); });
+    Playing p{std::move(song)};
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+
+    // Playing without a range: refused as before.
+    p.type(U"gaA");
+    p.type(U" ");
+    REQUIRE(p.player.playing());
+    p.runFor(100ms);
+    p.type(U"R");
+    CHECK(p.ws.message() == "Stop first to record");
+    p.type(U" ");
+    p.runFor(10ms);
+
+    p.type(U"]s,rp"); // B, bars 3 to 5
+    p.type(U"gg ");   // playing from the start
+    p.runFor(1s);
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.ws.message() ==
+          "Recording onto Keys, punching in " + at(2 * bar) + " to " + at(5 * bar));
+    CHECK(contains(p.status(), U"● PRE")); // before punch-in
+    p.runFor(3500ms);                      // bar 3, at 4 s
+    CHECK(contains(p.status(), U"● REC"));
+    p.runFor(5400ms);
+    CHECK(p.player.recording());
+    p.runFor(200ms); // past punch-out, at 10 s
+    CHECK_FALSE(p.player.recording());
+    CHECK(p.player.playing());
+    // An empty range, and nothing played in it.
+    CHECK(p.ws.message() == "Nothing recorded: nothing was played");
+
+    // Past punch-in now: refused.
+    p.type(U"R");
+    CHECK(p.ws.message() == "Past the punch-in point: stop first, then R");
+    CHECK_FALSE(p.player.recording());
+}

@@ -524,3 +524,53 @@ TEST_CASE("a punch stopped early records to the stop, and overdubbing keeps what
     // Past where it stopped, the old note stays, whichever the mode.
     CHECK(eventAt(events, bar + 3 * q, true));
 }
+
+TEST_CASE("punching in on the fly records from punch-in without a lead-in, and only before it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    const auto bar = ppqn.whole();
+    Recording r{ppqn};
+    r.document.edit("Set up", {},
+                    [&](Song& song)
+                    {
+                        song.updateEvents(r.lead(), [&](EventList& events)
+                                          { events.insert({bar + q, Note{41, 90, q}}); });
+                    });
+    REQUIRE(r.player.play(r.document.underlying()));
+    r.started = r.clock.time;
+    r.step();
+    runTo(r, 500ms);
+    // A punch the playhead has passed can't start; one ahead of it can.
+    CHECK_FALSE(r.session.start(r.player, ArmedSpan{0, bar}));
+    CHECK_FALSE(r.session.start(r.player)); // without a punch, nothing to start while playing
+    REQUIRE(r.session.start(r.player, ArmedSpan{bar, 2 * bar}));
+    CHECK(r.player.playing());
+    CHECK(r.player.recordPhase() == Player::RecordPhase::PreRoll);
+    runTo(r, 1500ms);
+    r.receive({0x90, 50, 100}); // held into the range: starts at punch-in
+    runTo(r, 2500ms);
+    CHECK(r.player.recordPhase() == Player::RecordPhase::Recording);
+    r.receive({0x80, 50, 0});
+    runTo(r, 4100ms);
+    CHECK(r.player.punchedOut());
+    const auto completed = r.session.finish({}, "Record Lead");
+    REQUIRE(completed);
+    CHECK(r.player.playing());
+    const auto& events = r.document.underlying().events(r.lead());
+    const auto* note = eventAt(events, bar, true);
+    REQUIRE(note != nullptr);
+    CHECK(noteEnd(*note) == bar + q);
+    CHECK_FALSE(eventAt(events, bar + q, true)); // replaced
+}
+
+TEST_CASE("a playback loop can't be punched into on the fly")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto bar = ppqn.whole();
+    Recording r{ppqn};
+    REQUIRE(r.player.playLoop(r.document.underlying(), 0, 4 * bar));
+    r.step();
+    CHECK_FALSE(r.session.start(r.player, ArmedSpan{2 * bar, 3 * bar}));
+    CHECK(r.session.state() == RecordingSession::State::Idle);
+}

@@ -3337,12 +3337,26 @@ bool Workspace::record()
         refuse("Nothing to record from", MessageKind::Warning);
         return true;
     }
-    if (recording_.pending() || player_->playing() || player_->stopping())
+    // While playing, only a punch range armed ahead of the playhead can be recorded, on the
+    // fly (decided 24 November 2026).
+    const auto punch = punchSpan();
+    const auto playhead = player_->position();
+    if (recording_.pending() || player_->stopping() || (player_->playing() && !punch))
     {
         refuse(player_->recording() ? "Already recording: Space stops"
                : recording_.state() == core::RecordingSession::State::Finishing
                    ? "Finishing the take: try again in a moment"
                    : "Stop first to record");
+        return true;
+    }
+    if (player_->playing() && player_->looping())
+    {
+        refuse("Recording while looping comes later: stop first to punch in");
+        return true;
+    }
+    if (player_->playing() && playhead && *playhead >= punch->from)
+    {
+        refuse("Past the punch-in point: stop first, then R");
         return true;
     }
     const auto& song = document_.song();
@@ -3380,7 +3394,6 @@ bool Workspace::record()
         return true;
     }
     // With a punch range armed, R records that (decided 24 November 2026), from its start.
-    const auto punch = punchSpan();
     if (!recording_.start(*player_, punch))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
@@ -3456,8 +3469,10 @@ void Workspace::finishRecording()
     const auto punched = std::exchange(punching_, std::nullopt);
     if (!completed->changed)
     {
-        setMessage(punched ? "Nothing recorded: stopped before the punch-in point"
-                           : "Nothing recorded: stopped before the record point",
+        // Stopped too soon, or recording nothing over nothing.
+        setMessage(completed->reached ? "Nothing recorded: nothing was played"
+                   : punched          ? "Nothing recorded: stopped before the punch-in point"
+                                      : "Nothing recorded: stopped before the record point",
                    MessageKind::Information);
         return;
     }
