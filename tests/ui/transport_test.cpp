@@ -153,10 +153,60 @@ Shown indicator(Playing& p, std::u32string_view word)
 
 } // namespace
 
+TEST_CASE("loop and punch have leader groups of their own, built alike, in Normal and Visual mode")
+{
+    Playing p;
+    p.ws.setHints(true, 0);
+    const auto hint = [&](std::string_view keys) -> std::optional<Workspace::Hint>
+    {
+        for (const auto& shown : p.ws.hints().value_or(std::vector<Workspace::Hint>{}))
+        {
+            if (shown.keys == keys)
+            {
+                return shown;
+            }
+        }
+        return std::nullopt;
+    };
+    p.type(U"ga");
+    for (const auto* start : {U",", U"v,"})
+    {
+        p.type(start);
+        CHECK(hint("L") == Workspace::Hint{"L", "Loop", true});
+        CHECK(hint("P") == Workspace::Hint{"P", "Punch", true});
+        p.type(U"P");
+        CHECK(hint("P"));
+        CHECK(hint("l"));
+        CHECK(hint("d"));
+        p.press(Key::of(NamedKey::Escape));
+        p.press(Key::of(NamedKey::Escape));
+        p.type(start);
+        p.type(U"L");
+        CHECK(hint("L"));
+        CHECK(hint("l"));
+        p.press(Key::of(NamedKey::Escape));
+        p.press(Key::of(NamedKey::Escape));
+        // Recording keeps the tracks and the mode; labels no longer loop.
+        p.type(start);
+        p.type(U"r");
+        CHECK(hint("a"));
+        CHECK_FALSE(hint("p"));
+        CHECK_FALSE(hint("l"));
+        CHECK_FALSE(hint("P"));
+        p.press(Key::of(NamedKey::Escape));
+        p.press(Key::of(NamedKey::Escape));
+        p.type(start);
+        p.type(U"l");
+        CHECK_FALSE(hint("L"));
+        p.press(Key::of(NamedKey::Escape));
+        p.press(Key::of(NamedKey::Escape));
+    }
+}
+
 TEST_CASE("the loop key uses the current section or Visual selection")
 {
     Playing p;
-    p.type(U"ga,L");
+    p.type(U"ga,LL");
     REQUIRE(p.player.looping());
     CHECK(p.player.startPosition() == 0);
     CHECK(p.ws.message().starts_with("Looping 1:1:"));
@@ -167,7 +217,7 @@ TEST_CASE("the loop key uses the current section or Visual selection")
     CHECK_FALSE(p.player.looping());
     p.runFor(50ms);
 
-    p.type(U"ggv,L");
+    p.type(U"ggv,LL");
     REQUIRE(p.player.looping());
     CHECK(p.ws.message() == "Looping 1:1:000 to 2:1:000");
 }
@@ -182,7 +232,7 @@ TEST_CASE("choosing loop labels remembers both endpoints and loops across sectio
     song.setLabel(join + q, "After join");
     Playing p{std::move(song)};
     p.ws.setLineHandler([&](const std::string& line) { p.ws.report(p.registry.runLine(line)); });
-    p.type(U"ga,lLBefore join");
+    p.type(U"ga,LlBefore join");
     p.press(Key::of(NamedKey::Enter));
     p.type(U"After join");
     p.press(Key::of(NamedKey::Enter));
@@ -196,7 +246,7 @@ TEST_CASE("choosing loop labels remembers both endpoints and loops across sectio
     CHECK(p.player.position().value() >= join - q);
     CHECK(p.player.position().value() < join);
 
-    p.type(U",lL");
+    p.type(U",Ll");
     p.press(Key::of(NamedKey::Enter));
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.message() == range);
@@ -2357,26 +2407,26 @@ TEST_CASE("a punch range is armed from a section, a selection or two labels, unt
     };
 
     CHECK(indicator(p, U"PUNCH") == Shown::Off);
-    p.type(U"ga,rp");
+    p.type(U"ga,PP");
     CHECK(p.ws.message() == "Punch range: A, " + at(0) + " to " + at(2 * bar));
     CHECK(armed() == core::ArmedSpan{0, 2 * bar});
     CHECK(indicator(p, U"PUNCH") == Shown::Lit);
 
     // Another section replaces it, saying what it replaced.
-    p.type(U"]s,rp");
+    p.type(U"]s,PP");
     CHECK(p.ws.message() == "Punch range: B, " + at(2 * bar) + " to " + at(5 * bar) +
                                 ", replacing A, " + at(0) + " to " + at(2 * bar));
     CHECK(armed() == core::ArmedSpan{2 * bar, 5 * bar});
 
     // A Visual selection's time, ending the selection.
-    p.type(U"ggvl,rp");
+    p.type(U"ggvl,PP");
     CHECK(p.ws.mode() == Mode::Normal);
     CHECK(armed() == core::ArmedSpan{0, 2 * bar});
     CHECK(p.ws.message().starts_with("Punch range: " + at(0) + " to " + at(2 * bar) +
                                      ", replacing B, "));
 
     // Two labels, chosen, across a section join; the pair is offered again.
-    p.type(U",rl");
+    p.type(U",Pl");
     CHECK(shows(U"Punch in: "));
     p.type(U"in");
     p.press(Key::of(NamedKey::Enter));
@@ -2386,7 +2436,7 @@ TEST_CASE("a punch range is armed from a section, a selection or two labels, unt
     CHECK(armed() == core::ArmedSpan{bar, 6 * bar});
     CHECK(p.ws.message().starts_with("Punch range: in to out, " + at(bar) + " to " + at(6 * bar) +
                                      ", replacing "));
-    p.type(U",rl");
+    p.type(U",Pl");
     p.press(Key::of(NamedKey::Enter));
     p.press(Key::of(NamedKey::Enter));
     CHECK(p.ws.message() == "Punch range: in to out, " + at(bar) + " to " + at(6 * bar));
@@ -2402,11 +2452,11 @@ TEST_CASE("a punch range is armed from a section, a selection or two labels, unt
 
     // Arming plays nothing; clearing.
     CHECK_FALSE(p.player.playing());
-    p.type(U",rP");
+    p.type(U",Pd");
     CHECK(p.ws.message() == "Punch range cleared: in to out, " + at(bar) + " to " + at(6 * bar));
     CHECK_FALSE(armed());
     CHECK(indicator(p, U"PUNCH") == Shown::Off);
-    p.type(U",rP");
+    p.type(U",Pd");
     CHECK(p.ws.message() == "No punch range is armed");
     CHECK_FALSE(p.ws.refused()); // nothing to do, as disarming with no track armed
 }
@@ -2423,7 +2473,7 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
         p.press(Key::of(NamedKey::Escape)); // a key, after which the range is looked at
     };
 
-    p.type(U"ga]s,rp");                                       // B
+    p.type(U"ga]s,PP");                                       // B
     edit([](core::Song& song) { song.resizeSection(0, 1); }); // A a bar longer
     CHECK(p.ws.punchSpan() == core::ArmedSpan{3 * bar, 6 * bar});
     edit([](core::Song& song) { song.renameSection(1, "Verse"); });
@@ -2452,7 +2502,7 @@ TEST_CASE("an armed punch range follows its section or labels through edits, and
 
     // A selection's time stays where it is, cut short at the end.
     p.type(U"gg");
-    p.type(U"Gv,rp");
+    p.type(U"Gv,PP");
     const auto span = p.ws.punchSpan();
     REQUIRE(span);
     edit([](core::Song& song) { song.insertBars(0, 1); });
@@ -2471,7 +2521,7 @@ TEST_CASE("R records the armed punch range, playing on past its end with the tak
     const core::Tick bar = ppqn.whole();
     const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
 
-    p.type(U"gaA]s,rp"); // B, bars 3 to 5
+    p.type(U"gaA]s,PP"); // B, bars 3 to 5
     p.type(U"R");
     REQUIRE(p.player.recording());
     CHECK(p.ws.message() ==
@@ -2519,7 +2569,7 @@ TEST_CASE("R while playing punches in ahead of the playhead, and is refused past
     p.type(U" ");
     p.runFor(10ms);
 
-    p.type(U"]s,rp"); // B, bars 3 to 5
+    p.type(U"]s,PP"); // B, bars 3 to 5
     p.type(U"gg ");   // playing from the start
     p.runFor(1s);
     p.type(U"R");

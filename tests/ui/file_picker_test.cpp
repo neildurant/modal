@@ -1150,12 +1150,12 @@ TEST_CASE("each open song keeps its own punch range")
     p.makeSong("A.modal", "Song A");
     p.makeSong("B.modal", "Song B");
     p.type(U":e A\n");
-    p.type(U",rp");
+    p.type(U",PP");
     const auto armedA = p.workspace.punchSpan();
     REQUIRE(armedA);
     p.type(U":e B\n");
     CHECK_FALSE(p.workspace.punchSpan());
-    p.type(U"Gv,rp"); // its last bar
+    p.type(U"Gv,PP"); // its last bar
     const auto armedB = p.workspace.punchSpan();
     REQUIRE(armedB);
     CHECK(armedB != armedA);

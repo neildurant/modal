@@ -149,14 +149,14 @@ after counts multiply.
 | `, s s`, `, s l`, `, s f` | Split at bar, label to section, follow meter |
 | `, b i`, `, b d`, `, b m` | Song-bar insert/delete, meter or Visual rebar |
 | Space, Shift-Space | Play/stop, stop and return |
-| `, L` | Loop the current section or Visual selection's time |
-| `, l L`, `:loop START END` | Loop between two song labels |
+| `, L L` | Loop the current section or Visual selection's time |
+| `, L l`, `:loop START END` | Loop between two song labels |
 | `m` then Space, Ctrl-Space | Set play-from marker, set it and play |
 | `R`, `, r m`, `, r t` | Record, replace/overdub, track Thru |
 | `, r A` | Disarm every armed track |
-| `, r p` | Arm a punch range: the current section, or the Visual selection's time |
-| `, r l` | Arm a punch range between two labels (also `:punch IN OUT`) |
-| `, r P` | Clear the punch range |
+| `, P P` | Arm a punch range: the current section, or the Visual selection's time |
+| `, P l` | Arm a punch range between two labels (also `:punch IN OUT`) |
+| `, P d` | Clear the punch range |
 | `, l l`, `, l d`, `, l s` | Add, delete a label; section from a label |
 | `, l m`, `, l x` | List marks, delete marks by name |
 | `, m m`, `, m c`, `, m s` | Click mode, lead-in mode, Metronome page |

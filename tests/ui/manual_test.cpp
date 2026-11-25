@@ -308,9 +308,9 @@ TEST_CASE("render the manual's worked examples offscreen", "[.manual-images]")
     m.type(U",ms");
     save("metronome");
     // The second section armed as a punch range, then cleared so the guides don't show it.
-    m.type(U"gagg]s,rp");
+    m.type(U"gagg]s,PP");
     save("punch-range");
-    m.type(U",rP");
+    m.type(U",Pd");
     m.type(U"gagg");
     guide("arrangement-guide",
           {{viewWidth, cell.height / 2, U"1 Track / position"},

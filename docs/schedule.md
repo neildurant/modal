@@ -234,7 +234,7 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Manual updates and final validation. Accepted on reading.
 - [ ] **Doing** — Arm playback loops separately from starting playback, with the steps before it (agreed 25 November 2026). See [design.md](design.md#input-and-recording) and [decisions.md](decisions.md#loop-and-punch-groups-saved-ranges-and-a-shorter-status-line-25-november-2026).
     - [x] **Done** — The palette finds a key with any modifiers: `<Space>` and `Space` find `<S-Space>` and `<C-Space>`. Accepted on trial.
-    - [ ] **To do** — Leader groups: punch on `, P P`, `, P l`, `, P d`; loops on `, L` as a group (`, L L`, `, L l`).
+    - [ ] **Doing** — Leader groups: punch on `, P P`, `, P l`, `, P d`; loops on `, L` as a group (`, L L`, `, L l`).
     - [ ] **To do** — The punch range saved with the song, arming and clearing as undo steps.
     - [ ] **To do** — A shorter status line: the file's name to `Ctrl-g`, `[+]` kept; `IN` as a light, the last message in the Ports view.
     - [ ] **To do** — Armed loops: `, L L`, `, L l`, `, L d` and `, L t`, Space and `Ctrl-Space`, the solid bracket and `LOOP`, saved with the song.

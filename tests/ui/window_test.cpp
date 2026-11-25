@@ -1084,13 +1084,13 @@ TEST_CASE("a sample of an armed punch range", "[.sample]")
             view.handle(Key::typed(key), 0);
     };
     view.run("view-arrangement", 0);
-    type(U"]s,rp"); // the second section
+    type(U"]s,PP"); // the second section
     REQUIRE(view.punchSpan());
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-punch-arrangement.bmp"));
     window->draw(view.frame(), *builtInTheme("light"));
     CHECK(window->saveFrame(base + "-punch-arrangement-light.bmp"));
-    type(U"gg3}v2},rp"); // three bars, within the section
+    type(U"gg3}v2},PP"); // three bars, within the section
     window->draw(view.frame(), *builtInTheme("dark"));
     CHECK(window->saveFrame(base + "-punch-arrangement-bars.bmp"));
     view.run("view-piano-roll", 0);

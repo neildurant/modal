@@ -224,13 +224,13 @@ original note start. The C setting controls notes, not all state restoration.
 ## Repeating a passage {#sec-loop-playback}
 
 A loop plays a span of time repeatedly so you can listen to a phrase or a
-transition in context. Use `, L` to hear the cursor's section. To loop a shorter
+transition in context. Looping has a group of its own, `, L`. Use `, L L` to hear the cursor's section. To loop a shorter
 passage, select its time in Visual mode first. Selecting a run of sections on
 the section strip loops all of them. The transport shows **LOOP**, and Space
 stops it. Mute and Solo work as they do in ordinary playback.
 
 Song labels give a passage reusable endpoints. For example, put a label one
-bar before a chorus and another one bar into it. Use `, l L` to choose the
+bar before a chorus and another one bar into it. Use `, L l` (**l** for labels) to choose the
 first label and then the second. In each list, type part of the label name to
 narrow the choices or use Up and Down to move through them. Enter accepts the
 highlighted label. Playback returns to the first label as soon as it reaches
@@ -319,19 +319,18 @@ record it as many times as you like, and the music on either side is left as
 it was.
 
 The span is called a **punch range**; *punching in* is where recording
-starts and *punching out* is where it stops. The keys are in the Recording
-group, `, r`, with `p` for punch:
+starts and *punching out* is where it stops. The keys have a group of their
+own, `, P` for punch, built as the loop's `, L` is:
 
-- `, r p` arms the cursor's section, the usual unit for retaking a verse or
+- `, P P` arms the cursor's section, the usual unit for retaking a verse or
   chorus. In Visual mode it arms the selection's span of time instead, for a
   few bars within a section.
-- `, r l` chooses two song labels as its edges, for a passage marked out in
+- `, P l` chooses two song labels as its edges, for a passage marked out in
   the song, even one crossing from one section into the next. It asks for the
-  punch-in label and then the punch-out label, as `, l L` does for a loop, and
+  punch-in label and then the punch-out label, as `, L l` does for a loop, and
   offers the same pair again next time. `:punch "Before fill" "After fill"`
   names them at the prompt.
-- `, r P` clears it. The capital undoes what the small letter did, as `, r A`
-  disarms every track after `, r a` arms one.
+- `, P d` clears it, **d** as in deleting a label with `, l d`.
 
 An armed range shows as a dashed red bracket along the foot of the ruler, in
 the arrangement and the piano roll, with a short upright cap at each end. The
@@ -362,7 +361,7 @@ becomes one undoable edit as the playhead passes punch-out. Press Space when
 you've heard enough. Stopping before punch-out records only as far as the
 stop.
 
-For example, arm the second verse with `, r p` and set a one-bar pre-roll.
+For example, arm the second verse with `, P P` and set a one-bar pre-roll.
 Press `R`: the last bar of the first verse plays, you play through the
 second verse, and at the chorus playback continues with your new verse in
 place. If it wasn't right, `u` takes the take back and `R` tries again, the
@@ -389,7 +388,7 @@ one. The transport shows `● PRE` until punch-in, then `● REC`. Once the play
 is past punch-in, `R` is refused: stop and press `R` again to record the range
 with its lead-in. Recording while a playback loop is running isn't available yet.
 
-To record from the play-from marker again, clear the range with `, r P`.
+To record from the play-from marker again, clear the range with `, P d`.
 
 ## Completing and keeping a take
 
