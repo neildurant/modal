@@ -3409,7 +3409,9 @@ bool Workspace::record()
     // punch range too, for now.
     const auto loop = loopSpan();
     const auto playhead = player_->position();
-    if (recording_.pending() || player_->stopping() || (player_->playing() && !punch))
+    // While a loop plays, R records it from its next pass (decided 25 November 2026).
+    const bool looping = player_->playing() && player_->looping() && loop;
+    if (recording_.pending() || player_->stopping() || (player_->playing() && !punch && !looping))
     {
         refuse(player_->recording() ? "Already recording: Space stops"
                : recording_.state() == core::RecordingSession::State::Finishing
@@ -3417,18 +3419,18 @@ bool Workspace::record()
                    : "Stop first to record");
         return true;
     }
-    if (player_->playing() && player_->looping())
+    if (player_->playing() && player_->looping() && !looping)
     {
-        refuse("Recording while looping comes later: stop first to punch in");
+        refuse("Stop first to record");
         return true;
     }
-    if (loop && punch && !player_->playing())
+    if (loop && punch && (looping || !player_->playing()))
     {
         refuse("A loop and a punch range are both on: " + keysOf("loop-toggle") + " or " +
                keysOf("punch-toggle") + " switches one off");
         return true;
     }
-    if (player_->playing() && playhead && *playhead >= punch->from)
+    if (player_->playing() && !looping && playhead && *playhead >= punch->from)
     {
         refuse("Past the punch-in point: stop first, then R");
         return true;
@@ -3468,7 +3470,7 @@ bool Workspace::record()
         return true;
     }
     // With a punch range armed, R records that (decided 24 November 2026), from its start.
-    const auto recordLoop = player_->playing() ? std::nullopt : loop;
+    const auto recordLoop = !player_->playing() || looping ? loop : std::nullopt;
     if (!recording_.start(*player_, punch, recordLoop))
     {
         refuse("The engine is busy and didn't take that: try again", MessageKind::Warning);
@@ -3483,7 +3485,8 @@ bool Workspace::record()
                 positionText(song.meter(), punch->to);
     if (recordLoop)
         text += ", looping " + positionText(song.meter(), recordLoop->from) + " to " +
-                positionText(song.meter(), recordLoop->to);
+                positionText(song.meter(), recordLoop->to) +
+                (looping ? ", from the loop's start" : "");
     text += nothing;
     if (!player_->clicking())
         text += "; no click, with no metronome port or default output";

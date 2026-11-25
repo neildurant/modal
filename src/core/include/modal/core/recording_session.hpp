@@ -43,7 +43,8 @@ public:
     // A failed start installs no hooks and leaves the document and history unchanged. Given a
     // punch range, the pass records only that, playback carrying on past its end; and while
     // playing, it punches in on the fly (see Player::punchIn). Given a loop, it records the
-    // loop pass after pass (see Player::record).
+    // loop pass after pass (see Player::record); while it's playing, from its next pass (see
+    // Player::recordLoop).
     bool start(Player& player, std::optional<ArmedSpan> punch = std::nullopt,
                std::optional<ArmedSpan> loop = std::nullopt);
     bool stop();

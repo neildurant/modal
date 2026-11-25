@@ -127,6 +127,12 @@ public:
     // tracks replaced falling silent from punch-in and the click as the metronome says.
     [[nodiscard]] bool punchIn(const Song& song, ArmedSpan punch);
 
+    // Records the loop being played (decided 25 November 2026): from its next pass, or from
+    // its start if the playhead hasn't reached it yet, then pass after pass as record() does
+    // with a loop. What's played before then is a pre-roll, not recorded. The tracks replaced
+    // fall silent at once.
+    [[nodiscard]] bool recordLoop(const Song& song, ArmedSpan loop);
+
     // Whether recording, from record() until stopped or punched out; and whether the pass has
     // a click, which it hasn't without a metronome port or default output, nor a count-in then.
     bool recording() const { return recorder_.has_value() && playing_ && !punchedOut_; }
@@ -285,6 +291,9 @@ private:
     std::uint32_t pass_ = 0;              // the engine's count of the pass being recorded
     std::vector<Recorder> passes_;        // passes ended, their takes still to be applied
     std::uint32_t passesTaken_ = 0;       // how many ended passes have been taken
+    std::uint32_t firstPass_ = 0;         // the engine's count of the first pass recorded
+    // Recording a loop that was playing, whether its first pass is still to come.
+    bool beforeFirstPass() const;
     // Recording a loop, moves on to the given pass, ending the passes before it.
     void nextPass(std::uint32_t pass);
     // Whether a pass's take changes the song: in replace mode, only if something was played.

@@ -136,6 +136,7 @@ bool Player::record(const Song& song, std::optional<ArmedSpan> punch, std::optio
     started_ = start.playFrom;
     recordLoop_ = loop;
     pass_ = 0;
+    firstPass_ = 0;
     passes_.clear();
     passesTaken_ = 0;
     looping_ = loop.has_value();
@@ -143,11 +144,37 @@ bool Player::record(const Song& song, std::optional<ArmedSpan> punch, std::optio
     return true;
 }
 
+bool Player::recordLoop(const Song& song, ArmedSpan loop)
+{
+    if (!playing_ || !looping_ || recorder_ || loop.to <= loop.from)
+        return false;
+    const auto status = engine_.status();
+    // Not yet in the loop, from the cursor or counting in: from its start in this pass.
+    const bool before = !status.position || *status.position < loop.from;
+    firstPass_ = status.pass + (before ? 0 : 1);
+    recorder_.emplace(song, play_, loop.from, song.recordMode, resolveInput_);
+    click_ = lookUp(song.metronome.port);
+    recordPoint_ = loop.from;
+    recordLoop_ = loop;
+    pass_ = firstPass_;
+    passes_.clear();
+    passesTaken_ = firstPass_;
+    replacing_ = song.recordMode == RecordMode::Replace;
+    previewAt_ = loop.from;
+    update(song);
+    return true;
+}
+
+bool Player::beforeFirstPass() const
+{
+    return recordLoop_ && engine_.status().pass < firstPass_;
+}
+
 std::optional<std::uint32_t> Player::recordingPass() const
 {
     if (!recordLoop_ || !recorder_)
         return std::nullopt;
-    return pass_ + 1;
+    return pass_ - firstPass_ + 1;
 }
 
 void Player::nextPass(std::uint32_t pass)
@@ -175,7 +202,8 @@ std::optional<Player::Take> Player::finishPass(const Song& song)
         passes_.erase(passes_.begin());
         ++passesTaken_;
         if (pass.played(recordLoop_->to))
-            return Take{pass.finish(song, recordLoop_->to), pass.tracks(), true, passesTaken_};
+            return Take{pass.finish(song, recordLoop_->to), pass.tracks(), true,
+                        passesTaken_ - firstPass_};
     }
     return std::nullopt;
 }
@@ -275,6 +303,8 @@ std::optional<Player::RecordPhase> Player::recordPhase() const
     {
         return std::nullopt;
     }
+    if (beforeFirstPass())
+        return RecordPhase::PreRoll;
     const auto phase = leadInPhase();
     return phase == LeadInPhase::CountIn   ? RecordPhase::CountIn
            : phase == LeadInPhase::PreRoll ? RecordPhase::PreRoll
@@ -350,7 +380,8 @@ std::optional<Player::Take> Player::finishRecording(const Song& song)
     if (recordLoop_)
         stop = std::min(stop, recordLoop_->to);
     Take take{!recordLoop_ || keeps(*recorder_, stop) ? recorder_->finish(song, stop) : song,
-              recorder_->tracks(), stop > recordPoint_, recordingPass().value_or(0)};
+              recorder_->tracks(), stop > recordPoint_ && !beforeFirstPass(),
+              recordingPass().value_or(0)};
     recorder_.reset();
     click_.reset();
     punchOut_.reset();

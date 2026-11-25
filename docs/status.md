@@ -6,6 +6,16 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Loop recording, step b: `R` while a loop plays, 25 November 2026
+
+`R` while a loop is playing records it (`Player::recordLoop`): from its next pass, or from its start if the playhead hasn't reached it yet (playing from the cursor, or counting in), and then pass after pass as in step a. The pass it starts at is the engine's count then (`firstPass_`); input stamped before it is the pre-roll, not recorded, and the transport shows `● PRE` until it comes, then `● REC 1`, passes numbered from where recording began. In replace, the tracks recorded fall silent at once, as decided before building: it shows at once what `R` has done, and a change at the wrap would come a frame or so late. Stopped before the first pass, nothing is recorded (`Nothing recorded: stopped before the record point`). With a punch range on too, it's refused as from stopped. The message adds `, from the loop's start`.
+
+grammar.md, design.md and decisions.md describe it. **Pending:** desktop trial with a MIDI keyboard; then the manual (step c).
+
+**Validation.** Player through the engine, at every test PPQN: within the loop, from the next pass, the pre-roll's note not recorded, the pass numbered 1; before the loop, from its start; stopped before the first pass, nothing reached and the song unchanged; refused without a loop playing, or when already recording. Workspace, at two PPQNs: the message, `● PRE`, the old note silent at once, `● REC 1`, pass 1 replacing it as it wraps, `● REC 2`; refused with a punch range on too. MSVC Debug passes 1,332 tests (2 MIDI skips); WSL Clang Debug builds without warnings and passes 1,333 (3 skips); whole-tree formatting passes.
+
+**To try** (with a MIDI keyboard): arm a track, `, L L` on a section with something in it, Space to loop it, then `R` partway through: `● PRE`, and the track falls silent. Play once the loop comes round: `● REC 1`, and as it wraps, `Recorded pass 1 onto …`. From the cursor before the loop with `Ctrl-Space`, `R` records from when the playhead enters it. Stop during `● PRE`: nothing recorded. With `, P P` on too, `R` is refused.
+
 ### Loop recording, step a: `R` records an armed loop, 25 November 2026
 
 Decided before building (see design.md, Passes, and decisions.md, Loop recording): loop recording follows the song's replace or overdub setting; in replace a pass with nothing played leaves the one before, and the tracks recorded are silent throughout, heard back once stopped; each pass is an undo step as the loop wraps; `R` is refused with a loop and a punch range both on; erase-while-looping was dropped; punch recording within a loop is unscheduled; the transport shows `● REC 3`.

@@ -36,13 +36,16 @@ std::span<const TrackId> RecordingSession::tracks() const
 bool RecordingSession::start(Player& player, std::optional<ArmedSpan> punch,
                              std::optional<ArmedSpan> loop)
 {
-    // Playing, only a punch can start, on the fly.
-    if (pending() || player.stopping() || (player.playing() && (!punch || loop)) ||
-        !(player.playing() ? player.punchIn(document_.underlying(), *punch)
-                           : player.record(document_.underlying(), punch, loop)))
-    {
+    if (pending() || player.stopping())
         return false;
-    }
+    // Playing, a punch can start on the fly, or a loop being played be recorded.
+    const auto& song = document_.underlying();
+    const bool started = !player.playing() ? player.record(song, punch, loop)
+                         : loop            ? !punch && player.recordLoop(song, *loop)
+                         : punch           ? player.punchIn(song, *punch)
+                                           : false;
+    if (!started)
+        return false;
     take_ = Take{&player, player.recordingTracks(), player.inputLost()};
     document_.setPreview([this](const Song& song) { return take_->player->previewTake(song); });
     setGuard();

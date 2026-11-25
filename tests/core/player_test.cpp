@@ -650,6 +650,109 @@ TEST_CASE("recording a loop ends each pass as it wraps, a pass with nothing play
     CHECK_FALSE(p.player.recordingPass());
 }
 
+TEST_CASE("recording the loop being played starts at its next pass, or at its start if not yet "
+          "in it")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const auto q = ppqn.quarter();
+    auto song = songAt(ppqn);
+    const auto id = song.addTrack("Recorded");
+    song.updateTrack(id, [](Track& track) { track.arm = true; });
+    Playing p{song};
+    const auto advance = [&](std::chrono::nanoseconds time)
+    {
+        const auto end = p.clock.time + time;
+        while (p.clock.time < end)
+        {
+            p.clock.time = std::min(end, p.clock.time + 100ms);
+            p.engine.step();
+        }
+        return p.player.poll();
+    };
+    const auto play = [&](std::uint8_t status, std::uint8_t pitch)
+    {
+        REQUIRE(p.engine.receive(InputId{0}, std::array<std::uint8_t, 3>{status, pitch, 100},
+                                 p.clock.time));
+        p.engine.step();
+        p.player.takeInput();
+        return p.player.position().value_or(-1);
+    };
+    const auto pitches = [&](const Song& recorded)
+    {
+        std::vector<int> result;
+        for (const auto& event : recorded.events(id).all())
+            result.push_back(std::get<Note>(event.data).pitch);
+        return result;
+    };
+
+    SECTION("within the loop, from its next pass")
+    {
+        REQUIRE(p.player.playLoop(song, 0, 2 * q));
+        advance(250ms);
+        REQUIRE(p.player.recordLoop(song, ArmedSpan{0, 2 * q}));
+        CHECK(p.player.recording());
+        CHECK(p.player.recordPhase() == Player::RecordPhase::PreRoll);
+        CHECK_FALSE(p.player.recordLoop(song, ArmedSpan{0, 2 * q})); // already
+        play(0x90, 60); // before the first pass: not recorded
+        advance(250ms);
+        play(0x80, 60);
+        advance(600ms);
+        CHECK(p.player.recordPhase() == Player::RecordPhase::Recording);
+        CHECK(p.player.recordingPass() == 1u);
+        const auto on = play(0x90, 62);
+        advance(250ms);
+        play(0x80, 62);
+        advance(900ms);
+        CHECK(p.player.recordingPass() == 2u);
+        const auto pass = p.player.finishPass(song);
+        REQUIRE(pass);
+        CHECK(pass->pass == 1u);
+        CHECK(pitches(pass->song) == std::vector{62});
+        CHECK(pass->song.events(id).all().front().tick == on);
+    }
+    SECTION("before the loop, from its start")
+    {
+        REQUIRE(p.player.playLoop(song, 2 * q, 4 * q, 0));
+        advance(250ms);
+        REQUIRE(p.player.recordLoop(song, ArmedSpan{2 * q, 4 * q}));
+        CHECK(p.player.recordPhase() == Player::RecordPhase::PreRoll);
+        advance(1000ms);
+        CHECK(p.player.recordPhase() == Player::RecordPhase::Recording);
+        CHECK(p.player.recordingPass() == 1u);
+        play(0x90, 64);
+        advance(100ms);
+        play(0x80, 64);
+        REQUIRE(p.player.stop());
+        p.engine.step();
+        p.player.poll();
+        const auto last = p.player.finishRecording(song);
+        REQUIRE(last);
+        CHECK(last->pass == 1u);
+        CHECK(pitches(last->song) == std::vector{64});
+    }
+    SECTION("stopped before the first pass, nothing recorded")
+    {
+        REQUIRE(p.player.playLoop(song, 0, 2 * q));
+        advance(250ms);
+        REQUIRE(p.player.recordLoop(song, ArmedSpan{0, 2 * q}));
+        play(0x90, 60);
+        advance(100ms);
+        REQUIRE(p.player.stop());
+        p.engine.step();
+        p.player.poll();
+        const auto last = p.player.finishRecording(song);
+        REQUIRE(last);
+        CHECK_FALSE(last->reached);
+        CHECK(last->song == song);
+    }
+    SECTION("not without a loop playing")
+    {
+        CHECK_FALSE(p.player.recordLoop(song, ArmedSpan{0, 2 * q}));
+        REQUIRE(p.player.play(song));
+        CHECK_FALSE(p.player.recordLoop(song, ArmedSpan{0, 2 * q}));
+    }
+}
+
 TEST_CASE("a record the engine can't take leaves the song planned for playing")
 {
     const auto ppqn = MODAL_ANY_PPQN();

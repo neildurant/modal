@@ -2864,6 +2864,65 @@ TEST_CASE("R records an armed loop pass after pass, each an undo step as it wrap
     CHECK(pitches() == std::vector{67});
 }
 
+TEST_CASE("R while a loop plays records it from its next pass, the tracks replaced silent at once")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto keys = song.tracks()[0]->id();
+    song.updateEvents(keys, [&](core::EventList& events)
+                      { events.insert({ppqn.whole(), core::Note{48, 90, ppqn.quarter()}}); });
+    Playing p{std::move(song)};
+    const core::Tick bar = ppqn.whole();
+    const auto at = [&](core::Tick tick) { return positionText(p.document.song().meter(), tick); };
+    const auto pitches = [&]
+    {
+        std::vector<int> result;
+        for (const auto& event : p.document.song().events(keys).all())
+            result.push_back(std::get<core::Note>(event.data).pitch);
+        return result;
+    };
+    const auto heard = [&](std::uint8_t pitch)
+    {
+        return std::ranges::any_of(p.sink.sent,
+                                   [&](const auto& sent)
+                                   {
+                                       return sent.bytes.size() == 3 && sent.bytes[1] == pitch &&
+                                              (sent.bytes[0] & 0xF0) == 0x90;
+                                   });
+    };
+
+    p.type(U"gaA,LL "); // looping A, bars 1 and 2
+    REQUIRE(p.player.looping());
+    p.runFor(500ms);
+    p.sink.sent.clear();
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    CHECK(p.ws.message() == "Recording onto Keys, looping " + at(0) + " to " + at(2 * bar) +
+                                ", from the loop's start");
+    CHECK(contains(p.status(), U"● PRE"));
+    p.runFor(2s);
+    CHECK_FALSE(heard(48)); // silent at once, the old note in bar 2 not played
+    p.runFor(2s);
+    CHECK(contains(p.status(), U"● REC 1"));
+    p.runFor(500ms);
+    playNote(p, 60);
+    p.runFor(4s);
+    CHECK(p.ws.message() == "Recorded pass 1 onto Keys");
+    CHECK(pitches() == std::vector{60});
+    CHECK(contains(p.status(), U"● REC 2"));
+    p.type(U" ");
+    p.runFor(10ms);
+    CHECK_FALSE(p.player.playing());
+
+    // With a punch range on too, refused as from stopped.
+    p.type(U"]s,PPgg");
+    p.type(U" ");
+    REQUIRE(p.player.looping());
+    p.type(U"R");
+    CHECK(p.ws.message() == "A loop and a punch range are both on: ,Lt or ,Pt switches one off");
+    CHECK_FALSE(p.player.recording());
+}
+
 TEST_CASE("R while playing punches in ahead of the playhead, and is refused past punch-in")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
