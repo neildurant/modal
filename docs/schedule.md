@@ -241,7 +241,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Changes to the loop while playing take effect at once, through a new engine command. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
 - [ ] **Doing** — Loop recording, by the song's replace or overdub setting (decided 25 November 2026). See [design.md](design.md#input-and-recording).
-    - [ ] **Doing** — `R` with a loop armed records it, each pass an undo step as the playhead wraps.
+    - [x] **Done** — `R` with a loop armed records it, each pass an undo step as the playhead wraps. Accepted on trial.
     - [ ] **To do** — `R` while a loop plays, starting at the next pass.
     - [ ] **To do** — Manual updates and final validation.
 - [ ] **To do** — Basic take management: audition, choose an active take, discard alternatives, and keep takes with their section; palette support for takes.
