@@ -6,6 +6,10 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Loop recording, step c: the manual, 25 November 2026
+
+The recording chapter has a new section, "Recording a loop, pass after pass" (`#sec-loop-recording`), between punch-in and completing a take: passes in overdub and replace, why replace keeps the recorded tracks silent, `● REC n`, each pass an undo step, stopping partway, `R` while a loop plays, and the refusals with a punch range on or a loop change while recording. The punch section and "Preparing a recording" point to it, the chapter's closing note and the introduction no longer call loop recording unavailable, and the key reference's `R` row mentions loops. Two stale sentences in design.md (`R` refused while looping) now describe it. No new figures: the status line's `● REC 2` is described in text. Both formats built with `tools/build-manual.cmake`, with no unresolved references. **Pending:** reading.
+
 ### Loop recording, step b: `R` while a loop plays, 25 November 2026
 
 `R` while a loop is playing records it (`Player::recordLoop`): from its next pass, or from its start if the playhead hasn't reached it yet (playing from the cursor, or counting in), and then pass after pass as in step a. The pass it starts at is the engine's count then (`firstPass_`); input stamped before it is the pre-roll, not recorded, and the transport shows `● PRE` until it comes, then `● REC 1`, passes numbered from where recording began. In replace, the tracks recorded fall silent at once, as decided before building: it shows at once what `R` has done, and a change at the wrap would come a frame or so late. Stopped before the first pass, nothing is recorded (`Nothing recorded: stopped before the record point`). With a punch range on too, it's refused as from stopped. The message adds `, from the loop's start`.

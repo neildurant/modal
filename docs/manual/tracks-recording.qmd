@@ -292,7 +292,8 @@ to be recorded onto several parts deliberately.
 `R` starts a take from the play-from marker, after the selected count-in or
 pre-roll. It requires at least one armed track with usable input. Space
 stops the take. To record only part of the song, or to start recording while
-the song is already playing, arm a punch range (@sec-punch-recording).
+the song is already playing, arm a punch range (@sec-punch-recording). To record
+a passage again and again, arm a loop (@sec-loop-recording).
 
 **Replace** removes existing material in the recorded range. From the record
 point, a track actually being recorded is silent so that the replaced part
@@ -429,10 +430,56 @@ before the range and press `R` at any point before the playhead reaches
 punch-in. There is no lead-in, since the music already playing serves as
 one. The transport shows `● PRE` until punch-in, then `● REC`. Once the playhead
 is past punch-in, `R` is refused: stop and press `R` again to record the range
-with its lead-in. Recording while a playback loop is running isn't available yet.
+with its lead-in. While a loop plays, `R` records the loop instead
+(@sec-loop-recording).
 
 To record from the play-from marker again, switch the range off with `, P t`,
 or clear it with `, P d`.
+
+## Recording a loop, pass after pass {#sec-loop-recording}
+
+Some parts are easier to build up than to play in one go, such as a drum
+pattern played one drum at a time. Others take a few tries before a phrase
+sits right. **Loop recording** plays a passage over and over and records each
+time round. Each time round is called a **pass**. What happens to the passes
+depends on the song's replace or overdub setting, the same `, r m` as for any
+recording:
+
+- In **overdub**, each pass is added to what's there, so a part builds up:
+  the kick drum on the first pass, the snare on the second, the hi-hat on the
+  third. You hear the earlier passes as you play the next.
+- In **replace**, each pass replaces the one before, so the last one is kept.
+  Play the phrase until it's right, then stop. A pass in which you play
+  nothing leaves the one before it alone, so you can let a pass go by to think
+  without losing your last attempt. The tracks being recorded are silent
+  throughout, as in any replace recording. Otherwise you would hear the old
+  part until your first note, and then not hear what you played on the next
+  pass. You hear the pass that was kept once you stop.
+
+Arm a loop as for playback (@sec-loop-playback), for example a section with
+`, L L`, and press `R`. Playback starts with the recording lead-in from the
+Metronome page, and the first pass begins at the loop's start. After that the
+loop goes round seamlessly, with no lead-in between passes. The transport
+shows which pass is being recorded: `● REC 1`, `● REC 2` and so on.
+
+Each pass goes into the song as the playhead returns to the loop's start,
+saying **Recorded pass 2 onto Drums**, and each pass is its own undo step.
+So after overdubbing the kick, snare and hi-hat, `u` takes back the hi-hat
+and keeps the kick and snare. Press Space to stop. Stopping partway through a
+pass keeps what you played in it up to the stop. In replace mode, the rest of
+the loop keeps the pass before. If you played nothing in that last pass,
+Modal says so and leaves the song as the previous pass left it.
+
+You can also start loop recording while a loop is already playing, for
+instance after listening to it a few times. Press `R` and recording starts at
+the loop's next pass, or at its start if the playhead hasn't reached the loop
+yet. The transport shows `● PRE` until then, and in replace mode the tracks
+being recorded fall silent at once, so you can hear that recording is
+waiting. Stopping before the pass begins records nothing.
+
+A loop and a punch range can't both be used for one recording. With both
+switched on, `R` is refused: switch one off with `, L t` or `, P t`. While
+recording a loop, the loop can't be changed or switched off; stop first.
 
 ## Completing and keeping a take
 
@@ -452,6 +499,7 @@ Modal reports it, and an overflow stops safely rather than presenting an
 incomplete performance as an ordinary successful take. Check warnings before
 accepting the result.
 
-This edition supports linear recording, overdubbing and punch recording. Loop
-recording and a library of alternate takes are not available yet. Here
-“take” means the performance made between a recording start and stop.
+This edition supports linear recording, overdubbing, punch recording and loop
+recording. A library of alternate takes is not available yet. Here “take”
+means the performance made between a recording start and stop, or one pass
+of a loop.

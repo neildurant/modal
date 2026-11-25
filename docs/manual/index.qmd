@@ -22,7 +22,7 @@ The chapters progress from orientation and editing grammar to note entry,
 arrangement, recording, performance shaping, controllers and efficient work.
 Configuration and file exchange follow, with compact key tables and generated
 transform and settings references at the back. Planned features such as
-Insert-mode step entry and loop recording are not presented as available.
+Insert-mode step entry and a library of takes are not presented as available.
 
 ## Reading this book {.unnumbered}
 

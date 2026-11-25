@@ -153,7 +153,7 @@ after counts multiply.
 | `, L l`, `:loop START END` | Arm a loop between two song labels |
 | `, L t`, `, L d` | Switch looping off or on, keeping the loop; clear it |
 | `m` then Space, Ctrl-Space | Set play-from marker, set it and play |
-| `R`, `, r m`, `, r t` | Record, replace/overdub, track Thru |
+| `R`, `, r m`, `, r t` | Record (a loop pass after pass), replace/overdub, track Thru |
 | `, r A` | Disarm every armed track |
 | `, P P` | Arm a punch range: the current section, or the Visual selection's time |
 | `, P l` | Arm a punch range between two labels (also `:punch IN OUT`) |
