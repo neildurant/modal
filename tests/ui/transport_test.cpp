@@ -2967,3 +2967,67 @@ TEST_CASE("R while playing punches in ahead of the playhead, and is refused past
     CHECK(p.ws.message() == "Past the punch-in point: stop first, then R");
     CHECK_FALSE(p.player.recording());
 }
+
+TEST_CASE(
+    "the take keys choose among a section's takes on the track, Before among them, going round")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    song.countIn.mode = core::CountInSettings::Mode::None;
+    const auto keys = song.tracks()[0]->id();
+    const core::Tick bar = ppqn.whole();
+    song.updateEvents(keys, [&](core::EventList& events)
+                      { events.insert({0, core::Note{50, 100, bar / 4}}); }); // entered by hand
+    Playing p{std::move(song)};
+    const auto pitches = [&]
+    {
+        std::vector<int> result;
+        for (const auto& event : p.document.song().events(keys).all())
+            result.push_back(std::get<core::Note>(event.data).pitch);
+        return result;
+    };
+
+    // Two passes of the loop A in replace, each a take; what was there first is Before.
+    p.type(U"gaA,LL");
+    p.type(U"R");
+    REQUIRE(p.player.recording());
+    p.runFor(1s);
+    playNote(p, 60);
+    p.runFor(3s);
+    playNote(p, 64);
+    p.runFor(4s);
+    p.type(U" ");
+    p.runFor(10ms);
+    REQUIRE_FALSE(p.player.playing());
+    REQUIRE(pitches() == std::vector{64});
+
+    p.type(U"[t");
+    CHECK(p.ws.message() == "Take 1 of 2 on Keys in A, bars 1–2");
+    CHECK(pitches() == std::vector{60});
+    p.type(U"[t");
+    CHECK(p.ws.message() == "Before the takes on Keys in A, bars 1–2");
+    CHECK(pitches() == std::vector{50});
+    p.type(U"[t"); // round to the last
+    CHECK(p.ws.message() == "Take 2 of 2 on Keys in A, bars 1–2");
+    CHECK(pitches() == std::vector{64});
+    p.type(U"2]t"); // round past Before
+    CHECK(p.ws.message() == "Take 1 of 2 on Keys in A, bars 1–2");
+    CHECK(pitches() == std::vector{60});
+
+    // Each choice an undo step.
+    p.type(U"u");
+    CHECK(pitches() == std::vector{64});
+
+    // While playing, at once.
+    p.type(U" ");
+    REQUIRE(p.player.playing());
+    p.type(U"]t");
+    CHECK(p.player.playing());
+    CHECK(pitches() == std::vector{50});
+    p.type(U" ");
+    p.runFor(10ms);
+
+    // Another section, with none.
+    p.type(U"]s]t");
+    CHECK(p.ws.message() == "No takes on Keys in B");
+}

@@ -4,6 +4,7 @@
 
 #include <modal/core/song.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/core/takes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -254,4 +255,52 @@ TEST_CASE("a take or a take= that doesn't make sense stops the song being read, 
     CHECK(error("    take 1 2:1:0 3:1:0\n      2:1:0 note C4 v=100 len=1/4 take=1\n") ==
           "line 9: an event in a take doesn't name one");
     CHECK(error("    take 1 2:1:0 3:1:0 when=3\n") == "line 8: unknown take setting \"when=3\"");
+}
+
+TEST_CASE("choosing a take puts it in place of what starts in its span, noting it")
+{
+    Takes t{MODAL_ANY_PPQN()};
+    REQUIRE(t.song.updatePart(0, t.track,
+                              [&](TrackContent& part)
+                              {
+                                  // A long note from bar 2 into the takes' span, and one after.
+                                  part.events.insert({t.bar, Note{30, 100, 2 * t.bar}});
+                                  part.events.insert({6 * t.bar, t.note(70)});
+                              }));
+    CHECK(playingTake(t.part(), 3 * t.bar) == 2u);
+
+    REQUIRE(chooseTake(t.song, 0, t.track, 1));
+    CHECK(t.tags() == Tags{{0, 0}, {1, 0}, {2, 1}, {3, 1}, {4, 1}, {6, 0}});
+    const auto& events = t.song.events(t.track);
+    CHECK(std::get<Note>(events[1].data).duration == t.bar); // cut where the span starts
+    CHECK(std::get<Note>(events[2].data).pitch == 50);
+    CHECK(playingTake(t.part(), 3 * t.bar) == 1u);
+    CHECK(t.part().takes.size() == 2); // the takes themselves unchanged
+
+    const auto before = t.song;
+    CHECK_FALSE(chooseTake(t.song, 0, t.track, 9));
+    CHECK_FALSE(chooseTake(t.song, 1, t.track, 1));
+    CHECK(t.song.sections()[0] == before.sections()[0]);
+}
+
+TEST_CASE("the take playing is the one noted whose span holds the time, or the last noted")
+{
+    Takes t{MODAL_ANY_PPQN()};
+    // A punch of bar 4 alone, chosen, within take 2's span.
+    REQUIRE(t.song.updatePart(0, t.track,
+                              [&](TrackContent& part)
+                              {
+                                  Take punch;
+                                  punch.id = 3;
+                                  punch.from = 3 * t.bar;
+                                  punch.to = 4 * t.bar;
+                                  punch.events.insert({3 * t.bar, t.note(90)});
+                                  part.takes.push_back(punch);
+                              }));
+    REQUIRE(chooseTake(t.song, 0, t.track, 3));
+    CHECK(playingTake(t.part(), 3 * t.bar) == 3u);
+    CHECK(playingTake(t.part(), 2 * t.bar) == 2u);
+    CHECK(playingTake(t.part(), 0) == 3u); // in no span: the last noted
+    REQUIRE(t.song.updatePart(0, t.track, [](TrackContent& part) { part.events = {}; }));
+    CHECK_FALSE(playingTake(t.part(), 0));
 }

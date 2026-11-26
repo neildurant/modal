@@ -31,6 +31,7 @@ add_library(modal_core STATIC
     smf_export.cpp
     song_file.cpp
     song.cpp
+    takes.cpp
     tempo_map.cpp
     thru.cpp
     track.cpp

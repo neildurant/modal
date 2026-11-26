@@ -6,6 +6,14 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Takes, step c: `]t` and `[t` choose a take, 26 November 2026
+
+`]t` / `[t` (`take-next`, `take-previous`, in `modalrc`'s new Takes section) step through the cursor's section and track's takes, going round, Before first, with a count. Core: `playingTake` (the take the part's events note whose span holds the cursor, or the last noted) and `chooseTake` (the take's events in place of what starts in its span, noting it, an earlier note into the span cut) in `takes.hpp`; the workspace's `stepTake` in `workspace_takes.cpp`. Messages: `Take 1 of 2 on Keys in A, bars 1–2`, `Before the takes on Keys in A, bars 1–2`, `No takes on Keys in B`; undo step `Choose take 1 on Keys in A`. **Pending:** desktop trial with a MIDI keyboard (steps b and c together); the manual (step g).
+
+**Validation.** `take_test.cpp`: choosing a take replaces what starts in its span, tagging it and cutting a long note into it, leaving the takes; an unknown take or section refused; the take playing by span, by the last noted, and none. `transport_test.cpp`, at two PPQNs: two replace loop passes over a hand-entered note, then `[t` to take 1, Before and round to take 2, `2]t` round past Before, `u`, `]t` while playing, and a section with none.
+
+**To try** (with a MIDI keyboard): put a few notes in a section by hand, arm the track, `, L L` on that section, replace mode, `R`, and play something different on each of two or three passes; stop. The last pass plays. In the arrangement or piano roll on that track and section, `[t` goes back a take at a time (`Take 2 of 3 …`), then to Before, your hand-entered notes, then round to the last; `]t` the other way, `2]t` two at a time. `u` undoes a choice. Play the loop and press `]t` while it plays: the change is heard straight away. A punch over part of the section makes takes of just those bars, and choosing one changes only them. Save, reopen, and the takes are still there.
+
 ### Takes, step b: replace recordings make takes, 26 November 2026
 
 `Recorder::finish`, in replace mode, keeps what was played as a take in each section it was played in (`keepTakes`), over that section's part of the span, and tags the part's matching events; what it replaced from no take goes into the section's Before take. This covers linear recording, punching and each loop pass, as they all finish through the recorder. Overdub is unchanged. Still nothing shows but the saved file's `take` lines, so no trial yet: choosing takes (step c) is the first thing to try.

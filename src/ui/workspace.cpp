@@ -140,6 +140,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return clearPunch();
                 if (name == "punch-toggle")
                     return togglePunch();
+                if (name == "take-next" || name == "take-previous")
+                    return stepTake(call.count, name == "take-next");
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);

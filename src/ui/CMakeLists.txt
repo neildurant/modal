@@ -22,6 +22,7 @@ add_library(modal_ui STATIC
     workspace_jumps.cpp
     workspace_paste.cpp
     workspace_punch.cpp
+    workspace_takes.cpp
     config.cpp
     drum_maps.cpp
     workspace_drum_maps.cpp
