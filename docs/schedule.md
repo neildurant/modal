@@ -252,15 +252,15 @@ Deliver in this order, building on linear recording:
 - [ ] **Doing** — Take stacks and range comping. See [design.md](design.md#take-stacks-and-comping).
     - [x] **Done** — Record the agreed stack, editing, join and Bake design and review mock-ups.
     - [x] **Done** — Settle the file model and compatibility. Accept ordinary songs and refuse the old test take format.
-    - [ ] **Doing** — Stack, resolved playback, chase and export with saved songs. Automated checks passed. See [status.md](status.md).
+    - [x] **Done** — Stack, resolved playback, chase and export with saved songs. See [status.md](status.md).
     - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Desktop MIDI trial pending. See [status.md](status.md).
     - [x] **Done** — Show active ranges and the take being edited.
         - [x] **Done** — Label ranges in the arrangement and piano roll, and show the edit destination in the piano-roll header.
         - [x] **Done** — Add the section-strip count and event-list take column.
     - [ ] **Doing** — Take lanes and range comping.
         - [x] **Done** — Review the lanes, range selection and audition mock-ups.
-        - [ ] **Doing** — Show source lanes in both views, with per-track expansion and neutral inactive spans.
-        - [ ] **Doing** — Audition and assign a source over the selected range, with bar navigation and hints at the bottom.
+        - [ ] **Doing** — Show source lanes in both views. Final label colours await desktop review.
+        - [x] **Done** — Audition and assign a source over the selected range.
         - [ ] **To do** — Edit focused takes and copy selections between takes.
     - [ ] **To do** — Review audition and range-choice shortcuts with take lanes visible.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
