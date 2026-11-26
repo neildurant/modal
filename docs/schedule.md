@@ -259,8 +259,8 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Add the section-strip count and event-list take column.
     - [ ] **Doing** — Take lanes and range comping.
         - [x] **Done** — Review the lanes, range selection and audition mock-ups.
-        - [ ] **Doing** — Show source lanes in both views, with a toggle to keep them visible.
-        - [ ] **Doing** — Audition and assign a source over the selected range, with hints at the bottom.
+        - [ ] **Doing** — Show source lanes in both views, with per-track expansion and neutral inactive spans.
+        - [ ] **Doing** — Audition and assign a source over the selected range, with bar navigation and hints at the bottom.
         - [ ] **To do** — Edit focused takes and copy selections between takes.
     - [ ] **To do** — Review audition and range-choice shortcuts with take lanes visible.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.

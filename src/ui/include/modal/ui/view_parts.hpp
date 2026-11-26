@@ -238,7 +238,8 @@ struct TakeLaneDisplay
 
 TakeLaneDisplay takeLaneDisplay(const core::Song& song, SongCursor cursor,
                                 const TakeChoice* choice);
-Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell);
+Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell,
+                 bool indent = false);
 
 // Label the part of each active take that is visible on a timeline row.
 void addTakeBands(Region& region, const core::Song& song, core::TrackId track,

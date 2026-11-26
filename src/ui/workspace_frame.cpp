@@ -305,11 +305,13 @@ Bar Workspace::messageBar(bool withMessage) const
     if (takeChoice_ && (message_.empty() || messageKind_ != MessageKind::Warning))
     {
         if (takeChoice_->preview)
-            row.left.push_back({"Previewing   ", accent});
-        row.left.push_back({!takeChoice_->take() ? "No take covers the range   Esc Close"
+            row.left.push_back({"Previewing  ", accent});
+        if (takeChoice_->singleBar)
+            row.left.push_back({"h/l ←/→ Bar  ", text});
+        row.left.push_back({!takeChoice_->take() ? "No take covers the range  Esc Close"
                             : takeChoice_->preview
-                                ? "j/k ↑/↓ Take   p End preview   Enter Apply   Esc Cancel"
-                                : "j/k ↑/↓ Take   p Preview   Enter Apply   Esc Cancel",
+                                ? "j/k ↑/↓ Take  p End preview  Enter Apply  Esc Cancel"
+                                : "j/k ↑/↓ Take  p Preview  Enter Apply  Esc Cancel",
                             text});
         return row;
     }

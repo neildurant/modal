@@ -502,7 +502,8 @@ accepting the result.
 ## Seeing which take plays {#sec-showing-takes}
 
 Replace recordings keep alternate performances as numbered takes. Each take
-belongs to one track in one section. A recording across a section boundary
+belongs to one track in one section, with numbering local to that pair.
+A recording across a section boundary
 creates a separate take in each section where it records or replaces MIDI.
 The section strip counts those stored takes across its tracks, including
 takes that are currently silent.
@@ -522,12 +523,13 @@ column is hidden.
 
 Open the take lanes with `, k c` (choose) in the arrangement or the piano
 roll. The lanes open beneath the current track in the arrangement, or below
-the piano-roll ruler. Each lane shows the stored performance. Brighter
-shading shows where the saved comp uses that take.
+the piano-roll ruler. Each lane shows the stored performance. Coloured
+spans play, and grey spans are alternatives you can choose.
 
-Use `, k v` (view) if you want the lanes visible while you mark the range.
-This applies in both views. The lanes stay visible when you leave the
-chooser, and `, k v` hides them again.
+Use `, k v` (view) to keep a track's lanes visible while you mark the
+range. In the arrangement, `K` also toggles them, and the `K` indicator
+shows that the track is expanded. Each track keeps its own setting between
+views. Its lanes stay visible when you leave the chooser.
 
 The chooser takes the cursor's bar by default. To choose a shorter phrase
 or several bars at once, make a Visual time selection within one section
@@ -536,6 +538,11 @@ performance with a punch, open the chooser in bar three and move the
 highlight to the punch with `j` or `k`, or with the arrow keys. The outline
 shows the time that would change. The highlighted take must cover that whole
 span.
+
+With the chooser open on a single bar, move to the previous or next bar
+with `h` and `l` or the Left and Right arrow keys. Moving ends any
+preview, so you can compare and then choose a take for the new bar. The
+ends of a Visual time selection stay where you set them.
 
 The bottom line lists the controls. Press `p` to preview the highlighted
 take and Space to start or stop playback. **Previewing** appears at the

@@ -46,7 +46,8 @@ TakeLaneDisplay takeLaneDisplay(const core::Song& song, SongCursor cursor, const
     return {source.content(*cursor.track), song.sectionStart(section), source.length(), choice};
 }
 
-Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell)
+Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell,
+                 bool indent)
 {
     Region panel{
         .bounds = bounds, .background = Role::Background, .text = {}, .under = {}, .over = {}};
@@ -74,23 +75,26 @@ Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, C
         const int height = cell.height - 2 * inset;
         panel.under.push_back(
             {{0, y, bounds.width, cell.height}, i % 2 == 0 ? Role::Panel : Role::Background, 110});
-        const auto band = [&](core::Tick from, core::Tick to, std::uint8_t alpha)
+        const auto band = [&](core::Tick from, core::Tick to, Role role, std::uint8_t alpha)
         {
             const int x = xAt(start + from);
             const int right = xAt(start + to);
             if (right > x)
-                panel.under.push_back({{x, top, right - x, height}, colour, alpha});
+                panel.under.push_back({{x, top, right - x, height}, role, alpha});
         };
-        band(take.from, take.to, 65);
+        auto inactiveFrom = take.from;
         for (const auto& range : active)
         {
             if (range.take == take.id)
-                band(range.from, range.to, 160);
+            {
+                band(inactiveFrom, range.from, Role::Dim, 56);
+                band(range.from, range.to, colour, 100);
+                inactiveFrom = range.to;
+            }
         }
+        band(inactiveFrom, take.to, Role::Dim, 56);
         if (choice && take.id == selected)
         {
-            if (choice->preview)
-                band(choice->from - start, choice->to - start, 160);
             const int x = xAt(choice->from);
             const int w = xAt(choice->to) - x;
             if (w > 0 && height > 1)
@@ -109,12 +113,20 @@ Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, C
                 continue;
             const auto* note = std::get_if<core::Note>(&event.data);
             const int width = note ? std::max(xAt(tick + note->duration) - x, 1) : 2;
-            panel.over.push_back({{x, y + cell.height / 2, width, 2}, colour, 255});
+            panel.over.push_back({{x, y + cell.height / 2, width, 2}, Role::BarText, 150});
         }
-        panel.text.push_back({cell.width,
+        panel.text.push_back({(indent ? 4 : 1) * cell.width,
                               y,
                               decodeUtf8("T" + std::to_string(i + 1)),
-                              {colour, Role::Background, kBold}});
+                              {Role::BarText, Role::Background, kPlain}});
+    }
+    if (indent)
+    {
+        const int x = 2 * cell.width;
+        const int edge = hairline(cell);
+        const int end = bounds.height - cell.height / 2;
+        panel.under.push_back({{x, 0, edge, end}, Role::BarLine, 255});
+        panel.under.push_back({{x, end - edge, cell.width, edge}, Role::BarLine, 255});
     }
     return panel;
 }

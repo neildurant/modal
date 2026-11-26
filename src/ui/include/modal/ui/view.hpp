@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -82,6 +83,7 @@ struct TakeChoice
     std::vector<std::uint32_t> candidates;
     std::size_t selected = 0;
     bool preview = false;
+    bool singleBar = false;
 
     std::uint32_t take() const { return candidates.empty() ? 0 : candidates[selected]; }
 };
@@ -286,7 +288,7 @@ public:
     // Whether to tint the bars where a track has a meter of its own (ownmeter).
     virtual bool ownMeter() const = 0;
     virtual const TakeChoice* takeChoice() const { return nullptr; }
-    virtual bool takeLanesVisible() const { return false; }
+    virtual std::span<const core::TrackId> expandedTakeTracks() const { return {}; }
     // Where the punch range armed in the song is, to show it in the ruler.
     virtual std::optional<core::ArmedSpan> punchSpan() const { return std::nullopt; }
     // The punch and loop ranges armed, where they are now, for the rulers' brackets.

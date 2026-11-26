@@ -3246,7 +3246,7 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
         {
             if (std::ranges::any_of(
                     region.text, [](const TextRun& run)
-                    { return run.text == U"T1" && run.style.foreground == Role::Take1; }))
+                    { return run.text == U"T1" && run.style.foreground == Role::BarText; }))
                 return true;
         }
         return false;
@@ -3263,6 +3263,7 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     p.type(U",kc");
     REQUIRE(showsLanes());
     CHECK(bottomHas(U"↑/↓"));
+    CHECK(bottomHas(U"←/→"));
     CHECK(bottomHas(U"Enter Apply"));
     p.press(Key::of(NamedKey::Up));
     p.type(U"p");
@@ -3278,6 +3279,13 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     CHECK(std::ranges::any_of(notes, [](const auto& note) { return note.first == 60; }));
     p.type(U" ");
     p.runFor(50ms);
+    p.press(Key::of(NamedKey::Right));
+    CHECK((piano ? p.ws.pianoRoll().cursor() : p.ws.arrangement().cursor()).tick == bar);
+    CHECK_FALSE(p.document.hasPreview());
+    CHECK(chosen(p.ws.playbackSong(), 0) == 2);
+    p.type(U"lhh");
+    CHECK((piano ? p.ws.pianoRoll().cursor() : p.ws.arrangement().cursor()).tick == 0);
+    CHECK(bottomHas(U"Enter Apply"));
     p.press(Key::of(NamedKey::Escape));
     CHECK_FALSE(showsLanes());
     CHECK_FALSE(bottomHas(U"Enter Apply"));
@@ -3293,6 +3301,8 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     p.type(U",kc");
     REQUIRE(showsLanes());
     CHECK(bottomHas(U"Enter Apply"));
+    CHECK_FALSE(bottomHas(U"←/→"));
+    p.press(Key::of(NamedKey::Right));
     p.type(U"k");
     p.press(Key::of(NamedKey::Enter));
     CHECK(showsLanes());
@@ -3304,4 +3314,48 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     CHECK(chosen(p.document.underlying(), 0) == 2);
     p.type(U",kv");
     CHECK_FALSE(showsLanes());
+}
+
+TEST_CASE("arrangement take lanes belong to tracks and keep their rows while navigating")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    song.addTrack("Bass");
+    song.addTrack("Drums");
+    const auto bar = ppqn.whole();
+    core::EventList notes;
+    notes.insert({0, core::Note{60, 90, ppqn.quarter()}});
+    song.addRecordedTake(song.tracks()[0]->id(), 0, bar, 1, notes);
+    song.addRecordedTake(song.tracks()[1]->id(), 0, bar, 2, notes);
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 32 * kCell.height, kCell);
+    p.type(U"gaK");
+    const auto laneHeights = [&]
+    {
+        std::vector<int> y;
+        for (const auto& region : p.ws.frame())
+        {
+            if (std::ranges::any_of(
+                    region.text, [](const TextRun& run)
+                    { return run.text == U"T1" && run.style.foreground == Role::BarText; }))
+                y.push_back(region.bounds.y);
+        }
+        return y;
+    };
+    const auto keys = laneHeights();
+    REQUIRE(keys.size() == 1);
+    p.type(U"j");
+    CHECK(laneHeights() == keys);
+    p.type(U"K");
+    const auto both = laneHeights();
+    REQUIRE(both.size() == 2);
+    CHECK(both.front() == keys.front());
+    p.type(U"jkkj");
+    CHECK(laneHeights() == both);
+    p.type(U"K");
+    CHECK(laneHeights() == keys);
+    p.type(U"gr");
+    CHECK(laneHeights().empty());
+    p.type(U"gakgr");
+    CHECK(laneHeights().size() == 1);
 }

@@ -1410,11 +1410,12 @@ private:
     CommandResult stepTake(int count, bool forward);
     CommandResult removeTakes(bool keepOnly);
     const TakeChoice* takeChoice() const override { return takeChoice_ ? &*takeChoice_ : nullptr; }
-    bool takeLanesVisible() const override { return showTakeLanes_ || takeChoice_.has_value(); }
-    bool showTakeLanes_ = false;
+    std::span<const core::TrackId> expandedTakeTracks() const override;
+    std::map<std::uint64_t, std::vector<core::TrackId>> expandedTakeTracks_;
     std::optional<TakeChoice> takeChoice_;
     CommandResult toggleTakeLanes();
     CommandResult chooseTakeRange();
+    bool moveTakeBar(int direction);
     bool takeChoiceKey(const Key& key);
     void updateTakePreview();
     void closeTakeChoice(bool restorePlayback = true);

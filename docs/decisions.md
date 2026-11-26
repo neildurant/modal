@@ -901,6 +901,8 @@ Decided 27 November 2026 to use the same take chooser in the arrangement and pia
 
 After the take chooser trial on 27 November 2026, add `, k v` so the lanes can guide range selection before opening the chooser. Put the lanes directly below the playing ranges. The selection outline identifies the candidate, the ruler identifies the time, and the bottom message row supplies the controls and preview state.
 
+After trying the toggle, make expansion per track, with `K` beside the arrangement's track toggles. This keeps the track rows steady when moving vertically. Indent the source labels under their track, use grey where a source is inactive and reserve its colour for the playing spans. Separate the piano roll's notes from the take rows with a thin rule. In the bar chooser, allow horizontal movement and clear the preview when changing bars so it cannot carry into a different range by accident.
+
 ## Loop playback (24 November 2026)
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).

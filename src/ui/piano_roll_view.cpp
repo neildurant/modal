@@ -1503,10 +1503,12 @@ int PianoRollView::rulerRows() const
 
 int PianoRollView::takeRows() const
 {
-    if (!host_.takeLanesVisible())
+    const auto track = trackId();
+    const auto expanded = host_.expandedTakeTracks();
+    if (!track || (!host_.takeChoice() && std::ranges::find(expanded, *track) == expanded.end()))
         return 0;
     const int below = layout_.main.height / cell_.height - kRulerRows - 1;
-    return takeLaneDisplay(document_.underlying(), cursor(), host_.takeChoice()).rows(below / 2);
+    return takeLaneDisplay(document_.song(), cursor(), host_.takeChoice()).rows(below / 2);
 }
 
 core::LaneHeight PianoRollView::laneSize() const
@@ -5602,9 +5604,17 @@ void PianoRollView::addRegions(Frame& frame) const
     {
         auto takeScale = scale;
         takeScale.x = keyWidth;
-        const auto lanes = takeLaneDisplay(document_.underlying(), cursor(), host_.takeChoice());
+        const auto lanes = takeLaneDisplay(song, cursor(), host_.takeChoice());
         frame.push_back(takeLanes(lanes, {main.x, notesTop - rows * h, main.width, rows * h},
                                   takeScale, cell_));
+    }
+    if (rulerHeight > kRulerRows * h && notesHeight > 0)
+    {
+        frame.push_back({.bounds = {main.x, notesTop, main.width, lineWidth},
+                         .background = Role::BarLine,
+                         .text = {},
+                         .under = {},
+                         .over = {}});
     }
 
     addBars(frame, p);

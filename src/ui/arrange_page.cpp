@@ -68,11 +68,13 @@ ArrangePage::ArrangePage(core::Song song)
     : song_(std::move(song))
     , end_(song_.end())
 {
+    findTakeTracks();
 }
 
 void ArrangePage::setSong(core::Song song)
 {
     song_ = std::move(song);
+    findTakeTracks();
     end_ = song_.end();
     track_ = song_.tracks().empty() ? 0 : std::min(track_, song_.tracks().size() - 1);
     time_ = std::clamp<core::Tick>(time_, 0, std::max<core::Tick>(end_ - 1, 0));
@@ -81,6 +83,41 @@ void ArrangePage::setSong(core::Song song)
         stripCursor_ = std::min(*stripCursor_, song_.sections().size() - 1);
     }
     follow();
+}
+
+void ArrangePage::findTakeTracks()
+{
+    takeTracks_.clear();
+    for (const auto& track : song_.tracks())
+    {
+        if (std::ranges::any_of(song_.sections(),
+                                [&](const auto& section)
+                                {
+                                    const auto* part = section->content(track->id());
+                                    return part && !part->takes.empty();
+                                }))
+            takeTracks_.push_back(track->id());
+    }
+}
+
+void ArrangePage::setTakeLanes(std::span<const core::TrackId> expanded, const TakeChoice* choice)
+{
+    expandedTakeTracks_.assign(expanded.begin(), expanded.end());
+    choosingTake_ =
+        choice ? std::optional{std::pair{choice->track, choice->section}} : std::nullopt;
+}
+
+int ArrangePage::takeRows(std::size_t track) const
+{
+    const auto id = song_.tracks()[track]->id();
+    const bool choosing = choosingTake_ && choosingTake_->first == id;
+    if (!choosing && std::ranges::find(expandedTakeTracks_, id) == expandedTakeTracks_.end())
+        return 0;
+    const auto section = choosing ? choosingTake_->second : song_.sectionAt(time_);
+    if (section >= song_.sections().size())
+        return 0;
+    const auto* part = song_.sections()[section]->content(id);
+    return part ? std::min(trackRowsInView() / 2, static_cast<int>(part->takes.size())) : 0;
 }
 
 void ArrangePage::setCursor(std::size_t track, core::Tick time)
@@ -169,9 +206,24 @@ core::Tick ArrangePage::columnTicks() const
     return std::max<core::Tick>(kZooms[zoom_].toTicks(song_.ppqn()), 1);
 }
 
-int ArrangePage::viewTracks() const
+int ArrangePage::trackRowsInView() const
 {
     return std::max(main_.height / cell_.height - kRulerRows, 1);
+}
+
+int ArrangePage::viewTracks() const
+{
+    const int room = trackRowsInView();
+    if (expandedTakeTracks_.empty() && !choosingTake_)
+        return room;
+    int rows = 0;
+    int visible = 0;
+    for (auto i = topTrack_; i < song_.tracks().size() && rows < room; ++i)
+    {
+        ++visible;
+        rows += 1 + takeRows(i);
+    }
+    return std::max(visible, 1);
 }
 
 int ArrangePage::headerColumns() const
@@ -182,7 +234,7 @@ int ArrangePage::headerColumns() const
     {
         columns += trackColumn(field).width;
     }
-    return columns;
+    return columns + (takeTracks_.empty() ? 0 : kTrackButtonColumns + 1);
 }
 
 int ArrangePage::viewColumns() const
@@ -307,13 +359,36 @@ void ArrangePage::follow()
     }
     // Tracks: scroll only as far as needed to keep the cursor's track in view, and no
     // further than the last track.
-    const auto tracks = static_cast<std::int64_t>(song_.tracks().size());
-    const std::int64_t rows = viewTracks();
-    auto top = std::clamp<std::int64_t>(static_cast<std::int64_t>(topTrack_), 0,
-                                        std::max<std::int64_t>(tracks - rows, 0));
-    const auto current = static_cast<std::int64_t>(track_);
-    top = std::clamp(top, current - rows + 1, current);
-    topTrack_ = static_cast<std::size_t>(top);
+    const int rows = trackRowsInView();
+    auto lastTop = song_.tracks().size() - 1;
+    int used = 1 + takeRows(lastTop);
+    while (lastTop > 0)
+    {
+        const int height = 1 + takeRows(lastTop - 1);
+        if (used + height > rows)
+            break;
+        used += height;
+        --lastTop;
+    }
+    auto top = std::min({topTrack_, track_, lastTop});
+    used = 1 + (choosingTake_ ? takeRows(track_) : 0);
+    for (auto i = top; i < track_ && used <= rows; ++i)
+        used += 1 + takeRows(i);
+    if (used > rows)
+    {
+        // Walk back from the cursor to keep as many complete preceding rows as will fit.
+        top = track_;
+        used = 1 + (choosingTake_ ? takeRows(track_) : 0);
+        while (top > 0)
+        {
+            const int height = 1 + takeRows(top - 1);
+            if (used + height > rows)
+                break;
+            used += height;
+            --top;
+        }
+    }
+    topTrack_ = top;
 
     // Time, in whole columns: keep the cursor's bar fully in view, or its start if it's
     // longer than the view, and don't show more than needed after the end.
@@ -343,25 +418,17 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
                              const std::vector<core::TrackId>& moving, bool ownMeters,
                              bool recording, const core::ArmedSpans& ranges,
-                             const TakeLaneDisplay* lanes) const
+                             const TakeChoice* choice) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
     const auto tracks = song_.tracks();
-    const int trackRows = rows - kRulerRows;
-    const int takeRows = lanes ? lanes->rows(std::min((trackRows + 1) / 2, trackRows - 1)) : 0;
-    const int room = trackRows - takeRows;
-    auto topTrack = topTrack_;
-    if (takeRows > 0)
-    {
-        const auto before = static_cast<std::size_t>(room - 1);
-        topTrack = std::clamp(topTrack, track_ - std::min(track_, before), track_);
-    }
-    const auto trackLine = [&](int line)
-    {
-        return kRulerRows + line +
-               (topTrack + static_cast<std::size_t>(line) > track_ ? takeRows : 0);
-    };
+    const auto topTrack = topTrack_;
+    std::vector<int> lines{kRulerRows};
+    for (auto i = topTrack; i < tracks.size() && lines.back() < rows; ++i)
+        lines.push_back(std::min(lines.back() + 1 + takeRows(i), rows));
+    const int shownTracks = static_cast<int>(lines.size() - 1);
+    const auto trackLine = [&](int line) { return lines[static_cast<std::size_t>(line)]; };
 
     // The track headers, in text cells.
     CellGrid headers{columns, rows};
@@ -374,7 +441,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     // (decided 13 November 2026, after use).
     const Style onRows{Role::Text, Role::TrackRows, kPlain};
     const Style dimOnRows{Role::Dim, Role::TrackRows, kPlain};
-    for (int line = 0; line < room; ++line)
+    for (int line = 0; line < shownTracks; ++line)
     {
         const auto index = topTrack + static_cast<std::size_t>(line);
         if (index >= tracks.size())
@@ -408,7 +475,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     frame.push_back(gridRegion(headers, main_, cell_, Role::Background));
     // The buttons after the names, drawn as the Tracks view draws them, so they look and mean
     // the same; the cursor stays on the bars, the keys switching them for its track.
-    for (int line = 0; line < room; ++line)
+    for (int line = 0; line < shownTracks; ++line)
     {
         const auto index = topTrack + static_cast<std::size_t>(line);
         if (index >= tracks.size())
@@ -416,11 +483,25 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             break;
         }
         int x = (4 + nameColumns_ + 1) * cell_.width;
+        const int y = trackLine(line) * cell_.height;
         for (const auto field : columns_)
         {
-            addTrackButton(frame.back(), x, trackLine(line) * cell_.height, cell_, field,
-                           *tracks[index], Role::TrackRows, false, recording);
+            addTrackButton(frame.back(), x, y, cell_, field, *tracks[index], Role::TrackRows, false,
+                           recording);
             x += trackColumn(field).width * cell_.width;
+        }
+        const auto id = tracks[index]->id();
+        if (std::ranges::find(takeTracks_, id) != takeTracks_.end())
+        {
+            const bool expanded =
+                std::ranges::find(expandedTakeTracks_, id) != expandedTakeTracks_.end() ||
+                (choice && choice->track == id);
+            const int edge = hairline(cell_);
+            frame.back().under.push_back({{x, y + edge, kTrackButtonColumns * cell_.width,
+                                           std::max(1, cell_.height - 2 * edge)},
+                                          expanded ? Role::Selection : Role::Panel});
+            frame.back().text.push_back(
+                {x, y, U" K ", {expanded ? Role::Text : Role::Dim, Role::TrackRows, kBold}});
         }
     }
 
@@ -442,9 +523,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     const core::Tick right = leftTick_ + (timeline.bounds.width / cell_.width + 1) * column;
     const core::Tick shownEnd = std::min(right, end_);
     const int tracksTop = kRulerRows * cell_.height;
-    const int shownTracks = static_cast<int>(std::min<std::size_t>(
-        tracks.size() - topTrack, static_cast<std::size_t>(std::max(room, 0))));
-    const int tracksBottom = tracksTop + (shownTracks + takeRows) * cell_.height;
+    const int tracksBottom = trackLine(shownTracks) * cell_.height;
     timeline.under.push_back(
         {{0, tracksTop, timeline.bounds.width, tracksBottom - tracksTop}, Role::TrackRows, 255});
     const int lineWidth = hairline(cell_); // also the space beside a line
@@ -905,14 +984,20 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
             {{scale.toX(*playhead_), 0, 2 * lineWidth, tracksBottom}, Role::Accent, 255});
     }
     frame.push_back(std::move(timeline));
-    if (takeRows > 0)
+    auto takeScale = scale;
+    takeScale.x = timelineX;
+    for (int line = 0; line < shownTracks; ++line)
     {
-        auto takeScale = scale;
-        takeScale.x = timelineX;
-        const int y = (trackLine(static_cast<int>(track_ - topTrack)) + 1) * cell_.height;
-        frame.push_back(takeLanes(*lanes,
-                                  {main_.x, main_.y + y, main_.width, takeRows * cell_.height},
-                                  takeScale, cell_));
+        const int start = trackLine(line) + 1;
+        const int count = trackLine(line + 1) - start;
+        if (count <= 0)
+            continue;
+        const auto id = tracks[topTrack + static_cast<std::size_t>(line)]->id();
+        const auto lanes = takeLaneDisplay(song_, {id, time_, std::nullopt},
+                                           choice && choice->track == id ? choice : nullptr);
+        frame.push_back(takeLanes(
+            lanes, {main_.x, main_.y + start * cell_.height, main_.width, count * cell_.height},
+            takeScale, cell_, true));
     }
 }
 

@@ -35,13 +35,57 @@ std::string barsText(const core::Song& song, core::Tick from, core::Tick to)
                          : "bars " + std::to_string(first) + "–" + std::to_string(last);
 }
 
+TakeChoice rangeChoice(const core::Song& song, core::TrackId track, std::size_t section,
+                       core::Tick from, core::Tick to, bool singleBar)
+{
+    TakeChoice choice{.track = track,
+                      .section = section,
+                      .from = from,
+                      .to = to,
+                      .candidates = {},
+                      .singleBar = singleBar};
+    const auto* part = song.sections()[section]->content(track);
+    if (!part)
+        return choice;
+    const auto start = song.sectionStart(section);
+    const auto active = core::activeSource(*part, from - start);
+    for (const auto& take : part->takes)
+    {
+        if (take.from <= from - start && take.to >= to - start)
+        {
+            if (take.id == active)
+                choice.selected = choice.candidates.size();
+            choice.candidates.push_back(take.id);
+        }
+    }
+    return choice;
+}
+
 } // namespace
+
+std::span<const core::TrackId> Workspace::expandedTakeTracks() const
+{
+    const auto found = expandedTakeTracks_.find(document_.underlying().identity());
+    return found == expandedTakeTracks_.end() ? std::span<const core::TrackId>{}
+                                              : std::span<const core::TrackId>{found->second};
+}
 
 CommandResult Workspace::toggleTakeLanes()
 {
-    showTakeLanes_ = !showTakeLanes_;
+    const auto track = view().cursor().track;
+    if (!track)
+        return CommandResult::error("Go to a track to show its takes");
+    const auto& song = document_.underlying();
+    auto& expanded = expandedTakeTracks_[song.identity()];
+    const auto found = std::ranges::find(expanded, *track);
+    const bool show = found == expanded.end();
+    if (show)
+        expanded.push_back(*track);
+    else
+        expanded.erase(found);
     layOut();
-    return {true, showTakeLanes_ ? "Take lanes shown" : "Take lanes hidden"};
+    return {true, "Take lanes " + std::string{show ? "shown on " : "hidden on "} +
+                      trackName(song, *track)};
 }
 
 CommandResult Workspace::chooseTakeRange()
@@ -82,22 +126,33 @@ CommandResult Workspace::chooseTakeRange()
     if (!part || part->takes.empty())
         return CommandResult::error("No takes here");
 
-    TakeChoice choice{
-        .track = *cursor.track, .section = section, .from = from, .to = to, .candidates = {}};
-    const auto active = core::activeSource(*part, from - start);
-    for (const auto& take : part->takes)
-    {
-        if (take.from <= from - start && take.to >= to - start)
-        {
-            if (take.id == active)
-                choice.selected = choice.candidates.size();
-            choice.candidates.push_back(take.id);
-        }
-    }
+    auto choice = rangeChoice(song, *cursor.track, section, from, to, !selection_);
     endVisual();
     takeChoice_ = std::move(choice);
     layOut();
     return {true};
+}
+
+bool Workspace::moveTakeBar(int direction)
+{
+    const auto& song = document_.underlying();
+    const auto& current = *takeChoice_;
+    const auto& meter = song.meter(current.track);
+    const auto next = direction < 0 ? current.from - 1 : current.to;
+    if (next < 0 || next >= song.end())
+        return false;
+    const auto bar = meter.toBarBeatTick(next).bar;
+    const auto section = song.sectionAt(next);
+    const auto from = std::max(meter.barStart(bar), song.sectionStart(section));
+    const auto to = std::min(meter.barStart(bar + 1), song.sectionStart(section + 1));
+    const auto track = current.track;
+    takeChoice_ = rangeChoice(song, track, section, from, to, true);
+    updateTakePreview();
+    auto cursor = view().cursor();
+    cursor.tick = from;
+    view().setCursor(cursor);
+    layOut();
+    return true;
 }
 
 bool Workspace::takeChoiceKey(const Key& key)
@@ -116,6 +171,13 @@ bool Workspace::takeChoiceKey(const Key& key)
         return true;
     }
     auto& choice = *takeChoice_;
+    if (choice.singleBar)
+    {
+        if (key.character == U'h' || key.named == NamedKey::Left)
+            return moveTakeBar(-1);
+        if (key.character == U'l' || key.named == NamedKey::Right)
+            return moveTakeBar(1);
+    }
     if (choice.candidates.empty())
         return false;
     if (key.character == U'j' || key.named == NamedKey::Down)

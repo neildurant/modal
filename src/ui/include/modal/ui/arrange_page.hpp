@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,7 +22,7 @@
 namespace modal::ui
 {
 
-struct TakeLaneDisplay;
+struct TakeChoice;
 
 // The arrangement's tracks and ruler, first sketched in milestone 3's test view and drawn by the
 // arrangement view (see ArrangeView). A row for each track, with its number and name in text cells,
@@ -116,6 +117,7 @@ public:
 
     // How many tracks' rows are fully in view.
     int viewTracks() const;
+    void setTakeLanes(std::span<const core::TrackId> expanded, const TakeChoice* choice);
 
     // The tracks and ruler, with the play-from marker in the ruler if there's one.
     // A Visual selection, drawn in place of the cursor's bar across the tracks: the tracks
@@ -134,7 +136,7 @@ public:
                     std::optional<Selected> selected = std::nullopt,
                     const std::vector<core::TrackId>& moving = {}, bool ownMeters = true,
                     bool recording = false, const core::ArmedSpans& ranges = {},
-                    const TakeLaneDisplay* lanes = nullptr) const;
+                    const TakeChoice* choice = nullptr) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.
@@ -159,6 +161,9 @@ private:
     const core::MeterMap& meterOf(const core::Track& track) const;
     std::int64_t lastBar(const core::Track& track) const;
     void follow();
+    int trackRowsInView() const;
+    int takeRows(std::size_t track) const;
+    void findTakeTracks();
     core::Tick columnTicks() const;
     int viewColumns() const;
 
@@ -173,6 +178,9 @@ private:
     std::size_t zoom_ = kDefaultZoom;
     int nameColumns_ = kNameColumns;
     std::vector<TrackField> columns_{arrangementColumns().begin(), arrangementColumns().end()};
+    std::vector<core::TrackId> takeTracks_;
+    std::vector<core::TrackId> expandedTakeTracks_;
+    std::optional<std::pair<core::TrackId, std::size_t>> choosingTake_;
     Rect main_;
     CellSize cell_{1, 1};
 };
