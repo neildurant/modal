@@ -245,8 +245,8 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — `R` while a loop plays, starting at the next pass. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
 - [ ] **Doing** — Basic take management (agreed 25 November 2026): a take is a performance, and the part notes which take each event came from. See [design.md](design.md#input-and-recording).
-    - [ ] **Doing** — Takes per section and track, the take on each event, saved with the song.
-    - [ ] **To do** — Replace recordings make takes: Before, and each loop pass.
+    - [x] **Done** — Takes per section and track, the take on each event, saved with the song.
+    - [ ] **Doing** — Replace recordings make takes: Before, and each loop pass.
     - [ ] **To do** — `]t` / `[t` choose a take, stopped or playing.
     - [ ] **To do** — `, k o` keeps only the take playing; `, k d` discards it.
     - [ ] **To do** — Showing takes in the arrangement, section strip, piano roll and event list, settled from renders.

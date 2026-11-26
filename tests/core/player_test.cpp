@@ -164,9 +164,10 @@ TEST_CASE("recording retains each input's tempo mapping across live edits and de
     REQUIRE(take);
     const auto events = take->song.events(id).all();
     REQUIRE(events.size() == 3);
-    CHECK(events[0] == Event{oldTick, ControlChange{11, 80}});
-    CHECK(events[1] == Event{oldTick, Note{88, 90, start - oldTick, 64}});
-    CHECK(events[2] == Event{start, Note{99, 100, q / 2, 70}});
+    // All from the one take recorded.
+    CHECK(events[0] == Event{oldTick, ControlChange{11, 80}, 1});
+    CHECK(events[1] == Event{oldTick, Note{88, 90, start - oldTick, 64}, 1});
+    CHECK(events[2] == Event{start, Note{99, 100, q / 2, 70}, 1});
 }
 
 TEST_CASE("the metronome set to always clicks in plain playback, and set to while recording "
@@ -614,8 +615,10 @@ TEST_CASE("recording a loop ends each pass as it wraps, a pass with nothing play
     CHECK(pass->pass == 1u);
     CHECK(pass->tracks == std::vector{id});
     song = pass->song;
+    // In replace, each pass is a take, and what plays notes it.
+    const std::uint32_t first = mode == RecordMode::Replace ? 1 : 0;
     CHECK(std::vector<Event>(song.events(id).all().begin(), song.events(id).all().end()) ==
-          std::vector<Event>{{on, Note{60, 100, off - on, 100}}});
+          std::vector<Event>{{on, Note{60, 100, off - on, 100}, first}});
     p.player.update(song);
 
     // The second: nothing played, so passed over, leaving the first.
@@ -643,10 +646,14 @@ TEST_CASE("recording a loop ends each pass as it wraps, a pass with nothing play
     const auto stop = again + std::get<Note>(events.back().data).duration;
     CHECK(stop >= off);
     CHECK(stop < 2 * q);
-    std::vector<Event> expected{{again, Note{64, 100, stop - again}}};
+    std::vector<Event> expected{{again, Note{64, 100, stop - again}, first == 0 ? 0u : 2u}};
     if (mode == RecordMode::Overdub)
         expected.insert(expected.begin(), {on, Note{60, 100, off - on, 100}});
     CHECK(std::vector<Event>(events.begin(), events.end()) == expected);
+    // Both passes kept as takes in replace, the second playing; none in overdub.
+    const auto* part = last->song.sections()[0]->content(id);
+    REQUIRE(part != nullptr);
+    CHECK(part->takes.size() == (mode == RecordMode::Replace ? 2u : 0u));
     CHECK_FALSE(p.player.recordingPass());
 }
 

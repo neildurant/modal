@@ -6,6 +6,12 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Takes, step b: replace recordings make takes, 26 November 2026
+
+`Recorder::finish`, in replace mode, keeps what was played as a take in each section it was played in (`keepTakes`), over that section's part of the span, and tags the part's matching events; what it replaced from no take goes into the section's Before take. This covers linear recording, punching and each loop pass, as they all finish through the recorder. Overdub is unchanged. Still nothing shows but the saved file's `take` lines, so no trial yet: choosing takes (step c) is the first thing to try.
+
+**Validation.** `recorder_test.cpp`, at every test PPQN: a replace recording over a hand-entered note gives Before and take 2 with the part tagged, and a second recording over it a third take with Before unchanged; a recording crossing three sections gives a take in the two played in, with one recording time; an overdub keeps none. `player_test.cpp`'s loop-recording test now checks each replace pass is a take (two takes, the last playing) and none in overdub. Existing recorder tests compare what plays without the take (`eventsOf`); two exact comparisons in `player_test.cpp` and `recording_session_test.cpp` now expect take 1. **Pending:** the WSL Clang build for steps a and b, stopped for low memory.
+
 ### Takes, step a: takes per section and track, saved with the song, 25 November 2026
 
 The model for basic take management, as agreed (design.md, Takes): `Take` (id, span, `before`, `recorded`, its events) in `TrackContent::takes`, and `Event::take`, the id of the take an event came from, 0 for none. `Song::updatePart` edits one track's part of one section directly, its events and takes, for recording to keep takes in step b. Tags naming no take of their part are cleared wherever content changes (`updateContent`, and the flattened source in `setSource`, so an event moved to another section forgets its take). Takes follow time edits: `contentBetween` cuts them (splitting, shortening, removing bars), and `joinSections` merges the pieces of one take again or renumbers a clashing one with its events' tags (joining, inserting and removing bars). Saving and reading: `take=N` on events, `take N [before] FROM TO [recorded=S]` blocks with their events, validated on reading, and rescaled with the song. Nothing shows yet: there's no user-visible change, so no trial or manual. The take id makes `Event` 48 bytes, from 40, and the size check in `event_test.cpp` now allows that.

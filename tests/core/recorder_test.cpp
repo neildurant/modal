@@ -63,10 +63,16 @@ StampedInput stamped(nanoseconds songTime, const Bytes& bytes, InputId input = k
     return result;
 }
 
+// What a track plays, without the takes its events note, which take_test.cpp checks.
 std::vector<Event> eventsOf(const Song& song, TrackId id)
 {
-    const auto events = song.events(id).all();
-    return {events.begin(), events.end()};
+    std::vector<Event> events;
+    for (auto event : song.events(id).all())
+    {
+        event.take = 0;
+        events.push_back(std::move(event));
+    }
+    return events;
 }
 
 Event note(Tick tick, std::uint8_t pitch, Tick duration, std::uint8_t velocity = 100,
@@ -540,4 +546,120 @@ TEST_CASE("a take writing a ramp's controller in its span removes the ramp, and 
     CHECK(result.ramps(id)[0].lane == expression);
     CHECK(std::ranges::count(eventsOf(result, id), cc(q + q / 2, 1, 64)) == 1);
     CHECK(song.ramps(id).size() == 2); // the song recorded onto is unchanged
+}
+
+namespace
+{
+
+const TrackContent& partOf(const Song& song, TrackId id, std::size_t section = 0)
+{
+    const auto* part = song.sections()[section]->content(id);
+    REQUIRE(part != nullptr);
+    return *part;
+}
+
+} // namespace
+
+TEST_CASE("a replace recording is kept as a take, and what it replaced from no take as Before")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick bar = ppqn.whole(); // 2 s at 120 BPM
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+    song.updateEvents(id, [&](EventList& events)
+                      { events.insert(note(bar, 40, q)); }); // entered by hand, in bar 2
+
+    Recorder first{song, kPlay, bar};
+    first.receive(stamped(2000ms, {0x90, 60, 100}));
+    first.receive(stamped(2500ms, {0x80, 60, 64}));
+    const auto once = first.finish(2 * bar);
+    {
+        const auto& part = partOf(once, id);
+        REQUIRE(part.takes.size() == 2);
+        const auto& before = part.takes[0];
+        CHECK(before.before);
+        CHECK(before.from == bar);
+        CHECK(before.to == 2 * bar);
+        CHECK(before.recorded == 0);
+        CHECK(std::vector<Event>(before.events.all().begin(), before.events.all().end()) ==
+              std::vector<Event>{note(bar, 40, q)});
+        const auto& take = part.takes[1];
+        CHECK_FALSE(take.before);
+        CHECK(take.from == bar);
+        CHECK(take.to == 2 * bar);
+        CHECK(take.recorded > 0);
+        CHECK(std::vector<Event>(take.events.all().begin(), take.events.all().end()) ==
+              std::vector<Event>{note(bar, 60, q, 100, 64)});
+        REQUIRE(once.events(id).size() == 1);
+        CHECK(once.events(id)[0].take == take.id);
+    }
+
+    // Again over the same bar: another take, and Before as it was, as what it replaced was
+    // the first take's.
+    Recorder second{once, kPlay, bar};
+    second.receive(stamped(2000ms, {0x90, 62, 100}));
+    second.receive(stamped(2500ms, {0x80, 62, 64}));
+    const auto twice = second.finish(2 * bar);
+    const auto& part = partOf(twice, id);
+    REQUIRE(part.takes.size() == 3);
+    CHECK(part.takes[0] == partOf(once, id).takes[0]);
+    CHECK(part.takes[1] == partOf(once, id).takes[1]);
+    CHECK(part.takes[2].id == 3);
+    REQUIRE(twice.events(id).size() == 1);
+    CHECK(twice.events(id)[0] == Event{bar, Note{62, 100, q, 64}, 3});
+}
+
+TEST_CASE("a recording crossing sections is a take in each it was played in")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick bar = ppqn.whole();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+    song.splitSection(2 * bar, "B");
+    song.splitSection(3 * bar, "C");
+
+    // From bar 2 to bar 5, played in bars 2 and 3 only.
+    Recorder recorder{song, kPlay, bar};
+    recorder.receive(stamped(3000ms, {0x90, 60, 100}));
+    recorder.receive(stamped(3500ms, {0x80, 60, 64}));
+    recorder.receive(stamped(5000ms, {0x90, 62, 100}));
+    recorder.receive(stamped(5500ms, {0x80, 62, 64}));
+    const auto result = recorder.finish(4 * bar);
+
+    const auto& a = partOf(result, id, 0);
+    REQUIRE(a.takes.size() == 1);
+    CHECK(a.takes[0].from == bar);
+    CHECK(a.takes[0].to == 2 * bar);
+    CHECK(a.takes[0].events.size() == 1);
+    const auto& b = partOf(result, id, 1);
+    REQUIRE(b.takes.size() == 1);
+    CHECK(b.takes[0].from == 0);
+    CHECK(b.takes[0].to == bar);
+    CHECK(b.takes[0].events[0].tick == 2 * q);           // 5 s, half a bar into B
+    CHECK(a.takes[0].recorded == b.takes[0].recorded);   // one recording
+    CHECK(result.sections()[2]->content(id) == nullptr); // nothing played in C
+    REQUIRE(result.events(id).size() == 2);
+    CHECK(result.events(id)[0].take == 1);
+    CHECK(result.events(id)[1].take == 1);
+}
+
+TEST_CASE("an overdub adds to the part and keeps no take")
+{
+    const auto ppqn = MODAL_ANY_PPQN();
+    const Tick bar = ppqn.whole();
+    const Tick q = ppqn.quarter();
+    Song song = songAt(ppqn);
+    const auto id = addTrack(song, 1);
+    song.updateEvents(id, [&](EventList& events) { events.insert(note(bar, 40, q)); });
+
+    Recorder recorder{song, kPlay, bar, RecordMode::Overdub};
+    recorder.receive(stamped(2500ms, {0x90, 60, 100}));
+    recorder.receive(stamped(3000ms, {0x80, 60, 64}));
+    const auto result = recorder.finish(2 * bar);
+    CHECK(partOf(result, id).takes.empty());
+    REQUIRE(result.events(id).size() == 2);
+    CHECK(result.events(id)[0].take == 0);
+    CHECK(result.events(id)[1].take == 0);
 }

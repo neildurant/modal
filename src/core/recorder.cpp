@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <map>
+#include <span>
 #include <utility>
 
 namespace modal::core
@@ -13,6 +14,13 @@ namespace
 {
 
 using std::chrono::nanoseconds;
+
+std::int64_t secondsNow()
+{
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
 
 constexpr std::uint8_t kPedalDown = 64;                    // values from this up hold a pedal down
 constexpr std::array<std::uint8_t, 3> kPedals{64, 66, 67}; // sustain, sostenuto, soft
@@ -80,6 +88,7 @@ Recorder::Recorder(Song song, std::uint64_t play, Tick start, RecordMode mode,
     , play_(play)
     , start_(start)
     , mode_(mode)
+    , recorded_(secondsNow())
 {
     for (const auto& track : song_.tracks())
     {
@@ -259,6 +268,7 @@ Recorder Recorder::nextPass(Tick start) const
 {
     Recorder next = *this;
     next.start_ = start;
+    next.recorded_ = secondsNow();
     next.partial_.clear();
     for (auto& take : next.takes_)
     {
@@ -330,13 +340,106 @@ Song Recorder::finish(Song song, Tick stop) const
                 song.removeRamp(take.track, r);
             }
         }
-        song.updateEvents(take.track,
-                          [&](EventList& events) { events = applied(events, take, stop); });
+        std::vector<Event> played;
+        std::vector<Event> removed;
+        song.updateEvents(take.track, [&](EventList& events)
+                          { events = applied(events, take, stop, played, removed); });
+        if (mode_ == RecordMode::Replace)
+        {
+            keepTakes(song, take.track, played, removed, stop);
+        }
     }
     return song;
 }
 
-EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick stop) const
+void Recorder::keepTakes(Song& song, TrackId track, std::span<const Event> played,
+                         std::span<const Event> removed, Tick stop) const
+{
+    for (std::size_t i = 0; i < song.sections().size(); ++i)
+    {
+        const Tick sectionStart = song.sectionStart(i);
+        const Tick from = std::max(start_, sectionStart);
+        const Tick to = std::min(stop, song.sectionStart(i + 1));
+        if (from >= to)
+        {
+            continue;
+        }
+        // Positioned from the section's start.
+        const auto within = [&](std::span<const Event> events)
+        {
+            EventList part;
+            for (auto event : events)
+            {
+                if (event.tick >= from && event.tick < to)
+                {
+                    event.tick -= sectionStart;
+                    event.take = 0;
+                    part.insert(std::move(event));
+                }
+            }
+            return part;
+        };
+        auto take = within(played);
+        auto before = within(removed);
+        if (take.empty() && before.empty())
+        {
+            continue;
+        }
+        song.updatePart(
+            i, track,
+            [&](TrackContent& part)
+            {
+                if (!before.empty())
+                {
+                    const auto it = std::ranges::find(part.takes, true, &Take::before);
+                    if (it == part.takes.end())
+                    {
+                        part.takes.insert(part.takes.begin(),
+                                          Take{part.nextTakeId(), from - sectionStart,
+                                               to - sectionStart, true, 0, std::move(before)});
+                    }
+                    else
+                    {
+                        it->from = std::min(it->from, from - sectionStart);
+                        it->to = std::max(it->to, to - sectionStart);
+                        for (const auto& event : before.all())
+                        {
+                            it->events.insert(event);
+                        }
+                    }
+                }
+                if (take.empty())
+                {
+                    return;
+                }
+                const auto id = part.nextTakeId();
+                // The events played, in the part, note the take; each is matched once.
+                std::vector<bool> tagged(part.events.size(), false);
+                for (const auto& event : take.all())
+                {
+                    // Only those at its tick, as the preview does this on every frame.
+                    const auto at = part.events.startingIn(event.tick, event.tick + 1);
+                    const auto first =
+                        static_cast<std::size_t>(at.data() - part.events.all().data());
+                    for (std::size_t e = first; e < first + at.size(); ++e)
+                    {
+                        const auto& candidate = part.events[e];
+                        if (!tagged[e] && candidate.take == 0 && candidate.data == event.data)
+                        {
+                            part.events.setTake(e, id);
+                            tagged[e] = true;
+                            break;
+                        }
+                    }
+                }
+                part.takes.push_back(Take{id, from - sectionStart, to - sectionStart, false,
+                                          recorded_, std::move(take)});
+            });
+    }
+}
+
+EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick stop,
+                            std::vector<Event>& played, std::vector<Event>& replaced) const
 {
     // The take, kept to [start, stop), with what was held at the record point starting there.
     PedalState takeAtStart;
@@ -409,6 +512,10 @@ EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick
                 setEnd(old.back(), start_);
             }
         }
+        else if (event.take == 0)
+        {
+            replaced.push_back(event);
+        }
     }
     std::vector<Event> upAtStart;
     std::vector<Event> downAtStop;
@@ -431,6 +538,8 @@ EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick
     }
 
     resolveOverlaps(old, recorded);
+    played.insert(played.end(), heldAtStart.begin(), heldAtStart.end());
+    played.insert(played.end(), recorded.begin(), recorded.end());
 
     // At each tick, non-note events keep this order, and notes follow them.
     std::vector<Event> all;

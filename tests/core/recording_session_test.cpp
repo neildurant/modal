@@ -127,7 +127,7 @@ TEST_CASE("a recording session keeps its take pending until one acknowledged und
     CHECK_FALSE(r.session.fileOperationRefusal());
     CHECK(r.session.tracks().empty());
     REQUIRE(r.document.underlying().events(r.lead()).size() == 1);
-    CHECK(r.document.underlying().events(r.lead())[0] == Event{q / 2, Note{60, 100, q, 70}});
+    CHECK(r.document.underlying().events(r.lead())[0] == Event{q / 2, Note{60, 100, q, 70}, 1});
     const auto version = r.document.version();
     CHECK_FALSE(r.session.finish({}, "Again"));
     CHECK(r.document.version() == version);
