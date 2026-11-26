@@ -1404,6 +1404,7 @@ private:
     CommandResult togglePunch();
     // ]t and [t: the cursor's section and track's next or previous take, going round.
     CommandResult stepTake(int count, bool forward);
+    CommandResult removeTakes(bool keepOnly);
     std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
     // Says why, when a key's edit has cleared the song's punch range, as it left it nowhere: the
     // song it had before the key, and its range then.

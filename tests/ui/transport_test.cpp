@@ -3027,7 +3027,40 @@ TEST_CASE(
     p.type(U" ");
     p.runFor(10ms);
 
+    const auto takeCount = [&]
+    {
+        const auto* part = p.document.song().sections()[0]->content(keys);
+        return part ? part->takes.size() : 0;
+    };
+    // Discard Before, the first take, so the next performance plays in its place.
+    p.type(U",kd");
+    CHECK(p.ws.message() == "Discarded the take on Keys in A");
+    CHECK(pitches() == std::vector{60});
+    CHECK(takeCount() == 2);
+    p.type(U"u");
+    CHECK(pitches() == std::vector{50});
+    CHECK(takeCount() == 3);
+
+    p.type(U"]t,ko");
+    CHECK(p.ws.message() == "Kept only this take on Keys in A");
+    CHECK(pitches() == std::vector{60});
+    REQUIRE(takeCount() == 1);
+    p.type(U",ko");
+    CHECK(p.ws.message() == "Only one take on Keys in A");
+    p.type(U"u");
+    CHECK(takeCount() == 3);
+    CHECK(pitches() == std::vector{60});
+    p.type(U",ko,kd");
+    CHECK(p.ws.message() == "Discarded the take on Keys in A. No takes left");
+    CHECK(takeCount() == 0);
+    CHECK(pitches().empty());
+    p.type(U"u");
+    CHECK(takeCount() == 1);
+    CHECK(pitches() == std::vector{60});
+
     // Another section, with none.
     p.type(U"]s]t");
+    CHECK(p.ws.message() == "No takes on Keys in B");
+    p.type(U",kd");
     CHECK(p.ws.message() == "No takes on Keys in B");
 }

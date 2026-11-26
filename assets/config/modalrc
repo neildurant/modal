@@ -151,10 +151,13 @@ vmap <leader>Pd punch-clear       "Clear the punch range"
 
 " Takes: each replace recording is kept as a take of its section on the track, with what it
 " replaced as Before. ]t and [t choose the next take and the one before, going round, heard at
-" once, even while playing.
+" once, even while playing. The Takes group keeps only the playing take or discards it.
 keysection "Takes"
 nmap ]t         take-next         "Next take"
 nmap [t         take-previous     "Take before"
+ngroup <leader>k "Takes"
+nmap <leader>ko take-keep-only    "Keep only this take"
+nmap <leader>kd take-discard      "Discard this take"
 
 " Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
 " there, and after an operator is the range to it (d'a); '' goes back to before the last jump.

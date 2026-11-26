@@ -142,6 +142,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return togglePunch();
                 if (name == "take-next" || name == "take-previous")
                     return stepTake(call.count, name == "take-next");
+                if (name == "take-keep-only" || name == "take-discard")
+                    return removeTakes(name == "take-keep-only");
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);

@@ -27,4 +27,18 @@ std::optional<std::uint32_t> playingTake(const TrackContent& part, Tick at);
 // recording's would be. Returns false, changing nothing, if there's no such take.
 bool chooseTake(Song& song, std::size_t section, TrackId track, std::uint32_t take);
 
+// Discards every take of a track's part of a section but one, Before too; events still playing
+// from those discarded stay, noting none. Returns how many went, none if there's no such take.
+std::size_t keepOnlyTake(Song& song, std::size_t section, TrackId track, std::uint32_t take);
+
+// Discards a take and removes the events noting it. Chooses the take before it, or the one
+// after if it was first, over that replacement's span. Returns the take chosen instead, if
+// any; nothing changes if there's no such take.
+struct Discarded
+{
+    bool done = false;
+    std::optional<std::uint32_t> instead;
+};
+Discarded discardTake(Song& song, std::size_t section, TrackId track, std::uint32_t take);
+
 } // namespace modal::core

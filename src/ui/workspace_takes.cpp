@@ -83,4 +83,42 @@ CommandResult Workspace::stepTake(int count, bool forward)
     return {true, message};
 }
 
+CommandResult Workspace::removeTakes(bool keepOnly)
+{
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
+    const auto track = view().cursor().track;
+    if (!track)
+        return CommandResult::error("Go to a track to manage its takes");
+    const auto& song = document_.song();
+    const auto tick = view().cursor().tick;
+    const auto index = song.sectionAt(tick);
+    const auto& section = *song.sections()[index];
+    const auto where = " on " + trackName(song, *track) + " in " + section.name();
+    const auto* part = section.content(*track);
+    if (part == nullptr || part->takes.empty())
+        return {false, "No takes" + where, false, true};
+    const auto playing = core::playingTake(*part, tick - song.sectionStart(index));
+    if (!playing)
+        return {false, "No take playing" + where, false, true};
+
+    if (keepOnly)
+    {
+        if (part->takes.size() == 1)
+            return {false, "Only one take" + where, false, true};
+        const bool changed =
+            document_.edit("Keep only this take" + where, view().place(), [&](core::Song& edited)
+                           { core::keepOnlyTake(edited, index, *track, *playing); });
+        return {changed, changed ? "Kept only this take" + where : ""};
+    }
+
+    core::Discarded discarded;
+    const bool changed =
+        document_.edit("Discard take" + where, view().place(), [&](core::Song& edited)
+                       { discarded = core::discardTake(edited, index, *track, *playing); });
+    if (!changed)
+        return {false, ""};
+    return {true, "Discarded the take" + where + (discarded.instead ? "" : ". No takes left")};
+}
+
 } // namespace modal::ui

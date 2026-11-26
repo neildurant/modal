@@ -304,3 +304,55 @@ TEST_CASE("the take playing is the one noted whose span holds the time, or the l
     REQUIRE(t.song.updatePart(0, t.track, [](TrackContent& part) { part.events = {}; }));
     CHECK_FALSE(playingTake(t.part(), 0));
 }
+
+TEST_CASE("keeping only the playing take preserves the part and clears other take tags")
+{
+    Takes t{MODAL_ANY_PPQN()};
+    REQUIRE(t.song.updatePart(0, t.track,
+                              [&](TrackContent& part)
+                              {
+                                  part.takes[0].before = true;
+                                  part.events.insert({3 * t.bar, t.note(50), 1});
+                              }));
+    CHECK(keepOnlyTake(t.song, 0, t.track, 2) == 1);
+    REQUIRE(t.part().takes.size() == 1);
+    CHECK(t.part().takes.front().id == 2);
+    CHECK(t.tags() == Tags{{0, 0}, {2, 2}, {3, 2}, {3, 0}, {4, 2}});
+    CHECK(keepOnlyTake(t.song, 0, t.track, 2) == 0);
+    CHECK(keepOnlyTake(t.song, 0, t.track, 1) == 0);
+}
+
+TEST_CASE("discarding a take clears its whole performance and chooses a neighbouring take")
+{
+    Takes t{MODAL_ANY_PPQN()};
+    SECTION("a shorter preceding take leaves no events from the discarded take outside its span")
+    {
+        REQUIRE(t.song.updatePart(0, t.track,
+                                  [&](TrackContent& part)
+                                  {
+                                      auto& first = part.takes.front();
+                                      first.to = 3 * t.bar;
+                                      first.events = {};
+                                      first.events.insert({2 * t.bar, t.note(50)});
+                                      part.events.insert({4 * t.bar, t.note(70)});
+                                  }));
+        const auto discarded = discardTake(t.song, 0, t.track, 2);
+        CHECK(discarded.done);
+        CHECK(discarded.instead == 1u);
+        CHECK(t.tags() == Tags{{0, 0}, {2, 1}, {4, 0}});
+    }
+    SECTION(
+        "discarding the first chooses the next, then discarding the last leaves ordinary events")
+    {
+        REQUIRE(chooseTake(t.song, 0, t.track, 1));
+        const auto first = discardTake(t.song, 0, t.track, 1);
+        CHECK(first.done);
+        CHECK(first.instead == 2u);
+        CHECK(t.tags() == Tags{{0, 0}, {2, 2}, {3, 2}, {4, 2}});
+        const auto last = discardTake(t.song, 0, t.track, 2);
+        CHECK(last.done);
+        CHECK_FALSE(last.instead);
+        CHECK(t.tags() == Tags{{0, 0}});
+        CHECK_FALSE(discardTake(t.song, 0, t.track, 2).done);
+    }
+}

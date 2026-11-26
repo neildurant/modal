@@ -6,9 +6,13 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
-### Takes, step d: keeping and discarding takes, started 26 November 2026
+### Takes, step d: keeping and discarding takes, 26 November 2026
 
-Not on `main` yet. The branch `takes-discard-wip` holds a first draft of the core functions, `keepOnlyTake` and `discardTake` in `takes.hpp` / `takes.cpp`, **not yet built or tested**. Still to do: build and test them, then the `, k` group (`, k o` keeps only the take playing, `, k d` discards it) in the workspace and `modalrc`, the messages, tests driving the keys, and the docs; then a desktop trial. Choices in the draft, to raise at the trial: `, k o` discards Before too, events still playing from discarded takes staying as ordinary events; `, k d` chooses the take before (or after, if first) in its place, and discarding the only take removes its events, as if never recorded.
+The Takes leader group has `, k o` to keep only the playing take and `, k d` to discard it, each as an undo step. Both act on the cursor's section and track. Keeping only a take leaves the sound as it was and clears the tags on events still playing from discarded takes. Discarding removes all events tagged with that take and chooses the preceding take over its own span, or the next if the discarded take was first. Core changes the part in one edit even when the spans differ. The grammar and design describe the behaviour. Pending: desktop trial and the manual (step g).
+
+**Validation.** Native Linux GCC and Clang Debug each built and passed 1,346 tests, with three MIDI tests skipped in each. Whole-tree formatting passed. Core tests cover both operations at both test PPQNs, including a shorter replacement and discarding the last take. The Workspace test drives the keys after actual replace passes through the fake-clock transport, checking the messages, playing notes and undo.
+
+**To try:** record two or three replace passes over a section with hand-entered notes. Stop and use `, k d` to hear the preceding take. Undo with `u`, choose a performance with `[t` or `]t`, and use `, k o` to keep it. Check that it still sounds the same and `]t` has no other take to choose. Then use `, k d` to remove the sole remaining take and `u` to bring it back. Try the same in a section with both a whole-section take and a one-bar punch.
 
 ### Takes, step c: `]t` and `[t` choose a take, 26 November 2026
 
