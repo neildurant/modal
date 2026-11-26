@@ -1891,11 +1891,11 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
             }
             for (const auto& range : content->comp)
             {
-                const auto from = scale(range.from);
-                const auto to = scale(range.to);
-                if (from < to)
+                const auto scaledFrom = scale(range.from);
+                const auto scaledTo = scale(range.to);
+                if (scaledFrom < scaledTo)
                 {
-                    scaled.comp.push_back({from, to, range.take});
+                    scaled.comp.push_back({scaledFrom, scaledTo, range.take});
                 }
             }
             for (auto ramp : content->ramps)

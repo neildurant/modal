@@ -5600,13 +5600,13 @@ void PianoRollView::addRegions(Frame& frame) const
     }
     frame.push_back(std::move(keyRuler));
     frame.push_back(std::move(ruler));
-    if (const int rows = takeRows(); rows > 0)
+    if (const int laneRows = takeRows(); laneRows > 0)
     {
         auto takeScale = scale;
         takeScale.x = keyWidth;
         const auto lanes = takeLaneDisplay(song, cursor(), host_.takeChoice());
-        frame.push_back(takeLanes(lanes, {main.x, notesTop - rows * h, main.width, rows * h},
-                                  takeScale, cell_));
+        frame.push_back(takeLanes(
+            lanes, {main.x, notesTop - laneRows * h, main.width, laneRows * h}, takeScale, cell_));
     }
     if (rulerHeight > kRulerRows * h && notesHeight > 0)
     {
