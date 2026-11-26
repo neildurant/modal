@@ -248,7 +248,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Takes per section and track, the take on each event, saved with the song.
     - [x] **Done** — Replace recordings make takes: Before, and each loop pass. Accepted on trial.
     - [x] **Done** — `]t` / `[t` choose a take, stopped or playing. Accepted on trial.
-    - [ ] **Doing** — `, k o` keeps only the take playing; `, k d` discards it. Desktop trial pending. See [status.md](status.md).
+    - [ ] **Doing** — `, k o` keeps only the take playing; `, k d` discards it. Desktop MIDI trial deferred. See [status.md](status.md).
     - [ ] **To do** — Showing takes in the arrangement, section strip, piano roll and event list, settled from renders.
     - [ ] **To do** — Palette support for takes.
     - [ ] **To do** — Manual updates and final validation.

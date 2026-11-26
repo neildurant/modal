@@ -1,0 +1,38 @@
+modal-song 1
+song "Take trial" ppqn=960
+
+track 1 "Keys" ch=1 grid=1/8
+track 2 "Bass" ch=2 grid=1/8
+
+section "Verse" bars=4
+  meter 1:1:0 4/4
+  tempo 1:1:0 100
+  track 1
+    1:1:0 note E4 v=90 len=1/4 take=2
+    2:1:0 note G4 v=90 len=1/4 take=2
+    3:1:0 note C5 v=95 len=1/8 take=3
+    3:2:0 note A4 v=85 len=1/8 take=3
+    4:1:0 note C4 v=80 len=1/2
+    take 1 before 1:1:0 4:1:0
+      1:1:0 note C4 v=80 len=1/4
+      2:1:0 note D4 v=80 len=1/4
+      3:1:0 note E4 v=80 len=1/4
+    take 2 1:1:0 4:1:0 recorded=1764095460
+      1:1:0 note E4 v=90 len=1/4
+      2:1:0 note G4 v=90 len=1/4
+      3:1:0 note B4 v=90 len=1/4
+    take 3 3:1:0 4:1:0 recorded=1764095520
+      3:1:0 note C5 v=95 len=1/8
+      3:2:0 note A4 v=85 len=1/8
+  track 2
+    1:1:0 note C2 v=85 len=1/2 take=1
+    2:1:0 note G2 v=85 len=1/2 take=1
+    take 1 1:1:0 3:1:0 recorded=1764095580
+      1:1:0 note C2 v=85 len=1/2
+      2:1:0 note G2 v=85 len=1/2
+
+section "Outro" bars=2
+  meter 1:1:0 4/4
+  tempo 1:1:0 100
+  track 1
+    1:1:0 note C4 v=80 len=1/2
