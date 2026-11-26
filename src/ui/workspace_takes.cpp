@@ -69,8 +69,11 @@ CommandResult Workspace::stepTake(int count, bool forward)
     const auto start = song.sectionStart(index);
     const auto span = barsText(song, start + chosen.from, start + chosen.to);
     const auto id = chosen.id;
-    document_.edit(title, view().place(),
-                   [&](core::Song& edited) { core::chooseTake(edited, index, *track, id); });
+    if (document_.edit(title, view().place(),
+                       [&](core::Song& edited) { core::chooseTake(edited, index, *track, id); }))
+    {
+        refresh();
+    }
     const auto message = "Take " + number + " of " + std::to_string(size) + where + ", " + span;
     return {true, message};
 }
@@ -101,6 +104,10 @@ CommandResult Workspace::removeTakes(bool keepOnly)
         const bool changed =
             document_.edit("Keep only this take" + where, view().place(), [&](core::Song& edited)
                            { core::keepOnlyTake(edited, index, *track, *playing); });
+        if (changed)
+        {
+            refresh();
+        }
         return {changed, changed ? "Kept only this take" + where : ""};
     }
 
@@ -110,6 +117,7 @@ CommandResult Workspace::removeTakes(bool keepOnly)
                        { core::discardTake(edited, index, *track, *playing); });
     if (!changed)
         return {false, ""};
+    refresh();
     return {true, "Discarded the take" + where + (lastTake ? ". No takes left" : "")};
 }
 

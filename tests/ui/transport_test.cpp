@@ -3063,3 +3063,57 @@ TEST_CASE("the take keys choose among a section's stack in order")
     p.type(U",kd");
     CHECK(p.ws.message() == "No takes on Keys in B");
 }
+
+TEST_CASE("discarding takes repeatedly refreshes the event list before drawing")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto keys = song.tracks()[0]->id();
+    const auto bar = ppqn.whole();
+    const auto beat = ppqn.quarter();
+    const auto to = bar + 2 * beat;
+    REQUIRE(song.updatePart(0, keys,
+                            [&](core::TrackContent& part)
+                            {
+                                core::Take earlier{1, bar, to, 1, {}};
+                                earlier.events.insert({bar, core::Note{71, 90, beat}});
+                                core::Take later{2, bar, to, 2, {}};
+                                later.events.insert({bar, core::Note{72, 90, beat}});
+                                later.events.insert({bar + beat, core::Note{69, 90, beat}});
+                                part.takes = {earlier, later};
+                                part.events.insert({to, core::Note{60, 90, beat}});
+                            }));
+    Playing p{std::move(song)};
+    p.type(U"galge");
+    REQUIRE(p.view.cursor().tick == bar);
+    REQUIRE(p.document.song().events(keys).size() == 3);
+
+    const auto shows = [&](std::u32string_view text)
+    {
+        const auto frame = p.ws.frame();
+        return std::ranges::any_of(frame.front().text,
+                                   [&](const TextRun& run) { return contains(run.text, text); });
+    };
+    p.type(U"[t");
+    CHECK(shows(U"B4"));
+    CHECK_FALSE(shows(U"C5"));
+    CHECK(p.view.cursor().tick == bar);
+    p.type(U"u");
+
+    p.type(U",kd");
+    CHECK(shows(U"B4"));
+    CHECK_FALSE(shows(U"C5"));
+    CHECK(p.view.cursor().tick == bar);
+    p.type(U",kd");
+    CHECK(p.ws.message() == "Discarded the take on Keys in A. No takes left");
+    CHECK_FALSE(shows(U"B4"));
+    CHECK(shows(U"C4"));
+    CHECK(p.view.cursor().tick == bar);
+
+    const auto version = p.document.version();
+    p.type(U",kd");
+    CHECK(p.ws.message() == "No takes on Keys in A");
+    CHECK(p.document.version() == version);
+    p.type(U"u");
+    CHECK(shows(U"B4"));
+}
