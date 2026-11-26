@@ -36,6 +36,8 @@ The local stack implementation stores take sources and range choices in format 2
 
 **Per-track validation.** GCC and Clang Debug each passed 1,353 tests, with three MIDI tests skipped. Workspace tests check both views, independent expansion, stable row positions, bar movement, preview cancellation and Visual range handling. Whole-tree formatting passed and the manual built in HTML and PDF.
 
+**Take label colours.** The per-track appearance was accepted. The left-hand lane labels now use their take's colour in both views, with grey retained for inactive spans. The offscreen renders are in `build/review/takes/coloured-labels-*.png`. GCC and Clang Debug each passed 1,353 tests, with three MIDI tests skipped. Whole-tree formatting passed and the manual built in HTML and PDF. The label refinement is ready for desktop review.
+
 **Section counts and event sources.** Open the saved fixture and check that the arrangement shows `Verse · 4 takes`, three on Keys and one on Bass. Open the event list on Keys with `ge` and check the coloured `T2` and `T3` cells, and the empty cells for bars 4 and 5. Narrow windows retain the editing columns. Offscreen renders are in `build/review/takes` as `section-count*.png`, `event-source.png`, `event-source-compact.png` and `take-palette-piano.png`. GCC and Clang Debug each passed 1,351 tests, with three MIDI tests skipped. Whole-tree formatting passed. The recording chapter describes the display and both HTML and PDF built. The take display was accepted on 27 November 2026. The real MIDI recording trial remains pending. Next is the take-lane and range-comping step in the schedule.
 
 ### Takes, step d: keeping and discarding takes, 26 November 2026

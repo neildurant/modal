@@ -118,7 +118,7 @@ Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, C
         panel.text.push_back({(indent ? 4 : 1) * cell.width,
                               y,
                               decodeUtf8("T" + std::to_string(i + 1)),
-                              {Role::BarText, Role::Background, kPlain}});
+                              {colour, Role::Background, kBold}});
     }
     if (indent)
     {

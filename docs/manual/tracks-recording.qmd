@@ -523,8 +523,9 @@ column is hidden.
 
 Open the take lanes with `, k c` (choose) in the arrangement or the piano
 roll. The lanes open beneath the current track in the arrangement, or below
-the piano-roll ruler. Each lane shows the stored performance. Coloured
-spans play, and grey spans are alternatives you can choose.
+the piano-roll ruler. Each lane shows the stored performance, with its
+label in the take's colour. Coloured spans play, and grey spans are
+alternatives you can choose.
 
 Use `, k v` (view) to keep a track's lanes visible while you mark the
 range. In the arrangement, `K` also toggles them, and the `K` indicator

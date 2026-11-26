@@ -3246,7 +3246,7 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
         {
             if (std::ranges::any_of(
                     region.text, [](const TextRun& run)
-                    { return run.text == U"T1" && run.style.foreground == Role::BarText; }))
+                    { return run.text == U"T1" && run.style.foreground == Role::Take1; }))
                 return true;
         }
         return false;
@@ -3337,7 +3337,7 @@ TEST_CASE("arrangement take lanes belong to tracks and keep their rows while nav
         {
             if (std::ranges::any_of(
                     region.text, [](const TextRun& run)
-                    { return run.text == U"T1" && run.style.foreground == Role::BarText; }))
+                    { return run.text == U"T1" && run.style.foreground == Role::Take1; }))
                 y.push_back(region.bounds.y);
         }
         return y;
