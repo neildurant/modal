@@ -893,6 +893,10 @@ At the join, preserve held notes and established controller state by default. A 
 
 Decided 26 November 2026 to start the stack in format 2 without take migration. Only disposable test songs used the earlier take data. Keep format 1 for ordinary songs and give an explicit error for its old take blocks or tags.
 
+Decided 27 November 2026 to revisit the take shortcuts after take lanes are visible. Choosing across a take's full span can overwrite an existing punch choice, and choosing the previous take then the next does not restore that punch. With the source spans visible, auditioning a take and assigning a source to a range can be reviewed as separate actions.
+
+Decided 27 November 2026 to keep the event list's source colour in the Take column, using the timeline palette. The default tints cycle through blue, violet, teal and green, leaving orange available for selection. The section strip counts all takes stored on its tracks so it also indicates alternatives that the current playback does not use.
+
 ## Loop playback (24 November 2026)
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).

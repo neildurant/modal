@@ -499,7 +499,21 @@ Modal reports it, and an overflow stops safely rather than presenting an
 incomplete performance as an ordinary successful take. Check warnings before
 accepting the result.
 
-This edition supports linear recording, overdubbing, punch recording and loop
-recording. A library of alternate takes is not available yet. Here “take”
-means the performance made between a recording start and stop, or one pass
-of a loop.
+## Seeing which take plays {#sec-showing-takes}
+
+Replace recordings keep alternate performances as numbered takes. Each take
+belongs to one track in one section. A recording across a section boundary
+creates a separate take in each section where it records or replaces MIDI.
+The section strip counts those stored takes across its tracks, including
+takes that are currently silent.
+
+For example, if a two-bar punch replaces the end of an earlier phrase, the
+arrangement and piano-roll ruler show the earlier take up to the punch and
+the punch take for its full range, including any rests. The piano-roll
+header shows which take receives edits at the cursor. Where ordinary MIDI
+plays, that destination is the part itself.
+
+In the event list, the **Take** column identifies the source of each event
+using the same labels and colours as the ruler. Ordinary MIDI has an empty
+Take cell. In a narrow window the editing fields take priority, and the
+column is hidden.

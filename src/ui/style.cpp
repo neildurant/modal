@@ -61,6 +61,10 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "indicator-rewind",
     "indicator-input",
     "message-line",
+    "take-1",
+    "take-2",
+    "take-3",
+    "take-4",
 };
 
 std::optional<int> hexDigit(char c)

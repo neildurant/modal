@@ -753,7 +753,30 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                                                    : Role::Bar,
                                       255});
             const int room = (x1 - x0 - 2 * lineWidth) / cell_.width;
-            auto name = decodeUtf8(song_.sections()[i]->name());
+            const auto& section = *song_.sections()[i];
+            auto name = decodeUtf8(section.name());
+            if (room - static_cast<int>(name.size()) >= 9) // room for at least " · 1 take"
+            {
+                std::size_t count = 0;
+                for (const auto& track : song_.tracks())
+                {
+                    if (const auto* part = section.content(track->id()))
+                    {
+                        count += part->takes.size();
+                    }
+                }
+                if (count > 0)
+                {
+                    auto caption = decodeUtf8(" · " + std::to_string(count) +
+                                              (count == 1 ? " take" : " takes"));
+                    if (static_cast<int>(name.size() + caption.size()) <= room)
+                    {
+                        const int x = x0 + lineWidth + static_cast<int>(name.size()) * cell_.width;
+                        timeline.text.push_back(
+                            {x, y, std::move(caption), {Role::Text, Role::Background, kPlain}});
+                    }
+                }
+            }
             if (static_cast<int>(name.size()) > room)
             {
                 if (room < kMinSegmentCharacters + 1)

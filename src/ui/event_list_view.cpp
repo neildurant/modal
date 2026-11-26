@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/note_fraction.hpp>
+#include <modal/core/takes.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/cell_grid.hpp>
 #include <modal/ui/config.hpp>
@@ -1786,6 +1787,17 @@ Region EventListView::listRegion() const
         at += width[c];
     }
 
+    const auto& song = document_.song();
+    const auto track = list_.track();
+    const int takeRoom = layout_.columns - at;
+    const bool showTake = takeRoom >= 5 && track &&
+                          std::ranges::any_of(song.sections(),
+                                              [&](const auto& section)
+                                              {
+                                                  const auto* part = section->content(*track);
+                                                  return part && !part->takes.empty();
+                                              });
+
     // The headings stay put as the list scrolls.
     grid.fill(0, 0, layout_.columns, 1, {U' ', kHeading});
     for (std::size_t c = 0; c < kColumnCount; ++c)
@@ -1793,6 +1805,10 @@ Region EventListView::listRegion() const
         const auto& column = kColumns[c];
         grid.write(textX(x[c], width[c], column.right, column.heading), 0, column.heading,
                    kHeading);
+    }
+    if (showTake)
+    {
+        grid.write(at, 0, "Take", kHeading);
     }
 
     // A note being added by o shows as a row of its own after the cursor's, being edited.
@@ -1836,7 +1852,8 @@ Region EventListView::listRegion() const
         const auto text = isAdded ? added : list_.text(row);
         auto style = !isAdded && list_.rows()[row].dim ? kDimText : kPlainText;
         // A ramp's points in the accent colour, as the lane draws them.
-        if (!isAdded && rampOf(row))
+        const bool rampPoint = !isAdded && rampOf(row).has_value();
+        if (rampPoint)
         {
             style.foreground = Role::Accent;
         }
@@ -1858,13 +1875,31 @@ Region EventListView::listRegion() const
             style.background = Role::Selection;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});
         }
+        std::string takeLabel;
+        if (showTake && !isAdded && !rampPoint && list_.rows()[row].kind == RowKind::Event)
+        {
+            const auto tick = list_.rows()[row].tick;
+            const auto section = song.sectionAt(tick);
+            if (const auto* part = song.sections()[section]->content(*track))
+            {
+                const auto source = core::activeSource(*part, tick - song.sectionStart(section));
+                const auto take = std::ranges::find(part->takes, source, &core::Take::id);
+                if (take != part->takes.end())
+                {
+                    takeLabel = "T" + std::to_string(take - part->takes.begin() + 1);
+                    grid.write(at, line, fitted(takeLabel, takeRoom),
+                               {takeColour(take->id), style.background, kPlain});
+                }
+            }
+        }
         for (std::size_t c = 0; c < kColumnCount; ++c)
         {
             const auto column = static_cast<Column>(c);
             // The last column with text may run on, such as a name or SysEx bytes.
             const bool runsOn = column == Column::Data && text[Column::Value].empty() &&
                                 text[Column::Length].empty();
-            const int room = runsOn ? layout_.columns - x[c] : width[c];
+            const int room =
+                runsOn ? (takeLabel.empty() ? layout_.columns : at - 1) - x[c] : width[c];
             const auto shown = fitted(text.cells[c], room);
             const int start = textX(x[c], width[c], kColumns[c].right, shown);
             const bool inPrompt =

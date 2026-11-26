@@ -25,6 +25,10 @@ highlight beat-line    #323856
 highlight bar-line     #565f89
 highlight note         #41a6b5
 highlight note-selected #ff9e64
+highlight take-1 #7aa2f7
+highlight take-2 #c49bfa
+highlight take-3 #62c4cc
+highlight take-4 #a8c778
 highlight label        #ff9e64
 highlight density-1    #24494f
 highlight density-2    #2f6c76

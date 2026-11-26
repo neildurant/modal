@@ -289,6 +289,10 @@ std::string base16ThemeText(const Base16Scheme& scheme)
         {Role::IndicatorRewind, blue},
         {Role::IndicatorInput, green},
         {Role::MessageLine, base(0x01)},
+        {Role::Take1, blue},
+        {Role::Take2, magenta},
+        {Role::Take3, cyan},
+        {Role::Take4, green},
     }};
 
     std::string text = "\" " + (scheme.name.empty() ? std::string{"A base16 scheme"} : scheme.name);

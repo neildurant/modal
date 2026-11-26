@@ -223,6 +223,9 @@ void addMarkDot(Region& region, int x, int y, CellSize cell);
 
 struct TimeScale;
 
+// The same palette entry for a take in each view, even if its displayed number changes.
+Role takeColour(std::uint32_t id);
+
 // Label the part of each active take that is visible on a timeline row.
 void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
                   const TimeScale& scale, core::Tick from, core::Tick to, int y, CellSize cell);

@@ -3167,5 +3167,49 @@ TEST_CASE("musical views show active takes, including a silent punch")
     const auto frame = p.ws.frame();
     const auto& timeline = frame[1];
     CHECK(std::ranges::any_of(timeline.under, [](const Shape& shape)
-                              { return shape.role == Role::Label && shape.alpha == 165; }));
+                              { return shape.role == Role::Take2 && shape.alpha == 165; }));
+}
+
+TEST_CASE("the section strip counts local takes and the event list colours their events")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto keys = song.tracks().front()->id();
+    song.addTrack("Bass");
+    const auto bass = song.tracks().back()->id();
+    const auto bar = ppqn.whole();
+    core::EventList notes;
+    notes.insert({0, core::Note{60, 90, ppqn.quarter()}});
+    notes.insert({2 * bar, core::Note{62, 90, ppqn.quarter()}});
+    song.addRecordedTake(keys, 0, 3 * bar, 1, notes);
+    core::EventList punch;
+    punch.insert({0, core::Note{64, 90, ppqn.quarter()}});
+    song.addRecordedTake(keys, 0, bar, 2, punch);
+    song.addRecordedTake(bass, 0, bar, 3, punch);
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 28 * kCell.height, kCell);
+    const auto shows = [&](std::u32string_view needle, Role colour)
+    {
+        for (const auto& region : p.ws.frame())
+        {
+            if (std::ranges::any_of(
+                    region.text, [&](const TextRun& run)
+                    { return contains(run.text, needle) && run.style.foreground == colour; }))
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    p.type(U"ga4zi");
+    CHECK(shows(U"· 3 takes", Role::Text));
+    CHECK(shows(U"· 1 take", Role::Text));
+    p.type(U"ge");
+    CHECK(shows(U"Take", Role::BarText));
+    CHECK(shows(U"T2", Role::Take2));
+    CHECK(shows(U"T1", Role::Take1));
+    p.ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
+    CHECK_FALSE(shows(U"Take", Role::BarText));
+    CHECK_FALSE(shows(U"T2", Role::Take2));
 }

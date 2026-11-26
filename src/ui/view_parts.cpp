@@ -24,10 +24,15 @@
 namespace modal::ui
 {
 
+Role takeColour(std::uint32_t id)
+{
+    constexpr std::array colours{Role::Take1, Role::Take2, Role::Take3, Role::Take4};
+    return colours[(id - 1) % colours.size()];
+}
+
 void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
                   const TimeScale& scale, core::Tick from, core::Tick to, int y, CellSize cell)
 {
-    constexpr std::array colours{Role::Accent, Role::Label, Role::Note};
     const int stroke = hairline(cell);
     const int inset = std::max(cell.height / 7, 1);
     const int height = cell.height - 2 * inset;
@@ -61,7 +66,7 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             const int width = last - first;
             const int left = first + (width > stroke ? stroke : 0);
             const auto index = static_cast<std::size_t>(take - part->takes.begin());
-            const auto colour = colours[index % colours.size()];
+            const auto colour = takeColour(take->id);
             region.under.push_back({{left, y + inset, last - left, height}, colour, 100});
 
             const auto text = decodeUtf8("T" + std::to_string(index + 1));

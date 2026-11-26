@@ -160,5 +160,6 @@ The roles are:
 | `track-rows` | behind the arrangement's track rows, across the names, buttons and bars |
 | `hint-key`, `hint-group` | a key in the hint menu, and a group of keys that leads to more |
 | `note-selected` | in the piano roll, the note under the cursor and the notes a selection takes |
+| `take-1` through `take-4` | repeating colours for take ranges and event-list take labels |
 
 `:write-config` lists the colours of every role in the theme you've chosen.

@@ -256,8 +256,9 @@ Deliver in this order, building on linear recording:
     - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Desktop MIDI trial pending. See [status.md](status.md).
     - [ ] **Doing** — Show active ranges and the take being edited.
         - [ ] **Doing** — Label ranges in the arrangement and piano roll, and show the edit destination in the piano-roll header.
-        - [ ] **To do** — Add the section-strip count and event-list take column.
+        - [ ] **Doing** — Add the section-strip count and event-list take column.
     - [ ] **To do** — Choose comp ranges, edit focused takes, copy selections between takes and show take lanes.
+    - [ ] **To do** — Review audition and range-choice shortcuts with take lanes visible.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
     - [ ] **To do** — Bake a comp to a chosen new or existing track.
     - [ ] **To do** — Palette support, manual updates and final validation.
