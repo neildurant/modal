@@ -283,7 +283,9 @@ Resolve the related [design questions](design.md#to-decide) before implementatio
 - [ ] **To do** — Mute selection/note - event list. User can mute selections of notes from playing
 - [ ] **To do** — Merging tracks: combining several tracks' events into one, as Sequencer Plus Gold's Merge (compared 15 November 2026).
 - [ ] **To do** — Moving a label to the cursor with `, l v`, choosing which (asked for and agreed 25 November 2026). See [design.md](design.md#data-model).
-- [ ] **To do** — Tempo transforms, after Sequencer Plus Gold's (compared 15 November 2026): accelerando and ritardando across a range, written as steps as tempo changes are; scaling and shifting the tempo map over a range; thinning and removing repeated tempo changes.
+- [ ] **To do** — Tempo shaping, after Sequencer Plus Gold's tempo transforms (compared 15 November 2026).
+    - [ ] **To do** — Editable tempo curves for accelerando and ritardando. Adjust the span, endpoints and shape during playback, and bake the result into explicit conductor tempo changes.
+    - [ ] **To do** — Scale and shift the tempo map over a range, and thin or remove repeated tempo changes.
 
 ## 13. Composition tools
 
@@ -291,10 +293,12 @@ Resolve the related [design questions](design.md#to-decide) before implementatio
 - [ ] **To do** — Text phrase entry: type a phrase in a compact, ABC-like syntax at the command line or in a prompt, e.g. `c4 d e f | g2 g`, and have it inserted at the cursor in the current grid and key.
 - [ ] **To do** — Chords by name: type Em9 or G/B to insert a voicing at the cursor, with the voicing style configurable (close, open, drop-2).
 - [ ] **To do** — Voicing transforms: invert a chord up or down, drop-2, drop-3, spread or close the voicing, and move the top voice. These are bread and butter for a keyboard player, and they compose naturally with `ic` and `.`.
+- [ ] **To do** — Editable inversions of performed chords on the chord track. Audition inversions across a progression, return to the original voicing at any time, and bake the chosen inversions into ordinary notes.
 - [ ] **To do** — Change mode: move a phrase between modes by scale degree, e.g. major to Dorian, or minor to Phrygian. A quick way to recolour a theme.
 - [ ] **To do** — Negative harmony: mirror a passage around the key's axis, turning major-sounding harmony into its minor mirror image. Related to the existing invert, but harmonically aware.
 - [ ] **To do** — Voice-leading: take a sequence of chords, or chord-track symbols, and re-voice them so each moves as little as possible to the next, within a range you set.
 - [ ] **To do** — A chord-name lane: a row showing the detected chord on each beat or bar across the page, e.g. Em9 · · · Cmaj7 · · · D/F# ·, so you can read the harmony of a dense piano part at a glance.
+- [ ] **To do** — Pedalling that follows chord changes over a range. Adjust the lift and re-pedal gap, hear it follow changes to the music, and bake the result into explicit sustain events.
 - [ ] **To do** — Chord substitutions: on a chord, offer common substitutes (relative minor, tritone sub, sus or add9 colours) to try in place, auditioned while looping.
 - [ ] **To do** — Polyrhythm spans: fill a range with n evenly spaced notes against the bar, e.g. 5 against 4 or 7 over two bars, as a starting rhythm.
 - [ ] **To do** — Transpose by relative intervals: (+m3, +5, −M2) in place of chromatic intervals.
@@ -410,6 +414,9 @@ No milestone or implementation commitment. Keep these unchecked unless they are 
 
 - [ ] **Unscheduled** — Punch recording within a loop (suggested 25 November 2026): with a punch range inside an armed loop, `R` records only the punch range on each pass, to retake a fill while hearing the bars around it.
 - [ ] **Unscheduled** — Adjust transforms by ear while a selection loops, with transform presets and palette support where needed (deferred 24 November 2026). See [design.md](design.md#midi-transforms).
+- [ ] **Unscheduled** — Editable groove regions. Adjust swing or follow the timing and accents of a recorded phrase over a range, then bake the resulting note timing and velocities.
+- [ ] **Unscheduled** — Chord-driven parts. Let a bass figure or arpeggio follow the chord track while adjusting its rhythm, register and voicing, then bake it into notes.
+- [ ] **Unscheduled** — Editable rhythm patterns. Adjust the number and placement of hits, phase and accents over a span, then bake the pattern into notes.
 - [ ] **Unscheduled** — Saved sessions (suggested 20 November 2026): reopen a set of songs together, each at the view and place it was left, across program runs.
 - [ ] **Unscheduled** — View snapshots (suggested 20 November 2026): save how a song is being looked at (view, places, zoom, folds) and restore it later, without changing the music. Shares a value-type capture of each view's place with saved sessions; song switching could then use the same capture.
 - [ ] **Unscheduled** — A paste-history panel while swapping (suggested 23 November 2026): straight after a put, a few lines above the message row list the paste history, newest first, the copy in the song highlighted; `[p` and `]p` move the highlight, and the next other key closes it. A new kind of panel, as `:registers`' listing closes on the next key.
