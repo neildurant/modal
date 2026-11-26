@@ -3167,5 +3167,5 @@ TEST_CASE("musical views show active takes, including a silent punch")
     const auto frame = p.ws.frame();
     const auto& timeline = frame[1];
     CHECK(std::ranges::any_of(timeline.under, [](const Shape& shape)
-                              { return shape.role == Role::Label && shape.alpha == 210; }));
+                              { return shape.role == Role::Label && shape.alpha == 165; }));
 }

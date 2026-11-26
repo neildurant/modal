@@ -30,7 +30,7 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
     constexpr std::array colours{Role::Accent, Role::Label, Role::Note};
     const int stroke = hairline(cell);
     const int inset = std::max(cell.height / 7, 1);
-    const int bottom = y + cell.height - inset;
+    const int height = cell.height - 2 * inset;
     for (auto section = song.sectionAt(from); section < song.sections().size(); ++section)
     {
         const auto start = song.sectionStart(section);
@@ -62,9 +62,7 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             const int left = first + (width > stroke ? stroke : 0);
             const auto index = static_cast<std::size_t>(take - part->takes.begin());
             const auto colour = colours[index % colours.size()];
-            region.under.push_back(
-                {{left, y + inset, last - left, cell.height - 2 * inset}, colour, 80});
-            region.under.push_back({{left, bottom - stroke, last - left, stroke}, colour, 210});
+            region.under.push_back({{left, y + inset, last - left, height}, colour, 100});
 
             const auto text = decodeUtf8("T" + std::to_string(index + 1));
             if (last - left >= static_cast<int>(text.size()) * cell.width + 2 * stroke)
@@ -75,9 +73,7 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             else
             {
                 region.under.push_back(
-                    {{left, y + inset, std::min(stroke, last - left), bottom - y - inset},
-                     colour,
-                     210});
+                    {{left, y + inset, std::min(stroke, last - left), height}, colour, 165});
             }
         }
     }
