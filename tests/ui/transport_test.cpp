@@ -3309,7 +3309,7 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     CHECK_FALSE(bottomHas(U"Enter Apply"));
     CHECK_FALSE(p.document.hasPreview());
     CHECK(chosen(p.document.underlying(), 0) == 1);
-    CHECK(chosen(p.document.underlying(), bar) == (piano ? 2 : 1));
+    CHECK(chosen(p.document.underlying(), bar) == (piano ? 2U : 1U));
     p.type(U"u");
     CHECK(chosen(p.document.underlying(), 0) == 2);
     p.type(U",kv");

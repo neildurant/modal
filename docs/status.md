@@ -20,7 +20,7 @@ Take stacks, resolved playback, chase, export and the chooser in the arrangement
 
 **Validation.** All six native Linux presets passed, including GCC and Clang Debug and Release, AddressSanitizer with UndefinedBehaviorSanitizer, and ThreadSanitizer. The Debug presets each passed 1,353 tests, with three MIDI tests skipped. The tests include a silent punch, format-2 save and reopen, chase and export, repeated-discard redraws, fake-MIDI preview playback, per-track expansion, bar navigation and Visual ranges at both test resolutions. Whole-tree formatting passed. The recording chapter built in HTML and PDF.
 
-**Windows CI follow-up.** MSVC reported shadowed locals while rescaling comp ranges. Renamed those locals and the piano roll's take-lane row count. Clang's shadowing check found no further warnings on changed lines, and both native Debug suites passed again.
+**Windows CI follow-up.** MSVC reported shadowed locals while rescaling comp ranges. Renamed those locals and the piano roll's take-lane row count. Clang's shadowing check found no further warnings on changed lines, and both native Debug suites passed again. MSVC then reported a signed/unsigned comparison in the take chooser's bar-navigation test, fixed with unsigned literals; MSVC Debug passed all 1,355 tests with two MIDI skips.
 
 **Next work.** Start with focused-take editing and Copy to take. Settle how the command handles events outside the destination take's span before implementing it. The lane-backed review of `[t` and `]t` follows. The join inspector and Bake are later on the schedule. Same-pitch overlaps use the existing scheduler behaviour until join resolution is implemented.
 
