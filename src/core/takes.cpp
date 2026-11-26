@@ -25,6 +25,50 @@ std::uint32_t activeSource(const TrackContent& part, Tick at)
     return 0;
 }
 
+std::vector<TakeRange> activeTakeRanges(const TrackContent& part, Tick from, Tick to)
+{
+    if (from >= to)
+    {
+        return {};
+    }
+    std::vector<Tick> boundaries{from, to};
+    const auto addBoundaries = [&](const auto& ranges)
+    {
+        for (const auto& range : ranges)
+        {
+            if (range.from > from && range.from < to)
+            {
+                boundaries.push_back(range.from);
+            }
+            if (range.to > from && range.to < to)
+            {
+                boundaries.push_back(range.to);
+            }
+        }
+    };
+    addBoundaries(part.takes);
+    addBoundaries(part.comp);
+    std::ranges::sort(boundaries);
+    const auto duplicates = std::ranges::unique(boundaries);
+    boundaries.erase(duplicates.begin(), duplicates.end());
+
+    std::vector<TakeRange> result;
+    for (std::size_t i = 1; i < boundaries.size(); ++i)
+    {
+        const auto start = boundaries[i - 1];
+        const auto source = activeSource(part, start);
+        if (!result.empty() && result.back().take == source)
+        {
+            result.back().to = boundaries[i];
+        }
+        else
+        {
+            result.push_back({start, boundaries[i], source});
+        }
+    }
+    return result;
+}
+
 std::optional<std::uint32_t> playingTake(const TrackContent& part, Tick at)
 {
     const auto source = activeSource(part, at);
@@ -159,27 +203,12 @@ std::size_t keepOnlyTake(Song& song, std::size_t section, TrackId track, std::ui
         [&](TrackContent& edited)
         {
             auto playing = playingEvents(edited);
-            std::vector<Tick> boundaries{chosen->from, chosen->to};
-            const auto addBoundaries = [&](const auto& ranges)
-            {
-                for (const auto& range : ranges)
-                {
-                    boundaries.push_back(std::clamp(range.from, chosen->from, chosen->to));
-                    boundaries.push_back(std::clamp(range.to, chosen->from, chosen->to));
-                }
-            };
-            addBoundaries(edited.takes);
-            addBoundaries(edited.comp);
-            std::ranges::sort(boundaries);
-            const auto duplicates = std::ranges::unique(boundaries);
-            boundaries.erase(duplicates.begin(), duplicates.end());
-
             edited.comp.clear();
-            for (std::size_t i = 1; i < boundaries.size(); ++i)
+            for (const auto& range : activeTakeRanges(*part, chosen->from, chosen->to))
             {
-                if (activeSource(*part, boundaries[i - 1]) != take)
+                if (range.take != take)
                 {
-                    assignTake(edited, {boundaries[i - 1], boundaries[i], 0});
+                    assignTake(edited, {range.from, range.to, 0});
                 }
             }
             std::erase_if(edited.takes, [&](const Take& other) { return other.id != take; });

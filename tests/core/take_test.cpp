@@ -217,6 +217,11 @@ TEST_CASE("take stacks and active ranges round trip without event tags")
           std::string::npos);
     CHECK(text.find("    comp 1 4:1:0 5:1:0\n") != std::string::npos);
     CHECK(t.tags() == Tags{{0, 0}, {2, 2}, {3, 1}, {4, 2}});
+    const auto visible = activeTakeRanges(t.part(), t.bar, 6 * t.bar);
+    CHECK(visible == std::vector{TakeRange{t.bar, 2 * t.bar, 0}, TakeRange{2 * t.bar, 3 * t.bar, 2},
+                                 TakeRange{3 * t.bar, 4 * t.bar, 1},
+                                 TakeRange{4 * t.bar, 5 * t.bar, 2},
+                                 TakeRange{5 * t.bar, 6 * t.bar, 0}});
 
     const auto read = readSong(text, ppqn);
     REQUIRE(read.song);

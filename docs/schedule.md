@@ -254,7 +254,9 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Settle the file model and compatibility. Accept ordinary songs and refuse the old test take format.
     - [ ] **Doing** — Stack, resolved playback, chase and export with saved songs. Automated checks passed. See [status.md](status.md).
     - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Desktop MIDI trial pending. See [status.md](status.md).
-    - [ ] **To do** — Show active ranges and the take being edited in the arrangement, section strip, piano roll and event list.
+    - [ ] **Doing** — Show active ranges and the take being edited.
+        - [ ] **Doing** — Label ranges in the arrangement and piano roll, and show the edit destination in the piano-roll header.
+        - [ ] **To do** — Add the section-strip count and event-list take column.
     - [ ] **To do** — Choose comp ranges, edit focused takes, copy selections between takes and show take lanes.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
     - [ ] **To do** — Bake a comp to a chosen new or existing track.

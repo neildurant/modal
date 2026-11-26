@@ -579,6 +579,12 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
     {
         timeline.under.push_back({rect, Role::OwnMeter, kOwnMeterAlpha});
     }
+    for (int line = 0; line < shownTracks; ++line)
+    {
+        const auto id = tracks[topTrack_ + static_cast<std::size_t>(line)]->id();
+        addTakeBands(timeline, song_, id, scale, leftTick_, shownEnd,
+                     tracksTop + line * cell_.height, cell_);
+    }
 
     // The ruler: labels by name, the conductor's meters, the section strip, and its bars,
     // numbered where there's room for the numbers.

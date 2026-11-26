@@ -160,6 +160,7 @@ public:
     core::NoteFraction grid() const; // the track's
     void addNewNote(Region& inspector, const core::Track& track) const;
     int noteRows() const; // the pitch rows fully in view
+    int rulerRows() const;
     // The track's lane height, , c h, and the lane's height in pixels from it.
     core::LaneHeight laneSize() const;
     int laneHeight() const;

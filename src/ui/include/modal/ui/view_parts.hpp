@@ -221,6 +221,12 @@ void addTempoSigns(std::vector<RowSign>& signs, const core::TempoMap& tempo, cor
 
 void addMarkDot(Region& region, int x, int y, CellSize cell);
 
+struct TimeScale;
+
+// Label the part of each active take that is visible on a timeline row.
+void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
+                  const TimeScale& scale, core::Tick from, core::Tick to, int y, CellSize cell);
+
 // An armed range in a ruler (decided 24 November 2026): a thin line along the bottom of the
 // ruler from x0 to x1, with a cap rising at each end that's in view, so its boundaries show
 // whatever the selection. The punch range's is dashed, in the recording colour; the loop's

@@ -16,6 +16,9 @@ namespace modal::core
 // The source chosen at a section-relative tick. Zero denotes the part's ordinary events.
 std::uint32_t activeSource(const TrackContent& part, Tick at);
 
+// The active ranges in [from, to), including ordinary material, in time order.
+std::vector<TakeRange> activeTakeRanges(const TrackContent& part, Tick from, Tick to);
+
 std::optional<std::uint32_t> playingTake(const TrackContent& part, Tick at);
 
 // Projects the sources into one event list for the editor and playback.

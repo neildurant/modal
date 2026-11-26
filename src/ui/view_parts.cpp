@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <modal/core/controllers.hpp>
+#include <modal/core/takes.hpp>
 #include <modal/ui/bar.hpp>
+#include <modal/ui/bar_lines.hpp>
 #include <modal/ui/event_text.hpp>
 #include <modal/ui/track_fields.hpp>
 #include <modal/ui/view_parts.hpp>
@@ -21,6 +23,65 @@
 
 namespace modal::ui
 {
+
+void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
+                  const TimeScale& scale, core::Tick from, core::Tick to, int y, CellSize cell)
+{
+    constexpr std::array colours{Role::Accent, Role::Label, Role::Note};
+    const int stroke = hairline(cell);
+    const int inset = std::max(cell.height / 7, 1);
+    const int bottom = y + cell.height - inset;
+    for (auto section = song.sectionAt(from); section < song.sections().size(); ++section)
+    {
+        const auto start = song.sectionStart(section);
+        if (start >= to)
+        {
+            break;
+        }
+        const auto* part = song.sections()[section]->content(track);
+        if (!part || part->takes.empty())
+        {
+            continue;
+        }
+        const auto end = std::min(to, song.sectionStart(section + 1));
+        for (const auto& span :
+             core::activeTakeRanges(*part, std::max(from, start) - start, end - start))
+        {
+            const auto take = std::ranges::find(part->takes, span.take, &core::Take::id);
+            if (take == part->takes.end())
+            {
+                continue;
+            }
+            const int first = std::max(scale.toX(start + span.from), 0);
+            if (first >= region.bounds.width)
+            {
+                continue;
+            }
+            const int last = std::clamp(scale.toX(start + span.to), first + 1, region.bounds.width);
+            const int width = last - first;
+            const int left = first + (width > stroke ? stroke : 0);
+            const auto index = static_cast<std::size_t>(take - part->takes.begin());
+            const auto colour = colours[index % colours.size()];
+            region.under.push_back(
+                {{left, y + inset, last - left, cell.height - 2 * inset}, colour, 80});
+            region.under.push_back({{left, bottom - stroke, last - left, stroke}, colour, 210});
+
+            const auto text = decodeUtf8("T" + std::to_string(index + 1));
+            if (last - left >= static_cast<int>(text.size()) * cell.width + 2 * stroke)
+            {
+                region.text.push_back(
+                    {left + stroke, y, text, {Role::Text, Role::Background, kBold}});
+            }
+            else
+            {
+                region.under.push_back(
+                    {{left, y + inset, std::min(stroke, last - left), bottom - y - inset},
+                     colour,
+                     210});
+            }
+        }
+    }
+}
 
 namespace
 {

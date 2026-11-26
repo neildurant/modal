@@ -3,6 +3,7 @@
 #include <modal/core/chords.hpp>
 #include <modal/core/controllers.hpp>
 #include <modal/core/pitch.hpp>
+#include <modal/core/takes.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
 #include <modal/ui/cell_grid.hpp>
@@ -1480,8 +1481,24 @@ PianoRollView::Page PianoRollView::page() const
 
 int PianoRollView::noteRows() const
 {
-    return std::max((layout_.main.height - kRulerRows * cell_.height - laneHeight()) / cell_.height,
-                    1);
+    return std::max(
+        (layout_.main.height - rulerRows() * cell_.height - laneHeight()) / cell_.height, 1);
+}
+
+int PianoRollView::rulerRows() const
+{
+    const auto track = trackId();
+    if (!track || layout_.main.height < (kRulerRows + 2) * cell_.height)
+    {
+        return kRulerRows;
+    }
+    const bool hasTakes = std::ranges::any_of(document_.song().sections(),
+                                              [&](const auto& section)
+                                              {
+                                                  const auto* part = section->content(*track);
+                                                  return part && !part->takes.empty();
+                                              });
+    return kRulerRows + (hasTakes ? 1 : 0);
 }
 
 core::LaneHeight PianoRollView::laneSize() const
@@ -1497,7 +1514,7 @@ int PianoRollView::laneHeight() const
     // (decided 17 November 2026). In a small window a quarter is still twice the three rows,
     // and half three times, so that each step makes it taller.
     const int h = cell_.height;
-    const int below = std::max(layout_.main.height - kRulerRows * h, 0);
+    const int below = std::max(layout_.main.height - rulerRows() * h, 0);
     const auto size = laneSize();
     const int rows = size == core::LaneHeight::Half      ? std::max(below / h / 2, 3 * kLaneRows)
                      : size == core::LaneHeight::Quarter ? std::max(below / h / 4, 2 * kLaneRows)
@@ -5068,7 +5085,7 @@ void PianoRollView::addRuler(Region& ruler, const TimeScale& scale, const Page& 
     // The punch and loop ranges armed, along the ruler's foot.
     addRangeBrackets(
         ruler, host_.armedRanges(), p.start, p.end,
-        [&](core::Tick tick) { return scale.toX(tick); }, width, ruler.bounds.height, cell_);
+        [&](core::Tick tick) { return scale.toX(tick); }, width, kRulerRows * h, cell_);
 }
 
 void PianoRollView::addRegions(Frame& frame) const
@@ -5083,7 +5100,7 @@ void PianoRollView::addRegions(Frame& frame) const
     const int keyColumns =
         std::min(map ? kDrumColumns : kKeyColumns, std::max(main.width / cell_.width - 1, 0));
     const int keyWidth = keyColumns * cell_.width;
-    const int rulerHeight = kRulerRows * h;
+    const int rulerHeight = rulerRows() * h;
     const int laneHeight = this->laneHeight();
     const int notesTop = main.y + rulerHeight;
     const int notesHeight = std::max(main.height - rulerHeight - laneHeight, 0);
@@ -5547,6 +5564,10 @@ void PianoRollView::addRegions(Frame& frame) const
                  .under = {},
                  .over = {}};
     addRuler(ruler, scale, p);
+    if (selectedTrackId && rulerHeight > kRulerRows * h)
+    {
+        addTakeBands(ruler, song, *selectedTrackId, scale, p.start, p.end, kRulerRows * h, cell_);
+    }
     if (playhead_ && *playhead_ >= p.start && *playhead_ < p.end)
     {
         const int x = scale.toX(*playhead_);
@@ -5746,12 +5767,30 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
     const auto& song = document_.song();
     std::vector<BarPair> left;
     std::vector<BarPair> right;
-    if (trackId())
+    if (const auto track = trackId())
     {
         left = trackPairs(song, track_ + 1);
         // After the output, before what comes and goes from track to track.
         left.insert(left.begin() + std::min<std::ptrdiff_t>(3, std::ssize(left)),
                     BarPair{"Grid:", padText(core::toString(grid()), 5, false), kDropGrid});
+        if (const auto* part = song.sections()[p.section]->content(*track);
+            part && !part->takes.empty())
+        {
+            const auto source = core::activeSource(*part, time_ - song.sectionStart(p.section));
+            const auto take = std::ranges::find(part->takes, source, &core::Take::id);
+            const auto nameWidth = static_cast<int>(decodeUtf8(left.front().value).size());
+            const bool compact = width_ / cell_.width < 92 + nameWidth;
+            const auto target =
+                take == part->takes.end()
+                    ? std::string{"Part"}
+                    : (compact ? "T" : "Take ") + std::to_string(take - part->takes.begin() + 1);
+            // Keep the edit destination visible when the header is too narrow for the track's
+            // full name and routing as well.
+            left[1].drop = kDropSection;      // channel
+            left[2].drop = kDropQuantise + 1; // output
+            left.insert(left.begin() + (compact ? 0 : 1),
+                        BarPair{compact ? "Edit:" : "Editing:", target});
+        }
     }
     else
     {

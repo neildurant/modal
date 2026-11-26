@@ -3117,3 +3117,55 @@ TEST_CASE("discarding takes repeatedly refreshes the event list before drawing")
     p.type(U"u");
     CHECK(shows(U"B4"));
 }
+
+TEST_CASE("musical views show active takes, including a silent punch")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto track = song.tracks()[0]->id();
+    const auto bar = ppqn.whole();
+    REQUIRE(song.updatePart(0, track,
+                            [&](core::TrackContent& part)
+                            {
+                                core::Take first{1, 0, 2 * bar, 1, {}};
+                                first.events.insert({0, core::Note{60, 90, ppqn.quarter()}});
+                                part.takes = {first, {2, bar, 2 * bar, 2, {}}};
+                            }));
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 28 * kCell.height, kCell);
+    const auto shows = [&](std::u32string_view text)
+    {
+        return std::ranges::any_of(p.ws.frame(),
+                                   [&](const Region& region)
+                                   {
+                                       return std::ranges::any_of(
+                                           region.text, [&](const TextRun& run)
+                                           { return contains(run.text, text); });
+                                   });
+    };
+
+    p.type(U"ga4zi");
+    CHECK(shows(U"T1"));
+    CHECK(shows(U"T2"));
+
+    p.type(U"galgr");
+    CHECK(shows(U"T1"));
+    CHECK(shows(U"T2"));
+    CHECK(shows(U"Editing:"));
+    CHECK(shows(U"Take 2"));
+    p.type(U",kd");
+    CHECK(shows(U"Take 1"));
+    CHECK_FALSE(shows(U"T2"));
+    p.type(U"u");
+    CHECK(shows(U"Take 2"));
+    p.ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
+    CHECK(shows(U"Edit:"));
+    CHECK(shows(U" T2"));
+
+    p.type(U"gazozozozozozozo");
+    CHECK_FALSE(shows(U"T2"));
+    const auto frame = p.ws.frame();
+    const auto& timeline = frame[1];
+    CHECK(std::ranges::any_of(timeline.under, [](const Shape& shape)
+                              { return shape.role == Role::Label && shape.alpha == 210; }));
+}
