@@ -149,9 +149,8 @@ vmap <leader>PP punch             "Punch range: the selected time"
 vmap <leader>Pl punch-labels      "Punch range between labels"
 vmap <leader>Pd punch-clear       "Clear the punch range"
 
-" Takes: each replace recording is kept as a take of its section on the track, with what it
-" replaced as Before. ]t and [t choose the next take and the one before, going round, heard at
-" once, even while playing. The Takes group keeps only the playing take or discards it.
+" Takes: replace recordings stack over the section's existing material. ]t and [t choose
+" among them in order. The Takes group keeps only the playing take or discards it.
 keysection "Takes"
 nmap ]t         take-next         "Next take"
 nmap [t         take-previous     "Take before"

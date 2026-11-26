@@ -1886,7 +1886,7 @@ TEST_CASE("the take shows as it's played, a held note growing with the playhead 
     CHECK(std::get<core::Note>(taken->data).duration >= std::get<core::Note>(later->data).duration);
 }
 
-TEST_CASE("a note and pedal still held when recording stops end there")
+TEST_CASE("a note still held ends at the stop and recorded pedal state carries")
 {
     Playing p;
     p.type(U",ra");
@@ -1904,7 +1904,7 @@ TEST_CASE("a note and pedal still held when recording stops end there")
     const auto note = noteOn(p.document.song(), id, 98);
     REQUIRE(note.has_value());
     const auto end = note->tick + std::get<core::Note>(note->data).duration;
-    CHECK(has(p.document.song(), id, core::Event{end, core::ControlChange{64, 0}}));
+    CHECK_FALSE(has(p.document.song(), id, core::Event{end, core::ControlChange{64, 0}}));
     // Let go after stopping: nothing more is recorded.
     const auto version = p.document.version();
     REQUIRE(
@@ -2968,8 +2968,7 @@ TEST_CASE("R while playing punches in ahead of the playhead, and is refused past
     CHECK_FALSE(p.player.recording());
 }
 
-TEST_CASE(
-    "the take keys choose among a section's takes on the track, Before among them, going round")
+TEST_CASE("the take keys choose among a section's stack in order")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
     auto song = punchSong(ppqn);
@@ -2987,7 +2986,7 @@ TEST_CASE(
         return result;
     };
 
-    // Two passes of the loop A in replace, each a take; what was there first is Before.
+    // Two passes of the loop A in replace, each a take; the original part is Take 1.
     p.type(U"gaA,LL");
     p.type(U"R");
     REQUIRE(p.player.recording());
@@ -3002,16 +3001,16 @@ TEST_CASE(
     REQUIRE(pitches() == std::vector{64});
 
     p.type(U"[t");
-    CHECK(p.ws.message() == "Take 1 of 2 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 2 of 3 on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{60});
     p.type(U"[t");
-    CHECK(p.ws.message() == "Before the takes on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 1 of 3 on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{50});
     p.type(U"[t"); // round to the last
-    CHECK(p.ws.message() == "Take 2 of 2 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 3 of 3 on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{64});
-    p.type(U"2]t"); // round past Before
-    CHECK(p.ws.message() == "Take 1 of 2 on Keys in A, bars 1–2");
+    p.type(U"2]t"); // round past Take 1
+    CHECK(p.ws.message() == "Take 2 of 3 on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{60});
 
     // Each choice an undo step.
@@ -3032,10 +3031,10 @@ TEST_CASE(
         const auto* part = p.document.song().sections()[0]->content(keys);
         return part ? part->takes.size() : 0;
     };
-    // Discard Before, the first take, so the next performance plays in its place.
+    // Discard the original part, so the newest performance plays in its place.
     p.type(U",kd");
     CHECK(p.ws.message() == "Discarded the take on Keys in A");
-    CHECK(pitches() == std::vector{60});
+    CHECK(pitches() == std::vector{64});
     CHECK(takeCount() == 2);
     p.type(U"u");
     CHECK(pitches() == std::vector{50});

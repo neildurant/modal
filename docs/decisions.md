@@ -885,6 +885,14 @@ Only replace recordings make takes: a take is an alternative to choose between, 
 
 Keeping and discarding were settled on 26 November 2026. Keeping only the playing take prunes the saved alternatives, including Before, without changing what is heard. Discarding the playing take removes its events even where the replacement does not reach, so a shorter replacement cannot leave part of the rejected performance playing. The preceding take fills its own span, or the next one does when discarding the first. Discarding the sole take simply removes its events.
 
+## Take stacks and comping (26 November 2026)
+
+The display review made it important to distinguish the source that owns the notes, the range chosen for playback and the take currently receiving edits. In a stack, hand-entered material can already be a layer and a punch can cover just its recorded span, so there is no need to collect displaced material into Before. Choose one source per range. For an individual note or controller event worth borrowing, copy it into the destination take at the original tick. A persistent link to the source would add complexity to the display and editing rules with little musical benefit.
+
+At the join, preserve held notes and established controller state by default. A same-pitch overlap may need a retrigger, tie or the outgoing note alone, and a controller may need the incoming value at entry or its next value brought forward. The inspector gives these adjustments a visible place. Each saved choice generates the necessary playback result from the current source data, as an editable ramp does. Bake writes that result to a destination the user chooses. Naming it **Bake** describes the conversion to explicit events in the same way as baking a ramp or sustain. See [the design](design.md#take-stacks-and-comping).
+
+Decided 26 November 2026 to start the stack in format 2 without take migration. Only disposable test songs used the earlier take data. Keep format 1 for ordinary songs and give an explicit error for its old take blocks or tags.
+
 ## Loop playback (24 November 2026)
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).

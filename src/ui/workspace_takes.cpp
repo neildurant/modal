@@ -9,9 +9,7 @@
 namespace modal::ui
 {
 
-// Takes (decided 25 November 2026): each replace recording is kept as a take of its section on
-// the track, and ]t and [t choose among the cursor's section and track's takes, in the order
-// recorded with Before first, going round, heard at once while playing.
+// ]t and [t choose among the cursor's section and track's takes in stack order.
 
 namespace
 {
@@ -65,21 +63,15 @@ CommandResult Workspace::stepTake(int count, bool forward)
     at = ((at + (forward ? steps : -steps)) % size + size) % size;
     const auto& chosen = takes[static_cast<std::size_t>(at)];
 
-    const auto performances =
-        std::ranges::count_if(takes, [](const core::Take& take) { return !take.before; });
-    const auto number = std::ranges::count_if(takes.begin(), takes.begin() + at + 1,
-                                              [](const core::Take& take) { return !take.before; });
+    const auto number = std::to_string(at + 1);
     const auto where = " on " + name + " in " + section.name();
-    const auto title =
-        chosen.before ? "Choose Before" + where : "Choose take " + std::to_string(number) + where;
+    const auto title = "Choose take " + number + where;
     const auto start = song.sectionStart(index);
     const auto span = barsText(song, start + chosen.from, start + chosen.to);
     const auto id = chosen.id;
     document_.edit(title, view().place(),
                    [&](core::Song& edited) { core::chooseTake(edited, index, *track, id); });
-    const auto message = chosen.before ? "Before the takes" + where + ", " + span
-                                       : "Take " + std::to_string(number) + " of " +
-                                             std::to_string(performances) + where + ", " + span;
+    const auto message = "Take " + number + " of " + std::to_string(size) + where + ", " + span;
     return {true, message};
 }
 
@@ -112,13 +104,13 @@ CommandResult Workspace::removeTakes(bool keepOnly)
         return {changed, changed ? "Kept only this take" + where : ""};
     }
 
-    core::Discarded discarded;
+    const bool lastTake = part->takes.size() == 1;
     const bool changed =
         document_.edit("Discard take" + where, view().place(), [&](core::Song& edited)
-                       { discarded = core::discardTake(edited, index, *track, *playing); });
+                       { core::discardTake(edited, index, *track, *playing); });
     if (!changed)
         return {false, ""};
-    return {true, "Discarded the take" + where + (discarded.instead ? "" : ". No takes left")};
+    return {true, "Discarded the take" + where + (lastTake ? ". No takes left" : "")};
 }
 
 } // namespace modal::ui

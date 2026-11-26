@@ -127,7 +127,7 @@ TEST_CASE("a recording session keeps its take pending until one acknowledged und
     CHECK_FALSE(r.session.fileOperationRefusal());
     CHECK(r.session.tracks().empty());
     REQUIRE(r.document.underlying().events(r.lead()).size() == 1);
-    CHECK(r.document.underlying().events(r.lead())[0] == Event{q / 2, Note{60, 100, q, 70}, 1});
+    CHECK(r.document.underlying().events(r.lead())[0] == Event{q / 2, Note{60, 100, q, 70}});
     const auto version = r.document.version();
     CHECK_FALSE(r.session.finish({}, "Again"));
     CHECK(r.document.version() == version);
@@ -458,7 +458,7 @@ TEST_CASE("a punch records only its range, ending there as playback carries on")
     const auto& events = r.document.underlying().events(r.lead());
     const auto* cut = eventAt(events, 0, true);
     REQUIRE(cut != nullptr);
-    CHECK(noteEnd(*cut) == bar); // the old note cut at punch-in
+    CHECK(noteEnd(*cut) == 2 * bar); // the earlier note keeps its end
     const auto* held = eventAt(events, bar, true);
     REQUIRE(held != nullptr);
     CHECK(std::get<Note>(held->data).pitch == 50);
@@ -469,13 +469,9 @@ TEST_CASE("a punch records only its range, ending there as playback carries on")
     CHECK(std::get<Note>(last->data).pitch == 60);
     CHECK(noteEnd(*last) == 2 * bar);
     CHECK(eventAt(events, 2 * bar + q, true)); // after it, kept
-    // The pedal let up at punch-in and put down again at punch-out, as it was there.
-    const auto* up = eventAt(events, bar, false);
-    REQUIRE(up != nullptr);
-    CHECK(up->data == EventData{ControlChange{64, 0}});
-    const auto* down = eventAt(events, 2 * bar, false);
-    REQUIRE(down != nullptr);
-    CHECK(down->data == EventData{ControlChange{64, 127}});
+    // Sustain carries across the punch until a later event changes it.
+    CHECK_FALSE(eventAt(events, bar, false));
+    CHECK_FALSE(eventAt(events, 2 * bar, false));
     const auto notes = std::ranges::count_if(events.all(), &Event::isNote);
     CHECK(notes == 4);
 

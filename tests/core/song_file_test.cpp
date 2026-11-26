@@ -473,7 +473,7 @@ TEST_CASE("anything wrong in a song file stops it being read, saying where")
     const std::vector<Bad> cases{
         {"", "line 1", "empty"},
         {"MThd\n", "line 1", "not a Modal song"},
-        {"modal-song 2\n", "line 1", "newer Modal"},
+        {"modal-song 3\n", "line 1", "newer Modal"},
         {"modal-song 1\nsection \"A\" bars=1\n", "line 2", "song line"},
         {"modal-song 1\nsong \"S\"\n", "line 2", "ppqn"},
         {header, "line 4", "no sections"},

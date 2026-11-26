@@ -6,9 +6,19 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Next work on takes, 26 November 2026
+
+The take review settled on stacked sources and a comp that chooses one take per time range. The [agreed design](design.md#take-stacks-and-comping) includes Copy to take, the join inspector and Bake. The offscreen review images are in the local build's `build/review/takes` directory. The [schedule](schedule.md#11-loops-punch-recording-and-takes) puts the file model and playing part first. Old take files were disposable tests, so the new reader refuses them explicitly and still opens ordinary format 1 songs.
+
+The local stack implementation stores take sources and range choices in format 2. Choosing, discarding, keeping and recording use the stack, and the existing editing and export paths use its resolved events. The deferred trial and results for the version on `main` are recorded below. Take displays, the join editor and the manual update follow in milestone 11. Same-pitch overlaps still use the scheduler's existing latest-end behaviour until join resolution is implemented.
+
+**Validation.** Native Linux GCC and Clang Debug each passed 1,348 tests, with three MIDI tests skipped in each. Whole-tree formatting passed. Tests cover selecting a silent range, editing the active source while preserving hidden material, saving and reopening ranges, rejecting the old take format, preservation through section edits, and using the chosen sources for MIDI chase and export. The format 2 fixture and the ordinary format 1 manual example also opened through the regular song reader.
+
+**To try without MIDI:** open [takes.modal](../tests/fixtures/takes.modal). In the arrangement, go to bar 3 on Keys and open the piano roll. Use `, k d` to reveal the longer take's B4, then `u` to restore the punch. Use `, k o` and check that the material in bars 1–2 stays audible and editable. In a MIDI trial, record a short replace punch over an existing part and check that the underlying notes return when you discard the punch. The MIDI trial is pending.
+
 ### Takes, step d: keeping and discarding takes, 26 November 2026
 
-The Takes leader group has `, k o` to keep only the playing take and `, k d` to discard it, each as an undo step. Both act on the cursor's section and track. Keeping only a take leaves the sound as it was and clears the tags on events still playing from discarded takes. Discarding removes all events tagged with that take and chooses the preceding take over its own span, or the next if the discarded take was first. Core changes the part in one edit even when the spans differ. The grammar and design describe the behaviour. Pending: desktop trial and the manual (step g).
+The Takes leader group has `, k o` to keep only the playing take and `, k d` to discard it, each as an undo step. Both act on the cursor's section and track. Keeping only a take leaves the sound as it was and clears the tags on events still playing from discarded takes. Discarding removes all events tagged with that take and chooses the preceding take over its own span, or the next if the discarded take was first. Core changes the part in one edit even when the spans differ. The grammar and design describe the behaviour. The commands were published in `876e893`, and [CI](https://github.com/neildurant/modal/actions/runs/45799606140) and the [manual build](https://github.com/neildurant/modal/actions/runs/45799606209) passed at `1be077a`. The desktop MIDI trial is pending. The manual update is scheduled with take stacks.
 
 **Validation.** Native Linux GCC and Clang Debug each built and passed 1,346 tests, with three MIDI tests skipped in each. Whole-tree formatting passed. Core tests cover both operations at both test PPQNs, including a shorter replacement and discarding the last take. The Workspace test drives the keys after actual replace passes through the fake-clock transport, checking the messages, playing notes and undo.
 

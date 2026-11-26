@@ -181,8 +181,8 @@ struct PlanOptions
     std::optional<DestinationId> metronomeDestination; // none leaves the metronome out
     bool bypassQuantize = false;                       // play every track as stored, to compare
     // While recording in replace mode, the tracks being recorded, which play only what comes
-    // before the record point, as replace will leave them: notes cut short there and pedals
-    // let up there (decided November 2026).
+    // before the record point. Notes are cut short and pedals let up for silent monitoring
+    // during the replace pass.
     std::vector<TrackId> replacing = {};
     Tick replacingFrom = 0;
     // A track's input, the default's being empty; without one, as for a machine without

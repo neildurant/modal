@@ -40,9 +40,6 @@ public:
 
     void erase(std::size_t index);
 
-    // Notes which take an event came from, which leaves its place in the order alone.
-    void setTake(std::size_t index, std::uint32_t take) { events_[index].take = take; }
-
     friend bool operator==(const EventList&, const EventList&) = default;
 
 private:

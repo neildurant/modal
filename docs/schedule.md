@@ -244,16 +244,22 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — `R` with a loop armed records it, each pass an undo step as the playhead wraps. Accepted on trial.
     - [x] **Done** — `R` while a loop plays, starting at the next pass. Accepted on trial.
     - [x] **Done** — Manual updates and final validation. Accepted on reading.
-- [ ] **Doing** — Basic take management (agreed 25 November 2026): a take is a performance, and the part notes which take each event came from. See [design.md](design.md#input-and-recording).
+- [ ] **Doing** — Basic take management on `main`. See [status.md](status.md) for the existing behaviour and trial.
     - [x] **Done** — Takes per section and track, the take on each event, saved with the song.
     - [x] **Done** — Replace recordings make takes: Before, and each loop pass. Accepted on trial.
     - [x] **Done** — `]t` / `[t` choose a take, stopped or playing. Accepted on trial.
     - [ ] **Doing** — `, k o` keeps only the take playing; `, k d` discards it. Desktop MIDI trial deferred. See [status.md](status.md).
-    - [ ] **To do** — Showing takes in the arrangement, section strip, piano roll and event list, settled from renders.
-    - [ ] **To do** — Palette support for takes.
-    - [ ] **To do** — Manual updates and final validation.
+- [ ] **Doing** — Take stacks and range comping. See [design.md](design.md#take-stacks-and-comping).
+    - [x] **Done** — Record the agreed stack, editing, join and Bake design and review mock-ups.
+    - [x] **Done** — Settle the file model and compatibility. Accept ordinary songs and refuse the old test take format.
+    - [ ] **Doing** — Stack, resolved playback, chase and export with saved songs. Automated checks passed. See [status.md](status.md).
+    - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Desktop MIDI trial pending. See [status.md](status.md).
+    - [ ] **To do** — Show active ranges and the take being edited in the arrangement, section strip, piano roll and event list.
+    - [ ] **To do** — Choose comp ranges, edit focused takes, copy selections between takes and show take lanes.
+    - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
+    - [ ] **To do** — Bake a comp to a chosen new or existing track.
+    - [ ] **To do** — Palette support, manual updates and final validation.
 - [ ] **To do** — Count-in and pre-roll choices between passes.
-- [ ] **To do** — Take lanes and comping. Ideas to weigh, not agreed, are in design.md, Feature notes (noted 15 November 2026).
 
 Resolve the related [design questions](design.md#to-decide) before implementation.
 

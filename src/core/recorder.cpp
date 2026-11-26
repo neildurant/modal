@@ -340,106 +340,22 @@ Song Recorder::finish(Song song, Tick stop) const
                 song.removeRamp(take.track, r);
             }
         }
-        std::vector<Event> played;
-        std::vector<Event> removed;
-        song.updateEvents(take.track, [&](EventList& events)
-                          { events = applied(events, take, stop, played, removed); });
+        std::vector<Event> releases;
+        const auto played = captured(take, stop, releases);
         if (mode_ == RecordMode::Replace)
         {
-            keepTakes(song, take.track, played, removed, stop);
+            song.addRecordedTake(take.track, start_, stop, recorded_, played);
+        }
+        else
+        {
+            song.updateEvents(take.track, [&](EventList& events)
+                              { events = overdubbed(events, played, releases, stop); });
         }
     }
     return song;
 }
 
-void Recorder::keepTakes(Song& song, TrackId track, std::span<const Event> played,
-                         std::span<const Event> removed, Tick stop) const
-{
-    for (std::size_t i = 0; i < song.sections().size(); ++i)
-    {
-        const Tick sectionStart = song.sectionStart(i);
-        const Tick from = std::max(start_, sectionStart);
-        const Tick to = std::min(stop, song.sectionStart(i + 1));
-        if (from >= to)
-        {
-            continue;
-        }
-        // Positioned from the section's start.
-        const auto within = [&](std::span<const Event> events)
-        {
-            EventList part;
-            for (auto event : events)
-            {
-                if (event.tick >= from && event.tick < to)
-                {
-                    event.tick -= sectionStart;
-                    event.take = 0;
-                    part.insert(std::move(event));
-                }
-            }
-            return part;
-        };
-        auto take = within(played);
-        auto before = within(removed);
-        if (take.empty() && before.empty())
-        {
-            continue;
-        }
-        song.updatePart(
-            i, track,
-            [&](TrackContent& part)
-            {
-                if (!before.empty())
-                {
-                    const auto it = std::ranges::find(part.takes, true, &Take::before);
-                    if (it == part.takes.end())
-                    {
-                        part.takes.insert(part.takes.begin(),
-                                          Take{part.nextTakeId(), from - sectionStart,
-                                               to - sectionStart, true, 0, std::move(before)});
-                    }
-                    else
-                    {
-                        it->from = std::min(it->from, from - sectionStart);
-                        it->to = std::max(it->to, to - sectionStart);
-                        for (const auto& event : before.all())
-                        {
-                            it->events.insert(event);
-                        }
-                    }
-                }
-                if (take.empty())
-                {
-                    return;
-                }
-                const auto id = part.nextTakeId();
-                // The events played, in the part, note the take; each is matched once.
-                std::vector<bool> tagged(part.events.size(), false);
-                for (const auto& event : take.all())
-                {
-                    // Only those at its tick, as the preview does this on every frame.
-                    const auto at = part.events.startingIn(event.tick, event.tick + 1);
-                    const auto first =
-                        static_cast<std::size_t>(at.data() - part.events.all().data());
-                    for (std::size_t e = first; e < first + at.size(); ++e)
-                    {
-                        const auto& candidate = part.events[e];
-                        if (!tagged[e] && candidate.take == 0 && candidate.data == event.data)
-                        {
-                            part.events.setTake(e, id);
-                            tagged[e] = true;
-                            break;
-                        }
-                    }
-                }
-                part.takes.push_back(Take{id, from - sectionStart, to - sectionStart, false,
-                                          recorded_, std::move(take)});
-            });
-    }
-}
-
-EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick stop,
-                            std::vector<Event>& played, std::vector<Event>& replaced) const
+EventList Recorder::captured(const TrackTake& take, Tick stop, std::vector<Event>& releases) const
 {
     // The take, kept to [start, stop), with what was held at the record point starting there.
     PedalState takeAtStart;
@@ -475,84 +391,47 @@ EventList Recorder::applied(const EventList& events, const TrackTake& take, Tick
         setEnd(note, end);
         recorded.push_back(std::move(note));
     }
-    std::vector<Event> heldAtStart;
+    EventList played;
     for (const auto& pedal : takeAtStart.down())
     {
-        heldAtStart.push_back({start_, pedal});
+        played.insert({start_, pedal});
     }
-    std::vector<Event> releasedAtStop;
+    for (auto& event : recorded)
+    {
+        played.insert(std::move(event));
+    }
     for (const auto& pedal : takeAtStop.down())
     {
-        releasedAtStop.push_back({stop, ControlChange{pedal.controller, 0}});
+        releases.push_back({stop, ControlChange{pedal.controller, 0}});
     }
+    return played;
+}
 
-    // What stays of the track, with its pedals patched at the edges of what was replaced.
-    PedalState oldAtStart;
+EventList Recorder::overdubbed(const EventList& events, const EventList& captured,
+                               const std::vector<Event>& releases, Tick stop) const
+{
+    auto result = merged(events, {captured.all().begin(), captured.all().end()});
     PedalState oldAtStop;
-    std::vector<Event> old;
     for (const auto& event : events.all())
     {
-        if (event.tick < start_)
+        if (event.tick > stop)
         {
-            oldAtStart.apply(event);
+            break;
         }
-        if (event.tick <= stop)
-        {
-            oldAtStop.apply(event);
-        }
-        if (mode_ == RecordMode::Overdub || event.tick >= stop)
-        {
-            old.push_back(event);
-        }
-        else if (event.tick < start_)
-        {
-            old.push_back(event);
-            if (event.isNote() && endOf(event) > start_)
-            {
-                setEnd(old.back(), start_);
-            }
-        }
-        else if (event.take == 0)
-        {
-            replaced.push_back(event);
-        }
+        oldAtStop.apply(event);
     }
-    std::vector<Event> upAtStart;
-    std::vector<Event> downAtStop;
-    for (const auto& pedal : oldAtStart.down())
+    for (const auto& event : releases)
     {
-        if (mode_ == RecordMode::Replace)
-        {
-            upAtStart.push_back({start_, ControlChange{pedal.controller, 0}});
-        }
+        result.insert(event);
     }
     for (const auto& pedal : oldAtStop.down())
     {
-        const bool released = std::ranges::any_of(
-            releasedAtStop, [&](const Event& event)
-            { return std::get<ControlChange>(event.data).controller == pedal.controller; });
-        if (mode_ == RecordMode::Replace || released)
+        if (std::ranges::any_of(
+                releases, [&](const Event& event)
+                { return std::get<ControlChange>(event.data).controller == pedal.controller; }))
         {
-            downAtStop.push_back({stop, pedal});
+            result.insert({stop, pedal});
         }
-    }
-
-    resolveOverlaps(old, recorded);
-    played.insert(played.end(), heldAtStart.begin(), heldAtStart.end());
-    played.insert(played.end(), recorded.begin(), recorded.end());
-
-    // At each tick, non-note events keep this order, and notes follow them.
-    std::vector<Event> all;
-    for (auto* part : {&old, &upAtStart, &heldAtStart, &recorded, &releasedAtStop, &downAtStop})
-    {
-        all.insert(all.end(), part->begin(), part->end());
-    }
-    std::ranges::stable_sort(all, {}, &Event::tick);
-
-    EventList result;
-    for (auto& event : all)
-    {
-        result.insert(std::move(event));
     }
     return result;
 }

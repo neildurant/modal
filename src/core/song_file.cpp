@@ -32,7 +32,9 @@ using textFormat::quotedText;
 using textFormat::Token;
 using textFormat::tokenize;
 
-constexpr int kVersion = 1;
+constexpr int kPlainVersion = 1;
+constexpr int kVersion = 2;
+constexpr auto kOldTakes = "this song uses the old take format, which cannot be opened";
 constexpr std::uintmax_t kMaxFileSize = 256u * 1024 * 1024;
 constexpr std::int64_t kMaxPpqn = std::int64_t{1} << 20;
 
@@ -212,6 +214,7 @@ private:
     bool readEvent(std::span<const Token> tokens);
     bool readRamp(std::span<const Token> tokens);
     bool readTake(std::span<const Token> tokens);
+    bool readComp(std::span<const Token> tokens);
     std::optional<EventData> eventData(std::span<const Token> tokens);
 
     // Ends the conductor's part of the section, ready for the tracks.
@@ -262,9 +265,11 @@ private:
         EventList events;
         std::vector<ControllerRamp> ramps;
         std::vector<Take> takes; // once one is open, the events read go into the last
+        std::vector<TakeRange> comp;
     };
 
     int line_ = 0;
+    int version_ = kPlainVersion;
     std::string error_;
     Stage stage_ = Stage::Version;
     Ppqn ppqn_ = kPpqn;
@@ -377,6 +382,10 @@ bool Reader::readLine(std::span<const Token> tokens)
     {
         return readTake(tokens);
     }
+    if (word == "comp")
+    {
+        return readComp(tokens);
+    }
     if (word == "track")
     {
         return stage_ == Stage::Header ? readTrack(tokens) : readBlock(tokens);
@@ -437,6 +446,7 @@ bool Reader::readVersion(std::span<const Token> tokens)
     {
         return fail("the song was written by a newer Modal (format " + tokens[1].text + ")");
     }
+    version_ = static_cast<int>(*version);
     stage_ = Stage::Song;
     return true;
 }
@@ -985,7 +995,8 @@ bool Reader::readMeter(std::span<const Token> tokens)
     }
 
     auto& meter = block_ ? block_->meter : section_->meter;
-    if (block_ ? !block_->events.empty() || !block_->ramps.empty() || !block_->takes.empty()
+    if (block_ ? !block_->events.empty() || !block_->ramps.empty() || !block_->takes.empty() ||
+                     !block_->comp.empty()
                : section_->meterClosed)
     {
         return fail("meter lines come first");
@@ -1153,7 +1164,7 @@ bool Reader::readBlock(std::span<const Token> tokens)
     {
         return fail("track " + tokens[1].text + " comes twice in this section");
     }
-    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}, {}});
+    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}, {}, {}});
     return true;
 }
 
@@ -1177,36 +1188,27 @@ bool Reader::readEvent(std::span<const Token> tokens)
     {
         return fail("the event is past the end of the section");
     }
-    // take=N last: the take the event came from.
-    auto rest = tokens.subspan(1);
-    std::uint32_t take = 0;
+    const auto rest = tokens.subspan(1);
     if (rest.size() > 1 && !rest.back().quoted && rest.back().text.starts_with("take="))
     {
-        const auto id = parseInteger(std::string_view{rest.back().text}.substr(5), 1,
-                                     std::numeric_limits<std::uint32_t>::max());
-        if (!id)
-        {
-            return fail("an event's take is a take's number, as take=2");
-        }
-        if (!block_->takes.empty())
-        {
-            return fail("an event in a take doesn't name one");
-        }
-        take = static_cast<std::uint32_t>(*id);
-        rest = rest.first(rest.size() - 1);
+        return fail(kOldTakes);
     }
     auto data = eventData(rest);
     if (!data)
     {
         return false;
     }
-    Event event{*tick, std::move(*data), take};
+    Event event{*tick, std::move(*data)};
     if (!isValid(event))
     {
         return fail("the event has a value out of range");
     }
     if (!block_->takes.empty())
     {
+        if (!block_->comp.empty())
+        {
+            return fail("take events come before comp ranges");
+        }
         auto& open = block_->takes.back();
         if (event.tick < open.from || event.tick >= open.to)
         {
@@ -1221,13 +1223,19 @@ bool Reader::readEvent(std::span<const Token> tokens)
 
 bool Reader::readTake(std::span<const Token> tokens)
 {
+    if (version_ == kPlainVersion || (tokens.size() > 2 && tokens[2].text == "before"))
+    {
+        return fail(kOldTakes);
+    }
     if (!block_)
     {
         return fail("a take belongs in a track, in a section");
     }
-    const bool before = tokens.size() > 2 && !tokens[2].quoted && tokens[2].text == "before";
-    const auto span = tokens.subspan(before ? 3 : 2);
-    if (tokens.size() < 4 || span.size() < 2 || span.size() > 3)
+    if (!block_->comp.empty())
+    {
+        return fail("takes come before comp ranges");
+    }
+    if (tokens.size() < 4 || tokens.size() > 5)
     {
         return fail("a take is a number and its span, as take 2 5:1:0 7:1:0 recorded=1764000000");
     }
@@ -1236,9 +1244,9 @@ bool Reader::readTake(std::span<const Token> tokens)
     {
         return fail("a take's number is from 1");
     }
+    const auto span = tokens.subspan(2);
     Take take;
     take.id = static_cast<std::uint32_t>(*id);
-    take.before = before;
     if (std::ranges::find(block_->takes, take.id, &Take::id) != block_->takes.end())
     {
         return fail("take " + tokens[1].text + " comes twice in this track");
@@ -1271,6 +1279,33 @@ bool Reader::readTake(std::span<const Token> tokens)
         take.recorded = *recorded;
     }
     block_->takes.push_back(std::move(take));
+    return true;
+}
+
+bool Reader::readComp(std::span<const Token> tokens)
+{
+    if (version_ == kPlainVersion)
+    {
+        return fail("comp ranges require song format 2");
+    }
+    if (!block_ || tokens.size() != 4)
+    {
+        return fail("a comp range belongs in a track, as comp 2 5:1:0 7:1:0");
+    }
+    const auto id = parseInteger(tokens[1].text, 0, std::numeric_limits<std::uint32_t>::max());
+    const auto& meter = block_->meter ? *block_->meter : section_->section->meter();
+    const auto from = tickAt(meter, tokens[2].text);
+    const auto to = tickAt(meter, tokens[3].text);
+    if (!id || !from || !to)
+    {
+        return fail("a comp range needs a take number and two positions");
+    }
+    if (*from >= *to || *to > section_->section->length() ||
+        (!block_->comp.empty() && *from < block_->comp.back().to))
+    {
+        return fail("comp ranges must run forwards in time order without overlaps");
+    }
+    block_->comp.push_back({*from, *to, static_cast<std::uint32_t>(*id)});
     return true;
 }
 
@@ -1629,14 +1664,11 @@ bool Reader::closeBlock()
     {
         std::ranges::stable_sort(block_->ramps, {}, &ControllerRamp::start);
         TrackContent content{std::move(block_->meter), std::move(block_->events),
-                             std::move(block_->ramps), std::move(block_->takes)};
-        for (const auto& event : content.events.all())
+                             std::move(block_->ramps), std::move(block_->takes),
+                             std::move(block_->comp)};
+        if (!content.validTakes(section_->section->length()))
         {
-            if (event.take != 0 && content.take(event.take) == nullptr)
-            {
-                return fail("an event names take " + std::to_string(event.take) +
-                            ", which the track doesn't have here");
-            }
+            return fail("a comp range names a missing take or runs outside its span");
         }
         section_->section->setContent(block_->id, std::move(content));
         block_.reset();
@@ -1839,14 +1871,32 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
             for (const auto& take : content->takes)
             {
                 Take scaledTake = take;
-                scaledTake.from = scale(take.from);
+                scaledTake.from = std::min(scale(take.from), length - 1);
                 scaledTake.to = std::max(scale(take.to), scaledTake.from + 1);
                 scaledTake.events = {};
                 for (const auto& event : take.events.all())
                 {
-                    scaledTake.events.insert(scaledEvent(event));
+                    auto moved = scaledEvent(event);
+                    if (moved.tick >= scaledTake.to)
+                    {
+                        if (auto* note = std::get_if<Note>(&moved.data))
+                        {
+                            note->duration += moved.tick - (scaledTake.to - 1);
+                        }
+                        moved.tick = scaledTake.to - 1;
+                    }
+                    scaledTake.events.insert(std::move(moved));
                 }
                 scaled.takes.push_back(std::move(scaledTake));
+            }
+            for (const auto& range : content->comp)
+            {
+                const auto from = scale(range.from);
+                const auto to = scale(range.to);
+                if (from < to)
+                {
+                    scaled.comp.push_back({from, to, range.take});
+                }
             }
             for (auto ramp : content->ramps)
             {
@@ -1905,7 +1955,19 @@ std::string writeSong(const Song& song)
         out += '\n';
     };
 
-    line(0, "modal-song " + std::to_string(kVersion));
+    const bool hasTakes =
+        std::ranges::any_of(song.sections(),
+                            [&](const auto& section)
+                            {
+                                return std::ranges::any_of(song.tracks(),
+                                                           [&](const auto& track)
+                                                           {
+                                                               const auto* part =
+                                                                   section->content(track->id());
+                                                               return part && !part->takes.empty();
+                                                           });
+                            });
+    line(0, "modal-song " + std::to_string(hasTakes ? kVersion : kPlainVersion));
     line(0, "song " + quotedText(song.title) + " ppqn=" + std::to_string(ppqn.value));
 
     const auto& metronome = song.metronome;
@@ -2144,15 +2206,14 @@ std::string writeSong(const Song& song)
             for (const auto& event : content->events.all())
             {
                 line(2, positionText(trackMeter, event.tick) + " " +
-                            std::visit(eventText, event.data) +
-                            (event.take != 0 ? " take=" + std::to_string(event.take) : ""));
+                            std::visit(eventText, event.data));
             }
             // Each take after the part, its events under it, as played.
             for (const auto& take : content->takes)
             {
-                std::string takeText =
-                    "take " + std::to_string(take.id) + (take.before ? " before " : " ") +
-                    positionText(trackMeter, take.from) + " " + positionText(trackMeter, take.to);
+                std::string takeText = "take " + std::to_string(take.id) + " " +
+                                       positionText(trackMeter, take.from) + " " +
+                                       positionText(trackMeter, take.to);
                 if (take.recorded != 0)
                 {
                     takeText += " recorded=" + std::to_string(take.recorded);
@@ -2163,6 +2224,12 @@ std::string writeSong(const Song& song)
                     line(3, positionText(trackMeter, event.tick) + " " +
                                 std::visit(eventText, event.data));
                 }
+            }
+            for (const auto& range : content->comp)
+            {
+                line(2, "comp " + std::to_string(range.take) + " " +
+                            positionText(trackMeter, range.from) + " " +
+                            positionText(trackMeter, range.to));
             }
         }
     }

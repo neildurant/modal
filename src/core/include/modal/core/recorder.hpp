@@ -41,10 +41,8 @@ public:
     // Input from another play, or from none, is ignored.
     void receive(const StampedInput& input);
 
-    // The song with the take applied, recording having stopped at `stop`. If that's not after
-    // the record point, the song is unchanged. In replace mode, what was played is kept as a
-    // take in each section it reaches, its events in the part noting it, and what it replaced
-    // that came from no take is kept in the section's Before take (decided 25 November 2026).
+    // Applies the recording up to stop. Replace adds a source to each affected section's
+    // stack, and overdub adds the captured events to the playing part.
     Song finish(Tick stop) const;
 
     // The same, onto the song as it is when recording stops, so edits made while recording
@@ -105,14 +103,9 @@ private:
                 std::uint8_t velocity, Tick tick);
     void noteOff(TrackTake& take, InputId input, std::uint8_t inChannel, std::uint8_t pitch,
                  std::uint8_t releaseVelocity, Tick tick);
-    // The track's events with the take applied; what was played from the record point, and
-    // what was removed that came from no take, are added to the last two.
-    EventList applied(const EventList& events, const TrackTake& take, Tick stop,
-                      std::vector<Event>& played, std::vector<Event>& replaced) const;
-    // Keeps what was played as a take of each section it reaches, and what was removed as
-    // their Before (see finish()).
-    void keepTakes(Song& song, TrackId track, std::span<const Event> played,
-                   std::span<const Event> removed, Tick stop) const;
+    EventList captured(const TrackTake& take, Tick stop, std::vector<Event>& releases) const;
+    EventList overdubbed(const EventList& events, const EventList& captured,
+                         const std::vector<Event>& releases, Tick stop) const;
 
     Song song_;
     std::uint64_t play_;

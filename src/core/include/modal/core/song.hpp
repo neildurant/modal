@@ -55,22 +55,25 @@ struct Mark
     friend bool operator==(const Mark&, const Mark&) = default;
 };
 
-// A take (decided 25 November 2026): a performance recorded onto a track in a section, the
-// events played and the span recorded, positioned from the section's start. The part that plays
-// is ordinary events, each noting the take it came from; choosing a take puts its events in
-// place of what starts in its span.
+// An editable source in a track's stack, positioned from the section's start.
 struct Take
 {
-    std::uint32_t id = 1; // from 1, unique among its part's takes, and what its events note
-    Tick from = 0;        // the span recorded
+    std::uint32_t id = 1; // unique in its part, above zero
+    Tick from = 0;
     Tick to = 0;
-    // Not a performance but what a replace recording removed that came from no take, kept so
-    // it can be chosen again.
-    bool before = false;
     std::int64_t recorded = 0; // when, in seconds since 1970 (UTC); 0 if not known
-    EventList events;          // as played, each noting no take
+    EventList events;
 
     friend bool operator==(const Take&, const Take&) = default;
+};
+
+struct TakeRange
+{
+    Tick from;
+    Tick to;
+    std::uint32_t take; // zero chooses the ordinary events under the stack
+
+    friend bool operator==(const TakeRange&, const TakeRange&) = default;
 };
 
 // One track's part of a section, positioned from the section's start.
@@ -79,12 +82,13 @@ struct TrackContent
     // The track's own meter here, or none to follow the conductor's. The section's end cuts
     // its last bar short if the bar would run past it.
     std::optional<MeterMap> meter;
-    // Its own events, including any its ramps hide.
+    // Ordinary events under the stack, including any its ramps hide.
     EventList events;
     // Its controller ramps, in order of start, each ending before the section does.
     std::vector<ControllerRamp> ramps;
-    // Its takes, in the order recorded, Before first where there is one.
+    // Its takes, oldest first, and explicit playback choices in time order.
     std::vector<Take> takes;
+    std::vector<TakeRange> comp{};
 
     bool empty() const { return !meter && events.empty() && ramps.empty() && takes.empty(); }
 
@@ -92,9 +96,7 @@ struct TrackContent
     const Take* take(std::uint32_t id) const;
     // An id for a new take: one more than the highest.
     std::uint32_t nextTakeId() const;
-    // Clears the take noted by any event that names no take here, as an event moved or put from
-    // elsewhere would.
-    void forgetUnknownTakes();
+    bool validTakes(Tick sectionLength) const;
 
     friend bool operator==(const TrackContent&, const TrackContent&) = default;
 };
@@ -436,13 +438,13 @@ public:
     bool updateMeter(TrackId id, const std::function<void(MeterMap&)>& edit);
     bool updateEvents(TrackId id, const std::function<void(EventList&)>& edit);
 
-    // Edits a track's part of one section directly, its events, ramps and takes, positioned
-    // from the section's start, as keeping takes does (decided 25 November 2026). Its meter is
-    // left as it was, and events noting a take the part doesn't have note none. Returns false,
-    // changing nothing, for no such section or track, or for an event or take starting outside
-    // the section.
+    // Edits a track's part of one section, using section-relative positions. Its meter is kept.
+    // Returns false for an unknown section or track, or for invalid events, takes or choices.
     bool updatePart(std::size_t section, TrackId id,
                     const std::function<void(TrackContent&)>& edit);
+
+    void addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded,
+                         const EventList& events);
 
     // Sets the meter over a span of time, never moving an event: the conductor's (and so the
     // tracks following it), or one track's, which then has a meter of its own in each section
