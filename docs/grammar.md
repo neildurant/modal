@@ -338,7 +338,9 @@ While recording or waiting for its take to finish after stopping, save, export, 
 
 `, k o` keeps only the take playing at the cursor on its section and track. Material still heard from other takes stays as ordinary events. `, k d` discards the playing take and reveals the material below it. Both keys work stopped or during playback, and `u` undoes each change.
 
-`, k c` chooses a take for the cursor's bar or the Visual time selection on the current track, within one section. The take lanes open beneath the arrangement track or the piano-roll ruler. `j` and `k` or Down and Up highlight takes that cover the entire range. `p` toggles preview, Space starts or stops playback, Enter applies the highlighted take over the range in one undo step, and Escape closes the lanes and cancels the preview.
+`, k c` chooses a take for the cursor's bar or the Visual time selection on the current track, within one section. The take lanes open beneath the arrangement track or the piano-roll ruler. `j` and `k` or Down and Up highlight takes that cover the entire range. `p` toggles preview, Space starts or stops playback, Enter applies the highlighted take over the range in one undo step, and Escape leaves the chooser and cancels the preview.
+
+`, k v` shows or hides the take lanes while working in the arrangement and piano roll, including while selecting a range. The same visibility setting applies in both views. Enter or Escape leaves the chooser and returns to that visibility setting. The chooser's hints and preview indicator are at the bottom.
 
 ## The Metronome page
 

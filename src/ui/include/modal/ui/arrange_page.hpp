@@ -21,7 +21,7 @@
 namespace modal::ui
 {
 
-struct TakeChoice;
+struct TakeLaneDisplay;
 
 // The arrangement's tracks and ruler, first sketched in milestone 3's test view and drawn by the
 // arrangement view (see ArrangeView). A row for each track, with its number and name in text cells,
@@ -134,8 +134,7 @@ public:
                     std::optional<Selected> selected = std::nullopt,
                     const std::vector<core::TrackId>& moving = {}, bool ownMeters = true,
                     bool recording = false, const core::ArmedSpans& ranges = {},
-                    const TakeChoice* takeChoice = nullptr,
-                    const core::Song* saved = nullptr) const;
+                    const TakeLaneDisplay* lanes = nullptr) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

@@ -286,6 +286,7 @@ public:
     // Whether to tint the bars where a track has a meter of its own (ownmeter).
     virtual bool ownMeter() const = 0;
     virtual const TakeChoice* takeChoice() const { return nullptr; }
+    virtual bool takeLanesVisible() const { return false; }
     // Where the punch range armed in the song is, to show it in the ruler.
     virtual std::optional<core::ArmedSpan> punchSpan() const { return std::nullopt; }
     // The punch and loop ranges armed, where they are now, for the rulers' brackets.

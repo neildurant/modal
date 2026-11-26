@@ -146,6 +146,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return removeTakes(name == "take-keep-only");
                 if (name == "take-choose-range")
                     return chooseTakeRange();
+                if (name == "take-lanes-toggle")
+                    return toggleTakeLanes();
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);

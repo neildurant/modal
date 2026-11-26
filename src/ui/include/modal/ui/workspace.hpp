@@ -1410,7 +1410,10 @@ private:
     CommandResult stepTake(int count, bool forward);
     CommandResult removeTakes(bool keepOnly);
     const TakeChoice* takeChoice() const override { return takeChoice_ ? &*takeChoice_ : nullptr; }
+    bool takeLanesVisible() const override { return showTakeLanes_ || takeChoice_.has_value(); }
+    bool showTakeLanes_ = false;
     std::optional<TakeChoice> takeChoice_;
+    CommandResult toggleTakeLanes();
     CommandResult chooseTakeRange();
     bool takeChoiceKey(const Key& key);
     void updateTakePreview();

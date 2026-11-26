@@ -899,6 +899,8 @@ Decided 27 November 2026 to keep the event list's source colour in the Take colu
 
 Decided 27 November 2026 to use the same take chooser in the arrangement and piano roll. The arrangement stack expands beneath its track, so a broad assignment can be made in context. The chooser anchors a bar or Visual time range and keeps moving the highlight, previewing and applying separate. This makes the affected time visible before an edit and keeps earlier range choices outside it.
 
+After the take chooser trial on 27 November 2026, add `, k v` so the lanes can guide range selection before opening the chooser. Put the lanes directly below the playing ranges. The selection outline identifies the candidate, the ruler identifies the time, and the bottom message row supplies the controls and preview state.
+
 ## Loop playback (24 November 2026)
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).

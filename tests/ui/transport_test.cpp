@@ -3246,18 +3246,28 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
         {
             if (std::ranges::any_of(
                     region.text, [](const TextRun& run)
-                    { return contains(run.text, U"↑/↓") && contains(run.text, U"Enter Apply"); }))
+                    { return run.text == U"T1" && run.style.foreground == Role::Take1; }))
                 return true;
         }
         return false;
     };
+    const auto bottomHas = [&](std::u32string_view text)
+    {
+        const auto frame = p.ws.frame();
+        return std::ranges::any_of(frame[frame.size() - 2].text,
+                                   [&](const TextRun& run) { return contains(run.text, text); });
+    };
 
     const auto before = p.document.version();
+    CHECK_FALSE(showsLanes());
     p.type(U",kc");
     REQUIRE(showsLanes());
+    CHECK(bottomHas(U"↑/↓"));
+    CHECK(bottomHas(U"Enter Apply"));
     p.press(Key::of(NamedKey::Up));
     p.type(U"p");
     REQUIRE(p.document.hasPreview());
+    CHECK(bottomHas(U"Previewing"));
     CHECK(p.document.version() == before);
     CHECK(chosen(p.document.underlying(), 0) == 2);
     CHECK(chosen(p.ws.playbackSong(), 0) == 1);
@@ -3270,16 +3280,28 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     p.runFor(50ms);
     p.press(Key::of(NamedKey::Escape));
     CHECK_FALSE(showsLanes());
+    CHECK_FALSE(bottomHas(U"Enter Apply"));
     CHECK_FALSE(p.document.hasPreview());
     CHECK(p.document.version() == before);
 
-    p.type(U"vl,kc");
+    p.type(U",kv");
+    CHECK(showsLanes());
+    CHECK_FALSE(bottomHas(U"Enter Apply"));
+    p.type(U"vl");
+    CHECK(showsLanes());
+    CHECK_FALSE(bottomHas(U"Enter Apply"));
+    p.type(U",kc");
     REQUIRE(showsLanes());
+    CHECK(bottomHas(U"Enter Apply"));
     p.type(U"k");
     p.press(Key::of(NamedKey::Enter));
+    CHECK(showsLanes());
+    CHECK_FALSE(bottomHas(U"Enter Apply"));
     CHECK_FALSE(p.document.hasPreview());
     CHECK(chosen(p.document.underlying(), 0) == 1);
     CHECK(chosen(p.document.underlying(), bar) == (piano ? 2 : 1));
     p.type(U"u");
     CHECK(chosen(p.document.underlying(), 0) == 2);
+    p.type(U",kv");
+    CHECK_FALSE(showsLanes());
 }

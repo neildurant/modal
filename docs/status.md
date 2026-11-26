@@ -28,6 +28,10 @@ The local stack implementation stores take sources and range choices in format 2
 
 **Take-lane validation.** GCC and Clang Debug each passed 1,352 tests, with three MIDI tests skipped. Whole-tree formatting passed. The updated recording chapter built in HTML and PDF.
 
+**Take-lane display follow-up, 27 November 2026.** The chooser worked on desktop trial. To review the refinements, press `, k v` on Keys in the saved fixture. The lanes stay beneath the comp strip while marking time and after Enter or Escape leaves the chooser. Press `, k v` again to hide them, then use `, k c` to check that they appear for the choice and collapse when it ends. Check the bottom row for the arrow and `j`/`k` hints and **Previewing** while preview is on. New offscreen renders are in `build/review/takes/take-lanes-*-select.png` and `take-lanes-*-preview-clean.png`. The visual follow-up and real MIDI recording trial are pending.
+
+**Follow-up validation.** GCC and Clang Debug each passed 1,352 tests, with three MIDI tests skipped. The chooser regression checks visibility before selection and after leaving the chooser, and that its keys and preview state are in the bottom row. Whole-tree formatting passed, and the manual built in HTML and PDF.
+
 **Section counts and event sources.** Open the saved fixture and check that the arrangement shows `Verse · 4 takes`, three on Keys and one on Bass. Open the event list on Keys with `ge` and check the coloured `T2` and `T3` cells, and the empty cells for bars 4 and 5. Narrow windows retain the editing columns. Offscreen renders are in `build/review/takes` as `section-count*.png`, `event-source.png`, `event-source-compact.png` and `take-palette-piano.png`. GCC and Clang Debug each passed 1,351 tests, with three MIDI tests skipped. Whole-tree formatting passed. The recording chapter describes the display and both HTML and PDF built. The take display was accepted on 27 November 2026. The real MIDI recording trial remains pending. Next is the take-lane and range-comping step in the schedule.
 
 ### Takes, step d: keeping and discarding takes, 26 November 2026

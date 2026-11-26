@@ -30,62 +30,36 @@ Role takeColour(std::uint32_t id)
     return colours[(id - 1) % colours.size()];
 }
 
-int takeLaneRows(const core::Song& song, const TakeChoice* choice, int available)
+int TakeLaneDisplay::rows(int available) const
 {
-    if (!choice || available < 3 || choice->section >= song.sections().size())
-        return 0;
-    const auto* part = song.sections()[choice->section]->content(choice->track);
-    return part ? std::min(available, 2 + static_cast<int>(part->takes.size())) : 0;
+    return part && available > 0 ? std::min(available, static_cast<int>(part->takes.size())) : 0;
 }
 
-Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds, TimeScale scale,
-                 CellSize cell)
+TakeLaneDisplay takeLaneDisplay(const core::Song& song, SongCursor cursor, const TakeChoice* choice)
+{
+    if (!cursor.track)
+        return {};
+    const auto section = choice ? choice->section : song.sectionAt(cursor.tick);
+    if (section >= song.sections().size())
+        return {};
+    const auto& source = *song.sections()[section];
+    return {source.content(*cursor.track), song.sectionStart(section), source.length(), choice};
+}
+
+Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell)
 {
     Region panel{
         .bounds = bounds, .background = Role::Background, .text = {}, .under = {}, .over = {}};
-    const auto& section = *saved.sections()[choice.section];
-    const auto& part = *section.content(choice.track);
-    const auto start = saved.sectionStart(choice.section);
-    const auto shown = static_cast<std::size_t>(bounds.height / cell.height - 2);
-    const auto selected = std::ranges::find(part.takes, choice.take(), &core::Take::id);
+    const auto& part = *display.part;
+    const auto* choice = display.choice;
+    const auto selected = choice ? choice->take() : 0;
+    const auto start = display.sectionStart;
+    const auto shown = static_cast<std::size_t>(bounds.height / cell.height);
+    const auto focused = std::ranges::find(part.takes, selected, &core::Take::id);
     const auto index =
-        selected == part.takes.end() ? 0U : static_cast<std::size_t>(selected - part.takes.begin());
+        focused == part.takes.end() ? 0U : static_cast<std::size_t>(focused - part.takes.begin());
     const auto first = std::min(index >= shown ? index - shown + 1 : 0, part.takes.size() - shown);
-    const auto label = [&](std::uint32_t id)
-    {
-        const auto take = std::ranges::find(part.takes, id, &core::Take::id);
-        return take == part.takes.end() ? std::string{"Part"}
-                                        : "T" + std::to_string(take - part.takes.begin() + 1);
-    };
-    const auto selectedRanges =
-        core::activeTakeRanges(part, choice.from - start, choice.to - start);
-    const auto active = core::activeTakeRanges(part, 0, section.length());
-    const auto playing = selectedRanges.size() == 1 ? label(selectedRanges.front().take)
-                                                    : std::string{"several sources"};
-    const auto& meter = saved.meter(choice.track);
-    const auto firstBar = meter.toBarBeatTick(choice.from).bar;
-    const auto endBar = meter.toBarBeatTick(choice.to).bar;
-    const bool wholeBars =
-        choice.from == meter.barStart(firstBar) && choice.to == meter.barStart(endBar);
-    const auto span = !wholeBars
-                          ? positionText(meter, choice.from) + "–" + positionText(meter, choice.to)
-                      : endBar == firstBar + 1
-                          ? "Bar " + std::to_string(firstBar)
-                          : "Bars " + std::to_string(firstBar) + "–" + std::to_string(endBar - 1);
-    auto title = "Takes · " + section.name() + " · " + span;
-    if (choice.preview)
-        title += " · Previewing " + label(choice.take()) + " · Cancel restores " + playing;
-    else if (choice.take())
-        title += " · " + label(choice.take()) + " highlighted · Plays " + playing;
-    if (shown < part.takes.size())
-        title += " · " + std::to_string(first + 1) + "–" + std::to_string(first + shown) + " of " +
-                 std::to_string(part.takes.size());
-    panel.under.push_back({{0, 0, bounds.width, 2 * cell.height}, Role::Bar, 255});
-    panel.text.push_back({cell.width, 0, decodeUtf8(title), {Role::Text, Role::Bar, kBold}});
-    const auto keys = !choice.take()   ? U"No take covers the range   Esc Close"
-                      : choice.preview ? U"j/k ↑/↓ Take   p End preview   Enter Apply   Esc Cancel"
-                                       : U"j/k ↑/↓ Take   p Preview   Enter Apply   Esc Cancel";
-    panel.text.push_back({cell.width, cell.height, keys, {Role::BarText, Role::Bar, kPlain}});
+    const auto active = core::activeTakeRanges(part, 0, display.sectionLength);
 
     const int left = std::clamp(scale.x, 0, bounds.width);
     const auto xAt = [&](core::Tick tick)
@@ -95,7 +69,7 @@ Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds,
     {
         const auto& take = part.takes[i];
         const auto colour = takeColour(take.id);
-        const int y = (2 + static_cast<int>(i - first)) * cell.height;
+        const int y = static_cast<int>(i - first) * cell.height;
         const int top = y + inset;
         const int height = cell.height - 2 * inset;
         panel.under.push_back(
@@ -113,12 +87,12 @@ Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds,
             if (range.take == take.id)
                 band(range.from, range.to, 160);
         }
-        if (take.id == choice.take())
+        if (choice && take.id == selected)
         {
-            if (choice.preview)
-                band(choice.from - start, choice.to - start, 160);
-            const int x = xAt(choice.from);
-            const int w = xAt(choice.to) - x;
+            if (choice->preview)
+                band(choice->from - start, choice->to - start, 160);
+            const int x = xAt(choice->from);
+            const int w = xAt(choice->to) - x;
             if (w > 0 && height > 1)
             {
                 for (const int line : {top, top + height - 1})
@@ -137,8 +111,10 @@ Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds,
             const int width = note ? std::max(xAt(tick + note->duration) - x, 1) : 2;
             panel.over.push_back({{x, y + cell.height / 2, width, 2}, colour, 255});
         }
-        panel.text.push_back(
-            {cell.width, y, decodeUtf8(label(take.id)), {colour, Role::Background, kBold}});
+        panel.text.push_back({cell.width,
+                              y,
+                              decodeUtf8("T" + std::to_string(i + 1)),
+                              {colour, Role::Background, kBold}});
     }
     return panel;
 }

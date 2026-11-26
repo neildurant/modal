@@ -227,7 +227,8 @@ std::vector<std::string> Workspace::messageLines() const
 {
     // Whether the message row holds it, with what's beside it; if not, its words in lines as
     // wide as the window.
-    if (message_.empty() || promptRowShown())
+    if (message_.empty() || promptRowShown() ||
+        (takeChoice_ && messageKind_ != MessageKind::Warning))
     {
         return {};
     }
@@ -301,6 +302,17 @@ Bar Workspace::messageBar(bool withMessage) const
     const Style text{Role::BarText, Role::MessageLine, kPlain};
     const Style dim{Role::Dim, Role::MessageLine, kPlain};
     const Style accent{Role::Accent, Role::MessageLine, kPlain};
+    if (takeChoice_ && (message_.empty() || messageKind_ != MessageKind::Warning))
+    {
+        if (takeChoice_->preview)
+            row.left.push_back({"Previewing   ", accent});
+        row.left.push_back({!takeChoice_->take() ? "No take covers the range   Esc Close"
+                            : takeChoice_->preview
+                                ? "j/k ↑/↓ Take   p End preview   Enter Apply   Esc Cancel"
+                                : "j/k ↑/↓ Take   p Preview   Enter Apply   Esc Cancel",
+                            text});
+        return row;
+    }
     // A list narrowed by typing: its label, what's typed and the cursor after it, as the :
     // prompt has, so it's plain it can be typed into (decided 20 November 2026, after use).
     const auto typing = [&](std::string label, const std::u32string& typed)

@@ -525,6 +525,10 @@ roll. The lanes open beneath the current track in the arrangement, or below
 the piano-roll ruler. Each lane shows the stored performance. Brighter
 shading shows where the saved comp uses that take.
 
+Use `, k v` (view) if you want the lanes visible while you mark the range.
+This applies in both views. The lanes stay visible when you leave the
+chooser, and `, k v` hides them again.
+
 The chooser takes the cursor's bar by default. To choose a shorter phrase
 or several bars at once, make a Visual time selection within one section
 before opening it. For example, to replace just bar three of a long
@@ -533,7 +537,8 @@ highlight to the punch with `j` or `k`, or with the arrow keys. The outline
 shows the time that would change. The highlighted take must cover that whole
 span.
 
-Press `p` to preview the highlighted take and Space to start or stop
-playback. The preview changes what you hear for that range. Enter applies
-the highlighted take in one undoable edit. Escape closes the lanes and
+The bottom line lists the controls. Press `p` to preview the highlighted
+take and Space to start or stop playback. **Previewing** appears at the
+bottom while the temporary choice is in effect. Enter applies the
+highlighted take in one undoable edit. Escape leaves the chooser and
 returns playback to the choices you had before the preview.

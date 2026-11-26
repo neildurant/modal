@@ -343,16 +343,13 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                              std::optional<Selected> selected,
                              const std::vector<core::TrackId>& moving, bool ownMeters,
                              bool recording, const core::ArmedSpans& ranges,
-                             const TakeChoice* takeChoice, const core::Song* saved) const
+                             const TakeLaneDisplay* lanes) const
 {
     const int columns = (main_.width + cell_.width - 1) / cell_.width;
     const int rows = (main_.height + cell_.height - 1) / cell_.height;
     const auto tracks = song_.tracks();
     const int trackRows = rows - kRulerRows;
-    const int takeRows =
-        saved && track_ < tracks.size() && takeChoice && tracks[track_]->id() == takeChoice->track
-            ? takeLaneRows(*saved, takeChoice, (trackRows + 1) / 2)
-            : 0;
+    const int takeRows = lanes ? lanes->rows(std::min((trackRows + 1) / 2, trackRows - 1)) : 0;
     const int room = trackRows - takeRows;
     auto topTrack = topTrack_;
     if (takeRows > 0)
@@ -913,7 +910,7 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
         auto takeScale = scale;
         takeScale.x = timelineX;
         const int y = (trackLine(static_cast<int>(track_ - topTrack)) + 1) * cell_.height;
-        frame.push_back(takeLanes(*saved, *takeChoice,
+        frame.push_back(takeLanes(*lanes,
                                   {main_.x, main_.y + y, main_.width, takeRows * cell_.height},
                                   takeScale, cell_));
     }

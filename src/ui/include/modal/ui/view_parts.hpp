@@ -225,9 +225,20 @@ struct TimeScale;
 
 // The same palette entry for a take in each view, even if its displayed number changes.
 Role takeColour(std::uint32_t id);
-int takeLaneRows(const core::Song& song, const TakeChoice* choice, int available);
-Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds, TimeScale scale,
-                 CellSize cell);
+
+struct TakeLaneDisplay
+{
+    const core::TrackContent* part = nullptr;
+    core::Tick sectionStart = 0;
+    core::Tick sectionLength = 0;
+    const TakeChoice* choice = nullptr;
+
+    int rows(int available) const;
+};
+
+TakeLaneDisplay takeLaneDisplay(const core::Song& song, SongCursor cursor,
+                                const TakeChoice* choice);
+Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, CellSize cell);
 
 // Label the part of each active take that is visible on a timeline row.
 void addTakeBands(Region& region, const core::Song& song, core::TrackId track,

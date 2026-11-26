@@ -37,6 +37,13 @@ std::string barsText(const core::Song& song, core::Tick from, core::Tick to)
 
 } // namespace
 
+CommandResult Workspace::toggleTakeLanes()
+{
+    showTakeLanes_ = !showTakeLanes_;
+    layOut();
+    return {true, showTakeLanes_ ? "Take lanes shown" : "Take lanes hidden"};
+}
+
 CommandResult Workspace::chooseTakeRange()
 {
     if (recording_.pending())
