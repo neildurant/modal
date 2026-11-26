@@ -74,4 +74,53 @@ bool chooseTake(Song& song, std::size_t section, TrackId track, std::uint32_t ta
                            });
 }
 
+std::size_t keepOnlyTake(Song& song, std::size_t section, TrackId track, std::uint32_t take)
+{
+    if (section >= song.sections().size())
+        return 0;
+    const auto* part = song.sections()[section]->content(track);
+    if (part == nullptr || part->take(take) == nullptr)
+        return 0;
+    const auto others = part->takes.size() - 1;
+    if (others == 0)
+        return 0;
+    song.updatePart(section, track,
+                    [&](TrackContent& edited)
+                    { std::erase_if(edited.takes, [&](const Take& t) { return t.id != take; }); });
+    return others;
+}
+
+Discarded discardTake(Song& song, std::size_t section, TrackId track, std::uint32_t take)
+{
+    if (section >= song.sections().size())
+        return {};
+    const auto* part = song.sections()[section]->content(track);
+    if (part == nullptr || part->take(take) == nullptr)
+        return {};
+    const auto& takes = part->takes;
+    const auto at = static_cast<std::size_t>(std::ranges::find(takes, take, &Take::id) -
+                                             takes.begin());
+    Discarded result{true, std::nullopt};
+    if (takes.size() > 1)
+        result.instead = takes[at > 0 ? at - 1 : at + 1].id;
+    if (result.instead)
+        chooseTake(song, section, track, *result.instead);
+    song.updatePart(section, track,
+                    [&](TrackContent& edited)
+                    {
+                        if (!result.instead)
+                        {
+                            EventList kept;
+                            for (const auto& event : edited.events.all())
+                            {
+                                if (event.take != take)
+                                    kept.insert(event);
+                            }
+                            edited.events = std::move(kept);
+                        }
+                        std::erase_if(edited.takes, [&](const Take& t) { return t.id == take; });
+                    });
+    return result;
+}
+
 } // namespace modal::core
