@@ -6,6 +6,10 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 ## Current handoff
 
+### Takes, step d: keeping and discarding takes, started 26 November 2026
+
+Not on `main` yet. The branch `takes-discard-wip` holds a first draft of the core functions, `keepOnlyTake` and `discardTake` in `takes.hpp` / `takes.cpp`, **not yet built or tested**. Still to do: build and test them, then the `, k` group (`, k o` keeps only the take playing, `, k d` discards it) in the workspace and `modalrc`, the messages, tests driving the keys, and the docs; then a desktop trial. Choices in the draft, to raise at the trial: `, k o` discards Before too, events still playing from discarded takes staying as ordinary events; `, k d` chooses the take before (or after, if first) in its place, and discarding the only take removes its events, as if never recorded.
+
 ### Takes, step c: `]t` and `[t` choose a take, 26 November 2026
 
 `]t` / `[t` (`take-next`, `take-previous`, in `modalrc`'s new Takes section) step through the cursor's section and track's takes, going round, Before first, with a count. Core: `playingTake` (the take the part's events note whose span holds the cursor, or the last noted) and `chooseTake` (the take's events in place of what starts in its span, noting it, an earlier note into the span cut) in `takes.hpp`; the workspace's `stepTake` in `workspace_takes.cpp`. Messages: `Take 1 of 2 on Keys in A, bars 1–2`, `Before the takes on Keys in A, bars 1–2`, `No takes on Keys in B`; undo step `Choose take 1 on Keys in A`. WSL Clang: 1,347 tests pass, 3 skipped. **Accepted** on trial with a MIDI keyboard, 26 November 2026, with step b: everything to try worked as described. Pending: the manual (step g).
