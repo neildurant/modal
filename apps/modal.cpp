@@ -792,7 +792,7 @@ int main(int argc, char* argv[])
     const auto portsChanged = [&]
     {
         auto problem = playback.openInputs();
-        auto missing = playback.update(document.underlying());
+        auto missing = playback.update(view.playbackSong());
         if (problem.empty())
             problem = std::move(missing);
         if (!problem.empty())
@@ -1007,7 +1007,7 @@ int main(int argc, char* argv[])
                         auto error = playback.pollInputs(now);
                         if (!playback.inputDeadline())
                         {
-                            auto missing = playback.update(document.underlying());
+                            auto missing = playback.update(view.playbackSong());
                             if (error.empty())
                                 error = std::move(missing);
                             changed = true;

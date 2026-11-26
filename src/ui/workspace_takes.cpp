@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <string>
+#include <tuple>
 
 namespace modal::ui
 {
@@ -35,6 +36,171 @@ std::string barsText(const core::Song& song, core::Tick from, core::Tick to)
 }
 
 } // namespace
+
+CommandResult Workspace::chooseTakeRange()
+{
+    if (recording_.pending())
+        return CommandResult::error("Recording: Space stops it first");
+    if (shown() != ViewKind::Arrangement && shown() != ViewKind::PianoRoll)
+        return CommandResult::error("Choose a take in the arrangement or piano roll");
+    const auto cursor = view().cursor();
+    if (!cursor.track)
+        return CommandResult::error("Go to a track to choose its takes");
+
+    const auto& song = document_.underlying();
+    const auto& meter = song.meter(*cursor.track);
+    const auto bar = meter.toBarBeatTick(cursor.tick).bar;
+    auto from = meter.barStart(bar);
+    auto to = std::min(meter.barStart(bar + 1), song.end());
+    if (selection_)
+    {
+        const auto span = view().selectionSpan();
+        if (!span)
+            return CommandResult::error("Select the time to comp");
+        if (shown() == ViewKind::Arrangement && selection_->anchor.track != cursor.track)
+            return CommandResult::error("Choose a take on one track at a time");
+        std::tie(from, to) = *span;
+    }
+    const auto section = song.sectionAt(selection_ ? from : cursor.tick);
+    const auto start = song.sectionStart(section);
+    const auto end = song.sectionStart(section + 1);
+    if (!selection_)
+    {
+        from = std::max(from, start);
+        to = std::min(to, end);
+    }
+    if (from >= to || from < start || to > end)
+        return CommandResult::error("Choose a range within one section");
+    const auto* part = song.sections()[section]->content(*cursor.track);
+    if (!part || part->takes.empty())
+        return CommandResult::error("No takes here");
+
+    TakeChoice choice{
+        .track = *cursor.track, .section = section, .from = from, .to = to, .candidates = {}};
+    const auto active = core::activeSource(*part, from - start);
+    for (const auto& take : part->takes)
+    {
+        if (take.from <= from - start && take.to >= to - start)
+        {
+            if (take.id == active)
+                choice.selected = choice.candidates.size();
+            choice.candidates.push_back(take.id);
+        }
+    }
+    endVisual();
+    takeChoice_ = std::move(choice);
+    layOut();
+    return {true};
+}
+
+bool Workspace::takeChoiceKey(const Key& key)
+{
+    const auto binding = keymap_.match(Mode::Normal, std::vector<Key>{key});
+    if (binding.binding &&
+        (binding.binding->command == "play-toggle" || binding.binding->command == "play-cursor" ||
+         binding.binding->command == "panic"))
+        return transport(binding.binding->command);
+    if (key.modifiers != kNoModifiers)
+        return false;
+    if (key.named == NamedKey::Escape)
+    {
+        closeTakeChoice();
+        setMessage("Take choice cancelled", MessageKind::Information);
+        return true;
+    }
+    auto& choice = *takeChoice_;
+    if (choice.candidates.empty())
+        return false;
+    if (key.character == U'j' || key.named == NamedKey::Down)
+    {
+        choice.selected = std::min(choice.selected + 1, choice.candidates.size() - 1);
+    }
+    else if (key.character == U'k' || key.named == NamedKey::Up)
+    {
+        if (choice.selected > 0)
+            --choice.selected;
+    }
+    else if (key.character == U'p')
+    {
+        choice.preview = !choice.preview;
+    }
+    else if (key.named == NamedKey::Enter)
+    {
+        const auto chosen = choice;
+        closeTakeChoice(false);
+        const auto start = document_.underlying().sectionStart(chosen.section);
+        document_.edit("Choose take for range", view().place(),
+                       [&](core::Song& song)
+                       {
+                           song.updatePart(chosen.section, chosen.track,
+                                           [&](core::TrackContent& part)
+                                           {
+                                               core::assignTake(part,
+                                                                {chosen.from - start,
+                                                                 chosen.to - start, chosen.take()});
+                                           });
+                       });
+        refresh();
+        if (player_)
+            player_->update(document_.underlying());
+        setMessage("Take applied", MessageKind::Information);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+    updateTakePreview();
+    return true;
+}
+
+void Workspace::updateTakePreview()
+{
+    const auto& choice = *takeChoice_;
+    if (choice.preview)
+    {
+        const auto id = choice.take();
+        const auto start = document_.underlying().sectionStart(choice.section);
+        const core::TakeRange range{choice.from - start, choice.to - start, id};
+        document_.setPreview(
+            [track = choice.track, section = choice.section, range](const core::Song& song)
+            {
+                auto preview = song;
+                preview.updatePart(section, track, [&](core::TrackContent& part)
+                                   { core::assignTake(part, range); });
+                return preview;
+            });
+    }
+    else if (document_.hasPreview())
+    {
+        document_.setPreview({});
+    }
+    else
+    {
+        return;
+    }
+    refresh();
+    if (player_)
+        player_->update(document_.song());
+}
+
+void Workspace::closeTakeChoice(bool restorePlayback)
+{
+    if (!takeChoice_)
+        return;
+    if (takeChoice_->preview)
+    {
+        document_.setPreview({});
+        if (restorePlayback)
+        {
+            refresh();
+            if (player_)
+                player_->update(document_.underlying());
+        }
+    }
+    takeChoice_.reset();
+    layOut();
+}
 
 CommandResult Workspace::stepTake(int count, bool forward)
 {

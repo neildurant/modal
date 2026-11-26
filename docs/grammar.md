@@ -338,6 +338,8 @@ While recording or waiting for its take to finish after stopping, save, export, 
 
 `, k o` keeps only the take playing at the cursor on its section and track. Material still heard from other takes stays as ordinary events. `, k d` discards the playing take and reveals the material below it. Both keys work stopped or during playback, and `u` undoes each change.
 
+`, k c` chooses a take for the cursor's bar or the Visual time selection on the current track, within one section. The take lanes open beneath the arrangement track or the piano-roll ruler. `j` and `k` or Down and Up highlight takes that cover the entire range. `p` toggles preview, Space starts or stops playback, Enter applies the highlighted take over the range in one undo step, and Escape closes the lanes and cancels the preview.
+
 ## The Metronome page
 
 `, m s` or `:metronome`. `j` / `k` move between settings and `h` / `l` between a row's fields: a click's note, velocity and Test button, or a count-in's or pre-roll's number and Bars or Beats. Enter edits a typed value in place, Up and Down step it, Enter sets it and Escape leaves it; a digit on a number field starts typing it straight away. Fields marked `▾` open a drop-down list with Enter: Up and Down or `j` / `k` choose, a letter goes to a choice starting with it (the port's list narrows to what's typed instead), Enter takes it and Escape leaves it. Enter on Test plays the click, as changing its note or velocity does. Each change is an undo step.

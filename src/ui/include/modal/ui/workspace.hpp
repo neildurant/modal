@@ -148,6 +148,10 @@ public:
 
     core::RecordingSession& recordingSession() { return recording_; }
     const core::RecordingSession& recordingSession() const { return recording_; }
+    const core::Song& playbackSong() const
+    {
+        return takeChoice_ && takeChoice_->preview ? document_.song() : document_.underlying();
+    }
 
     TracksView& tracks() { return *tracks_; }
     const TracksView& tracks() const { return *tracks_; }
@@ -1405,6 +1409,12 @@ private:
     // ]t and [t: the cursor's section and track's next or previous take, going round.
     CommandResult stepTake(int count, bool forward);
     CommandResult removeTakes(bool keepOnly);
+    const TakeChoice* takeChoice() const override { return takeChoice_ ? &*takeChoice_ : nullptr; }
+    std::optional<TakeChoice> takeChoice_;
+    CommandResult chooseTakeRange();
+    bool takeChoiceKey(const Key& key);
+    void updateTakePreview();
+    void closeTakeChoice(bool restorePlayback = true);
     std::string armedRangeText(const core::ArmedRange& range, core::ArmedSpan span) const;
     // Says why, when a key's edit has cleared the song's punch range, as it left it nowhere: the
     // song it had before the key, and its range then.

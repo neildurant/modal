@@ -157,6 +157,9 @@ nmap [t         take-previous     "Take before"
 ngroup <leader>k "Takes"
 nmap <leader>ko take-keep-only    "Keep only this take"
 nmap <leader>kd take-discard      "Discard this take"
+nmap <leader>kc take-choose-range "Choose a take for this bar"
+vgroup <leader>k "Takes"
+vmap <leader>kc take-choose-range "Choose a take for the selected time"
 
 " Marks: ma marks the cursor's place with a letter, saved with the song; 'a (or `a) goes
 " there, and after an operator is the range to it (d'a); '' goes back to before the last jump.

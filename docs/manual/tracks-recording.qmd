@@ -517,3 +517,23 @@ In the event list, the **Take** column identifies the source of each event
 using the same labels and colours as the ruler. Ordinary MIDI has an empty
 Take cell. In a narrow window the editing fields take priority, and the
 column is hidden.
+
+### Choosing a take for a passage
+
+Open the take lanes with `, k c` (choose) in the arrangement or the piano
+roll. The lanes open beneath the current track in the arrangement, or below
+the piano-roll ruler. Each lane shows the stored performance. Brighter
+shading shows where the saved comp uses that take.
+
+The chooser takes the cursor's bar by default. To choose a shorter phrase
+or several bars at once, make a Visual time selection within one section
+before opening it. For example, to replace just bar three of a long
+performance with a punch, open the chooser in bar three and move the
+highlight to the punch with `j` or `k`, or with the arrow keys. The outline
+shows the time that would change. The highlighted take must cover that whole
+span.
+
+Press `p` to preview the highlighted take and Space to start or stop
+playback. The preview changes what you hear for that range. Enter applies
+the highlighted take in one undoable edit. Escape closes the lanes and
+returns playback to the choices you had before the preview.

@@ -1498,7 +1498,16 @@ int PianoRollView::rulerRows() const
                                                   const auto* part = section->content(*track);
                                                   return part && !part->takes.empty();
                                               });
-    return kRulerRows + (hasTakes ? 1 : 0);
+    return kRulerRows + (hasTakes ? 1 : 0) + takeRows();
+}
+
+int PianoRollView::takeRows() const
+{
+    const auto* choice = host_.takeChoice();
+    const int below = layout_.main.height / cell_.height - kRulerRows - 1;
+    return choice && trackId() == choice->track
+               ? takeLaneRows(document_.underlying(), choice, below / 2)
+               : 0;
 }
 
 core::LaneHeight PianoRollView::laneSize() const
@@ -5590,6 +5599,14 @@ void PianoRollView::addRegions(Frame& frame) const
     }
     frame.push_back(std::move(keyRuler));
     frame.push_back(std::move(ruler));
+    if (const int rows = takeRows(); rows > 0)
+    {
+        auto takeScale = scale;
+        takeScale.x = keyWidth;
+        frame.push_back(takeLanes(document_.underlying(), *host_.takeChoice(),
+                                  {main.x, notesTop - rows * h, main.width, rows * h}, takeScale,
+                                  cell_));
+    }
 
     addBars(frame, p);
     if (laneChooser_)
@@ -5776,7 +5793,11 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
         if (const auto* part = song.sections()[p.section]->content(*track);
             part && !part->takes.empty())
         {
-            const auto source = core::activeSource(*part, time_ - song.sectionStart(p.section));
+            const auto* choice = host_.takeChoice();
+            const bool preview = choice && choice->preview;
+            const auto source =
+                preview ? choice->take()
+                        : core::activeSource(*part, time_ - song.sectionStart(p.section));
             const auto take = std::ranges::find(part->takes, source, &core::Take::id);
             const auto nameWidth = static_cast<int>(decodeUtf8(left.front().value).size());
             const bool compact = width_ / cell_.width < 92 + nameWidth;
@@ -5788,8 +5809,10 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
             // full name and routing as well.
             left[1].drop = kDropSection;      // channel
             left[2].drop = kDropQuantise + 1; // output
-            left.insert(left.begin() + (compact ? 0 : 1),
-                        BarPair{compact ? "Edit:" : "Editing:", target});
+            left.insert(left.begin() + (compact ? 0 : 1), BarPair{preview   ? "Preview:"
+                                                                  : compact ? "Edit:"
+                                                                            : "Editing:",
+                                                                  target});
         }
     }
     else

@@ -21,6 +21,8 @@
 namespace modal::ui
 {
 
+struct TakeChoice;
+
 // The arrangement's tracks and ruler, first sketched in milestone 3's test view and drawn by the
 // arrangement view (see ArrangeView). A row for each track, with its number and name in text cells,
 // then its bars as blocks on one time scale, so a bar's block is as wide as the bar is long: shaded
@@ -131,7 +133,9 @@ public:
     void addRegions(Frame& frame, std::optional<core::Tick> playFrom = std::nullopt,
                     std::optional<Selected> selected = std::nullopt,
                     const std::vector<core::TrackId>& moving = {}, bool ownMeters = true,
-                    bool recording = false, const core::ArmedSpans& ranges = {}) const;
+                    bool recording = false, const core::ArmedSpans& ranges = {},
+                    const TakeChoice* takeChoice = nullptr,
+                    const core::Song* saved = nullptr) const;
 
     // The cursor's track, bar (of the track's last) and meter, and the length of time in a
     // column, for the status line.

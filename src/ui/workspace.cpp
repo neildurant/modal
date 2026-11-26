@@ -144,6 +144,8 @@ Workspace::Workspace(CommandRegistry& registry, core::Document& document, Keymap
                     return stepTake(call.count, name == "take-next");
                 if (name == "take-keep-only" || name == "take-discard")
                     return removeTakes(name == "take-keep-only");
+                if (name == "take-choose-range")
+                    return chooseTakeRange();
                 if (name == "track-freeze")
                 {
                     return trackFreeze(call.arguments);
@@ -486,6 +488,7 @@ void Workspace::refresh()
 
 void Workspace::resetForSong()
 {
+    closeTakeChoice();
     songChoice_.reset();
     loopLabelChoice_.reset();
     drumMapChoice_.reset();
@@ -643,6 +646,7 @@ void Workspace::switchTo(View& view, bool remember, bool fresh)
         }
         return;
     }
+    closeTakeChoice();
     const auto cursor = current_->cursor();
     recordJump(here()); // changing view is a jump, for Ctrl-o
     if (selection_)
@@ -752,8 +756,8 @@ void Workspace::auditionHere(std::uint64_t versionBefore)
     // Visual selection grows, nor as the song changes: an added note or one moved to a new
     // pitch is heard by the view's asking.
     const auto here = noteHeardHere();
-    const bool landed =
-        here && here != heard_ && mode_ != Mode::Visual && document_.version() == versionBefore;
+    const bool landed = here && here != heard_ && !takeChoice_ && mode_ != Mode::Visual &&
+                        document_.version() == versionBefore;
     heard_ = here;
     if (landed)
     {
@@ -771,6 +775,7 @@ void Workspace::sendValue(core::TrackId track, const core::EventData& data)
 
 void Workspace::cancelDrafts()
 {
+    closeTakeChoice();
     view().cancelEditing();
 }
 
@@ -1293,6 +1298,8 @@ bool Workspace::handleKey(const Key& key, std::int64_t now)
     // a count or keys waiting for more.
     searching_.gnKept = false;
     refused_ = false;
+    if (takeChoice_)
+        return takeChoiceKey(key);
     if (songChoice_)
         return songChoiceKey(key);
     if (loopLabelChoice_)
@@ -3657,9 +3664,9 @@ void Workspace::showPlayhead()
         // Until the engine starts, show where this play was asked to start.
         lastPlayhead_ = player_->position().value_or(
             player_->recording() ? player_->marker() : player_->startPosition());
-        view().showPlayhead(lastPlayhead_, !following_ ? Follow::None
-                                           : rewind_   ? Follow::View
-                                                       : Follow::Cursor);
+        view().showPlayhead(lastPlayhead_, !following_ || takeChoice_ ? Follow::None
+                                           : rewind_                  ? Follow::View
+                                                                      : Follow::Cursor);
     }
     else if (wasPlaying_)
     {
@@ -3675,9 +3682,9 @@ void Workspace::showPlayhead()
         }
         else
         {
-            view().stopPlayhead(!following_ ? std::nullopt
-                                : rewind_   ? std::optional{lastPlayhead_}
-                                            : std::optional{player_->marker()});
+            view().stopPlayhead(!following_ || takeChoice_ ? std::nullopt
+                                : rewind_                  ? std::optional{lastPlayhead_}
+                                                           : std::optional{player_->marker()});
             // Stopping in place is a jump, so '' goes back as Shift-Space does.
             if (following_ && playedFrom_ && view().cursor() != *playedFrom_)
             {

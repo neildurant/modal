@@ -897,6 +897,8 @@ Decided 27 November 2026 to revisit the take shortcuts after take lanes are visi
 
 Decided 27 November 2026 to keep the event list's source colour in the Take column, using the timeline palette. The default tints cycle through blue, violet, teal and green, leaving orange available for selection. The section strip counts all takes stored on its tracks so it also indicates alternatives that the current playback does not use.
 
+Decided 27 November 2026 to use the same take chooser in the arrangement and piano roll. The arrangement stack expands beneath its track, so a broad assignment can be made in context. The chooser anchors a bar or Visual time range and keeps moving the highlight, previewing and applying separate. This makes the affected time visible before an edit and keeps earlier range choices outside it.
+
 ## Loop playback (24 November 2026)
 
 Use `, L` for the current section or selection's time, and `, l L` under Labels and marks for two reusable endpoints. Song labels let a range cross a section join and survive reopening the song. The chooser preselects the previous pair in the open song so hearing it again takes two Enters. The command line accepts the same endpoints by name. At the join, known controller and program state is chased. Values without an earlier event are left as they stand, since the song supplies no value to restore. Releases at the join prevent notes and held pedals from carrying into the next pass. See [design.md](design.md#input-and-recording).

@@ -7,6 +7,7 @@
 #include <modal/core/document.hpp>
 #include <modal/core/player.hpp>
 #include <modal/core/song_file.hpp>
+#include <modal/core/takes.hpp>
 #include <modal/ui/demo_song.hpp>
 #include <modal/ui/event_list_view.hpp>
 #include <modal/ui/event_text.hpp>
@@ -3212,4 +3213,73 @@ TEST_CASE("the section strip counts local takes and the event list colours their
     p.ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
     CHECK_FALSE(shows(U"Take", Role::BarText));
     CHECK_FALSE(shows(U"T2", Role::Take2));
+}
+
+TEST_CASE("the take chooser previews and applies only the chosen time in both views")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    const bool piano = GENERATE(false, true);
+    auto song = punchSong(ppqn);
+    const auto track = song.tracks().front()->id();
+    const auto bar = ppqn.whole();
+    const auto beat = ppqn.quarter();
+    REQUIRE(song.updatePart(0, track,
+                            [&](core::TrackContent& part)
+                            {
+                                core::Take first{1, 0, 2 * bar, 1, {}};
+                                core::Take second{2, 0, 2 * bar, 2, {}};
+                                for (const auto tick : {core::Tick{0}, beat, bar, bar + beat})
+                                {
+                                    first.events.insert({tick, core::Note{60, 90, beat}});
+                                    second.events.insert({tick, core::Note{62, 90, beat}});
+                                }
+                                part.takes = {first, second};
+                            }));
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 32 * kCell.height, kCell);
+    p.type(piano ? U"ga4zigr" : U"ga4zi");
+    const auto chosen = [&](const core::Song& current, core::Tick tick)
+    { return core::activeSource(*current.sections()[0]->content(track), tick); };
+    const auto showsLanes = [&]
+    {
+        for (const auto& region : p.ws.frame())
+        {
+            if (std::ranges::any_of(
+                    region.text, [](const TextRun& run)
+                    { return contains(run.text, U"↑/↓") && contains(run.text, U"Enter Apply"); }))
+                return true;
+        }
+        return false;
+    };
+
+    const auto before = p.document.version();
+    p.type(U",kc");
+    REQUIRE(showsLanes());
+    p.press(Key::of(NamedKey::Up));
+    p.type(U"p");
+    REQUIRE(p.document.hasPreview());
+    CHECK(p.document.version() == before);
+    CHECK(chosen(p.document.underlying(), 0) == 2);
+    CHECK(chosen(p.ws.playbackSong(), 0) == 1);
+    CHECK(chosen(p.document.song(), bar) == 2);
+    p.type(U" ");
+    p.runFor(50ms);
+    const auto notes = notesSent(p);
+    CHECK(std::ranges::any_of(notes, [](const auto& note) { return note.first == 60; }));
+    p.type(U" ");
+    p.runFor(50ms);
+    p.press(Key::of(NamedKey::Escape));
+    CHECK_FALSE(showsLanes());
+    CHECK_FALSE(p.document.hasPreview());
+    CHECK(p.document.version() == before);
+
+    p.type(U"vl,kc");
+    REQUIRE(showsLanes());
+    p.type(U"k");
+    p.press(Key::of(NamedKey::Enter));
+    CHECK_FALSE(p.document.hasPreview());
+    CHECK(chosen(p.document.underlying(), 0) == 1);
+    CHECK(chosen(p.document.underlying(), bar) == (piano ? 2 : 1));
+    p.type(U"u");
+    CHECK(chosen(p.document.underlying(), 0) == 2);
 }

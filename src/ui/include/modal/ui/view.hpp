@@ -73,6 +73,19 @@ enum class ViewKind : std::uint8_t
     Metronome,
 };
 
+struct TakeChoice
+{
+    core::TrackId track;
+    std::size_t section;
+    core::Tick from;
+    core::Tick to;
+    std::vector<std::uint32_t> candidates;
+    std::size_t selected = 0;
+    bool preview = false;
+
+    std::uint32_t take() const { return candidates.empty() ? 0 : candidates[selected]; }
+};
+
 // The unnamed register, shared by the views (decided for milestone 5): what was yanked or
 // deleted. Either an area's events, a list for each of its tracks from the top down, their
 // ticks from the area's start, and the area's length, which P makes room for (0 if it has
@@ -272,6 +285,7 @@ public:
 
     // Whether to tint the bars where a track has a meter of its own (ownmeter).
     virtual bool ownMeter() const = 0;
+    virtual const TakeChoice* takeChoice() const { return nullptr; }
     // Where the punch range armed in the song is, to show it in the ruler.
     virtual std::optional<core::ArmedSpan> punchSpan() const { return std::nullopt; }
     // The punch and loop ranges armed, where they are now, for the rulers' brackets.

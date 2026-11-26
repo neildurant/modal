@@ -257,7 +257,11 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Show active ranges and the take being edited.
         - [x] **Done** — Label ranges in the arrangement and piano roll, and show the edit destination in the piano-roll header.
         - [x] **Done** — Add the section-strip count and event-list take column.
-    - [ ] **To do** — Choose comp ranges, edit focused takes, copy selections between takes and show take lanes.
+    - [ ] **Doing** — Take lanes and range comping.
+        - [x] **Done** — Review the lanes, range selection and audition mock-ups.
+        - [ ] **Doing** — Show source lanes and their place in the comp in both views.
+        - [ ] **Doing** — Audition and assign a source over the selected range.
+        - [ ] **To do** — Edit focused takes and copy selections between takes.
     - [ ] **To do** — Review audition and range-choice shortcuts with take lanes visible.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
     - [ ] **To do** — Bake a comp to a chosen new or existing track.

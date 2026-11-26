@@ -30,6 +30,119 @@ Role takeColour(std::uint32_t id)
     return colours[(id - 1) % colours.size()];
 }
 
+int takeLaneRows(const core::Song& song, const TakeChoice* choice, int available)
+{
+    if (!choice || available < 3 || choice->section >= song.sections().size())
+        return 0;
+    const auto* part = song.sections()[choice->section]->content(choice->track);
+    return part ? std::min(available, 2 + static_cast<int>(part->takes.size())) : 0;
+}
+
+Region takeLanes(const core::Song& saved, const TakeChoice& choice, Rect bounds, TimeScale scale,
+                 CellSize cell)
+{
+    Region panel{
+        .bounds = bounds, .background = Role::Background, .text = {}, .under = {}, .over = {}};
+    const auto& section = *saved.sections()[choice.section];
+    const auto& part = *section.content(choice.track);
+    const auto start = saved.sectionStart(choice.section);
+    const auto shown = static_cast<std::size_t>(bounds.height / cell.height - 2);
+    const auto selected = std::ranges::find(part.takes, choice.take(), &core::Take::id);
+    const auto index =
+        selected == part.takes.end() ? 0U : static_cast<std::size_t>(selected - part.takes.begin());
+    const auto first = std::min(index >= shown ? index - shown + 1 : 0, part.takes.size() - shown);
+    const auto label = [&](std::uint32_t id)
+    {
+        const auto take = std::ranges::find(part.takes, id, &core::Take::id);
+        return take == part.takes.end() ? std::string{"Part"}
+                                        : "T" + std::to_string(take - part.takes.begin() + 1);
+    };
+    const auto selectedRanges =
+        core::activeTakeRanges(part, choice.from - start, choice.to - start);
+    const auto active = core::activeTakeRanges(part, 0, section.length());
+    const auto playing = selectedRanges.size() == 1 ? label(selectedRanges.front().take)
+                                                    : std::string{"several sources"};
+    const auto& meter = saved.meter(choice.track);
+    const auto firstBar = meter.toBarBeatTick(choice.from).bar;
+    const auto endBar = meter.toBarBeatTick(choice.to).bar;
+    const bool wholeBars =
+        choice.from == meter.barStart(firstBar) && choice.to == meter.barStart(endBar);
+    const auto span = !wholeBars
+                          ? positionText(meter, choice.from) + "–" + positionText(meter, choice.to)
+                      : endBar == firstBar + 1
+                          ? "Bar " + std::to_string(firstBar)
+                          : "Bars " + std::to_string(firstBar) + "–" + std::to_string(endBar - 1);
+    auto title = "Takes · " + section.name() + " · " + span;
+    if (choice.preview)
+        title += " · Previewing " + label(choice.take()) + " · Cancel restores " + playing;
+    else if (choice.take())
+        title += " · " + label(choice.take()) + " highlighted · Plays " + playing;
+    if (shown < part.takes.size())
+        title += " · " + std::to_string(first + 1) + "–" + std::to_string(first + shown) + " of " +
+                 std::to_string(part.takes.size());
+    panel.under.push_back({{0, 0, bounds.width, 2 * cell.height}, Role::Bar, 255});
+    panel.text.push_back({cell.width, 0, decodeUtf8(title), {Role::Text, Role::Bar, kBold}});
+    const auto keys = !choice.take()   ? U"No take covers the range   Esc Close"
+                      : choice.preview ? U"j/k ↑/↓ Take   p End preview   Enter Apply   Esc Cancel"
+                                       : U"j/k ↑/↓ Take   p Preview   Enter Apply   Esc Cancel";
+    panel.text.push_back({cell.width, cell.height, keys, {Role::BarText, Role::Bar, kPlain}});
+
+    const int left = std::clamp(scale.x, 0, bounds.width);
+    const auto xAt = [&](core::Tick tick)
+    { return std::clamp(scale.toX(tick), left, bounds.width); };
+    const int inset = std::max(cell.height / 7, 1);
+    for (std::size_t i = first; i < first + shown; ++i)
+    {
+        const auto& take = part.takes[i];
+        const auto colour = takeColour(take.id);
+        const int y = (2 + static_cast<int>(i - first)) * cell.height;
+        const int top = y + inset;
+        const int height = cell.height - 2 * inset;
+        panel.under.push_back(
+            {{0, y, bounds.width, cell.height}, i % 2 == 0 ? Role::Panel : Role::Background, 110});
+        const auto band = [&](core::Tick from, core::Tick to, std::uint8_t alpha)
+        {
+            const int x = xAt(start + from);
+            const int right = xAt(start + to);
+            if (right > x)
+                panel.under.push_back({{x, top, right - x, height}, colour, alpha});
+        };
+        band(take.from, take.to, 65);
+        for (const auto& range : active)
+        {
+            if (range.take == take.id)
+                band(range.from, range.to, 160);
+        }
+        if (take.id == choice.take())
+        {
+            if (choice.preview)
+                band(choice.from - start, choice.to - start, 160);
+            const int x = xAt(choice.from);
+            const int w = xAt(choice.to) - x;
+            if (w > 0 && height > 1)
+            {
+                for (const int line : {top, top + height - 1})
+                    panel.over.push_back({{x, line, w, 1}, Role::Cursor, 255});
+                for (const int side : {x, x + w - 1})
+                    panel.over.push_back({{side, top, 1, height}, Role::Cursor, 255});
+            }
+        }
+        for (const auto& event : take.events.all())
+        {
+            const auto tick = start + event.tick;
+            const int x = xAt(tick);
+            if (tick < scale.start || x >= bounds.width)
+                continue;
+            const auto* note = std::get_if<core::Note>(&event.data);
+            const int width = note ? std::max(xAt(tick + note->duration) - x, 1) : 2;
+            panel.over.push_back({{x, y + cell.height / 2, width, 2}, colour, 255});
+        }
+        panel.text.push_back(
+            {cell.width, y, decodeUtf8(label(take.id)), {colour, Role::Background, kBold}});
+    }
+    return panel;
+}
+
 void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
                   const TimeScale& scale, core::Tick from, core::Tick to, int y, CellSize cell)
 {
