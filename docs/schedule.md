@@ -264,7 +264,7 @@ Deliver in this order, building on linear recording:
     - [ ] **Doing** — The take model agreed 27 November 2026: everything is a take. See [design.md](design.md#take-stacks-and-comping).
         - [x] **Done** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours. Accepted on trial.
         - [ ] **Doing** — Every event in a take: implicit takes for entered, imported and read material, a gap extending the take before it, the plain file form, and the take display only for comped time.
-            - [ ] **Doing** — Clearer `Tn` labels on the take lanes, from offscreen renders. Desktop trial pending.
+            - [x] **Done** — Clearer `Tn` labels on the take lanes, from offscreen renders. Accepted on trial.
             - [ ] **To do** — Parts hold only takes; implicit takes and the gap rule in core.
             - [ ] **To do** — The plain file form and the fixture.
             - [ ] **To do** — The take display, `]t`, `[t` and `, k c` only for parts with comped time.
