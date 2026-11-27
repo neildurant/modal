@@ -263,9 +263,14 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Audition and assign a source over the selected range.
     - [ ] **Doing** — The take model agreed 27 November 2026: everything is a take. See [design.md](design.md#take-stacks-and-comping).
         - [x] **Done** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours. Accepted on trial.
-        - [ ] **To do** — Every event in a take: implicit takes for entered, imported and read material, the plain file form, and the take display only for comped time.
-        - [ ] **To do** — New material goes to the take playing, a gap extends the take before it, replace makes a take and overdub merges. Desktop MIDI trial, including the one deferred.
-        - [ ] **To do** — None in the chooser, the comp and the file, with entry and overdub under None starting a take.
+        - [ ] **Doing** — Every event in a take: implicit takes for entered, imported and read material, a gap extending the take before it, the plain file form, and the take display only for comped time.
+            - [ ] **To do** — Clearer `Tn` labels on the take lanes, from offscreen renders.
+            - [ ] **To do** — Parts hold only takes; implicit takes and the gap rule in core.
+            - [ ] **To do** — The plain file form and the fixture.
+            - [ ] **To do** — The take display, `]t`, `[t` and `, k c` only for parts with comped time.
+            - [ ] **To do** — Manual, grammar and validation.
+        - [ ] **To do** — New material goes to the take playing, replace makes a take and overdub merges. Desktop MIDI trial, including the one deferred.
+        - [ ] **To do** — None in the chooser, the comp and the file, with entry and overdub under None starting a take, and New take and New take from a copy (`, k n`, `, k N`, keys to confirm). See [design.md](design.md#take-stacks-and-comping).
         - [ ] **To do** — `, k d` on any take, Restore take and Bake in place, after settling their keys.
         - [ ] **To do** — Manual updates and validation.
     - [ ] **To do** — Edit focused takes and copy selections between takes.
