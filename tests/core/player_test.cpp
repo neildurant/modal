@@ -649,10 +649,10 @@ TEST_CASE("recording a loop ends each pass as it wraps, a pass with nothing play
     if (mode == RecordMode::Overdub)
         expected.insert(expected.begin(), {on, Note{60, 100, off - on, 100}});
     CHECK(std::vector<Event>(events.begin(), events.end()) == expected);
-    // Both passes kept as takes in replace, the second playing; none in overdub.
+    // Both passes kept as takes in replace, the second playing; one in overdub, merged into.
     const auto* part = last->song.sections()[0]->content(id);
     REQUIRE(part != nullptr);
-    CHECK(part->takes.size() == (mode == RecordMode::Replace ? 2u : 0u));
+    CHECK(part->takes.size() == (mode == RecordMode::Replace ? 2u : 1u));
     CHECK_FALSE(p.player.recordingPass());
 }
 

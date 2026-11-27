@@ -4,6 +4,7 @@
 #include "support/ppqn.hpp"
 
 #include <modal/core/song.hpp>
+#include <modal/core/takes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -131,8 +132,9 @@ TEST_CASE("events are held by the section they start in, from its start")
     const auto& verse = *song.sections()[1];
     REQUIRE(intro.content(piano));
     REQUIRE(verse.content(piano));
-    CHECK(ticksOf(intro.content(piano)->events) == std::vector<Tick>{0, bar + ppqn.quarter()});
-    CHECK(ticksOf(verse.content(piano)->events) == std::vector<Tick>{0, bar + 1});
+    CHECK(ticksOf(playingEvents(*intro.content(piano))) ==
+          std::vector<Tick>{0, bar + ppqn.quarter()});
+    CHECK(ticksOf(playingEvents(*verse.content(piano))) == std::vector<Tick>{0, bar + 1});
 
     // The flattened events are the song's, from its start, as given.
     CHECK(ticksOf(song.events(piano)) ==
@@ -415,7 +417,7 @@ TEST_CASE("splitting a section")
         REQUIRE(verse.labels().size() == 1);
         CHECK(verse.labels()[0] == Label{bar, "fill"});
         CHECK(song.labels()[0] == Label{5 * bar, "fill"});
-        CHECK(ticksOf(verse.content(drums)->events) == std::vector<Tick>{0});
+        CHECK(ticksOf(playingEvents(*verse.content(drums))) == std::vector<Tick>{0});
         CHECK(ticksOf(song.events(drums)) == std::vector<Tick>{0, 4 * bar});
 
         // Four whole notes are four 7/8 bars and a 1/2 remainder; then the Verse starts a new
@@ -541,10 +543,10 @@ TEST_CASE("a song made from its parts")
     Section intro{"Intro", 2 * bar, MeterMap{ppqn}, kDefaultTempo};
     intro.addTempo({bar, Tempo{400'000}});
     intro.addLabel({bar, "fill"});
-    intro.setContent(TrackId{3}, {std::nullopt, events, {}, {}});
+    intro.setContent(TrackId{3}, plainPart(events, 2 * bar));
     Section verse{"Verse", 6 * q, MeterMap{ppqn, {3, 4}}, Tempo{400'000}};
     verse.setColour("blue");
-    verse.setContent(TrackId{3}, {std::nullopt, events, {}, {}});
+    verse.setContent(TrackId{3}, plainPart(events, 6 * q));
 
     const Song song{ppqn, {bass}, {intro, verse}};
     REQUIRE(song.tracks().size() == 1);

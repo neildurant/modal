@@ -38,7 +38,9 @@ std::string takeLabel(const core::Take& take)
 
 int TakeLaneDisplay::rows(int available) const
 {
-    return part && available > 0 ? std::min(available, static_cast<int>(part->takes.size())) : 0;
+    return part && available > 0 && (choice || core::hasComping(*part))
+               ? std::min(available, static_cast<int>(part->takes.size()))
+               : 0;
 }
 
 TakeLaneDisplay takeLaneDisplay(const core::Song& song, SongCursor cursor, const TakeChoice* choice)
@@ -151,7 +153,7 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             break;
         }
         const auto* part = song.sections()[section]->content(track);
-        if (!part || part->takes.empty())
+        if (!part || !core::hasComping(*part))
         {
             continue;
         }

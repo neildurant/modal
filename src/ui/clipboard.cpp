@@ -52,12 +52,14 @@ core::Song eventsSong(const EventRegister& reg, core::Ppqn ppqn)
         const core::TrackId id{i + 1};
         tracks.emplace_back(id);
         core::TrackContent content;
-        if (i < reg.tracks.size())
+        if (i < reg.tracks.size() && !reg.tracks[i].empty())
         {
+            core::EventList events;
             for (const auto& event : reg.tracks[i])
             {
-                content.events.insert(event);
+                events.insert(event);
             }
+            content = core::plainPart(std::move(events), length);
         }
         if (i < reg.ramps.size())
         {

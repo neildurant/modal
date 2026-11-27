@@ -3,6 +3,7 @@
 #include "support/ppqn.hpp"
 
 #include <modal/core/song.hpp>
+#include <modal/core/takes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -218,7 +219,8 @@ TEST_CASE("removing bars on every track closes up after them, each section stayi
         CHECK(edit.removed[0]->name() == "From B");
         CHECK(edit.removed[0]->length() == bar);
         REQUIRE(edit.removed[0]->content(s.track) != nullptr);
-        CHECK(std::get<Note>(edit.removed[0]->content(s.track)->events[0].data).pitch == 43);
+        CHECK(std::get<Note>(playingEvents(*edit.removed[0]->content(s.track))[0].data).pitch ==
+              43);
     }
     SECTION("at a section's start, which keeps its name")
     {

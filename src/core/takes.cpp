@@ -75,12 +75,30 @@ std::optional<std::uint32_t> playingTake(const TrackContent& part, Tick at)
     return source == 0 ? std::nullopt : std::optional{source};
 }
 
+bool hasComping(const TrackContent& part)
+{
+    // A range chosen silent is a choice; one choosing a take is only where takes overlap.
+    if (std::ranges::any_of(part.comp, [](const TakeRange& range) { return range.take == 0; }))
+    {
+        return true;
+    }
+    for (std::size_t i = 0; i < part.takes.size(); ++i)
+    {
+        for (std::size_t j = i + 1; j < part.takes.size(); ++j)
+        {
+            const auto& a = part.takes[i];
+            const auto& b = part.takes[j];
+            if (a.from < b.to && b.from < a.to)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 EventList playingEvents(const TrackContent& part)
 {
-    if (part.takes.empty())
-    {
-        return part.events;
-    }
     EventList playing;
     const auto append = [&](const EventList& events, std::uint32_t source)
     {
@@ -92,7 +110,6 @@ EventList playingEvents(const TrackContent& part)
             }
         }
     };
-    append(part.events, 0);
     for (const auto& take : part.takes)
     {
         append(take.events, take.id);
@@ -100,14 +117,67 @@ EventList playingEvents(const TrackContent& part)
     return playing;
 }
 
-void replacePlayingEvents(TrackContent& part, EventList events)
+namespace
 {
+
+// The take an event at a tick goes into, made or grown if need be.
+Take& takeFor(TrackContent& part, Tick at, Tick length, const NewTakeId& newId)
+{
+    if (const auto id = activeSource(part, at); id != 0)
+    {
+        return *std::ranges::find(part.takes, id, &Take::id);
+    }
+    const auto added = [&](Tick from, Tick to) -> Take&
+    {
+        const auto colour = part.newTakeColour();
+        return part.takes.emplace_back(Take{newId(), from, to, 0, {}, colour});
+    };
+    const auto none = std::ranges::find_if(part.comp, [&](const TakeRange& range)
+                                           { return at >= range.from && at < range.to; });
+    if (none != part.comp.end())
+    {
+        const auto range = *none;
+        auto& made = added(range.from, range.to);
+        assignTake(part, {range.from, range.to, made.id});
+        return made;
+    }
     if (part.takes.empty())
     {
-        part.events = std::move(events);
-        return;
+        return added(0, length);
     }
+    // A gap: no take covers it, so it lies between where one ends and the next starts.
+    Tick gapFrom = 0;
+    Tick gapTo = length;
+    for (const auto& take : part.takes)
+    {
+        if (take.to <= at)
+        {
+            gapFrom = std::max(gapFrom, take.to);
+        }
+        else
+        {
+            gapTo = std::min(gapTo, take.from);
+        }
+    }
+    const auto newest = [&](auto matches) -> Take*
+    {
+        const auto it = std::ranges::find_if(part.takes.rbegin(), part.takes.rend(), matches);
+        return it == part.takes.rend() ? nullptr : &*it;
+    };
+    if (auto* before = newest([&](const Take& take) { return take.to == gapFrom; }))
+    {
+        before->to = gapTo;
+        return *before;
+    }
+    auto* after = newest([&](const Take& take) { return take.from == gapTo; });
+    after->from = gapFrom;
+    return *after;
+}
 
+} // namespace
+
+void replacePlayingEvents(TrackContent& part, EventList events, Tick length, const NewTakeId& newId)
+{
     const auto hide = [&](EventList& source, std::uint32_t id)
     {
         EventList hidden;
@@ -120,17 +190,20 @@ void replacePlayingEvents(TrackContent& part, EventList events)
         }
         source = std::move(hidden);
     };
-    hide(part.events, 0);
     for (auto& take : part.takes)
     {
         hide(take.events, take.id);
     }
     for (auto event : events.all())
     {
-        const auto id = activeSource(part, event.tick);
-        const auto at = std::ranges::find(part.takes, id, &Take::id);
-        auto& source = at == part.takes.end() ? part.events : at->events;
-        source.insert(std::move(event));
+        const auto at = event.tick;
+        takeFor(part, at, length, newId).events.insert(std::move(event));
+    }
+    // A part whose only take has lost all it held is empty again, as it was before entering
+    // material made the take.
+    if (part.takes.size() == 1 && part.comp.empty() && part.takes[0].events.empty())
+    {
+        part.takes.clear();
     }
 }
 
@@ -198,23 +271,19 @@ std::size_t keepOnlyTake(Song& song, std::size_t section, TrackId track, std::ui
     }
 
     const auto removed = part->takes.size() - 1;
-    const bool changed = song.updatePart(
-        section, track,
-        [&](TrackContent& edited)
-        {
-            auto playing = playingEvents(edited);
-            edited.comp.clear();
-            for (const auto& range : activeTakeRanges(*part, chosen->from, chosen->to))
-            {
-                if (range.take != take)
-                {
-                    assignTake(edited, {range.from, range.to, 0});
-                }
-            }
-            std::erase_if(edited.takes, [&](const Take& other) { return other.id != take; });
-            edited.events = {};
-            replacePlayingEvents(edited, std::move(playing));
-        });
+    const auto length = song.sections()[section]->length();
+    const bool changed = song.updatePart(section, track,
+                                         [&](TrackContent& edited)
+                                         {
+                                             auto playing = playingEvents(edited);
+                                             edited.comp.clear();
+                                             std::erase_if(edited.takes, [&](const Take& other)
+                                                           { return other.id != take; });
+                                             auto& kept = edited.takes.front();
+                                             kept.from = 0;
+                                             kept.to = length;
+                                             kept.events = std::move(playing);
+                                         });
     return changed ? removed : 0;
 }
 

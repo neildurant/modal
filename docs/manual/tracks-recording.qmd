@@ -501,25 +501,38 @@ accepting the result.
 
 ## Seeing which take plays {#sec-showing-takes}
 
-Replace recordings keep alternate performances as numbered takes. The
-numbers count across the whole song and are never used again, so a take you
+A take is one performance of a part, and all of a part's music belongs to
+one take or another. Each replace recording makes a new take, keeping the
+performances it covers as alternatives. When you enter, paste or import
+notes into a part that has no take yet, Modal makes one for them, covering
+the whole section, much as other sequencers make a clip when you draw the
+first note. Later notes join whichever take plays where they land. A note
+in a gap that no take covers joins the take before the gap, which grows to
+cover it, so typing a few notes after a recorded phrase doesn't scatter the
+part across new takes.
+
+Takes only show where there is a choice: where two takes cover the same
+time. A part with a single take looks just as it would if takes didn't
+exist, so most parts never show any. On such a part, `]t` and `, k c` say
+there are no other takes.
+
+The numbers count across the whole song and are never used again, so a take you
 remember as "take 9" keeps its number, and its colour, however many others
 come and go. Gaps are normal: one part might hold takes 4, 9 and 12. A
 recording across a section boundary is one take, with a piece in each
 section where it records or replaces MIDI, and each piece is chosen on its
 own. Copying a section gives its takes new numbers, so each copy can then be
-edited differently. The section strip counts the stored takes across its
-tracks, including takes that are currently silent.
+edited differently. The section strip counts the stored takes on its tracks
+that have a choice, including takes that are currently silent.
 
 For example, if a two-bar punch replaces the end of an earlier phrase, the
 arrangement and piano-roll ruler show the earlier take up to the punch and
 the punch take for its full range, including any rests. The piano-roll
-header shows which take receives edits at the cursor. Where ordinary MIDI
-plays, that destination is the part itself.
+header shows which take receives edits at the cursor.
 
 In the event list, the **Take** column identifies the source of each event
-using the same labels and colours as the ruler. Ordinary MIDI has an empty
-Take cell. In a narrow window the editing fields take priority, and the
+using the same labels and colours as the ruler, on tracks with a choice of
+takes. In a narrow window the editing fields take priority, and the
 column is hidden.
 
 ### Choosing a take for a passage

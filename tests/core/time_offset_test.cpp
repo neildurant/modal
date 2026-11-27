@@ -141,9 +141,10 @@ TEST_CASE("whole tracks keep settings and per-section own or inherited meters")
     original.noteVelocity = 70;
     Section intro{"Intro", bar, MeterMap{ppqn}, Tempo{500000}};
     Section verse{"Verse", 2 * bar, MeterMap{ppqn}, Tempo{500000}};
-    TrackContent content;
-    content.events.insert({0, Note{60, 100, ppqn.quarter()}});
-    intro.setContent(original.id(), content);
+    EventList events;
+    events.insert({0, Note{60, 100, ppqn.quarter()}});
+    intro.setContent(original.id(), plainPart(events, bar));
+    auto content = plainPart(events, 2 * bar);
     content.meter.emplace(ppqn, TimeSignature{2, 4});
     verse.setContent(original.id(), content);
     Song song{ppqn, {original}, {intro, verse}};
@@ -190,10 +191,10 @@ TEST_CASE("a whole track put into other sections is laid along time, keeping its
 
     // Two bars of 7/8 in the conductor, which the bass follows, a note on each downbeat.
     Section riff{"Riff", 14 * eighth, MeterMap{ppqn, TimeSignature{7, 8}}, Tempo{500000}};
-    TrackContent content;
-    content.events.insert({0, Note{40, 100, q}});
-    content.events.insert({7 * eighth, Note{43, 100, q}});
-    riff.setContent(bass.id(), content);
+    EventList events;
+    events.insert({0, Note{40, 100, q}});
+    events.insert({7 * eighth, Note{43, 100, q}});
+    riff.setContent(bass.id(), plainPart(events, 14 * eighth));
     const Song source{ppqn, {bass}, {riff}};
     const auto copy = source.copyTrack(bass.id());
     REQUIRE(copy);

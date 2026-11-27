@@ -1795,7 +1795,7 @@ Region EventListView::listRegion() const
                                               [&](const auto& section)
                                               {
                                                   const auto* part = section->content(*track);
-                                                  return part && !part->takes.empty();
+                                                  return part && core::hasComping(*part);
                                               });
 
     // The headings stay put as the list scrolls.

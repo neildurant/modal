@@ -125,6 +125,9 @@ CommandResult Workspace::chooseTakeRange()
     const auto* part = song.sections()[section]->content(*cursor.track);
     if (!part || part->takes.empty())
         return CommandResult::error("No takes here");
+    // Until None can be chosen, a part with nothing to choose between has nothing to offer.
+    if (!core::hasComping(*part))
+        return CommandResult::error("No other takes here");
 
     auto choice = rangeChoice(song, *cursor.track, section, from, to, !selection_);
     endVisual();
@@ -286,6 +289,8 @@ CommandResult Workspace::stepTake(int count, bool forward)
     const auto* part = section.content(*track);
     if (part == nullptr || part->takes.empty())
         return {false, "No takes on " + name + " in " + section.name(), false, true};
+    if (!core::hasComping(*part))
+        return {false, "No other takes on " + name + " in " + section.name(), false, true};
 
     // From the take playing, or before the first going forward (after the last going back).
     const auto& takes = part->takes;

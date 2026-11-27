@@ -265,10 +265,10 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours. Accepted on trial.
         - [ ] **Doing** — Every event in a take: implicit takes for entered, imported and read material, a gap extending the take before it, the plain file form, and the take display only for comped time.
             - [x] **Done** — Clearer `Tn` labels on the take lanes, from offscreen renders. Accepted on trial.
-            - [ ] **To do** — Parts hold only takes; implicit takes and the gap rule in core.
-            - [ ] **To do** — The plain file form and the fixture.
-            - [ ] **To do** — The take display, `]t`, `[t` and `, k c` only for parts with comped time.
-            - [ ] **To do** — Manual, grammar and validation.
+            - [ ] **Doing** — Parts hold only takes; implicit takes and the gap rule in core. Built; desktop trial pending.
+            - [ ] **Doing** — The plain file form and the fixture. Built; desktop trial pending.
+            - [ ] **Doing** — The take display, `]t`, `[t` and `, k c` only for parts with comped time. Built; desktop trial pending.
+            - [ ] **Doing** — Manual, grammar and validation. Written and validated; desktop trial pending.
         - [ ] **To do** — New material goes to the take playing, replace makes a take and overdub merges. Desktop MIDI trial, including the one deferred.
         - [ ] **To do** — None in the chooser, the comp and the file, with entry and overdub under None starting a take, and New take and New take from a copy (`, k n`, `, k N`, keys to confirm). See [design.md](design.md#take-stacks-and-comping).
         - [ ] **To do** — `, k d` on any take, Restore take and Bake in place, after settling their keys.

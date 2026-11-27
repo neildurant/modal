@@ -56,11 +56,14 @@ struct Mark
     friend bool operator==(const Mark&, const Mark&) = default;
 };
 
-// An editable source in a track's stack, positioned from the section's start.
+// A performance in a track's part, positioned from the section's start. Every event in a part
+// belongs to a take (decided 27 November 2026): one recorded, or one made when material is
+// entered, imported or read into a part without one, covering the section.
 struct Take
 {
     // Numbered across the song, above zero, and never used again for another take (decided 27
-    // November 2026). The pieces of one pass in different sections share it.
+    // November 2026). The pieces of one pass in different sections share it. Zero, only while
+    // a song is being put together, asks the song for a new number.
     std::uint32_t id = 1;
     Tick from = 0;
     Tick to = 0;
@@ -82,7 +85,7 @@ struct TakeRange
 {
     Tick from;
     Tick to;
-    std::uint32_t take; // zero chooses the ordinary events under the stack
+    std::uint32_t take; // zero chooses none, so the range is silent
 
     friend bool operator==(const TakeRange&, const TakeRange&) = default;
 };
@@ -93,15 +96,15 @@ struct TrackContent
     // The track's own meter here, or none to follow the conductor's. The section's end cuts
     // its last bar short if the bar would run past it.
     std::optional<MeterMap> meter;
-    // Ordinary events under the stack, including any its ramps hide.
-    EventList events;
-    // Its controller ramps, in order of start, each ending before the section does.
+    // Its controller ramps, in order of start, each ending before the section does. They belong
+    // to the part rather than a take (decided 27 November 2026).
     std::vector<ControllerRamp> ramps;
-    // Its takes, oldest first, and explicit playback choices in time order.
+    // Its takes, oldest first, holding all its events, including any its ramps hide, and
+    // explicit playback choices in time order.
     std::vector<Take> takes;
     std::vector<TakeRange> comp{};
 
-    bool empty() const { return !meter && events.empty() && ramps.empty() && takes.empty(); }
+    bool empty() const { return !meter && ramps.empty() && takes.empty(); }
 
     // The take of an id, or null.
     const Take* take(std::uint32_t id) const;
@@ -110,6 +113,10 @@ struct TrackContent
 
     friend bool operator==(const TrackContent&, const TrackContent&) = default;
 };
+
+// A part of these events, as one take over a section `length` long, which the song numbers
+// when it's made with it.
+TrackContent plainPart(EventList events, Tick length);
 
 // A section of the song, spanning every track. Everything in it is positioned from its start,
 // so moving or copying a section changes nothing inside it. Only the song changes sections.
@@ -209,8 +216,11 @@ public:
     // A song made from its parts, as reading a file does: its tracks in display order, and at
     // least one section, whose content is for those tracks, in order. The parts must fit
     // together: each section's conductor meter a whole number of bars, and its tempo changes,
-    // labels and events inside it.
-    Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections);
+    // labels and events inside it. Takes numbered 0 are numbered here, as new takes, from
+    // `nextTakeId` or above the highest take, whichever is higher, so a number a saved song's
+    // count has passed is never used again.
+    Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections,
+         std::uint32_t nextTakeId = 1);
 
     Ppqn ppqn() const { return tempo_.ppqn(); }
 

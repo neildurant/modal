@@ -120,8 +120,7 @@ std::vector<Take> takesBetween(std::span<const Take> takes, Tick from, Tick to)
 // A part of a track's content from one tick until another, positioned from the first.
 TrackContent contentBetween(const TrackContent& content, Tick from, Tick to)
 {
-    TrackContent result{std::nullopt, eventsBetween(content.events, from, to),
-                        rampsBetween(content.ramps, from, to),
+    TrackContent result{std::nullopt, rampsBetween(content.ramps, from, to),
                         takesBetween(content.takes, from, to)};
     if (!result.takes.empty())
     {
@@ -175,11 +174,6 @@ void joinTakes(TrackContent& content, const TrackContent& after, Tick at, std::u
         }
         content.takes.push_back(std::move(moved));
     }
-    for (auto event : after.events.all())
-    {
-        event.tick += at;
-        content.events.insert(std::move(event));
-    }
     for (auto range : after.comp)
     {
         if (const auto it = ids.find(range.take); it != ids.end())
@@ -228,6 +222,13 @@ std::uint8_t newTakeColour(std::span<const Take> takes)
         ++used[take.colour % kTakeColours];
     }
     return static_cast<std::uint8_t>(std::ranges::min_element(used) - used.begin());
+}
+
+TrackContent plainPart(EventList events, Tick length)
+{
+    TrackContent part;
+    part.takes.push_back({0, 0, length, 0, std::move(events), 0});
+    return part;
 }
 
 bool TrackContent::validTakes(Tick sectionLength) const
@@ -340,7 +341,8 @@ Song::Song(Ppqn ppqn)
     rebuildConductor();
 }
 
-Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
+Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections,
+           std::uint32_t nextTakeId)
     : tempo_(ppqn)
     , meter_(ppqn)
 {
@@ -350,6 +352,7 @@ Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
         nextTrackId_ = std::max(nextTrackId_, track.id().value + 1);
         tracks_.push_back(std::make_shared<const Track>(std::move(track)));
     }
+    nextTakeId_ = std::max(nextTakeId_, nextTakeId);
     for (auto& section : sections)
     {
         assert(section.meter_.ppqn() == ppqn);
@@ -358,6 +361,25 @@ Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
             for (const auto& take : content->takes)
             {
                 nextTakeId_ = std::max(nextTakeId_, take.id + 1);
+            }
+        }
+    }
+    // Then the takes still to be numbered, in order through the song.
+    for (auto& section : sections)
+    {
+        for (auto& [id, content] : section.content_)
+        {
+            if (std::ranges::any_of(content->takes, [](const Take& take) { return take.id == 0; }))
+            {
+                auto numbered = *content;
+                for (auto& take : numbered.takes)
+                {
+                    if (take.id == 0)
+                    {
+                        take.id = newTakeId();
+                    }
+                }
+                content = std::make_shared<const TrackContent>(std::move(numbered));
             }
         }
         sections_.push_back(std::make_shared<const Section>(std::move(section)));
@@ -578,10 +600,8 @@ std::optional<TrackId> Song::insertTrack(std::size_t position, const TrackCopy& 
     Tick offset = 0;
     for (const auto& part : copy.parts)
     {
-        const auto playing =
-            part.content.takes.empty() ? std::nullopt : std::optional{playingEvents(part.content)};
-        const auto& partEvents = playing ? *playing : part.content.events;
-        for (auto event : partEvents.all())
+        const auto playing = playingEvents(part.content);
+        for (auto event : playing.all())
         {
             event.tick += offset;
             events.insert(std::move(event));
@@ -1218,7 +1238,7 @@ Song::BarsEdit Song::insertBars(Tick at, std::int64_t count, std::optional<TimeS
                 return result;
             }
             added->content_.emplace(
-                id, std::make_shared<const TrackContent>(TrackContent{own, EventList{}, {}, {}}));
+                id, std::make_shared<const TrackContent>(TrackContent{own, {}, {}}));
         }
     }
     Song edited = *this;
@@ -1271,13 +1291,14 @@ void Song::fitToContent()
     Tick extent = 1;
     for (const auto& [id, content] : section->content_)
     {
-        for (const auto& event : content->events.all())
-        {
-            extent = std::max(extent, endOf(event));
-        }
         for (const auto& take : content->takes)
         {
-            extent = std::max(extent, take.to);
+            // A take running to the section's end, as one made by entering material does, is
+            // open to whatever length the section has; another's span is kept, rests and all.
+            if (take.to < section->length_)
+            {
+                extent = std::max(extent, take.to);
+            }
             for (const auto& event : take.events.all())
             {
                 extent = std::max(extent, endOf(event));
@@ -1309,10 +1330,23 @@ void Song::fitToContent()
     section->meter_ = meterBetween(section->meter_, 0, section->length_);
     for (auto& [id, content] : section->content_)
     {
-        if (content->meter)
+        auto trimmed = *content;
+        if (trimmed.meter)
         {
-            auto trimmed = *content;
             trimmed.meter = meterBetween(*content->meter, 0, section->length_);
+        }
+        for (auto& take : trimmed.takes)
+        {
+            take.to = std::min(take.to, section->length_);
+        }
+        std::erase_if(trimmed.takes, [](const Take& take) { return take.from >= take.to; });
+        for (auto& range : trimmed.comp)
+        {
+            range.to = std::min(range.to, section->length_);
+        }
+        std::erase_if(trimmed.comp, [](const TakeRange& range) { return range.from >= range.to; });
+        if (!(trimmed == *content))
+        {
             content = std::make_shared<const TrackContent>(std::move(trimmed));
         }
     }
@@ -1633,9 +1667,7 @@ bool Song::updatePart(std::size_t section, TrackId id,
     TrackContent content = old ? *old : TrackContent{};
     edit(content);
     const Tick length = sections_[section]->length_;
-    const auto outside = [&](const EventList& events)
-    { return !events.empty() && (events[0].tick < 0 || events.all().back().tick >= length); };
-    if (outside(content.events) || !content.validTakes(length))
+    if (!content.validTakes(length))
     {
         return false;
     }
@@ -1674,7 +1706,6 @@ void Song::addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded
         Tick from;
         Tick to;
         EventList played;
-        std::optional<std::uint32_t> base; // the number for what was there, if it's no take yet
     };
     std::vector<Piece> pieces;
     for (std::size_t section = sectionAt(from); section < sections_.size(); ++section)
@@ -1697,29 +1728,16 @@ void Song::addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded
             event.tick -= start;
             played.insert(std::move(event));
         }
-        pieces.push_back({section, first - start, last - start, std::move(played), std::nullopt});
+        pieces.push_back({section, first - start, last - start, std::move(played)});
     }
-    // What was there is numbered before the pass, being older, and the pass's pieces share one
-    // number (decided 27 November 2026).
-    for (auto& piece : pieces)
-    {
-        const auto* part = sections_[piece.section]->content(id);
-        if (part && part->takes.empty() && !part->events.empty())
-        {
-            piece.base = newTakeId();
-        }
-    }
+    // The pass's pieces share one number (decided 27 November 2026).
     const auto take = pieces.empty() ? 0 : newTakeId();
     // One colour for the whole pass, the first none of the parts it goes into has, so it looks
-    // the same in each section. What was there becomes a part's first take, in the first colour.
+    // the same in each section.
     std::vector<Take> beside; // their colours alone
     for (const auto& piece : pieces)
     {
-        if (piece.base)
-        {
-            beside.emplace_back();
-        }
-        else if (const auto* part = sections_[piece.section]->content(id))
+        if (const auto* part = sections_[piece.section]->content(id))
         {
             for (const auto& other : part->takes)
             {
@@ -1733,13 +1751,6 @@ void Song::addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded
         updateContent(piece.section, id,
                       [&](TrackContent& part)
                       {
-                          if (piece.base)
-                          {
-                              part.takes.push_back({*piece.base, 0,
-                                                    sections_[piece.section]->length_, 0,
-                                                    std::move(part.events), 0});
-                              part.events = {};
-                          }
                           part.takes.push_back({take, piece.from, piece.to, recorded,
                                                 std::move(piece.played), colour});
                           assignTake(part, {piece.from, piece.to, take});
@@ -1759,9 +1770,13 @@ void Song::setSource(std::size_t trackIndex, EventList source)
     growTo(extent);
     for (std::size_t i = 0; i < sections_.size(); ++i)
     {
-        updateContent(
-            i, id, [&](TrackContent& content)
-            { replacePlayingEvents(content, eventsBetween(source, starts_[i], starts_[i + 1])); });
+        updateContent(i, id,
+                      [&](TrackContent& content)
+                      {
+                          replacePlayingEvents(
+                              content, eventsBetween(source, starts_[i], starts_[i + 1]),
+                              sections_[i]->length_, [this] { return newTakeId(); });
+                      });
     }
     auto& flat = flattened_[trackIndex];
     flat.source = std::make_shared<const EventList>(std::move(source));
@@ -2068,10 +2083,8 @@ void Song::rebuildEvents(std::size_t trackIndex)
     {
         if (const auto* content = sections_[s]->content(id))
         {
-            const auto playing =
-                content->takes.empty() ? std::nullopt : std::optional{playingEvents(*content)};
-            const auto& partEvents = playing ? *playing : content->events;
-            for (auto event : partEvents.all())
+            const auto playing = playingEvents(*content);
+            for (auto event : playing.all())
             {
                 event.tick += starts_[s];
                 source->insert(std::move(event));

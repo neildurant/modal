@@ -628,7 +628,7 @@ TEST_CASE("a recording crossing sections is a take in each it was played in")
     REQUIRE(result.events(id).size() == 2);
 }
 
-TEST_CASE("an overdub adds to the part and keeps no take")
+TEST_CASE("an overdub merges into the take there and makes no new one")
 {
     const auto ppqn = MODAL_ANY_PPQN();
     const Tick bar = ppqn.whole();
@@ -641,6 +641,8 @@ TEST_CASE("an overdub adds to the part and keeps no take")
     recorder.receive(stamped(2500ms, {0x90, 60, 100}));
     recorder.receive(stamped(3000ms, {0x80, 60, 64}));
     const auto result = recorder.finish(2 * bar);
-    CHECK(partOf(result, id).takes.empty());
+    // The one take entering the first note made, holding both.
+    REQUIRE(partOf(result, id).takes.size() == 1);
+    CHECK(partOf(result, id).takes[0].events.size() == 2);
     REQUIRE(result.events(id).size() == 2);
 }

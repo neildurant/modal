@@ -1496,7 +1496,7 @@ int PianoRollView::rulerRows() const
                                               [&](const auto& section)
                                               {
                                                   const auto* part = section->content(*track);
-                                                  return part && !part->takes.empty();
+                                                  return part && core::hasComping(*part);
                                               });
     return kRulerRows + (hasTakes ? 1 : 0) + takeRows();
 }
@@ -5800,7 +5800,7 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
         left.insert(left.begin() + std::min<std::ptrdiff_t>(3, std::ssize(left)),
                     BarPair{"Grid:", padText(core::toString(grid()), 5, false), kDropGrid});
         if (const auto* part = song.sections()[p.section]->content(*track);
-            part && !part->takes.empty() && !host_.takeChoice())
+            part && core::hasComping(*part) && !host_.takeChoice())
         {
             const auto source = core::activeSource(*part, time_ - song.sectionStart(p.section));
             const auto take = std::ranges::find(part->takes, source, &core::Take::id);

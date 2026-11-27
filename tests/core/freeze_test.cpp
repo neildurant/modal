@@ -4,6 +4,7 @@
 #include "support/ppqn.hpp"
 
 #include <modal/core/freeze.hpp>
+#include <modal/core/takes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -196,8 +197,8 @@ TEST_CASE("Freeze moves across sections without splitting notes or changing boun
     CHECK(song.sections()[0]->name() == "Section 1");
     CHECK(song.sections()[1]->name() == "Verse");
     const auto* empty = song.sections()[0]->content(id);
-    CHECK((empty == nullptr || empty->events.empty()));
-    const auto& moved = song.sections()[1]->content(id)->events;
+    CHECK((empty == nullptr || playingEvents(*empty).empty()));
+    const auto moved = playingEvents(*song.sections()[1]->content(id));
     REQUIRE(moved.size() == 2);
     CHECK(moved[0].tick == ppqn.quarter() / 2);
     CHECK(std::get<Note>(moved[0].data).duration == bar);

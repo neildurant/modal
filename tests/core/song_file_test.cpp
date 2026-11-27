@@ -171,7 +171,7 @@ TEST_CASE("the song format")
     song.fitToContent();
 
     CHECK(writeSong(song) == R"(modal-song 1
-song "Untitled" ppqn=960
+song "Untitled" ppqn=960 next-take=3
 metronome when=recording ch=10 downbeat=E5 downbeatvel=110 beat=F5 beatvel=80 len=1/32
 countin mode=countin bars=1 beats=0 preroll=1
 
@@ -184,9 +184,9 @@ section "Intro" bars=4
   label 3:1:0 "fix this fill"
   mark a 1:1:0
   mark b 2:1:0 track=1 pitch=E2
-  track 1
+  track 1 take=1 colour=1
     1:1:0 note E1 v=96 len=1/8
-  track 2
+  track 2 take=2 colour=1
     meter 1:1:0 7/8
     meter 5:1:0 4/8
     2:1:240 note C2 v=110 len=1/16
@@ -194,7 +194,8 @@ section "Intro" bars=4
 section "Verse 1" bars=1
   meter 1:1:0 4/4
   tempo 1:1:0 120
-  track 2
+  track 1 take=1 colour=1
+  track 2 take=2 colour=1
     meter 1:1:0 7/8
 )");
 }

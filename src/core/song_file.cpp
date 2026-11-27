@@ -262,10 +262,15 @@ private:
     {
         TrackId id;
         std::optional<MeterMap> meter;
-        EventList events;
+        EventList events; // a plain part's, before any take line
         std::vector<ControllerRamp> ramps;
         std::vector<Take> takes; // once one is open, the events read go into the last
         std::vector<TakeRange> comp;
+        // A plain part's take, from its track line: a number, or zero for a new one, and its
+        // colour. Without them, a plain part's events are a new take in the first colour.
+        std::uint32_t take = 0;
+        std::uint8_t colour = 0;
+        bool hasTake = false;
     };
 
     int line_ = 0;
@@ -340,9 +345,8 @@ SongReadResult Reader::read(std::string_view text)
         result.error = error_;
         return result;
     }
-    result.song.emplace(ppqn_, std::move(tracks_), std::move(sections_));
+    result.song.emplace(ppqn_, std::move(tracks_), std::move(sections_), nextTake_);
     result.song->title = std::move(title_);
-    result.song->reserveTakeIds(nextTake_);
     result.song->metronome = std::move(metronome_);
     result.song->countIn = countIn_;
     result.song->playbackLeadIn = playbackLeadIn_;
@@ -1160,9 +1164,10 @@ bool Reader::readBlock(std::span<const Token> tokens)
     {
         return false;
     }
-    if (tokens.size() != 2)
+    if (tokens.size() < 2)
     {
-        return fail("a track line in a section is just its number");
+        return fail("a track line in a section is its number, then a plain part's take, as "
+                    "track 1 take=4 colour=2");
     }
     const auto number = parseInteger(tokens[1].text, 1, std::numeric_limits<std::int64_t>::max());
     const auto it = std::ranges::find_if(
@@ -1176,7 +1181,34 @@ bool Reader::readBlock(std::span<const Token> tokens)
     {
         return fail("track " + tokens[1].text + " comes twice in this section");
     }
-    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}, {}, {}});
+    block_.emplace(OpenBlock{it->id(), std::nullopt, {}, {}, {}, {}, 0, 0, false});
+    for (const auto& token : tokens.subspan(2))
+    {
+        const auto [name, value] = settingOf(token);
+        if (name == "take" && value)
+        {
+            const auto id = parseInteger(*value, 1, std::numeric_limits<std::uint32_t>::max());
+            if (!id)
+            {
+                return fail("a take's number is from 1");
+            }
+            block_->take = static_cast<std::uint32_t>(*id);
+            block_->hasTake = true;
+        }
+        else if (name == "colour" && value)
+        {
+            const auto colour = parseInteger(*value, 1, kTakeColours);
+            if (!colour)
+            {
+                return fail("a take's colour= is from 1 to " + std::to_string(kTakeColours));
+            }
+            block_->colour = static_cast<std::uint8_t>(*colour - 1);
+        }
+        else
+        {
+            return fail("unknown track setting \"" + token.text + "\" in a section");
+        }
+    }
     return true;
 }
 
@@ -1695,10 +1727,21 @@ bool Reader::closeBlock()
     if (block_)
     {
         std::ranges::stable_sort(block_->ramps, {}, &ControllerRamp::start);
-        TrackContent content{std::move(block_->meter), std::move(block_->events),
-                             std::move(block_->ramps), std::move(block_->takes),
-                             std::move(block_->comp)};
-        if (!content.validTakes(section_->section->length()))
+        // A plain part is one take over the section (decided 27 November 2026), numbered by
+        // the song if its track line doesn't give the number.
+        const bool plain = block_->hasTake || !block_->events.empty();
+        if (plain)
+        {
+            if (!block_->takes.empty())
+            {
+                return fail("a part with take lines has its events in them");
+            }
+            block_->takes.push_back({block_->take, 0, section_->section->length(), 0,
+                                     std::move(block_->events), block_->colour});
+        }
+        TrackContent content{std::move(block_->meter), std::move(block_->ramps),
+                             std::move(block_->takes), std::move(block_->comp)};
+        if (!plain && !content.validTakes(section_->section->length()))
         {
             return fail("a comp range names a missing take or runs outside its span");
         }
@@ -1896,15 +1939,11 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
                 }
                 return event;
             };
-            for (const auto& event : content->events.all())
-            {
-                scaled.events.insert(scaledEvent(event));
-            }
             for (const auto& take : content->takes)
             {
                 Take scaledTake = take;
                 scaledTake.from = std::min(scale(take.from), length - 1);
-                scaledTake.to = std::max(scale(take.to), scaledTake.from + 1);
+                scaledTake.to = std::min(std::max(scale(take.to), scaledTake.from + 1), length);
                 scaledTake.events = {};
                 for (const auto& event : take.events.all())
                 {
@@ -1977,6 +2016,20 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
 
 } // namespace
 
+namespace
+{
+
+// A part's one take, if it's written plainly: it covers the section and nothing is chosen.
+const Take* plainTake(const TrackContent& part, Tick length)
+{
+    return part.takes.size() == 1 && part.comp.empty() && part.takes[0].from == 0 &&
+                   part.takes[0].to == length
+               ? &part.takes[0]
+               : nullptr;
+}
+
+} // namespace
+
 std::string writeSong(const Song& song)
 {
     const auto ppqn = song.ppqn();
@@ -1988,18 +2041,18 @@ std::string writeSong(const Song& song)
         out += '\n';
     };
 
-    const bool hasTakes =
-        std::ranges::any_of(song.sections(),
-                            [&](const auto& section)
-                            {
-                                return std::ranges::any_of(song.tracks(),
-                                                           [&](const auto& track)
-                                                           {
-                                                               const auto* part =
-                                                                   section->content(track->id());
-                                                               return part && !part->takes.empty();
-                                                           });
-                            });
+    const bool hasTakes = std::ranges::any_of(
+        song.sections(),
+        [&](const auto& section)
+        {
+            return std::ranges::any_of(song.tracks(),
+                                       [&](const auto& track)
+                                       {
+                                           const auto* part = section->content(track->id());
+                                           return part && !part->takes.empty() &&
+                                                  !plainTake(*part, section->length());
+                                       });
+        });
     line(0, "modal-song " + std::to_string(hasTakes ? kVersion : kPlainVersion));
     line(0, "song " + quotedText(song.title) + " ppqn=" + std::to_string(ppqn.value) +
                 (song.nextTakeId() > 1 ? " next-take=" + std::to_string(song.nextTakeId()) : ""));
@@ -2207,7 +2260,13 @@ std::string writeSong(const Song& song)
             {
                 continue;
             }
-            line(1, "track " + std::to_string(track->id().value));
+            // A part with one take over the section and no choices is written plainly, its
+            // take's number and colour on its track line (decided 27 November 2026).
+            const auto* single = plainTake(*content, section->length());
+            line(1, "track " + std::to_string(track->id().value) +
+                        (single ? " take=" + std::to_string(single->id) +
+                                      " colour=" + std::to_string(single->colour + 1)
+                                : ""));
             const auto& trackMeter = content->meter ? *content->meter : meter;
             if (content->meter)
             {
@@ -2237,10 +2296,14 @@ std::string writeSong(const Song& song)
                 }
                 line(2, rampText);
             }
-            for (const auto& event : content->events.all())
+            if (single)
             {
-                line(2, positionText(trackMeter, event.tick) + " " +
-                            std::visit(eventText, event.data));
+                for (const auto& event : single->events.all())
+                {
+                    line(2, positionText(trackMeter, event.tick) + " " +
+                                std::visit(eventText, event.data));
+                }
+                continue;
             }
             // Each take after the part, its events under it, as played.
             for (const auto& take : content->takes)

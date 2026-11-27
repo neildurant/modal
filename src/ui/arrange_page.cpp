@@ -2,6 +2,7 @@
 
 #include <modal/core/event.hpp>
 #include <modal/core/meter_map.hpp>
+#include <modal/core/takes.hpp>
 #include <modal/ui/arrange_page.hpp>
 #include <modal/ui/bar.hpp>
 #include <modal/ui/bar_lines.hpp>
@@ -94,7 +95,7 @@ void ArrangePage::findTakeTracks()
                                 [&](const auto& section)
                                 {
                                     const auto* part = section->content(track->id());
-                                    return part && !part->takes.empty();
+                                    return part && core::hasComping(*part);
                                 }))
             takeTracks_.push_back(track->id());
     }
@@ -117,7 +118,9 @@ int ArrangePage::takeRows(std::size_t track) const
     if (section >= song_.sections().size())
         return 0;
     const auto* part = song_.sections()[section]->content(id);
-    return part ? std::min(trackRowsInView() / 2, static_cast<int>(part->takes.size())) : 0;
+    return part && (choosing || core::hasComping(*part))
+               ? std::min(trackRowsInView() / 2, static_cast<int>(part->takes.size()))
+               : 0;
 }
 
 void ArrangePage::setCursor(std::size_t track, core::Tick time)
@@ -854,7 +857,8 @@ void ArrangePage::addRegions(Frame& frame, std::optional<core::Tick> playFrom,
                 std::size_t count = 0;
                 for (const auto& track : song_.tracks())
                 {
-                    if (const auto* part = section.content(track->id()))
+                    if (const auto* part = section.content(track->id());
+                        part && core::hasComping(*part))
                     {
                         count += part->takes.size();
                     }

@@ -3076,13 +3076,15 @@ TEST_CASE("discarding takes repeatedly refreshes the event list before drawing")
     REQUIRE(song.updatePart(0, keys,
                             [&](core::TrackContent& part)
                             {
+                                // A take of its own after them, which discarding them leaves.
+                                core::Take after{3, to, 2 * bar, 0, {}, 2};
+                                after.events.insert({to, core::Note{60, 90, beat}});
                                 core::Take earlier{1, bar, to, 1, {}, 0};
                                 earlier.events.insert({bar, core::Note{71, 90, beat}});
                                 core::Take later{2, bar, to, 2, {}, 1};
                                 later.events.insert({bar, core::Note{72, 90, beat}});
                                 later.events.insert({bar + beat, core::Note{69, 90, beat}});
-                                part.takes = {earlier, later};
-                                part.events.insert({to, core::Note{60, 90, beat}});
+                                part.takes = {after, earlier, later};
                             }));
     Playing p{std::move(song)};
     p.type(U"galge");
@@ -3106,14 +3108,14 @@ TEST_CASE("discarding takes repeatedly refreshes the event list before drawing")
     CHECK_FALSE(shows(U"C5"));
     CHECK(p.view.cursor().tick == bar);
     p.type(U",kd");
-    CHECK(p.ws.message() == "Discarded the take on Keys in A. No takes left");
+    CHECK(p.ws.message() == "Discarded the take on Keys in A");
     CHECK_FALSE(shows(U"B4"));
     CHECK(shows(U"C4"));
     CHECK(p.view.cursor().tick == bar);
 
     const auto version = p.document.version();
     p.type(U",kd");
-    CHECK(p.ws.message() == "No takes on Keys in A");
+    CHECK(p.ws.message() == "No take playing on Keys in A");
     CHECK(p.document.version() == version);
     p.type(U"u");
     CHECK(shows(U"B4"));
@@ -3155,7 +3157,8 @@ TEST_CASE("musical views show active takes, including a silent punch")
     CHECK(shows(U"Editing:"));
     CHECK(shows(U"Take 2"));
     p.type(U",kd");
-    CHECK(shows(U"Take 1"));
+    // T1 alone is left, with nothing to choose, so the part shows no takes.
+    CHECK_FALSE(shows(U"Take 1"));
     CHECK_FALSE(shows(U"T2"));
     p.type(U"u");
     CHECK(shows(U"Take 2"));
@@ -3204,8 +3207,10 @@ TEST_CASE("the section strip counts local takes and the event list colours their
     };
 
     p.type(U"ga4zi");
-    CHECK(shows(U"· 3 takes", Role::Text));
-    CHECK(shows(U"· 1 take", Role::Text));
+    // Keys has two takes to choose between in A; Bass's one, alone, isn't counted.
+    CHECK(shows(U"· 2 takes", Role::Text));
+    CHECK_FALSE(shows(U"· 1 take", Role::Text));
+    CHECK_FALSE(shows(U"· 3 takes", Role::Text));
     p.type(U"ge");
     CHECK(shows(U"Take", Role::BarText));
     CHECK(shows(U"T2", Role::Take2));
@@ -3213,6 +3218,54 @@ TEST_CASE("the section strip counts local takes and the event list colours their
     p.ws.resize(80 * kCell.width, 24 * kCell.height, kCell);
     CHECK_FALSE(shows(U"Take", Role::BarText));
     CHECK_FALSE(shows(U"T2", Role::Take2));
+}
+
+TEST_CASE("a part with one take shows no takes, and the take keys say there's nothing to choose")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto keys = song.tracks().front()->id();
+    song.addTrack("Bass");
+    const auto bass = song.tracks().back()->id();
+    const auto bar = ppqn.whole();
+    core::EventList notes;
+    notes.insert({0, core::Note{60, 90, ppqn.quarter()}});
+    song.addRecordedTake(keys, 0, bar, 1, notes);
+    song.addRecordedTake(keys, 0, bar, 2, notes);
+    // Bass's notes entered, as one take made for them.
+    REQUIRE(song.updateEvents(bass, [&](core::EventList& events)
+                              { events.insert({0, core::Note{40, 90, ppqn.quarter()}}); }));
+    REQUIRE(song.sections()[0]->content(bass)->takes.size() == 1);
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 28 * kCell.height, kCell);
+    const auto labelled = [&](Role colour)
+    {
+        return std::ranges::count_if(
+            p.ws.frame(),
+            [&](const Region& region)
+            {
+                return std::ranges::any_of(
+                    region.text, [&](const TextRun& run)
+                    { return run.text.starts_with(U"T") && run.style.background == colour; });
+            });
+    };
+
+    p.type(U"ga");
+    // Keys's row carries its takes' labels on their chips; Bass's, with one take, none.
+    CHECK(labelled(Role::Take2) == 1);
+    CHECK(labelled(Role::Take1) == 0); // Bass's take is in the first colour
+    p.type(U"j]t");
+    CHECK(p.ws.message() == "No other takes on Bass in A");
+    p.type(U",kc");
+    CHECK(p.ws.message() == "No other takes here");
+    p.type(U"gr");
+    CHECK_FALSE(std::ranges::any_of(p.ws.frame(),
+                                    [](const Region& region)
+                                    {
+                                        return std::ranges::any_of(
+                                            region.text, [](const TextRun& run)
+                                            { return contains(run.text, U"Editing:"); });
+                                    }));
 }
 
 TEST_CASE("the take chooser previews and applies only the chosen time in both views")
@@ -3363,8 +3416,12 @@ TEST_CASE("arrangement take lanes belong to tracks and keep their rows while nav
     const auto bar = ppqn.whole();
     core::EventList notes;
     notes.insert({0, core::Note{60, 90, ppqn.quarter()}});
-    song.addRecordedTake(song.tracks()[0]->id(), 0, bar, 1, notes);
-    song.addRecordedTake(song.tracks()[1]->id(), 0, bar, 2, notes);
+    // Two passes on each, so each has a choice to show.
+    for (const std::size_t track : {0U, 1U})
+    {
+        song.addRecordedTake(song.tracks()[track]->id(), 0, bar, 1, notes);
+        song.addRecordedTake(song.tracks()[track]->id(), 0, bar, 2, notes);
+    }
     Playing p{std::move(song)};
     p.ws.resize(112 * kCell.width, 32 * kCell.height, kCell);
     p.type(U"gaK");
