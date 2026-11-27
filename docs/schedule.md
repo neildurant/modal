@@ -259,10 +259,10 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Add the section-strip count and event-list take column.
     - [ ] **Doing** — Take lanes and range comping.
         - [x] **Done** — Review the lanes, range selection and audition mock-ups.
-        - [ ] **Doing** — Show source lanes in both views. Final label colours await desktop review.
+        - [ ] **Doing** — Show source lanes in both views. The `Tn` labels in the arrangement lanes have too little contrast against the take colours (found on trial, 27 November 2026); fix from offscreen renders before the final review.
         - [x] **Done** — Audition and assign a source over the selected range.
     - [ ] **Doing** — The take model agreed 27 November 2026: everything is a take. See [design.md](design.md#take-stacks-and-comping).
-        - [ ] **Doing** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours.
+        - [x] **Done** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours. Accepted on trial.
         - [ ] **To do** — Every event in a take: implicit takes for entered, imported and read material, the plain file form, and the take display only for comped time.
         - [ ] **To do** — New material goes to the take playing, a gap extends the take before it, replace makes a take and overdub merges. Desktop MIDI trial, including the one deferred.
         - [ ] **To do** — None in the chooser, the comp and the file, with entry and overdub under None starting a take.
