@@ -109,7 +109,7 @@ set_source_files_properties(ui/manual_test.cpp ui/manual_reference_test.cpp PROP
 set_source_files_properties(ui/command_names_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "MODAL_UI_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}/src/ui\"")
 
-set_source_files_properties(core/take_test.cpp PROPERTIES
+set_source_files_properties(core/take_test.cpp ui/window_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "MODAL_FIXTURE_DIR=\"${PROJECT_SOURCE_DIR}/tests/fixtures\"")
 
 target_link_libraries(modal_tests PRIVATE

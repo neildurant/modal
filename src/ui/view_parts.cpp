@@ -176,10 +176,14 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             region.under.push_back({{left, y + inset, last - left, height}, colour, 100});
 
             const auto text = decodeUtf8(takeLabel(*take));
-            if (last - left >= static_cast<int>(text.size()) * cell.width + 2 * stroke)
+            const int labelWidth = static_cast<int>(text.size()) * cell.width + 2 * stroke;
+            if (last - left >= labelWidth)
             {
-                region.text.push_back(
-                    {left + stroke, y, text, {Role::Text, Role::Background, kBold}});
+                // A solid chip of the take's colour under the label, the text in the background's
+                // colour, as text on the tinted band was hard to read (found on trial, 27
+                // November 2026).
+                region.under.push_back({{left, y + inset, labelWidth, height}, colour, 255});
+                region.text.push_back({left + stroke, y, text, {Role::Background, colour, kBold}});
             }
             else
             {

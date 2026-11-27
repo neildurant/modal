@@ -8,6 +8,14 @@ Where Modal stands, for whoever picks up the work next. Keep it current: update 
 
 Updated 27 November 2026.
 
+### Take model, step 2a: clearer take labels, 27 November 2026
+
+The low-contrast labels were those inside the coloured comp bands on the track rows and the piano roll's take ruler (`T5`, `T8`, `T11` in the fixture), drawn in the text colour over the tinted band: 4.2–5.2:1 in the dark themes and 2.5–2.7:1 in the light theme. They're now drawn in the background's colour on a solid chip of the take's colour, 6.8–9.5:1 in the dark themes and 4.0–5.7:1 in the light. The lane labels to the left of the stack, and the event list's Take column, were already the take colour on the background and are unchanged. A new `[.sample]` test, `a sample of take lanes`, renders the fixture's lanes in the arrangement and piano roll in `darker`, `dark` and `light`; before and after renders are in `build/review/take-labels`.
+
+**Validation.** MSVC Debug passed all 1,361 tests with two MIDI skips. Whole-tree formatting passed. Not pushed: waiting for the desktop trial.
+
+**To try.** Open [takes.modal](../tests/fixtures/takes.modal). In the arrangement, the `T5` and `T8` labels on the Keys row and `T11` on Bass sit on solid chips of their colours, dark text on each; `K` expands the lanes, and the piano roll's take ruler shows the same chips. Try the light theme (`:theme light`) too.
+
 ### Take model, step 1: song-wide take numbers and fixed colours, 27 November 2026
 
 The first step of [the take model](design.md#take-stacks-and-comping) is built and accepted. Take numbers now count across the song (`Song::nextTakeId`), from a counter that only goes up. Undo, redo and cancelled groups never lower it, as for track IDs. It's saved as `next-take=N` on the `song` line, and a song read without it starts above its highest take. Every part edit raises it past any take put in directly. A replace pass gets one number for all its pieces across sections, after the numbers given to what it replaced, and one colour across them. Copied sections (`insertSections`, and so section puts and copies between songs) give their takes new numbers, the pieces of one take sharing one, with their comp ranges following. Joining sections merges pieces with the same number; a clash, possible only in songs saved before this, takes a new number from the counter. Each take saves its colour (`colour=1` to `4`), chosen when it's made as the first its parts don't use, or else the least used; a take read without one gets the colour it would have had. Labels, the event list's Take column and the piano-roll header show the take's number, and `]t` / `[t` say `Take 4 (2 takes) on Keys in A, bars 1–2`. The fixture's takes are renumbered 3, 5, 8 and 11 to show the gaps. The manual's take section, grammar.md and design.md describe it.

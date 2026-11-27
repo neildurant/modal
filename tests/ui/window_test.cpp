@@ -1564,3 +1564,36 @@ TEST_CASE("a sample of drum names and saved-map comparison", "[.sample][.manual-
     save("-tracks");
     save("-tracks-light", "light");
 }
+
+TEST_CASE("a sample of take lanes", "[.sample]")
+{
+    auto window = offscreen(1000, 600);
+    const char* path = std::getenv("MODAL_SAMPLE_BMP");
+    std::string base = path != nullptr ? path : "sample.bmp";
+    base = base.substr(0, base.rfind('.'));
+
+    auto read = modal::core::readSongFile(std::string{MODAL_FIXTURE_DIR} + "/takes.modal");
+    REQUIRE(read.song);
+    modal::core::Document document{std::move(*read.song)};
+    CommandRegistry registry;
+    Workspace view{registry, document};
+    view.resize(window->pixelWidth(), window->pixelHeight(), window->cellSize());
+    const auto type = [&](std::u32string_view keys)
+    {
+        for (const char32_t key : keys)
+            view.handle(Key::typed(key), 0);
+    };
+    const auto save = [&](std::string_view name)
+    {
+        for (const std::string_view theme : {"darker", "dark", "light"})
+        {
+            window->draw(view.frame(), *builtInTheme(theme));
+            CHECK(window->saveFrame(base + std::string{name} + "-" + std::string{theme} + ".bmp"));
+        }
+    };
+    view.run("view-arrangement", 0);
+    type(U"ggK"); // Keys, its lanes expanded
+    save("-take-lanes-arrangement");
+    view.run("view-piano-roll", 0); // the lanes follow the track
+    save("-take-lanes-piano");
+}
