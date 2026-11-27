@@ -4,6 +4,7 @@
 #include <modal/core/takes.hpp>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <charconv>
@@ -137,8 +138,10 @@ TrackContent contentBetween(const TrackContent& content, Tick from, Tick to)
     return result;
 }
 
-// Rejoins pieces of one take and renumbers other colliding IDs together with their choices.
-void joinTakes(TrackContent& content, const TrackContent& after, Tick at)
+// Rejoins pieces of one take. Takes are numbered across the song, so two different takes can
+// only share a number in a song written before that (decided 27 November 2026); such a take
+// gets a new number from the song's count, `next`, together with its choices.
+void joinTakes(TrackContent& content, const TrackContent& after, Tick at, std::uint32_t& next)
 {
     std::map<std::uint32_t, std::uint32_t> ids;
     for (const auto& take : after.takes)
@@ -159,14 +162,7 @@ void joinTakes(TrackContent& content, const TrackContent& after, Tick at)
         Take moved = take;
         if (content.take(take.id) != nullptr)
         {
-            moved.id = std::max(content.nextTakeId(), after.nextTakeId());
-            while (content.take(moved.id) || after.take(moved.id))
-            {
-                if (++moved.id == 0)
-                {
-                    ++moved.id;
-                }
-            }
+            moved.id = next++;
             ids[take.id] = moved.id;
         }
         moved.from += at;
@@ -224,23 +220,14 @@ const Take* TrackContent::take(std::uint32_t id) const
     return it == takes.end() ? nullptr : &*it;
 }
 
-std::uint32_t TrackContent::nextTakeId() const
+std::uint8_t newTakeColour(std::span<const Take> takes)
 {
-    std::uint32_t highest = 0;
+    std::array<std::size_t, kTakeColours> used{};
     for (const auto& take : takes)
     {
-        highest = std::max(highest, take.id);
+        ++used[take.colour % kTakeColours];
     }
-    if (highest != std::numeric_limits<std::uint32_t>::max())
-    {
-        return highest + 1;
-    }
-    std::uint32_t available = 1;
-    while (take(available))
-    {
-        ++available;
-    }
-    return available;
+    return static_cast<std::uint8_t>(std::ranges::min_element(used) - used.begin());
 }
 
 bool TrackContent::validTakes(Tick sectionLength) const
@@ -366,6 +353,13 @@ Song::Song(Ppqn ppqn, std::vector<Track> tracks, std::vector<Section> sections)
     for (auto& section : sections)
     {
         assert(section.meter_.ppqn() == ppqn);
+        for (const auto& [id, content] : section.content_)
+        {
+            for (const auto& take : content->takes)
+            {
+                nextTakeId_ = std::max(nextTakeId_, take.id + 1);
+            }
+        }
         sections_.push_back(std::make_shared<const Section>(std::move(section)));
     }
     rebuildAll();
@@ -385,6 +379,7 @@ Song::Song(Parts parts)
     , tracks_(std::move(parts.tracks))
     , sections_(std::move(parts.sections))
     , nextTrackId_(parts.nextTrackId)
+    , nextTakeId_(parts.nextTakeId)
     , identity_(parts.identity)
     , tempo_(parts.ppqn)
     , meter_(parts.ppqn)
@@ -395,9 +390,9 @@ Song::Song(Parts parts)
 
 Song::Parts Song::parts() const
 {
-    return {ppqn(),     title,        metronome, countIn, playbackLeadIn, repeatPlaybackLeadIn,
-            recordMode, punch,        punchOn,   loop,    loopOn,         tracks_,
-            sections_,  nextTrackId_, identity_};
+    return {ppqn(),     title,        metronome,   countIn,  playbackLeadIn, repeatPlaybackLeadIn,
+            recordMode, punch,        punchOn,     loop,     loopOn,         tracks_,
+            sections_,  nextTrackId_, nextTakeId_, identity_};
 }
 
 bool operator==(const Song& a, const Song& b)
@@ -817,6 +812,9 @@ bool Song::insertSections(std::size_t index,
                           std::span<const std::shared_ptr<const Section>> sections)
 {
     index = std::min(index, sections_.size());
+    // A copy's takes are takes of their own, with new numbers, so each copy of a performance
+    // can be edited apart (decided 27 November 2026); the pieces of one take keep one number.
+    std::map<std::pair<TrackId, std::uint32_t>, std::uint32_t> renumbered;
     for (const auto& section : sections)
     {
         auto copy = std::make_shared<Section>(*section);
@@ -829,6 +827,35 @@ bool Song::insertSections(std::size_t index,
                           return std::ranges::none_of(tracks_, [&](const auto& track)
                                                       { return track->id() == entry.first; });
                       });
+        for (auto& [track, content] : copy->content_)
+        {
+            if (content->takes.empty())
+            {
+                continue;
+            }
+            auto changed = *content;
+            const auto number = [&](std::uint32_t old)
+            {
+                const auto [it, added] = renumbered.try_emplace({track, old}, 0);
+                if (added)
+                {
+                    it->second = newTakeId();
+                }
+                return it->second;
+            };
+            for (auto& take : changed.takes)
+            {
+                take.id = number(take.id);
+            }
+            for (auto& range : changed.comp)
+            {
+                if (range.take != 0)
+                {
+                    range.take = number(range.take);
+                }
+            }
+            content = std::make_shared<const TrackContent>(std::move(changed));
+        }
         sections_.insert(sections_.begin() + static_cast<std::ptrdiff_t>(index++), std::move(copy));
     }
     if (sections.empty())
@@ -1075,7 +1102,7 @@ bool Song::joinSections(std::size_t index)
         content.meter.reset();
         if (after)
         {
-            joinTakes(content, *after, at);
+            joinTakes(content, *after, at, nextTakeId_);
             for (auto ramp : after->ramps)
             {
                 ramp.start += at;
@@ -1640,6 +1667,16 @@ void Song::addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded
     {
         return;
     }
+    // The pass's piece in each section where it captures or replaces MIDI.
+    struct Piece
+    {
+        std::size_t section;
+        Tick from;
+        Tick to;
+        EventList played;
+        std::optional<std::uint32_t> base; // the number for what was there, if it's no take yet
+    };
+    std::vector<Piece> pieces;
     for (std::size_t section = sectionAt(from); section < sections_.size(); ++section)
     {
         const Tick start = starts_[section];
@@ -1660,19 +1697,52 @@ void Song::addRecordedTake(TrackId id, Tick from, Tick to, std::int64_t recorded
             event.tick -= start;
             played.insert(std::move(event));
         }
-        updateContent(section, id,
+        pieces.push_back({section, first - start, last - start, std::move(played), std::nullopt});
+    }
+    // What was there is numbered before the pass, being older, and the pass's pieces share one
+    // number (decided 27 November 2026).
+    for (auto& piece : pieces)
+    {
+        const auto* part = sections_[piece.section]->content(id);
+        if (part && part->takes.empty() && !part->events.empty())
+        {
+            piece.base = newTakeId();
+        }
+    }
+    const auto take = pieces.empty() ? 0 : newTakeId();
+    // One colour for the whole pass, the first none of the parts it goes into has, so it looks
+    // the same in each section. What was there becomes a part's first take, in the first colour.
+    std::vector<Take> beside; // their colours alone
+    for (const auto& piece : pieces)
+    {
+        if (piece.base)
+        {
+            beside.emplace_back();
+        }
+        else if (const auto* part = sections_[piece.section]->content(id))
+        {
+            for (const auto& other : part->takes)
+            {
+                beside.emplace_back().colour = other.colour;
+            }
+        }
+    }
+    const auto colour = newTakeColour(beside);
+    for (auto& piece : pieces)
+    {
+        updateContent(piece.section, id,
                       [&](TrackContent& part)
                       {
-                          if (part.takes.empty() && !part.events.empty())
+                          if (piece.base)
                           {
-                              part.takes.push_back(
-                                  {1, 0, sections_[section]->length_, 0, std::move(part.events)});
+                              part.takes.push_back({*piece.base, 0,
+                                                    sections_[piece.section]->length_, 0,
+                                                    std::move(part.events), 0});
                               part.events = {};
                           }
-                          const auto take = part.nextTakeId();
-                          part.takes.push_back(
-                              {take, first - start, last - start, recorded, std::move(played)});
-                          assignTake(part, {first - start, last - start, take});
+                          part.takes.push_back({take, piece.from, piece.to, recorded,
+                                                std::move(piece.played), colour});
+                          assignTake(part, {piece.from, piece.to, take});
                       });
     }
     rebuildEvents(index);
@@ -1928,6 +1998,12 @@ void Song::updateContent(std::size_t index, TrackId id,
     const auto* old = sections_[index]->content(id);
     TrackContent content = old ? *old : TrackContent{};
     edit(content);
+    // A take put in directly, as a test or a reader may, still keeps its number from being used
+    // again.
+    for (const auto& take : content.takes)
+    {
+        nextTakeId_ = std::max(nextTakeId_, take.id + 1);
+    }
     const bool empty = content.empty();
     if (old ? content == *old : empty)
     {

@@ -274,6 +274,7 @@ private:
     Stage stage_ = Stage::Version;
     Ppqn ppqn_ = kPpqn;
     std::string title_;
+    std::uint32_t nextTake_ = 1;
     MetronomeSettings metronome_;
     CountInSettings countIn_;
     CountInSettings playbackLeadIn_ = kDefaultPlaybackLeadIn;
@@ -341,6 +342,7 @@ SongReadResult Reader::read(std::string_view text)
     }
     result.song.emplace(ppqn_, std::move(tracks_), std::move(sections_));
     result.song->title = std::move(title_);
+    result.song->reserveTakeIds(nextTake_);
     result.song->metronome = std::move(metronome_);
     result.song->countIn = countIn_;
     result.song->playbackLeadIn = playbackLeadIn_;
@@ -462,6 +464,16 @@ bool Reader::readSong(std::span<const Token> tokens)
     for (const auto& token : tokens.subspan(2))
     {
         const auto [name, value] = settingOf(token);
+        if (name == "next-take" && value)
+        {
+            const auto next = parseInteger(*value, 1, std::numeric_limits<std::uint32_t>::max());
+            if (!next)
+            {
+                return fail("next-take is the number the next take gets, from 1");
+            }
+            nextTake_ = static_cast<std::uint32_t>(*next);
+            continue;
+        }
         if (name != "ppqn" || !value)
         {
             return fail("unknown song setting \"" + token.text + "\"");
@@ -1235,9 +1247,10 @@ bool Reader::readTake(std::span<const Token> tokens)
     {
         return fail("takes come before comp ranges");
     }
-    if (tokens.size() < 4 || tokens.size() > 5)
+    if (tokens.size() < 4 || tokens.size() > 6)
     {
-        return fail("a take is a number and its span, as take 2 5:1:0 7:1:0 recorded=1764000000");
+        return fail("a take is a number and its span, as take 2 5:1:0 7:1:0 recorded=1764000000 "
+                    "colour=2");
     }
     const auto id = parseInteger(tokens[1].text, 1, std::numeric_limits<std::uint32_t>::max());
     if (!id)
@@ -1264,19 +1277,38 @@ bool Reader::readTake(std::span<const Token> tokens)
     }
     take.from = *from;
     take.to = *to;
-    if (span.size() == 3)
+    bool coloured = false;
+    for (const auto& token : span.subspan(2))
     {
-        if (!span[2].text.starts_with("recorded="))
+        const auto [name, value] = settingOf(token);
+        if (name == "recorded" && value)
         {
-            return fail("unknown take setting \"" + span[2].text + "\"");
+            const auto recorded = parseInteger(*value, 0, std::numeric_limits<std::int64_t>::max());
+            if (!recorded)
+            {
+                return fail("a take's recorded= is seconds since 1970");
+            }
+            take.recorded = *recorded;
         }
-        const auto recorded = parseInteger(std::string_view{span[2].text}.substr(9), 0,
-                                           std::numeric_limits<std::int64_t>::max());
-        if (!recorded)
+        else if (name == "colour" && value)
         {
-            return fail("a take's recorded= is seconds since 1970");
+            const auto colour = parseInteger(*value, 1, kTakeColours);
+            if (!colour)
+            {
+                return fail("a take's colour= is from 1 to " + std::to_string(kTakeColours));
+            }
+            take.colour = static_cast<std::uint8_t>(*colour - 1);
+            coloured = true;
         }
-        take.recorded = *recorded;
+        else
+        {
+            return fail("unknown take setting \"" + token.text + "\"");
+        }
+    }
+    // A take saved without its colour gets the one it would have had if made now.
+    if (!coloured)
+    {
+        take.colour = newTakeColour(block_->takes);
     }
     block_->takes.push_back(std::move(take));
     return true;
@@ -1920,6 +1952,7 @@ std::optional<Song> rescaled(const Song& song, Ppqn to, std::string& error)
     }
     Song result{to, std::move(tracks), std::move(sections)};
     result.title = song.title;
+    result.reserveTakeIds(song.nextTakeId());
     result.metronome = song.metronome;
     result.countIn = song.countIn;
     result.playbackLeadIn = song.playbackLeadIn;
@@ -1968,7 +2001,8 @@ std::string writeSong(const Song& song)
                                                            });
                             });
     line(0, "modal-song " + std::to_string(hasTakes ? kVersion : kPlainVersion));
-    line(0, "song " + quotedText(song.title) + " ppqn=" + std::to_string(ppqn.value));
+    line(0, "song " + quotedText(song.title) + " ppqn=" + std::to_string(ppqn.value) +
+                (song.nextTakeId() > 1 ? " next-take=" + std::to_string(song.nextTakeId()) : ""));
 
     const auto& metronome = song.metronome;
     std::string metronomeLine =
@@ -2218,6 +2252,7 @@ std::string writeSong(const Song& song)
                 {
                     takeText += " recorded=" + std::to_string(take.recorded);
                 }
+                takeText += " colour=" + std::to_string(take.colour + 1);
                 line(2, takeText);
                 for (const auto& event : take.events.all())
                 {

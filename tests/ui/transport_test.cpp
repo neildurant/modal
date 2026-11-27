@@ -3002,16 +3002,16 @@ TEST_CASE("the take keys choose among a section's stack in order")
     REQUIRE(pitches() == std::vector{64});
 
     p.type(U"[t");
-    CHECK(p.ws.message() == "Take 2 of 3 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 2 (3 takes) on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{60});
     p.type(U"[t");
-    CHECK(p.ws.message() == "Take 1 of 3 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 1 (3 takes) on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{50});
     p.type(U"[t"); // round to the last
-    CHECK(p.ws.message() == "Take 3 of 3 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 3 (3 takes) on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{64});
     p.type(U"2]t"); // round past Take 1
-    CHECK(p.ws.message() == "Take 2 of 3 on Keys in A, bars 1–2");
+    CHECK(p.ws.message() == "Take 2 (3 takes) on Keys in A, bars 1–2");
     CHECK(pitches() == std::vector{60});
 
     // Each choice an undo step.
@@ -3076,9 +3076,9 @@ TEST_CASE("discarding takes repeatedly refreshes the event list before drawing")
     REQUIRE(song.updatePart(0, keys,
                             [&](core::TrackContent& part)
                             {
-                                core::Take earlier{1, bar, to, 1, {}};
+                                core::Take earlier{1, bar, to, 1, {}, 0};
                                 earlier.events.insert({bar, core::Note{71, 90, beat}});
-                                core::Take later{2, bar, to, 2, {}};
+                                core::Take later{2, bar, to, 2, {}, 1};
                                 later.events.insert({bar, core::Note{72, 90, beat}});
                                 later.events.insert({bar + beat, core::Note{69, 90, beat}});
                                 part.takes = {earlier, later};
@@ -3128,9 +3128,9 @@ TEST_CASE("musical views show active takes, including a silent punch")
     REQUIRE(song.updatePart(0, track,
                             [&](core::TrackContent& part)
                             {
-                                core::Take first{1, 0, 2 * bar, 1, {}};
+                                core::Take first{1, 0, 2 * bar, 1, {}, 0};
                                 first.events.insert({0, core::Note{60, 90, ppqn.quarter()}});
-                                part.takes = {first, {2, bar, 2 * bar, 2, {}}};
+                                part.takes = {first, {2, bar, 2 * bar, 2, {}, 1}};
                             }));
     Playing p{std::move(song)};
     p.ws.resize(112 * kCell.width, 28 * kCell.height, kCell);
@@ -3226,8 +3226,8 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     REQUIRE(song.updatePart(0, track,
                             [&](core::TrackContent& part)
                             {
-                                core::Take first{1, 0, 2 * bar, 1, {}};
-                                core::Take second{2, 0, 2 * bar, 2, {}};
+                                core::Take first{1, 0, 2 * bar, 1, {}, 0};
+                                core::Take second{2, 0, 2 * bar, 2, {}, 1};
                                 for (const auto tick : {core::Tick{0}, beat, bar, bar + beat})
                                 {
                                     first.events.insert({tick, core::Note{60, 90, beat}});
@@ -3316,6 +3316,44 @@ TEST_CASE("the take chooser previews and applies only the chosen time in both vi
     CHECK_FALSE(showsLanes());
 }
 
+TEST_CASE("takes are labelled by their numbers across the song, gaps and all")
+{
+    const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
+    auto song = punchSong(ppqn);
+    const auto track = song.tracks()[0]->id();
+    const auto bar = ppqn.whole();
+    REQUIRE(song.updatePart(0, track,
+                            [&](core::TrackContent& part)
+                            {
+                                core::Take early{4, 0, 2 * bar, 1, {}, 0};
+                                early.events.insert({0, core::Note{60, 90, ppqn.quarter()}});
+                                core::Take late{9, 0, 2 * bar, 2, {}, 1};
+                                late.events.insert({0, core::Note{64, 90, ppqn.quarter()}});
+                                part.takes = {early, late};
+                            }));
+    Playing p{std::move(song)};
+    p.ws.resize(112 * kCell.width, 28 * kCell.height, kCell);
+    const auto shows = [&](std::u32string_view text, Role colour)
+    {
+        return std::ranges::any_of(
+            p.ws.frame(),
+            [&](const Region& region)
+            {
+                return std::ranges::any_of(
+                    region.text, [&](const TextRun& run)
+                    { return run.text == text && run.style.foreground == colour; });
+            });
+    };
+
+    p.type(U"gaK");
+    CHECK(shows(U"T4", Role::Take1));
+    CHECK(shows(U"T9", Role::Take2));
+    p.type(U"[t");
+    CHECK(p.ws.message() == "Take 4 (2 takes) on Keys in A, bars 1–2");
+    p.type(U"[t");
+    CHECK(p.ws.message() == "Take 9 (2 takes) on Keys in A, bars 1–2");
+}
+
 TEST_CASE("arrangement take lanes belong to tracks and keep their rows while navigating")
 {
     const auto ppqn = GENERATE(core::kPpqn, core::Ppqn{96});
@@ -3337,7 +3375,7 @@ TEST_CASE("arrangement take lanes belong to tracks and keep their rows while nav
         {
             if (std::ranges::any_of(
                     region.text, [](const TextRun& run)
-                    { return run.text == U"T1" && run.style.foreground == Role::Take1; }))
+                    { return run.text.starts_with(U"T") && run.style.foreground == Role::Take1; }))
                 y.push_back(region.bounds.y);
         }
         return y;

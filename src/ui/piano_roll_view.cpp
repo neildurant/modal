@@ -5806,10 +5806,9 @@ void PianoRollView::addBars(Frame& frame, const Page& p) const
             const auto take = std::ranges::find(part->takes, source, &core::Take::id);
             const auto nameWidth = static_cast<int>(decodeUtf8(left.front().value).size());
             const bool compact = width_ / cell_.width < 92 + nameWidth;
-            const auto target =
-                take == part->takes.end()
-                    ? std::string{"Part"}
-                    : (compact ? "T" : "Take ") + std::to_string(take - part->takes.begin() + 1);
+            const auto target = take == part->takes.end()
+                                    ? std::string{"Part"}
+                                    : (compact ? "T" : "Take ") + std::to_string(take->id);
             // Keep the edit destination visible when the header is too narrow for the track's
             // full name and routing as well.
             left[1].drop = kDropSection;      // channel

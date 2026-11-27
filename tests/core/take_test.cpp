@@ -2,6 +2,7 @@
 
 #include "support/ppqn.hpp"
 
+#include <modal/core/document.hpp>
 #include <modal/core/playback_plan.hpp>
 #include <modal/core/smf.hpp>
 #include <modal/core/song.hpp>
@@ -11,6 +12,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -92,7 +95,7 @@ TEST_CASE("a track's part keeps its takes and derives the source from the active
     REQUIRE(t.part().takes.size() == 2);
     CHECK(t.part().take(2)->recorded == 2000);
     CHECK(t.part().take(3) == nullptr);
-    CHECK(t.part().nextTakeId() == 3);
+    CHECK(t.song.nextTakeId() == 3);
     CHECK(t.tags() == Tags{{0, 0}, {2, 2}, {3, 2}, {4, 2}});
 
     SECTION("a put into the underlying part gets its source from the destination")
@@ -212,9 +215,10 @@ TEST_CASE("take stacks and active ranges round trip without event tags")
                               { assignTake(part, {3 * t.bar, 4 * t.bar, 1}); }));
     const auto text = writeSong(t.song);
     CHECK(text.starts_with("modal-song 2\n"));
-    CHECK(text.find("take=") == std::string::npos);
-    CHECK(text.find("    take 1 3:1:0 6:1:0 recorded=1000\n      3:1:0 note D3 v=100 len=1/4\n") !=
-          std::string::npos);
+    CHECK(text.find(" take=") == std::string::npos);
+    CHECK(text.find(" ppqn=" + std::to_string(ppqn.value) + " next-take=3\n") != std::string::npos);
+    CHECK(text.find("    take 1 3:1:0 6:1:0 recorded=1000 colour=1\n"
+                    "      3:1:0 note D3 v=100 len=1/4\n") != std::string::npos);
     CHECK(text.find("    comp 1 4:1:0 5:1:0\n") != std::string::npos);
     CHECK(t.tags() == Tags{{0, 0}, {2, 2}, {3, 1}, {4, 2}});
     const auto visible = activeTakeRanges(t.part(), t.bar, 6 * t.bar);
@@ -238,7 +242,7 @@ TEST_CASE("takes are rescaled with the song")
                               [&](TrackContent& part)
                               {
                                   const auto end = t.song.end();
-                                  Take last{3, end - 1, end, 0, {}};
+                                  Take last{3, end - 1, end, 0, {}, 2};
                                   last.events.insert({end - 1, ControlChange{11, 90}});
                                   part.takes.push_back(std::move(last));
                               }));
@@ -421,4 +425,225 @@ TEST_CASE("discarding a take clears its whole performance and chooses a neighbou
         CHECK(t.tags() == Tags{{0, 0}});
         CHECK_FALSE(discardTake(t.song, 0, t.track, 2).done);
     }
+}
+
+namespace
+{
+
+// Eight bars over two sections of four, Verse and Chorus, with a track, Keys.
+struct TwoSections
+{
+    explicit TwoSections(Ppqn ppqn)
+        : song{ppqn}
+        , bar{ppqn.whole()}
+        , track{song.addTrack("Keys")}
+    {
+        REQUIRE(song.splitSection(4 * bar, "Chorus"));
+        REQUIRE(song.renameSection(0, "Verse"));
+    }
+
+    Note note(int pitch) const { return Note{static_cast<std::uint8_t>(pitch), 100, bar / 4}; }
+
+    // A replace pass with a note at the start of each of its bars.
+    void record(Song& into, Tick from, Tick to, int pitch, std::int64_t recorded) const
+    {
+        EventList played;
+        for (Tick at = from; at < to; at += bar)
+        {
+            played.insert({at, note(pitch)});
+        }
+        into.addRecordedTake(track, from, to, recorded, played);
+    }
+
+    const TrackContent& part(const Song& in, std::size_t section) const
+    {
+        const auto* content = in.sections()[section]->content(track);
+        REQUIRE(content != nullptr);
+        return *content;
+    }
+
+    std::vector<std::uint32_t> ids(const Song& in, std::size_t section) const
+    {
+        std::vector<std::uint32_t> found;
+        for (const auto& take : part(in, section).takes)
+        {
+            found.push_back(take.id);
+        }
+        return found;
+    }
+
+    std::vector<int> colours(const Song& in, std::size_t section) const
+    {
+        std::vector<int> found;
+        for (const auto& take : part(in, section).takes)
+        {
+            found.push_back(take.colour);
+        }
+        return found;
+    }
+
+    Song song;
+    Tick bar;
+    TrackId track;
+};
+
+using Ids = std::vector<std::uint32_t>;
+using Colours = std::vector<int>;
+
+} // namespace
+
+TEST_CASE("a pass across sections is one take, numbered after what it replaced")
+{
+    TwoSections t{MODAL_ANY_PPQN()};
+    // Entered by hand in the Verse, under the pass; the Chorus has nothing before it.
+    REQUIRE(t.song.updateEvents(t.track, [&](EventList& events)
+                                { events.insert({2 * t.bar, t.note(50)}); }));
+    t.record(t.song, 2 * t.bar, 6 * t.bar, 60, 1000);
+
+    CHECK(t.ids(t.song, 0) == Ids{1, 2});
+    CHECK(t.ids(t.song, 1) == Ids{2});
+    CHECK(t.part(t.song, 1).takes[0].recorded == 1000);
+    // One colour for the pass in both sections, after the first take's.
+    CHECK(t.colours(t.song, 0) == Colours{0, 1});
+    CHECK(t.colours(t.song, 1) == Colours{1});
+    CHECK(t.song.nextTakeId() == 3);
+
+    SECTION("joining the sections puts the pass back together")
+    {
+        REQUIRE(t.song.joinSections(0));
+        CHECK(t.ids(t.song, 0) == Ids{1, 2});
+        CHECK(t.part(t.song, 0).takes[1].from == 2 * t.bar);
+        CHECK(t.part(t.song, 0).takes[1].to == 6 * t.bar);
+        CHECK(t.song.nextTakeId() == 3);
+    }
+}
+
+TEST_CASE("take numbers are never used again, even after undo")
+{
+    TwoSections t{MODAL_ANY_PPQN()};
+    Document document{t.song};
+    const auto record = [&](int pitch)
+    {
+        REQUIRE(document.edit("Record", {},
+                              [&](Song& song) { t.record(song, 0, 2 * t.bar, pitch, 1000); }));
+    };
+    record(60);
+    record(62);
+    CHECK(t.ids(document.song(), 0) == Ids{1, 2});
+
+    REQUIRE(document.undo());
+    CHECK(t.ids(document.song(), 0) == Ids{1});
+    record(64);
+    CHECK(t.ids(document.song(), 0) == Ids{1, 3});
+
+    REQUIRE(document.undo());
+    REQUIRE(document.undo());
+    CHECK(document.song().nextTakeId() == 4);
+    record(65);
+    CHECK(t.ids(document.song(), 0) == Ids{4});
+
+    SECTION("nor after saving and reading the song again")
+    {
+        REQUIRE(document.edit("Discard", {},
+                              [&](Song& song) { REQUIRE(discardTake(song, 0, t.track, 4).done); }));
+        const auto text = writeSong(document.song());
+        CHECK(text.find(" next-take=5\n") != std::string::npos);
+        const auto read = readSong(text, document.song().ppqn());
+        REQUIRE(read.song);
+        CHECK(read.song->nextTakeId() == 5);
+    }
+}
+
+TEST_CASE("copied sections get new take numbers, the pieces of a take sharing one")
+{
+    TwoSections t{MODAL_ANY_PPQN()};
+    REQUIRE(t.song.updateEvents(t.track, [&](EventList& events)
+                                { events.insert({2 * t.bar, t.note(50)}); }));
+    t.record(t.song, 2 * t.bar, 6 * t.bar, 60, 1000);
+    REQUIRE(t.song.updatePart(0, t.track, [&](TrackContent& part)
+                              { assignTake(part, {3 * t.bar, 4 * t.bar, 1}); }));
+    const auto original = t.song.sections()[0];
+
+    const std::vector copied(t.song.sections().begin(), t.song.sections().end());
+    REQUIRE(t.song.insertSections(2, copied));
+    CHECK(t.ids(t.song, 2) == Ids{3, 4});
+    CHECK(t.ids(t.song, 3) == Ids{4});
+    CHECK(t.part(t.song, 2).comp ==
+          std::vector{TakeRange{2 * t.bar, 3 * t.bar, 4}, TakeRange{3 * t.bar, 4 * t.bar, 3}});
+    CHECK(t.part(t.song, 3).comp == std::vector{TakeRange{0, 2 * t.bar, 4}});
+    CHECK(t.colours(t.song, 2) == t.colours(t.song, 0));
+    CHECK(t.song.nextTakeId() == 5);
+    // The originals are as they were.
+    CHECK(t.song.sections()[0] == original);
+    CHECK(t.ids(t.song, 1) == Ids{2});
+}
+
+TEST_CASE("a take keeps its colour as others go, and a new one takes the free colour")
+{
+    TwoSections t{MODAL_ANY_PPQN()};
+    t.record(t.song, 0, 2 * t.bar, 60, 1000);
+    t.record(t.song, 0, 2 * t.bar, 62, 2000);
+    t.record(t.song, 0, 2 * t.bar, 64, 3000);
+    CHECK(t.ids(t.song, 0) == Ids{1, 2, 3});
+    CHECK(t.colours(t.song, 0) == Colours{0, 1, 2});
+
+    REQUIRE(discardTake(t.song, 0, t.track, 2).done);
+    CHECK(t.colours(t.song, 0) == Colours{0, 2});
+    t.record(t.song, 0, 2 * t.bar, 65, 4000);
+    CHECK(t.ids(t.song, 0) == Ids{1, 3, 4});
+    CHECK(t.colours(t.song, 0) == Colours{0, 2, 1});
+
+    SECTION("saved with the song")
+    {
+        const auto text = writeSong(t.song);
+        CHECK(text.find("take 4 1:1:0 3:1:0 recorded=4000 colour=2\n") != std::string::npos);
+        const auto read = readSong(text, t.song.ppqn());
+        REQUIRE(read.song);
+        CHECK(t.colours(*read.song, 0) == Colours{0, 2, 1});
+    }
+    SECTION("or, saved without them, given as if made in order")
+    {
+        auto text = writeSong(t.song);
+        for (const auto* colour : {" colour=1", " colour=2", " colour=3"})
+        {
+            for (auto at = text.find(colour); at != std::string::npos; at = text.find(colour))
+            {
+                text.erase(at, std::string_view{colour}.size());
+            }
+        }
+        const auto read = readSong(text, t.song.ppqn());
+        REQUIRE(read.song);
+        CHECK(t.colours(*read.song, 0) == Colours{0, 1, 2});
+    }
+    SECTION("a colour that isn't one is refused")
+    {
+        auto text = writeSong(t.song);
+        const auto at = text.find("colour=2");
+        REQUIRE(at != std::string::npos);
+        text.replace(at, 8, "colour=5");
+        CHECK_FALSE(readSong(text, t.song.ppqn()).song);
+    }
+}
+
+TEST_CASE("the take trial fixture reads, its numbers gaps and all")
+{
+    std::ifstream file{std::string{MODAL_FIXTURE_DIR} + "/takes.modal", std::ios::binary};
+    REQUIRE(file);
+    const std::string text{std::istreambuf_iterator<char>{file}, {}};
+    const auto read = readSong(text, kPpqn);
+    REQUIRE(read.song);
+    CHECK(read.song->nextTakeId() == 13);
+    const auto ids = [&](std::size_t track)
+    {
+        std::vector<std::uint32_t> found;
+        const auto* part = read.song->sections()[0]->content(read.song->tracks()[track]->id());
+        REQUIRE(part);
+        for (const auto& take : part->takes)
+        {
+            found.push_back(take.id);
+        }
+        return found;
+    };
+    CHECK(ids(0) == std::vector<std::uint32_t>{3, 5, 8});
+    CHECK(ids(1) == std::vector<std::uint32_t>{11});
 }

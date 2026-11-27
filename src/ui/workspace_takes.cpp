@@ -298,7 +298,7 @@ CommandResult Workspace::stepTake(int count, bool forward)
     at = ((at + (forward ? steps : -steps)) % size + size) % size;
     const auto& chosen = takes[static_cast<std::size_t>(at)];
 
-    const auto number = std::to_string(at + 1);
+    const auto number = std::to_string(chosen.id);
     const auto where = " on " + name + " in " + section.name();
     const auto title = "Choose take " + number + where;
     const auto start = song.sectionStart(index);
@@ -309,7 +309,9 @@ CommandResult Workspace::stepTake(int count, bool forward)
     {
         refresh();
     }
-    const auto message = "Take " + number + " of " + std::to_string(size) + where + ", " + span;
+    // Numbered across the song, so its number says nothing of how many there are here.
+    const auto message = "Take " + number + " (" + std::to_string(size) +
+                         (size == 1 ? " take)" : " takes)") + where + ", " + span;
     return {true, message};
 }
 

@@ -501,12 +501,15 @@ accepting the result.
 
 ## Seeing which take plays {#sec-showing-takes}
 
-Replace recordings keep alternate performances as numbered takes. Each take
-belongs to one track in one section, with numbering local to that pair.
-A recording across a section boundary
-creates a separate take in each section where it records or replaces MIDI.
-The section strip counts those stored takes across its tracks, including
-takes that are currently silent.
+Replace recordings keep alternate performances as numbered takes. The
+numbers count across the whole song and are never used again, so a take you
+remember as "take 9" keeps its number, and its colour, however many others
+come and go. Gaps are normal: one part might hold takes 4, 9 and 12. A
+recording across a section boundary is one take, with a piece in each
+section where it records or replaces MIDI, and each piece is chosen on its
+own. Copying a section gives its takes new numbers, so each copy can then be
+edited differently. The section strip counts the stored takes across its
+tracks, including takes that are currently silent.
 
 For example, if a two-bar punch replaces the end of an earlier phrase, the
 arrangement and piano-roll ruler show the earlier take up to the punch and

@@ -24,10 +24,16 @@
 namespace modal::ui
 {
 
-Role takeColour(std::uint32_t id)
+Role takeColour(const core::Take& take)
 {
     constexpr std::array colours{Role::Take1, Role::Take2, Role::Take3, Role::Take4};
-    return colours[(id - 1) % colours.size()];
+    static_assert(colours.size() == core::kTakeColours);
+    return colours[take.colour % colours.size()];
+}
+
+std::string takeLabel(const core::Take& take)
+{
+    return "T" + std::to_string(take.id);
 }
 
 int TakeLaneDisplay::rows(int available) const
@@ -69,7 +75,7 @@ Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, C
     for (std::size_t i = first; i < first + shown; ++i)
     {
         const auto& take = part.takes[i];
-        const auto colour = takeColour(take.id);
+        const auto colour = takeColour(take);
         const int y = static_cast<int>(i - first) * cell.height;
         const int top = y + inset;
         const int height = cell.height - 2 * inset;
@@ -117,7 +123,7 @@ Region takeLanes(const TakeLaneDisplay& display, Rect bounds, TimeScale scale, C
         }
         panel.text.push_back({(indent ? 4 : 1) * cell.width,
                               y,
-                              decodeUtf8("T" + std::to_string(i + 1)),
+                              decodeUtf8(takeLabel(take)),
                               {colour, Role::Background, kBold}});
     }
     if (indent)
@@ -166,11 +172,10 @@ void addTakeBands(Region& region, const core::Song& song, core::TrackId track,
             const int last = std::clamp(scale.toX(start + span.to), first + 1, region.bounds.width);
             const int width = last - first;
             const int left = first + (width > stroke ? stroke : 0);
-            const auto index = static_cast<std::size_t>(take - part->takes.begin());
-            const auto colour = takeColour(take->id);
+            const auto colour = takeColour(*take);
             region.under.push_back({{left, y + inset, last - left, height}, colour, 100});
 
-            const auto text = decodeUtf8("T" + std::to_string(index + 1));
+            const auto text = decodeUtf8(takeLabel(*take));
             if (last - left >= static_cast<int>(text.size()) * cell.width + 2 * stroke)
             {
                 region.text.push_back(

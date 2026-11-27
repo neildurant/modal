@@ -1,5 +1,5 @@
 modal-song 2
-song "Take trial" ppqn=960
+song "Take trial" ppqn=960 next-take=13
 
 track 1 "Keys" ch=1 grid=1/8
 track 2 "Bass" ch=2 grid=1/8
@@ -9,20 +9,20 @@ section "Verse" bars=4
   tempo 1:1:0 100
   track 1
     4:1:0 note C4 v=80 len=1/2
-    take 1 1:1:0 4:1:0
+    take 3 1:1:0 4:1:0 colour=1
       1:1:0 note C4 v=80 len=1/4
       2:1:0 note D4 v=80 len=1/4
       3:1:0 note E4 v=80 len=1/4
-    take 2 1:1:0 4:1:0 recorded=1764095460
+    take 5 1:1:0 4:1:0 recorded=1764095460 colour=2
       1:1:0 note E4 v=90 len=1/4
       2:1:0 note G4 v=90 len=1/4
       3:1:0 note B4 v=90 len=1/4
-    take 3 3:1:0 4:1:0 recorded=1764095520
+    take 8 3:1:0 4:1:0 recorded=1764095520 colour=3
       3:1:0 note C5 v=95 len=1/8
       3:2:0 note A4 v=85 len=1/8
-    comp 2 1:1:0 3:1:0
+    comp 5 1:1:0 3:1:0
   track 2
-    take 1 1:1:0 3:1:0 recorded=1764095580
+    take 11 1:1:0 3:1:0 recorded=1764095580 colour=1
       1:1:0 note C2 v=85 len=1/2
       2:1:0 note G2 v=85 len=1/2
 

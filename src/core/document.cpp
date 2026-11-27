@@ -174,8 +174,9 @@ bool Document::cancelGroup()
         return false;
     }
     auto [parts, id] = groupStarts_.back();
-    // Track IDs are never reused, even for a track added in the group.
+    // Track and take IDs are never reused, even for one added in the group.
     parts.nextTrackId = std::max(parts.nextTrackId, song_.parts().nextTrackId);
+    parts.nextTakeId = std::max(parts.nextTakeId, song_.nextTakeId());
     Song restored{std::move(parts)};
     if (!(restored == song_))
     {
@@ -282,8 +283,9 @@ void Document::record(EditStep step)
 bool Document::restore(std::size_t index)
 {
     auto parts = states_[index].parts;
-    // Track IDs are never reused, even for a track added after undoing the one that had it.
+    // Track and take IDs are never reused, even for one added after undoing the one that had it.
     parts.nextTrackId = std::max(parts.nextTrackId, song_.parts().nextTrackId);
+    parts.nextTakeId = std::max(parts.nextTakeId, song_.nextTakeId());
     Song restored{std::move(parts)};
     if (!allowed(restored))
     {

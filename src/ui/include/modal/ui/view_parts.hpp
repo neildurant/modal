@@ -224,7 +224,9 @@ void addMarkDot(Region& region, int x, int y, CellSize cell);
 struct TimeScale;
 
 // The same palette entry for a take in each view, even if its displayed number changes.
-Role takeColour(std::uint32_t id);
+// The colour a take shows in, and its label, T and its number.
+Role takeColour(const core::Take& take);
+std::string takeLabel(const core::Take& take);
 
 struct TakeLaneDisplay
 {

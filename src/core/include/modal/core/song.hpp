@@ -10,6 +10,7 @@
 #include <modal/core/tick.hpp>
 #include <modal/core/track.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -58,14 +59,24 @@ struct Mark
 // An editable source in a track's stack, positioned from the section's start.
 struct Take
 {
-    std::uint32_t id = 1; // unique in its part, above zero
+    // Numbered across the song, above zero, and never used again for another take (decided 27
+    // November 2026). The pieces of one pass in different sections share it.
+    std::uint32_t id = 1;
     Tick from = 0;
     Tick to = 0;
     std::int64_t recorded = 0; // when, in seconds since 1970 (UTC); 0 if not known
     EventList events;
+    // Which of the take colours it shows in, below kTakeColours, chosen when it's made and kept,
+    // so it doesn't change as other takes come and go.
+    std::uint8_t colour = 0;
 
     friend bool operator==(const Take&, const Take&) = default;
 };
+
+inline constexpr std::uint8_t kTakeColours = 4;
+
+// The colour for a new take beside these: the first none of them has, or else the least used.
+std::uint8_t newTakeColour(std::span<const Take> takes);
 
 struct TakeRange
 {
@@ -94,8 +105,7 @@ struct TrackContent
 
     // The take of an id, or null.
     const Take* take(std::uint32_t id) const;
-    // An id for a new take: one more than the highest.
-    std::uint32_t nextTakeId() const;
+    std::uint8_t newTakeColour() const { return core::newTakeColour(takes); }
     bool validTakes(Tick sectionLength) const;
 
     friend bool operator==(const TrackContent&, const TrackContent&) = default;
@@ -258,6 +268,13 @@ public:
     // a ramp that would cross a section becomes its events. Refuses a different PPQN, leaving
     // the song unchanged.
     std::optional<TrackId> insertTrack(std::size_t position, const TrackCopy& copy);
+
+    // The number the next take made in the song gets. Take numbers are counted across the song
+    // and never used again, even after undo (decided 27 November 2026). A song made from its
+    // parts starts above the highest take in it.
+    std::uint32_t nextTakeId() const { return nextTakeId_; }
+    // Raises the count, as reading a saved song does; never lowers it.
+    void reserveTakeIds(std::uint32_t next) { nextTakeId_ = std::max(nextTakeId_, next); }
 
     // Sections in order.
     std::span<const std::shared_ptr<const Section>> sections() const { return sections_; }
@@ -503,6 +520,7 @@ public:
         std::vector<std::shared_ptr<const Track>> tracks;
         std::vector<std::shared_ptr<const Section>> sections;
         std::uint64_t nextTrackId;
+        std::uint32_t nextTakeId;
         std::uint64_t identity;
     };
 
@@ -523,6 +541,9 @@ private:
     };
 
     std::size_t indexOf(TrackId id) const;
+
+    // A number for a new take, from the song's count.
+    std::uint32_t newTakeId() { return nextTakeId_++; }
 
     // Shares a track's own events out to the sections, and rebuilds what plays.
     void setSource(std::size_t trackIndex, EventList source);
@@ -556,6 +577,7 @@ private:
     std::vector<std::shared_ptr<const Track>> tracks_;
     std::vector<std::shared_ptr<const Section>> sections_;
     std::uint64_t nextTrackId_ = 1;
+    std::uint32_t nextTakeId_ = 1;
     std::uint64_t identity_ = newIdentity();
 
     // Flattened.

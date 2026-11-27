@@ -1875,7 +1875,7 @@ Region EventListView::listRegion() const
             style.background = Role::Selection;
             grid.fill(0, line, layout_.columns, 1, {U' ', style});
         }
-        std::string takeLabel;
+        std::string takeText;
         if (showTake && !isAdded && !rampPoint && list_.rows()[row].kind == RowKind::Event)
         {
             const auto tick = list_.rows()[row].tick;
@@ -1886,9 +1886,9 @@ Region EventListView::listRegion() const
                 const auto take = std::ranges::find(part->takes, source, &core::Take::id);
                 if (take != part->takes.end())
                 {
-                    takeLabel = "T" + std::to_string(take - part->takes.begin() + 1);
-                    grid.write(at, line, fitted(takeLabel, takeRoom),
-                               {takeColour(take->id), style.background, kPlain});
+                    takeText = takeLabel(*take);
+                    grid.write(at, line, fitted(takeText, takeRoom),
+                               {takeColour(*take), style.background, kPlain});
                 }
             }
         }
@@ -1899,7 +1899,7 @@ Region EventListView::listRegion() const
             const bool runsOn = column == Column::Data && text[Column::Value].empty() &&
                                 text[Column::Length].empty();
             const int room =
-                runsOn ? (takeLabel.empty() ? layout_.columns : at - 1) - x[c] : width[c];
+                runsOn ? (takeText.empty() ? layout_.columns : at - 1) - x[c] : width[c];
             const auto shown = fitted(text.cells[c], room);
             const int start = textX(x[c], width[c], kColumns[c].right, shown);
             const bool inPrompt =
