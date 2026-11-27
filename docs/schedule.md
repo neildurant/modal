@@ -253,7 +253,7 @@ Deliver in this order, building on linear recording:
     - [x] **Done** — Record the agreed stack, editing, join and Bake design and review mock-ups.
     - [x] **Done** — Settle the file model and compatibility. Accept ordinary songs and refuse the old test take format.
     - [x] **Done** — Stack, resolved playback, chase and export with saved songs. See [status.md](status.md).
-    - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Desktop MIDI trial pending. See [status.md](status.md).
+    - [ ] **Doing** — Stack semantics for replace recording and choose, keep and discard. Being replaced by the take model below, whose recording step takes over the pending desktop MIDI trial. See [status.md](status.md).
     - [x] **Done** — Show active ranges and the take being edited.
         - [x] **Done** — Label ranges in the arrangement and piano roll, and show the edit destination in the piano-roll header.
         - [x] **Done** — Add the section-strip count and event-list take column.
@@ -261,7 +261,14 @@ Deliver in this order, building on linear recording:
         - [x] **Done** — Review the lanes, range selection and audition mock-ups.
         - [ ] **Doing** — Show source lanes in both views. Final label colours await desktop review.
         - [x] **Done** — Audition and assign a source over the selected range.
-        - [ ] **To do** — Edit focused takes and copy selections between takes.
+    - [ ] **To do** — The take model agreed 27 November 2026: everything is a take. See [design.md](design.md#take-stacks-and-comping).
+        - [ ] **To do** — Song-wide take numbers that only go up, one per recorded pass across sections, new numbers for copies, and fixed colours.
+        - [ ] **To do** — Every event in a take: implicit takes for entered, imported and read material, the plain file form, and the take display only for comped time.
+        - [ ] **To do** — New material goes to the take playing, a gap extends the take before it, replace makes a take and overdub merges. Desktop MIDI trial, including the one deferred.
+        - [ ] **To do** — None in the chooser, the comp and the file, with entry and overdub under None starting a take.
+        - [ ] **To do** — `, k d` on any take, Restore take and Bake in place, after settling their keys.
+        - [ ] **To do** — Manual updates and validation.
+    - [ ] **To do** — Edit focused takes and copy selections between takes.
     - [ ] **To do** — Review audition and range-choice shortcuts with take lanes visible.
     - [ ] **To do** — Resolve note overlaps, controller values and program changes in the join inspector, with offscreen previews.
     - [ ] **To do** — Bake a comp to a chosen new or existing track.
